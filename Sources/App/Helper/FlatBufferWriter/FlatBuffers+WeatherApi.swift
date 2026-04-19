@@ -990,6 +990,8 @@ extension MultiDomains {
             return .ecmwfIfs04
         case .metno_nordic:
             return .metnoNordic
+        case .geosphere_arome_austria:
+            return .geosphereAromeAustria
         case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
         case .era5, .copernicus_era5:
@@ -1240,6 +1242,9 @@ extension MultiDomains {
             return .ecmwfWam025EnsembleMean
         case .ncep_gefswave025_ensemble_mean:
             return .ncepGefswave025EnsembleMean
+        case .geosphere_seamless:
+            // TODO register in SDK
+            return .geosphereAromeAustria
         }
     }
 }

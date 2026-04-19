@@ -496,12 +496,9 @@ extension GenericDomain {
     }
     
     /// Make a default reader for a single domain with hourly data with cache and deriver
-    func makeDerivedHourly<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, throwOnMissingLocation: Bool) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
+    func makeDerivedHourly<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
         
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            if throwOnMissingLocation {
-                throw ForecastApiError.noDataAvailableForThisLocation
-            }
             return nil
         }
         return VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
@@ -513,12 +510,9 @@ extension GenericDomain {
     }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
-    func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, throwOnMissingLocation: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
+    func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            if throwOnMissingLocation {
-                throw ForecastApiError.noDataAvailableForThisLocation
-            }
             return (nil, nil, nil, nil)
         }
         let hourly = VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
@@ -619,7 +613,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             return .two(.raw(temperature), .raw(rh)) { temperature, rh, _ in
                 let dewpoint = zip(temperature.data, rh.data).map(Meteorology.dewpoint)
-                return DataAndUnit(dewpoint, .percentage)
+                return DataAndUnit(dewpoint, .celsius)
             }
         case .cloudcover:
             return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .cloud_cover, level: v.level), isSpread: false))
@@ -810,7 +804,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             return .two(.raw(temperature), .raw(rh)) { temperature, rh, _ in
                 let dewpoint = zip(temperature.data, rh.data).map(Meteorology.dewpoint)
-                return DataAndUnit(dewpoint, .percentage)
+                return DataAndUnit(dewpoint, .celsius)
             }
         case .vapour_pressure_deficit, .vapor_pressure_deficit:
             guard
@@ -876,7 +870,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             if let direct = Reader.variableFromString("direct_radiation") {
                 return .two(.raw(swrad), .raw(direct)) { swrad, direct, _ in
-                    return DataAndUnit(zip(swrad.data, direct.data).map(-), swrad.unit)
+                    return DataAndUnit(zip(swrad.data, direct.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
             return .one(.raw(swrad)) { swrad, time in
@@ -889,7 +883,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             if let diffuse = Reader.variableFromString("diffuse_radiation") {
                 return .two(.raw(swrad), .raw(diffuse)) { swrad, diffuse, _ in
-                    return DataAndUnit(zip(swrad.data, diffuse.data).map(-), swrad.unit)
+                    return DataAndUnit(zip(swrad.data, diffuse.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
             return .one(.raw(swrad)) { swrad, time in

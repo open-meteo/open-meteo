@@ -479,6 +479,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (18.9 * 0.025, 0)
         case .mass_density_8m:
             return (1e9, 0)  // convert kg/m³ to µg/m³
+        case .convective_inhibition:
+            return (-1, 0) // Convert to positive numbers
         default:
             return nil
         }

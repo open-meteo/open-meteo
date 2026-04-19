@@ -143,7 +143,7 @@ final class Curl: Sendable {
                 request.method = method
                 if let user = user, let password = password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if url.contains(".your-objectstorage.com") {
+                    if url.contains(".your-objectstorage.com") || url.contains("s3.open-meteo.com") || url.contains("127.0.0.1:7480") {
                         let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                         try signer.sign(request: &request, body: nil)
                     } else {
@@ -299,7 +299,6 @@ final class Curl: Sendable {
     func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
-        let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
@@ -307,15 +306,13 @@ final class Curl: Sendable {
             // Retry failed file transfers after this point
             do {
                 let lastModified = response.headers.lastModified?.value
-                try FileManager.default.removeItemIfExists(at: fileTemp)
                 let contentLength = try response.contentLength() ?? minSize
                 let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    try await response.body.tracker(tracker).decodeBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
+                    try await response.body.tracker(tracker).decodeBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified, logger: logger)
                 } else {
-                    try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
+                    try await response.body.tracker(tracker).saveTo(file: toFile, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
-                try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
                 totalBytesTransfered.add(tracker.transfered.load(ordering: .relaxed), ordering: .relaxed)
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
@@ -368,12 +365,13 @@ final class Curl: Sendable {
 
 extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file. Buffers up to 1024kb until flushed to disk.
+    /// Uses temporary files and atomic move
     /// Optimised for ZFS recordsize of 1024kb
     /// NOTE: File IO is blocking e.g. synchronous
     /// If `size` is set, the required file size will be prealiocated
     /// If `modificationDate` is set, the files modification date will be set to it
     func saveTo(file: String, size: Int?, modificationDate: Date?, logger: Logger) async throws {
-        let fn = try FileHandle.createNewFile(file: file, size: size)
+        let fn = try FileHandle.createNewFile(file: file, size: size, overwrite: true, temporary: true)
         let recordSize = 1024 * 1024 // 1mb
 
         /// Buffer up to 1024kb and then write larger chunks
@@ -419,7 +417,7 @@ extension AsyncSequence where Element == ByteBuffer {
                 throw CurlError.futimes(error: String(cString: strerror(errno)))
             }
         }
-        return
+        try fn.linkTemporary(file: file)
     }
 }
 

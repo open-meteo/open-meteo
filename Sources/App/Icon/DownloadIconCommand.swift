@@ -153,9 +153,9 @@ struct DownloadIconCommand: AsyncCommand {
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, ensembleMeanDomain: domain.ensembleMeanDomain)
-            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
-            let writer15Min = OmSpatialMultistepWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writer15Min = OmSpatialMultistepWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
@@ -188,6 +188,11 @@ struct DownloadIconCommand: AsyncCommand {
                             continue
                         }
                         if let variable = variable as? IconSurfaceVariable {
+                            if [IconSurfaceVariable.diffuse_radiation, .direct_radiation].contains(variable) {
+                                for i in array2d.data.indices {
+                                    array2d.data[i] = max(array2d.data[i], 0)
+                                }
+                            }
                             if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
                                 await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: array2d)
                                 continue
@@ -229,6 +234,12 @@ struct DownloadIconCommand: AsyncCommand {
                     }
 
                     if let variable = variable as? IconSurfaceVariable {
+                        if [IconSurfaceVariable.diffuse_radiation, .direct_radiation].contains(variable) {
+                            for i in array2d.data.indices {
+                                array2d.data[i] = max(array2d.data[i], 0)
+                            }
+                        }
+                        
                         if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                             continue

@@ -108,8 +108,8 @@ struct MeteoSwissDownload: AsyncCommand {
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
             let rhCalculator = RelativeHumidityCalculator(outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m)
             
-            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             
             try await variables.foreachConcurrent(nConcurrent: 4) { variable in
                 let storagePrecipitation = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
@@ -147,11 +147,11 @@ struct MeteoSwissDownload: AsyncCommand {
                         if variable == .precipitation {
                             await storagePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
-                        /// CIN is set to -1000 for missing data. This is really bad for compression. Typical ranges 0...250. Set it to -1 to mark missing data.
+                        /// CIN is set to -1000 for no convection. Set to 0.
                         if variable == .convective_inhibition {
                             for i in array2d.data.indices {
                                 if array2d.data[i] <= -999 {
-                                    array2d.data[i] = -1
+                                    array2d.data[i] = 0
                                 }
                             }
                         }
@@ -335,8 +335,7 @@ fileprivate extension HTTPClient {
 
 extension OmFileWriter where FileHandle == Foundation.FileHandle {
     static func write<D: OmFileArrayDataTypeProtocol>(file: String, data: [D], scale_factor: Float = 1, add_offset: Float = 0) throws {
-        let temporary = "\(file)~"
-        let writeFn = try FileHandle.createNewFile(file: temporary)
+        let writeFn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         let fileWriter = OmFileWriter(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
         let writer = try fileWriter.prepareArray(
             type: D.self,
@@ -353,7 +352,7 @@ extension OmFileWriter where FileHandle == Foundation.FileHandle {
             children: []
         )
         try fileWriter.writeTrailer(rootVariable: variable)
+        try writeFn.linkTemporary(file: file)
         try writeFn.close()
-        try FileManager.default.moveItem(atPath: temporary, toPath: file)
     }
 }

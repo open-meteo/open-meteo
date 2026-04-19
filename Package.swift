@@ -31,14 +31,14 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.26.0"),
-        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "4de07b5669d41c5ce6269a71a15767a1bf0b3ec2"), // Because unsafe C flags are set, tagged releases cannot be used
+        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "18bee8578d953bd95ad7de1ae688faa7cf421f7c"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/curl-swift.git", from: "1.0.1"),
         //.package(url: "https://github.com/patrick-zippenfenig/SwiftParallelBzip2", from: "0.0.10"), -> code is embedded because linux release build crashes otherwise...
         //.package(url: "/Users/patrick/Documents/curl-swift", branch: "main"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
-        .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
         .package(url: "https://github.com/open-meteo/swift-hdf5.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")

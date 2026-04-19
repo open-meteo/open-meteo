@@ -12,12 +12,14 @@ public final actor ApiKeyManager {
     struct KeyAndLimit: Equatable {
         let key: String.SubSequence
         let limit: Int
+        let id: String.SubSequence?
 
         static func readApiKeys(path: String) -> [KeyAndLimit] {
             return (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: ",").sorted().map {
                 let parts = $0.split(separator: ";")
                 let limit = parts.count <= 1 ? 0 : Int(parts[1]) ?? 0
-                return KeyAndLimit(key: parts[0], limit: limit)
+                let id = parts.count <= 2 ? nil : parts[2]
+                return KeyAndLimit(key: parts[0], limit: limit, id: id)
             } ?? []
         }
     }
@@ -27,25 +29,34 @@ public final actor ApiKeyManager {
             return
         }
         self.apiKeys = KeyAndLimit.readApiKeys(path: apiKeysPath)
-        self.usage = .init(repeating: (0, 0), count: apiKeys.count)
+        self.usage = .init()
+        self.usage.reserveCapacity(apiKeys.count)
     }
 
     var apiKeys = [KeyAndLimit]()
 
-    var usage = [(calls: Int32, weight: Float)]()
+    /// usage per customer id
+    var usage = [String: (calls: Int32, weight: Float)]()
 
     func set(_ keys: [KeyAndLimit]) {
         if self.apiKeys == keys {
             return
         }
         self.apiKeys = keys
-        self.usage = .init(repeating: (0, 0), count: keys.count)
     }
 
     /// Return current API key usage
     func getUsage() -> String {
-        let usage = zip(self.apiKeys, self.usage).sorted { $0.1.weight > $1.1.weight }
+        let usage = self.usage.sorted { $0.1.weight > $1.1.weight }
         return usage[0..<min(10, usage.count)].map { "\($0.0)=\($0.1.calls) (w\($0.1.weight))" }.joined(separator: ", ")
+    }
+    
+    /// Return current usage and reset counter to 0
+    func flushUsage() -> [String: (calls: Int32, weight: Float)] {
+        let usage = self.usage
+        self.usage = .init()
+        self.usage.reserveCapacity(self.apiKeys.count)
+        return usage
     }
 
     func isEmpty() -> Bool {
@@ -57,10 +68,14 @@ public final actor ApiKeyManager {
     }
 
     func increment(apikey: String.SubSequence, weight: Float) {
-        guard let index = apiKeys.firstIndex(where: { $0.key == apikey }) else {
+        guard let id = apiKeys.first(where: { $0.key == apikey })?.id.map(String.init) else {
             return
         }
-        usage[index] = (usage[index].calls + 1, usage[index].weight + weight)
+        guard let used = usage[id] else {
+            usage[id] = (1, weight)
+            return
+        }
+        usage[id] = (used.calls + 1, used.weight + weight)
     }
 
     /// Fetch API keys and update database
@@ -82,7 +97,33 @@ public final actor ApiKeyManager {
         // Set new keys
         await ApiKeyManager.instance.set(keys)
     }
+    
+    /// Upload metered API usage events
+    @Sendable public static func uploadApiKeyMetrics(application: Application) async {
+        guard let apiKey = Environment.get("STRIPE_API_KEY") else {
+            return
+        }
+        let logger = application.logger
+        let events = await Self.instance.flushUsage()
+        guard events.count > 0 else {
+            return
+        }
+        logger.error("API Key Metrics: Getting session to upload \(events.count) events")
+        let meter = StripeMeterEvents(apiKey: apiKey, client: application.http.client.shared, logger: logger)
+        do {
+            let time = DispatchTime.now()
+            let session = try await meter.getAuthenticationToken()
+            logger.error("API Key Metrics: Established session in \(time.timeElapsedPretty())")
+            let time2 = DispatchTime.now()
+            try await session.submit(events: events)
+            logger.error("API Key Metrics: Upload of \(events.count) entries completed in \(time2.timeElapsedPretty())")
+        } catch {
+            logger.error("API Key Metrics: Failed to upload. Error: \(error)")
+        }
+    }
 }
+
+
 extension SocketAddress {
     var rateLimitSlot: Int {
         switch self {
@@ -115,7 +156,9 @@ extension Request {
         guard let host = headers[.host].first(where: { $0.contains("open-meteo.com") }) else {
             // localhost or not an openmeteo host
             let params = try parseApiParams()
-            return try await fn(nil, params).response(format: params.formatWithOptions, concurrencySlot: nil)
+            let responder = try await fn(nil, params)
+            let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+            return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: { host.starts(with: $0) }) == true || isDevNode
@@ -163,7 +206,10 @@ extension Request {
                 throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot)
+            guard weight <= RateLimiter.limitHourly else {
+                throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
+            }
+            let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
             if isCFWorker {
                 await RateLimiter.instance.increment(int64: slot, count: weight)
             } else {
@@ -195,7 +241,7 @@ extension Request {
             throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
         }
         let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-        let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot)
+        let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
         await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         return response
     }

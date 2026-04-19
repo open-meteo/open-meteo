@@ -16,11 +16,10 @@ extension Encodable {
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(self)
         
-        let fileTemp = "\(path)~"
-        let fn = try FileHandle.createNewFile(file: fileTemp, size: data.count, overwrite: true)
+        let fn = try FileHandle.createNewFile(file: path, size: data.count, overwrite: true, temporary: true)
         try fn.write(contentsOf: data)
+        try fn.linkTemporary(file: path)
         try fn.close()
-        try FileManager.default.moveFileOverwrite(from: fileTemp, to: path)
     }
 }
 

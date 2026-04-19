@@ -111,6 +111,7 @@ fileprivate final actor RemoteFileManagerCache {
         var remoteDeleted = 0
         var remoteRevalidated = 0
         var remoteCheckedExist = 0
+        var lastPrint = Timestamp.now()
         
         mutating func reset() {
             inactivity = 0
@@ -119,6 +120,7 @@ fileprivate final actor RemoteFileManagerCache {
             remoteDeleted = 0
             remoteRevalidated = 0
             remoteCheckedExist = 0
+            lastPrint = Timestamp.now()
         }
     }
     
@@ -351,7 +353,7 @@ fileprivate final actor RemoteFileManagerCache {
                 }
             }
         }
-        if statistics.ticks.isMultiple(of: 10), total > 0 {
+        if total > 0, statistics.lastPrint > Timestamp.now().subtract(minutes: 5) {
             logger.error("OmFileManager: \(total) open files, \(running) running. Revalidation took \(startRevalidation.timeElapsedPretty()). \(statistics)")
             if OpenMeteo.remoteDataDirectory != nil {
                 logger.error("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")

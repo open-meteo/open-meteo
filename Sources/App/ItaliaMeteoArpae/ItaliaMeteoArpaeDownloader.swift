@@ -109,7 +109,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         }()
 
         let grid = domain.grid
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let variableLevel: [VariableLevel] = ItaliaMeteoArpaeVariablesDownload.allCases.flatMap({ variable in
             variable.levels.map { level in
@@ -318,6 +318,15 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     let depth = Float(scaledValueOfSecondFixedSurface - scaledValueOfFirstFixedSurface)
                     array2d.array.data.multiplyAdd(multiply: 0.1 / depth, add: 0)
                     try await writer.write(time: time, member: 0, variable: variable, data: array2d.array.data)
+                }
+                
+                /// CIN is set to -1000 for no convection. Set to 0.
+                if v.variable == .CIN_ML {
+                    for i in array2d.array.data.indices {
+                        if array2d.array.data[i] <= -999 {
+                            array2d.array.data[i] = 0
+                        }
+                    }
                 }
 
                 if let variable = v.variable.getGenericVariable(attributes: attributes) {

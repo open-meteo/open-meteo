@@ -19,11 +19,9 @@ public final class OmFileWriterHelper: Sendable {
         if !overwrite && FileManager.default.fileExists(atPath: file) {
             throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
         }
-        let fileTemp = "\(file)~"
-        try FileManager.default.removeItemIfExists(at: fileTemp)
-        let fn = try FileHandle.createNewFile(file: fileTemp)
+        let fn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         try all.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: scalefactor)
-        try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
+        try fn.linkTemporary(file: file)
         return fn
     }
     
@@ -68,15 +66,9 @@ extension Array where Element == Float {
         guard !FileManager.default.fileExists(atPath: file) else {
             fatalError("File exists already \(file)")
         }
-        let tempFile = file + "~"
-        // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
-        FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
-        try FileManager.default.removeItemIfExists(at: tempFile)
-        let writeFn = try FileHandle.createNewFile(file: tempFile)
+        let writeFn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         try writeOmFile(fn: writeFn, dimensions: dimensions, chunks: chunks, compression: compression, scalefactor: scalefactor)
-
-        // Overwrite existing file, with newly created
-        try FileManager.default.moveFileOverwrite(from: tempFile, to: file)
+        try writeFn.linkTemporary(file: file)
 
         if createNetCdf {
             let ncPath = file.replacingOccurrences(of: ".om", with: ".nc")

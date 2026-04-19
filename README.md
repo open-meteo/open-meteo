@@ -45,6 +45,7 @@ Apps:
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [BusyRunner](https://busyrunner.com/) Allows users to plan their weekly runs based on the weather.
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
+- [Calima Canarias](https://calimacanarias.com) Real-time Saharan dust (calima) forecast and air quality monitoring for the Canary Islands and the rest of Spain.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
@@ -62,6 +63,7 @@ Apps:
 - [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
 - [Overmorrow](https://github.com/bmaroti9/Overmorrow) A modern material design Android weather app.
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
+- [Pollen Today](https://pollen.today) Real-time pollen and allergen forecasts across Europe.
 - [Precip](https://precip.ai) Hyperlocal weather history and forecast app for Android, iOS, and Web.
 - [QuickWeather](https://github.com/TylerWilliamson/QuickWeather) Fast, free, and open source Android app
 - [Rain](https://github.com/DarkMooNight/Rain) Free, open source, beautiful, minimal and fast weather app
@@ -73,6 +75,7 @@ Apps:
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
 - [Typhoon](https://archisman-panigrahi.github.io/typhoon) A stylish weather app for GNU/Linux that acts as a desktop widget
+- [UVI Today](https://uvi.today) UV index forecasts with WHO sun protection guidelines, using CAMS air quality data via Open-Meteo.
 - [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
 - [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
 - [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
@@ -107,18 +110,18 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 
 ## Client SDKs
 
-- Go https://github.com/HectorMalot/omgo
-- Python https://github.com/m0rp43us/openmeteopy
-- Kotlin https://github.com/open-meteo/open-meteo-api-kotlin
-- .Net / C# https://github.com/AlienDwarf/open-meteo-dotnet
-- dotnet 8 / C# https://github.com/colinnuk/open-meteo-dotnet-client-sdk
-- PHP Laravel https://github.com/michaelnabil230/laravel-weather
-- R https://github.com/tpisel/openmeteo
-- PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
-- PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
+- .Net 8 / C#: https://github.com/colinnuk/open-meteo-dotnet-client-sdk
 - Android library for Geocoding API: https://github.com/woheller69/OmGeoDialog
 - Dart / Flutter: https://github.com/neursh/open-meteo-dart
+- Go: https://github.com/HectorMalot/omgo
+- Kotlin: https://github.com/open-meteo/open-meteo-api-kotlin
+- PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
+- PHP Laravel: https://github.com/michaelnabil230/laravel-weather
+- PHP Symfony 6.2: https://gitlab.com/flibidi67/open-meteo
+- Python: https://github.com/open-meteo/python-requests
+- R: https://github.com/tpisel/openmeteo
 - Rust: https://github.com/angelodlfrtr/open-meteo-rs
+- TypeScript: https://github.com/open-meteo/typescript
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 

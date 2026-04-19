@@ -242,7 +242,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         case .visibility:
             return .linear
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation_clear_sky:
             return .solar_backwards_averaged
         case .precipitation_type:

@@ -125,7 +125,7 @@ struct DownloadBomCommand: AsyncCommand {
         let variables = ["wnd_ucmp", "wnd_vcmp"]
         
         /// Use different realm, because model levels have 1 hour additional delay
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: "model-level")
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: "model-level", logger: logger)
 
         // Download u/v wind
         try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
@@ -183,8 +183,8 @@ struct DownloadBomCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
-        let writerProbabilities = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
+        let writerProbabilities = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
         
         // list of variables to download
         // http://www.bom.gov.au/nwp/doc/access/docs/ACCESS-G.all-flds.slv.surface.shtml
@@ -322,7 +322,7 @@ struct DownloadBomCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
         // list of variables to download
         // http://www.bom.gov.au/nwp/doc/access/docs/ACCESS-G.all-flds.slv.surface.shtml

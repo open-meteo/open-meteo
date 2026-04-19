@@ -138,8 +138,8 @@ struct GfsGraphCastDownload: AsyncCommand {
             logger.info("Downloading forecastHour \(forecastHour)")
             
             let storePrecipMembers = VariablePerMemberStorage<GfsGraphCastSurfaceVariable>()
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
-            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
             
             try await members.foreachConcurrent(nConcurrent: 2) { member in
                 let urls = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)

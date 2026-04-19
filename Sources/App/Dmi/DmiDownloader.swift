@@ -114,7 +114,7 @@ struct DmiDownload: AsyncCommand {
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
                 let inMemorySurface = VariablePerMemberStorage<DmiSurfaceVariable>()
                 let windSpeedCalculator = WindSpeedCalculator<DmiSurfaceVariable>(trueNorth: trueNorth)
-                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil, logger: logger)
 
                 // process sequentialy, as precipitation need to be in order for deaveraging
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
@@ -219,6 +219,13 @@ struct DmiDownload: AsyncCommand {
                             // Set it to 0 to work with conversion
                             for i in grib2d.array.data.indices {
                                 if grib2d.array.data[i].isNaN {
+                                    grib2d.array.data[i] = 0
+                                }
+                            }
+                        case .convective_inhibition:
+                            /// CIN is set to +1000 for no convection. Set to 0.
+                            for i in grib2d.array.data.indices {
+                                if grib2d.array.data[i] == 1000 {
                                     grib2d.array.data[i] = 0
                                 }
                             }

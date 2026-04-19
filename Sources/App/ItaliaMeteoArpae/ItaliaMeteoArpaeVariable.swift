@@ -336,7 +336,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         case .direct_radiation:
             return .solar_backwards_averaged
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .total_column_integrated_water_vapour:
             return .hermite(bounds: nil)
         }

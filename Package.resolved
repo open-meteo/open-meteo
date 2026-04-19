@@ -1,5 +1,5 @@
 {
-  "originHash" : "40de2dab0ba13d8b326edcab5fec8a4230d92128fa7ccfef67ac52b86ac081be",
+  "originHash" : "bca15a910cf6fd3caf6a1a3986f9c4dec7ebd2f7f044795bec6350d9a08a3696",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -60,7 +60,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/om-file-format.git",
       "state" : {
-        "revision" : "4de07b5669d41c5ce6269a71a15767a1bf0b3ec2"
+        "revision" : "18bee8578d953bd95ad7de1ae688faa7cf421f7c"
       }
     },
     {
@@ -149,8 +149,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "6f70fa9eab24c1fd982af18c281c4525d05e3095",
-        "version" : "4.2.0"
+        "revision" : "fa308c07a6fa04a727212d793e761460e41049c3",
+        "version" : "4.3.0"
       }
     },
     {
@@ -158,8 +158,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-distributed-tracing.git",
       "state" : {
-        "revision" : "e109d8b5308d0e05201d9a1dd1c475446a946a11",
-        "version" : "1.4.0"
+        "revision" : "dc4030184203ffafbb2ec614352487235d747fe0",
+        "version" : "1.4.1"
       }
     },
     {
@@ -212,8 +212,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "e932d3c4d8f77433c8f7093b5ebcbf91463948a0",
-        "version" : "2.95.0"
+        "revision" : "b31565862a8f39866af50bc6676160d8dda7de35",
+        "version" : "2.96.0"
       }
     },
     {
@@ -311,8 +311,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git",
       "state" : {
-        "revision" : "1a653bcc6d3e0c5650886aba5c5a277cd49f0bbd",
-        "version" : "1.0.7"
+        "revision" : "e4db6c3ad57b58d472a05b73cf8ea78352957500",
+        "version" : "1.0.8"
       }
     },
     {

@@ -237,7 +237,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .visibility:
             return .linear
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .boundary_layer_height:
             return .hermite(bounds: 0...10e9)
         case .total_column_integrated_water_vapour:
