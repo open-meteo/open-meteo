@@ -64,12 +64,12 @@ struct DownloadAiconCommand: AsyncCommand {
         uploadS3Bucket: String?
     ) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        
+
         try FileManager.default.createDirectory(atPath: domain.domainRegistry.directoryStatic, withIntermediateDirectories: true)
-        
+
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-        
+
         let curl = Curl(
             logger: logger,
             client: application.dedicatedHttpClient,
@@ -78,7 +78,7 @@ struct DownloadAiconCommand: AsyncCommand {
         )
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
-        
+
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
 
         let deaverager = GribDeaverager()

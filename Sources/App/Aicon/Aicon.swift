@@ -3,18 +3,18 @@ import OmFileFormat
 
 /**
  AICON domain - DWD's AI-based weather prediction model
- 
+
  AICON (AI ICON) is a machine-learning-based variant of the ICON model developed at DWD.
  It operates on the same global R3B7 grid as ICON global (≈13km resolution) and produces
  3-hourly forecasts up to 180 hours lead time, initialized 4 times per day (0/6/12/18 UTC).
 
  Data is available at:
  https://opendata.dwd.de/weather/nwp/v1/m/aicon/p/
- 
+
  The URL structure is:
  - Surface variables:  .../p/{VAR}/r/{YYYY-MM-DDTHH:00}/s/PT{HHH}H00M.grib2
  - Model-level variables: .../p/{VAR}/lvt1/150/lv1/{LEVEL}/r/{YYYY-MM-DDTHH:00}/s/PT{HHH}H00M.grib2
- 
+
  AICON model levels (13 levels) map to ICON global model levels:
    AICON 1  → ICON level  49  (≈21115m)
    AICON 2  → ICON level  57  (≈16694m)
@@ -39,7 +39,7 @@ enum AiconDomain: String, CaseIterable, GenericDomain {
     }
 
     var countEnsembleMember: Int { return 1 }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .aicon_global:
