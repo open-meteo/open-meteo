@@ -115,7 +115,7 @@ struct KmaDownload: AsyncCommand {
             let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
             let windSpeedCalculator = WindSpeedCalculator<KmaSurfaceVariable>()
             let fHHH = forecastHour.zeroPadded(len: 3)
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 guard let kmaName = variable.getKmaName(domain: domain) else {
                     return

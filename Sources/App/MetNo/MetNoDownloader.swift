@@ -124,7 +124,7 @@ struct MetNoDownloader: AsyncCommand {
             return
         }*/
 
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
         
         for variable in variables {
             logger.info("Download \(variable)")

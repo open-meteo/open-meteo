@@ -131,7 +131,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger)
 
             for variable in variables {
                 guard let meta = variable.getCamsGlobalMeta() else {
@@ -322,7 +322,7 @@ struct DownloadCamsCommand: AsyncCommand {
 
         do {
             let h = try await curl.withCdsApi(dataset: "cams-europe-air-quality-forecasts", query: query, apikey: cdskey, server: "https://ads.atmosphere.copernicus.eu/api") { messages in
-                let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
                 try await messages.foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try GribAttributes(message: message)
                     let timestamp = attributes.timestamp

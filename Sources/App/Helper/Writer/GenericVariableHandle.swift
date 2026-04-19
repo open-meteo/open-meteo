@@ -42,7 +42,7 @@ struct GenericVariableHandle: Sendable {
             if generateTimeSeries {
                 let startTime = DispatchTime.now()
                 try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
-                logger.info("Convert completed in \(startTime.timeElapsedPretty())")
+                logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
             
             /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
@@ -85,15 +85,15 @@ struct GenericVariableHandle: Sendable {
             }
         }
         
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
+        if OpenMeteo.generatePreviousDay, generateTimeSeries, let run {
+            for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
+                let domain = handles[0].domain
             
-            if generateTimeSeries, let run {
                 // if run is nil, do not attempt to generate previous days files
-                logger.info("Convert previous day database if required")
+                logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimePreviousDays = DispatchTime.now()
                 try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression)
-                logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty())")
+                logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
                 if !uploadS3OnlyProbabilities, let uploadS3Bucket {
@@ -109,10 +109,10 @@ struct GenericVariableHandle: Sendable {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
             if generateFullRun, domain.countEnsembleMember == 1, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
-                logger.info("Generate full run data")
+                logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
                 try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
-                logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty())")
+                logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 if let uploadS3Bucket {
                     try domain.domainRegistry.syncToS3PerRun(
@@ -143,9 +143,7 @@ struct GenericVariableHandle: Sendable {
             let file = OmFileType.run(domain: domain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
             try file.createDirectory()
             let filePath = file.getFilePath()
-            let fileTemp = "\(filePath)~"
-            try FileManager.default.removeItemIfExists(at: fileTemp)
-            let fn = try FileHandle.createNewFile(file: fileTemp)
+            let fn = try FileHandle.createNewFile(file: filePath, overwrite: true, temporary: true)
             
             let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
             let chunks = nMembers > 1 ? [1, 1, chunknLocations, nTime] : [1, chunknLocations, nTime]
@@ -217,8 +215,7 @@ struct GenericVariableHandle: Sendable {
             let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
             let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
-            
-            try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)
+            try fn.linkTemporary(file: filePath)
             progress.finish()
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()

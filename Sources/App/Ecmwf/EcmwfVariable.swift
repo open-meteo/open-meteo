@@ -97,7 +97,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// only in AIFS025_single
     case showers
     /// only in aifs
-    case dew_point_2m
+    //case dew_point_2m
     case snow_depth_water_equivalent
     case snow_depth
     case runoff
@@ -318,8 +318,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return .percentage
         case .cloud_cover_high:
             return .percentage
-        case .dew_point_2m:
-            return .celsius
+//        case .dew_point_2m:
+//            return .celsius
         case .relative_humidity_2m:
             return .percentage
         case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
@@ -478,8 +478,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return nil
         case .cloud_cover_high:
             return nil
-        case .dew_point_2m:
-            return 2
+//        case .dew_point_2m:
+//            return 2
         case .relative_humidity_2m:
             return 2
         case .soil_moisture_0_to_7cm:
@@ -658,10 +658,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return "mcc"
         case .cloud_cover_high:
             return "hcc"
-        case .dew_point_2m:
-            return "2d"
+//        case .dew_point_2m:
+//            return "2d"
         case .relative_humidity_2m:
-            return "2r"
+            return "2d" // use dew-point, data is converted while downloading
         case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
             return "vsw"
         // case .soil_moisture_7_to_28cm:
@@ -726,8 +726,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return 1
         case .cloud_cover_high:
             return 1
-        case .dew_point_2m:
-            return 20
+//        case .dew_point_2m:
+//            return 20
         case .relative_humidity_2m:
             return 1
         case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
@@ -749,14 +749,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     func multiplyAdd(domain: EcmwfDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
-        case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_150hPa, .temperature_100hPa, .temperature_50hPa, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
+        case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_150hPa, .temperature_100hPa, .temperature_50hPa, .temperature_2m, .temperature_2m_min, .temperature_2m_max/*, .dew_point_2m*/:
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth_water_equivalent:
             if domain == .aifs025_single || domain == .aifs025_ensemble {
                 // AIFS Single is already kg/m2
-                return (1, 0)
+                return nil
             }
             return (1000, 0) // meters to millimeter
         case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_150hPa, .specific_humidity_50hPa:
@@ -765,7 +765,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             if domain == .aifs025_single || domain == .aifs025_ensemble {
                 // AIFS Single is already %
-                return (1, 0)
+                return nil
             }
             return (100, 0)
         default:
@@ -952,7 +952,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case soil_moisture_0_to_100cm
     case soil_temperature_0_to_100cm
     case growing_degree_days_base_0_limit_50
-    case leaf_wetness_probability
+//    case leaf_wetness_probability
     case soil_moisture_index_0_to_7cm
     case soil_moisture_index_7_to_28cm
     case soil_moisture_index_28_to_100cm

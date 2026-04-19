@@ -9,7 +9,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?) async throws -> Response
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool) async throws -> Response
 
     var numberOfLocations: Int { get }
 }
@@ -208,13 +208,15 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil) async throws -> Response {
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true) async throws -> Response {
         if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
-        for location in results {
-            for model in location.results {
-                try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables, weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+        if prefetch {
+            for location in results {
+                for model in location.results {
+                    try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables, weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+                }
             }
         }
         switch format ?? .json() {

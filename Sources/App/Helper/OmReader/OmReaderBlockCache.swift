@@ -102,23 +102,27 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
         }
         
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
-        //defer { data.deallocate() }
-        for superBlock in superBlocks {
-            let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
-            let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
-            let keyStart = superKey &+ UInt64(blocks.lowerBound)
-            //print("withData blocks \(blocks)")
-            try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
-                let block = blocks.lowerBound + Int(key &- keyStart)
-                let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
-                return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
-            }), dataCallback: {(key, value) in
-                let block = blocks.lowerBound + Int(key &- keyStart)
-                let fileRange = block * blockSize ..< min((block + 1) * blockSize, fileSize)
-                let range = dataRange.intersect(fileTime: fileRange)!
-                let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
-                value[range.file].copyBytes(to: dest)
-            })
+        do {
+            for superBlock in superBlocks {
+                let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
+                let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
+                let keyStart = superKey &+ UInt64(blocks.lowerBound)
+                //print("withData blocks \(blocks)")
+                try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
+                    let block = blocks.lowerBound + Int(key &- keyStart)
+                    let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
+                    return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
+                }), dataCallback: {(key, value) in
+                    let block = blocks.lowerBound + Int(key &- keyStart)
+                    let fileRange = block * blockSize ..< min((block + 1) * blockSize, fileSize)
+                    let range = dataRange.intersect(fileTime: fileRange)!
+                    let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
+                    value[range.file].copyBytes(to: dest)
+                })
+            }
+        } catch {
+            data.deallocate()
+            throw error
         }
         return .owned(UnsafeRawBufferPointer(data))
     }

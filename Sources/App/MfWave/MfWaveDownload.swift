@@ -179,7 +179,7 @@ struct MfWaveDownload: AsyncCommand {
         )
         logger.info("Downloadig timerange \(downloadRange.prettyString())")
         
-        let writer = OmSpatialMultistepWriter(domain: domain, run: runDownload, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: runDownload, storeOnDisk: true, realm: nil, logger: logger)
 
         // Iterate from d-1 to d+10 in 12 hour steps
         for step in downloadRange {

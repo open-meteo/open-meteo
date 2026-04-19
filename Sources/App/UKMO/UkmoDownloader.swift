@@ -268,7 +268,7 @@ struct UkmoDownload: AsyncCommand {
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 if variable.skipHour0, timestamp == run {
                     return
@@ -308,6 +308,14 @@ struct UkmoDownload: AsyncCommand {
                         if variable == .freezing_level_height {
                             for i in data.indices {
                                 data[i] += domainElevation[i]
+                            }
+                        }
+                        /// CIN is set to -1000 for no convection. Set to 0.
+                        if variable == .convective_inhibition {
+                            for i in data.indices {
+                                if data[i] <= -999 {
+                                    data[i] = 0
+                                }
                             }
                         }
                     }

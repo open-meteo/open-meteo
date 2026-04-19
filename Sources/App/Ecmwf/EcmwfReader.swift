@@ -449,14 +449,14 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(t2m.map({ t2m in
                 max(min(t2m, limit) - base, 0) / 24
             }), .gddCelsius)
-        case .leaf_wetness_probability:
-            let temperature = try await get(raw: .temperature_2m, time: time).data
-            let dewpoint = try await get(raw: .dew_point_2m, time: time).data
-            let precipitation = try await get(raw: .precipitation, time: time).data
-            return DataAndUnit(zip(zip(temperature, dewpoint), precipitation).map( {
-                let ((temperature, dewpoint), precipitation) = $0
-                return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
-            }), .percentage)
+//        case .leaf_wetness_probability:
+//            let temperature = try await get(raw: .temperature_2m, time: time).data
+//            let dewpoint = try await get(raw: .dew_point_2m, time: time).data
+//            let precipitation = try await get(raw: .precipitation, time: time).data
+//            return DataAndUnit(zip(zip(temperature, dewpoint), precipitation).map( {
+//                let ((temperature, dewpoint), precipitation) = $0
+//                return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
+//            }), .percentage)
         case .soil_moisture_index_0_to_7cm:
             guard let soilType = try await self.getStatic(type: .soilType) else {
                 throw ForecastApiError.generic(message: "Could not read soil type")
@@ -764,10 +764,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .soil_temperature_28_to_100cm, time: time)
         case .growing_degree_days_base_0_limit_50:
             try await prefetchData(raw: .temperature_2m, time: time)
-        case .leaf_wetness_probability:
-            try await prefetchData(raw: .precipitation, time: time)
-            try await prefetchData(raw: .dew_point_2m, time: time)
-            try await prefetchData(raw: .temperature_2m, time: time)
+//        case .leaf_wetness_probability:
+//            try await prefetchData(raw: .precipitation, time: time)
+//            try await prefetchData(raw: .dew_point_2m, time: time)
+//            try await prefetchData(raw: .temperature_2m, time: time)
         case .soil_moisture_index_0_to_7cm:
             try await prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
         case .soil_moisture_index_7_to_28cm:

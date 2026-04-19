@@ -140,7 +140,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return .hermite(bounds: nil)
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .cape:
             return .hermite(bounds: 0...10e9)
         case .visibility:

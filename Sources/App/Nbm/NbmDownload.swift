@@ -138,7 +138,7 @@ struct NbmDownload: AsyncCommand {
             logger.info("Downloading forecastHour \(forecastHour)")
 
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0)
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger)
             let inMemory = VariablePerMemberStorage<NbmSurfaceVariable>()
 
             let variables: [NbmVariableAndDomain] = variables.map {

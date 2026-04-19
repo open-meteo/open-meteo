@@ -40,6 +40,9 @@ extension ForecastapiResult {
                     try await location.daily(variables: variables.dailyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {
+                    try await location.weekly(variables: variables.weeklyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                for location in results {
                     try await location.monthly(variables: variables.monthlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 try await b.flush()

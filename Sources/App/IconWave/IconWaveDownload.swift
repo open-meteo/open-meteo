@@ -79,7 +79,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(forecastHour)")
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger)
             
             for variable in variables {
                 guard variable.availableFor(domain: domain) else {

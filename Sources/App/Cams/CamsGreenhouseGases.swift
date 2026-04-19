@@ -48,7 +48,7 @@ extension DownloadCamsCommand {
             apikey: cdskey,
             server: "https://ads.atmosphere.copernicus.eu/api"
         ) { messages in
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
             try await messages.foreachConcurrent(nConcurrent: concurrent) { message in
                 let attributes = try GribAttributes(message: message)
                 let timestamp = attributes.timestamp

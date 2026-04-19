@@ -7,7 +7,7 @@ fileprivate enum CurlNetCdfError: Error {
 }
 
 extension Curl {
-    /// Download all grib files and return an array of grib messages
+    /// Download a NetCDF file and try to read from it. If the read fails, download again
     func downloadNetCdf(url: String, file: String, ncVariable: String, bzip2Decode: Bool, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> Group {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)

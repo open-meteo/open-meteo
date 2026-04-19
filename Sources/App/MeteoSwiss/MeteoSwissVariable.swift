@@ -131,7 +131,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
         case .cape:
             return .hermite(bounds: 0...10e9)
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .cloud_base:
             return .hermite(bounds: 0...10e9)
         case .sunshine_duration:
