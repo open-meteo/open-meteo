@@ -196,9 +196,9 @@ struct EumetnetDownloader: AsyncCommand {
         // so we need to flip the latitude axis.
         precipData.flipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
-        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: run, storeOnDisk: true, realm: nil, logger: logger)
         try await writer.write(member: 0, variable: EumetnetVariable.precipitation, data: precipData)
-        return try await writer.finalise(completed: true, validTimes: [run], uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: [run], uploadS3Bucket: uploadS3Bucket)
     }
 }
 
