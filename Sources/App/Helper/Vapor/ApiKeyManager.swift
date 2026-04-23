@@ -191,8 +191,7 @@ extension Request {
             }
             
             let params = try parseApiParams()
-            let apikey = headers["X-Api-Key"].first ?? params.apikey
-            guard apikey == nil else {
+            guard params.apikey == nil && headers.contains(name: "X-Api-Key") == false else {
                 guard self.method != .POST else {
                     throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
                 }
