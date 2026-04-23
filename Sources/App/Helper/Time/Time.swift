@@ -168,6 +168,10 @@ public struct Timestamp: Hashable, Sendable {
     var iso8601_YYYY_MM_dd_HH_mmZ: String {
         return "\(iso8601_YYYY_MM_dd_HH_mm)Z"
     }
+    
+    var iso8601_YYYY_MM_dd_HH_mm_ssZ: String {
+        return "\(iso8601_YYYY_MM_dd_HH_mm):00Z"
+    }
 
     /// With format `yyyy-MM-dd'T'HHmm'`
     var iso8601_YYYY_MM_dd_HHmm: String {
