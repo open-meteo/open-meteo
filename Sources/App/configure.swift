@@ -216,6 +216,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ValidateOmFilesCommand(), as: "validate-om-files")
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
+    app.asyncCommands.use(DownloadWeatherNextCommand(), as: "download-weathernext")
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
