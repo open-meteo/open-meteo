@@ -39,6 +39,14 @@ import Testing
         let sub3 = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 9..<9.5))!
         #expect(sub3.map { $0 } == [823068, 823069, 823070, 823071, 825636, 825637, 825638, 825639])
     }
+    
+    @Test func gaussianGridArea() {
+        let grid = GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33..<71, longitude: -11..<33))
+        #expect(grid.count == 157257)
+        let first = grid.getCoordinates(gridpoint: 0)
+        #expect(first.latitude == 12)
+        #expect(first.longitude == 12)
+    }
 
     @Test func boundingBoxAtBorder() {
         let grid = RegularGrid(nx: 360, ny: 180, latMin: -90, lonMin: -180, dx: 1, dy: 1)

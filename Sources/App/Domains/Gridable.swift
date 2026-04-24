@@ -290,7 +290,7 @@ enum GridSelectionMode: String, Codable {
     case nearest
 }
 
-public struct BoundingBoxWGS84 {
+public struct BoundingBoxWGS84: Sendable {
     let latitude: Range<Float>
     let longitude: Range<Float>
 }

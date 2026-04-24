@@ -57,6 +57,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     case sea_level_height_msl
     
     case lightning_density
+    case shortwave_radiation_clear_sky
 
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
@@ -79,7 +80,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .soil_temperature_7_to_28cm: return 20
         case .soil_temperature_28_to_100cm: return 20
         case .soil_temperature_100_to_255cm: return 20
-        case .shortwave_radiation: return 1
+        case .shortwave_radiation, .shortwave_radiation_clear_sky: return 1
         case .precipitation, .runoff, .showers: return 10
         case .direct_radiation: return 1
         case .soil_moisture_0_to_7cm: return 1000
@@ -153,7 +154,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .hermite(bounds: nil)
         case .soil_moisture_100_to_255cm:
             return .hermite(bounds: nil)
-        case .shortwave_radiation:
+        case .shortwave_radiation, .shortwave_radiation_clear_sky:
             return .solar_backwards_averaged
         case .precipitation, .runoff, .showers:
             return .backwards_sum
@@ -274,7 +275,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .soil_temperature_7_to_28cm: return .celsius
         case .soil_temperature_28_to_100cm: return .celsius
         case .soil_temperature_100_to_255cm: return .celsius
-        case .shortwave_radiation: return .wattPerSquareMetre
+        case .shortwave_radiation, .shortwave_radiation_clear_sky: return .wattPerSquareMetre
         case .precipitation, .runoff, .showers: return .millimetre
         case .direct_radiation: return .wattPerSquareMetre
         case .soil_moisture_0_to_7cm: return .cubicMetrePerCubicMetre
@@ -321,7 +322,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .precipitation, .showers, .snowfall_water_equivalent: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
-        case .shortwave_radiation, .direct_radiation: return true
+        case .shortwave_radiation, .shortwave_radiation_clear_sky, .direct_radiation: return true
         case .wind_v_component_10m, .wind_u_component_10m: return true
         case .wind_v_component_100m, .wind_u_component_100m: return true
         case .wind_v_component_200m, .wind_u_component_200m: return true
@@ -409,6 +410,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "sf"
         case .shortwave_radiation:
             return "ssrd"
+        case .shortwave_radiation_clear_sky:
+            return "ssrc"
         case .precipitation:
             return "tp"
         case .total_column_integrated_water_vapour:
@@ -446,7 +449,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return (100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth:
             return (1000, 0) // meters to millimetre
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation, .shortwave_radiation_clear_sky, .direct_radiation:
             return (1 / Float(dtSeconds), 0) // joules to watt
         default:
             return nil

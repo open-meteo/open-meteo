@@ -545,7 +545,7 @@ struct GaussianGridArea: Gridable {
         return bestLocal
     }
 
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> GaussianGridAreaSlice {
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> GaussianGridAreaSlice? {
         return GaussianGridAreaSlice(area: self, bb: bb)
     }
 }
@@ -559,14 +559,15 @@ struct GaussianGridAreaSlice: Sequence {
         let latitudeLines = area.type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
 
+        let y1: Int = Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy / 2) / dy)))
+        let y2: Int = Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy / 2) / dy)))
+        
         // Clamp y bounds to the area's row range
-        let y1 = max(area.yStart, min(area.yEnd - 1,
-            Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy / 2) / dy)))))
-        let y2 = max(area.yStart, min(area.yEnd - 1,
-            Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy / 2) / dy)))))
+        let y1Clamped = Swift.max(area.yStart, Swift.min(area.yEnd - 1, y1))
+        let y2Clamped = Swift.max(area.yStart, Swift.min(area.yEnd - 1, y2))
 
-        let startLineIdx = y1 - area.yStart
-        let endLineIdx   = y2 - area.yStart
+        let startLineIdx = y1Clamped - area.yStart
+        let endLineIdx   = y2Clamped - area.yStart
 
         var iter = GaussianGridAreaSliceIterator(
             area: area,

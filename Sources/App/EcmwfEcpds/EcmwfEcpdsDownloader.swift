@@ -347,61 +347,64 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let file = hour == 0 ? 11 : 1
             let prefix = run.hour % 12 == 0 ? "D" : "S"
             let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3)).bz2"
+            let urls = domain.getUrl(run: run, timestamp: timestamp, server: server)
             
-            try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
-                guard let shortName = message.get(attribute: "shortName"),
-                      let unit = message.get(attribute: "units"),
-                      let stepRange = message.get(attribute: "stepRange"),
-                      let stepType = message.get(attribute: "stepType") else {
-                    fatalError("could not get step range or type")
-                }
-                if shortName == "lsm" {
-                    return
-                }
-                //let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
-                let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
-                
-                guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode.split(separator: ",").contains(where: { $0 == shortName})}) else {
-                    logger.warning("Could not map variable \(shortName)")
-                    return
-                }
-                
-                //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
-                let isMax = [EcmwfEcdpsIfsVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min].contains(variable)
-                let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
-                /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
-                if (isAccumulated || isMax) && hour == 0 {
-                    return
-                }
-                
-                // logger.info("Processing \(variable)")
-                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                try grib2d.load(message: message)
-                
-                // Deaccumulate precipitation
-                if isAccumulated {
-                    // grib attributes for `stepType` are set wrongly to `instant`
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(hour)", grib2d: &grib2d) else {
+            for url in urls {
+                try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
+                    guard let shortName = message.get(attribute: "shortName"),
+                          let unit = message.get(attribute: "units"),
+                          let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType") else {
+                        fatalError("could not get step range or type")
+                    }
+                    if shortName == "lsm" {
                         return
                     }
-                }
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
-                if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {
-                    await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                    try await inMemory.calculateSnowDepth(density: .snow_density, waterEquivalent: .snow_depth, outVariable: EcmwfEcdpsIfsVariable.snow_depth, writer: writer)
-                    if variable == .snow_depth {
+                    //let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
+                    let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
+                    
+                    guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode.split(separator: ",").contains(where: { $0 == shortName})}) else {
+                        logger.warning("Could not map variable \(shortName)")
                         return
                     }
+                    
+                    //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
+                    let isMax = [EcmwfEcdpsIfsVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min].contains(variable)
+                    let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
+                    /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
+                    if (isAccumulated || isMax) && hour == 0 {
+                        return
+                    }
+                    
+                    // logger.info("Processing \(variable)")
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    try grib2d.load(message: message)
+                    
+                    // Deaccumulate precipitation
+                    if isAccumulated {
+                        // grib attributes for `stepType` are set wrongly to `instant`
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(hour)", grib2d: &grib2d) else {
+                            return
+                        }
+                    }
+                    
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
+                    if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {
+                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                        try await inMemory.calculateSnowDepth(density: .snow_density, waterEquivalent: .snow_depth, outVariable: EcmwfEcdpsIfsVariable.snow_depth, writer: writer)
+                        if variable == .snow_depth {
+                            return
+                        }
+                    }
+                    
+                    logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
+                    try await writer.write(member: member, variable: variable, data: grib2d.array.data)
                 }
-
-                logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
-                try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
             logger.info("Completed hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm), elapsed \(time.timeElapsedPretty())]")
             
@@ -441,11 +444,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             logger.info("Downloading hour \(hour)")
             
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
-
-            let stream = run.hour % 12 == 0 ? "wave" : "scwv"
             // ope_d2_ifs-ens-cf_od_scwv_fc_20251116T180000Z_20251116T180000Z_0h.bz2
             // ope_d2_ifs-ens-cf_od_wave_fc_20251109T000000Z_20251109T000000Z_0h.bz2
-            let url = "\(server)ope_d2_ifs-ens-cf_od_\(stream)_fc_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2"
+            let url = domain.getUrl(run: run, timestamp: timestamp, server: server)[0]
             
             try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName"),
