@@ -849,6 +849,27 @@ extension WeatherNextVariable {
         Self.surfaceVariables.contains(self)
     }
 
+    var isRelativeHumidityPressureLevel: Bool {
+        switch self {
+        case .relative_humidity_50hPa,
+             .relative_humidity_100hPa,
+             .relative_humidity_150hPa,
+             .relative_humidity_200hPa,
+             .relative_humidity_250hPa,
+             .relative_humidity_300hPa,
+             .relative_humidity_400hPa,
+             .relative_humidity_500hPa,
+             .relative_humidity_600hPa,
+             .relative_humidity_700hPa,
+             .relative_humidity_850hPa,
+             .relative_humidity_925hPa,
+             .relative_humidity_1000hPa:
+            return true
+        default:
+            return false
+        }
+    }
+
     static func temperature(level: WeatherNextPressureLevel) -> WeatherNextVariable {
         switch level {
         case .hPa50: return .temperature_50hPa

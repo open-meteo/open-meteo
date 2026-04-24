@@ -3,17 +3,16 @@ import Vapor
 import OmFileFormat
 
 /**
- Skeleton downloader for Google DeepMind WeatherNext-2 ensemble data.
+ Downloader for Google DeepMind WeatherNext-2 ensemble data.
 
  Source layout:
  `gs://om-weathernext/output/{modelrun-in-iso8601}/{timestamp-in-iso8601}.om`
 
  Notes:
- - Input files are already preprocessed `.om` files.
- - Each source file is expected to contain one valid time.
- - Each variable has shape `64 x 721 x 1440` = `members x latitude x longitude`.
- - This file intentionally provides a clean integration skeleton only.
- - The actual upstream `.om` decoding and GCS transport still need to be implemented.
+ - Input files are preprocessed `.om` files.
+ - Each source file contains one valid time.
+ - Each raw variable has dimensions `[member, lat, lon]`.
+ - Processing is intentionally stream-like to avoid loading the full source file into memory.
  */
 struct DownloadWeatherNextCommand: AsyncCommand {
     struct Signature: CommandSignature {
@@ -56,7 +55,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let server = signature.server ?? "gs://om-weathernext/output/"
-
         let nConcurrent = signature.concurrent ?? 1
         let generateFullRun = false
 
@@ -87,7 +85,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         )
     }
 
-    /// Placeholder for future static assets such as elevation or land/sea masks.
     func prepareStaticFilesIfRequired(
         application: Application,
         domain: WeatherNextDomain,
@@ -100,14 +97,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         logger.info("Static file preparation for \(domain) is currently a no-op")
     }
 
-    /**
-     Main skeleton pipeline:
-     1. determine valid times for the run
-     2. fetch one upstream `.om` file per valid time
-     3. decode all raw variables for all members
-     4. write raw variables into spatial timestep files
-     5. derive selected variables during ingest
-     */
     func download(
         application: Application,
         domain: WeatherNextDomain,
@@ -123,13 +112,14 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let writer = OmSpatialMultistepWriter(
             domain: domain,
             run: run,
-            storeOnDisk: false,
+            storeOnDisk: true, // FIXME: change to false
             realm: nil,
             logger: logger,
             ensembleMeanDomain: domain.ensembleMeanDomain
         )
 
-        let timestamps = (0..<domain.omFileLength).map { run.add(($0 + 1) * domain.dtSeconds) }
+        // let timestamps = (0..<domain.omFileLength).map { run.add(($0 + 1) * domain.dtSeconds) }
+        let timestamps = (0..<2).map { run.add(($0 + 1) * domain.dtSeconds) }
         logger.info("Processing \(timestamps.count) WeatherNext timesteps")
 
         for timestamp in timestamps {
@@ -146,19 +136,13 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 )
             }
 
-            let decoded = try decodeWeatherNextFile(
+            try await processWeatherNextFile(
                 application: application,
                 domain: domain,
                 file: localFile,
                 run: run,
-                validTime: timestamp
-            )
-
-            try await writeDecodedTimestep(
-                application: application,
-                domain: domain,
-                writer: writer,
-                decoded: decoded
+                validTime: timestamp,
+                writer: writer
             )
         }
 
@@ -182,125 +166,113 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         )
     }
 
-    /**
-     Decode one upstream WeatherNext `.om` file into member-wise arrays.
-
-     Expected upstream payload:
-     - one valid time per file
-     - all variables present
-     - dimensions `[member, lat, lon]`
-
-     This is the main integration point once the upstream OM payload details are known.
-     */
-    func decodeWeatherNextFile(
+    func processWeatherNextFile(
         application: Application,
         domain: WeatherNextDomain,
         file: String,
         run: Timestamp,
-        validTime: Timestamp
-    ) throws -> WeatherNextDecodedTimestep {
-        _ = application
-        _ = domain
-        _ = file
-        _ = run
-
-        throw WeatherNextDownloaderError.notImplemented(
-            "WeatherNext upstream OM decoding is not implemented yet for \(validTime.iso8601_YYYY_MM_dd_HH_mm)"
-        )
-    }
-
-    func writeDecodedTimestep(
-        application: Application,
-        domain: WeatherNextDomain,
-        writer: OmSpatialMultistepWriter,
-        decoded: WeatherNextDecodedTimestep
+        validTime: Timestamp,
+        writer: OmSpatialMultistepWriter
     ) async throws {
         let logger = application.logger
-        logger.info("Writing decoded timestep \(decoded.validTime.iso8601_YYYY_MM_dd_HH_mm)")
+        _ = run
+
+        let root = try await OmFileReader(file: file)
+
+        logger.info("Writing timestep \(validTime.iso8601_YYYY_MM_dd_HH_mm)")
 
         for member in 0..<domain.countEnsembleMember {
+            var relativeHumidity = [WeatherNextPressureLevel: [Float]]()
+            relativeHumidity.reserveCapacity(WeatherNextPressureLevel.allCases.count)
+
             for variable in WeatherNextVariable.rawVariables {
-                guard let data = decoded.data[WeatherNextMemberVariable(member: member, variable: variable)] else {
-                    continue
+                let data = try await readMemberSlice(
+                    root: root,
+                    variable: variable,
+                    member: member,
+                    domain: domain
+                )
+
+                try await writer.write(
+                    time: validTime,
+                    member: member,
+                    variable: variable,
+                    data: data
+                )
+
+                if let level = variable.pressureLevel, variable.isRelativeHumidityPressureLevel {
+                    relativeHumidity[level] = data
                 }
-                try await writer.write(time: decoded.validTime, member: member, variable: variable, data: data)
             }
 
-            try await deriveSurfaceWind(writer: writer, decoded: decoded, member: member)
-            try await derivePressureLevelWind(writer: writer, decoded: decoded, member: member)
-            try await deriveCloudCover(writer: writer, decoded: decoded, member: member)
+            try await deriveCloudCover(
+                writer: writer,
+                validTime: validTime,
+                member: member,
+                relativeHumidity: relativeHumidity
+            )
         }
     }
 
-    /// Derive wind speed / direction from 10m and 100m U/V components.
-    func deriveSurfaceWind(
-        writer: OmSpatialMultistepWriter,
-        decoded: WeatherNextDecodedTimestep,
-        member: Int
-    ) async throws {
-        let pairs: [(u: WeatherNextVariable, v: WeatherNextVariable, speed: WeatherNextVariable, direction: WeatherNextVariable)] = [
-            (WeatherNextVariable.wind_u_component_10m, WeatherNextVariable.wind_v_component_10m, WeatherNextVariable.wind_speed_10m, WeatherNextVariable.wind_direction_10m),
-            (WeatherNextVariable.wind_u_component_100m, WeatherNextVariable.wind_v_component_100m, WeatherNextVariable.wind_speed_100m, WeatherNextVariable.wind_direction_100m)
-        ]
-
-        for pair in pairs {
-            guard
-                let u = decoded.data[WeatherNextMemberVariable(member: member, variable: pair.u)],
-                let v = decoded.data[WeatherNextMemberVariable(member: member, variable: pair.v)]
-            else {
-                continue
-            }
-
-            let speed = zip(u, v).map(Meteorology.windspeed)
-            let direction = Meteorology.windirectionFast(u: u, v: v)
-
-            try await writer.write(time: decoded.validTime, member: member, variable: pair.speed, data: speed)
-            try await writer.write(time: decoded.validTime, member: member, variable: pair.direction, data: direction)
+    func readMemberSlice<Backend>(
+        root: OmFileReader<Backend>,
+        variable: WeatherNextVariable,
+        member: Int,
+        domain: WeatherNextDomain
+    ) async throws -> [Float] {
+        guard let child = try await root.getChild(name: variable.rawValue),
+              let array = child.asArray(of: Float.self) else {
+            throw WeatherNextDownloaderError.notImplemented("Could not open source variable \(variable.rawValue)")
         }
+
+        let dims = Array(array.getDimensions())
+        guard dims.count == 3 else {
+            throw WeatherNextDownloaderError.notImplemented("Unexpected dimensions for \(variable.rawValue): \(dims)")
+        }
+        guard dims[0] == UInt64(domain.countEnsembleMember),
+              dims[1] == UInt64(domain.grid.ny),
+              dims[2] == UInt64(domain.grid.nx) else {
+            throw WeatherNextDownloaderError.notImplemented("Unexpected shape for \(variable.rawValue): \(dims)")
+        }
+
+        let memberRange = UInt64(member)..<UInt64(member + 1)
+        let latRange = UInt64(0)..<UInt64(domain.grid.ny)
+        let lonRange = UInt64(0)..<UInt64(domain.grid.nx)
+
+        var data = [Float](repeating: .nan, count: domain.grid.count)
+        try await array.read(
+            into: &data,
+            range: [memberRange, latRange, lonRange],
+            intoCubeOffset: [0, 0, 0],
+            intoCubeDimension: [1, UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
+        )
+
+        if let fma = variable.multiplyAdd {
+            data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+        }
+        return data
     }
 
-    /// Derive wind speed / direction for pressure levels from U/V components.
-    func derivePressureLevelWind(
-        writer: OmSpatialMultistepWriter,
-        decoded: WeatherNextDecodedTimestep,
-        member: Int
-    ) async throws {
-        for level in WeatherNextPressureLevel.allCases {
-            guard
-                let u = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.windU(level: level))],
-                let v = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.windV(level: level))]
-            else {
-                continue
-            }
-
-            let speed = zip(u, v).map(Meteorology.windspeed)
-            let direction = Meteorology.windirectionFast(u: u, v: v)
-
-            try await writer.write(time: decoded.validTime, member: member, variable: WeatherNextVariable.windSpeed(level: level), data: speed)
-            try await writer.write(time: decoded.validTime, member: member, variable: WeatherNextVariable.windDirection(level: level), data: direction)
-        }
-    }
-
-    /// Derive cloud cover from pressure-level relative humidity using the same grouping as ECMWF.
     func deriveCloudCover(
         writer: OmSpatialMultistepWriter,
-        decoded: WeatherNextDecodedTimestep,
-        member: Int
+        validTime: Timestamp,
+        member: Int,
+        relativeHumidity: [WeatherNextPressureLevel: [Float]]
     ) async throws {
         guard
-            let rh1000 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_1000hPa)],
-            let rh925 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_925hPa)],
-            let rh850 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_850hPa)],
-            let rh700 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_700hPa)],
-            let rh600 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_600hPa)],
-            let rh500 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_500hPa)],
-            let rh400 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_400hPa)],
-            let rh300 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_300hPa)],
-            let rh250 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_250hPa)],
-            let rh200 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_200hPa)],
-            let rh150 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_150hPa)],
-            let rh100 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_100hPa)],
-            let rh50 = decoded.data[WeatherNextMemberVariable(member: member, variable: WeatherNextVariable.relative_humidity_50hPa)]
+            let rh1000 = relativeHumidity[.hPa1000],
+            let rh925 = relativeHumidity[.hPa925],
+            let rh850 = relativeHumidity[.hPa850],
+            let rh700 = relativeHumidity[.hPa700],
+            let rh600 = relativeHumidity[.hPa600],
+            let rh500 = relativeHumidity[.hPa500],
+            let rh400 = relativeHumidity[.hPa400],
+            let rh300 = relativeHumidity[.hPa300],
+            let rh250 = relativeHumidity[.hPa250],
+            let rh200 = relativeHumidity[.hPa200],
+            let rh150 = relativeHumidity[.hPa150],
+            let rh100 = relativeHumidity[.hPa100],
+            let rh50 = relativeHumidity[.hPa50]
         else {
             return
         }
@@ -349,10 +321,10 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
 
-        try await writer.write(time: decoded.validTime, member: member, variable: WeatherNextVariable.cloud_cover_low, data: cloudcoverLow)
-        try await writer.write(time: decoded.validTime, member: member, variable: WeatherNextVariable.cloud_cover_mid, data: cloudcoverMid)
-        try await writer.write(time: decoded.validTime, member: member, variable: WeatherNextVariable.cloud_cover_high, data: cloudcoverHigh)
-        try await writer.write(time: decoded.validTime, member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
+        try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover_low, data: cloudcoverLow)
+        try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover_mid, data: cloudcoverMid)
+        try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover_high, data: cloudcoverHigh)
+        try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
     }
 }
 
@@ -369,15 +341,4 @@ struct WeatherNextSourcePath {
         let base = server.hasSuffix("/") ? server : "\(server)/"
         return "\(base)\(run.iso8601_YYYY_MM_dd_HH_mm_ssZ)/\(validTime.iso8601_YYYY_MM_dd_HH_mm_ssZ).om"
     }
-}
-
-struct WeatherNextMemberVariable: Hashable {
-    let member: Int
-    let variable: WeatherNextVariable
-}
-
-struct WeatherNextDecodedTimestep {
-    let run: Timestamp
-    let validTime: Timestamp
-    let data: [WeatherNextMemberVariable: [Float]]
 }
