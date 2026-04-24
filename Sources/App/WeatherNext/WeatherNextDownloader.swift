@@ -1,9 +1,6 @@
 import Foundation
 import Vapor
 import OmFileFormat
-import AsyncHTTPClient
-import NIOCore
-import JWT
 
 /**
  Skeleton downloader for Google DeepMind WeatherNext-2 ensemble data.
@@ -172,59 +169,17 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         )
     }
 
-    /**
-     Download a private GCS object using authenticated HTTP only.
-
-     Authentication source:
-     1. service account JSON pointed to by `GOOGLE_APPLICATION_CREDENTIALS`
-
-     The `server` argument is still expected in `gs://bucket/prefix/` form, but the actual
-     transfer is performed against the authenticated GCS JSON media endpoint.
-     */
     func fetchSourceFile(
         application: Application,
         remotePath: String,
         localFile: String
     ) async throws {
-        let logger = application.logger
-        logger.info("Fetching \(remotePath) -> \(localFile)")
-
-        let token = try await WeatherNextGoogleAuthTokenProvider(
+        try await GoogleCloudStorage.download(
             client: application.dedicatedHttpClient,
-            logger: logger
-        ).getAccessToken()
-
-        let url = try WeatherNextGcsPath(remotePath).authenticatedDownloadUrl
-        var request = HTTPClientRequest(url: url)
-        request.method = .GET
-        request.headers.add(name: "Authorization", value: "Bearer \(token)")
-
-        let response = try await application.dedicatedHttpClient.execute(request, timeout: .seconds(300))
-        guard response.status == .ok else {
-            let error = try await response.readStringImmutable() ?? ""
-            throw WeatherNextDownloaderError.httpError(
-                status: Int(response.status.code),
-                message: "Could not download \(remotePath): \(error)"
-            )
-        }
-
-        try FileManager.default.createDirectory(
-            atPath: URL(fileURLWithPath: localFile).deletingLastPathComponent().path,
-            withIntermediateDirectories: true
+            logger: application.logger,
+            remotePath: remotePath,
+            localFile: localFile
         )
-
-        let fileHandle = try FileHandle.createNewFile(file: localFile, overwrite: true, temporary: true)
-        do {
-            for try await chunk in response.body {
-                try Task.checkCancellation()
-                try fileHandle.write(contentsOf: Data(buffer: chunk))
-            }
-            try fileHandle.linkTemporary(file: localFile)
-        } catch {
-            try? fileHandle.close()
-            throw error
-        }
-        try fileHandle.close()
     }
 
     /**
@@ -403,10 +358,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
 enum WeatherNextDownloaderError: Error {
     case notImplemented(String)
-    case invalidGcsPath(String)
-    case missingGoogleCredentials(String)
-    case invalidGoogleCredentials(String)
-    case httpError(status: Int, message: String)
 }
 
 struct WeatherNextSourcePath {
@@ -417,159 +368,6 @@ struct WeatherNextSourcePath {
     var remotePath: String {
         let base = server.hasSuffix("/") ? server : "\(server)/"
         return "\(base)\(run.iso8601_YYYY_MM_dd_HH_mm_ssZ)/\(validTime.iso8601_YYYY_MM_dd_HH_mm_ssZ).om"
-    }
-}
-
-private struct WeatherNextGcsPath {
-    let bucket: String
-    let object: String
-
-    init(_ gsPath: String) throws {
-        guard gsPath.hasPrefix("gs://") else {
-            throw WeatherNextDownloaderError.invalidGcsPath("Expected gs:// path, got \(gsPath)")
-        }
-        let withoutScheme = String(gsPath.dropFirst("gs://".count))
-        let parts = withoutScheme.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
-        guard let bucket = parts.first, !bucket.isEmpty else {
-            throw WeatherNextDownloaderError.invalidGcsPath("Missing bucket in \(gsPath)")
-        }
-        self.bucket = String(bucket)
-        self.object = parts.count > 1 ? String(parts[1]) : ""
-    }
-
-    var authenticatedDownloadUrl: String {
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~")
-        let encodedObject = object.addingPercentEncoding(withAllowedCharacters: allowed) ?? object
-        return "https://storage.googleapis.com/download/storage/v1/b/\(bucket)/o/\(encodedObject)?alt=media"
-    }
-}
-
-private actor WeatherNextGoogleAuthTokenProvider {
-    private let client: HTTPClient
-    private let logger: Logger
-    private var cachedToken: CachedToken?
-
-    init(client: HTTPClient, logger: Logger) {
-        self.client = client
-        self.logger = logger
-    }
-
-    func getAccessToken() async throws -> String {
-        if let cachedToken, cachedToken.expiry > Date().addingTimeInterval(60) {
-            return cachedToken.token
-        }
-
-        let credentialsPath = try getCredentialsPath()
-        let credentials = try readCredentials(path: credentialsPath)
-        let jwt = try await makeSignedJwt(credentials: credentials)
-        let token = try await exchangeJwtForAccessToken(jwt: jwt, tokenUri: credentials.token_uri)
-
-        self.cachedToken = token
-        return token.token
-    }
-
-    private func getCredentialsPath() throws -> String {
-        guard let path = Environment.get("GOOGLE_APPLICATION_CREDENTIALS"), !path.isEmpty else {
-            throw WeatherNextDownloaderError.missingGoogleCredentials(
-                "Set GOOGLE_APPLICATION_CREDENTIALS to a Google service account JSON file"
-            )
-        }
-        return path
-    }
-
-    private func readCredentials(path: String) throws -> ServiceAccountCredentials {
-        let data = try Data(contentsOf: URL(fileURLWithPath: path))
-        let decoder = JSONDecoder()
-        let credentials = try decoder.decode(ServiceAccountCredentials.self, from: data)
-        guard credentials.type == "service_account" else {
-            throw WeatherNextDownloaderError.invalidGoogleCredentials(
-                "GOOGLE_APPLICATION_CREDENTIALS must point to a service account JSON file"
-            )
-        }
-        return credentials
-    }
-
-    private func makeSignedJwt(credentials: ServiceAccountCredentials) async throws -> String {
-        let payload = GoogleServiceAccountPayload(
-            iss: IssuerClaim(value: credentials.client_email),
-            scope: "https://www.googleapis.com/auth/devstorage.read_only",
-            aud: AudienceClaim(value: credentials.token_uri),
-            exp: ExpirationClaim(value: Date().addingTimeInterval(3600)),
-            iat: IssuedAtClaim(value: Date())
-        )
-
-        let key = try Insecure.RSA.PrivateKey(pem: credentials.private_key)
-        let keys = JWTKeyCollection()
-        await keys.add(rsa: key, digestAlgorithm: .sha256)
-
-        return try await keys.sign(payload)
-    }
-
-    private func exchangeJwtForAccessToken(jwt: String, tokenUri: String) async throws -> CachedToken {
-        var request = HTTPClientRequest(url: tokenUri)
-        request.method = .POST
-        request.headers.add(name: "Content-Type", value: "application/x-www-form-urlencoded")
-
-        let body = "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=\(jwt)"
-        request.body = .bytes(ByteBuffer(string: body))
-
-        let response = try await client.execute(request, timeout: .seconds(60))
-        guard response.status == .ok else {
-            let error = try await response.readStringImmutable() ?? ""
-            throw WeatherNextDownloaderError.httpError(
-                status: Int(response.status.code),
-                message: "Could not obtain Google OAuth token: \(error)"
-            )
-        }
-
-        guard let tokenResponse = try await response.readJSONDecodable(GoogleAccessTokenResponse.self) else {
-            throw WeatherNextDownloaderError.invalidGoogleCredentials("Could not decode Google OAuth token response")
-        }
-
-        return CachedToken(
-            token: tokenResponse.access_token,
-            expiry: Date().addingTimeInterval(TimeInterval(tokenResponse.expires_in))
-        )
-    }
-
-    private struct CachedToken {
-        let token: String
-        let expiry: Date
-    }
-
-    private struct ServiceAccountCredentials: Decodable {
-        let type: String
-        let private_key: String
-        let client_email: String
-        let token_uri: String
-    }
-
-    private struct GoogleAccessTokenResponse: Decodable {
-        let access_token: String
-        let expires_in: Int
-        let token_type: String
-    }
-
-    private struct GoogleServiceAccountPayload: JWTPayload {
-        let iss: IssuerClaim
-        let scope: String
-        let aud: AudienceClaim
-        let exp: ExpirationClaim
-        let iat: IssuedAtClaim
-
-        func verify(using algorithm: some JWTAlgorithm) async throws {
-            try exp.verifyNotExpired()
-        }
-    }
-}
-
-private extension Data {
-    func base64UrlEncodedString() -> String {
-        self.base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
     }
 }
 
