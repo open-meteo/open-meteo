@@ -41,11 +41,35 @@ import Testing
     }
     
     @Test func gaussianGridArea() {
-        let grid = GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33..<71, longitude: -11..<33))
+        // using longitudeOfFirstGridPointInDegrees longitudeOfLastGridPointInDegrees
+        // latitudeOfLastGridPointInDegrees latitudeOfFirstGridPointInDegrees
+        let grid = GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33.005..<70.967, longitude: -11..<37))
+        #expect(grid.linePointCount.count == 541) // number of latitude lines
+        #expect(grid.linePointCount[0] == 147)
+        #expect(grid.linePointCount[1] == 147)
+        #expect(grid.linePointCount[2] == 147)
+        #expect(grid.linePointCount[3] == 148)
+        #expect(grid.linePointCount[4] == 149)
+        
+        #expect(grid.linePointCount[540] == 435)
+        #expect(grid.linePointCount[539] == 434)
+        #expect(grid.linePointCount[538] == 434)
+        #expect(grid.linePointCount[537] == 433)
+        
         #expect(grid.count == 157257)
         let first = grid.getCoordinates(gridpoint: 0)
-        #expect(first.latitude == 12)
-        #expect(first.longitude == 12)
+        #expect(first.latitude == 70.966606)
+        #expect(first.longitude == -10.800018)
+        
+        let last = grid.getCoordinates(gridpoint: grid.count-1)
+        #expect(last.latitude == 33.005272)
+        #expect(last.longitude == 36.993866)
+        
+        let point = grid.findPoint(lat: 70.966606, lon: -10.800018)
+        #expect(point == 0)
+        
+        let point2 = grid.findPoint(lat: 33.005272, lon: 36.993866)
+        #expect(point2 == grid.count-1)
     }
 
     @Test func boundingBoxAtBorder() {
