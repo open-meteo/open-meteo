@@ -257,8 +257,7 @@ enum DomainRegistry: String, CaseIterable {
         case .ecmwf_ifs_europe_ensemble:
             return EcmwfEcpdsDomain.ifs_europe_ensemble
         case .ecmwf_ifs_europe_ensemble_mean:
-            // TODO
-            fatalError()
+            return EcmwfEcpdsDomain.ifs_europe_ensemble_mean
         case .ecmwf_wam:
             return EcmwfEcpdsDomain.wam
         case .ecmwf_ifs_analysis_long_window:

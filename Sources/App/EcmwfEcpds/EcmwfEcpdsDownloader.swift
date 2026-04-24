@@ -178,7 +178,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         for run in runs {
             logger.info("Downloading run \(run.iso8601_YYYY_MM_dd_HH_mm)")
             
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             let deaverager = GribDeaverager()
             let stepsArray = run.hour % 12 == 0 ? fullRunSteps : sideRunSteps
             for steps in stepsArray {
@@ -231,7 +231,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         
                         //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
                         let isMax = [EcmwfEcdpsIfsVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min].contains(variable)
-                        let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
+                        let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .shortwave_radiation_clear_sky, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
                         /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
                         if (isAccumulated || isMax) && hour == 0 {
                             return
@@ -341,12 +341,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             /// Delta time seconds considering irregular timesteps
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
 
             let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
-            let file = hour == 0 ? 11 : 1
-            let prefix = run.hour % 12 == 0 ? "D" : "S"
-            let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3)).bz2"
             let urls = domain.getUrl(run: run, timestamp: timestamp, server: server)
             
             for url in urls {
@@ -370,7 +367,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     
                     //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
                     let isMax = [EcmwfEcdpsIfsVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min].contains(variable)
-                    let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
+                    let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .shortwave_radiation_clear_sky, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
                     /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
                     if (isAccumulated || isMax) && hour == 0 {
                         return
@@ -443,7 +440,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             // ope_d2_ifs-ens-cf_od_scwv_fc_20251116T180000Z_20251116T180000Z_0h.bz2
             // ope_d2_ifs-ens-cf_od_wave_fc_20251109T000000Z_20251109T000000Z_0h.bz2
             let url = domain.getUrl(run: run, timestamp: timestamp, server: server)[0]
