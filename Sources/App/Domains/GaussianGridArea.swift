@@ -2,6 +2,9 @@ import Foundation
 
 /// A geographic subset of a Gaussian grid backed by a flat 1D array.
 ///
+/// TODO:
+/// - Optimised terrain and sea grid cell resolution
+///
 /// Local array indices `(0..<nx)` enumerate points north-to-south, then west-to-east within each
 /// latitude line — the same order as the subset extracted from the full grid.
 struct GaussianGridArea: Gridable {
