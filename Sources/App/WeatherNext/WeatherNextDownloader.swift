@@ -118,8 +118,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             ensembleMeanDomain: domain.ensembleMeanDomain
         )
 
-        // let timestamps = (0..<domain.omFileLength).map { run.add(($0 + 1) * domain.dtSeconds) }
-        let timestamps = (0..<2).map { run.add(($0 + 1) * domain.dtSeconds) }
+        let timestamps = (0..<domain.omFileLength).map { run.add(($0 + 1) * domain.dtSeconds) }
         logger.info("Processing \(timestamps.count) WeatherNext timesteps")
 
         for timestamp in timestamps {

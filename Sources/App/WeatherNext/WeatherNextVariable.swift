@@ -625,21 +625,6 @@ enum WeatherNextVariable: String, CaseIterable, GenericVariableMixable, GenericV
         case .pressure_msl:
             return (1 / 100, 0)
 
-        case .relative_humidity_50hPa,
-             .relative_humidity_100hPa,
-             .relative_humidity_150hPa,
-             .relative_humidity_200hPa,
-             .relative_humidity_250hPa,
-             .relative_humidity_300hPa,
-             .relative_humidity_400hPa,
-             .relative_humidity_500hPa,
-             .relative_humidity_600hPa,
-             .relative_humidity_700hPa,
-             .relative_humidity_850hPa,
-             .relative_humidity_925hPa,
-             .relative_humidity_1000hPa:
-            return (100, 0)
-
         default:
             return nil
         }
