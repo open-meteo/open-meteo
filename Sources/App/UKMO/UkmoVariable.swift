@@ -178,7 +178,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .wind_speed_10m:
             return .metrePerSecond
         case .wind_direction_10m:
-            return .percentage
+            return .degreeDirection
         case .visibility:
             return .metre
         case .cloud_base:// , .cloud_top:
