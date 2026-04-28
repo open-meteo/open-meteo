@@ -189,8 +189,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             //let fullRunSteps = full15Days ? ["\(sideRunSteps[0])/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"] : [sideRunSteps[0], "150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360"]
             let fullRunSteps = full15Days ? "\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360" : "\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"
             
-            let paramsSide = "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fdir/hcc/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/vis/blh"
-            let paramsMain = "\(paramsSide)/rsn/sd/sithick/ocu/ocv/145.151/130.151/34.128"
+            let paramsSide = "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fdir/hcc/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh"
+            let paramsMain = "\(paramsSide)/rsn/sd/98.174/ocu/ocv/145.151/130.151/34.128"
             // "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/130.151/34.128"
             
             let params = params ?? (isMainRun ? paramsMain : paramsSide)
