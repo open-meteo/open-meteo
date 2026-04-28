@@ -106,12 +106,12 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     }
 
     func forecastTimestamps(for run: Timestamp) -> [Timestamp] {
-        (0..<omFileLength).map { run.add($0 * dtSeconds) }
+        (0..<omFileLength).map { run.add(($0 + 1) * dtSeconds) }
     }
 
     /// Placeholder until the actual publication delay is validated.
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        return t.add(hours: -12).floor(toNearestHour: 6)
+        return t.add(hours: -18).floor(toNearestHour: 6)
     }
 }

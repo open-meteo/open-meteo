@@ -34,6 +34,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
         var skipExisting: Bool
 
+        @Flag(name: "process-local-only", help: "Only process files already downloaded to the local directory")
+        var processLocalOnly: Bool
+
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
@@ -56,7 +59,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         let server = signature.server ?? "gs://om-weathernext/output/"
         let nConcurrent = signature.concurrent ?? 1
-        let generateFullRun = false
+        let generateFullRun = true // only true for ensemble mean?
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await prepareStaticFilesIfRequired(application: context.application, domain: domain, server: server, run: run)
@@ -68,6 +71,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             server: server,
             concurrent: nConcurrent,
             skipFilesIfExisting: signature.skipExisting,
+            processLocalOnly: signature.processLocalOnly,
             uploadS3Bucket: signature.uploadS3Bucket
         )
 
@@ -104,6 +108,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         server: String,
         concurrent: Int,
         skipFilesIfExisting: Bool,
+        processLocalOnly: Bool,
         uploadS3Bucket: String?
     ) async throws -> [GenericVariableHandle] {
         let logger = application.logger
@@ -118,7 +123,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             ensembleMeanDomain: domain.ensembleMeanDomain
         )
 
-        let timestamps = (0..<domain.omFileLength).map { run.add(($0 + 1) * domain.dtSeconds) }
+        let timestamps = domain.forecastTimestamps(for: run)
         logger.info("Processing \(timestamps.count) WeatherNext timesteps")
 
         for timestamp in timestamps {
@@ -127,12 +132,17 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
             logger.info("Processing \(source.remotePath)")
 
-            if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: localFile) {
-                try await fetchSourceFile(
-                    application: application,
-                    remotePath: source.remotePath,
-                    localFile: localFile
-                )
+            if !processLocalOnly {
+                if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: localFile) {
+                    try await fetchSourceFile(
+                        application: application,
+                        remotePath: source.remotePath,
+                        localFile: localFile
+                    )
+                }
+            } else if !FileManager.default.fileExists(atPath: localFile) {
+                logger.info("Skipping missing local file: \(localFile)")
+                continue
             }
 
             try await processWeatherNextFile(
@@ -180,6 +190,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         logger.info("Writing timestep \(validTime.iso8601_YYYY_MM_dd_HH_mm)")
 
+        let inMemoryPrecipitation = VariablePerMemberStorage<WeatherNextVariable>()
+
         for member in 0..<domain.countEnsembleMember {
             var relativeHumidity = [WeatherNextPressureLevel: [Float]]()
             relativeHumidity.reserveCapacity(WeatherNextPressureLevel.allCases.count)
@@ -199,6 +211,15 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                     data: data
                 )
 
+                if variable == .total_precipitation_6hr {
+                    await inMemoryPrecipitation.set(
+                        variable: variable,
+                        timestamp: validTime,
+                        member: member,
+                        data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny)
+                    )
+                }
+
                 if let level = variable.pressureLevel, variable.isRelativeHumidityPressureLevel {
                     relativeHumidity[level] = data
                 }
@@ -211,6 +232,22 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 relativeHumidity: relativeHumidity
             )
         }
+
+        if domain.countEnsembleMember > 1 {
+            let writerProbabilities = OmSpatialTimestepWriter(
+                domain: domain,
+                run: run,
+                time: validTime,
+                storeOnDisk: true,
+                realm: nil,
+                logger: logger
+            )
+            try await inMemoryPrecipitation.calculatePrecipitationProbability(
+                precipitationVariable: .total_precipitation_6hr,
+                dtHoursOfCurrentStep: domain.dtSeconds / 3600,
+                writer: writerProbabilities
+            )
+        }
     }
 
     func readMemberSlice<Backend>(
@@ -219,19 +256,21 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         member: Int,
         domain: WeatherNextDomain
     ) async throws -> [Float] {
-        guard let child = try await root.getChild(name: variable.rawValue),
+        let sourceName = variable.rawValue
+
+        guard let child = try await root.getChild(name: sourceName),
               let array = child.asArray(of: Float.self) else {
-            throw WeatherNextDownloaderError.notImplemented("Could not open source variable \(variable.rawValue)")
+            throw WeatherNextDownloaderError.notImplemented("Could not open source variable \(sourceName)")
         }
 
         let dims = Array(array.getDimensions())
         guard dims.count == 3 else {
-            throw WeatherNextDownloaderError.notImplemented("Unexpected dimensions for \(variable.rawValue): \(dims)")
+            throw WeatherNextDownloaderError.notImplemented("Unexpected dimensions for \(sourceName): \(dims)")
         }
         guard dims[0] == UInt64(domain.countEnsembleMember),
               dims[1] == UInt64(domain.grid.ny),
               dims[2] == UInt64(domain.grid.nx) else {
-            throw WeatherNextDownloaderError.notImplemented("Unexpected shape for \(variable.rawValue): \(dims)")
+            throw WeatherNextDownloaderError.notImplemented("Unexpected shape for \(sourceName): \(dims)")
         }
 
         let memberRange = UInt64(member)..<UInt64(member + 1)
@@ -246,9 +285,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             intoCubeDimension: [1, UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
         )
 
-        if let fma = variable.multiplyAdd {
-            data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-        }
         return data
     }
 

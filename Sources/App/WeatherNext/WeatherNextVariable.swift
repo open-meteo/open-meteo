@@ -24,7 +24,16 @@ enum WeatherNextPressureLevel: Int, CaseIterable, Sendable {
     }
 }
 
-enum WeatherNextVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
+/**
+ WeatherNext surface variables.
+
+ Naming notes:
+ - `rawValue` is used to address the source OM child in the upstream WeatherNext files.
+ - `omFileName.file` is the canonical Open-Meteo output/storage name.
+ - Most variables use the same name for both, but `total_precipitation_6hr` is intentionally
+   mapped to the canonical output name `precipitation`.
+ */
+enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
     case wind_u_component_100m
     case wind_v_component_100m
     case wind_u_component_10m
@@ -37,555 +46,103 @@ enum WeatherNextVariable: String, CaseIterable, GenericVariableMixable, GenericV
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
-
-    case geopotential_height_50hPa
-    case geopotential_height_100hPa
-    case geopotential_height_150hPa
-    case geopotential_height_200hPa
-    case geopotential_height_250hPa
-    case geopotential_height_300hPa
-    case geopotential_height_400hPa
-    case geopotential_height_500hPa
-    case geopotential_height_600hPa
-    case geopotential_height_700hPa
-    case geopotential_height_850hPa
-    case geopotential_height_925hPa
-    case geopotential_height_1000hPa
-
-    case relative_humidity_50hPa
-    case relative_humidity_100hPa
-    case relative_humidity_150hPa
-    case relative_humidity_200hPa
-    case relative_humidity_250hPa
-    case relative_humidity_300hPa
-    case relative_humidity_400hPa
-    case relative_humidity_500hPa
-    case relative_humidity_600hPa
-    case relative_humidity_700hPa
-    case relative_humidity_850hPa
-    case relative_humidity_925hPa
-    case relative_humidity_1000hPa
-
-    case temperature_50hPa
-    case temperature_100hPa
-    case temperature_150hPa
-    case temperature_200hPa
-    case temperature_250hPa
-    case temperature_300hPa
-    case temperature_400hPa
-    case temperature_500hPa
-    case temperature_600hPa
-    case temperature_700hPa
-    case temperature_850hPa
-    case temperature_925hPa
-    case temperature_1000hPa
-
-    case wind_u_component_50hPa
-    case wind_u_component_100hPa
-    case wind_u_component_150hPa
-    case wind_u_component_200hPa
-    case wind_u_component_250hPa
-    case wind_u_component_300hPa
-    case wind_u_component_400hPa
-    case wind_u_component_500hPa
-    case wind_u_component_600hPa
-    case wind_u_component_700hPa
-    case wind_u_component_850hPa
-    case wind_u_component_925hPa
-    case wind_u_component_1000hPa
-
-    case wind_v_component_50hPa
-    case wind_v_component_100hPa
-    case wind_v_component_150hPa
-    case wind_v_component_200hPa
-    case wind_v_component_250hPa
-    case wind_v_component_300hPa
-    case wind_v_component_400hPa
-    case wind_v_component_500hPa
-    case wind_v_component_600hPa
-    case wind_v_component_700hPa
-    case wind_v_component_850hPa
-    case wind_v_component_925hPa
-    case wind_v_component_1000hPa
-
-    case vertical_velocity_50hPa
-    case vertical_velocity_100hPa
-    case vertical_velocity_150hPa
-    case vertical_velocity_200hPa
-    case vertical_velocity_250hPa
-    case vertical_velocity_300hPa
-    case vertical_velocity_400hPa
-    case vertical_velocity_500hPa
-    case vertical_velocity_600hPa
-    case vertical_velocity_700hPa
-    case vertical_velocity_850hPa
-    case vertical_velocity_925hPa
-    case vertical_velocity_1000hPa
-
     case wind_speed_10m
     case wind_direction_10m
     case wind_speed_100m
     case wind_direction_100m
 
-    case wind_speed_50hPa
-    case wind_speed_100hPa
-    case wind_speed_150hPa
-    case wind_speed_200hPa
-    case wind_speed_250hPa
-    case wind_speed_300hPa
-    case wind_speed_400hPa
-    case wind_speed_500hPa
-    case wind_speed_600hPa
-    case wind_speed_700hPa
-    case wind_speed_850hPa
-    case wind_speed_925hPa
-    case wind_speed_1000hPa
+    private enum MetadataGroup {
+        case temperature
+        case pressureMsl
+        case precipitation
+        case cloudCover
+        case windComponent
+        case windSpeed
+        case windDirection
+    }
 
-    case wind_direction_50hPa
-    case wind_direction_100hPa
-    case wind_direction_150hPa
-    case wind_direction_200hPa
-    case wind_direction_250hPa
-    case wind_direction_300hPa
-    case wind_direction_400hPa
-    case wind_direction_500hPa
-    case wind_direction_600hPa
-    case wind_direction_700hPa
-    case wind_direction_850hPa
-    case wind_direction_925hPa
-    case wind_direction_1000hPa
+    private var metadataGroup: MetadataGroup {
+        switch self {
+        case .temperature_2m, .sea_surface_temperature:
+            return .temperature
+        case .pressure_msl:
+            return .pressureMsl
+        case .total_precipitation_6hr:
+            return .precipitation
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            return .cloudCover
+        case .wind_u_component_100m,
+             .wind_v_component_100m,
+             .wind_u_component_10m,
+             .wind_v_component_10m:
+            return .windComponent
+        case .wind_speed_10m, .wind_speed_100m:
+            return .windSpeed
+        case .wind_direction_10m, .wind_direction_100m:
+            return .windDirection
+        }
+    }
 
     var omFileName: (file: String, level: Int) {
-        (rawValue, 0)
+        switch self {
+        case .total_precipitation_6hr:
+            return ("precipitation", 0)
+        default:
+            return (rawValue, 0)
+        }
     }
 
     var scalefactor: Float {
-        switch self {
-        case .temperature_2m,
-             .sea_surface_temperature,
-             .temperature_50hPa,
-             .temperature_100hPa,
-             .temperature_150hPa,
-             .temperature_200hPa,
-             .temperature_250hPa,
-             .temperature_300hPa,
-             .temperature_400hPa,
-             .temperature_500hPa,
-             .temperature_600hPa,
-             .temperature_700hPa,
-             .temperature_850hPa,
-             .temperature_925hPa,
-             .temperature_1000hPa:
+        switch metadataGroup {
+        case .temperature:
             return 20
-
-        case .relative_humidity_50hPa,
-             .relative_humidity_100hPa,
-             .relative_humidity_150hPa,
-             .relative_humidity_200hPa,
-             .relative_humidity_250hPa,
-             .relative_humidity_300hPa,
-             .relative_humidity_400hPa,
-             .relative_humidity_500hPa,
-             .relative_humidity_600hPa,
-             .relative_humidity_700hPa,
-             .relative_humidity_850hPa,
-             .relative_humidity_925hPa,
-             .relative_humidity_1000hPa:
-            return 1
-
-        case .pressure_msl:
+        case .pressureMsl:
             return 10
-
-        case .total_precipitation_6hr:
+        case .precipitation:
             return 10
-
-        case .cloud_cover,
-             .cloud_cover_low,
-             .cloud_cover_mid,
-             .cloud_cover_high:
+        case .cloudCover:
             return 1
-
-        case .wind_speed_10m,
-             .wind_speed_100m,
-             .wind_speed_50hPa,
-             .wind_speed_100hPa,
-             .wind_speed_150hPa,
-             .wind_speed_200hPa,
-             .wind_speed_250hPa,
-             .wind_speed_300hPa,
-             .wind_speed_400hPa,
-             .wind_speed_500hPa,
-             .wind_speed_600hPa,
-             .wind_speed_700hPa,
-             .wind_speed_850hPa,
-             .wind_speed_925hPa,
-             .wind_speed_1000hPa,
-             .wind_u_component_10m,
-             .wind_v_component_10m,
-             .wind_u_component_100m,
-             .wind_v_component_100m,
-             .wind_u_component_50hPa,
-             .wind_u_component_100hPa,
-             .wind_u_component_150hPa,
-             .wind_u_component_200hPa,
-             .wind_u_component_250hPa,
-             .wind_u_component_300hPa,
-             .wind_u_component_400hPa,
-             .wind_u_component_500hPa,
-             .wind_u_component_600hPa,
-             .wind_u_component_700hPa,
-             .wind_u_component_850hPa,
-             .wind_u_component_925hPa,
-             .wind_u_component_1000hPa,
-             .wind_v_component_50hPa,
-             .wind_v_component_100hPa,
-             .wind_v_component_150hPa,
-             .wind_v_component_200hPa,
-             .wind_v_component_250hPa,
-             .wind_v_component_300hPa,
-             .wind_v_component_400hPa,
-             .wind_v_component_500hPa,
-             .wind_v_component_600hPa,
-             .wind_v_component_700hPa,
-             .wind_v_component_850hPa,
-             .wind_v_component_925hPa,
-             .wind_v_component_1000hPa:
+        case .windComponent, .windSpeed:
             return 10
-
-        case .wind_direction_10m,
-             .wind_direction_100m,
-             .wind_direction_50hPa,
-             .wind_direction_100hPa,
-             .wind_direction_150hPa,
-             .wind_direction_200hPa,
-             .wind_direction_250hPa,
-             .wind_direction_300hPa,
-             .wind_direction_400hPa,
-             .wind_direction_500hPa,
-             .wind_direction_600hPa,
-             .wind_direction_700hPa,
-             .wind_direction_850hPa,
-             .wind_direction_925hPa,
-             .wind_direction_1000hPa:
+        case .windDirection:
             return 1
-
-        case .geopotential_height_50hPa,
-             .geopotential_height_100hPa,
-             .geopotential_height_150hPa,
-             .geopotential_height_200hPa,
-             .geopotential_height_250hPa,
-             .geopotential_height_300hPa,
-             .geopotential_height_400hPa,
-             .geopotential_height_500hPa,
-             .geopotential_height_600hPa,
-             .geopotential_height_700hPa,
-             .geopotential_height_850hPa,
-             .geopotential_height_925hPa,
-             .geopotential_height_1000hPa:
-            return 1
-
-        case .vertical_velocity_50hPa,
-             .vertical_velocity_100hPa,
-             .vertical_velocity_150hPa,
-             .vertical_velocity_200hPa,
-             .vertical_velocity_250hPa,
-             .vertical_velocity_300hPa,
-             .vertical_velocity_400hPa,
-             .vertical_velocity_500hPa,
-             .vertical_velocity_600hPa,
-             .vertical_velocity_700hPa,
-             .vertical_velocity_850hPa,
-             .vertical_velocity_925hPa,
-             .vertical_velocity_1000hPa:
-            return 100
         }
     }
 
     var interpolation: ReaderInterpolation {
-        switch self {
-        case .temperature_2m,
-             .sea_surface_temperature,
-             .temperature_50hPa,
-             .temperature_100hPa,
-             .temperature_150hPa,
-             .temperature_200hPa,
-             .temperature_250hPa,
-             .temperature_300hPa,
-             .temperature_400hPa,
-             .temperature_500hPa,
-             .temperature_600hPa,
-             .temperature_700hPa,
-             .temperature_850hPa,
-             .temperature_925hPa,
-             .temperature_1000hPa,
-             .pressure_msl,
-             .geopotential_height_50hPa,
-             .geopotential_height_100hPa,
-             .geopotential_height_150hPa,
-             .geopotential_height_200hPa,
-             .geopotential_height_250hPa,
-             .geopotential_height_300hPa,
-             .geopotential_height_400hPa,
-             .geopotential_height_500hPa,
-             .geopotential_height_600hPa,
-             .geopotential_height_700hPa,
-             .geopotential_height_850hPa,
-             .geopotential_height_925hPa,
-             .geopotential_height_1000hPa,
-             .wind_u_component_10m,
-             .wind_v_component_10m,
-             .wind_u_component_100m,
-             .wind_v_component_100m,
-             .wind_u_component_50hPa,
-             .wind_u_component_100hPa,
-             .wind_u_component_150hPa,
-             .wind_u_component_200hPa,
-             .wind_u_component_250hPa,
-             .wind_u_component_300hPa,
-             .wind_u_component_400hPa,
-             .wind_u_component_500hPa,
-             .wind_u_component_600hPa,
-             .wind_u_component_700hPa,
-             .wind_u_component_850hPa,
-             .wind_u_component_925hPa,
-             .wind_u_component_1000hPa,
-             .wind_v_component_50hPa,
-             .wind_v_component_100hPa,
-             .wind_v_component_150hPa,
-             .wind_v_component_200hPa,
-             .wind_v_component_250hPa,
-             .wind_v_component_300hPa,
-             .wind_v_component_400hPa,
-             .wind_v_component_500hPa,
-             .wind_v_component_600hPa,
-             .wind_v_component_700hPa,
-             .wind_v_component_850hPa,
-             .wind_v_component_925hPa,
-             .wind_v_component_1000hPa,
-             .vertical_velocity_50hPa,
-             .vertical_velocity_100hPa,
-             .vertical_velocity_150hPa,
-             .vertical_velocity_200hPa,
-             .vertical_velocity_250hPa,
-             .vertical_velocity_300hPa,
-             .vertical_velocity_400hPa,
-             .vertical_velocity_500hPa,
-             .vertical_velocity_600hPa,
-             .vertical_velocity_700hPa,
-             .vertical_velocity_850hPa,
-             .vertical_velocity_925hPa,
-             .vertical_velocity_1000hPa:
+        switch metadataGroup {
+        case .temperature, .pressureMsl, .windComponent:
             return .hermite(bounds: nil)
-
-        case .wind_speed_10m,
-             .wind_speed_100m,
-             .wind_speed_50hPa,
-             .wind_speed_100hPa,
-             .wind_speed_150hPa,
-             .wind_speed_200hPa,
-             .wind_speed_250hPa,
-             .wind_speed_300hPa,
-             .wind_speed_400hPa,
-             .wind_speed_500hPa,
-             .wind_speed_600hPa,
-             .wind_speed_700hPa,
-             .wind_speed_850hPa,
-             .wind_speed_925hPa,
-             .wind_speed_1000hPa:
-            return .hermite(bounds: 0...10e9)
-
-        case .wind_direction_10m,
-             .wind_direction_100m,
-             .wind_direction_50hPa,
-             .wind_direction_100hPa,
-             .wind_direction_150hPa,
-             .wind_direction_200hPa,
-             .wind_direction_250hPa,
-             .wind_direction_300hPa,
-             .wind_direction_400hPa,
-             .wind_direction_500hPa,
-             .wind_direction_600hPa,
-             .wind_direction_700hPa,
-             .wind_direction_850hPa,
-             .wind_direction_925hPa,
-             .wind_direction_1000hPa:
-            return .linearDegrees
-
-        case .relative_humidity_50hPa,
-             .relative_humidity_100hPa,
-             .relative_humidity_150hPa,
-             .relative_humidity_200hPa,
-             .relative_humidity_250hPa,
-             .relative_humidity_300hPa,
-             .relative_humidity_400hPa,
-             .relative_humidity_500hPa,
-             .relative_humidity_600hPa,
-             .relative_humidity_700hPa,
-             .relative_humidity_850hPa,
-             .relative_humidity_925hPa,
-             .relative_humidity_1000hPa:
-            return .hermite(bounds: 0...100)
-
-        case .total_precipitation_6hr:
+        case .precipitation:
             return .backwards_sum
-
-        case .cloud_cover,
-             .cloud_cover_low,
-             .cloud_cover_mid,
-             .cloud_cover_high:
+        case .cloudCover:
             return .hermite(bounds: 0...100)
+        case .windSpeed:
+            return .hermite(bounds: 0...10e9)
+        case .windDirection:
+            return .linearDegrees
         }
     }
 
     var unit: SiUnit {
-        switch self {
-        case .temperature_2m,
-             .sea_surface_temperature,
-             .temperature_50hPa,
-             .temperature_100hPa,
-             .temperature_150hPa,
-             .temperature_200hPa,
-             .temperature_250hPa,
-             .temperature_300hPa,
-             .temperature_400hPa,
-             .temperature_500hPa,
-             .temperature_600hPa,
-             .temperature_700hPa,
-             .temperature_850hPa,
-             .temperature_925hPa,
-             .temperature_1000hPa:
+        switch metadataGroup {
+        case .temperature:
             return .celsius
-
-        case .pressure_msl:
+        case .pressureMsl:
             return .hectopascal
-
-        case .total_precipitation_6hr:
+        case .precipitation:
             return .millimetre
-
-        case .cloud_cover,
-             .cloud_cover_low,
-             .cloud_cover_mid,
-             .cloud_cover_high:
+        case .cloudCover:
             return .percentage
-
-        case .relative_humidity_50hPa,
-             .relative_humidity_100hPa,
-             .relative_humidity_150hPa,
-             .relative_humidity_200hPa,
-             .relative_humidity_250hPa,
-             .relative_humidity_300hPa,
-             .relative_humidity_400hPa,
-             .relative_humidity_500hPa,
-             .relative_humidity_600hPa,
-             .relative_humidity_700hPa,
-             .relative_humidity_850hPa,
-             .relative_humidity_925hPa,
-             .relative_humidity_1000hPa:
-            return .percentage
-
-        case .wind_speed_10m,
-             .wind_speed_100m,
-             .wind_speed_50hPa,
-             .wind_speed_100hPa,
-             .wind_speed_150hPa,
-             .wind_speed_200hPa,
-             .wind_speed_250hPa,
-             .wind_speed_300hPa,
-             .wind_speed_400hPa,
-             .wind_speed_500hPa,
-             .wind_speed_600hPa,
-             .wind_speed_700hPa,
-             .wind_speed_850hPa,
-             .wind_speed_925hPa,
-             .wind_speed_1000hPa,
-             .wind_u_component_10m,
-             .wind_v_component_10m,
-             .wind_u_component_100m,
-             .wind_v_component_100m,
-             .wind_u_component_50hPa,
-             .wind_u_component_100hPa,
-             .wind_u_component_150hPa,
-             .wind_u_component_200hPa,
-             .wind_u_component_250hPa,
-             .wind_u_component_300hPa,
-             .wind_u_component_400hPa,
-             .wind_u_component_500hPa,
-             .wind_u_component_600hPa,
-             .wind_u_component_700hPa,
-             .wind_u_component_850hPa,
-             .wind_u_component_925hPa,
-             .wind_u_component_1000hPa,
-             .wind_v_component_50hPa,
-             .wind_v_component_100hPa,
-             .wind_v_component_150hPa,
-             .wind_v_component_200hPa,
-             .wind_v_component_250hPa,
-             .wind_v_component_300hPa,
-             .wind_v_component_400hPa,
-             .wind_v_component_500hPa,
-             .wind_v_component_600hPa,
-             .wind_v_component_700hPa,
-             .wind_v_component_850hPa,
-             .wind_v_component_925hPa,
-             .wind_v_component_1000hPa:
+        case .windComponent, .windSpeed:
             return .metrePerSecond
-
-        case .wind_direction_10m,
-             .wind_direction_100m,
-             .wind_direction_50hPa,
-             .wind_direction_100hPa,
-             .wind_direction_150hPa,
-             .wind_direction_200hPa,
-             .wind_direction_250hPa,
-             .wind_direction_300hPa,
-             .wind_direction_400hPa,
-             .wind_direction_500hPa,
-             .wind_direction_600hPa,
-             .wind_direction_700hPa,
-             .wind_direction_850hPa,
-             .wind_direction_925hPa,
-             .wind_direction_1000hPa:
+        case .windDirection:
             return .degreeDirection
-
-        case .geopotential_height_50hPa,
-             .geopotential_height_100hPa,
-             .geopotential_height_150hPa,
-             .geopotential_height_200hPa,
-             .geopotential_height_250hPa,
-             .geopotential_height_300hPa,
-             .geopotential_height_400hPa,
-             .geopotential_height_500hPa,
-             .geopotential_height_600hPa,
-             .geopotential_height_700hPa,
-             .geopotential_height_850hPa,
-             .geopotential_height_925hPa,
-             .geopotential_height_1000hPa:
-            return .metre
-
-        case .vertical_velocity_50hPa,
-             .vertical_velocity_100hPa,
-             .vertical_velocity_150hPa,
-             .vertical_velocity_200hPa,
-             .vertical_velocity_250hPa,
-             .vertical_velocity_300hPa,
-             .vertical_velocity_400hPa,
-             .vertical_velocity_500hPa,
-             .vertical_velocity_600hPa,
-             .vertical_velocity_700hPa,
-             .vertical_velocity_850hPa,
-             .vertical_velocity_925hPa,
-             .vertical_velocity_1000hPa:
-            return .metrePerSecond
         }
     }
 
     var isElevationCorrectable: Bool {
-        switch self {
-        case .temperature_2m:
-            return true
-        default:
-            return false
-        }
+        self == .temperature_2m
     }
 
     var storePreviousForecast: Bool {
@@ -602,444 +159,227 @@ enum WeatherNextVariable: String, CaseIterable, GenericVariableMixable, GenericV
             return false
         }
     }
-
-    var multiplyAdd: (multiply: Float, add: Float)? {
-        switch self {
-        case .temperature_2m,
-             .sea_surface_temperature,
-             .temperature_50hPa,
-             .temperature_100hPa,
-             .temperature_150hPa,
-             .temperature_200hPa,
-             .temperature_250hPa,
-             .temperature_300hPa,
-             .temperature_400hPa,
-             .temperature_500hPa,
-             .temperature_600hPa,
-             .temperature_700hPa,
-             .temperature_850hPa,
-             .temperature_925hPa,
-             .temperature_1000hPa:
-            return (1, -273.15)
-
-        case .pressure_msl:
-            return (1 / 100, 0)
-
-        default:
-            return nil
-        }
-    }
 }
 
-extension WeatherNextVariable {
-    static let rawVariables: [WeatherNextVariable] = [
-        .wind_u_component_100m,
-        .wind_v_component_100m,
-        .wind_u_component_10m,
-        .wind_v_component_10m,
-        .temperature_2m,
-        .pressure_msl,
-        .sea_surface_temperature,
-        .total_precipitation_6hr,
-        .geopotential_height_50hPa,
-        .geopotential_height_100hPa,
-        .geopotential_height_150hPa,
-        .geopotential_height_200hPa,
-        .geopotential_height_250hPa,
-        .geopotential_height_300hPa,
-        .geopotential_height_400hPa,
-        .geopotential_height_500hPa,
-        .geopotential_height_600hPa,
-        .geopotential_height_700hPa,
-        .geopotential_height_850hPa,
-        .geopotential_height_925hPa,
-        .geopotential_height_1000hPa,
-        .relative_humidity_50hPa,
-        .relative_humidity_100hPa,
-        .relative_humidity_150hPa,
-        .relative_humidity_200hPa,
-        .relative_humidity_250hPa,
-        .relative_humidity_300hPa,
-        .relative_humidity_400hPa,
-        .relative_humidity_500hPa,
-        .relative_humidity_600hPa,
-        .relative_humidity_700hPa,
-        .relative_humidity_850hPa,
-        .relative_humidity_925hPa,
-        .relative_humidity_1000hPa,
-        .temperature_50hPa,
-        .temperature_100hPa,
-        .temperature_150hPa,
-        .temperature_200hPa,
-        .temperature_250hPa,
-        .temperature_300hPa,
-        .temperature_400hPa,
-        .temperature_500hPa,
-        .temperature_600hPa,
-        .temperature_700hPa,
-        .temperature_850hPa,
-        .temperature_925hPa,
-        .temperature_1000hPa,
-        .wind_u_component_50hPa,
-        .wind_u_component_100hPa,
-        .wind_u_component_150hPa,
-        .wind_u_component_200hPa,
-        .wind_u_component_250hPa,
-        .wind_u_component_300hPa,
-        .wind_u_component_400hPa,
-        .wind_u_component_500hPa,
-        .wind_u_component_600hPa,
-        .wind_u_component_700hPa,
-        .wind_u_component_850hPa,
-        .wind_u_component_925hPa,
-        .wind_u_component_1000hPa,
-        .wind_v_component_50hPa,
-        .wind_v_component_100hPa,
-        .wind_v_component_150hPa,
-        .wind_v_component_200hPa,
-        .wind_v_component_250hPa,
-        .wind_v_component_300hPa,
-        .wind_v_component_400hPa,
-        .wind_v_component_500hPa,
-        .wind_v_component_600hPa,
-        .wind_v_component_700hPa,
-        .wind_v_component_850hPa,
-        .wind_v_component_925hPa,
-        .wind_v_component_1000hPa,
-        .vertical_velocity_50hPa,
-        .vertical_velocity_100hPa,
-        .vertical_velocity_150hPa,
-        .vertical_velocity_200hPa,
-        .vertical_velocity_250hPa,
-        .vertical_velocity_300hPa,
-        .vertical_velocity_400hPa,
-        .vertical_velocity_500hPa,
-        .vertical_velocity_600hPa,
-        .vertical_velocity_700hPa,
-        .vertical_velocity_850hPa,
-        .vertical_velocity_925hPa,
-        .vertical_velocity_1000hPa
-    ]
+enum WeatherNextPressureVariableType: String, CaseIterable, Sendable {
+    case geopotential_height
+    case relative_humidity
+    case temperature
+    case wind_u_component
+    case wind_v_component
+    case vertical_velocity
+    case wind_speed
+    case wind_direction
+}
 
-    static let surfaceVariables: [WeatherNextVariable] = [
-        .wind_u_component_100m,
-        .wind_v_component_100m,
-        .wind_u_component_10m,
-        .wind_v_component_10m,
-        .temperature_2m,
-        .pressure_msl,
-        .sea_surface_temperature,
-        .total_precipitation_6hr,
-        .cloud_cover,
-        .cloud_cover_low,
-        .cloud_cover_mid,
-        .cloud_cover_high,
-        .wind_speed_10m,
-        .wind_direction_10m,
-        .wind_speed_100m,
-        .wind_direction_100m
-    ]
+/**
+ WeatherNext pressure-level variables.
 
-    static let pressureLevelVariables: [WeatherNextVariable] = [
-        .geopotential_height_50hPa,
-        .geopotential_height_100hPa,
-        .geopotential_height_150hPa,
-        .geopotential_height_200hPa,
-        .geopotential_height_250hPa,
-        .geopotential_height_300hPa,
-        .geopotential_height_400hPa,
-        .geopotential_height_500hPa,
-        .geopotential_height_600hPa,
-        .geopotential_height_700hPa,
-        .geopotential_height_850hPa,
-        .geopotential_height_925hPa,
-        .geopotential_height_1000hPa,
+ `rawValue` and `omFileName.file` are intentionally identical here, so a value like
+ `temperature_500hPa` is both:
+ - the source OM child name in the upstream WeatherNext file
+ - the canonical Open-Meteo storage/API name
+ */
+struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable, GenericVariable {
+    let variable: WeatherNextPressureVariableType
+    let level: Int
 
-        .relative_humidity_50hPa,
-        .relative_humidity_100hPa,
-        .relative_humidity_150hPa,
-        .relative_humidity_200hPa,
-        .relative_humidity_250hPa,
-        .relative_humidity_300hPa,
-        .relative_humidity_400hPa,
-        .relative_humidity_500hPa,
-        .relative_humidity_600hPa,
-        .relative_humidity_700hPa,
-        .relative_humidity_850hPa,
-        .relative_humidity_925hPa,
-        .relative_humidity_1000hPa,
-
-        .temperature_50hPa,
-        .temperature_100hPa,
-        .temperature_150hPa,
-        .temperature_200hPa,
-        .temperature_250hPa,
-        .temperature_300hPa,
-        .temperature_400hPa,
-        .temperature_500hPa,
-        .temperature_600hPa,
-        .temperature_700hPa,
-        .temperature_850hPa,
-        .temperature_925hPa,
-        .temperature_1000hPa,
-
-        .wind_u_component_50hPa,
-        .wind_u_component_100hPa,
-        .wind_u_component_150hPa,
-        .wind_u_component_200hPa,
-        .wind_u_component_250hPa,
-        .wind_u_component_300hPa,
-        .wind_u_component_400hPa,
-        .wind_u_component_500hPa,
-        .wind_u_component_600hPa,
-        .wind_u_component_700hPa,
-        .wind_u_component_850hPa,
-        .wind_u_component_925hPa,
-        .wind_u_component_1000hPa,
-
-        .wind_v_component_50hPa,
-        .wind_v_component_100hPa,
-        .wind_v_component_150hPa,
-        .wind_v_component_200hPa,
-        .wind_v_component_250hPa,
-        .wind_v_component_300hPa,
-        .wind_v_component_400hPa,
-        .wind_v_component_500hPa,
-        .wind_v_component_600hPa,
-        .wind_v_component_700hPa,
-        .wind_v_component_850hPa,
-        .wind_v_component_925hPa,
-        .wind_v_component_1000hPa,
-
-        .vertical_velocity_50hPa,
-        .vertical_velocity_100hPa,
-        .vertical_velocity_150hPa,
-        .vertical_velocity_200hPa,
-        .vertical_velocity_250hPa,
-        .vertical_velocity_300hPa,
-        .vertical_velocity_400hPa,
-        .vertical_velocity_500hPa,
-        .vertical_velocity_600hPa,
-        .vertical_velocity_700hPa,
-        .vertical_velocity_850hPa,
-        .vertical_velocity_925hPa,
-        .vertical_velocity_1000hPa
-    ]
-
-    var isPressureLevelVariable: Bool {
-        Self.pressureLevelVariables.contains(self)
+    init(variable: WeatherNextPressureVariableType, level: Int) {
+        self.variable = variable
+        self.level = level
     }
 
-    var isSurfaceVariable: Bool {
-        Self.surfaceVariables.contains(self)
-    }
-
-    var isRelativeHumidityPressureLevel: Bool {
-        switch self {
-        case .relative_humidity_50hPa,
-             .relative_humidity_100hPa,
-             .relative_humidity_150hPa,
-             .relative_humidity_200hPa,
-             .relative_humidity_250hPa,
-             .relative_humidity_300hPa,
-             .relative_humidity_400hPa,
-             .relative_humidity_500hPa,
-             .relative_humidity_600hPa,
-             .relative_humidity_700hPa,
-             .relative_humidity_850hPa,
-             .relative_humidity_925hPa,
-             .relative_humidity_1000hPa:
-            return true
-        default:
-            return false
-        }
-    }
-
-    static func temperature(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        switch level {
-        case .hPa50: return .temperature_50hPa
-        case .hPa100: return .temperature_100hPa
-        case .hPa150: return .temperature_150hPa
-        case .hPa200: return .temperature_200hPa
-        case .hPa250: return .temperature_250hPa
-        case .hPa300: return .temperature_300hPa
-        case .hPa400: return .temperature_400hPa
-        case .hPa500: return .temperature_500hPa
-        case .hPa600: return .temperature_600hPa
-        case .hPa700: return .temperature_700hPa
-        case .hPa850: return .temperature_850hPa
-        case .hPa925: return .temperature_925hPa
-        case .hPa1000: return .temperature_1000hPa
-        }
-    }
-
-    static func windU(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        switch level {
-        case .hPa50: return .wind_u_component_50hPa
-        case .hPa100: return .wind_u_component_100hPa
-        case .hPa150: return .wind_u_component_150hPa
-        case .hPa200: return .wind_u_component_200hPa
-        case .hPa250: return .wind_u_component_250hPa
-        case .hPa300: return .wind_u_component_300hPa
-        case .hPa400: return .wind_u_component_400hPa
-        case .hPa500: return .wind_u_component_500hPa
-        case .hPa600: return .wind_u_component_600hPa
-        case .hPa700: return .wind_u_component_700hPa
-        case .hPa850: return .wind_u_component_850hPa
-        case .hPa925: return .wind_u_component_925hPa
-        case .hPa1000: return .wind_u_component_1000hPa
-        }
-    }
-
-    static func windV(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        switch level {
-        case .hPa50: return .wind_v_component_50hPa
-        case .hPa100: return .wind_v_component_100hPa
-        case .hPa150: return .wind_v_component_150hPa
-        case .hPa200: return .wind_v_component_200hPa
-        case .hPa250: return .wind_v_component_250hPa
-        case .hPa300: return .wind_v_component_300hPa
-        case .hPa400: return .wind_v_component_400hPa
-        case .hPa500: return .wind_v_component_500hPa
-        case .hPa600: return .wind_v_component_600hPa
-        case .hPa700: return .wind_v_component_700hPa
-        case .hPa850: return .wind_v_component_850hPa
-        case .hPa925: return .wind_v_component_925hPa
-        case .hPa1000: return .wind_v_component_1000hPa
-        }
-    }
-
-    static func windSpeed(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        switch level {
-        case .hPa50: return .wind_speed_50hPa
-        case .hPa100: return .wind_speed_100hPa
-        case .hPa150: return .wind_speed_150hPa
-        case .hPa200: return .wind_speed_200hPa
-        case .hPa250: return .wind_speed_250hPa
-        case .hPa300: return .wind_speed_300hPa
-        case .hPa400: return .wind_speed_400hPa
-        case .hPa500: return .wind_speed_500hPa
-        case .hPa600: return .wind_speed_600hPa
-        case .hPa700: return .wind_speed_700hPa
-        case .hPa850: return .wind_speed_850hPa
-        case .hPa925: return .wind_speed_925hPa
-        case .hPa1000: return .wind_speed_1000hPa
-        }
-    }
-
-    static func windDirection(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        switch level {
-        case .hPa50: return .wind_direction_50hPa
-        case .hPa100: return .wind_direction_100hPa
-        case .hPa150: return .wind_direction_150hPa
-        case .hPa200: return .wind_direction_200hPa
-        case .hPa250: return .wind_direction_250hPa
-        case .hPa300: return .wind_direction_300hPa
-        case .hPa400: return .wind_direction_400hPa
-        case .hPa500: return .wind_direction_500hPa
-        case .hPa600: return .wind_direction_600hPa
-        case .hPa700: return .wind_direction_700hPa
-        case .hPa850: return .wind_direction_850hPa
-        case .hPa925: return .wind_direction_925hPa
-        case .hPa1000: return .wind_direction_1000hPa
-        }
+    init(variable: WeatherNextPressureVariableType, level: WeatherNextPressureLevel) {
+        self.init(variable: variable, level: level.level)
     }
 
     var pressureLevel: WeatherNextPressureLevel? {
-        switch self {
-        case .geopotential_height_50hPa,
-             .relative_humidity_50hPa,
-             .temperature_50hPa,
-             .wind_u_component_50hPa,
-             .wind_v_component_50hPa,
-             .vertical_velocity_50hPa:
-            return .hPa50
-        case .geopotential_height_100hPa,
-             .relative_humidity_100hPa,
-             .temperature_100hPa,
-             .wind_u_component_100hPa,
-             .wind_v_component_100hPa,
-             .vertical_velocity_100hPa:
-            return .hPa100
-        case .geopotential_height_150hPa,
-             .relative_humidity_150hPa,
-             .temperature_150hPa,
-             .wind_u_component_150hPa,
-             .wind_v_component_150hPa,
-             .vertical_velocity_150hPa:
-            return .hPa150
-        case .geopotential_height_200hPa,
-             .relative_humidity_200hPa,
-             .temperature_200hPa,
-             .wind_u_component_200hPa,
-             .wind_v_component_200hPa,
-             .vertical_velocity_200hPa:
-            return .hPa200
-        case .geopotential_height_250hPa,
-             .relative_humidity_250hPa,
-             .temperature_250hPa,
-             .wind_u_component_250hPa,
-             .wind_v_component_250hPa,
-             .vertical_velocity_250hPa:
-            return .hPa250
-        case .geopotential_height_300hPa,
-             .relative_humidity_300hPa,
-             .temperature_300hPa,
-             .wind_u_component_300hPa,
-             .wind_v_component_300hPa,
-             .vertical_velocity_300hPa:
-            return .hPa300
-        case .geopotential_height_400hPa,
-             .relative_humidity_400hPa,
-             .temperature_400hPa,
-             .wind_u_component_400hPa,
-             .wind_v_component_400hPa,
-             .vertical_velocity_400hPa:
-            return .hPa400
-        case .geopotential_height_500hPa,
-             .relative_humidity_500hPa,
-             .temperature_500hPa,
-             .wind_u_component_500hPa,
-             .wind_v_component_500hPa,
-             .vertical_velocity_500hPa:
-            return .hPa500
-        case .geopotential_height_600hPa,
-             .relative_humidity_600hPa,
-             .temperature_600hPa,
-             .wind_u_component_600hPa,
-             .wind_v_component_600hPa,
-             .vertical_velocity_600hPa:
-            return .hPa600
-        case .geopotential_height_700hPa,
-             .relative_humidity_700hPa,
-             .temperature_700hPa,
-             .wind_u_component_700hPa,
-             .wind_v_component_700hPa,
-             .vertical_velocity_700hPa:
-            return .hPa700
-        case .geopotential_height_850hPa,
-             .relative_humidity_850hPa,
-             .temperature_850hPa,
-             .wind_u_component_850hPa,
-             .wind_v_component_850hPa,
-             .vertical_velocity_850hPa:
-            return .hPa850
-        case .geopotential_height_925hPa,
-             .relative_humidity_925hPa,
-             .temperature_925hPa,
-             .wind_u_component_925hPa,
-             .wind_v_component_925hPa,
-             .vertical_velocity_925hPa:
-            return .hPa925
-        case .geopotential_height_1000hPa,
-             .relative_humidity_1000hPa,
-             .temperature_1000hPa,
-             .wind_u_component_1000hPa,
-             .wind_v_component_1000hPa,
-             .vertical_velocity_1000hPa:
-            return .hPa1000
-        default:
+        WeatherNextPressureLevel(rawValue: level)
+    }
+
+    var omFileName: (file: String, level: Int) {
+        (rawValue, 0)
+    }
+
+    var scalefactor: Float {
+        switch variable {
+        case .temperature:
+            return 20
+        case .relative_humidity:
+            return 1
+        case .geopotential_height:
+            return 1
+        case .wind_u_component, .wind_v_component, .wind_speed:
+            return 10
+        case .wind_direction:
+            return 1
+        case .vertical_velocity:
+            return 100
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch variable {
+        case .temperature,
+             .geopotential_height,
+             .wind_u_component,
+             .wind_v_component,
+             .vertical_velocity:
+            return .hermite(bounds: nil)
+        case .relative_humidity:
+            return .hermite(bounds: 0...100)
+        case .wind_speed:
+            return .hermite(bounds: 0...10e9)
+        case .wind_direction:
+            return .linearDegrees
+        }
+    }
+
+    var unit: SiUnit {
+        switch variable {
+        case .temperature:
+            return .celsius
+        case .relative_humidity:
+            return .percentage
+        case .geopotential_height:
+            return .metre
+        case .wind_u_component, .wind_v_component, .wind_speed, .vertical_velocity:
+            return .metrePerSecond
+        case .wind_direction:
+            return .degreeDirection
+        }
+    }
+
+    var isElevationCorrectable: Bool {
+        false
+    }
+
+    var storePreviousForecast: Bool {
+        false
+    }
+}
+
+typealias WeatherNextVariable = SurfaceAndPressureVariable<WeatherNextSurfaceVariable, WeatherNextPressureVariable>
+
+extension WeatherNextVariable {
+    private static let rawPressureVariableTypes: [WeatherNextPressureVariableType] = [
+        .geopotential_height,
+        .relative_humidity,
+        .temperature,
+        .wind_u_component,
+        .wind_v_component,
+        .vertical_velocity
+    ]
+
+    private static let derivedPressureVariableTypes: [WeatherNextPressureVariableType] = [
+        .wind_speed,
+        .wind_direction
+    ]
+
+    static let surfaceVariables: [WeatherNextVariable] =
+        WeatherNextSurfaceVariable.allCases.map(Self.surface)
+
+    /**
+     Pressure-level variables physically present in the upstream WeatherNext source files.
+     */
+    static let pressureLevelVariables: [WeatherNextVariable] =
+        WeatherNextPressureLevel.allCases.flatMap { level in
+            rawPressureVariableTypes.map { type in
+                Self.pressure(.init(variable: type, level: level))
+            }
+        }
+
+    /**
+     Pressure-level variables derived and exposed in Open-Meteo output naming, but not read directly
+     from the upstream WeatherNext source files.
+     */
+    static let derivedPressureLevelVariables: [WeatherNextVariable] =
+        WeatherNextPressureLevel.allCases.flatMap { level in
+            derivedPressureVariableTypes.map { type in
+                Self.pressure(.init(variable: type, level: level))
+            }
+        }
+
+    /**
+     Variables read directly from the upstream WeatherNext OM files.
+     */
+    static let rawVariables: [WeatherNextVariable] =
+        [
+            .surface(.wind_u_component_100m),
+            .surface(.wind_v_component_100m),
+            .surface(.wind_u_component_10m),
+            .surface(.wind_v_component_10m),
+            .surface(.temperature_2m),
+            .surface(.pressure_msl),
+            .surface(.sea_surface_temperature),
+            .surface(.total_precipitation_6hr)
+        ] + pressureLevelVariables
+
+    var isPressureLevelVariable: Bool {
+        if case .pressure = self {
+            return true
+        }
+        return false
+    }
+
+    var isSurfaceVariable: Bool {
+        if case .surface = self {
+            return true
+        }
+        return false
+    }
+
+    var isRelativeHumidityPressureLevel: Bool {
+        guard case .pressure(let pressure) = self else {
+            return false
+        }
+        return pressure.variable == .relative_humidity
+    }
+
+    var pressureLevel: WeatherNextPressureLevel? {
+        guard case .pressure(let pressure) = self else {
             return nil
         }
+        return pressure.pressureLevel
+    }
+
+    static func temperature(level: WeatherNextPressureLevel) -> WeatherNextVariable {
+        .pressure(.init(variable: .temperature, level: level))
+    }
+
+    static func windU(level: WeatherNextPressureLevel) -> WeatherNextVariable {
+        .pressure(.init(variable: .wind_u_component, level: level))
+    }
+
+    static func windV(level: WeatherNextPressureLevel) -> WeatherNextVariable {
+        .pressure(.init(variable: .wind_v_component, level: level))
+    }
+
+    static func windSpeed(level: WeatherNextPressureLevel) -> WeatherNextVariable {
+        .pressure(.init(variable: .wind_speed, level: level))
+    }
+
+    static func windDirection(level: WeatherNextPressureLevel) -> WeatherNextVariable {
+        .pressure(.init(variable: .wind_direction, level: level))
+    }
+
+    static var cloud_cover: WeatherNextVariable {
+        .surface(.cloud_cover)
+    }
+
+    static var cloud_cover_low: WeatherNextVariable {
+        .surface(.cloud_cover_low)
+    }
+
+    static var cloud_cover_mid: WeatherNextVariable {
+        .surface(.cloud_cover_mid)
+    }
+
+    static var cloud_cover_high: WeatherNextVariable {
+        .surface(.cloud_cover_high)
+    }
+
+    static var total_precipitation_6hr: WeatherNextVariable {
+        .surface(.total_precipitation_6hr)
     }
 }
