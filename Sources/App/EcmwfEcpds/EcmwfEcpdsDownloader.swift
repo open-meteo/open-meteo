@@ -152,7 +152,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let `class` = "od"
             /// iso string `2016-03-18`
             let date: String
-            let expver = 1
+            let expver: Int
             let levtype = "sfc"
             let param: String
             /// Use forecast hours 1...12. Skip hour 0, as the model is instable at hour 0
@@ -166,22 +166,41 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         let client = application.makeNewHttpClient(redirectConfiguration: .disallow)
         let curl = Curl(logger: logger, client: client, deadLineHours: 999999)
         
-        let sideRunSteps = ["0/1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36/37/38/39/40/41/42/43/44/45/46/47/48/49/50/51/52/53/54/55/56/57/58/59/60/61/62/63/64/65/66/67/68/69/70/71/72/73/74/75/76/77/78/79/80/81/82/83/84/85/86/87/88/89/90/93/96/99/102/105/108/111/114/117/120/123/126/129/132/135/138/141/144"]
-        /// Split 0z/12z runs into 2 requests, because MARS transfers are limited to 75 GB
-        let fullRunSteps = [sideRunSteps[0], "150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360"]
-        
-        let params = params ?? "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/130.151/34.128"
-        
         /// Run process task in the background
         var processTask: Task<(), any Error>? = nil
         
         for run in runs {
+            let isMainRun = run.hour % 12 == 0
+            
+            /// r49 hindcasts at expr 79 are available
+            let ifsR49Hindcast = run >= Timestamp(2024, 3, 13) && run <= Timestamp(2024, 11, 12, 6)
+            
+            /// Side runs at 144h not available before august 6th 18z
+            if !isMainRun && run < Timestamp(2024, 8, 6, 18) {
+                continue
+            }
+            
+            /// Hindcasts only provide 15 days past 16 july
+            let full15Days = run >= Timestamp(2024, 7, 16)
+            
+            let sideRunSteps = "0/1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36/37/38/39/40/41/42/43/44/45/46/47/48/49/50/51/52/53/54/55/56/57/58/59/60/61/62/63/64/65/66/67/68/69/70/71/72/73/74/75/76/77/78/79/80/81/82/83/84/85/86/87/88/89/90/93/96/99/102/105/108/111/114/117/120/123/126/129/132/135/138/141/144"
+            /// Split 0z/12z runs into 2 requests, because MARS transfers are limited to 75 GB -> reduced vars, should fit now
+            /// r48 only provides up to 10 days
+            //let fullRunSteps = full15Days ? ["\(sideRunSteps[0])/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"] : [sideRunSteps[0], "150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360"]
+            let fullRunSteps = full15Days ? "\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360" : "\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"
+            
+            let paramsSide = "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fdir/hcc/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/vis/blh"
+            let paramsMain = "\(paramsSide)/rsn/sd/sithick/ocu/ocv/145.151/130.151/34.128"
+            // "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/130.151/34.128"
+            
+            let params = params ?? (isMainRun ? paramsMain : paramsSide)
+            
             logger.info("Downloading run \(run.iso8601_YYYY_MM_dd_HH_mm)")
             
             let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             let deaverager = GribDeaverager()
-            let stepsArray = run.hour % 12 == 0 ? fullRunSteps : sideRunSteps
-            for steps in stepsArray {
+            let steps = isMainRun ? fullRunSteps : sideRunSteps
+            //for steps in stepsArray {
                 // 20.3 = visibility
                 // 145.151 = Sea surface height
                 // 98.174 = Sea ice thickness
@@ -192,6 +211,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 
                 let query = EcmwfQuery(
                     date: run.iso8601_YYYY_MM_dd,
+                    expver: ifsR49Hindcast ? 79 : 1,
                     param: params,
                     step: steps,
                     stream: run.hour % 12 == 0 ? "oper" : "scda",
@@ -289,7 +309,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     /// Delete job from ECMWF MARS queue to free up resources
                     try await curl.cleanupEcmwfApiJob(job: job, email: email, apikey: key)
                     
-                    if stepsArray.last == steps {
+                    //if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
                         let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
                         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false)
@@ -302,9 +322,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                             logger.info("Deleting local run directory: \(runDir)")
                             try FileManager.default.removeItem(atPath: runDir)
                         }
-                    }
+                    //}
                 }
-            }
+            //}
         }
         try await processTask?.value
         try await client.shutdown()
