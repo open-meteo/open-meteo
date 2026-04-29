@@ -75,7 +75,7 @@ enum ItaliaMeteoArpaeVariablesDownload: String, CaseIterable {
         }
     }
 
-    func getGenericVariable(attributes: GribAttributes) -> GenericVariable? {
+    func getGenericVariable(attributes: GribAttributes) -> (any GenericVariable)? {
         switch self {
         case .ASOB_S:
             return ItaliaMeteoArpaeSurfaceVariable.shortwave_radiation

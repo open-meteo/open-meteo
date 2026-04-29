@@ -63,7 +63,7 @@ struct DownloadEra5Command: AsyncCommand {
 
         let domain = try CdsDomain.load(rawValue: signature.domain)
 
-        let variables: [GenericVariable]
+        let variables: [any GenericVariable]
         switch domain {
         case .cerra:
             variables = try CerraVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? CerraVariable.allCases
@@ -333,7 +333,7 @@ struct DownloadEra5Command: AsyncCommand {
         try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
     }
 
-    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
+    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [any GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
         switch domain {
         case .era5_land, .era5, .era5_ocean, .era5_ensemble:
             let variables = variables.map {

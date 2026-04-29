@@ -297,7 +297,7 @@ struct DmiDownload: AsyncCommand {
     }
 
     /// https://opendatadocs.dmi.govcloud.dk/Data/Forecast_Data_Weather_Model_HARMONIE_DINI_EDR
-    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
+    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> (any GenericVariable)? {
         // if parameterName == "Direct solar exposure" {
             // This contains DNI
             // return DmiSurfaceVariable.shortwave_radiation
