@@ -52,9 +52,9 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     var domainRegistryStatic: DomainRegistry? {
         switch self {
         case .weathernext_global:
-            return .google_weathernext_global
+            return .ecmwf_ifs025
         case .weathernext_global_ensemble_mean:
-            return .google_weathernext_global
+            return .ecmwf_ifs025
         }
     }
 
