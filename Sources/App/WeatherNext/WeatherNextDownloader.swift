@@ -112,7 +112,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         uploadS3Bucket: String?
     ) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        _ = concurrent
 
         let writer = OmSpatialMultistepWriter(
             domain: domain,
@@ -126,7 +125,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let timestamps = domain.forecastTimestamps(for: run)
         logger.info("Processing \(timestamps.count) WeatherNext timesteps")
 
-        for timestamp in timestamps {
+        let localFiles = try await timestamps.asyncMap { timestamp in
             let source = WeatherNextSourcePath(server: server, run: run, validTime: timestamp)
             let localFile = "\(domain.downloadDirectory)\(timestamp.iso8601_YYYY_MM_dd_HHmm).om"
 
@@ -142,7 +141,14 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 }
             } else if !FileManager.default.fileExists(atPath: localFile) {
                 logger.info("Skipping missing local file: \(localFile)")
-                continue
+            }
+
+            return localFile
+        }
+
+        try await zip(timestamps, localFiles).foreachConcurrent(nConcurrent: concurrent) { timestamp, localFile in
+            guard FileManager.default.fileExists(atPath: localFile) else {
+                return
             }
 
             try await processWeatherNextFile(
@@ -151,7 +157,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 file: localFile,
                 run: run,
                 validTime: timestamp,
-                writer: writer
+                writer: writer,
+                concurrent: concurrent
             )
         }
 
@@ -181,24 +188,25 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         file: String,
         run: Timestamp,
         validTime: Timestamp,
-        writer: OmSpatialMultistepWriter
+        writer: OmSpatialMultistepWriter,
+        concurrent: Int
     ) async throws {
         let logger = application.logger
-        _ = run
-
-        let root = try await OmFileReader(file: file)
 
         logger.info("Writing timestep \(validTime.iso8601_YYYY_MM_dd_HH_mm)")
 
         let inMemoryPrecipitation = VariablePerMemberStorage<WeatherNextVariable>()
 
-        for member in 0..<domain.countEnsembleMember {
+        try await Array(0..<domain.countEnsembleMember).foreachConcurrent(nConcurrent: concurrent) { member in
+            let root = try await OmFileReader(file: file)
+            let arrays = try await openVariableArrays(root: root, variables: WeatherNextVariable.rawVariables, domain: domain)
+
             var relativeHumidity = [WeatherNextPressureLevel: [Float]]()
             relativeHumidity.reserveCapacity(WeatherNextPressureLevel.allCases.count)
 
             for variable in WeatherNextVariable.rawVariables {
                 let data = try await readMemberSlice(
-                    root: root,
+                    array: try array(for: variable, in: arrays),
                     variable: variable,
                     member: member,
                     domain: domain
@@ -250,29 +258,54 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         }
     }
 
-    func readMemberSlice<Backend>(
+    func openVariableArrays<Backend>(
         root: OmFileReader<Backend>,
+        variables: [WeatherNextVariable],
+        domain: WeatherNextDomain
+    ) async throws -> [WeatherNextVariable: OmFileReaderArray<Backend, Float>] {
+        var arrays = [WeatherNextVariable: OmFileReaderArray<Backend, Float>]()
+        arrays.reserveCapacity(variables.count)
+
+        for variable in variables {
+            let sourceName = variable.rawValue
+
+            guard let child = try await root.getChild(name: sourceName),
+                  let array = child.asArray(of: Float.self) else {
+                throw WeatherNextDownloaderError.notImplemented("Could not open source variable \(sourceName)")
+            }
+
+            let dims = Array(array.getDimensions())
+            guard dims.count == 3 else {
+                throw WeatherNextDownloaderError.notImplemented("Unexpected dimensions for \(sourceName): \(dims)")
+            }
+            guard dims[0] == UInt64(domain.countEnsembleMember),
+                  dims[1] == UInt64(domain.grid.ny),
+                  dims[2] == UInt64(domain.grid.nx) else {
+                throw WeatherNextDownloaderError.notImplemented("Unexpected shape for \(sourceName): \(dims)")
+            }
+
+            arrays[variable] = array
+        }
+
+        return arrays
+    }
+
+    func array<Backend>(
+        for variable: WeatherNextVariable,
+        in arrays: [WeatherNextVariable: OmFileReaderArray<Backend, Float>]
+    ) throws -> OmFileReaderArray<Backend, Float> {
+        guard let array = arrays[variable] else {
+            throw WeatherNextDownloaderError.notImplemented("Missing cached source variable \(variable.rawValue)")
+        }
+        return array
+    }
+
+    func readMemberSlice<Backend>(
+        array: OmFileReaderArray<Backend, Float>,
         variable: WeatherNextVariable,
         member: Int,
         domain: WeatherNextDomain
     ) async throws -> [Float] {
-        let sourceName = variable.rawValue
-
-        guard let child = try await root.getChild(name: sourceName),
-              let array = child.asArray(of: Float.self) else {
-            throw WeatherNextDownloaderError.notImplemented("Could not open source variable \(sourceName)")
-        }
-
-        let dims = Array(array.getDimensions())
-        guard dims.count == 3 else {
-            throw WeatherNextDownloaderError.notImplemented("Unexpected dimensions for \(sourceName): \(dims)")
-        }
-        guard dims[0] == UInt64(domain.countEnsembleMember),
-              dims[1] == UInt64(domain.grid.ny),
-              dims[2] == UInt64(domain.grid.nx) else {
-            throw WeatherNextDownloaderError.notImplemented("Unexpected shape for \(sourceName): \(dims)")
-        }
-
         let memberRange = UInt64(member)..<UInt64(member + 1)
         let latRange = UInt64(0)..<UInt64(domain.grid.ny)
         let lonRange = UInt64(0)..<UInt64(domain.grid.nx)
