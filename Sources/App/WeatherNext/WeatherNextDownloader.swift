@@ -146,12 +146,13 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             return localFile
         }
 
-        try await zip(timestamps, localFiles).foreachConcurrent(nConcurrent: concurrent) { timestamp, localFile in
+        // Collect probability handles across all timesteps
+        let allHandles = try await zip(timestamps, localFiles).asyncMap { timestamp, localFile in
             guard FileManager.default.fileExists(atPath: localFile) else {
-                return
+                return [GenericVariableHandle]()
             }
 
-            try await processWeatherNextFile(
+            return try await processWeatherNextFile(
                 application: application,
                 domain: domain,
                 file: localFile,
@@ -162,11 +163,13 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             )
         }
 
-        return try await writer.finalise(
+        let mainHandles = try await writer.finalise(
             completed: true,
             validTimes: timestamps,
             uploadS3Bucket: uploadS3Bucket
         )
+
+        return mainHandles + allHandles.flatMap { $0 }
     }
 
     func fetchSourceFile(
@@ -190,7 +193,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         validTime: Timestamp,
         writer: OmSpatialMultistepWriter,
         concurrent: Int
-    ) async throws {
+    ) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         logger.info("Writing timestep \(validTime.iso8601_YYYY_MM_dd_HH_mm)")
@@ -255,7 +258,13 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 dtHoursOfCurrentStep: domain.dtSeconds / 3600,
                 writer: writerProbabilities
             )
+            return try await writerProbabilities.finalise(
+                completed: true,
+                validTimes: [validTime],
+                uploadS3Bucket: nil
+            )
         }
+        return []
     }
 
     func openVariableArrays<Backend>(
