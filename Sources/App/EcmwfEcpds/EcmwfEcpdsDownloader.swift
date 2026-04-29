@@ -375,6 +375,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let urls = domain.getUrl(run: run, timestamp: timestamp, server: server)
             
             for url in urls {
+                let elevationLsmGenerator = ElevationLsmGenerator()
                 try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let shortName = message.get(attribute: "shortName"),
                           let unit = message.get(attribute: "units"),
@@ -382,7 +383,17 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                           let stepType = message.get(attribute: "stepType") else {
                         fatalError("could not get step range or type")
                     }
-                    if shortName == "lsm" {
+                    if shortName == "lsm" || shortName == "z" {
+                        if domain.surfaceElevationFileOm.exists() {
+                            return
+                        }
+                        logger.info("Got \(shortName)")
+                        let d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
+                        if shortName == "lsm" {
+                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain)
+                        } else {
+                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain)
+                        }
                         return
                     }
                     //let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
