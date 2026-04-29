@@ -294,14 +294,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         
                         let writer = try await writer.getWriter(time: timestamp)
                         
-                        /// IFS ensemble only downloads snow depth water equivalent for now
-                        if domain == .ifs_europe_ensemble {
-                            let variable = EcmwfEcdpsIfsEuropeEnsembleVariable.snow_depth_water_equivalent
-                            logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
-                            try await writer.write(member: member, variable: variable, data: grib2d.array.data)
-                            return
-                        }
-                        
                         // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
                         if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {
                             await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
@@ -429,6 +421,14 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
+                    /// IFS ensemble only downloads snow depth water equivalent
+                    if variable == .snow_depth, domain == .ifs_europe_ensemble {
+                        let variable = EcmwfEcdpsIfsEuropeEnsembleVariable.snow_depth_water_equivalent
+                        logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
+                        try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+                        return
+                    }
+                    
                     // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
                     if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
@@ -438,7 +438,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         }
                     }
                     
-                    logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
+                    logger.debug("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
                     try await writer.write(member: member, variable: variable, data: grib2d.array.data)
                 }
             }
