@@ -59,7 +59,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         let server = signature.server ?? "gs://om-weathernext/output/"
         let nConcurrent = signature.concurrent ?? 1
-        let generateFullRun = true // only true for ensemble mean?
+        let generateFullRun = domain.countEnsembleMember == 1
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await prepareStaticFilesIfRequired(application: context.application, domain: domain, server: server, run: run)
@@ -326,6 +326,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             intoCubeOffset: [0, 0, 0],
             intoCubeDimension: [1, UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
         )
+
+        data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
         return data
     }
