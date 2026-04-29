@@ -17,10 +17,7 @@ struct GaussianGridArea: Gridable {
     let yStart: Int
     /// One past the last latitude line index
     let yEnd: Int
-    /// Starting global-x index for each latitude line within the area (0-based per line in area)
-    let lineXStart: [Int]
-    /// Number of grid points retained within the longitude bounds for each latitude line
-    let linePointCount: [Int]
+
     /// Prefix sums: `prefixSum[i]` = total points in lines 0..<i; length is `lineCount + 1`
     let prefixSum: [Int]
 
@@ -63,8 +60,6 @@ struct GaussianGridArea: Gridable {
         self.yEnd   = y2 + 1
 
         let lineCount = yEnd - yStart
-        var xStarts  = [Int](repeating: 0, count: lineCount)
-        var counts   = [Int](repeating: 0, count: lineCount)
         var prefix   = [Int](repeating: 0, count: lineCount + 1)
 
         for i in 0..<lineCount {
@@ -75,15 +70,8 @@ struct GaussianGridArea: Gridable {
             let x2    = (Int(bounds.longitude.upperBound / dx) + nxLine) % nxLine
             // When x2 < x1 the range wraps across 0°/360°
             let n     = x2 >= x1 ? (x2 - x1 + 1) : (nxLine - x1 + x2 + 1)
-            //let lat    = Float(latitudeLines - y - 1) * dy + dy / 2
-            //print("\(i) lat \(lat) x1: \(x1), x2: \(x2), nxLine: \(nxLine), n \(n)")
-            xStarts[i]       = x1
-            counts[i]        = n
             prefix[i + 1]    = prefix[i] + n
         }
-
-        self.lineXStart    = xStarts
-        self.linePointCount = counts
         self.prefixSum     = prefix
     }
 
@@ -108,7 +96,8 @@ struct GaussianGridArea: Gridable {
         let nxLine = type.nxOf(y: y)
         let dx     = 360 / Float(nxLine)
         let xOffset = gridpoint - prefixSum[lineIdx]
-        let x      = (lineXStart[lineIdx] + xOffset) % nxLine
+        let x1    = (Int(bounds.longitude.lowerBound / dx) + nxLine) % nxLine
+        let x      = (x1 + xOffset) % nxLine
         let lon    = Float(x) * dx
         let lat    = Float(latitudeLines - y - 1) * dy + dy / 2
         return (lat, lon >= 180 ? lon - 360 : lon)
@@ -132,8 +121,11 @@ struct GaussianGridArea: Gridable {
             let nxLine  = type.nxOf(y: yGlobal)
             let dx      = 360 / Float(nxLine)
             let xGlobal = (Int(round(lon / dx)) + nxLine) % nxLine
-            let xRel    = (xGlobal - lineXStart[lineIdx] + nxLine) % nxLine
-            guard xRel < linePointCount[lineIdx] else { continue }
+            let x1    = (Int(bounds.longitude.lowerBound / dx) + nxLine) % nxLine
+            let x2    = (Int(bounds.longitude.upperBound / dx) + nxLine) % nxLine
+            let xRel    = (xGlobal - x1 + nxLine) % nxLine
+            let n     = x2 >= x1 ? (x2 - x1 + 1) : (nxLine - x1 + x2 + 1)
+            guard xRel < n else { continue }
             let localIndex  = prefixSum[lineIdx] + xRel
             let pointLat    = Float(latitudeLines - yGlobal - 1) * dy + dy / 2
             let pointLon    = Float(xGlobal) * dx
@@ -201,8 +193,11 @@ struct GaussianGridAreaSliceIterator: IteratorProtocol {
         let dx     = 360 / Float(nxLine)
         let x1Sub  = (Int(round(bb.longitude.lowerBound / dx)) + nxLine) % nxLine
         let x2Sub  = (Int(round(bb.longitude.upperBound / dx)) + nxLine) % nxLine
-        let areaX1    = area.lineXStart[lineIdx]
-        let areaCount = area.linePointCount[lineIdx]
+        let x1    = (Int(area.bounds.longitude.lowerBound / dx) + nxLine) % nxLine
+        let x2    = (Int(area.bounds.longitude.upperBound / dx) + nxLine) % nxLine
+        let n     = x2 >= x1 ? (x2 - x1 + 1) : (nxLine - x1 + x2 + 1)
+        let areaX1    = x1
+        let areaCount = n
         // Express sub-bbox x bounds as offsets from the area's western edge, clamped to [0, areaCount)
         let rel1   = (x1Sub - areaX1 + nxLine) % nxLine
         let rel2   = (x2Sub - areaX1 + nxLine) % nxLine
