@@ -33,7 +33,7 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
                 nx: 1440,
                 ny: 721,
                 latMin: -90,
-                lonMin: -180,
+                lonMin: 0,
                 dx: 0.25,
                 dy: 0.25
             )
