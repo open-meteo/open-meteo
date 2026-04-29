@@ -306,7 +306,7 @@ extension MfWaveDomain {
 }
 
 extension Variable {
-    func toMfVariable() -> GenericVariable? {
+    func toMfVariable() -> (any GenericVariable)? {
         switch name {
         case "VHM0":
             return MfWaveVariable.wave_height

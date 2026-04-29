@@ -309,7 +309,7 @@ struct KnmiDownload: AsyncCommand {
         return handles
     }
 
-    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String, indicatorOfParameter: Int) -> GenericVariable? {
+    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String, indicatorOfParameter: Int) -> (any GenericVariable)? {
         if typeOfLevel == "isobaricInhPa" {
             guard let level = Int(levelStr) else {
                 fatalError("Could not parse level str \(levelStr)")
