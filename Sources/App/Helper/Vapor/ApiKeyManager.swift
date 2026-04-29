@@ -191,7 +191,7 @@ extension Request {
             }
             
             let params = try parseApiParams()
-            guard params.apikey == nil else {
+            guard params.apikey == nil && headers.contains(name: "X-Api-Key") == false else {
                 guard self.method != .POST else {
                     throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
                 }
@@ -219,7 +219,7 @@ extension Request {
         }
 
         let params = try parseApiParams()
-        guard let apikey = params.apikey else {
+        guard let apikey = headers["X-Api-Key"].first ?? params.apikey else {
             throw ApiKeyManagerError.apiKeyRequired
         }
         guard let limit = await ApiKeyManager.instance.getLimit(String.SubSequence(apikey)) else {
