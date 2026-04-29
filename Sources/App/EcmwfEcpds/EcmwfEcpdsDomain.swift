@@ -5,13 +5,22 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     
     case ifs_europe_ensemble
     case ifs_europe_ensemble_mean
+    
+    case aifs_europe_ensemble
+    case aifs_europe_ensemble_mean
 
     func getDownloadForecastSteps(run: Int) -> [Int] {
-        switch run {
-        case 0, 12: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3)) + Array(stride(from: 150, through: 360, by: 6))
-        case 6, 18: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3))
-        default: fatalError("Invalid run")
+        switch self {
+        case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
+            switch run {
+            case 0, 12: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3)) + Array(stride(from: 150, through: 360, by: 6))
+            case 6, 18: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3))
+            default: fatalError("Invalid run")
+            }
+        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
+            return Array(stride(from: 0, through: 360, by: 6))
         }
+
     }
 
     var domainRegistry: DomainRegistry {
@@ -24,6 +33,10 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
             return .ecmwf_ifs_europe_ensemble
         case .ifs_europe_ensemble_mean:
             return .ecmwf_ifs_europe_ensemble_mean
+        case .aifs_europe_ensemble:
+            return .ecmwf_aifs_europe_ensemble
+        case .aifs_europe_ensemble_mean:
+            return .ecmwf_aifs_europe_ensemble_mean
         }
     }
 
@@ -45,6 +58,8 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
             // 15 days forecast, 1-hourly data.
             // Must be `24 * 21` for compatibility reasons from old IFS HRES data
             return 24 * 21 // 504
+        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
+            return 8 * (15 + 4) // 152
         }
     }
 
@@ -52,12 +67,14 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         switch self {
         case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
             return 3600
+        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
+            return 6*3600
         }
     }
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
+        case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean, .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
             return 6 * 3600
         }
     }
@@ -68,14 +85,16 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
             return GaussianGrid(type: .o1280)
         case .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
             return GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33.005..<70.967, longitude: -11..<37))
+        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
+            return GaussianGridArea(type: .n320, bounds: BoundingBoxWGS84(latitude: 33.0211..<70.9601, longitude: -11..<37))
         }
     }
 
     var countEnsembleMember: Int {
         switch self {
-        case .ifs, .wam, .ifs_europe_ensemble_mean:
+        case .ifs, .wam, .ifs_europe_ensemble_mean, .aifs_europe_ensemble_mean:
             return 1
-        case .ifs_europe_ensemble:
+        case .ifs_europe_ensemble, .aifs_europe_ensemble:
             return 51
         }
     }
@@ -84,6 +103,8 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         switch self {
         case .ifs_europe_ensemble:
             return .ifs_europe_ensemble_mean
+        case .aifs_europe_ensemble:
+            return .aifs_europe_ensemble_mean
         default:
             return nil
         }
@@ -104,9 +125,9 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
             return true
         case .wam:
             return true
-        case .ifs_europe_ensemble:
+        case .ifs_europe_ensemble, .aifs_europe_ensemble:
             return false
-        case .ifs_europe_ensemble_mean:
+        case .ifs_europe_ensemble_mean, .aifs_europe_ensemble_mean:
             return true
         }
     }
@@ -114,7 +135,7 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
+        case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean, .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
             // https://confluence.ecmwf.int/display/DAC/Dissemination+schedule
             // IFS has a delay of 5:45
             // the last step being available at 7:34 (0z/12z) or 6:27 (6z/18z)
@@ -147,6 +168,12 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
             return [
                 "\(server)ope_i1_ifs-ens_od_enfo_cf_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2",
                 "\(server)ope_i1_ifs-ens_od_enfo_pf_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2"
+            ]
+        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            return [
+                "\(server)ope_i2_aifs-ens_ai_enfo_cf_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2",
+                "\(server)ope_i2_aifs-ens_ai_enfo_pf_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2"
             ]
         }
     }

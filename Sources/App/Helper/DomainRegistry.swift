@@ -101,6 +101,8 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_aifs025_single
     case ecmwf_aifs025_ensemble
     case ecmwf_aifs025_ensemble_mean
+    case ecmwf_aifs_europe_ensemble
+    case ecmwf_aifs_europe_ensemble_mean
     case ecmwf_wam
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
@@ -258,6 +260,10 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfEcpdsDomain.ifs_europe_ensemble
         case .ecmwf_ifs_europe_ensemble_mean:
             return EcmwfEcpdsDomain.ifs_europe_ensemble_mean
+        case .ecmwf_aifs_europe_ensemble:
+            return EcmwfEcpdsDomain.aifs_europe_ensemble
+        case .ecmwf_aifs_europe_ensemble_mean:
+            return EcmwfEcpdsDomain.aifs_europe_ensemble_mean
         case .ecmwf_wam:
             return EcmwfEcpdsDomain.wam
         case .ecmwf_ifs_analysis_long_window:
