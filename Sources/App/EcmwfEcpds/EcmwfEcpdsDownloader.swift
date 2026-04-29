@@ -424,7 +424,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     /// IFS ensemble only downloads snow depth water equivalent
                     if variable == .snow_depth, domain == .ifs_europe_ensemble {
                         let variable = EcmwfEcdpsIfsEuropeEnsembleVariable.snow_depth_water_equivalent
-                        logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
+                        logger.debug("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
                         try await writer.write(member: member, variable: variable, data: grib2d.array.data)
                         return
                     }
