@@ -32,9 +32,23 @@ protocol GenericDomain: Sendable {
     
     /// Number of ensemble members, including control. Default 1
     var countEnsembleMember: Int { get }
+    
+    /// Whether or not to generate the full run database in ./data_run
+    var generateFullRun: Bool { get }
+    
+    /// Whether to generate regular database ./data
+    var generateTimeSeries: Bool { get }
 }
 
 extension GenericDomain {
+    var generateFullRun: Bool {
+        return countEnsembleMember == 1
+    }
+    
+    var generateTimeSeries: Bool {
+        return true
+    }
+    
     var dtHours: Int { dtSeconds / 3600 }
 
     /// Temporary directory to download data

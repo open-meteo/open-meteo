@@ -93,6 +93,24 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         return countEnsembleMember > 1
     }
     
+    var generateFullRun: Bool {
+        // Force full run database also for ensembles
+        return true
+    }
+    
+    var generateTimeSeries: Bool {
+        switch self {
+        case .ifs:
+            return true
+        case .wam:
+            return true
+        case .ifs_europe_ensemble:
+            return false
+        case .ifs_europe_ensemble_mean:
+            return true
+        }
+    }
+    
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
