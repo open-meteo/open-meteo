@@ -41,7 +41,6 @@ struct GenericVariableHandle: Sendable {
             let domain = handles[0].domain
             
             let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
-            let generateFullRun = generateFullRun && domain.generateFullRun
             
             if generateTimeSeries {
                 let startTime = DispatchTime.now()
@@ -112,6 +111,7 @@ struct GenericVariableHandle: Sendable {
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
+            let generateFullRun = generateFullRun && domain.generateFullRun
             if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
