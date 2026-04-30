@@ -55,8 +55,23 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         guard domain.ensembleMeanDomain != nil else {
             throw WeatherNextDownloaderError.notImplemented("Direct download of \(domain.rawValue) is not supported. Download \(WeatherNextDomain.weathernext_global.rawValue) to generate ensemble mean output.")
         }
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let logger = context.application.logger
+        let run: Timestamp
+        if let runArg = signature.run {
+            run = try Timestamp.fromRunHourOrYYYYMMDD(runArg)
+        } else {
+            // Determine the expected run from the domain's delay-based lastRun, then
+            // wait for the marker file to confirm that run is actually available.
+            let targetRun = domain.lastRun
+            let deadline = Date().addingTimeInterval(TimeInterval(6 * 3600)) // 6-hour hard deadline
+            try await waitForMarker(
+                client: context.application.dedicatedHttpClient,
+                logger: logger,
+                targetRun: targetRun,
+                deadline: deadline
+            )
+            run = targetRun
+        }
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
@@ -394,6 +409,42 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover_mid, data: cloudcoverMid)
         try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover_high, data: cloudcoverHigh)
         try await writer.write(time: validTime, member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
+    }
+
+    /// Poll the marker file until it reports a run matching (or newer than) `targetRun`.
+    /// Each run must wait for the marker to confirm availability before processing begins.
+    func waitForMarker(
+        client: HTTPClient,
+        logger: Logger,
+        targetRun: Timestamp,
+        deadline: Date
+    ) async throws {
+        let baseInterval: TimeInterval = 60   // seconds between retries
+        let maxInterval: TimeInterval = 300   // cap at 5 minutes
+        var attempt = 0
+
+        while true {
+            attempt += 1
+            let marker = try await GoogleCloudStorage.readFileAsString(
+                client: client,
+                logger: logger,
+                remotePath: WeatherNextDomain.markerFilePath
+            )
+            let currentRun = try WeatherNextDomain.parseTimestampFromMarker(marker)
+            if currentRun >= targetRun {
+                logger.info("Marker reports run \(currentRun.iso8601_YYYY_MM_dd_HH_mm) (target: \(targetRun.iso8601_YYYY_MM_dd_HH_mm)). Proceeding.")
+                return
+            }
+
+        let wait = min(baseInterval * Double(attempt), maxInterval)
+            if Date().addingTimeInterval(wait) > deadline {
+                throw WeatherNextDownloaderError.notImplemented(
+                    "Timed out waiting for run \(targetRun.iso8601_YYYY_MM_dd_HH_mm) to appear in marker file"
+                )
+            }
+            logger.info("Marker still at \(currentRun.iso8601_YYYY_MM_dd_HH_mm). Waiting \(wait.rounded())s for target \(targetRun.iso8601_YYYY_MM_dd_HH_mm)...")
+            try await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+        }
     }
 }
 

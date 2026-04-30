@@ -110,9 +110,37 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
         (0..<omFileLength).map { run.add(($0 + 1) * dtSeconds) }
     }
 
-    /// Placeholder until the actual publication delay is validated.
+    /// Weathernext dissemination schedule: https://developers.google.com/weathernext/guides/dissemination
+    /// We add 45 minutes for the Python processing for zarr to .om conversion
+    /// 6 hours 50 min + 45 min ~ 8 hours
+    /// When `--run` is not provided, the downloader will poll the marker file instead.
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        return t.add(hours: -18).floor(toNearestHour: 6)
+        return t.add(hours: -8).floor(toNearestHour: 6)
+    }
+
+    /// Path to the marker file that signals the latest completed run.
+    static let markerFilePath = "gs://om-weathernext/latestfinishedrun"
+
+    /// Parse a WeatherNext marker string (e.g. `20260430_06hr_01_preds`) into a Timestamp.
+    /// The format is `YYYYMMDD_HHhr_01_preds` where HH is the zero-padded hour (00–23).
+    static func parseTimestampFromMarker(_ marker: String) throws -> Timestamp {
+        guard marker.count >= 10 else {
+            throw WeatherNextDownloaderError.notImplemented("Invalid marker format: '\(marker)'")
+        }
+
+        let yearStr  = String(marker.prefix(4))
+        let monthStr = String(marker.dropFirst(4).prefix(2))
+        let dayStr   = String(marker.dropFirst(6).prefix(2))
+        let hourStr  = String(marker.dropFirst(9).prefix(2))
+
+        guard let year  = Int(yearStr),
+              let month = Int(monthStr),
+              let day   = Int(dayStr),
+              let hour  = Int(hourStr) else {
+            throw WeatherNextDownloaderError.notImplemented("Could not parse marker: '\(marker)'")
+        }
+
+        return Timestamp(year, month, day, hour)
     }
 }

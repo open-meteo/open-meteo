@@ -201,4 +201,34 @@ enum GoogleCloudStorage {
         }
         try fileHandle.close()
     }
+
+    /// Read a small file from GCS and return its contents as a String.
+    /// Used for marker/control files that contain plain text.
+    static func readFileAsString(
+        client: HTTPClient,
+        logger: Logger,
+        remotePath: String
+    ) async throws -> String {
+        let token = try await GoogleCloudStorageAuth(
+            client: client,
+            logger: logger
+        ).getAccessToken()
+
+        let url = try GoogleCloudStoragePath(remotePath).authenticatedDownloadUrl
+        var request = HTTPClientRequest(url: url)
+        request.method = .GET
+        request.headers.add(name: "Authorization", value: "Bearer \(token)")
+
+        let response = try await client.execute(request, timeout: .seconds(60))
+        guard response.status == .ok else {
+            let error = try await response.readStringImmutable() ?? ""
+            throw GoogleCloudStorageError.httpError(
+                status: Int(response.status.code),
+                message: "Could not read \(remotePath): \(error)"
+            )
+        }
+
+        let body = try await response.body.collect(upTo: 1024 * 1024)
+        return String(buffer: body)
+    }
 }
