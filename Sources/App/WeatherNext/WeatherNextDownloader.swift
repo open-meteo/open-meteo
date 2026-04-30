@@ -65,7 +65,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let generateFullRun = domain.countEnsembleMember == 1
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try await prepareStaticFilesIfRequired(application: context.application, domain: domain, server: server, run: run)
 
         let handles = try await download(
             application: context.application,
@@ -90,18 +89,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities,
             generateFullRun: generateFullRun
         )
-    }
-
-    func prepareStaticFilesIfRequired(
-        application: Application,
-        domain: WeatherNextDomain,
-        server: String,
-        run: Timestamp
-    ) async throws {
-        let logger = application.logger
-        _ = server
-        _ = run
-        logger.info("Static file preparation for \(domain) is currently a no-op")
     }
 
     func download(
