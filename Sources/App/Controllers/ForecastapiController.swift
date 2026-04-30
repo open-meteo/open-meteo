@@ -319,6 +319,8 @@ struct WeatherApiController {
                         guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
                             return nil
                         }
+                        /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
+                        let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
                         return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                     }
                     guard !readers.isEmpty else {
@@ -335,6 +337,8 @@ struct WeatherApiController {
                     guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                     }
+                    /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
+                    let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
 
                     if dates.count == 0 {
                         let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
@@ -913,6 +917,25 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case multiple([(any GenericDomain, any GenericVariable.Type)])
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
         case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
+        
+        var singleDomain: (any GenericDomain)? {
+            switch self {
+            case .single(let domain, _): return domain
+            case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _): return domain
+            default: return nil
+            }
+        }
+    }
+    
+    /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
+    /// This only works with one domain. Needs larger rewrite if this should work with seamless domains like ec46+seas5.
+    var useLatestRun: Bool {
+        switch self {
+        case .ecmwf_ifs_europe_ensemble, .ecmwf_aifs_europe_ensemble:
+            return true
+        default:
+            return false
+        }
     }
     
     /// Generic domains with hourly data that can use the generic deriver controller
