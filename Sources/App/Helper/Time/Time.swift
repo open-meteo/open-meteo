@@ -152,8 +152,8 @@ public struct Timestamp: Hashable, Sendable {
         return Weekday(rawValue: Int8(t.tm_wday))!
     }
 
-    /// With format `yyyy-MM-dd'T'HH:mm'`
-    var iso8601_YYYY_MM_dd_HH_mm: String {
+    @inline(always)
+    func timeComponents() -> (year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int) {
         var time = timeIntervalSince1970
         var t = tm()
         gmtime_r(&time, &t)
@@ -162,6 +162,13 @@ public struct Timestamp: Hashable, Sendable {
         let day = Int(t.tm_mday)
         let hour = Int(t.tm_hour)
         let minute = Int(t.tm_min)
+        let second = Int(t.tm_sec)
+        return (year, month, day, hour, minute, second)
+    }
+
+    /// With format `yyyy-MM-dd'T'HH:mm'`
+    var iso8601_YYYY_MM_dd_HH_mm: String {
+        let (year, month, day, hour, minute, _) = self.timeComponents()
         return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2))"
     }
     
@@ -170,32 +177,19 @@ public struct Timestamp: Hashable, Sendable {
     }
     
     var iso8601_YYYY_MM_dd_HH_mm_ssZ: String {
-        return "\(iso8601_YYYY_MM_dd_HH_mm):00Z"
+        let (year, month, day, hour, minute, seconds) = self.timeComponents()
+        return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2)):\(seconds.zeroPadded(len: 2))Z"
     }
 
     /// With format `yyyy-MM-dd'T'HHmm'`
     var iso8601_YYYY_MM_dd_HHmm: String {
-        var time = timeIntervalSince1970
-        var t = tm()
-        gmtime_r(&time, &t)
-        let year = Int(t.tm_year + 1900)
-        let month = Int(t.tm_mon + 1)
-        let day = Int(t.tm_mday)
-        let hour = Int(t.tm_hour)
-        let minute = Int(t.tm_min)
+        let (year, month, day, hour, minute, _) = self.timeComponents()
         return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))"
     }
 
     /// With format `yyyyMMdd'T'HHmm'`
     var iso8601_YYYYMMddTHHmm: String {
-        var time = timeIntervalSince1970
-        var t = tm()
-        gmtime_r(&time, &t)
-        let year = Int(t.tm_year + 1900)
-        let month = Int(t.tm_mon + 1)
-        let day = Int(t.tm_mday)
-        let hour = Int(t.tm_hour)
-        let minute = Int(t.tm_min)
+        let (year, month, day, hour, minute, _) = self.timeComponents()
         return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))"
     }
 
@@ -234,14 +228,7 @@ public struct Timestamp: Hashable, Sendable {
     
     /// With format `yyyy/MM/dd/hh:mmZ`
     var format_directoriesYYYYMMddhhmm: String {
-        var time = timeIntervalSince1970
-        var t = tm()
-        gmtime_r(&time, &t)
-        let year = Int(t.tm_year + 1900)
-        let month = Int(t.tm_mon + 1)
-        let day = Int(t.tm_mday)
-        let hour = Int(t.tm_hour)
-        let minute = Int(t.tm_min)
+        let (year, month, day, hour, minute, _) = self.timeComponents()
         return "\(year)/\(month.zeroPadded(len: 2))/\(day.zeroPadded(len: 2))/\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))Z"
     }
 
