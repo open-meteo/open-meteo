@@ -843,7 +843,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case gem_global_ensemble
 
     case bom_access_global_ensemble
-    case google_weathernext_global
+    case google_weathernext_global_ensemble
+    case google_weathernext_global // FIXME: This is currently only for remapping in ensemble API
 
     case ncep_gefs_seamless
     case ncep_gefs025
@@ -938,7 +939,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(EumetsatLsaSafDomain.iodc, EumetsatLsaSafVariable.self)
         case .bom_access_global_ensemble:
             return .single(BomDomain.access_global_ensemble, BomVariable.self)
-        case .google_weathernext_global:
+        case .google_weathernext_global_ensemble:
             return .single(WeatherNextDomain.weathernext_global, WeatherNextVariable.self)
         case .bom_access_global:
             return .singleWithPrecipitationProbability(BomDomain.access_global, BomVariable.self, precipitationProb: BomDomain.access_global_ensemble)
@@ -1031,8 +1032,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .ecmwf_aifs025_ensemble
         case .gem_global:
             return .gem_global_ensemble
-        case .google_weathernext_global_ensemble_mean:
-            return .google_weathernext_global
+        case .google_weathernext_global:
+            return .google_weathernext_global_ensemble
         case .gfs_seamless:
             return .ncep_gefs_seamless
         case .gfs025:
@@ -1583,7 +1584,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global_ensemble:
             return [] // migrated
-        case .google_weathernext_global:
+        case .google_weathernext_global_ensemble, .google_weathernext_global:
             return [] // migrated
         case .ukmo_global_ensemble_20km:
             return try await UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -1764,7 +1765,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .bom_access_global:
             return nil // migrated
-        case .google_weathernext_global:
+        case .google_weathernext_global_ensemble, .google_weathernext_global:
             return WeatherNextDomain.weathernext_global
         case .google_weathernext_global_ensemble_mean:
             return WeatherNextDomain.weathernext_global_ensemble_mean
@@ -2041,7 +2042,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .bom_access_global:
             return nil // migrated
-        case .google_weathernext_global:
+        case .google_weathernext_global_ensemble, .google_weathernext_global:
             return nil // migrated
         case .google_weathernext_global_ensemble_mean:
             return nil // migrated
@@ -2241,7 +2242,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GemDomain.gem_global_ensemble.countEnsembleMember
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble.countEnsembleMember
-        case .google_weathernext_global:
+        case .google_weathernext_global_ensemble:
             return WeatherNextDomain.weathernext_global.countEnsembleMember
         case .ukmo_global_ensemble_20km:
             return UkmoDomain.global_ensemble_20km.countEnsembleMember
