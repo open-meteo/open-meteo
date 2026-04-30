@@ -304,7 +304,7 @@ struct WeatherApiController {
             let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
             
             /// Only read 15 minutely data if actually necessary
-            let include15Min = params.current?.isEmpty == false || params.minutely_15?.isEmpty == false || params.current_weather == true
+            let include15Min = params.current?.isEmpty == false || params.minutely_15?.isEmpty == false || params.current_weather == true || (params.temporal_resolution?.dtSeconds ?? 3600) <= 30*60
             
             let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
 

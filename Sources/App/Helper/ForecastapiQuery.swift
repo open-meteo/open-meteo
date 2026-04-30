@@ -21,6 +21,8 @@ extension ClosedRange where Element == Timestamp {
 /// Option to overwrite the temporal output resolution instead of always getting 1-hourly data.
 enum ApiTemporalResolution: String, Codable {
     case native
+    case minutely_15
+    case minutely_30
     case hourly
     case hourly_1
     case hourly_3
@@ -30,6 +32,10 @@ enum ApiTemporalResolution: String, Codable {
         switch self {
         case .native:
             return nil
+        case .minutely_15:
+            return 15*60
+        case .minutely_30:
+            return 30*60
         case .hourly, .hourly_1:
             return 3600
         case .hourly_3:
