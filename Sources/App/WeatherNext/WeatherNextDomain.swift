@@ -106,6 +106,7 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     }
 
     func forecastTimestamps(for run: Timestamp) -> [Timestamp] {
+        // Note that for weathernext ensemble forecast hour 0 is not included! 
         (0..<omFileLength).map { run.add(($0 + 1) * dtSeconds) }
     }
 

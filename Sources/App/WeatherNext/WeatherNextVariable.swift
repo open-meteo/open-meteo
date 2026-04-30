@@ -46,10 +46,6 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
-    case wind_speed_10m
-    case wind_direction_10m
-    case wind_speed_100m
-    case wind_direction_100m
 
     private enum MetadataGroup {
         case temperature
@@ -57,8 +53,6 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
         case precipitation
         case cloudCover
         case windComponent
-        case windSpeed
-        case windDirection
     }
 
     private var metadataGroup: MetadataGroup {
@@ -76,10 +70,6 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
              .wind_u_component_10m,
              .wind_v_component_10m:
             return .windComponent
-        case .wind_speed_10m, .wind_speed_100m:
-            return .windSpeed
-        case .wind_direction_10m, .wind_direction_100m:
-            return .windDirection
         }
     }
 
@@ -102,10 +92,8 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
             return 10
         case .cloudCover:
             return 1
-        case .windComponent, .windSpeed:
+        case .windComponent:
             return 10
-        case .windDirection:
-            return 1
         }
     }
 
@@ -117,10 +105,6 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
             return .backwards_sum
         case .cloudCover:
             return .hermite(bounds: 0...100)
-        case .windSpeed:
-            return .hermite(bounds: 0...10e9)
-        case .windDirection:
-            return .linearDegrees
         }
     }
 
@@ -134,10 +118,8 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
             return .millimetre
         case .cloudCover:
             return .percentage
-        case .windComponent, .windSpeed:
+        case .windComponent:
             return .metrePerSecond
-        case .windDirection:
-            return .degreeDirection
         }
     }
 
@@ -168,8 +150,6 @@ enum WeatherNextPressureVariableType: String, CaseIterable, Sendable {
     case wind_u_component
     case wind_v_component
     case vertical_velocity
-    case wind_speed
-    case wind_direction
 }
 
 /**
@@ -209,10 +189,8 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
             return 1
         case .geopotential_height:
             return 1
-        case .wind_u_component, .wind_v_component, .wind_speed:
+        case .wind_u_component, .wind_v_component:
             return 10
-        case .wind_direction:
-            return 1
         case .vertical_velocity:
             return 100
         }
@@ -228,10 +206,6 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
             return .hermite(bounds: nil)
         case .relative_humidity:
             return .hermite(bounds: 0...100)
-        case .wind_speed:
-            return .hermite(bounds: 0...10e9)
-        case .wind_direction:
-            return .linearDegrees
         }
     }
 
@@ -243,10 +217,8 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
             return .percentage
         case .geopotential_height:
             return .metre
-        case .wind_u_component, .wind_v_component, .wind_speed, .vertical_velocity:
+        case .wind_u_component, .wind_v_component, .vertical_velocity:
             return .metrePerSecond
-        case .wind_direction:
-            return .degreeDirection
         }
     }
 
@@ -271,11 +243,6 @@ extension WeatherNextVariable {
         .vertical_velocity
     ]
 
-    private static let derivedPressureVariableTypes: [WeatherNextPressureVariableType] = [
-        .wind_speed,
-        .wind_direction
-    ]
-
     static let surfaceVariables: [WeatherNextVariable] =
         WeatherNextSurfaceVariable.allCases.map(Self.surface)
 
@@ -285,17 +252,6 @@ extension WeatherNextVariable {
     static let pressureLevelVariables: [WeatherNextVariable] =
         WeatherNextPressureLevel.allCases.flatMap { level in
             rawPressureVariableTypes.map { type in
-                Self.pressure(.init(variable: type, level: level))
-            }
-        }
-
-    /**
-     Pressure-level variables derived and exposed in Open-Meteo output naming, but not read directly
-     from the upstream WeatherNext source files.
-     */
-    static let derivedPressureLevelVariables: [WeatherNextVariable] =
-        WeatherNextPressureLevel.allCases.flatMap { level in
-            derivedPressureVariableTypes.map { type in
                 Self.pressure(.init(variable: type, level: level))
             }
         }
@@ -353,14 +309,6 @@ extension WeatherNextVariable {
 
     static func windV(level: WeatherNextPressureLevel) -> WeatherNextVariable {
         .pressure(.init(variable: .wind_v_component, level: level))
-    }
-
-    static func windSpeed(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        .pressure(.init(variable: .wind_speed, level: level))
-    }
-
-    static func windDirection(level: WeatherNextPressureLevel) -> WeatherNextVariable {
-        .pressure(.init(variable: .wind_direction, level: level))
     }
 
     static var cloud_cover: WeatherNextVariable {
