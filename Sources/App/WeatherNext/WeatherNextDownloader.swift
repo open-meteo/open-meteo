@@ -52,6 +52,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         disableIdleSleep()
 
         let domain = try WeatherNextDomain.load(rawValue: signature.domain)
+        guard domain.ensembleMeanDomain != nil else {
+            throw WeatherNextDownloaderError.notImplemented("Direct download of \(domain.rawValue) is not supported. Download \(WeatherNextDomain.weathernext_global.rawValue) to generate ensemble mean output.")
+        }
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let logger = context.application.logger
 

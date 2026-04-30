@@ -843,6 +843,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case gem_global_ensemble
 
     case bom_access_global_ensemble
+    case google_weathernext_global
 
     case ncep_gefs_seamless
     case ncep_gefs025
@@ -897,6 +898,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ncep_gefs_ensemble_mean_seamless
     case cmc_gem_geps_ensemble_mean
     case bom_access_global_ensemble_mean
+    case google_weathernext_global_ensemble_mean
     case ukmo_global_ensemble_mean_20km
     case ukmo_uk_ensemble_mean_2km
     case meteoswiss_icon_ch1_ensemble_mean
@@ -936,6 +938,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(EumetsatLsaSafDomain.iodc, EumetsatLsaSafVariable.self)
         case .bom_access_global_ensemble:
             return .single(BomDomain.access_global_ensemble, BomVariable.self)
+        case .google_weathernext_global:
+            return .single(WeatherNextDomain.weathernext_global, WeatherNextVariable.self)
         case .bom_access_global:
             return .singleWithPrecipitationProbability(BomDomain.access_global, BomVariable.self, precipitationProb: BomDomain.access_global_ensemble)
         case .cma_grapes_global:
@@ -982,6 +986,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
         case .bom_access_global_ensemble_mean:
             return .single(BomDomain.access_global_ensemble, VariableOrSpread<BomVariable>.self)
+        case .google_weathernext_global_ensemble_mean:
+            return .single(WeatherNextDomain.weathernext_global_ensemble_mean, VariableOrSpread<WeatherNextVariable>.self)
         case .ukmo_global_ensemble_mean_20km:
             return .single(UkmoDomain.global_ensemble_mean_20km, VariableOrSpread<UkmoVariable>.self)
         case .ukmo_uk_ensemble_mean_2km:
@@ -1025,6 +1031,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .ecmwf_aifs025_ensemble
         case .gem_global:
             return .gem_global_ensemble
+        case .google_weathernext_global_ensemble_mean:
+            return .google_weathernext_global
         case .gfs_seamless:
             return .ncep_gefs_seamless
         case .gfs025:
@@ -1575,6 +1583,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global_ensemble:
             return [] // migrated
+        case .google_weathernext_global:
+            return [] // migrated
         case .ukmo_global_ensemble_20km:
             return try await UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ukmo_uk_ensemble_2km:
@@ -1664,7 +1674,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return []
         case .dwd_sis_europe_africa_v4:
             return []
-        case .dwd_icon_eps_ensemble_mean_seamless, .dwd_icon_eps_ensemble_mean, .dwd_icon_eu_eps_ensemble_mean, .dwd_icon_d2_eps_ensemble_mean, .ecmwf_ifs025_ensemble_mean, .ecmwf_aifs025_ensemble_mean, .ncep_gefs025_ensemble_mean, .ncep_gefs05_ensemble_mean, .ncep_gefs_ensemble_mean_seamless, .cmc_gem_geps_ensemble_mean, .bom_access_global_ensemble_mean, .ukmo_global_ensemble_mean_20km, .ukmo_uk_ensemble_mean_2km, .meteoswiss_icon_ch1_ensemble_mean, .meteoswiss_icon_ch2_ensemble_mean, .ecmwf_wam025_ensemble_mean, .ncep_gefswave025_ensemble_mean:
+        case .dwd_icon_eps_ensemble_mean_seamless, .dwd_icon_eps_ensemble_mean, .dwd_icon_eu_eps_ensemble_mean, .dwd_icon_d2_eps_ensemble_mean, .ecmwf_ifs025_ensemble_mean, .ecmwf_aifs025_ensemble_mean, .ncep_gefs025_ensemble_mean, .ncep_gefs05_ensemble_mean, .ncep_gefs_ensemble_mean_seamless, .cmc_gem_geps_ensemble_mean, .bom_access_global_ensemble_mean, .google_weathernext_global_ensemble_mean, .ukmo_global_ensemble_mean_20km, .ukmo_uk_ensemble_mean_2km, .meteoswiss_icon_ch1_ensemble_mean, .meteoswiss_icon_ch2_ensemble_mean, .ecmwf_wam025_ensemble_mean, .ncep_gefswave025_ensemble_mean:
             return [] // migrated
         case .geosphere_seamless:
             return  [] // migrated
@@ -1754,6 +1764,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .bom_access_global:
             return nil // migrated
+        case .google_weathernext_global:
+            return WeatherNextDomain.weathernext_global
+        case .google_weathernext_global_ensemble_mean:
+            return WeatherNextDomain.weathernext_global_ensemble_mean
         case .best_match:
             return nil
         case .gfs_seamless, .gfs_mix, .ncep_seamless:
@@ -2027,6 +2041,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .bom_access_global:
             return nil // migrated
+        case .google_weathernext_global:
+            return nil // migrated
+        case .google_weathernext_global_ensemble_mean:
+            return nil // migrated
         case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m, .arpae_cosmo_seamless:
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
@@ -2223,6 +2241,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GemDomain.gem_global_ensemble.countEnsembleMember
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble.countEnsembleMember
+        case .google_weathernext_global:
+            return WeatherNextDomain.weathernext_global.countEnsembleMember
         case .ukmo_global_ensemble_20km:
             return UkmoDomain.global_ensemble_20km.countEnsembleMember
         case .ukmo_uk_ensemble_2km:
@@ -2252,6 +2272,3 @@ enum ModelError: AbortError {
 
     case domainInitFailed(domain: String)
 }
-
-
-
