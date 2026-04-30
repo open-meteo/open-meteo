@@ -152,11 +152,6 @@ public struct Timestamp: Hashable, Sendable {
         return Weekday(rawValue: Int8(t.tm_wday))!
     }
 
-    #if swift(>=6.3)
-    @inline(always)
-    #else
-    @inline(_always)
-    #endif
     func timeComponents() -> (year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int) {
         var time = timeIntervalSince1970
         var t = tm()
