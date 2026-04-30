@@ -600,7 +600,6 @@ extension DomainRegistry {
         let dir = rawValue
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
-            logger.info("AWS upload to bucket \(bucket)")
             for variable in vDirectories {
                 let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
                 if !FileManager.default.fileExists(atPath: src) {
@@ -612,6 +611,7 @@ extension DomainRegistry {
                         // do not upload data from past days yet
                         return
                     }
+                    logger.info("AWS upload [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                     try Process.awsSync(
                         src: src,
                         dest: "s3://\(bucket)/data/\(dir)/\(variable)",
@@ -624,6 +624,7 @@ extension DomainRegistry {
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
+                logger.info("AWS upload [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let exclude = bucket == "openmeteo" && profile == nil ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket)")
                 let startTimeAws = DispatchTime.now()
