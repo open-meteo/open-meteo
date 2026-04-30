@@ -131,6 +131,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case total_column_integrated_water_vapour
+    case total_column_water
     case updraft
     case uv_index
     case uv_index_clear_sky

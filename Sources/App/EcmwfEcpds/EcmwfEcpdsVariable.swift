@@ -550,3 +550,97 @@ enum EcmwfEcdpsIfsEuropeEnsembleVariable: String, CaseIterable, GenericVariable 
         return false
     }
 }
+
+enum EcmwfEcdpsAifsEuropeEnsembleVariable: String, CaseIterable, GenericVariable {
+    case wind_u_component_10m
+    case wind_v_component_10m
+    case wind_u_component_100m
+    case wind_v_component_100m
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+    case temperature_2m
+    case dew_point_2m
+    case pressure_msl
+    case snowfall_water_equivalent
+    case shortwave_radiation
+    case precipitation
+    case total_column_water
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    /// Scale-factor to compress data
+    var scalefactor: Float {
+        switch self {
+        case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m: return 20 // 0.05 m/s resolution. Typically 10, but want to have sligthly higher resolution
+        case .cloud_cover: return 1
+        case .cloud_cover_low: return 1
+        case .cloud_cover_mid: return 1
+        case .cloud_cover_high: return 1
+        case .dew_point_2m: return 20
+        case .temperature_2m: return 20
+        case .pressure_msl: return 0.1 // stored in pascal for historical reasons
+        case .shortwave_radiation: return 1
+        case .precipitation: return 10
+        case .total_column_water: return 10 // TODO check scaling
+        case .snowfall_water_equivalent: return 10
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .dew_point_2m:
+            return .hermite(bounds: nil)
+        case .cloud_cover:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_low:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_mid:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_high:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .snowfall_water_equivalent:
+            return .backwards_sum
+        case .shortwave_radiation:
+            return .solar_backwards_averaged
+        case .precipitation:
+            return .backwards_sum
+        case .total_column_water:
+            return .hermite(bounds: 0...10e9)
+        }
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m: return .metrePerSecond
+        case .dew_point_2m: return .celsius
+        case .temperature_2m: return .celsius
+        case .cloud_cover: return .percentage
+        case .cloud_cover_low: return .percentage
+        case .cloud_cover_mid: return .percentage
+        case .cloud_cover_high: return .percentage
+        case .pressure_msl: return .pascal
+        case .snowfall_water_equivalent: return .millimetre
+        case .shortwave_radiation: return .wattPerSquareMetre
+        case .precipitation: return .millimetre
+        case .total_column_water: return .kilogramPerSquareMetre
+        }
+    }
+
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m || self == .dew_point_2m
+    }
+
+    var storePreviousForecast: Bool {
+       return false
+    }
+}

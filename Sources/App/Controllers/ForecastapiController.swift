@@ -763,6 +763,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ecmwf_ifs025
     case ecmwf_aifs025
     case ecmwf_aifs025_single
+    case ecmwf_ifs_europe_ensemble
+    case ecmwf_ifs_europe_ensemble_mean
+    case ecmwf_aifs_europe_ensemble
+    case ecmwf_aifs_europe_ensemble_mean
     
     case ecmwf_seasonal_seamless
     case ecmwf_seas5
@@ -973,6 +977,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
         case .ncep_gefs05_ensemble_mean:
             return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+        case .ecmwf_ifs_europe_ensemble:
+            return .single(EcmwfEcpdsDomain.ifs_europe_ensemble, EcmwfEcdpsIfsEuropeEnsembleVariable.self)
+        case .ecmwf_ifs_europe_ensemble_mean:
+            return .single(EcmwfEcpdsDomain.ifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsIfsEuropeEnsembleVariable>.self)
+        case .ecmwf_aifs_europe_ensemble:
+            return .single(EcmwfEcpdsDomain.aifs_europe_ensemble, EcmwfEcdpsAifsEuropeEnsembleVariable.self)
+        case .ecmwf_aifs_europe_ensemble_mean:
+            return .single(EcmwfEcpdsDomain.aifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsAifsEuropeEnsembleVariable>.self)
         case .ncep_gefs_ensemble_mean_seamless:
             return .multiple([
                 (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self),
@@ -1668,6 +1680,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .geosphere_seamless:
             return  [] // migrated
+        case .ecmwf_ifs_europe_ensemble:
+            return  [] // migrated
+        case .ecmwf_ifs_europe_ensemble_mean:
+            return  [] // migrated
+        case .ecmwf_aifs_europe_ensemble:
+            return  [] // migrated
+        case .ecmwf_aifs_europe_ensemble_mean:
+            return  [] // migrated
         }
     }
 
@@ -1938,6 +1958,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .geosphere_seamless:
             return nil // migrated
+        case .ecmwf_ifs_europe_ensemble:
+            return nil // migrated
+        case .ecmwf_ifs_europe_ensemble_mean:
+            return nil // migrated
+        case .ecmwf_aifs_europe_ensemble:
+            return nil // migrated
+        case .ecmwf_aifs_europe_ensemble_mean:
+            return nil // migrated
         }
     }
 
@@ -2196,6 +2224,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .geosphere_seamless:
             return nil // migrated
+        case .ecmwf_ifs_europe_ensemble:
+            return nil // migrated
+        case .ecmwf_ifs_europe_ensemble_mean:
+            return nil // migrated
+        case .ecmwf_aifs_europe_ensemble:
+            return nil // migrated
+        case .ecmwf_aifs_europe_ensemble_mean:
+            return nil // migrated
         }
     }
 
@@ -2213,6 +2249,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return EcmwfDomain.ifs025_ensemble.countEnsembleMember
         case .ecmwf_aifs025_ensemble:
             return EcmwfDomain.aifs025_ensemble.countEnsembleMember
+        case .ecmwf_ifs_europe_ensemble:
+            return EcmwfEcpdsDomain.ifs_europe_ensemble.countEnsembleMember
+        case .ecmwf_aifs_europe_ensemble:
+            return EcmwfEcpdsDomain.aifs_europe_ensemble.countEnsembleMember
         case .ncep_gefs025:
             return GfsDomain.gfs025_ens.countEnsembleMember
         case .ncep_gefs05:

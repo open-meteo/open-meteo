@@ -394,6 +394,16 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     //let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                     
+                    /// AIFS contains total column water
+                    if shortName == "tcw" {
+                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                        try grib2d.load(message: message)
+                        let variable = EcmwfEcdpsAifsEuropeEnsembleVariable.total_column_water
+                        logger.debug("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
+                        try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+                        return
+                    }
+                    
                     guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode.split(separator: ",").contains(where: { $0 == shortName})}) else {
                         logger.warning("Could not map variable \(shortName)")
                         return
