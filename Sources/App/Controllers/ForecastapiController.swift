@@ -251,13 +251,13 @@ struct WeatherApiController {
             }
             let run = params.run
             switch type {
-            case .none, .seasonal:
+            case .none, .seasonal, .ensemble:
                 break
             case .singleRunsApi:
                 guard run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality, .climate, .flood:
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .marine, .airQuality, .climate, .flood:
                 guard run == nil else {
                     throw ForecastApiError.parameterMostNotBeSet(name: "run")
                 }
