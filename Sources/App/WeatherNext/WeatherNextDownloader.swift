@@ -423,14 +423,19 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let maxInterval: TimeInterval = 300   // cap at 5 minutes
         var attempt = 0
 
+        struct MarkerJson: Decodable {
+            let data: String
+        }
+
         while true {
             attempt += 1
-            let marker = try await GoogleCloudStorage.readFileAsString(
+            let marker = try await GoogleCloudStorage.readAndDecode(
+                MarkerJson.self,
                 client: client,
                 logger: logger,
                 remotePath: WeatherNextDomain.markerFilePath
             )
-            let currentRun = try WeatherNextDomain.parseTimestampFromMarker(marker)
+            let currentRun = try WeatherNextDomain.parseTimestampFromMarker(marker.data)
             if currentRun >= targetRun {
                 logger.info("Marker reports run \(currentRun.iso8601_YYYY_MM_dd_HH_mm) (target: \(targetRun.iso8601_YYYY_MM_dd_HH_mm)). Proceeding.")
                 return

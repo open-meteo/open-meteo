@@ -9,6 +9,7 @@ enum GoogleCloudStorageError: Error {
     case missingGoogleCredentials(String)
     case invalidGoogleCredentials(String)
     case httpError(status: Int, message: String)
+    case couldNotDecode
 }
 
 struct GoogleCloudStoragePath: Sendable {
@@ -202,13 +203,13 @@ enum GoogleCloudStorage {
         try fileHandle.close()
     }
 
-    /// Read a small file from GCS and return its contents as a String.
-    /// Used for marker/control files that contain plain text.
-    static func readFileAsString(
+    /// Read a small file from GCS and return its contents as a ByteBuffers
+    static func readAndDecode<T: Decodable>(
+        _ type: T.Type,
         client: HTTPClient,
         logger: Logger,
-        remotePath: String
-    ) async throws -> String {
+        remotePath: String,
+    ) async throws -> T {
         let token = try await GoogleCloudStorageAuth(
             client: client,
             logger: logger
@@ -228,7 +229,9 @@ enum GoogleCloudStorage {
             )
         }
 
-        let body = try await response.body.collect(upTo: 1024 * 1024)
-        return String(buffer: body)
+        guard let result = try await response.readJSONDecodable(type) else {
+            throw GoogleCloudStorageError.couldNotDecode
+        }
+        return result
     }
 }
