@@ -178,8 +178,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             /// r49 hindcasts at expr 79 are available
             let ifsR49Hindcast = run >= Timestamp(2024, 3, 13) && run <= Timestamp(2024, 11, 12, 6)
             
-            /// Side runs at 144h not available before august 6th 18z
-            if !isMainRun && run < Timestamp(2024, 8, 6, 18) {
+            /// Side runs at 144h not available before august 12th 6z
+            if !isMainRun && run < Timestamp(2024, 8, 12, 6) {
                 continue
             }
             
@@ -232,6 +232,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 // Wait for the previous process task to finish
                 try await processTask?.value
                 processTask = Task {
+                    
+                    
                     try await curl.getGribStream(url: gribUrl, bzip2Decode: false, nConcurrent: max(2, concurrent)).foreachConcurrent(nConcurrent: concurrent) { message in
                         guard let shortName = message.get(attribute: "shortName"),
                               let unit = message.get(attribute: "units"),
