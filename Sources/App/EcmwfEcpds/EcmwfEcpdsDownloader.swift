@@ -178,9 +178,13 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             /// r49 hindcasts at expr 79 are available
             let ifsR49Hindcast = run >= Timestamp(2024, 3, 13) && run <= Timestamp(2024, 11, 12, 6)
             
-            /// Side runs at 144h not available before august 12th 6z
-            if !isMainRun && run < Timestamp(2024, 8, 12, 6) {
+            /// Side runs at 144h not available before august 6th 18z
+            if !isMainRun && run < Timestamp(2024, 8, 6, 18) {
                 continue
+            }
+            
+            if run == Timestamp(2024, 8, 8, 6) || run == Timestamp(2024, 8, 9, 6) {
+                continue // missing runs in ECMWF archives
             }
             
             /// Hindcasts only provide 15 days past 16 july
