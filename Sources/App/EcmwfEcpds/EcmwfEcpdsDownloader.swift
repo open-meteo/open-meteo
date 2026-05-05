@@ -194,7 +194,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             /// Split 0z/12z runs into 2 requests, because MARS transfers are limited to 75 GB -> reduced vars, should fit now
             /// r48 only provides up to 10 days
             //let fullRunSteps = full15Days ? ["\(sideRunSteps[0])/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"] : [sideRunSteps[0], "150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360"]
-            let fullRunSteps = full15Days ? "\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360" : "\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"
+            let fullRunSteps = full15Days ? [sideRunSteps, "150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360"] : ["\(sideRunSteps)/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240"]
             
             let paramsSide = "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fdir/hcc/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh"
             let paramsMain = "\(paramsSide)/rsn/sd/98.174/ocu/ocv/145.151/130.151/34.128"
@@ -206,8 +206,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             
             let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             let deaverager = GribDeaverager()
-            let steps = isMainRun ? fullRunSteps : sideRunSteps
-            //for steps in stepsArray {
+            let stepsArray = isMainRun ? fullRunSteps : [sideRunSteps]
+            for steps in stepsArray {
                 // 20.3 = visibility
                 // 145.151 = Sea surface height
                 // 98.174 = Sea ice thickness
@@ -318,7 +318,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     /// Delete job from ECMWF MARS queue to free up resources
                     try await curl.cleanupEcmwfApiJob(job: job, email: email, apikey: key)
                     
-                    //if stepsArray.last == steps {
+                    if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
                         let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
                         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false)
@@ -331,9 +331,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                             logger.info("Deleting local run directory: \(runDir)")
                             try FileManager.default.removeItem(atPath: runDir)
                         }
-                    //}
+                    }
                 }
-            //}
+            }
         }
         try await processTask?.value
         try await client.shutdown()
