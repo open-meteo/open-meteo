@@ -68,7 +68,9 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     var updateIntervalSeconds: Int {
         switch self {
         case .weathernext_global, .weathernext_global_ensemble_mean:
-            return 6 * 3600
+            // the update interval is 6 hours, but 6z and 18z runs do not arrive in time
+            // therefore, for now we only process 0z and 12z runs
+            return 12 * 3600
         }
     }
 
@@ -116,7 +118,7 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     /// When `--run` is not provided, the downloader will poll the marker file instead.
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        return t.add(hours: -8).floor(toNearestHour: 6)
+        return t.add(hours: -8).floor(toNearest: self.updateIntervalSeconds)
     }
 
     /// Path to the marker file that signals the latest completed run.
