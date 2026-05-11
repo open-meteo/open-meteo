@@ -146,18 +146,19 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     }
     
     func getUrl(run: Timestamp, timestamp: Timestamp, server: String) -> [String] {
+        let is50R1 = run >= Timestamp(2026, 5, 12, 6, 0)
         switch self {
         case .ifs:
             // old legacy format
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let file = hour == 0 ? 11 : 1
-            let prefix = run.hour % 12 == 0 ? "D" : "S"
+            let prefix = (run.hour % 12 == 0 || is50R1) ? "D" : "S"
             let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3)).bz2"
             return [url]
         case .wam:
             // ope_d2_ifs-ens-cf_od_scwv_fc_20251116T180000Z_20251116T180000Z_0h.bz2
             // ope_d2_ifs-ens-cf_od_wave_fc_20251109T000000Z_20251109T000000Z_0h.bz2
-            let stream = run.hour % 12 == 0 ? "wave" : "scwv"
+            let stream = (run.hour % 12 == 0 || is50R1) ? "wave" : "scwv"
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let url = "\(server)ope_d2_ifs-ens-cf_od_\(stream)_fc_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2"
             return [url]
