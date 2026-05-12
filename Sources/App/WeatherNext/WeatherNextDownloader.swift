@@ -415,16 +415,9 @@ struct WeatherNextSourcePath {
 
 // MARK: – Source file adapter
 
-final class WeatherNextSourceFile: @unchecked Sendable {
-    private struct CloudTileCacheKey: Equatable {
-        let member: Int
-        let yRange: Range<UInt64>
-        let xRange: Range<UInt64>
-    }
-
+final class WeatherNextSourceFile: Sendable {
     let domain: WeatherNextDomain
     let arrays: [WeatherNextVariable: OmFileReaderArray<MmapFile, Float>]
-    private var cachedCloudTiles: (key: CloudTileCacheKey, values: [WeatherNextVariable: [Float]])?
 
     init(path: String, domain: WeatherNextDomain) async throws {
         self.domain = domain
@@ -543,17 +536,42 @@ final class WeatherNextSourceFile: @unchecked Sendable {
         yRange: Range<UInt64>,
         xRange: Range<UInt64>
     ) async throws -> [Float] {
-        let key = CloudTileCacheKey(member: member, yRange: yRange, xRange: xRange)
-        if let cachedCloudTiles, cachedCloudTiles.key == key, let cached = cachedCloudTiles.values[variable] {
-            return cached
+
+        // Helper to read specific levels and compute CC
+        let computeCC = { @Sendable (levels: [WeatherNextPressureLevel]) async throws -> [Float] in
+            var inputs: [(rh: [Float], rhCrit: Float)] = []
+            for level in levels {
+                let rh = try await self.readRawTile(
+                    variable: .pressure(.init(variable: .relative_humidity, level: level)),
+                    member: member, yRange: yRange, xRange: xRange
+                )
+                let rhCrit = Meteorology.relativeHumidityThreshold(pressureHPa: Float(level.rawValue))
+                inputs.append((rh: rh, rhCrit: rhCrit))
+            }
+            return Meteorology.cloudCoverFromRH(inputs)
         }
 
-        let derived = try await readCloudCoverTiles(member: member, yRange: yRange, xRange: xRange)
-        cachedCloudTiles = (key, derived)
-        guard let result = derived[variable] else {
+        switch variable {
+        case .cloud_cover_low:
+            return try await computeCC([.hPa1000, .hPa925, .hPa850])
+
+        case .cloud_cover_mid:
+            return try await computeCC([.hPa700, .hPa600, .hPa500, .hPa400])
+
+        case .cloud_cover_high:
+            return try await computeCC([.hPa300, .hPa250, .hPa200, .hPa150, .hPa100, .hPa50])
+
+        case .cloud_cover:
+            // Total cloud cover needs all of them
+            async let low = computeCC([.hPa1000, .hPa925, .hPa850])
+            async let mid = computeCC([.hPa700, .hPa600, .hPa500, .hPa400])
+            async let high = computeCC([.hPa300, .hPa250, .hPa200, .hPa150, .hPa100, .hPa50])
+
+            return try await Meteorology.cloudCoverTotal(low: low, mid: mid, high: high)
+
+        default:
             throw WeatherNextDownloaderError.missingVariable(variable.rawValue)
         }
-        return result
     }
 
     private func readCloudCoverTiles(
@@ -571,7 +589,7 @@ final class WeatherNextSourceFile: @unchecked Sendable {
                 xRange: xRange
             )
         }
-        
+
         let lowCC  = Meteorology.cloudCoverFromRH([
             (rh: rh[.hPa1000]!, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
             (rh: rh[.hPa925]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
@@ -591,7 +609,7 @@ final class WeatherNextSourceFile: @unchecked Sendable {
             (rh: rh[.hPa100]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
             (rh: rh[.hPa50]!,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
         ])
-        
+
         return [
             .cloud_cover_low: lowCC,
             .cloud_cover_mid: midCC,
