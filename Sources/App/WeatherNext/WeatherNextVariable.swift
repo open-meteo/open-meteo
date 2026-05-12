@@ -261,15 +261,16 @@ extension WeatherNextVariable {
      */
     static let rawVariables: [WeatherNextVariable] =
         [
-            .surface(.wind_u_component_100m),
-            .surface(.wind_v_component_100m),
-            .surface(.wind_u_component_10m),
-            .surface(.wind_v_component_10m),
+            // .surface(.wind_u_component_100m),
+            // .surface(.wind_v_component_100m),
+            // .surface(.wind_u_component_10m),
+            // .surface(.wind_v_component_10m),
             .surface(.temperature_2m),
-            .surface(.pressure_msl),
-            .surface(.sea_surface_temperature),
-            .surface(.total_precipitation_6hr)
-        ] + pressureLevelVariables
+            // .surface(.pressure_msl),
+            // .surface(.sea_surface_temperature),
+            // .surface(.total_precipitation_6hr)
+        ] 
+        // + pressureLevelVariables
 
     var isPressureLevelVariable: Bool {
         if case .pressure = self {
@@ -329,5 +330,28 @@ extension WeatherNextVariable {
 
     static var total_precipitation_6hr: WeatherNextVariable {
         .surface(.total_precipitation_6hr)
+    }
+
+    /// All variables that appear in the output archive: directly-read raw variables plus
+    /// the four cloud-cover variables that are derived from RH pressure levels.
+    static let allOutputVariables: [WeatherNextVariable] = rawVariables + [
+        // .cloud_cover_low,
+        // .cloud_cover_mid,
+        // .cloud_cover_high,
+        // .cloud_cover
+    ]
+
+    /// `true` for the four cloud-cover variables that are derived from RH pressure levels
+    /// rather than read directly from the source OM files.
+    var isCloudCoverDerived: Bool {
+        switch self {
+        case .surface(.cloud_cover),
+             .surface(.cloud_cover_low),
+             .surface(.cloud_cover_mid),
+             .surface(.cloud_cover_high):
+            return true
+        default:
+            return false
+        }
     }
 }

@@ -85,7 +85,7 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     var omFileLength: Int {
         switch self {
         case .weathernext_global, .weathernext_global_ensemble_mean:
-            return 60
+            return 10 // FIXME: Only FOR TESTING. 60 is correct
         }
     }
 
