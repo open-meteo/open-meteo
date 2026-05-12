@@ -250,7 +250,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // logger.info("Processing \(variable)")
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     try grib2d.load(message: message)
-                    grib2d.array.flipLatitude()
+                    if (domain == .aifs025_single || domain == .aifs025_ensemble) && run >= Timestamp(2026, 5, 12, 6, 0) {
+                        // AIFSv2 shifts data by 180° longitude
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                    } else {
+                        grib2d.array.flipLatitude()
+                    }
                     
                     // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     // fatalError()
@@ -356,6 +361,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
             for member in 0..<domain.countEnsembleMember {
+                if await writer.contains(member: member, variable: EcmwfVariable.cloud_cover_low) {
+                    continue
+                }
                 logger.info("Calculating cloud cover")
                 // 2025-10-13: added 100/150/600/400 hPa levels
                 guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
