@@ -468,6 +468,20 @@ final class WeatherNextSourceFile: Sendable {
         return result
     }
 
+    private func shiftedXRanges(for xRange: Range<UInt64>) -> (primary: Range<UInt64>, secondary: Range<UInt64>?) {
+        guard !xRange.isEmpty else {
+            return (0..<0, nil)
+        }
+        let nx = UInt64(domain.grid.nx)
+        let half = nx / 2
+        let srcStart = (xRange.lowerBound + half) % nx
+        let srcEnd = (xRange.upperBound - 1 + half) % nx + 1
+        if srcStart < srcEnd {
+            return (srcStart..<srcEnd, nil)
+        }
+        return (srcStart..<nx, 0..<srcEnd)
+    }
+
     func readSpatial(
         variable: WeatherNextVariable,
         member: Int,
@@ -489,44 +503,45 @@ final class WeatherNextSourceFile: Sendable {
         guard let array = arrays[variable] else {
             throw WeatherNextDownloaderError.missingVariable(variable.rawValue)
         }
-        let nx = domain.grid.nx
         let nY = Int(yRange.count)
         let nX = Int(xRange.count)
         var out = [Float](repeating: .nan, count: nY * nX)
 
-        let half = UInt64(nx / 2)
-        let srcXLo = (xRange.lowerBound + half) % UInt64(nx)
-        let srcXHi = (xRange.upperBound - 1 + half) % UInt64(nx) + 1
-
-        if srcXLo < srcXHi {
-            try await array.read(
-                into: &out,
-                range: [UInt64(member)..<UInt64(member + 1), yRange, srcXLo..<srcXHi]
-            )
+        if nY == 0 || nX == 0 {
             return out
         }
 
-        let nLeft = nx - Int(srcXLo)
-        let nRight = Int(srcXHi)
-        var leftBuf = [Float](repeating: .nan, count: nY * nLeft)
-        var rightBuf = [Float](repeating: .nan, count: nY * nRight)
+        let (primaryRange, secondaryRange) = shiftedXRanges(for: xRange)
 
-        try await array.read(
-            into: &leftBuf,
-            range: [UInt64(member)..<UInt64(member + 1), yRange, srcXLo..<UInt64(nx)]
-        )
-        try await array.read(
-            into: &rightBuf,
-            range: [UInt64(member)..<UInt64(member + 1), yRange, 0..<srcXHi]
-        )
+        if let secondaryRange {
+            let nLeft = Int(primaryRange.upperBound - primaryRange.lowerBound)
+            let nRight = Int(secondaryRange.upperBound - secondaryRange.lowerBound)
+            var leftBuf = [Float](repeating: .nan, count: nY * nLeft)
+            var rightBuf = [Float](repeating: .nan, count: nY * nRight)
 
-        for y in 0..<nY {
-            let outBase = y * nX
-            let leftBase = y * nLeft
-            let rightBase = y * nRight
-            for x in 0..<nLeft { out[outBase + x] = leftBuf[leftBase + x] }
-            for x in 0..<nRight { out[outBase + nLeft + x] = rightBuf[rightBase + x] }
+            try await array.read(
+                into: &leftBuf,
+                range: [UInt64(member)..<UInt64(member + 1), yRange, primaryRange]
+            )
+            try await array.read(
+                into: &rightBuf,
+                range: [UInt64(member)..<UInt64(member + 1), yRange, secondaryRange]
+            )
+
+            for y in 0..<nY {
+                let outBase = y * nX
+                let leftBase = y * nLeft
+                let rightBase = y * nRight
+                for x in 0..<nLeft { out[outBase + x] = leftBuf[leftBase + x] }
+                for x in 0..<nRight { out[outBase + nLeft + x] = rightBuf[rightBase + x] }
+            }
+            return out
         }
+
+        try await array.read(
+            into: &out,
+            range: [UInt64(member)..<UInt64(member + 1), yRange, primaryRange]
+        )
         return out
     }
 
