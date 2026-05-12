@@ -138,8 +138,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
             if !processLocalOnly {
                 if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: localFile) {
-                    try await fetchSourceFile(
-                        application: application,
+                    try await GoogleCloudStorage.download(
+                        client: application.dedicatedHttpClient,
+                        logger: application.logger,
                         remotePath: source.remotePath,
                         localFile: localFile
                     )
@@ -147,7 +148,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             } else if !FileManager.default.fileExists(atPath: localFile) {
                 logger.info("Skipping missing local file: \(localFile)")
             }
-
             return localFile
         }
 
@@ -177,18 +177,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         return mainHandles + allHandles.flatMap { $0 }
     }
 
-    func fetchSourceFile(
-        application: Application,
-        remotePath: String,
-        localFile: String
-    ) async throws {
-        try await GoogleCloudStorage.download(
-            client: application.dedicatedHttpClient,
-            logger: application.logger,
-            remotePath: remotePath,
-            localFile: localFile
-        )
-    }
+    // MARK: – Main conversion entry point
 
     func processWeatherNextFile(
         application: Application,
