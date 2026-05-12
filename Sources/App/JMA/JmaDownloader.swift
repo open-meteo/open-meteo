@@ -504,7 +504,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     }
 
     var countEnsembleMember: Int {
-        return 0
+        return 1
     }
 
     var hasYearlyFiles: Bool {
