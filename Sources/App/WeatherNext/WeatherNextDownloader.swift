@@ -413,58 +413,6 @@ struct WeatherNextSourcePath {
     }
 }
 
-// MARK: – Cloud-cover derivation (free functions)
-
-/// Compute per-location cloud cover as the element-wise max over a group of pressure levels,
-/// converting each RH value through `Meteorology.relativeHumidityToCloudCover`.
-fileprivate func cloudCoverFromRH(_ pairs: [(rh: [Float], hPa: Float)]) -> [Float] {
-    guard let first = pairs.first else { return [] }
-    var result = [Float](repeating: 0, count: first.rh.count)
-    for i in result.indices {
-        var maxCC: Float = 0
-        for (rh, hPa) in pairs {
-            let cc = Meteorology.relativeHumidityToCloudCover(relativeHumidity: rh[i], pressureHPa: hPa)
-            if cc > maxCC { maxCC = cc }
-        }
-        result[i] = maxCC
-    }
-    return result
-}
-
-/// Derive the four cloud-cover variables from a full set of RH pressure-level arrays.
-/// Works for any array length (full grid or spatial tile).
-fileprivate func deriveCloudCover(
-    relativeHumidity rh: [WeatherNextPressureLevel: [Float]]
-) -> [WeatherNextVariable: [Float]] {
-    // Low: 1000, 925, 850 hPa
-    let lowPairs: [(rh: [Float], hPa: Float)] = [
-        (.hPa1000, 1000), (.hPa925, 925), (.hPa850, 850)
-    ].compactMap { level, hPa in rh[level].map { ($0, hPa) } }
-
-    // Mid: 700, 600, 500, 400 hPa
-    let midPairs: [(rh: [Float], hPa: Float)] = [
-        (.hPa700, 700), (.hPa600, 600), (.hPa500, 500), (.hPa400, 400)
-    ].compactMap { level, hPa in rh[level].map { ($0, hPa) } }
-
-    // High: 300, 250, 200, 150, 100, 50 hPa
-    let highPairs: [(rh: [Float], hPa: Float)] = [
-        (.hPa300, 300), (.hPa250, 250), (.hPa200, 200),
-        (.hPa150, 150), (.hPa100, 100), (.hPa50, 50)
-    ].compactMap { level, hPa in rh[level].map { ($0, hPa) } }
-
-    let low  = cloudCoverFromRH(lowPairs)
-    let mid  = cloudCoverFromRH(midPairs)
-    let high = cloudCoverFromRH(highPairs)
-    let total = Meteorology.cloudCoverTotal(low: low, mid: mid, high: high)
-
-    return [
-        .cloud_cover_low:  low,
-        .cloud_cover_mid:  mid,
-        .cloud_cover_high: high,
-        .cloud_cover:      total
-    ]
-}
-
 // MARK: – Source file adapter
 
 final class WeatherNextSourceFile: @unchecked Sendable {
@@ -623,6 +571,32 @@ final class WeatherNextSourceFile: @unchecked Sendable {
                 xRange: xRange
             )
         }
-        return deriveCloudCover(relativeHumidity: rh)
+        
+        let lowCC  = Meteorology.cloudCoverFromRH([
+            (rh: rh[.hPa1000]!, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
+            (rh: rh[.hPa925]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
+            (rh: rh[.hPa850]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
+        ])
+        let midCC  = Meteorology.cloudCoverFromRH([
+            (rh: rh[.hPa700]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
+            (rh: rh[.hPa600]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
+            (rh: rh[.hPa500]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
+            (rh: rh[.hPa400]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
+        ])
+        let highCC = Meteorology.cloudCoverFromRH([
+            (rh: rh[.hPa300]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
+            (rh: rh[.hPa250]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
+            (rh: rh[.hPa200]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
+            (rh: rh[.hPa150]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
+            (rh: rh[.hPa100]!,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
+            (rh: rh[.hPa50]!,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
+        ])
+        
+        return [
+            .cloud_cover_low: lowCC,
+            .cloud_cover_mid: midCC,
+            .cloud_cover_high: highCC,
+            .cloud_cover: Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
+        ]
     }
 }

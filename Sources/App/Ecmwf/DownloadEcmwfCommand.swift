@@ -374,34 +374,31 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     logger.warning("Pressure level relative humidity unavailable")
                     continue
                 }
-                /// low clouds (surface - 3km): 1000/925/850
-                let cloudcoverLow = zip(rh1000, zip(rh925, rh850)).map {
-                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 1000),
-                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 925),
-                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 850)))
-                }
-                /// mid clouds (3 km - 8km): 700/600/500/400
-                let cloudcoverMid = zip(zip(rh700, rh600), zip(rh500, rh400)).map {
-                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 700),
-                        max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 600),
-                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 500),
-                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 400))))
-                }
-                /// high clouds (>8 km): 300/250/200/150/100/50
-                let cloudcoverHigh = zip(zip(rh300, rh250), zip(zip(rh200, rh150), zip(rh100, rh50))).map {
-                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 300),
-                            max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 250),
-                                max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.0, pressureHPa: 200),
-                                    max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.1, pressureHPa: 150),
-                                        max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.0, pressureHPa: 100),
-                                            Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.1, pressureHPa: 50))))))
-                }
                 
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow)
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid)
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh)
+                let lowCC = Meteorology.cloudCoverFromRH([
+                    (rh: rh1000, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
+                    (rh: rh925,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
+                    (rh: rh850,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
+                ])
+                let midCC = Meteorology.cloudCoverFromRH([
+                    (rh: rh700,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
+                    (rh: rh600,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
+                    (rh: rh500,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
+                    (rh: rh400,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
+                ])
+                let highCC = Meteorology.cloudCoverFromRH([
+                    (rh: rh300,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
+                    (rh: rh250,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
+                    (rh: rh200,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
+                    (rh: rh150,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
+                    (rh: rh100,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
+                    (rh: rh50,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
+                ])
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: lowCC)
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: midCC)
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: highCC)
                 if await !writer.contains(member: member, variable: EcmwfVariable.cloud_cover) {
-                    let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
+                    let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
                     try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
                 }
             }
