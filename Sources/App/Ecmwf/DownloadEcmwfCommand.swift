@@ -525,18 +525,18 @@ extension EcmwfDomain {
         let dateStr = run.format_YYYYMMdd
         switch self {
         case .ifs04:
-            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .wam025:
-            let product = run.hour == 0 || run.hour == 12 ? "wave" : "scwv"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "wave" : "scwv"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .wam025_ensemble:
-            let product = run.hour == 0 || run.hour == 12 ? "waef" : "scda"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "waef" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-ef.grib2"]
         case .ifs04_ensemble:
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
         case .ifs025:
-            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .ifs025_ensemble:
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
