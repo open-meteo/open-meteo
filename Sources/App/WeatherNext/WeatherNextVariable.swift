@@ -261,16 +261,16 @@ extension WeatherNextVariable {
      */
     static let rawVariables: [WeatherNextVariable] =
         [
-            // .surface(.wind_u_component_100m),
-            // .surface(.wind_v_component_100m),
-            // .surface(.wind_u_component_10m),
-            // .surface(.wind_v_component_10m),
+            .surface(.wind_u_component_100m),
+            .surface(.wind_v_component_100m),
+            .surface(.wind_u_component_10m),
+            .surface(.wind_v_component_10m),
             .surface(.temperature_2m),
-            // .surface(.pressure_msl),
-            // .surface(.sea_surface_temperature),
-            // .surface(.total_precipitation_6hr)
+            .surface(.pressure_msl),
+            .surface(.sea_surface_temperature),
+            .surface(.total_precipitation_6hr)
         ] 
-        // + pressureLevelVariables
+        + pressureLevelVariables
 
     var isPressureLevelVariable: Bool {
         if case .pressure = self {
