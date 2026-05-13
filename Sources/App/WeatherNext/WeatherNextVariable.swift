@@ -335,10 +335,10 @@ extension WeatherNextVariable {
     /// All variables that appear in the output archive: directly-read raw variables plus
     /// the four cloud-cover variables that are derived from RH pressure levels.
     static let allOutputVariables: [WeatherNextVariable] = rawVariables + [
-        // .cloud_cover_low,
-        // .cloud_cover_mid,
-        // .cloud_cover_high,
-        // .cloud_cover
+        .cloud_cover_low,
+        .cloud_cover_mid,
+        .cloud_cover_high,
+        .cloud_cover
     ]
 
     /// `true` for the four cloud-cover variables that are derived from RH pressure levels
