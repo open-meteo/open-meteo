@@ -1125,7 +1125,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             // water equivalent in millimetre, density in kg/m3
             guard
                 let depth = Reader.variableFromString("snow_depth"),
-                let density = Reader.variableFromString("density")
+                let density = Reader.variableFromString("snow_density")
             else {
                 return nil
             }
