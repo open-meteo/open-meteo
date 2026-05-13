@@ -374,31 +374,17 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             return []
         }
 
-        let threshold = Float(0.1) * Float(domain.dtSeconds / 3600)
+        let threshold = Float(0.1) * Float(domain.dtHours)
         let dimensions = [UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
-        let fullY = 0..<UInt64(domain.grid.ny)
-        let fullX = 0..<UInt64(domain.grid.nx)
+        let nMembers = domain.countEnsembleMember
+
         var handles = [GenericVariableHandle]()
         handles.reserveCapacity(available.count)
 
         for entry in available {
-            var probability = [Float](repeating: 0, count: domain.grid.count)
-            for member in 0..<domain.countEnsembleMember {
-                let precip = try await entry.source.readRawTile(
-                    variable: .total_precipitation_6hr,
-                    member: member,
-                    yRange: fullY,
-                    xRange: fullX
-                )
-                for i in precip.indices where precip[i] >= threshold {
-                    probability[i] += 1
-                }
-            }
-            probability.multiplyAdd(multiply: 100 / Float(domain.countEnsembleMember), add: 0)
-
             let time = TimerangeDt(start: entry.time, nTime: 1, dtSeconds: domain.dtSeconds)
-            let probabilityData = probability
-            let nx = domain.grid.nx
+            let source = entry.source
+
             handles.append(GenericVariableHandle(
                 variable: ProbabilityVariable.precipitation_probability,
                 time: time,
@@ -409,39 +395,33 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                     guard range.count == 2 else {
                         fatalError("Probability handles only support 2D spatial reads")
                     }
-                    return Self.make2DSlice(
-                        data: probabilityData,
-                        nx: nx,
-                        yRange: range[0],
-                        xRange: range[1]
-                    )
+                    let yRange = range[0]
+                    let xRange = range[1]
+                    if yRange.isEmpty || xRange.isEmpty {
+                        return []
+                    }
+
+                    let nLoc = Int(yRange.count * xRange.count)
+                    var probability = [Float](repeating: 0, count: nLoc)
+
+                    for member in 0..<nMembers {
+                        let precip = try await source.readRawTile(
+                            variable: .total_precipitation_6hr,
+                            member: member,
+                            yRange: yRange,
+                            xRange: xRange
+                        )
+                        for i in precip.indices where precip[i] >= threshold {
+                            probability[i] += 1
+                        }
+                    }
+
+                    probability.multiplyAdd(multiply: 100 / Float(nMembers), add: 0)
+                    return probability
                 }
             ))
         }
         return handles
-    }
-
-    static func make2DSlice(data: [Float], nx: Int, yRange: Range<UInt64>, xRange: Range<UInt64>) -> [Float] {
-        if yRange.count == 0 || xRange.count == 0 {
-            return []
-        }
-        if yRange.lowerBound == 0,
-           yRange.upperBound == UInt64(data.count / nx),
-           xRange.lowerBound == 0,
-           xRange.upperBound == UInt64(nx) {
-            return data
-        }
-
-        let nY = Int(yRange.count)
-        let nX = Int(xRange.count)
-        var out = [Float]()
-        out.reserveCapacity(nY * nX)
-        for y in Int(yRange.lowerBound)..<Int(yRange.upperBound) {
-            let rowStart = y * nx + Int(xRange.lowerBound)
-            let rowEnd = rowStart + nX
-            out.append(contentsOf: data[rowStart..<rowEnd])
-        }
-        return out
     }
 
     // MARK: – Marker polling
