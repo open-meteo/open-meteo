@@ -539,7 +539,10 @@ extension EcmwfDomain {
             let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .ifs025_ensemble:
-            return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
+            // control and perturbed runs are stored in different files
+            return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2",
+                    "\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
         case .aifs025:
             return ["\(base)\(dateStr)/\(runStr)z/aifs/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"]
         case .aifs025_single:
