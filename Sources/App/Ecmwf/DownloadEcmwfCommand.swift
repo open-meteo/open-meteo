@@ -214,9 +214,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         }
                         if let level = entry.level {
                             // entry is a pressure level variable
-                            if variable.gribName == "gh" && variable.level == level && entry.param == "z" {
-                                return true
-                            }
                             return variable.level == level && entry.param == variable.gribName
                         }
                         return entry.param == variable.gribName
@@ -279,10 +276,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-                    
-                    if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single, .aifs025_ensemble].contains(domain) {
-                        grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
                     }
                     
                     // Keep relative humidity in memory to generate total cloud cover files

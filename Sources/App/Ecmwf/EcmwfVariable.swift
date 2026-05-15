@@ -534,9 +534,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
                 return true
             }
             if let level = variable.level {
-                if shortName == "z" && variable.gribName == "gh" && levelhPa == level {
-                    return true
-                }
                 return shortName == variable.gribName && levelhPa == level
             }
             return shortName == variable.gribName
