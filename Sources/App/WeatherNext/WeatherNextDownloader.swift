@@ -187,13 +187,13 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             concurrent: concurrent
         )
 
-        let probabilityHandles = try await makeProbabilityHandles(
+        let probabilityHandles = try await preprocessPrecipPropability(
             logger: logger, 
             domain: domain,
             run: run,
             available: available
         )
-        let allHandles = sourceHandles + cloudCoverHandles + ensembleMeanHandles + probabilityHandles 
+        let allHandles = sourceHandles + ensembleMeanHandles + cloudCoverHandles + probabilityHandles 
 
         try await GenericVariableHandle.convert(
             logger: logger,
@@ -222,6 +222,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)],
         concurrent: Int
     ) async throws -> [GenericVariableHandle] {
+        logger.info("Preprocessing cloud cover")
         let fullY = 0..<UInt64(domain.grid.ny)
         let fullX = 0..<UInt64(domain.grid.nx)
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1, nTime: 1)
@@ -298,6 +299,49 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         return handles
     }
 
+    func preprocessPrecipPropability(
+        logger: Logger, 
+        domain: WeatherNextDomain,
+        run: Timestamp,
+        available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)]
+    ) async throws -> [GenericVariableHandle] {
+        guard domain.countEnsembleMember > 1,
+              WeatherNextVariable.allOutputVariables.contains(.total_precipitation_6hr)
+        else {
+            return []
+        }
+        logger.info("Preprocessing precipitation probability")
+
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
+        let fullY = 0..<UInt64(domain.grid.ny)
+        let fullX = 0..<UInt64(domain.grid.nx)
+        let nLoc = Int(fullY.count * fullX.count)
+        var probability = [Float](repeating: 0, count: nLoc)
+
+        let threshold = Float(0.1) * Float(domain.dtHours)
+        for entry in available {
+            let source = entry.source
+            probability = [Float](repeating: 0, count: nLoc)
+
+            for member in 0..<domain.countEnsembleMember {
+                let memberRange = UInt64(member)..<UInt64(member+1)  
+                let precip = try await source.arrays[.total_precipitation_6hr]!.read(range: [memberRange, fullY, fullX])
+                for i in precip.indices where precip[i] >= threshold {
+                    probability[i] += 1
+                }
+            }
+
+            probability.multiplyAdd(multiply: 100 / Float(domain.countEnsembleMember), add: 0)
+            try await writer.write(
+                time: entry.time, 
+                member: 1, 
+                variable: ProbabilityVariable.precipitation_probability, 
+                data: probability
+            )
+        }
+        return try await writer.finalise()
+    }
+    
     func calculateEnsembleMean(
         logger: Logger,
         domain: WeatherNextDomain,
@@ -375,48 +419,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             }
         }
         return handles
-    }
-
-    func makeProbabilityHandles(
-        logger: Logger, 
-        domain: WeatherNextDomain,
-        run: Timestamp,
-        available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)]
-    ) async throws -> [GenericVariableHandle] {
-        guard domain.countEnsembleMember > 1,
-              WeatherNextVariable.allOutputVariables.contains(.total_precipitation_6hr)
-        else {
-            return []
-        }
-
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
-
-        let threshold = Float(0.1) * Float(domain.dtHours)
-        for entry in available {
-            let source = entry.source
-
-            let fullY = 0..<UInt64(domain.grid.ny)
-            let fullX = 0..<UInt64(domain.grid.nx)
-            let nLoc = Int(fullY.count * fullX.count)
-            var probability = [Float](repeating: 0, count: nLoc)
-
-            for member in 0..<domain.countEnsembleMember {
-                let memberRange = UInt64(member)..<UInt64(member+1)  
-                let precip = try await source.arrays[.total_precipitation_6hr]!.read(range: [memberRange, fullY, fullX])
-                for i in precip.indices where precip[i] >= threshold {
-                    probability[i] += 1
-                }
-            }
-
-            probability.multiplyAdd(multiply: 100 / Float(domain.countEnsembleMember), add: 0)
-            try await writer.write(
-                time: entry.time, 
-                member: 1, 
-                variable: ProbabilityVariable.precipitation_probability, 
-                data: probability
-            )
-        }
-        return try await writer.finalise()
     }
 
     // MARK: – Marker polling
