@@ -161,21 +161,23 @@ struct GenericVariableHandle: Sendable {
                 }
             }
         }
-        
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
-            if generateFullRun, domain.countEnsembleMember == 1, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
-                logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                let startTimeFullRun = DispatchTime.now()
-                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
-                logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                
-                if let uploadS3Bucket {
-                    try domain.domainRegistry.syncToS3PerRun(
-                        logger: logger,
-                        bucket: uploadS3Bucket,
-                        run:run
-                    )
+
+        if generateFullRun, OpenMeteo.dataRunDirectory != nil {
+            for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
+                let domain = handles[0].domain
+                if domain.countEnsembleMember == 1, let run, run.hour % 3 == 0 {
+                    logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    let startTimeFullRun = DispatchTime.now()
+                    try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
+                    logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    
+                    if let uploadS3Bucket {
+                        try domain.domainRegistry.syncToS3PerRun(
+                            logger: logger,
+                            bucket: uploadS3Bucket,
+                            run:run
+                        )
+                    }
                 }
             }
         }

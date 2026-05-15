@@ -172,15 +172,30 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         uploadS3OnlyProbabilities: Bool,
     ) async throws {
         let logger = application.logger
-        let cloudCoverHandles = try await preprocessCloudCover(domain: domain, available: available)
-        let mainHandles = makeSourceHandles(domain: domain, available: available, cloudCoverHandles: cloudCoverHandles)
+        let sourceHandles = makeSourceHandles(domain: domain, available: available)
+        let ensembleMeanHandles = try await calculateEnsembleMean(
+            logger: logger, 
+            domain: domain, 
+            run: run,
+            sourceHandles: sourceHandles,
+            concurrent: concurrent
+        )
+        let cloudCoverHandles = try await preprocessCloudCover(
+            logger: logger, 
+            domain: domain, 
+            available: available, 
+            concurrent: concurrent
+        )
+
+        let probabilityHandles = try await makeProbabilityHandles(domain: domain, available: available)
+        let allHandles = sourceHandles + cloudCoverHandles + ensembleMeanHandles + probabilityHandles 
 
         try await GenericVariableHandle.convert(
             logger: logger,
             domain: domain,
             createNetcdf: createNetcdf,
             run: run,
-            handles: mainHandles,
+            handles: allHandles,
             concurrent: concurrent,
             writeUpdateJson: true,
             uploadS3Bucket: uploadS3Bucket,
@@ -188,51 +203,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             generateFullRun: false,
             generateTimeSeries: true
         )
-
-        if let ensembleMeanDomain = domain.ensembleMeanDomain {
-            let meanHandles = try await SpatialEnsembleStats.calculate(
-                logger: logger,
-                run: run,
-                ensembleMeanDomain: ensembleMeanDomain,
-                handles: mainHandles
-            )
-            try await GenericVariableHandle.convert(
-                logger: logger,
-                domain: ensembleMeanDomain,
-                createNetcdf: createNetcdf,
-                run: run,
-                handles: meanHandles,
-                concurrent: 1,
-                writeUpdateJson: true,
-                uploadS3Bucket: uploadS3Bucket,
-                uploadS3OnlyProbabilities: uploadS3OnlyProbabilities,
-                generateFullRun: ensembleMeanDomain.countEnsembleMember == 1,
-                generateTimeSeries: true
-            )
-        }
-
-        let probabilityHandles = try await makeProbabilityHandles(domain: domain, available: available)
-        if !probabilityHandles.isEmpty {
-            try await GenericVariableHandle.convert(
-                logger: logger,
-                domain: domain,
-                createNetcdf: createNetcdf,
-                run: run,
-                handles: probabilityHandles,
-                concurrent: 1,
-                writeUpdateJson: true,
-                uploadS3Bucket: uploadS3Bucket,
-                uploadS3OnlyProbabilities: uploadS3OnlyProbabilities,
-                generateFullRun: false,
-                generateTimeSeries: true
-            )
-        } else if let uploadS3Bucket, uploadS3OnlyProbabilities {
-            try await domain.domainRegistry.syncToS3(
-                logger: logger,
-                bucket: uploadS3Bucket,
-                variables: [ProbabilityVariable.precipitation_probability]
-            )
-        }
     }
 
     /// For each `(entry, member)` triplet, read every RH pressure level once over the
@@ -241,8 +211,10 @@ struct DownloadWeatherNextCommand: AsyncCommand {
     /// per `(time, member, cloudCoverVariable)` – backed by those temp files so that the
     /// downstream tile-read path never has to re-derive cloud cover from raw RH data.
     func preprocessCloudCover(
+        logger: Logger,
         domain: WeatherNextDomain,
-        available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)]
+        available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)],
+        concurrent: Int
     ) async throws -> [GenericVariableHandle] {
         let fullY = 0..<UInt64(domain.grid.ny)
         let fullX = 0..<UInt64(domain.grid.nx)
@@ -322,14 +294,62 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         return handles
     }
 
+    func calculateEnsembleMean(
+        logger: Logger,
+        domain: WeatherNextDomain,
+        run: Timestamp,
+        sourceHandles: [GenericVariableHandle],
+        concurrent: Int
+    ) async throws -> [GenericVariableHandle] {
+        logger.info("Calculating ensemble mean")
+        logger.info("Iterating over \(sourceHandles.count) source handles")
+
+        guard let ensembleMeanDomain = domain.ensembleMeanDomain else {
+            fatalError("ensembleMeanDomain not defined")
+        }
+        
+        var handles: [GenericVariableHandle] = []
+        for (_, timestepHandles) in sourceHandles.groupedPreservedOrder(by: { "\($0.time)" }) {
+            let time = timestepHandles.first!.time.range.first!
+            logger.info("Processing time step \(time.iso8601_YYYY_MM_dd_HH_mm)")
+            logger.info("File \(timestepHandles.first!.variable.omFileName.file)")
+            logger.info("Count \(timestepHandles.count)")
+
+            let writer = OmSpatialTimestepWriter(domain: ensembleMeanDomain, run: run, time: time, storeOnDisk: false, realm: nil, logger: logger) 
+            let calculator = EnsembleMeanCalculator()
+            
+            for (_, variableHandles) in timestepHandles.groupedPreservedOrder(by: { "\($0.variable)" }) {
+                logger.info("Processing variable \(variableHandles.first!.variable)")
+                logger.info("Count \(variableHandles.count)")
+                for handle in variableHandles {
+                    guard handle.time.count == 1 else {
+                        fatalError("Ensemble stats currently require single-timestep handles")
+                    }
+                    let fullY = 0..<UInt64(domain.grid.ny)
+                    let fullX = 0..<UInt64(domain.grid.nx)
+                    let data = try await handle.read(range: [fullY, fullX])
+                    await calculator.ingest(
+                        variable: handle.variable,
+                        spreadVariable: handle.variable.asSpreadVariableGeneric,
+                        data: data
+                    )
+                }
+            }
+            try await calculator.calculateAndWrite(to: writer)
+            handles += try await writer.finalise()
+            logger.info("handles.count \(handles.count)")
+        }
+  
+        return handles
+    }
+
     func makeSourceHandles(
         domain: WeatherNextDomain,
         available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)],
-        cloudCoverHandles: [GenericVariableHandle]
     ) -> [GenericVariableHandle] {
         let dimensions = [UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
-        // Start with the pre-computed cloud cover handles.
-        var handles = cloudCoverHandles
+        // Start empty
+        var handles: [GenericVariableHandle] = []
         let nonCloudVariables = WeatherNextVariable.allOutputVariables.filter { !$0.isCloudCoverDerived }
         handles.reserveCapacity(
             handles.count + available.count * nonCloudVariables.count * domain.countEnsembleMember
@@ -347,9 +367,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                         domain: domain,
                         dimensions: dimensions,
                         readRange: { range in
-                            guard range.count == 2 else {
-                                fatalError("WeatherNext source handles only support 2D spatial reads")
-                            }
+                            // guard range.count == 2 else {
+                            //     fatalError("WeatherNext source handles only support 2D spatial reads")
+                            // }
                             return try await source.readRawTile(
                                 variable: variable,
                                 member: member,
