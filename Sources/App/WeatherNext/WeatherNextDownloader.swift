@@ -187,7 +187,12 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             concurrent: concurrent
         )
 
-        let probabilityHandles = try await makeProbabilityHandles(domain: domain, available: available)
+        let probabilityHandles = try await makeProbabilityHandles(
+            logger: logger, 
+            domain: domain,
+            run: run,
+            available: available
+        )
         let allHandles = sourceHandles + cloudCoverHandles + ensembleMeanHandles + probabilityHandles 
 
         try await GenericVariableHandle.convert(
@@ -229,13 +234,11 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             let source = entry.source
 
             for member in 0..<domain.countEnsembleMember {
+                let memberRange = UInt64(member)..<UInt64(member+1)  
                 // Helper that reads one full-grid RH level for this member.
                 func readRH(_ level: WeatherNextPressureLevel) async throws -> [Float] {
-                    try await source.readRawTile(
-                        variable: .pressure(.init(variable: .relative_humidity, level: level)),
-                        member: member,
-                        yRange: fullY,
-                        xRange: fullX
+                    try await source.arrays[.pressure(.init(variable: .relative_humidity, level: level))]!.read(
+                        range: [memberRange, fullY, fullX]
                     )
                 }
 
@@ -327,7 +330,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                     }
                     let fullY = 0..<UInt64(domain.grid.ny)
                     let fullX = 0..<UInt64(domain.grid.nx)
-                    let data = try await handle.read(range: [fullY, fullX])
+                    let memberRange = UInt64(handle.member)..<UInt64(handle.member+1)
+                    let data = try await handle.reader.read(range: [memberRange, fullY, fullX])
                     await calculator.ingest(
                         variable: handle.variable,
                         spreadVariable: handle.variable.asSpreadVariableGeneric,
@@ -347,7 +351,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         domain: WeatherNextDomain,
         available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)],
     ) -> [GenericVariableHandle] {
-        let dimensions = [UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
         // Start empty
         var handles: [GenericVariableHandle] = []
         let nonCloudVariables = WeatherNextVariable.allOutputVariables.filter { !$0.isCloudCoverDerived }
@@ -364,19 +367,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                         variable: variable,
                         time: time,
                         member: member,
+                        reader: source.arrays[variable]!,
                         domain: domain,
-                        dimensions: dimensions,
-                        readRange: { range in
-                            // guard range.count == 2 else {
-                            //     fatalError("WeatherNext source handles only support 2D spatial reads")
-                            // }
-                            return try await source.readRawTile(
-                                variable: variable,
-                                member: member,
-                                yRange: range[0],
-                                xRange: range[1]
-                            )
-                        }
                     ))
                 }
             }
@@ -385,7 +377,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
     }
 
     func makeProbabilityHandles(
+        logger: Logger, 
         domain: WeatherNextDomain,
+        run: Timestamp,
         available: [(time: Timestamp, path: String, source: WeatherNextSourceFile)]
     ) async throws -> [GenericVariableHandle] {
         guard domain.countEnsembleMember > 1,
@@ -394,54 +388,34 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             return []
         }
 
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
+
         let threshold = Float(0.1) * Float(domain.dtHours)
-        let dimensions = [UInt64(domain.grid.ny), UInt64(domain.grid.nx)]
-        let nMembers = domain.countEnsembleMember
-
-        var handles = [GenericVariableHandle]()
-        handles.reserveCapacity(available.count)
-
         for entry in available {
-            let time = TimerangeDt(start: entry.time, nTime: 1, dtSeconds: domain.dtSeconds)
             let source = entry.source
 
-            handles.append(GenericVariableHandle(
-                variable: ProbabilityVariable.precipitation_probability,
-                time: time,
-                member: 0,
-                domain: domain,
-                dimensions: dimensions,
-                readRange: { range in
-                    guard range.count == 2 else {
-                        fatalError("Probability handles only support 2D spatial reads")
-                    }
-                    let yRange = range[0]
-                    let xRange = range[1]
-                    if yRange.isEmpty || xRange.isEmpty {
-                        return []
-                    }
+            let fullY = 0..<UInt64(domain.grid.ny)
+            let fullX = 0..<UInt64(domain.grid.nx)
+            let nLoc = Int(fullY.count * fullX.count)
+            var probability = [Float](repeating: 0, count: nLoc)
 
-                    let nLoc = Int(yRange.count * xRange.count)
-                    var probability = [Float](repeating: 0, count: nLoc)
-
-                    for member in 0..<nMembers {
-                        let precip = try await source.readRawTile(
-                            variable: .total_precipitation_6hr,
-                            member: member,
-                            yRange: yRange,
-                            xRange: xRange
-                        )
-                        for i in precip.indices where precip[i] >= threshold {
-                            probability[i] += 1
-                        }
-                    }
-
-                    probability.multiplyAdd(multiply: 100 / Float(nMembers), add: 0)
-                    return probability
+            for member in 0..<domain.countEnsembleMember {
+                let memberRange = UInt64(member)..<UInt64(member+1)  
+                let precip = try await source.arrays[.total_precipitation_6hr]!.read(range: [memberRange, fullY, fullX])
+                for i in precip.indices where precip[i] >= threshold {
+                    probability[i] += 1
                 }
-            ))
+            }
+
+            probability.multiplyAdd(multiply: 100 / Float(domain.countEnsembleMember), add: 0)
+            try await writer.write(
+                time: entry.time, 
+                member: 1, 
+                variable: ProbabilityVariable.precipitation_probability, 
+                data: probability
+            )
         }
-        return handles
+        return try await writer.finalise()
     }
 
     // MARK: – Marker polling
@@ -559,70 +533,5 @@ final class WeatherNextSourceFile: Sendable {
             result[variable] = array
         }
         return result
-    }
-
-    private func shiftedXRanges(for xRange: Range<UInt64>) -> (primary: Range<UInt64>, secondary: Range<UInt64>?) {
-        guard !xRange.isEmpty else {
-            return (0..<0, nil)
-        }
-        let nx = UInt64(domain.grid.nx)
-        let half = nx / 2
-        let srcStart = (xRange.lowerBound + half) % nx
-        let srcEnd = (xRange.upperBound - 1 + half) % nx + 1
-        if srcStart < srcEnd {
-            return (srcStart..<srcEnd, nil)
-        }
-        return (srcStart..<nx, 0..<srcEnd)
-    }
-
-    func readRawTile(
-        variable: WeatherNextVariable,
-        member: Int,
-        yRange: Range<UInt64>,
-        xRange: Range<UInt64>
-    ) async throws -> [Float] {
-        guard let array = arrays[variable] else {
-            throw WeatherNextDownloaderError.missingVariable(variable.rawValue)
-        }
-        let nY = Int(yRange.count)
-        let nX = Int(xRange.count)
-        var out = [Float](repeating: .nan, count: nY * nX)
-
-        if nY == 0 || nX == 0 {
-            return out
-        }
-
-        let (primaryRange, secondaryRange) = shiftedXRanges(for: xRange)
-
-        if let secondaryRange {
-            let nLeft = Int(primaryRange.upperBound - primaryRange.lowerBound)
-            let nRight = Int(secondaryRange.upperBound - secondaryRange.lowerBound)
-            var leftBuf = [Float](repeating: .nan, count: nY * nLeft)
-            var rightBuf = [Float](repeating: .nan, count: nY * nRight)
-
-            try await array.read(
-                into: &leftBuf,
-                range: [UInt64(member)..<UInt64(member + 1), yRange, primaryRange]
-            )
-            try await array.read(
-                into: &rightBuf,
-                range: [UInt64(member)..<UInt64(member + 1), yRange, secondaryRange]
-            )
-
-            for y in 0..<nY {
-                let outBase = y * nX
-                let leftBase = y * nLeft
-                let rightBase = y * nRight
-                for x in 0..<nLeft { out[outBase + x] = leftBuf[leftBase + x] }
-                for x in 0..<nRight { out[outBase + nLeft + x] = rightBuf[rightBase + x] }
-            }
-            return out
-        }
-
-        try await array.read(
-            into: &out,
-            range: [UInt64(member)..<UInt64(member + 1), yRange, primaryRange]
-        )
-        return out
     }
 }

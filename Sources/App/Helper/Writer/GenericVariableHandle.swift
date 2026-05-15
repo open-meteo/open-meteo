@@ -4,90 +4,34 @@ import Foundation
 import Logging
 
 
-/// Downloaders return file-backed or virtual spatial fields that can be transposed to
-/// rolling / time-series storage without requiring an intermediate rewrite to another
-/// spatial `.om` file layout.
+/// Downloaders return FileHandles to keep files open while downloading
+/// If another download starts and would overlap, this still keeps the old file open
 struct GenericVariableHandle: Sendable {
     let variable: any GenericVariable
     let time: TimerangeDt
     let member: Int
+    let reader: OmFileReaderArray<MmapFile, Float>
     let domain: GenericDomain
 
-    private let dimensions: [UInt64]
-    private let readRange: @Sendable ([Range<UInt64>]) async throws -> [Float]
-
-    private final class ReaderBox: Sendable {
-        let reader: any OmFileReaderArrayProtocol<Float>
-
-        init(reader: any OmFileReaderArrayProtocol<Float>) {
-            self.reader = reader
-        }
-
-        func read(range: [Range<UInt64>]) async throws -> [Float] {
-            try await reader.read(range: range)
-        }
-    }
-
     public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: GenericDomain) async throws {
-        let reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
+        self.reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
         let dimensions = reader.getDimensions()
         let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
         guard dimensions[0] == domain.grid.ny && dimensions[1] == domain.grid.nx else {
             fatalError("Dimensions do not match \(dimensions). Ny \(domain.grid.ny), Nx \(domain.grid.nx)")
         }
-        self.init(
-            variable: variable,
-            time: TimerangeDt(start: time, nTime: nt, dtSeconds: domain.dtSeconds),
-            member: member,
-            domain: domain,
-            dimensions: dimensions,
-            readRange: { range in
-                try await reader.read(range: range)
-            }
-        )
+        self.time = TimerangeDt(start: time, nTime: nt, dtSeconds: domain.dtSeconds)
+        self.variable = variable
+        self.member = member
+        self.domain = domain
     }
-
-    public init(variable: any GenericVariable, time: TimerangeDt, member: Int, reader: some OmFileReaderArrayProtocol<Float>, domain: GenericDomain) {
-        let dimensions = Array(reader.getDimensions())
-        let box = ReaderBox(reader: reader)
-        self.init(
-            variable: variable,
-            time: time,
-            member: member,
-            domain: domain,
-            dimensions: dimensions,
-            readRange: { range in
-                try await box.read(range: range)
-            }
-        )
-    }
-
-    public init(
-        variable: any GenericVariable,
-        time: TimerangeDt,
-        member: Int,
-        domain: GenericDomain,
-        dimensions: [UInt64],
-        readRange: @escaping @Sendable ([Range<UInt64>]) async throws -> [Float]
-    ) {
+    
+    public init(variable: any GenericVariable, time: TimerangeDt, member: Int, reader: OmFileReaderArray<MmapFile, Float>, domain: GenericDomain) {
         self.variable = variable
         self.time = time
         self.member = member
+        self.reader = reader
         self.domain = domain
-        self.dimensions = dimensions
-        self.readRange = readRange
-    }
-
-    func getDimensions() -> [UInt64] {
-        dimensions
-    }
-
-    func read(range: [Range<UInt64>]) async throws -> [Float] {
-        try await readRange(range)
-    }
-
-    func read() async throws -> [Float] {
-        try await read(range: dimensions.map { 0..<$0 })
     }
 
     /// Process concurrently
@@ -161,23 +105,21 @@ struct GenericVariableHandle: Sendable {
                 }
             }
         }
-
-        if generateFullRun, OpenMeteo.dataRunDirectory != nil {
-            for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-                let domain = handles[0].domain
-                if domain.countEnsembleMember == 1, let run, run.hour % 3 == 0 {
-                    logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    let startTimeFullRun = DispatchTime.now()
-                    try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
-                    logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    
-                    if let uploadS3Bucket {
-                        try domain.domainRegistry.syncToS3PerRun(
-                            logger: logger,
-                            bucket: uploadS3Bucket,
-                            run:run
-                        )
-                    }
+        
+        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
+            let domain = handles[0].domain
+            if generateFullRun, domain.countEnsembleMember == 1, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
+                logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                let startTimeFullRun = DispatchTime.now()
+                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
+                logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                
+                if let uploadS3Bucket {
+                    try domain.domainRegistry.syncToS3PerRun(
+                        logger: logger,
+                        bucket: uploadS3Bucket,
+                        run:run
+                    )
                 }
             }
         }
@@ -232,7 +174,7 @@ struct GenericVariableHandle: Sendable {
                     let nLoc = yRange.count * xRange.count
                     var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: nTime)
                     for reader in handles {
-                        let dimensions = reader.getDimensions()
+                        let dimensions = reader.reader.getDimensions()
                         let timeArrayIndex = time.firstIndex(of: reader.time.range.lowerBound)!
                         if dimensions.count == 3 {
                             /// Number of time steps in this file
@@ -240,11 +182,11 @@ struct GenericVariableHandle: Sendable {
                             guard nt == reader.time.count else {
                                 fatalError("invalid timesteps")
                             }
-                            let read = try await reader.read(range: [yRange, xRange, 0..<nt])
+                            let read = try! await reader.reader.read(range: [yRange, xRange, 0..<nt])
                             data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = read[0..<nLoc * Int(nt)]
                         } else {
                             // Single time step
-                            let read = try await reader.read(range: [yRange, xRange])
+                            let read = try! await reader.reader.read(range: [yRange, xRange])
                             data3d[0..<nLoc, reader.member, timeArrayIndex] = read[0..<nLoc]
                         }
                     }
@@ -310,7 +252,7 @@ struct GenericVariableHandle: Sendable {
                 logger.warning("No data to convert")
                 return
             }
-            guard handles.isEmpty == false else {
+            guard let maxTimeStepsPerFile = handles.max(by: { $0.time.count < $1.time.count })?.time.count else {
                 logger.warning("No data to convert")
                 return
             }
@@ -362,7 +304,7 @@ struct GenericVariableHandle: Sendable {
                 try ncVariable.setAttribute("add_offset", Float(0))
                 try ncVariable.setAttribute("_FillValue", Int16.max)
                 for reader in handles {
-                    let data = try await reader.read()
+                    let data = try! await reader.reader.read()
                     let nt = reader.time.count
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
                     if nt > 1 {
@@ -387,24 +329,32 @@ struct GenericVariableHandle: Sendable {
             try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
+                var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
                 for reader in handles {
-                    let dimensions = reader.getDimensions()
+                    let dimensions = reader.reader.getDimensions()
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
                     guard memberRange.contains(UInt64(reader.member)) else {
                         fatalError("Invalid reader.member \(reader.member) for range \(memberRange)")
                     }
-                    if dimensions.count == 3 {
+                    if dimensions.count == 3 && dimensions[0] == nMembers && dimensions[1] == ny && dimensions[2] == nx {
+                        /// Dimensions [member, y, x]
+                        for member in memberRange {
+                            try! await reader.reader.read(into: &readTemp, range: [member..<member+1, yRange, xRange])
+                            data3d[0..<nLoc, Int(member), timeArrayIndex] = readTemp[0..<nLoc]
+                        }
+                    } else if dimensions.count == 3 {
+                        /// Dimensions [y, x, time]
                         /// Number of time steps in this file
                         let nt = dimensions[2]
                         guard nt == reader.time.count else {
                             fatalError("invalid timesteps")
                         }
-                        let read = try await reader.read(range: [yRange, xRange, 0..<nt])
-                        data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = read[0..<nLoc * Int(nt)]
+                        try! await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
+                        data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
                     } else {
                         // Single time step
-                        let read = try await reader.read(range: [yRange, xRange])
-                        data3d[0..<nLoc, reader.member, timeArrayIndex] = read[0..<nLoc]
+                        try! await reader.reader.read(into: &readTemp, range: [yRange, xRange])
+                        data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }
                 
@@ -475,7 +425,7 @@ actor GribDeaverager {
         return .init(data: data)
     }
 
-    init(data: [Int: (step: Int, data: [Float])] = .init()) {
+    public init(data: [Int: (step: Int, data: [Float])] = .init()) {
         self.data = data
     }
     
