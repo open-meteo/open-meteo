@@ -112,10 +112,9 @@ struct CdoIconGlobal {
             fatalError("could not open weights file")
         }
 
-        let count = domain.grid.count
-        var mapping = [Int32](repeating: -1, count: count)
+        var mapping = [Int32](repeating: -1, count: domain.grid.count)
         for (i, src) in src_address.enumerated() {
-            mapping[Int(dst_address[i]) % count] = src - 1
+            mapping[Int(dst_address[i]) - 1] = src - 1
         }
         self.mapping = mapping
     }
