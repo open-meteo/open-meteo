@@ -210,7 +210,7 @@ struct GaussianGrid: Gridable {
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
         
-        /// Typically 1, which means to analyse a 3x3 grid, except at the poles where the centre needs to be shifted by other 0 or 2
+        /// Typically 1, which means to analyse a 3x3 grid, except at the poles where the centre needs to be shifted by either 0 or 2
         let shift = centerY == 0 ? 0 : centerY == 2*latitudeLines - 1 ? 2 : 1
         let yStart = centerY - shift
         
@@ -227,12 +227,12 @@ struct GaussianGrid: Gridable {
             let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
 
             /// If x wraps over 0° longitude, start at an offset to get a strictly increasing grid-point list
-            let start = max(0, searchRadius - xCenter)
+            let start = max(0, 1 - xCenter)
             for i in 0..<3 {
                 /// linear position inside the temporary 3x3 array
                 let pos3x3 = j * 3 + i
                 let iWrapped = (i + start) % 3
-                let x = xCenter + iWrapped - searchRadius
+                let x = xCenter + iWrapped - 1
                 gridpoints[pos3x3] = integral(y: y) + (x + 2*nx) % nx
                 let pointLon = Float(x) * dx
                 distances[pos3x3] = pow(pointLat - lat, 2) + pow(pointLon - lon, 2)
