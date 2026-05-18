@@ -50,8 +50,9 @@ struct DownloadAiconCommand: AsyncCommand {
     /**
      Download all requested variables for one model run.
 
-     For every 3-hourly forecast step (3, 6, … 180 h) all surface and model-level
-     variables are downloaded concurrently, remapped if necessary via CdoHelper,
+     For every 3-hourly forecast step in the selected run (up to 180 h for 0/12z,
+     up to 120 h for 6/18z) all surface and model-level variables are downloaded
+     concurrently, remapped if necessary via CdoHelper,
      and written to the om-file storage.
      */
     func downloadAicon(
@@ -82,7 +83,7 @@ struct DownloadAiconCommand: AsyncCommand {
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
 
         let deaverager = GribDeaverager()
-        let timestamps = domain.forecastSteps.map { run.add(hours: $0) }
+        let timestamps = domain.forecastSteps(run: run).map { run.add(hours: $0) }
 
         let handles = try await timestamps.enumerated().asyncMap { (i, timestamp) -> [GenericVariableHandle] in
             let forecastHours = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600

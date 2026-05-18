@@ -6,7 +6,8 @@ import OmFileFormat
 
  AICON (AI ICON) is a machine-learning-based variant of the ICON model developed at DWD.
  It operates on the same global R3B7 grid as ICON global (≈13km resolution) and produces
- 3-hourly forecasts up to 180 hours lead time, initialized 4 times per day (0/6/12/18 UTC).
+ 3-hourly forecasts initialized 4 times per day (0/6/12/18 UTC), with 0/12z runs
+ extending to 180 hours lead time and 6/18z runs extending to 120 hours.
 
  Data is available at:
  https://opendata.dwd.de/weather/nwp/v1/m/aicon/p/
@@ -65,7 +66,7 @@ enum AiconDomain: String, CaseIterable, GenericDomain {
     }
 
     /// Number of hourly timesteps to keep in each compressed chunk.
-    /// AICON runs to 180h, stored at 3h resolution → 60 steps + buffer.
+    /// Sized for the longest AICON runs (180h at 3h resolution) plus rolling buffer.
     var omFileLength: Int {
         switch self {
         case .aicon_global:
@@ -74,14 +75,16 @@ enum AiconDomain: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// 3-hourly forecast steps: 3, 6, 9, … 180
-    var forecastSteps: [Int] {
-        return Array(stride(from: 3, through: 180, by: 3))
+    /// 3-hourly forecast steps for a specific run.
+    /// 0/12z runs extend to 180h, while 6/18z runs extend to 120h.
+    func forecastSteps(run: Timestamp) -> [Int] {
+        let maxForecastHour = run.hour % 12 == 6 ? 120 : 180
+        return Array(stride(from: 3, through: maxForecastHour, by: 3))
     }
 
-    /// Number of forecast steps
+    /// Maximum number of forecast steps across all AICON runs.
     var forecastLength: Int {
-        return forecastSteps.count
+        return Array(stride(from: 3, through: 180, by: 3)).count
     }
 
     /// AICON model level indices (1-based, 1…13)
