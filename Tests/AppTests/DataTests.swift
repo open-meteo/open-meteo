@@ -79,6 +79,12 @@ import VaporTesting
             /// Cuxhaven at the sea. Center is sea grid point. 
             let h = try #require(await grid.findPointTerrainOptimised(lat: 53.890130, lon: 8.671630, elevation: 5, elevationFile: elevationFile))
             #expect(h.gridpoint == 537694)
+            
+            let northPole = try #require(await grid.findPointTerrainOptimised(lat: 90, lon: 0, elevation: 5, elevationFile: elevationFile))
+            #expect(northPole.gridpoint == 0)
+            
+            let southPole = try #require(await grid.findPointTerrainOptimised(lat: -90, lon: -18, elevation: 5, elevationFile: elevationFile))
+            #expect(southPole.gridpoint == grid.count-1)
         }
     }
     

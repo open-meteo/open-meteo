@@ -210,8 +210,10 @@ struct GaussianGrid: Gridable {
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
         
-        let yrange = (centerY - searchRadius..<centerY + searchRadius + 1).clamped(to: 0..<2*latitudeLines)
-        let width = 2*searchRadius + 1
+        /// Typically 1, which means to analyse a 3x3 grid, except at the poles where the centre needs to be shifted by other 0 or 2
+        let shift = centerY == 0 ? 0 : centerY == 2*latitudeLines - 1 ? 2 : 1
+        let yrange = centerY - shift..<centerY - shift + 3
+        let width = 2*1 + 1
         
         /// List of 3x3 gridpoints we want to read in linear 1D array index
         /// `x` wraps at 0° longitude
