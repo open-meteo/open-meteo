@@ -245,9 +245,8 @@ extension TimerangeDt {
 
     /// Adjust time for interpolation. E.g. Reads a bit more data for hermite interpolation
     func forInterpolationTo(modelDt: Int, interpolation: ReaderInterpolation) -> TimerangeDt {
-        let expand = modelDt * (interpolation.padding - 1)
-        let start = range.lowerBound.floor(toNearest: modelDt).add(-1 * expand)
-        let end = range.upperBound.ceil(toNearest: modelDt).add(expand)
+        let start = range.lowerBound.floor(toNearest: modelDt).add(-1 * modelDt * (interpolation.padding - 1))
+        let end = range.upperBound.ceil(toNearest: modelDt).add(modelDt * (interpolation.padding))
         return TimerangeDt(start: start, to: end, dtSeconds: modelDt)
     }
 }

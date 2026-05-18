@@ -5,7 +5,7 @@ import Foundation
 actor EnsembleMeanCalculator {
     fileprivate var variablesAndStats: [(any GenericVariable, (any GenericVariable)?, ArrayMeanStdDevSampler)] = []
     
-    func ingest(variable: any GenericVariable, spreadVariable: GenericVariable?, data: [Float]) async {
+    func ingest(variable: any GenericVariable, spreadVariable: (any GenericVariable)?, data: [Float]) async {
         guard let stats = variablesAndStats.first(where: {$0.0.omFileName == variable.omFileName}) else {
             let stats = ArrayMeanStdDevSampler()
             await stats.ingest(data)
@@ -29,7 +29,7 @@ actor EnsembleMeanCalculator {
 actor EnsembleMeanCalculatorMultistep {
     var calculators: [(Timestamp, EnsembleMeanCalculator)] = []
     
-    func ingest(time: Timestamp, variable: any GenericVariable, spreadVariable: GenericVariable?, data: [Float]) async {
+    func ingest(time: Timestamp, variable: any GenericVariable, spreadVariable: (any GenericVariable)?, data: [Float]) async {
         guard let calculator = calculators.first(where: {$0.0 == time}) else {
             let calculator = EnsembleMeanCalculator()
             await calculator.ingest(variable: variable, spreadVariable: spreadVariable, data: data)

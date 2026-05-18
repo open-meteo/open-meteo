@@ -176,7 +176,7 @@ extension VariablePerMemberStorage {
     }
 
     /// Sum up 2 variables
-    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+    func sumUp(var1: V, var2: V, outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         for (t, handles) in self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember }){
             guard
@@ -191,7 +191,7 @@ extension VariablePerMemberStorage {
     }
     
     /// Sum up 2 variables, and remove them from storage
-    nonisolated func sumUpRemovingBoth(var1: V, var2: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+    nonisolated func sumUpRemovingBoth(var1: V, var2: V, outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         // Note: A for loop + remove is not thread safe due to reentrance issues
         while let (var1, var2, member) = await getTwoRemoving(first: var1, second: var2, timestamp: writer.time) {
             let sum = zip(var1.data, var2.data).map(+)
@@ -200,7 +200,7 @@ extension VariablePerMemberStorage {
     }
     
     /// Sum up rain, snow and graupel for total precipitation
-    nonisolated func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+    nonisolated func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         while let (tgrp, tsnowp, tirf, member) = await getThreeRemoving(first: tgrp, second: tsnowp, third: tirf, timestamp: writer.time) {
             let precip = zip(tgrp.data, zip(tsnowp.data, tirf.data)).map({ $0 + $1.0 + $1.1 })
             try await writer.write(member: member, variable: outVariable, data: precip)
@@ -210,7 +210,7 @@ extension VariablePerMemberStorage {
     /// Calculate snowfall water equivalent based on precipitation and frozen precipitation percent
     /// `frozen_precipitation_percent` is given in percent [0-100]. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`. Used for GFS, NAM and HRRR
     /// Correct for rounding issues to prevent 0.1mm rain
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         let scalefactor = outVariable.scalefactor
         for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
             guard
@@ -235,7 +235,7 @@ extension VariablePerMemberStorage {
     }
     
     /// Calculate snow water equivalent from snow height and liquid ratio. Limit to precipitation amount. If domain elevation is higher than snowfall height, set snowfall amount to snow
-    nonisolated func calculateSnowfallWaterEquivalent(snowfall: V, liquidRatio: V, precipitation: V, snowfallHeight: V, domainElevation: [Float], outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+    nonisolated func calculateSnowfallWaterEquivalent(snowfall: V, liquidRatio: V, precipitation: V, snowfallHeight: V, domainElevation: [Float], outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         while let (snowfall, liquidRatio, precipitation, snowfallHeight, member) = await getFourRemoving(first: snowfall, second: liquidRatio, third: precipitation, forth: snowfallHeight, timestamp: writer.time) {
             let waterEquivalent = zip(zip(snowfall.data, zip(snowfallHeight.data, domainElevation)), zip(liquidRatio.data, precipitation.data)).map({
                 let liquidRatio = $1.0
@@ -255,7 +255,7 @@ extension VariablePerMemberStorage {
     /// Calculate snow depth from snow depth water equivalent and snow density. Removes both after use.
     /// Expects water equivalent in mm
     /// Density in kg/m3
-    nonisolated func calculateSnowDepth(density: V, waterEquivalent: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+    nonisolated func calculateSnowDepth(density: V, waterEquivalent: V, outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         while let (density, water, member) = await getTwoRemoving(first: density, second: waterEquivalent, timestamp: writer.time) {
             let height = zip(water.data, density.data).map(/)
             try await writer.write(member: member, variable: outVariable, data: height)
