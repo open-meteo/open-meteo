@@ -259,7 +259,7 @@ struct WeatherApiController {
                 }
             case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality, .climate, .flood:
                 guard run == nil else {
-                    throw ForecastApiError.parameterMostNotBeSet(name: "run")
+                    throw ForecastApiError.parameterMustNotBeSet(name: "run")
                 }
             }
             let cellSelection = params.cell_selection ?? (type == .marine ? .sea : .land)
