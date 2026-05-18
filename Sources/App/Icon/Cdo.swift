@@ -89,9 +89,10 @@ struct CdoIconGlobal {
         guard let dst_address = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "dst_address")?.asType(Int32.self)?.read() else {
             fatalError("could not open weights file")
         }
+
         var mapping = [Int32](repeating: -1, count: domain.grid.count)
         for (i, src) in src_address.enumerated() {
-            mapping[Int(dst_address[i])] = src - 1
+            mapping[Int(dst_address[i]) - 1] = src - 1
         }
         self.mapping = mapping
     }
