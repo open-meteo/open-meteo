@@ -1,5 +1,5 @@
 {
-  "originHash" : "b024a72e7112a8bdec8b9cb81244cacd50e553c9f18c18ae114f75eefb5112d9",
+  "originHash" : "5754142202ba966fe69593a03bbb79bd10d122a59bc7062912964af5443ea979",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -60,7 +60,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/om-file-format.git",
       "state" : {
-        "revision" : "18bee8578d953bd95ad7de1ae688faa7cf421f7c"
+        "revision" : "b63ca576d943d5403dfe2dc2a296f44b0a4393d5"
       }
     },
     {

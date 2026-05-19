@@ -251,7 +251,7 @@ struct UkmoDownload: AsyncCommand {
 
         /// Domain elevation field, needed to correct freezing level height
         let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation.map { $0 == -999 ? 0 : $0 }
