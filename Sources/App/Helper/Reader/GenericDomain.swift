@@ -87,7 +87,7 @@ extension GenericDomain {
             logger: logger
         )?.reference_time.toTimestamp()
     }
-
+    
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: OmFileType {
         .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "HSURF", chunk: nil)
