@@ -39,7 +39,7 @@ struct OmFileSplitter {
     /// icon-eu =  16
     /// icon-d2 = 25
     /// ecmwf = 30
-    /// NOTE: carefull with reducing nchunkLocaiton, because updates will use the wrong buffer size!!!!
+    /// NOTE: careful with reducing nchunkLocation, because updates will use the wrong buffer size!!!!
     static func calcChunknLocations(nTimePerFile: Int) -> Int {
         max(6, 3072 / nTimePerFile)
     }

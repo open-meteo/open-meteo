@@ -85,7 +85,7 @@ struct UkmoDownload: AsyncCommand {
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
             /*if signature.fixSolar {
-                // timeinterval devided by chunk time range
+                // timeinterval divided by chunk time range
                 let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
                 try self.fixSolarFiles(application: context.application, domain: domain, timerange: time)
                 return

@@ -74,7 +74,7 @@ struct DwdSisDownloader: AsyncCommand {
         /// The southernmost line is acquired 15 seconds plus (90-38)*1/0.025 = 2080 lines by 9.5 minutes => total 3 minutes after sweep start
         /// The scan-time for the limited latitude range is ~5:26 minutes
         /// This is not 100% correct, but a reasonable approximation
-        let sweepTimeOfLimitedLatitudeRangeSeconds = (4121/7201*9.5*60)
+        let sweepTimeOfLimitedLatitudeRangeSeconds = (Double(4121)/7201*9.5*60)
         let timeDifference: [Double] = (0..<3201 * 4121).map {
             let line = $0 / 3201
             let lineFraction = Double(line) / (4121-1)
