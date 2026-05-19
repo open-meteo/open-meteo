@@ -101,22 +101,22 @@ extension VariablePerMemberStorage {
     }
     
     /// Get 4 variables at once and remove them from storage
-    func getFourRemoving(first: V, second: V, third: V, forth: V, timestamp: Timestamp) -> (first: Array2D, second: Array2D, third: Array2D, forth: Array2D, member: Int)? {
+    func getFourRemoving(first: V, second: V, third: V, fourth: V, timestamp: Timestamp) -> (first: Array2D, second: Array2D, third: Array2D, fourth: Array2D, member: Int)? {
         for key in data.keys {
             guard
                 key.variable == first,
                 key.timestamp == timestamp,
                 let secondKey = data.first(where: {$0.key.variable == second && $0.key.timestamp == timestamp && $0.key.member == key.member})?.key,
                 let thirdKey = data.first(where: {$0.key.variable == third && $0.key.timestamp == timestamp && $0.key.member == key.member})?.key,
-                let forthKey = data.first(where: {$0.key.variable == forth && $0.key.timestamp == timestamp && $0.key.member == key.member})?.key,
+                let fourthKey = data.first(where: {$0.key.variable == fourth && $0.key.timestamp == timestamp && $0.key.member == key.member})?.key,
                 let firstData = data.removeValue(forKey: key),
                 let secondData = data.removeValue(forKey: secondKey),
                 let thirdData = data.removeValue(forKey: thirdKey),
-                let forthData = data.removeValue(forKey: forthKey)
+                let fourthData = data.removeValue(forKey: fourthKey)
             else {
                 continue
             }
-            return (firstData, secondData, thirdData, forthData, key.member)
+            return (firstData, secondData, thirdData, fourthData, key.member)
         }
         return nil
     }
@@ -236,7 +236,7 @@ extension VariablePerMemberStorage {
     
     /// Calculate snow water equivalent from snow height and liquid ratio. Limit to precipitation amount. If domain elevation is higher than snowfall height, set snowfall amount to snow
     nonisolated func calculateSnowfallWaterEquivalent(snowfall: V, liquidRatio: V, precipitation: V, snowfallHeight: V, domainElevation: [Float], outVariable: any GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        while let (snowfall, liquidRatio, precipitation, snowfallHeight, member) = await getFourRemoving(first: snowfall, second: liquidRatio, third: precipitation, forth: snowfallHeight, timestamp: writer.time) {
+        while let (snowfall, liquidRatio, precipitation, snowfallHeight, member) = await getFourRemoving(first: snowfall, second: liquidRatio, third: precipitation, fourth: snowfallHeight, timestamp: writer.time) {
             let waterEquivalent = zip(zip(snowfall.data, zip(snowfallHeight.data, domainElevation)), zip(liquidRatio.data, precipitation.data)).map({
                 let liquidRatio = $1.0
                 let precipitation = $1.1

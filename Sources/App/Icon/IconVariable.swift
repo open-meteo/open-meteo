@@ -168,12 +168,12 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
     /// Maxima are collected over hourly intervals on all domains. (Prior to 2015-07-07 maxima were collected over 3-hourly intervals on the global grid.)
     case wind_gusts_10m
 
-    /// Height of snow fall limit above MSL. It is defined as the height where the wet bulb temperature Tw first exceeds 1.3◦C (scanning mode from top to bottom).
+    /// Height of snow fall limit above MSL. It is defined as the height where the wet bulb temperature Tw first exceeds 1.3°C (scanning mode from top to bottom).
     /// If this threshold is never reached within the entire atmospheric column, SNOWLMT is undefined (GRIB2 bitmap). Only icon-eu + d2
     case snowfall_height
 
-    /// Height of the 0◦ C isotherm above MSL. In case of multiple 0◦ C isotherms, HZEROCL contains the uppermost one.
-    /// If the temperature is below 0◦ C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
+    /// Height of the 0° C isotherm above MSL. In case of multiple 0° C isotherms, HZEROCL contains the uppermost one.
+    /// If the temperature is below 0° C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
     case freezing_level_height
 
     /// Relative humidity on 2 meters

@@ -183,7 +183,7 @@ struct MfWaveDownload: AsyncCommand {
 
         // Iterate from d-1 to d+10 in 12 hour steps
         for step in downloadRange {
-            logger.info("Downloading file with timestap \(step.iso8601_YYYY_MM_dd_HH_mm) from run \(runDownload.format_YYYYMMddHH)")
+            logger.info("Downloading file with timestamp \(step.iso8601_YYYY_MM_dd_HH_mm) from run \(runDownload.format_YYYYMMddHH)")
 
             for url in domain.getUrl(run: runDownload, step: step) {
                 if onlyTides && !url.contains("MOL") {

@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import CHelper
 
 enum Meteorology {
@@ -268,7 +268,7 @@ enum Meteorology {
         return rh
     }
 
-    /// Wetbulb temperature Stull’s Approximation
+    /// Wetbulb temperature Stull's Approximation
     /// See https://www.omnicalculator.com/physics/wet-bulb
     public static func wetBulbTemperature(temperature t: Float, relativeHumidity rh: Float) -> Float {
         let twet = t * atan(0.151977 * sqrt(rh + 8.313659))

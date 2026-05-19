@@ -271,7 +271,7 @@ final class Curl: Sendable {
     /// Cache all HTTP download in temporary files. Only used for debugging.
     private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String, nConcurrent: Int, headers: [(String, String)] = []) async throws -> HTTPClientResponse {
         try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
-        // try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
+        // try FileManager.default.deleteFiles(directory: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
         let cacheFile = cacheDirectory + "/" + (url + (range ?? "")).sha256
         if !FileManager.default.fileExists(atPath: cacheFile) {
             try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
