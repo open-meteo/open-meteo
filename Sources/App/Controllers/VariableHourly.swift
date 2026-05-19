@@ -131,6 +131,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case total_column_integrated_water_vapour
+    case total_column_water
     case updraft
     case uv_index
     case uv_index_clear_sky
@@ -1124,7 +1125,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             // water equivalent in millimetre, density in kg/m3
             guard
                 let depth = Reader.variableFromString("snow_depth"),
-                let density = Reader.variableFromString("density")
+                let density = Reader.variableFromString("snow_density")
             else {
                 return nil
             }

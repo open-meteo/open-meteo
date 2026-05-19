@@ -210,36 +210,39 @@ struct GaussianGrid: Gridable {
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
         
-        let yrange = (centerY - searchRadius..<centerY + searchRadius + 1).clamped(to: 0..<2*latitudeLines)
-        let width = 2*searchRadius + 1
+        /// Typically 1, which means to analyse a 3x3 grid, except at the poles where the centre needs to be shifted by either 0 or 2
+        let shift = centerY == 0 ? 0 : centerY == 2*latitudeLines - 1 ? 2 : 1
+        let yStart = centerY - shift
         
         /// List of 3x3 gridpoints we want to read in linear 1D array index
         /// `x` wraps at 0° longitude
-        var gridpoints: [Int] = []
-        var distances: [Float] = []
-        gridpoints.reserveCapacity(yrange.count * width)
-        distances.reserveCapacity(yrange.count * width)
-        for y in yrange {
+        var gridpoints: [Int] = [Int](repeating: -1, count: 9)
+        var distances: [Float] = [Float](repeating: Float.nan, count: 9)
+
+        for j in 0..<3 {
+            let y = yStart + j
             let nx = nxOf(y: y)
             let dx = 360 / Float(nx)
             let xCenter = Int(round(lon / dx))
             let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
 
             /// If x wraps over 0° longitude, start at an offset to get a strictly increasing grid-point list
-            let start = max(0, searchRadius - xCenter)
-            for i in 0..<width {
-                let i = (i + start) % width
-                let x = xCenter + i - searchRadius
-                gridpoints.append(integral(y: y) + (x + 2*nx) % nx)
+            let start = max(0, 1 - xCenter)
+            for i in 0..<3 {
+                /// linear position inside the temporary 3x3 array
+                let pos3x3 = j * 3 + i
+                let iWrapped = (i + start) % 3
+                let x = xCenter + iWrapped - 1
+                gridpoints[pos3x3] = integral(y: y) + (x + 2*nx) % nx
                 let pointLon = Float(x) * dx
-                distances.append(pow(pointLat - lat, 2) + pow(pointLon - lon, 2))
+                distances[pos3x3] = pow(pointLat - lat, 2) + pow(pointLon - lon, 2)
             }
         }
         
         var start = 0
         /// Read grid elevation from list of gridpoints that might be consecutive
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
-        var elevation = [Float](repeating: .nan, count: gridpoints.count)
+        var elevation = [Float](repeating: .nan, count: 9)
         for i in gridpoints.indices {
             // if next one is not increasing by one, read it
             let lastIteration = i == gridpoints.count - 1
@@ -403,3 +406,4 @@ extension GaussianGrid.Slice: Sequence {
         }
     }
 }
+

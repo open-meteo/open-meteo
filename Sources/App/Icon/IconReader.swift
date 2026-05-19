@@ -304,10 +304,10 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .wind_speed_80m, .windspeed_80m, .wind_direction_80m, .winddirection_80m:
                 try await prefetchData(raw: .wind_u_component_80m, time: time)
                 try await prefetchData(raw: .wind_v_component_80m, time: time)
-            case .wind_speed_120m, .windspeed_120m, .wind_direction_120m, .winddirection_120m:
+            case .wind_speed_120m, .windspeed_120m, .wind_direction_120m, .winddirection_120m, .wind_speed_100m, .wind_direction_100m:
                 try await prefetchData(raw: .wind_u_component_120m, time: time)
                 try await prefetchData(raw: .wind_v_component_120m, time: time)
-            case .wind_speed_180m, .windspeed_180m, .wind_direction_180m, .winddirection_180m:
+            case .wind_speed_180m, .windspeed_180m, .wind_direction_180m, .winddirection_180m, .wind_speed_200m, .wind_direction_200m:
                 try await prefetchData(raw: .wind_u_component_180m, time: time)
                 try await prefetchData(raw: .wind_v_component_180m, time: time)
             case .snow_height:
@@ -450,6 +450,18 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let v = try await get(raw: .wind_v_component_180m, time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
+            case .wind_speed_100m:
+                let data = try await get(derived: .surface(.wind_speed_120m), time: time)
+                let scalefactor = Meteorology.scaleWindFactor(from: 120, to: 100)
+                return DataAndUnit(data.data.map { $0 * scalefactor }, data.unit)
+            case .wind_speed_200m:
+                let data = try await get(derived: .surface(.wind_speed_180m), time: time)
+                let scalefactor = Meteorology.scaleWindFactor(from: 180, to: 200)
+                return DataAndUnit(data.data.map { $0 * scalefactor }, data.unit)
+            case .wind_direction_100m:
+                return try await get(derived: .surface(.wind_direction_120m), time: time)
+            case .wind_direction_200m:
+                return try await get(derived: .surface(.wind_direction_180m), time: time)
             case .snow_height:
                 return try await get(raw: .snow_depth, time: time)
             case .apparent_temperature:

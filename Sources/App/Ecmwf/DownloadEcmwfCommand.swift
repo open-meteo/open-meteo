@@ -214,9 +214,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         }
                         if let level = entry.level {
                             // entry is a pressure level variable
-                            if variable.gribName == "gh" && variable.level == level && entry.param == "z" {
-                                return true
-                            }
                             return variable.level == level && entry.param == variable.gribName
                         }
                         return entry.param == variable.gribName
@@ -250,7 +247,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // logger.info("Processing \(variable)")
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     try grib2d.load(message: message)
-                    grib2d.array.flipLatitude()
+                    if (domain == .aifs025_single || domain == .aifs025_ensemble) && run >= Timestamp(2026, 5, 12, 6, 0) && run < Timestamp(2026,5,13,6) {
+                        // AIFSv2 shifts data by 180° longitude
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                    } else {
+                        grib2d.array.flipLatitude()
+                    }
                     
                     // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     // fatalError()
@@ -274,10 +276,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-                    
-                    if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single, .aifs025_ensemble].contains(domain) {
-                        grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
                     }
                     
                     // Keep relative humidity in memory to generate total cloud cover files
@@ -356,6 +354,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
             for member in 0..<domain.countEnsembleMember {
+                if await writer.contains(member: member, variable: EcmwfVariable.cloud_cover_low) {
+                    continue
+                }
                 logger.info("Calculating cloud cover")
                 // 2025-10-13: added 100/150/600/400 hPa levels
                 guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
@@ -517,21 +518,24 @@ extension EcmwfDomain {
         let dateStr = run.format_YYYYMMdd
         switch self {
         case .ifs04:
-            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .wam025:
-            let product = run.hour == 0 || run.hour == 12 ? "wave" : "scwv"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "wave" : "scwv"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .wam025_ensemble:
-            let product = run.hour == 0 || run.hour == 12 ? "waef" : "scda"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "waef" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-ef.grib2"]
         case .ifs04_ensemble:
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
         case .ifs025:
-            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .ifs025_ensemble:
-            return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
+            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
+            // control and perturbed runs are stored in different files
+            return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2",
+                    "\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
         case .aifs025:
             return ["\(base)\(dateStr)/\(runStr)z/aifs/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"]
         case .aifs025_single:

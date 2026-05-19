@@ -120,6 +120,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let u = try await get(raw: .wind_u_component_50hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
+        case .wind_speed_10hPa, .windspeed_10hPa:
+            let v = try await get(raw: .wind_v_component_10hPa, time: time)
+            let u = try await get(raw: .wind_u_component_10hPa, time: time)
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_1000hPa, .winddirection_1000hPa:
             let v = try await get(raw: .wind_v_component_1000hPa, time: time)
             let u = try await get(raw: .wind_u_component_1000hPa, time: time)
@@ -185,6 +190,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let u = try await get(raw: .wind_u_component_50hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
+        case .wind_direction_10hPa, .winddirection_10hPa:
+            let v = try await get(raw: .wind_v_component_10hPa, time: time)
+            let u = try await get(raw: .wind_u_component_10hPa, time: time)
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            return DataAndUnit(direction, .degreeDirection)
         case .soil_temperature_0_to_10cm, .soil_temperature_0_10cm, .soil_temperature_0_7cm:
             return try await get(raw: .soil_temperature_0_to_7cm, time: time)
         case .weather_code, .weathercode:
@@ -243,6 +253,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .cloudcover_50hPa, .cloud_cover_50hPa:
             let rh = try await get(raw: .relative_humidity_50hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50) }), .percentage)
+        case .cloudcover_10hPa, .cloud_cover_10hPa:
+            let rh = try await get(raw: .relative_humidity_10hPa, time: time)
+            return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 10) }), .percentage)
         case .snowfall:
             let snow = try await get(raw: .snowfall_water_equivalent, time: time).data.map({ $0 * 0.7 })
             return DataAndUnit(snow, .centimetre)
@@ -285,6 +298,8 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try await get(raw: .relative_humidity_100hPa, time: time)
         case .relativehumidity_50hPa:
             return try await get(raw: .relative_humidity_50hPa, time: time)
+        case .relativehumidity_10hPa:
+            return try await get(raw: .relative_humidity_10hPa, time: time)
         case .dew_point_1000hPa, .dewpoint_1000hPa:
             let temperature = try await get(raw: .temperature_1000hPa, time: time)
             let rh = try await get(raw: .relative_humidity_1000hPa, time: time)
@@ -336,6 +351,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .dew_point_50hPa, .dewpoint_50hPa:
             let temperature = try await get(raw: .temperature_50hPa, time: time)
             let rh = try await get(raw: .relative_humidity_50hPa, time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dew_point_10hPa, .dewpoint_10hPa:
+            let temperature = try await get(raw: .temperature_10hPa, time: time)
+            let rh = try await get(raw: .relative_humidity_10hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .soil_temperature_0cm, .skin_temperature:
             return try await get(raw: .surface_temperature, time: time)
@@ -566,6 +585,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .wind_speed_50hPa, .windspeed_50hPa:
             try await prefetchData(raw: .wind_v_component_50hPa, time: time)
             try await prefetchData(raw: .wind_u_component_50hPa, time: time)
+        case .wind_speed_10hPa, .windspeed_10hPa:
+            try await prefetchData(raw: .wind_v_component_10hPa, time: time)
+            try await prefetchData(raw: .wind_u_component_10hPa, time: time)
         case .wind_direction_10m, .winddirection_10m:
             try await prefetchData(raw: .wind_u_component_10m, time: time)
             try await prefetchData(raw: .wind_v_component_10m, time: time)
@@ -608,6 +630,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .wind_direction_50hPa, .winddirection_50hPa:
             try await prefetchData(raw: .wind_v_component_50hPa, time: time)
             try await prefetchData(raw: .wind_u_component_50hPa, time: time)
+        case .wind_direction_10hPa, .winddirection_10hPa:
+            try await prefetchData(raw: .wind_v_component_10hPa, time: time)
+            try await prefetchData(raw: .wind_u_component_10hPa, time: time)
         case .soil_temperature_0_to_10cm, .soil_temperature_0_10cm, .soil_temperature_0_7cm:
             try await prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
         case .cloud_cover_1000hPa, .cloudcover_1000hPa:
@@ -636,6 +661,8 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .relative_humidity_100hPa, time: time)
         case .cloud_cover_50hPa, .cloudcover_50hPa:
             try await prefetchData(raw: .relative_humidity_50hPa, time: time)
+        case .cloud_cover_10hPa, .cloudcover_10hPa:
+            try await prefetchData(raw: .relative_humidity_10hPa, time: time)
         case .weather_code, .weathercode:
             try await prefetchData(raw: .cloud_cover, time: time)
             try await prefetchData(derived: .snowfall, time: time)
@@ -681,6 +708,8 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .relative_humidity_100hPa, time: time)
         case .relativehumidity_50hPa:
             try await prefetchData(raw: .relative_humidity_50hPa, time: time)
+        case .relativehumidity_10hPa:
+            try await prefetchData(raw: .relative_humidity_10hPa, time: time)
         case .dew_point_1000hPa, .dewpoint_1000hPa:
             try await prefetchData(raw: .temperature_1000hPa, time: time)
             try await prefetchData(raw: .relative_humidity_1000hPa, time: time)
@@ -720,6 +749,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .dew_point_50hPa, .dewpoint_50hPa:
             try await prefetchData(raw: .temperature_50hPa, time: time)
             try await prefetchData(raw: .relative_humidity_50hPa, time: time)
+        case .dew_point_10hPa, .dewpoint_10hPa:
+            try await prefetchData(raw: .temperature_10hPa, time: time)
+            try await prefetchData(raw: .relative_humidity_10hPa, time: time)
         case .skin_temperature, .soil_temperature_0cm:
             try await prefetchData(raw: .surface_temperature, time: time)
         case .surface_air_pressure, .surface_pressure:
