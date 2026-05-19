@@ -1122,6 +1122,8 @@ extension MultiDomains {
             return .gfs05
         case .bom_access_global_ensemble:
             return .bomAccessGlobalEnsemble
+        case .google_weathernext_global_ensemble, .google_weathernext_global:
+            return .bomAccessGlobalEnsemble // FIXME: Needs to be added
         case .ukmo_global_ensemble_20km:
             return .ukmoGlobalEnsemble20km
         case .ukmo_uk_ensemble_2km:
@@ -1230,6 +1232,8 @@ extension MultiDomains {
             return .cmcGemGepsEnsembleMean
         case .bom_access_global_ensemble_mean:
             return .bomAccessGlobalEnsembleMean
+        case .google_weathernext_global_ensemble_mean:
+            return .bomAccessGlobalEnsembleMean // FIXME: Needs to be added
         case .ukmo_global_ensemble_mean_20km:
             return .ukmoGlobalEnsembleMean20km
         case .ukmo_uk_ensemble_mean_2km:
@@ -1248,4 +1252,3 @@ extension MultiDomains {
         }
     }
 }
-

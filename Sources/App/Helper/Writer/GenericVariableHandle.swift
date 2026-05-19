@@ -36,7 +36,20 @@ struct GenericVariableHandle: Sendable {
 
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
-    static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true) async throws {
+    static func convert(
+        logger: Logger, 
+        domain domainIgnored: GenericDomain, 
+        createNetcdf: Bool, 
+        run: Timestamp?, 
+        handles: [Self], 
+        concurrent: Int, 
+        writeUpdateJson: Bool, 
+        uploadS3Bucket: String?, 
+        uploadS3OnlyProbabilities: Bool, 
+        compression: OmCompressionType = .pfor_delta2d_int16, 
+        generateFullRun: Bool = true, 
+        generateTimeSeries: Bool = true
+    ) async throws {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
             if generateTimeSeries {
@@ -336,7 +349,12 @@ struct GenericVariableHandle: Sendable {
                     guard memberRange.contains(UInt64(reader.member)) else {
                         fatalError("Invalid reader.member \(reader.member) for range \(memberRange)")
                     }
-                    if dimensions.count == 3 {
+                    if dimensions.count == 3 && dimensions[0] == nMembers && dimensions[1] == ny && dimensions[2] == nx {
+                        /// Dimensions [member, y, x]
+                        try! await reader.reader.read(into: &readTemp, range: [UInt64(reader.member)..<UInt64(reader.member+1), yRange, xRange])
+                        data3d[0..<nLoc, Int(reader.member), timeArrayIndex] = readTemp[0..<nLoc]
+                    } else if dimensions.count == 3 {
+                        /// Dimensions [y, x, time]
                         /// Number of time steps in this file
                         let nt = dimensions[2]
                         guard nt == reader.time.count else {
