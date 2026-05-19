@@ -140,7 +140,7 @@ enum ReaderInterpolation {
     /// This happens with satellite data and missing time steps
     case solar_backwards_missing_not_averaged
 
-    /// Take the next hour, and devide by `dt` to preserve sums like precipitation
+    /// Take the next hour, and divide by `dt` to preserve sums like precipitation
     case backwards_sum
 
     /// Replicate value backwards. E.g. min/max of previous hours

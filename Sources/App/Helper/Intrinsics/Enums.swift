@@ -38,7 +38,7 @@ extension RawRepresentable where Self: CaseIterable, RawValue == String {
 }
 
 extension RawRepresentableString {
-    /// Initialise from string array and also decode comas
+    /// Initialise from string array and also decode commas
     static func load(commaSeparatedOptional: [String]?) throws -> [Self]? {
         guard let commaSeparatedOptional else {
             return nil
@@ -46,7 +46,7 @@ extension RawRepresentableString {
         return try load(commaSeparated: commaSeparatedOptional)
     }
 
-    /// Initialise from string array and also decode comas
+    /// Initialise from string array and also decode commas
     static func load(commaSeparated: [String]) throws -> [Self] {
         return try commaSeparated.flatMap({ s in
             try s.split(separator: ",").map {
@@ -60,7 +60,7 @@ extension RawRepresentableString {
 }
 
 extension Float {
-    /// Initialise from string array and also decode comas
+    /// Initialise from string array and also decode commas
     static func load(commaSeparated: [String]) throws -> [Float] {
         return try commaSeparated.flatMap({ s in
             try s.split(separator: ",").map {
@@ -72,7 +72,7 @@ extension Float {
         })
     }
 
-    /// Initialise from string array and also decode comas
+    /// Initialise from string array and also decode commas
     static func load(commaSeparatedOptional: [String]?) throws -> [Self]? {
         guard let commaSeparatedOptional else {
             return nil
@@ -82,7 +82,7 @@ extension Float {
 }
 
 extension Int {
-    /// Initialise from string array and also decode comas
+    /// Initialise from string array and also decode commas
     static func load(commaSeparated: [String]) throws -> [Int] {
         return try commaSeparated.flatMap({ s in
             try s.split(separator: ",").map {
@@ -94,7 +94,7 @@ extension Int {
         })
     }
 
-    /// Initialise from string array and also decode comas
+    /// Initialise from string array and also decode commas
     static func load(commaSeparatedOptional: [String]?) throws -> [Self]? {
         guard let commaSeparatedOptional else {
             return nil

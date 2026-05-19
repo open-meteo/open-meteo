@@ -28,14 +28,14 @@ extension Int {
     }
 
     /// Performs mathematical module keeping the result positive
-    @inlinable func moduloPositive(_ devisor: Int) -> Int {
-        return((self % devisor) + devisor) % devisor
+    @inlinable func moduloPositive(_ divisor: Int) -> Int {
+        return((self % divisor) + divisor) % divisor
     }
 
-    /// Devide the current number using integer devision, and report the reaming part as a fraction
-    @inlinable func moduloFraction(_ devisor: Int) -> (quotient: Int, fraction: Float) {
-        let fraction = Float(self.moduloPositive(devisor)) / Float(devisor)
-        return (self / devisor, fraction)
+    /// Divide the current number using integer division, and report the remaining part as a fraction
+    @inlinable func moduloFraction(_ divisor: Int) -> (quotient: Int, fraction: Float) {
+        let fraction = Float(self.moduloPositive(divisor)) / Float(divisor)
+        return (self / divisor, fraction)
     }
 
     @inlinable func ceil(to toNearest: Int) -> Int {
@@ -75,7 +75,7 @@ extension Range where Element == Int {
         let fileEnd = Swift.min(arrayUpper - fileLower, fileUpper - fileLower)
         let fileStart = fileEnd - array.count
         let file = fileStart ..< fileEnd
-        assert(file.count == array.count, "Offsets missmatch file=\(file.count), array=\(array.count)")
+        assert(file.count == array.count, "Offsets mismatch file=\(file.count), array=\(array.count)")
         return (file, array)
     }
 
@@ -103,7 +103,7 @@ extension Range where Bound == Float {
 }
 
 public extension RandomAccessCollection where Element == Float, Index == Int {
-    /// Calculate linear interpolation. Index and fraction are kept apart, because of floating point inprecisions
+    /// Calculate linear interpolation. Index and fraction are kept apart, because of floating point imprecisions
     @inlinable func interpolateLinear(_ i: Int, _ fraction: Float) -> Float {
         assert(self.count != 0)
         assert(0 <= fraction && fraction <= 1)

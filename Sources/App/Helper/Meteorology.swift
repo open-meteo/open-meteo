@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 import CHelper
 
 enum Meteorology {
@@ -176,17 +176,17 @@ enum Meteorology {
     /// Calculate relative humidity from temperature and dewpoint
     /// See https://www.omnicalculator.com/physics/relative-humidity
     @inlinable public static func relativeHumidity(temperature: Float, dewpoint: Float) -> Float {
-        let β = Float(17.625)
-        let λ = Float(243.04)
-        return max(min(100 * exp((β * dewpoint) / (λ + dewpoint)) / exp((β * temperature) / (λ + temperature)), 100), 0)
+        let Î² = Float(17.625)
+        let Î» = Float(243.04)
+        return max(min(100 * exp((Î² * dewpoint) / (Î» + dewpoint)) / exp((Î² * temperature) / (Î» + temperature)), 100), 0)
     }
     
     /// Calculate relative dewpoint from humidity and temperature
     /// See https://www.omnicalculator.com/physics/relative-humidity
     @inlinable public static func dewpoint(temperature: Float, relativeHumidity: Float) -> Float {
-        let β = Float(17.625)
-        let λ = Float(243.04)
-        return λ * (log(relativeHumidity / 100) + ((β * temperature) / (λ + temperature))) / (β - log(relativeHumidity / 100) - ((β * temperature) / (λ + temperature)))
+        let Î² = Float(17.625)
+        let Î» = Float(243.04)
+        return Î» * (log(relativeHumidity / 100) + ((Î² * temperature) / (Î» + temperature))) / (Î² - log(relativeHumidity / 100) - ((Î² * temperature) / (Î» + temperature)))
     }
     
     /// Calculate relative humidity. All variables should be on the same level
@@ -211,7 +211,7 @@ enum Meteorology {
     
     /// Calculate relative humidity using vapor vapor saturation
     /// Accounts for saturation pressure over ice. This is critical to use RH for upper level cloud cover fraction.
-    /// Uses ECMWF-like mixed phase transition between -23°C and 0°C
+    /// Uses ECMWF-like mixed phase transition between -23Â°C and 0Â°C
     /// All variables must be on the same level.
     /// humudity in g/kg, temperature in celsius, pressure in hPa
     @inlinable public static func specificToRelativeHumidity(
@@ -219,20 +219,20 @@ enum Meteorology {
         temperature T_C: Float,
         pressure p_hPa: Float
     ) -> Float {
-        /// Temperature at liquid water. Triple point. 0.01°C. ECMWF IFS since Cy45r1
+        /// Temperature at liquid water. Triple point. 0.01Â°C. ECMWF IFS since Cy45r1
         let T0: Float = 273.16
         /// Temperature for for end mixed freezing phase at -23C
         let Tice: Float = 250.16
         
         // Convert units
         let q = q_gPerKg / 1000.0       // g/kg -> kg/kg
-        let T = T_C + 273.15            // °C -> K
+        let T = T_C + 273.15            // Â°C -> K
         let p = p_hPa * 100.0           // hPa -> Pa
         
         // Vapor pressure from specific humidity (Pa)
         let e = (q * p) / (0.622 + 0.378 * q)
         
-        // Saturation over ice (Murphy & Koop 2005). Accurate range from -110°C to 0.01°C
+        // Saturation over ice (Murphy & Koop 2005). Accurate range from -110Â°C to 0.01Â°C
         let lnEsi = 9.550426
                     - (5723.265 / Float(T))
                     + 3.53068 * log(Float(T))
@@ -268,7 +268,7 @@ enum Meteorology {
         return rh
     }
 
-    /// Wetbulb temperature Stull’s Approximation
+    /// Wetbulb temperature Stull's Approximation
     /// See https://www.omnicalculator.com/physics/wet-bulb
     public static func wetBulbTemperature(temperature t: Float, relativeHumidity rh: Float) -> Float {
         let twet = t * atan(0.151977 * sqrt(rh + 8.313659))

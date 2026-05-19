@@ -5,10 +5,10 @@ import Foundation
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache.
  
- Cache misses are isolated by the underlaying cache coordinator, preventing same blocks requested from the backend.
+ Cache misses are isolated by the underlying cache coordinator, preventing same blocks requested from the backend.
  Cache hits do not block. Atomic operations are used to prevent race conditions.
  
- Cache keys are linear for 8MB (super block). Linear cache keys can be stored linearly by the underlaying atomic cache. This is the default AWS S3 `multipart_chunksize`.
+ Cache keys are linear for 8MB (super block). Linear cache keys can be stored linearly by the underlying atomic cache. This is the default AWS S3 `multipart_chunksize`.
  Consecutive reads of blocks are merged together. E.g. Two 64 kb reads are merged to a single 128 kb read. This reduces latency if data across multiple blocks is read.
  Only reads within the 8MB super block are merged to optimise for AWS S3 multipart chunk size.
  */
@@ -127,7 +127,7 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
         return .owned(UnsafeRawBufferPointer(data))
     }
     
-    /// Execute a closure with retrieved data. If data is cached, the underlaying data is used to call be closure (zero-copy).
+    /// Execute a closure with retrieved data. If data is cached, the underlying data is used to call be closure (zero-copy).
     func withData<T: Sendable>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
         switch try await fetch(offset: offset, count: count) {
         case .borrowed(let data):
@@ -138,7 +138,7 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
         }
     }
     
-    /// Get a exclusive `Data` object which is retrained independent from the underlaying cache.
+    /// Get a exclusive `Data` object which is retrained independent from the underlying cache.
     func getData(offset: Int, count: Int) async throws -> Data {
         switch try await fetch(offset: offset, count: count) {
         case .borrowed(let data):

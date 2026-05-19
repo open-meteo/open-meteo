@@ -48,7 +48,7 @@ import SwiftNetCDF
  MEDIUM:
  
  NICAM16-9S https://gmd.copernicus.org/articles/14/795/2021/
- 0.14°, but only 2040-2050 and 1950–1960, 2000–2010 (high computational cost hindered us from running NICAM16-9S for 100 years)
+ 0.14°, but only 2040-2050 and 1950-1960, 2000-2010 (high computational cost hindered us from running NICAM16-9S for 100 years)
  1h: precip
  3h: precip, clc, snow, swrad (+cs), temp, wind, pres, hum
  day: temp, clc, wind, precip, snow, hum, swrad,

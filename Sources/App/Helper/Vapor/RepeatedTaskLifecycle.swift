@@ -4,7 +4,7 @@ import NIO
 import NIOConcurrencyHelpers
 
 /**
- Run a repeated task as a lifecycle handler. Repeated task is encosled by locks to be thread safe.
+ Run a repeated task as a lifecycle handler. Repeated task is enclosed by locks to be thread safe.
  */
 final class RepeatedTaskLifecycle: LifecycleHandler {
     private let backgroundWatcher: NIOLockedValueBox<RepeatedTask?>

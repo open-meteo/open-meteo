@@ -24,7 +24,7 @@ struct MergeYearlyCommand: AsyncCommand {
         @Flag(name: "force", help: "Generate yearly file, even if it already exists")
         var force: Bool
 
-        @Flag(name: "delete", help: "Delete the underlaying chunks")
+        @Flag(name: "delete", help: "Delete the underlying chunks")
         var delete: Bool
         
         @Flag(name: "allow-missing", help: "Allow partial years (missing chunks)")

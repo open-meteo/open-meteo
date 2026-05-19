@@ -55,10 +55,10 @@ final class Curl: Sendable {
     /// Chunk size for concurrent downloads
     let chunkSize: Int
     
-    /// Default throw if unauthorized error occures
+    /// Default throw if unauthorized error occurs
     let retryUnauthorized: Bool
 
-    /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
+    /// If the environment variable `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }

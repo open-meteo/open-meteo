@@ -128,7 +128,7 @@ extension in6_addr {
                     return false
                 }
 
-                // No partial byte → exact match so far
+                // No partial byte -> exact match so far
                 if remainingBits == 0 {
                     return true
                 }

@@ -205,8 +205,8 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     /// LPI Lightning Potential Index . Scales form 0 to ~120
     case lightning_potential
 
-    /// Height of the 0◦ C isotherm above MSL. In case of multiple 0◦ C isotherms, HZEROCL contains the uppermost one.
-    /// If the temperature is below 0◦ C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
+    /// Height of the 0° C isotherm above MSL. In case of multiple 0° C isotherms, HZEROCL contains the uppermost one.
+    /// If the temperature is below 0° C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
     case freezing_level_height
     case snowfall_height
     case total_column_integrated_water_vapour

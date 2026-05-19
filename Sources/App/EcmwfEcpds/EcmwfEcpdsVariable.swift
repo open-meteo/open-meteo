@@ -65,7 +65,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     /// Scale-factor to compress data
     var scalefactor: Float {
         switch self {
-        case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_200m, .wind_v_component_200m: return 20 // 0.05 m/s resolution. Typically 10, but want to have sligthly higher resolution
+        case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_200m, .wind_v_component_200m: return 20 // 0.05 m/s resolution. Typically 10, but want to have slightly higher resolution
         case .cloud_cover: return 1
         case .cloud_cover_low: return 1
         case .cloud_cover_mid: return 1

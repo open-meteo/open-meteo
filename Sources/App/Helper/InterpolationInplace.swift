@@ -3,7 +3,7 @@ import Foundation
 extension Array3DFastTime {
     /// Fill in missing data by interpolating using differnet interpolation types
     ///
-    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour precipitation value should be divided by 2 before, to preserve the sum correctly
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
@@ -15,7 +15,7 @@ extension Array3DFastTime {
 extension Array2DFastTime {
     /// Fill in missing data by interpolating using differnet interpolation types
     ///
-    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour precipitation value should be divided by 2 before, to preserve the sum correctly
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
@@ -28,7 +28,7 @@ extension Array2DFastTime {
 extension Array where Element == Float {
     /// Fill in missing data by interpolating using differnet interpolation types
     ///
-    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour precipitation value should be divided by 2 before, to preserve the sum correctly
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling

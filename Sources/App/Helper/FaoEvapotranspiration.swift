@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 
 extension Meteorology {
     public static let boltzmanConstant = Float(0.20429166e-9)
@@ -17,7 +17,7 @@ extension Meteorology {
         }
 
         let Tmean = (temperature2mCelsiusDaily.max + temperature2mCelsiusDaily.min) / 2
-        /// Leaf wetness inlikely below 10°C. Scale a factor from 5°C - 15°C from 0 to 1
+        /// Leaf wetness inlikely below 10Â°C. Scale a factor from 5Â°C - 15Â°C from 0 to 1
         let temperatureProbability = max(min((Tmean - 5) * 10, 1), 0)
 
         /// Leaf wetness likely at low VPD
@@ -33,7 +33,7 @@ extension Meteorology {
         if precipitation > 1 {
             return min(80 + precipitation * 2, 100)
         }
-        /// Leaf wetness inlikely below 10°C. Scale a factor from 5°C - 15°C from 0 to 1
+        /// Leaf wetness inlikely below 10Â°C. Scale a factor from 5Â°C - 15Â°C from 0 to 1
         let temperatureProbability = max(min((temperature2mCelsius - 5) * 10, 1), 0)
 
         /// Leaf wetness likely at low VPD
@@ -48,19 +48,19 @@ extension Meteorology {
     /// Temperature max/min should be used instead of mean temperature, similar for FAO implementation
     /// As there is an inverse relation between all variables, min/max vlues are not perfectly accurate afterwards
     @inlinable public static func dewpointDaily(temperature2mCelsiusDaily: (max: Float, min: Float), relativeHumidity: Float) -> Float {
-        let β = Float(17.625)
-        let λ = Float(243.04)
-        let meanSat = ((β * temperature2mCelsiusDaily.min) / (λ + temperature2mCelsiusDaily.min) + (β * temperature2mCelsiusDaily.max) / (λ + temperature2mCelsiusDaily.max)) / 2
-        return λ * (log(relativeHumidity / 100) + (meanSat)) / (β - log(relativeHumidity / 100) - (meanSat))
+        let Î² = Float(17.625)
+        let Î» = Float(243.04)
+        let meanSat = ((Î² * temperature2mCelsiusDaily.min) / (Î» + temperature2mCelsiusDaily.min) + (Î² * temperature2mCelsiusDaily.max) / (Î» + temperature2mCelsiusDaily.max)) / 2
+        return Î» * (log(relativeHumidity / 100) + (meanSat)) / (Î² - log(relativeHumidity / 100) - (meanSat))
     }
 
     /// Calculate daily vapor pressure deficit using relative humidity min/max if available
     public static func vaporPressureDeficitDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
-        /// Slope of saturation vapour pressure curve at air temperature T [kPa °C-1], (Page 37)
-        let β = Float(17.27) // Actually 17.625 is now recommended. FAO uses the old one.
-        let λ = Float(237.3) // 243.04 new recommendation
-        let e0min = 0.6108 * exp(β * temperature2mCelsiusDailyMin / (temperature2mCelsiusDailyMin + λ))
-        let e0max = 0.6108 * exp(β * temperature2mCelsiusDailyMax / (temperature2mCelsiusDailyMax + λ))
+        /// Slope of saturation vapour pressure curve at air temperature T [kPa Â°C-1], (Page 37)
+        let Î² = Float(17.27) // Actually 17.625 is now recommended. FAO uses the old one.
+        let Î» = Float(237.3) // 243.04 new recommendation
+        let e0min = 0.6108 * exp(Î² * temperature2mCelsiusDailyMin / (temperature2mCelsiusDailyMin + Î»))
+        let e0max = 0.6108 * exp(Î² * temperature2mCelsiusDailyMax / (temperature2mCelsiusDailyMax + Î»))
         /// saturation vapor pressure at air temperature Thr. (kPa)
         let esat = (e0min + e0max) / 2
 
@@ -80,27 +80,27 @@ extension Meteorology {
 
     /// FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
     public static func et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, temperature2mCelsiusDailyMean: Float, windspeed10mMeterPerSecondMean: Float, shortwaveRadiationMJSum: Float, elevation: Float, extraTerrestrialRadiationSum: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
-        /// short wave radiaton or use Hargreaves’ radiation formula (Page 60)
+        /// short wave radiation or use Hargreaves' radiation formula (Page 60)
         let Rs = shortwaveRadiationMJSum.isNaN ? 0.16 * sqrtf(temperature2mCelsiusDailyMax - temperature2mCelsiusDailyMin) * extraTerrestrialRadiationSum : shortwaveRadiationMJSum
 
         let windspeed2m = scaleWindFactor(from: 10, to: 2) * windspeed10mMeterPerSecondMean
 
-        /// Slope of saturation vapour pressure curve at air temperature T [kPa °C-1], (Page 37)
-        let β = Float(17.27) // Actually 17.625 is now recommended. FAO uses the old one.
-        let λ = Float(237.3) // 243.04 new recommendation
-        let e0min = 0.6108 * exp(β * temperature2mCelsiusDailyMin / (temperature2mCelsiusDailyMin + λ))
-        let e0max = 0.6108 * exp(β * temperature2mCelsiusDailyMax / (temperature2mCelsiusDailyMax + λ))
+        /// Slope of saturation vapour pressure curve at air temperature T [kPa Â°C-1], (Page 37)
+        let Î² = Float(17.27) // Actually 17.625 is now recommended. FAO uses the old one.
+        let Î» = Float(237.3) // 243.04 new recommendation
+        let e0min = 0.6108 * exp(Î² * temperature2mCelsiusDailyMin / (temperature2mCelsiusDailyMin + Î»))
+        let e0max = 0.6108 * exp(Î² * temperature2mCelsiusDailyMax / (temperature2mCelsiusDailyMax + Î»))
         /// saturation vapor pressure at air temperature Thr. (kPa)
         let esat = (e0min + e0max) / 2
 
         ///  the slope of the vapour pressure curve is calculated using mean air temperature
-        let vaporPressurCurveSlope = 4098 * (0.6108 * exp(β * temperature2mCelsiusDailyMean / (temperature2mCelsiusDailyMean + λ))) / powf((temperature2mCelsiusDailyMean + λ), 2)
+        let vaporPressurCurveSlope = 4098 * (0.6108 * exp(Î² * temperature2mCelsiusDailyMean / (temperature2mCelsiusDailyMean + Î»))) / powf((temperature2mCelsiusDailyMean + Î»), 2)
 
         /// Air pressure in kPa. Evaporation at high altitudes is promoted due to low atmospheric pressure as expressed in the psychrometric constant. The effect is, however, small and in the calculation procedures, the average value for a location is sufficient.
         let simplifiedAtmosphericPressure = 101.3 * powf((293 - 0.0065 * elevation) / 293.0, 5.26)
 
-        /// psychrometric constant [kPa °C-1], (Equation 8)
-        let γ = 0.000665 * simplifiedAtmosphericPressure
+        /// psychrometric constant [kPa Â°C-1], (Equation 8)
+        let Î³ = 0.000665 * simplifiedAtmosphericPressure
 
         /// actual vapour pressure [kPa], (Page 37)
         let ea: Float
@@ -128,7 +128,7 @@ extension Meteorology {
         /// clear-sky solar radiation [MJ m-2 day-1] approximated, (Page 51)
         let Rso = (0.75 + 0.00002 * elevation) * extraTerrestrialRadiationSum
 
-        /// relative shortwave radiation (limited to ≤ 1.0. Although daily, could still happen at poles
+        /// relative shortwave radiation (limited to â‰¤ 1.0. Although daily, could still happen at poles
         let Rrel = extraTerrestrialRadiationSum <= 0 ? RrelAproximation : min(Rs / Rso, 1)
 
         /// net outgoing longwave radiation [MJ m-2 day-1]
@@ -141,7 +141,7 @@ extension Meteorology {
         let Ghr = (Rs <= 0) ? 0.5 * Rn : 0.1 * Rn
 
         // evapotranspiration
-        let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + γ * (37.0 / (temperature2mCelsiusDailyMean + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + γ * (1 + 0.34 * windspeed2m))
+        let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + Î³ * (37.0 / (temperature2mCelsiusDailyMean + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + Î³ * (1 + 0.34 * windspeed2m))
 
         return max(et0, 0)
     }
@@ -152,22 +152,22 @@ extension Meteorology {
 
         let windspeed2m = scaleWindFactor(from: 10, to: 2) * windspeed10mMeterPerSecond
 
-        /// Slope of saturation vapour pressure curve at air temperature T [kPa °C-1], (Page 37)
-        let β = Float(17.27) // Actaually 17.625 is now recommended. FAO uses the old one.
-        let λ = Float(237.3) // 243.04 new recommendation
-        let vaporPressurCurveSlope = 4098 * (0.6108 * exp(β * temperature2mCelsius / (temperature2mCelsius + λ))) / powf((temperature2mCelsius + λ), 2)
+        /// Slope of saturation vapour pressure curve at air temperature T [kPa Â°C-1], (Page 37)
+        let Î² = Float(17.27) // Actaually 17.625 is now recommended. FAO uses the old one.
+        let Î» = Float(237.3) // 243.04 new recommendation
+        let vaporPressurCurveSlope = 4098 * (0.6108 * exp(Î² * temperature2mCelsius / (temperature2mCelsius + Î»))) / powf((temperature2mCelsius + Î»), 2)
 
         /// Air pressure in kPa. Evaporation at high altitudes is promoted due to low atmospheric pressure as expressed in the psychrometric constant. The effect is, however, small and in the calculation procedures, the average value for a location is sufficient.
         let simplifiedAtmosphericPressure = 101.3 * powf((293 - 0.0065 * elevation) / 293.0, 5.26)
 
-        /// psychrometric constant [kPa °C-1], (Equation 8)
-        let γ = 0.000665 * simplifiedAtmosphericPressure
+        /// psychrometric constant [kPa Â°C-1], (Equation 8)
+        let Î³ = 0.000665 * simplifiedAtmosphericPressure
 
         /// saturation vapor pressure at air temperature Thr. (kPa)
-        let esat = 0.6108 * exp((β * temperature2mCelsius) / (temperature2mCelsius + λ))
+        let esat = 0.6108 * exp((Î² * temperature2mCelsius) / (temperature2mCelsius + Î»))
 
         /// actual vapour pressure [kPa], (Page 37)
-        let ea = 0.6108 * exp((β * dewpointCelsius) / (dewpointCelsius + λ))
+        let ea = 0.6108 * exp((Î² * dewpointCelsius) / (dewpointCelsius + Î»))
 
         let vaporPressureDeficit = esat - ea
 
@@ -185,7 +185,7 @@ extension Meteorology {
         /// As a more approximate alternative, one can assume Rs/Rso = 0.4 to 0.6 during nighttime periods in humid and subhumid climates and Rs/Rso = 0.7 to 0.8 in arid and semiarid climates. (Page 75)
         let RrelAproximation = 0.4 + relativeHumidity / 100 * 0.4
 
-        /// relative shortwave radiation (limited to ≤ 1.0
+        /// relative shortwave radiation (limited to â‰¤ 1.0
         let Rrel = extraTerrestrialRadiation <= 0 ? RrelAproximation : min(Rs / Rso, 1)
 
         /// net outgoing longwave radiation [MJ m-2 day-1]
@@ -198,7 +198,7 @@ extension Meteorology {
         let Ghr = (Rs <= 0) ? 0.5 * Rn : 0.1 * Rn
 
         // evapotranspiration
-        let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + γ * (37.0 / (temperature2mCelsius + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + γ * (1 + 0.34 * windspeed2m))
+        let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + Î³ * (37.0 / (temperature2mCelsius + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + Î³ * (1 + 0.34 * windspeed2m))
 
         return max(et0 * Float(dtSeconds / 3600), 0)
     }

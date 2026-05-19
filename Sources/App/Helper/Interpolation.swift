@@ -103,7 +103,7 @@ extension Array where Element == Float {
         }
     }
 
-    /// Take the next value and devide it by dt. Used for precipitation, snow, etc
+    /// Take the next value and divide it by dt. Used for precipitation, snow, etc
     func backwardsSum(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
         let multiply = Float(time.dtSeconds) / Float(timeLow.dtSeconds)
         return time.map { t in

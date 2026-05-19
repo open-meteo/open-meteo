@@ -139,7 +139,7 @@ struct DownloadEra5Command: AsyncCommand {
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 
-                // Read location one-by-one... Multi location support does not work with derived varibales
+                // Read location one-by-one... Multi location support does not work with derived variables
                 for (l, gridpoint) in locationRange.enumerated() {
                     let gridpointNext = min(gridpoint+1, writer.dim0-1)
                     let readerNext = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)), options: options)])

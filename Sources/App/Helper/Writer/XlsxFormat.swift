@@ -173,7 +173,7 @@ public final class GzipStream {
         }
         repeat {
             if zstream.pointee.avail_out == 0 {
-                /// Increase buffer capacity. Always double underlaying storage.
+                /// Increase buffer capacity. Always double underlying storage.
                 writebuffer.reserveCapacity(minimumWritableBytes: writebuffer.writerIndex)
                 writebuffer.withUnsafeMutableWritableBytes({ ptr in
                     zstream.pointee.avail_out = uInt(ptr.count)
