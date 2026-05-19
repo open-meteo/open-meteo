@@ -529,7 +529,7 @@ struct ExportCommand: AsyncCommand {
             guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
-            try await ncElevation.write(elevationFile.read(range: nil))
+            try await ncElevation.write(elevationFile.read())
         }
 
         // Calculate daily normals
