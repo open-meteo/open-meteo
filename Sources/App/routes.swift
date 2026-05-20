@@ -16,6 +16,6 @@ extension RoutesBuilder {
     )
     where Response: AsyncResponseEncodable {
         self.on(.GET, path, use: closure)
-        self.on(.POST, path, use: closure)
+        self.on(.POST, path, body: .collect(maxSize: "128kb"), use: closure)
     }
 }

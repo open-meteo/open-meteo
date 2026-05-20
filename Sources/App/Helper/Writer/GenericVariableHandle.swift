@@ -39,8 +39,12 @@ struct GenericVariableHandle: Sendable {
     static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true) async throws {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
+            
+            let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
+            
             if generateTimeSeries {
                 let startTime = DispatchTime.now()
+                logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
                 logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
@@ -108,7 +112,8 @@ struct GenericVariableHandle: Sendable {
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
-            if generateFullRun, domain.countEnsembleMember == 1, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
+            let generateFullRun = generateFullRun && domain.generateFullRun
+            if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
                 try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)

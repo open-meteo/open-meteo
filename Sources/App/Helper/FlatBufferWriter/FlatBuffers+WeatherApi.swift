@@ -658,6 +658,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .temperature, aggregation: .spread, altitude: 120)
         case .snow_depth_water_equivalent_spread:
             return .init(variable: .snowDepthWaterEquivalent, aggregation: .spread)
+        case .total_column_water:
+            // TODO register in SDK
+            return .init(variable: .totalColumnIntegratedWaterVapour, previousDay: previousDay)
         }
     }
 }
@@ -1036,6 +1039,14 @@ extension MultiDomains {
             return .ecmwfIfs025
         case .ecmwf_aifs025:
             return .ecmwfAifs025
+        case .ecmwf_ifs_europe_ensemble:
+            return .ecmwfIfs // TODO register in SDK
+        case .ecmwf_ifs_europe_ensemble_mean:
+            return .ecmwfIfs // TODO register in SDK
+        case .ecmwf_aifs_europe_ensemble:
+            return .ecmwfIfs // TODO register in SDK
+        case .ecmwf_aifs_europe_ensemble_mean:
+            return .ecmwfIfs // TODO register in SDK
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return .gfsGraphcast025
         case .gfs025, .ncep_gfs025:

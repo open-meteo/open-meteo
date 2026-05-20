@@ -5,6 +5,12 @@ import Vapor
 // import NIOFileSystem
 import VaporTesting
 
+extension InlineArray {
+    func toArray() -> [Element] {
+        return (0..<count).map{self[$0]}
+    }
+}
+
 @Suite struct DataTests {
     init() {
         #if Xcode
@@ -21,30 +27,43 @@ import VaporTesting
             let center = grid.findPointXY(lat: 53.647546, lon: 0)
             #expect(center.x == 0)
             #expect(center.y == 516)
-            let aa = try await grid.getSurroundingGridpoints(centerY: center.y, lat: 53.647546, lon: 0, elevationFile: elevationFile)
-            #expect(aa.gridpoints == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
-            #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
-            #expect(aa.distances.isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
+            let aa = grid.getSurroundingGridpoints(lat: 53.647546, lon: 0)
+            #expect(aa.gridpoints.toArray() == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
+            #expect(aa.distances.toArray().isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
             
-            let centerbb = grid.findPointXY(lat: 50.781, lon: 1.596)
-            let bb = try await grid.getSurroundingGridpoints(centerY: centerbb.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile)
-            #expect(bb.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
-            #expect(bb.elevations == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
-            #expect(bb.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            // Resolve elevation for given gridpoints, but only for the closest `minDistanceIndex`
+            var elevation1 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: aa.gridpoints, elevation: &elevation1, onlyMinDistanceIndex: aa.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation1.toArray().isSimilar([.nan, .nan, 6.0, -4.0, -999.0, .nan, .nan, .nan, .nan]))
+            // Resolve elevation for the remaining gridpoints
+            try await grid.getSurroundingElevation(gridpoints: aa.gridpoints, elevation: &elevation1, onlyMinDistanceIndex: aa.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation1.toArray() == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
             
+            let bb = grid.getSurroundingGridpoints(lat: 50.781, lon: 1.596)
+            #expect(bb.gridpoints.toArray() == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(bb.distances.toArray().isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            var elevation2 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation2.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, 76.0, .nan, .nan, .nan]))
+            try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation2.toArray() == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
             
             let bbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile))
             #expect(bbb.gridpoint == 630534)
             
             // WAM only returns NaN for this grid cell, use corrected land-mask
             let elevationFile2 = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
-            let center2 = grid.findPointXY(lat: 50.781, lon: 1.596)
             #expect(center.x == 0)
             #expect(center.y == 516)
-            let aaa = try await grid.getSurroundingGridpoints(centerY: center2.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile2)
-            #expect(aaa.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
-            #expect(aaa.elevations.isSimilar([-999.0, -999.0, .nan, -999.0, .nan, .nan, -999.0, .nan, .nan]))
-            #expect(aaa.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            let aaa = grid.getSurroundingGridpoints(lat: 50.781, lon: 1.596)
+            #expect(aaa.gridpoints.toArray() == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(aaa.distances.toArray().isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            var elevation3 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: aaa.gridpoints, elevation: &elevation3, onlyMinDistanceIndex: aaa.minDistanceIndex, firstPass: true, elevationFile: elevationFile2)
+            #expect(elevation3.toArray().isSimilar([.nan, .nan, .nan, -999.0, .nan, .nan, .nan, .nan, .nan]))
+            try await grid.getSurroundingElevation(gridpoints: aaa.gridpoints, elevation: &elevation3, onlyMinDistanceIndex: aaa.minDistanceIndex, firstPass: false, elevationFile: elevationFile2)
+            #expect(elevation3.toArray().isSimilar([-999.0, -999.0, .nan, -999.0, .nan, .nan, -999.0, .nan, .nan]))
+
             let bbbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile2))
             #expect(bbbb.gridpoint == 628290)
             let bResolved = grid.getCoordinates(gridpoint: 628290)
@@ -79,6 +98,49 @@ import VaporTesting
             /// Cuxhaven at the sea. Center is sea grid point. 
             let h = try #require(await grid.findPointTerrainOptimised(lat: 53.890130, lon: 8.671630, elevation: 5, elevationFile: elevationFile))
             #expect(h.gridpoint == 537694)
+            
+            let northPole = try #require(await grid.findPointTerrainOptimised(lat: 90, lon: 0, elevation: 5, elevationFile: elevationFile))
+            #expect(northPole.gridpoint == 0)
+            
+            let southPole = try #require(await grid.findPointTerrainOptimised(lat: -90, lon: -18, elevation: 5, elevationFile: elevationFile))
+            #expect(southPole.gridpoint == grid.count-1)
+        }
+    }
+    
+    /// TODO elevation file needs correction!
+    @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridAreaSeaMatch() async throws {
+        try await withApp { app in
+            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs_europe_ensemble.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let grid = GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33.005..<70.967, longitude: -11..<37))
+            // Longitude 0° wraps on x axis
+            let aa = grid.getSurroundingGridpoints(lat: 70.966606, lon: -10.800018)
+            #expect(aa.gridpoints.toArray() == [-1, -1, -1, 0, 1, -1, 147, 148, -1])
+            #expect(aa.distances.toArray().isSimilar([.nan, .nan, .nan, 3.6379788e-10, 0.10711972, .nan, 0.0064742942, 0.13833855, .nan], accuracy: 0.0001))
+            // Resolve elevation for given gridpoints, but only for the closest `minDistanceIndex`
+            var elevation1 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: aa.gridpoints, elevation: &elevation1, onlyMinDistanceIndex: aa.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation1.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, .nan, .nan, .nan, .nan]))
+            // Resolve elevation for the remaining gridpoints
+            try await grid.getSurroundingElevation(gridpoints: aa.gridpoints, elevation: &elevation1, onlyMinDistanceIndex: aa.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation1.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, .nan, -999.0, -999.0, .nan]))
+            
+            let bb = grid.getSurroundingGridpoints(lat: 33.005272, lon: 36.993866)
+            #expect(bb.gridpoints.toArray() == [156821, -1, -1, 157255, 157256, -1, -1, -1, -1])
+            #expect(bb.distances.toArray().isSimilar([0.0091824075, .nan, .nan, 0.012194311, 0.0, .nan, .nan, .nan, .nan], accuracy: 0.0001))
+            var elevation2 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation2.toArray().isSimilar([.nan, .nan, .nan, 7787.0, 6885.0, .nan, .nan, .nan, .nan]))
+            try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation2.toArray().isSimilar([6817.0, .nan, .nan, 7787.0, 6885.0, .nan, .nan, .nan, .nan]))
+            
+            let cc = grid.getSurroundingGridpoints(lat: 45, lon: -10.900018)
+            #expect(cc.gridpoints.toArray() == [89992, 89993, -1, 90335, 90336, -1, 90678, 90679, -1])
+            #expect(cc.distances.toArray().isSimilar([0.009651494, 0.024328139, .nan, 0.00069519074, 0.020056926, .nan, 0.0021960922, 0.026213925, .nan], accuracy: 0.0001))
+            var elevation3 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: cc.gridpoints, elevation: &elevation3, onlyMinDistanceIndex: cc.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation3.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, .nan, .nan, .nan, .nan]))
+            try await grid.getSurroundingElevation(gridpoints: cc.gridpoints, elevation: &elevation3, onlyMinDistanceIndex: cc.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation3.toArray().isSimilar([-999.0, -999.0, .nan, -999.0, -999.0, .nan, -999.0, -999.0, .nan]))
         }
     }
     
