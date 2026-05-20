@@ -52,7 +52,7 @@ struct MeteoSwissDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, ensembleMeanDomain: domain.ensembleMeanDomain)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -109,7 +109,7 @@ struct MeteoSwissDownload: AsyncCommand {
             let rhCalculator = RelativeHumidityCalculator(outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m)
             
             let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
             
             try await variables.foreachConcurrent(nConcurrent: 4) { variable in
                 let storagePrecipitation = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
