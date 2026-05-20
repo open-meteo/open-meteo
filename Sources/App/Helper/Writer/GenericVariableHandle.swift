@@ -253,6 +253,9 @@ struct GenericVariableHandle: Sendable {
         let ny = grid.ny
         // let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
+        
+        // Construct mean domain splitter once if needed, reuse for all variables
+        let meanDomainSplitter = ensembleMeanDomain.map { OmFileSplitter($0, nMembers: 1) }
 
         for (_, handles) in handles.groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" }) {
             guard let timeMin = handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound else {
@@ -337,12 +340,18 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            /// Cache of per-chunk ensemble mean and spread, populated during member conversion and consumed by the mean domain pass.
-            /// Each entry corresponds to one (yRange, xRange) chunk, stored in the same order the splitter iterates.
-            var meanChunks: [(mean: [Float], spread: [Float])] = []
-            let computeEnsembleStats = ensembleMeanDomain != nil && nMembers > 1
+            let ensembleMeanOutput: EnsembleMeanOutput? = (meanDomainSplitter != nil && nMembers > 1)
+                ? EnsembleMeanOutput(
+                    splitter: meanDomainSplitter!,
+                    meanVariable: variable.omFileName.file,
+                    meanScalefactor: variable.scalefactor,
+                    spreadVariable: variable.asSpreadVariableGeneric.omFileName.file,
+                    spreadScalefactor: variable.asSpreadVariableGeneric.scalefactor,
+                    nMembersActual: nMembersInVariables
+                )
+                : nil
 
-            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, ensembleMean: ensembleMeanOutput) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
@@ -377,56 +386,10 @@ struct GenericVariableHandle: Sendable {
                     locationRange: locationRange1D
                 )
 
-                // Compute ensemble mean and spread (sample std dev) across member axis and cache for the mean domain pass below.
-                // data3d layout: [location * nTime * nMembers + member * nTime + time] (Array3DFastTime: [nLocations, nLevel=nMembers, nTime])
-                if computeEnsembleStats {
-                    let nT = time.count
-                    var mean = [Float](repeating: 0, count: nLoc * nT)
-                    var m2 = [Float](repeating: 0, count: nLoc * nT)
-                    // Welford's online algorithm iterating over member axis.
-                    // Use nMembersInVariables (actual downloaded members) instead of nMembers (domain count)
-                    // to avoid accumulating NaN from uninitialized member slots when fewer members were downloaded.
-                    for member in 0..<nMembersInVariables {
-                        for loc in 0..<nLoc {
-                            for t in 0..<nT {
-                                let srcIdx = loc * nT * nMembers + member * nT + t
-                                let dstIdx = loc * nT + t
-                                let x = data3d.data[srcIdx]
-                                let delta = x - mean[dstIdx]
-                                mean[dstIdx] += delta / Float(member + 1)
-                                let delta2 = x - mean[dstIdx]
-                                m2[dstIdx] += delta * delta2
-                            }
-                        }
-                    }
-                    // Convert accumulated sum-of-squared-deltas to sample standard deviation
-                    let spread = m2.map { nMembersInVariables > 1 ? sqrt($0 / Float(nMembersInVariables - 1)) : 0 }
-                    meanChunks.append((mean: mean, spread: spread))
-                }
-
                 await progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
                 return ArraySlice(data3d.data)
             }
             await progress.finish()
-
-            // Write ensemble mean and spread into the mean domain's time-series files
-            if computeEnsembleStats, let meanDomain = ensembleMeanDomain {
-                let omMean = OmFileSplitter(meanDomain, nMembers: 1)
-                var chunkIndex = 0
-                let spreadVariable = variable.asSpreadVariableGeneric
-
-                // Mean
-                try await omMean.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { _, _, _ in
-                    defer { chunkIndex += 1 }
-                    return ArraySlice(meanChunks[chunkIndex].mean)
-                }
-                // Spread (sample std dev): unit handling preserved via VariableOrSpread
-                chunkIndex = 0
-                try await omMean.updateFromTimeOrientedStreaming3D(variable: spreadVariable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: spreadVariable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { _, _, _ in
-                    defer { chunkIndex += 1 }
-                    return ArraySlice(meanChunks[chunkIndex].spread)
-                }
-            }
         }
     }
 }

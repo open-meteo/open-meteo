@@ -2,6 +2,36 @@ import Foundation
 import OmFileFormat
 import Vapor
 
+/// Parameters for writing ensemble mean and spread into a separate mean domain,
+/// computed inline during the ensemble rolling-file write pass.
+struct EnsembleMeanOutput {
+    let splitter: OmFileSplitter
+    let meanVariable: String
+    let meanScalefactor: Float
+    let spreadVariable: String
+    let spreadScalefactor: Float
+    /// Actual number of downloaded members; may be less than `domain.countEnsembleMember`
+    /// when a model delivers a partial set (e.g. MeteoSwiss). Welford iterates only up to this.
+    let nMembersActual: Int
+}
+
+/// Per-time-chunk writers for the mean domain (chunked files, nMembers=1).
+/// Opened before the spatial loop so all time chunks are handled in one spatial pass.
+struct MeanChunkWriter {
+    let meanRead: OmFileReaderArray<MmapFile, Float>?
+    let spreadRead: OmFileReaderArray<MmapFile, Float>?
+    let meanWriteFile: OmFileWriter<FileHandle>
+    let meanWrite: OmFileWriterArray<Float, FileHandle>
+    let meanWriteFn: FileHandle
+    let meanFileName: String
+    let spreadWriteFile: OmFileWriter<FileHandle>
+    let spreadWrite: OmFileWriterArray<Float, FileHandle>
+    let spreadWriteFn: FileHandle
+    let spreadFileName: String
+    /// Offsets mapping `time` into this time-chunk file
+    let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
+}
+
 /// Read any time from multiple files
 struct OmFileSplitter {
     let domain: DomainRegistry
@@ -330,11 +360,11 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, ensembleMean: EnsembleMeanOutput? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         if nMembers > 1, let retainDays = domain.useRollingDays {
             // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
-            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, supplyChunk: supplyChunk)
+            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, ensembleMean: ensembleMean, supplyChunk: supplyChunk)
         }
         
         let indexTime = time.toIndexTime()
@@ -487,7 +517,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, ensembleMean: EnsembleMeanOutput? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: 0, previousDay: 0)
         try readFile.createDirectory()
@@ -536,6 +566,69 @@ struct OmFileSplitter {
         // print("Chunks [\(processChunkY),\(processChunkX)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         
         var fileData = [Float](repeating: .nan, count: processChunkY * processChunkX * fileTime.count * nMembers)
+
+        let meanChunkWriters: [MeanChunkWriter]
+        var meanFileData: [Float]
+        var spreadFileData: [Float]
+
+        if let em = ensembleMean {
+            let ms = em.splitter
+            let indexTime = time.toIndexTime()
+            let indextimeChunked = indexTime.divideRoundedUp(divisor: ms.nTimePerFile)
+
+            meanChunkWriters = try await indextimeChunked.asyncFlatMap { timeChunk -> [MeanChunkWriter] in
+                let chunkFileTime = timeChunk * ms.nTimePerFile ..< (timeChunk + 1) * ms.nTimePerFile
+                guard let offsets = indexTime.intersect(fileTime: chunkFileTime) else { return [] }
+
+                let meanOmFile = OmFileType.domainChunk(domain: ms.domain, variable: em.meanVariable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: 0)
+                let spreadOmFile = OmFileType.domainChunk(domain: ms.domain, variable: em.spreadVariable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: 0)
+                try meanOmFile.createDirectory()
+
+                let meanOmRead = try? await OmFileReader(mmapFile: meanOmFile.getFilePath())
+                let spreadOmRead = try? await OmFileReader(mmapFile: spreadOmFile.getFilePath())
+
+                let meanFileName = meanOmFile.getFilePath()
+                let spreadFileName = spreadOmFile.getFilePath()
+                let meanFn = try FileHandle.createNewFile(file: meanFileName, overwrite: true, temporary: true)
+                let spreadFn = try FileHandle.createNewFile(file: spreadFileName, overwrite: true, temporary: true)
+
+                let meanWriteFile = OmFileWriter(fn: meanFn, initialCapacity: 1024 * 1024)
+                let spreadWriteFile = OmFileWriter(fn: spreadFn, initialCapacity: 1024 * 1024)
+
+                let meanWriter = try meanWriteFile.prepareArray(
+                    type: Float.self,
+                    dimensions: [UInt64(ms.ny), UInt64(ms.nx), UInt64(ms.nTimePerFile)],
+                    chunkDimensions: [1, UInt64(ms.chunknLocations), UInt64(ms.nTimePerFile)],
+                    compression: compression,
+                    scale_factor: em.meanScalefactor,
+                    add_offset: 0
+                )
+                let spreadWriter = try spreadWriteFile.prepareArray(
+                    type: Float.self,
+                    dimensions: [UInt64(ms.ny), UInt64(ms.nx), UInt64(ms.nTimePerFile)],
+                    chunkDimensions: [1, UInt64(ms.chunknLocations), UInt64(ms.nTimePerFile)],
+                    compression: compression,
+                    scale_factor: em.spreadScalefactor,
+                    add_offset: 0
+                )
+
+                return [MeanChunkWriter(
+                    meanRead: meanOmRead?.asArray(of: Float.self),
+                    spreadRead: spreadOmRead?.asArray(of: Float.self),
+                    meanWriteFile: meanWriteFile, meanWrite: meanWriter,
+                    meanWriteFn: meanFn, meanFileName: meanFileName,
+                    spreadWriteFile: spreadWriteFile, spreadWrite: spreadWriter,
+                    spreadWriteFn: spreadFn, spreadFileName: spreadFileName,
+                    offsets: offsets
+                )]
+            }
+            meanFileData   = [Float](repeating: .nan, count: processChunkY * processChunkX * ensembleMean!.splitter.nTimePerFile)
+            spreadFileData = [Float](repeating: .nan, count: processChunkY * processChunkX * ensembleMean!.splitter.nTimePerFile)
+        } else {
+            meanChunkWriters = []
+            meanFileData   = []
+            spreadFileData = []
+        }
 
         for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
             for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
@@ -590,11 +683,97 @@ struct OmFileSplitter {
                     try writer.writeData(
                         pointer: UnsafeBufferPointer(start: fileData.baseAddress, count: yRange.count * xRange.count * nMembers * fileTime.count),
                         arrayDimensions: nMembers <= 1 ?
-                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(time.count)] :
+                            [UInt64(yRange.count), UInt64(xRange.count), UInt64(time.count)] :
                             [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(fileTime.count)]
                     )
                 }
 
+                // Compute ensemble mean and spread for this chunk, then write to mean domain's chunked files.
+                // data layout (Array3DFastTime): [loc * nMembers * nT + member * nT + t]
+                if let em = ensembleMean {
+                    let nLoc = yRange.count * xRange.count
+                    let nT = time.count
+                    var chunkMean   = [Float](repeating: 0, count: nLoc * nT)
+                    var chunkM2     = [Float](repeating: 0, count: nLoc * nT)
+
+                    // Welford's online algorithm — iterate only nMembersActual to avoid NaN from
+                    // uninitialized slots when fewer members were downloaded than domain.countEnsembleMember
+                    for member in 0..<em.nMembersActual {
+                        for loc in 0..<nLoc {
+                            for t in 0..<nT {
+                                let x = data[data.startIndex + loc * nMembers * nT + member * nT + t]
+                                let dstIdx = loc * nT + t
+                                let delta = x - chunkMean[dstIdx]
+                                chunkMean[dstIdx] += delta / Float(member + 1)
+                                chunkM2[dstIdx]   += delta * (x - chunkMean[dstIdx])
+                            }
+                        }
+                    }
+                    let chunkSpread = chunkM2.map {
+                        em.nMembersActual > 1 ? sqrt($0 / Float(em.nMembersActual - 1)) : 0
+                    }
+
+                    let ms = em.splitter
+                    for cw in meanChunkWriters {
+                        // Read existing mean/spread data from disk for this time chunk, or reset to NaN
+                        if let meanRead = cw.meanRead {
+                            // Read existing mean data
+                            try await meanRead.read(
+                                into: &meanFileData,
+                                range: [yRange, xRange, 0 ..< UInt64(ms.nTimePerFile)],
+                                intoCubeOffset: [0, 0, 0],
+                                intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(ms.nTimePerFile)]
+                            )
+                        } else {
+                            // No existing file; reset to NaN
+                            for i in meanFileData.indices {
+                                meanFileData[i] = .nan
+                            }
+                        }
+                        
+                        if let spreadRead = cw.spreadRead {
+                            // Read existing spread data
+                            try await spreadRead.read(
+                                into: &spreadFileData,
+                                range: [yRange, xRange, 0 ..< UInt64(ms.nTimePerFile)],
+                                intoCubeOffset: [0, 0, 0],
+                                intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(ms.nTimePerFile)]
+                            )
+                        } else {
+                            // No existing file; reset to NaN
+                            for i in spreadFileData.indices {
+                                spreadFileData[i] = .nan
+                            }
+                        }
+                        
+                        // Merge newly computed mean/spread into the file buffer (nMembers=1, l = loc)
+                        for loc in 0..<nLoc {
+                            for (tFile, tArray) in zip(cw.offsets.file, cw.offsets.array) {
+                                let src = chunkMean[loc * nT + tArray]
+                                if !src.isNaN {
+                                    meanFileData[ms.nTimePerFile * loc + tFile] = src
+                                }
+                                let srcSpread = chunkSpread[loc * nT + tArray]
+                                if !srcSpread.isNaN {
+                                    spreadFileData[ms.nTimePerFile * loc + tFile] = srcSpread
+                                }
+                            }
+                        }
+
+                        try meanFileData.withUnsafeBufferPointer { buf in
+                            try cw.meanWrite.writeData(
+                                pointer: UnsafeBufferPointer(start: buf.baseAddress, count: nLoc * ms.nTimePerFile),
+                                arrayDimensions: [UInt64(yRange.count), UInt64(xRange.count), UInt64(ms.nTimePerFile)]
+                            )
+                        }
+                        try spreadFileData.withUnsafeBufferPointer { buf in
+                            try cw.spreadWrite.writeData(
+                                pointer: UnsafeBufferPointer(start: buf.baseAddress, count: nLoc * ms.nTimePerFile),
+                                arrayDimensions: [UInt64(yRange.count), UInt64(xRange.count), UInt64(ms.nTimePerFile)]
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -608,6 +787,19 @@ struct OmFileSplitter {
         try writeFile.writeTrailer(rootVariable: root)
         try writeFn.linkTemporary(file: fileName)
         try writeFn.close()
+
+        // Finalise and link mean/spread chunked files
+        for cw in meanChunkWriters {
+            let root = try cw.meanWriteFile.write(array: try cw.meanWrite.finalise(), name: "", children: [])
+            try cw.meanWriteFile.writeTrailer(rootVariable: root)
+            try cw.meanWriteFn.linkTemporary(file: cw.meanFileName)
+            try cw.meanWriteFn.close()
+
+            let spreadRoot = try cw.spreadWriteFile.write(array: try cw.spreadWrite.finalise(), name: "", children: [])
+            try cw.spreadWriteFile.writeTrailer(rootVariable: spreadRoot)
+            try cw.spreadWriteFn.linkTemporary(file: cw.spreadFileName)
+            try cw.spreadWriteFn.close()
+        }
     }
 }
 
