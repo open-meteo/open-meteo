@@ -241,4 +241,3 @@ enum DwdSisVariable: String, GenericVariable {
         return false
     }
 }
-

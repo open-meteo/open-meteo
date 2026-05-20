@@ -2,8 +2,8 @@ import Foundation
 
 extension FileManager {
     /// Delete files older than a given date in a directory. No support for recursion.
-    public func deleteFiles(direcotry: String, olderThan: Date) throws {
-        let pathUrl = URL(fileURLWithPath: direcotry, isDirectory: true)
+    public func deleteFiles(directory: String, olderThan: Date) throws {
+        let pathUrl = URL(fileURLWithPath: directory, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: .skipsHiddenFiles) else {
             return

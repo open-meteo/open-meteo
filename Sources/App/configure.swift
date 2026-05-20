@@ -166,7 +166,7 @@ extension Application {
 
 // configures your application
 public func configure(_ app: Application) throws {
-    TimeZone.ReferenceType.default = TimeZone(abbreviation: "GMT")!
+    TimeZone.ReferenceType.default = TimeZone.gmt
 
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
