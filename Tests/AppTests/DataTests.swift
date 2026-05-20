@@ -107,7 +107,6 @@ extension InlineArray {
         }
     }
     
-    /// TODO elevation file needs correction!
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridAreaSeaMatch() async throws {
         try await withApp { app in
             let elevationFile = try #require(await EcmwfEcpdsDomain.ifs_europe_ensemble.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
@@ -129,9 +128,9 @@ extension InlineArray {
             #expect(bb.distances.toArray().isSimilar([0.0091824075, .nan, .nan, 0.012194311, 0.0, .nan, .nan, .nan, .nan], accuracy: 0.0001))
             var elevation2 = InlineArray<9, Float>(repeating: .nan)
             try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
-            #expect(elevation2.toArray().isSimilar([.nan, .nan, .nan, 7787.0, 6885.0, .nan, .nan, .nan, .nan]))
+            #expect(elevation2.toArray().isSimilar([.nan, .nan, .nan, 794.0, 702.0, .nan, .nan, .nan, .nan]))
             try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
-            #expect(elevation2.toArray().isSimilar([6817.0, .nan, .nan, 7787.0, 6885.0, .nan, .nan, .nan, .nan]))
+            #expect(elevation2.toArray().isSimilar([695.0, .nan, .nan, 794.0, 702.0, .nan, .nan, .nan, .nan]))
             
             let cc = grid.getSurroundingGridpoints(lat: 45, lon: -10.900018)
             #expect(cc.gridpoints.toArray() == [89992, 89993, -1, 90335, 90336, -1, 90678, 90679, -1])
