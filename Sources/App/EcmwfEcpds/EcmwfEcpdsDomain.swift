@@ -167,7 +167,7 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
             // ope_i1_ifs-ens_od_enfo_pf_20260424T060000Z_20260430T060000Z_144h.bz2
             // ope_i1_ifs-ens_od_enfo_cf_20260424T060000Z_20260430T060000Z_144h.bz2
             return [
-                "\(server)ope_i1_ifs-ens_od_enfo_cf_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2",
+                "\(server)ope_i1_ifs-ens-cf_od_oper_fc_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2",
                 "\(server)ope_i1_ifs-ens_od_enfo_pf_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2"
             ]
         case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
