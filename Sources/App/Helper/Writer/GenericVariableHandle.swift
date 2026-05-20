@@ -380,8 +380,10 @@ struct GenericVariableHandle: Sendable {
                     let nT = time.count
                     var mean = [Float](repeating: 0, count: nLoc * nT)
                     var m2 = [Float](repeating: 0, count: nLoc * nT)
-                    // Welford's online algorithm iterating over member axis
-                    for member in 0..<nMembers {
+                    // Welford's online algorithm iterating over member axis.
+                    // Use nMembersInVariables (actual downloaded members) instead of nMembers (domain count)
+                    // to avoid accumulating NaN from uninitialized member slots when fewer members were downloaded.
+                    for member in 0..<nMembersInVariables {
                         for loc in 0..<nLoc {
                             for t in 0..<nT {
                                 let srcIdx = loc * nT * nMembers + member * nT + t
@@ -395,7 +397,7 @@ struct GenericVariableHandle: Sendable {
                         }
                     }
                     // Convert accumulated sum-of-squared-deltas to sample standard deviation
-                    let spread = m2.map { nMembers > 1 ? sqrt($0 / Float(nMembers - 1)) : 0 }
+                    let spread = m2.map { nMembersInVariables > 1 ? sqrt($0 / Float(nMembersInVariables - 1)) : 0 }
                     meanChunks.append((mean: mean, spread: spread))
                 }
 
