@@ -205,7 +205,7 @@ struct GaussianGrid: Gridable {
     }
     
     /// Get a list of grid points surrounding a coordinate. Used to find sea grid points of optimize for land grid cells
-    func getSurroundingGridpoints(centerY: Int, lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoints: [Int], elevations: [Float], distances: [Float]) {
+    func getSurroundingGridpoints(centerY: Int, lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoints: InlineArray<9, Int>, elevations: InlineArray<9, Float>, distances: InlineArray<9, Float>) {
         
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
@@ -216,8 +216,8 @@ struct GaussianGrid: Gridable {
         
         /// List of 3x3 gridpoints we want to read in linear 1D array index
         /// `x` wraps at 0° longitude
-        var gridpoints: [Int] = [Int](repeating: -1, count: 9)
-        var distances: [Float] = [Float](repeating: Float.nan, count: 9)
+        var gridpoints = InlineArray<9, Int>(repeating: -1)
+        var distances = InlineArray<9, Float>(repeating: Float.nan)
 
         for j in 0..<3 {
             let y = yStart + j
@@ -242,14 +242,14 @@ struct GaussianGrid: Gridable {
         var start = 0
         /// Read grid elevation from list of gridpoints that might be consecutive
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
-        var elevation = [Float](repeating: .nan, count: 9)
+        var elevation = InlineArray<9, Float>(repeating: Float.nan)
         for i in gridpoints.indices {
             // if next one is not increasing by one, read it
             let lastIteration = i == gridpoints.count - 1
             if lastIteration || gridpoints[i] != gridpoints[i + 1] - 1 {
                 // read data from start to end
                 try await elevationFile.read(
-                    into: &elevation,
+                    into: elevation.veryUnsafeMutablePointer().baseAddress!,
                     range: [0..<1, UInt64(gridpoints[start])..<UInt64(gridpoints[i]+1)],
                     intoCubeOffset: [0, UInt64(start)],
                     intoCubeDimension: [1, UInt64(gridpoints.count)]

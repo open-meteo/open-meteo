@@ -5,6 +5,12 @@ import Vapor
 // import NIOFileSystem
 import VaporTesting
 
+extension InlineArray {
+    func toArray() -> [Element] {
+        return (0..<count).map{self[$0]}
+    }
+}
+
 @Suite struct DataTests {
     init() {
         #if Xcode
@@ -22,15 +28,15 @@ import VaporTesting
             #expect(center.x == 0)
             #expect(center.y == 516)
             let aa = try await grid.getSurroundingGridpoints(centerY: center.y, lat: 53.647546, lon: 0, elevationFile: elevationFile)
-            #expect(aa.gridpoints == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
-            #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
-            #expect(aa.distances.isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
+            #expect(aa.gridpoints.toArray() == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
+            #expect(aa.elevations.toArray() == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
+            #expect(aa.distances.toArray().isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
             
             let centerbb = grid.findPointXY(lat: 50.781, lon: 1.596)
             let bb = try await grid.getSurroundingGridpoints(centerY: centerbb.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile)
-            #expect(bb.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
-            #expect(bb.elevations == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
-            #expect(bb.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            #expect(bb.gridpoints.toArray() == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(bb.elevations.toArray() == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
+            #expect(bb.distances.toArray().isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
             
             
             let bbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile))
@@ -42,9 +48,9 @@ import VaporTesting
             #expect(center.x == 0)
             #expect(center.y == 516)
             let aaa = try await grid.getSurroundingGridpoints(centerY: center2.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile2)
-            #expect(aaa.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
-            #expect(aaa.elevations.isSimilar([-999.0, -999.0, .nan, -999.0, .nan, .nan, -999.0, .nan, .nan]))
-            #expect(aaa.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            #expect(aaa.gridpoints.toArray() == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(aaa.elevations.toArray().isSimilar([-999.0, -999.0, .nan, -999.0, .nan, .nan, -999.0, .nan, .nan]))
+            #expect(aaa.distances.toArray().isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
             let bbbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile2))
             #expect(bbbb.gridpoint == 628290)
             let bResolved = grid.getCoordinates(gridpoint: 628290)
