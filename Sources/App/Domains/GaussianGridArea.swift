@@ -1,9 +1,7 @@
 import Foundation
+import OmFileFormat
 
 /// A geographic subset of a Gaussian grid backed by a flat 1D array.
-///
-/// TODO:
-/// - Optimised terrain and sea grid cell resolution
 ///
 /// Local array indices `(0..<nx)` enumerate points north-to-south, then west-to-east within each
 /// latitude line — the same order as the subset extracted from the full grid.
@@ -141,6 +139,156 @@ struct GaussianGridArea: Gridable {
 
     func findBox(boundingBox bb: BoundingBoxWGS84) -> GaussianGridAreaSlice? {
         return GaussianGridAreaSlice(area: self, bb: bb)
+    }
+
+    /// Get a 3×3 list of local indices surrounding a coordinate.
+    /// Grid points are in strictly rising order, allowing optimised range reads.
+    /// Points outside the area bounds are stored as −1.
+    /// `minDistanceIndex` is −1 if no surrounding point lies within the area.
+    func getSurroundingGridpoints(lat: Float, lon: Float) -> (gridpoints: InlineArray<9, Int>, distances: InlineArray<9, Float>, minDistanceIndex: Int) {
+        let latitudeLines = type.latitudeLines
+        let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
+        /// Limited to 1 and count-2 to allow 3x3 ranges
+        let centerY = max(1, min(2 * latitudeLines - 2,
+            Int(round(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy)))))
+
+        var gridpoints = InlineArray<9, Int>(repeating: -1)
+        var distances = InlineArray<9, Float>(repeating: Float.nan)
+        var minDistance = Float.greatestFiniteMagnitude
+        var minDistanceIndex = -1
+
+        for j in 0..<3 {
+            let y = centerY + j - 1
+            guard y >= yStart && y < yEnd else { continue }
+            let lineIdx = y - yStart
+            let nxLine = type.nxOf(y: y)
+            let dx = 360 / Float(nxLine)
+            let xCenter = Int(round(lon / dx))
+            let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
+
+            let x1Area = (Int(bounds.longitude.lowerBound / dx) + nxLine) % nxLine
+            let lineCount = prefixSum[lineIdx + 1] - prefixSum[lineIdx]
+
+            /// If x wraps over 0° longitude, start at an offset to get a strictly increasing grid-point list
+            let start = max(0, 1 - xCenter)
+            for i in 0..<3 {
+                let iWrapped = (i + start) % 3
+                let x = xCenter + iWrapped - 1
+                let xWrapped = (x + 2 * nxLine) % nxLine
+                let xRel = (xWrapped - x1Area + nxLine) % nxLine
+                guard xRel < lineCount else { continue }
+                let localIndex = prefixSum[lineIdx] + xRel
+                let pointLon = Float(x) * dx
+                let distance = pow(pointLat - lat, 2) + pow(pointLon - lon, 2)
+                gridpoints[j * 3 + i] = localIndex
+                distances[j * 3 + i] = distance
+                if distance < minDistance {
+                    minDistance = distance
+                    minDistanceIndex = j * 3 + i
+                }
+            }
+        }
+        return (gridpoints, distances, minDistanceIndex)
+    }
+
+    /// Read elevation for surrounding grid points as returned from `getSurroundingGridpoints`.
+    /// `onlyMinDistanceIndex`: only read elevation to cover this index. Therefore only a single read is performed.
+    /// `firstPass` if false, only read data if `onlyMinDistanceIndex` does not match.
+    /// Entries with a −1 gridpoint index (outside the area) are skipped.
+    func getSurroundingElevation(gridpoints: InlineArray<9, Int>, elevation: inout InlineArray<9, Float>, onlyMinDistanceIndex: Int, firstPass: Bool, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws {
+        var start = 0
+        /// Read grid elevation from list of gridpoints that might be consecutive.
+        /// -999 marks sea points, therefore elevation matching will naturally avoid those.
+        for i in gridpoints.indices {
+            guard gridpoints[i] >= 0 else {
+                start = i + 1
+                continue
+            }
+            let lastIteration = i == gridpoints.count - 1
+            if lastIteration || gridpoints[i] != gridpoints[i + 1] - 1 {
+                if (start...i).contains(onlyMinDistanceIndex) != firstPass {
+                    start = i + 1
+                    continue
+                }
+                try await elevationFile.read(
+                    into: elevation.veryUnsafeMutablePointer().baseAddress!,
+                    range: [0..<1, UInt64(gridpoints[start])..<UInt64(gridpoints[i] + 1)],
+                    intoCubeOffset: [0, UInt64(start)],
+                    intoCubeDimension: [1, UInt64(gridpoints.count)]
+                )
+                start = i + 1
+            }
+        }
+    }
+
+    func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        let (gridpoints, distances, minDistanceIndex) = getSurroundingGridpoints(lat: lat, lon: lon)
+        guard minDistanceIndex >= 0 else { return nil }
+        var elevations = InlineArray<9, Float>(repeating: .nan)
+        // Get elevation only for closest grid cell
+        try await getSurroundingElevation(gridpoints: gridpoints, elevation: &elevations, onlyMinDistanceIndex: minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+        if elevations[minDistanceIndex] <= -999 {
+            return (gridpoints[minDistanceIndex], .sea)
+        }
+        // Resolve elevation for all grid cells
+        try await getSurroundingElevation(gridpoints: gridpoints, elevation: &elevations, onlyMinDistanceIndex: minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+        var minDistance = Float.greatestFiniteMagnitude
+        var minPosition = -1
+        for i in elevations.indices {
+            if elevations[i].isNaN { continue }
+            let distance = distances[i]
+            if elevations[i] <= -999 && distance < minDistance {
+                minDistance = distance
+                minPosition = gridpoints[i]
+            }
+        }
+        guard minPosition >= 0 else {
+            if elevations[minDistanceIndex].isNaN {
+                return (gridpoints[minDistanceIndex], .noData)
+            }
+            return (gridpoints[minDistanceIndex], .elevation(elevations[minDistanceIndex]))
+        }
+        return (minPosition, .sea)
+    }
+
+    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        let (gridpoints, distances, minDistanceIndex) = getSurroundingGridpoints(lat: lat, lon: lon)
+        guard minDistanceIndex >= 0 else { return nil }
+        var elevations = InlineArray<9, Float>(repeating: .nan)
+        // Get elevation only for closest grid cell
+        try await getSurroundingElevation(gridpoints: gridpoints, elevation: &elevations, onlyMinDistanceIndex: minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+        let centerPoint = gridpoints[minDistanceIndex]
+        let centerElevation = elevations[minDistanceIndex]
+        let deltaCenter = abs(centerElevation - elevation)
+        if deltaCenter <= 100 {
+            return (centerPoint, .elevation(elevation))
+        }
+        // Resolve elevation for all grid cells
+        try await getSurroundingElevation(gridpoints: gridpoints, elevation: &elevations, onlyMinDistanceIndex: minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+        var minDelta = Float.greatestFiniteMagnitude
+        var minPosition = -1
+        var minElevation = Float.nan
+        for i in elevations.indices {
+            if elevations[i].isNaN || elevations[i] <= -999 { continue }
+            let distanceKm = sqrt(distances[i]) * 111
+            /// For every 1km in distance, the elevation must be 30 m better
+            let distancePenalty = distanceKm * 30
+            let delta = abs(elevations[i] - elevation) + distancePenalty
+            if delta < minDelta && distanceKm < 50 {
+                minDelta = delta
+                minPosition = gridpoints[i]
+                minElevation = elevations[i]
+            }
+        }
+        /// only sea points or elevation is hugely off -> just use center
+        if minElevation.isNaN || minDelta > 1500 {
+            minElevation = centerElevation
+            minPosition = centerPoint
+        }
+        if minElevation <= -999 {
+            return (minPosition, .sea)
+        }
+        return (minPosition, .elevation(minElevation))
     }
 }
 

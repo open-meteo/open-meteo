@@ -107,6 +107,43 @@ extension InlineArray {
         }
     }
     
+    /// TODO elevation file needs correction!
+    @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridAreaSeaMatch() async throws {
+        try await withApp { app in
+            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs_europe_ensemble.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let grid = GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33.005..<70.967, longitude: -11..<37))
+            // Longitude 0° wraps on x axis
+            let aa = grid.getSurroundingGridpoints(lat: 70.966606, lon: -10.800018)
+            #expect(aa.gridpoints.toArray() == [-1, -1, -1, 0, 1, -1, 147, 148, -1])
+            #expect(aa.distances.toArray().isSimilar([.nan, .nan, .nan, 3.6379788e-10, 0.10711972, .nan, 0.0064742942, 0.13833855, .nan], accuracy: 0.0001))
+            // Resolve elevation for given gridpoints, but only for the closest `minDistanceIndex`
+            var elevation1 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: aa.gridpoints, elevation: &elevation1, onlyMinDistanceIndex: aa.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation1.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, .nan, .nan, .nan, .nan]))
+            // Resolve elevation for the remaining gridpoints
+            try await grid.getSurroundingElevation(gridpoints: aa.gridpoints, elevation: &elevation1, onlyMinDistanceIndex: aa.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation1.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, .nan, -999.0, -999.0, .nan]))
+            
+            let bb = grid.getSurroundingGridpoints(lat: 33.005272, lon: 36.993866)
+            #expect(bb.gridpoints.toArray() == [156821, -1, -1, 157255, 157256, -1, -1, -1, -1])
+            #expect(bb.distances.toArray().isSimilar([0.0091824075, .nan, .nan, 0.012194311, 0.0, .nan, .nan, .nan, .nan], accuracy: 0.0001))
+            var elevation2 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation2.toArray().isSimilar([.nan, .nan, .nan, 7787.0, 6885.0, .nan, .nan, .nan, .nan]))
+            try await grid.getSurroundingElevation(gridpoints: bb.gridpoints, elevation: &elevation2, onlyMinDistanceIndex: bb.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation2.toArray().isSimilar([6817.0, .nan, .nan, 7787.0, 6885.0, .nan, .nan, .nan, .nan]))
+            
+            let cc = grid.getSurroundingGridpoints(lat: 45, lon: -10.900018)
+            #expect(cc.gridpoints.toArray() == [89992, 89993, -1, 90335, 90336, -1, 90678, 90679, -1])
+            #expect(cc.distances.toArray().isSimilar([0.009651494, 0.024328139, .nan, 0.00069519074, 0.020056926, .nan, 0.0021960922, 0.026213925, .nan], accuracy: 0.0001))
+            var elevation3 = InlineArray<9, Float>(repeating: .nan)
+            try await grid.getSurroundingElevation(gridpoints: cc.gridpoints, elevation: &elevation3, onlyMinDistanceIndex: cc.minDistanceIndex, firstPass: true, elevationFile: elevationFile)
+            #expect(elevation3.toArray().isSimilar([.nan, .nan, .nan, -999.0, -999.0, .nan, .nan, .nan, .nan]))
+            try await grid.getSurroundingElevation(gridpoints: cc.gridpoints, elevation: &elevation3, onlyMinDistanceIndex: cc.minDistanceIndex, firstPass: false, elevationFile: elevationFile)
+            #expect(elevation3.toArray().isSimilar([-999.0, -999.0, .nan, -999.0, -999.0, .nan, -999.0, -999.0, .nan]))
+        }
+    }
+    
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func iconD2GridFindPoint() async throws {
         try await withApp { app in
             let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
