@@ -256,7 +256,7 @@ struct GaussianGrid: Gridable {
             // if next one is not increasing by one, read it
             let lastIteration = i == gridpoints.count - 1
             if lastIteration || gridpoints[i] != gridpoints[i + 1] - 1 {
-                if (start..<i).contains(onlyMinDistanceIndex) != firstPass {
+                if (start...i).contains(onlyMinDistanceIndex) != firstPass {
                     start = i+1
                     continue
                 }
