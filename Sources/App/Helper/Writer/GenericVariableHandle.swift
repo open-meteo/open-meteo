@@ -38,7 +38,7 @@ struct GenericVariableHandle: Sendable {
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
     /// If `fullRunSkipMeta` do not generate meta.json for each run
-    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
         let logger = application.logger
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
@@ -48,7 +48,7 @@ struct GenericVariableHandle: Sendable {
             if generateTimeSeries {
                 let startTime = DispatchTime.now()
                 logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
+                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
                 logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
             
@@ -99,7 +99,7 @@ struct GenericVariableHandle: Sendable {
                 // if run is nil, do not attempt to generate previous days files
                 logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimePreviousDays = DispatchTime.now()
-                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression)
+                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
                 logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
@@ -233,21 +233,21 @@ struct GenericVariableHandle: Sendable {
         }
     }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, ensembleMeanDomain: (any GenericDomain)?) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
                 .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
             })
         } else {
-            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
         }
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType) async throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, ensembleMeanDomain: (any GenericDomain)?) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -337,6 +337,11 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
+            /// Cache of per-chunk ensemble mean and spread, populated during member conversion and consumed by the mean domain pass.
+            /// Each entry corresponds to one (yRange, xRange) chunk, stored in the same order the splitter iterates.
+            var meanChunks: [(mean: [Float], spread: [Float])] = []
+            let computeEnsembleStats = ensembleMeanDomain != nil && nMembers > 1
+
             try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
@@ -372,10 +377,54 @@ struct GenericVariableHandle: Sendable {
                     locationRange: locationRange1D
                 )
 
+                // Compute ensemble mean and spread (sample std dev) across member axis and cache for the mean domain pass below.
+                // data3d layout: [location * nTime * nMembers + member * nTime + time] (Array3DFastTime: [nLocations, nLevel=nMembers, nTime])
+                if computeEnsembleStats {
+                    let nT = time.count
+                    var mean = [Float](repeating: 0, count: nLoc * nT)
+                    var m2 = [Float](repeating: 0, count: nLoc * nT)
+                    // Welford's online algorithm iterating over member axis
+                    for member in 0..<nMembers {
+                        for loc in 0..<nLoc {
+                            for t in 0..<nT {
+                                let srcIdx = loc * nT * nMembers + member * nT + t
+                                let dstIdx = loc * nT + t
+                                let x = data3d.data[srcIdx]
+                                let delta = x - mean[dstIdx]
+                                mean[dstIdx] += delta / Float(member + 1)
+                                let delta2 = x - mean[dstIdx]
+                                m2[dstIdx] += delta * delta2
+                            }
+                        }
+                    }
+                    // Convert accumulated sum-of-squared-deltas to sample standard deviation
+                    let spread = m2.map { nMembers > 1 ? sqrt($0 / Float(nMembers - 1)) : 0 }
+                    meanChunks.append((mean: mean, spread: spread))
+                }
+
                 await progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
                 return ArraySlice(data3d.data)
             }
             await progress.finish()
+
+            // Write ensemble mean and spread into the mean domain's time-series files
+            if computeEnsembleStats, let meanDomain = ensembleMeanDomain {
+                let omMean = OmFileSplitter(meanDomain, nMembers: 1)
+                var chunkIndex = 0
+                let spreadVariable = variable.asSpreadVariableGeneric
+
+                // Mean
+                try await omMean.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { _, _, _ in
+                    defer { chunkIndex += 1 }
+                    return ArraySlice(meanChunks[chunkIndex].mean)
+                }
+                // Spread (sample std dev): unit handling preserved via VariableOrSpread
+                chunkIndex = 0
+                try await omMean.updateFromTimeOrientedStreaming3D(variable: spreadVariable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: spreadVariable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { _, _, _ in
+                    defer { chunkIndex += 1 }
+                    return ArraySlice(meanChunks[chunkIndex].spread)
+                }
+            }
         }
     }
 }
@@ -475,4 +524,3 @@ actor GribDeaverager {
         return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &grib2d.array)
     }
 }
-
