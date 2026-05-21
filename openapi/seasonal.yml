@@ -1,0 +1,279 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Seasonal Weather Forecast API
+  description: >-
+    Seasonal weather forecasts based on ECMWF SEAS5 and other ensemble models providing probabilistic long-range forecasts up to 9 months ahead.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/seasonal:
+    servers:
+      - url: https://seasonal-api.open-meteo.com
+    get:
+      tags:
+        - Seasonal Forecast APIs
+      summary: Seasonal weather forecast up to 9 months
+      description: >-
+        Long-range seasonal forecasts from multiple ensemble models with 6-hourly and daily data.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hourly
+          in: query
+          description: >-
+            A list of weather variables (6-hourly resolution).
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - dew_point_2m
+                - pressure_msl
+                - sea_surface_temperature
+                - snowfall_water_equivalent
+                - precipitation
+                - shortwave_radiation
+                - soil_temperature_0_to_7cm
+                - cloud_cover
+                - wind_speed_10m
+                - wind_speed_100m
+                - wind_speed_200m
+                - wind_direction_10m
+                - wind_direction_100m
+                - wind_direction_200m
+                - wind_gusts_10m
+                - rain
+                - showers
+                - snowfall
+                - relative_humidity_2m
+                - apparent_temperature
+                - et0_fao_evapotranspiration
+                - vapour_pressure_deficit
+                - weather_code
+                - sunshine_duration
+                - wave_height
+                - wave_direction
+                - wave_period
+                - wave_peak_period
+                - soil_temperature_7_to_28cm
+                - soil_temperature_28_to_100cm
+                - soil_temperature_100_to_255cm
+                - soil_moisture_0_to_7cm
+                - soil_moisture_7_to_28cm
+                - soil_moisture_28_to_100cm
+                - soil_moisture_100_to_255cm
+                - shortwave_radiation
+                - direct_radiation
+                - diffuse_radiation
+                - direct_normal_irradiance
+                - global_tilted_irradiance
+                - terrestrial_radiation
+                - shortwave_radiation_instant
+                - direct_radiation_instant
+                - diffuse_radiation_instant
+                - direct_normal_irradiance_instant
+                - global_tilted_irradiance_instant
+                - terrestrial_radiation_instant
+        - name: daily
+          in: query
+          description: >-
+            A list of daily weather variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - apparent_temperature
+                - relative_humidity_2m
+                - dew_point_2m
+                - precipitation
+                - rain
+                - showers
+                - snowfall
+                - snowfall_water_equivalent
+                - pressure_msl
+                - surface_pressure
+                - sea_surface_temperature
+                - cloud_cover
+                - et0_fao_evapotranspiration
+                - shortwave_radiation
+                - sunrise
+                - sunset
+                - weather_code
+                - wet_bulb_temperature_2m
+                - vapour_pressure_deficit_max
+                - wind_speed_10m
+                - wind_speed_100m
+                - wind_speed_200m
+                - wind_gusts_10m
+                - wind_direction_10m
+                - wind_direction_100m
+                - wind_direction_200m
+                - soil_temperature_0_to_7cm
+                - soil_temperature_7_to_28cm
+                - soil_temperature_28_to_100cm
+                - soil_temperature_100_to_255cm
+                - soil_moisture_0_to_7cm
+                - soil_moisture_7_to_28cm
+                - soil_moisture_28_to_100cm
+                - soil_moisture_100_to_255cm
+                - temperature_2m_max
+                - temperature_2m_min
+                - temperature_2m_mean
+                - sunshine_duration
+        - name: temperature_unit
+          in: query
+          schema:
+            type: string
+            default: celsius
+            enum: [celsius, fahrenheit]
+        - name: wind_speed_unit
+          in: query
+          schema:
+            type: string
+            default: kmh
+            enum: [kmh, ms, mph, kn]
+        - name: precipitation_unit
+          in: query
+          schema:
+            type: string
+            default: mm
+            enum: [mm, inch]
+        - name: timeformat
+          in: query
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          description: >-
+            Number of forecast days. Up to 274 days (9 months).
+          schema:
+            type: integer
+            default: 92
+            minimum: 0
+            maximum: 274
+        - name: start_date
+          in: query
+          description: >-
+            Start date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: cell_selection
+          in: query
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - seasonal_best_match
+                - ncep_cfsv2
+                - ecmwf_ifs_seasonal
+                - ecmwf_ifs_seasonal_ensemble
+                - ukmo_seasonal
+                - dwd_icon_seas5
+                - dwd_icon_seas5_ensemble
+                - meteo_france_seas5
+                - meteo_france_seas5_ensemble
+                - gem_seas5
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  hourly:
+                    type: object
+                  hourly_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  daily:
+                    type: object
+                  daily_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string

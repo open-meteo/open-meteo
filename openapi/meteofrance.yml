@@ -1,0 +1,557 @@
+openapi: '3.1.0'
+info:
+  title: Météo-France Weather Forecast API
+  description: >-
+    Hourly weather forecast from Météo-France ARPEGE and AROME models.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/meteofrance:
+    servers:
+      - url: https://api.open-meteo.com
+    get:
+      tags:
+        - Weather Forecast APIs
+      summary: Météo-France Weather Forecast API
+      description: >-
+        Hourly weather forecast from Météo-France ARPEGE and AROME models.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          description: >-
+            Geographical WGS84 coordinates. Multiple coordinates can be comma separated.
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hourly
+          in: query
+          description: >-
+            A list of weather variables which should be returned.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - relative_humidity_2m
+                - dew_point_2m
+                - apparent_temperature
+                - precipitation
+                - rain
+                - snowfall
+                - weather_code
+                - pressure_msl
+                - surface_pressure
+                - cloud_cover
+                - cloud_cover_low
+                - cloud_cover_mid
+                - cloud_cover_high
+                - et0_fao_evapotranspiration
+                - vapour_pressure_deficit
+                - wind_speed_10m
+                - wind_speed_20m
+                - wind_speed_50m
+                - wind_speed_100m
+                - wind_speed_150m
+                - wind_speed_200m
+                - wind_speed_80m
+                - wind_speed_120m
+                - wind_speed_180m
+                - wind_direction_10m
+                - wind_direction_20m
+                - wind_direction_50m
+                - wind_direction_100m
+                - wind_direction_150m
+                - wind_direction_200m
+                - wind_direction_80m
+                - wind_direction_120m
+                - wind_direction_180m
+                - wind_gusts_10m
+                - temperature_20m
+                - temperature_50m
+                - temperature_100m
+                - temperature_150m
+                - temperature_200m
+                - temperature_80m
+                - temperature_120m
+                - temperature_180m
+                - is_day
+                - sunshine_duration
+                - cape
+                - wet_bulb_temperature_2m
+                - shortwave_radiation
+                - direct_radiation
+                - diffuse_radiation
+                - direct_normal_irradiance
+                - global_tilted_irradiance
+                - terrestrial_radiation
+                - shortwave_radiation_instant
+                - direct_radiation_instant
+                - diffuse_radiation_instant
+                - direct_normal_irradiance_instant
+                - global_tilted_irradiance_instant
+                - terrestrial_radiation_instant
+                - temperature_100hPa
+                - temperature_125hPa
+                - temperature_150hPa
+                - temperature_175hPa
+                - temperature_200hPa
+                - temperature_225hPa
+                - temperature_250hPa
+                - temperature_275hPa
+                - temperature_300hPa
+                - temperature_350hPa
+                - temperature_400hPa
+                - temperature_450hPa
+                - temperature_500hPa
+                - temperature_550hPa
+                - temperature_600hPa
+                - temperature_650hPa
+                - temperature_700hPa
+                - temperature_750hPa
+                - temperature_800hPa
+                - temperature_850hPa
+                - temperature_900hPa
+                - temperature_925hPa
+                - temperature_950hPa
+                - temperature_1000hPa
+                - dew_point_100hPa
+                - dew_point_125hPa
+                - dew_point_150hPa
+                - dew_point_175hPa
+                - dew_point_200hPa
+                - dew_point_225hPa
+                - dew_point_250hPa
+                - dew_point_275hPa
+                - dew_point_300hPa
+                - dew_point_350hPa
+                - dew_point_400hPa
+                - dew_point_450hPa
+                - dew_point_500hPa
+                - dew_point_550hPa
+                - dew_point_600hPa
+                - dew_point_650hPa
+                - dew_point_700hPa
+                - dew_point_750hPa
+                - dew_point_800hPa
+                - dew_point_850hPa
+                - dew_point_900hPa
+                - dew_point_925hPa
+                - dew_point_950hPa
+                - dew_point_1000hPa
+                - relative_humidity_100hPa
+                - relative_humidity_125hPa
+                - relative_humidity_150hPa
+                - relative_humidity_175hPa
+                - relative_humidity_200hPa
+                - relative_humidity_225hPa
+                - relative_humidity_250hPa
+                - relative_humidity_275hPa
+                - relative_humidity_300hPa
+                - relative_humidity_350hPa
+                - relative_humidity_400hPa
+                - relative_humidity_450hPa
+                - relative_humidity_500hPa
+                - relative_humidity_550hPa
+                - relative_humidity_600hPa
+                - relative_humidity_650hPa
+                - relative_humidity_700hPa
+                - relative_humidity_750hPa
+                - relative_humidity_800hPa
+                - relative_humidity_850hPa
+                - relative_humidity_900hPa
+                - relative_humidity_925hPa
+                - relative_humidity_950hPa
+                - relative_humidity_1000hPa
+                - cloud_cover_100hPa
+                - cloud_cover_125hPa
+                - cloud_cover_150hPa
+                - cloud_cover_175hPa
+                - cloud_cover_200hPa
+                - cloud_cover_225hPa
+                - cloud_cover_250hPa
+                - cloud_cover_275hPa
+                - cloud_cover_300hPa
+                - cloud_cover_350hPa
+                - cloud_cover_400hPa
+                - cloud_cover_450hPa
+                - cloud_cover_500hPa
+                - cloud_cover_550hPa
+                - cloud_cover_600hPa
+                - cloud_cover_650hPa
+                - cloud_cover_700hPa
+                - cloud_cover_750hPa
+                - cloud_cover_800hPa
+                - cloud_cover_850hPa
+                - cloud_cover_900hPa
+                - cloud_cover_925hPa
+                - cloud_cover_950hPa
+                - cloud_cover_1000hPa
+                - wind_speed_100hPa
+                - wind_speed_125hPa
+                - wind_speed_150hPa
+                - wind_speed_175hPa
+                - wind_speed_200hPa
+                - wind_speed_225hPa
+                - wind_speed_250hPa
+                - wind_speed_275hPa
+                - wind_speed_300hPa
+                - wind_speed_350hPa
+                - wind_speed_400hPa
+                - wind_speed_450hPa
+                - wind_speed_500hPa
+                - wind_speed_550hPa
+                - wind_speed_600hPa
+                - wind_speed_650hPa
+                - wind_speed_700hPa
+                - wind_speed_750hPa
+                - wind_speed_800hPa
+                - wind_speed_850hPa
+                - wind_speed_900hPa
+                - wind_speed_925hPa
+                - wind_speed_950hPa
+                - wind_speed_1000hPa
+                - wind_direction_100hPa
+                - wind_direction_125hPa
+                - wind_direction_150hPa
+                - wind_direction_175hPa
+                - wind_direction_200hPa
+                - wind_direction_225hPa
+                - wind_direction_250hPa
+                - wind_direction_275hPa
+                - wind_direction_300hPa
+                - wind_direction_350hPa
+                - wind_direction_400hPa
+                - wind_direction_450hPa
+                - wind_direction_500hPa
+                - wind_direction_550hPa
+                - wind_direction_600hPa
+                - wind_direction_650hPa
+                - wind_direction_700hPa
+                - wind_direction_750hPa
+                - wind_direction_800hPa
+                - wind_direction_850hPa
+                - wind_direction_900hPa
+                - wind_direction_925hPa
+                - wind_direction_950hPa
+                - wind_direction_1000hPa
+                - vertical_velocity_100hPa
+                - vertical_velocity_125hPa
+                - vertical_velocity_150hPa
+                - vertical_velocity_175hPa
+                - vertical_velocity_200hPa
+                - vertical_velocity_225hPa
+                - vertical_velocity_250hPa
+                - vertical_velocity_275hPa
+                - vertical_velocity_300hPa
+                - vertical_velocity_350hPa
+                - vertical_velocity_400hPa
+                - vertical_velocity_450hPa
+                - vertical_velocity_500hPa
+                - vertical_velocity_550hPa
+                - vertical_velocity_600hPa
+                - vertical_velocity_650hPa
+                - vertical_velocity_700hPa
+                - vertical_velocity_750hPa
+                - vertical_velocity_800hPa
+                - vertical_velocity_850hPa
+                - vertical_velocity_900hPa
+                - vertical_velocity_925hPa
+                - vertical_velocity_950hPa
+                - vertical_velocity_1000hPa
+                - geopotential_height_100hPa
+                - geopotential_height_125hPa
+                - geopotential_height_150hPa
+                - geopotential_height_175hPa
+                - geopotential_height_200hPa
+                - geopotential_height_225hPa
+                - geopotential_height_250hPa
+                - geopotential_height_275hPa
+                - geopotential_height_300hPa
+                - geopotential_height_350hPa
+                - geopotential_height_400hPa
+                - geopotential_height_450hPa
+                - geopotential_height_500hPa
+                - geopotential_height_550hPa
+                - geopotential_height_600hPa
+                - geopotential_height_650hPa
+                - geopotential_height_700hPa
+                - geopotential_height_750hPa
+                - geopotential_height_800hPa
+                - geopotential_height_850hPa
+                - geopotential_height_900hPa
+                - geopotential_height_925hPa
+                - geopotential_height_950hPa
+                - geopotential_height_1000hPa
+        - name: daily
+          in: query
+          description: >-
+            A list of daily weather variable aggregations.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - weather_code
+                - temperature_2m_max
+                - temperature_2m_min
+                - apparent_temperature_max
+                - apparent_temperature_min
+                - sunrise
+                - sunset
+                - daylight_duration
+                - sunshine_duration
+                - uv_index_max
+                - uv_index_clear_sky_max
+                - rain_sum
+                - showers_sum
+                - snowfall_sum
+                - precipitation_sum
+                - precipitation_hours
+        - name: current
+          in: query
+          description: >-
+            A list of variables to return for the current conditions.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - relative_humidity_2m
+                - apparent_temperature
+                - is_day
+                - precipitation
+                - rain
+                - showers
+                - snowfall
+                - weather_code
+                - cloud_cover
+                - pressure_msl
+                - surface_pressure
+                - wind_speed_10m
+                - wind_direction_10m
+                - wind_gusts_10m
+        - name: minutely_15
+          in: query
+          description: >-
+            A list of weather variables at 15-minute intervals.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - relative_humidity_2m
+                - dew_point_2m
+                - apparent_temperature
+                - precipitation
+                - rain
+                - snowfall
+                - wind_speed_10m
+                - wind_speed_20m
+                - wind_speed_50m
+                - wind_speed_100m
+                - wind_direction_10m
+                - wind_direction_20m
+                - wind_direction_50m
+                - wind_direction_100m
+                - cape
+                - is_day
+        - name: elevation
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: temperature_unit
+          in: query
+          schema:
+            type: string
+            default: celsius
+            enum: [celsius, fahrenheit]
+        - name: wind_speed_unit
+          in: query
+          schema:
+            type: string
+            default: kmh
+            enum: [kmh, ms, mph, kn]
+        - name: precipitation_unit
+          in: query
+          schema:
+            type: string
+            default: mm
+            enum: [mm, inch]
+        - name: timeformat
+          in: query
+          description: >-
+            If format unixtime is selected, all time values are returned in UNIX epoch time.
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          description: >-
+            Any IANA time zone name is supported. Use auto to resolve the local time zone.
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          description: >-
+            Return past days of data.
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          description: >-
+            Number of forecast days.
+          schema:
+            type: integer
+            default: 7
+            minimum: 0
+            maximum: 16
+        - name: past_hours
+          in: query
+          schema:
+            type: integer
+        - name: forecast_hours
+          in: query
+          schema:
+            type: integer
+        - name: start_date
+          in: query
+          description: >-
+            Start date of the time interval in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date of the time interval in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: tilt
+          in: query
+          description: >-
+            Slope tilt in degrees for global_tilted_irradiance calculation.
+          schema:
+            type: number
+            format: float
+            default: 0
+        - name: azimuth
+          in: query
+          description: >-
+            Azimuth for global_tilted_irradiance. North=0, East=90, South=180, West=270.
+          schema:
+            type: number
+            format: float
+            default: 0
+        - name: cell_selection
+          in: query
+          description: >-
+            Grid cell selection preference: land, sea, or nearest.
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - meteofrance_seamless
+                - meteofrance_arpege_world025
+                - meteofrance_arpege_europe
+                - meteofrance_arome_france
+                - meteofrance_arome_france_hd
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  hourly:
+                    type: object
+                  hourly_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  daily:
+                    type: object
+                  daily_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  current:
+                    type: object
+                  current_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  minutely_15:
+                    type: object
+                  minutely_15_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string

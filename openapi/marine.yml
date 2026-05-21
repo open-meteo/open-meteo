@@ -1,0 +1,274 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Marine Weather Forecast API
+  description: >-
+    Hourly marine weather forecasts including wave height, direction, period, swell, ocean currents, and sea surface temperature.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/marine:
+    servers:
+      - url: https://marine-api.open-meteo.com
+    get:
+      tags:
+        - Marine Weather APIs
+      summary: Hourly marine weather forecast
+      description: >-
+        Marine weather forecasts with wave conditions, ocean currents, and sea surface temperature.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hourly
+          in: query
+          description: >-
+            A list of marine weather variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - wave_height
+                - wave_direction
+                - wave_period
+                - wave_peak_period
+                - wind_wave_height
+                - wind_wave_direction
+                - wind_wave_period
+                - wind_wave_peak_period
+                - swell_wave_height
+                - swell_wave_direction
+                - swell_wave_period
+                - swell_wave_peak_period
+                - secondary_swell_wave_height
+                - secondary_swell_wave_period
+                - secondary_swell_wave_direction
+                - tertiary_swell_wave_height
+                - tertiary_swell_wave_period
+                - tertiary_swell_wave_direction
+                - sea_level_height_msl
+                - sea_surface_temperature
+                - ocean_current_velocity
+                - ocean_current_direction
+        - name: daily
+          in: query
+          description: >-
+            A list of daily marine weather variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - wave_height_max
+                - wave_direction_dominant
+                - wave_period_max
+                - wind_wave_height_max
+                - wind_wave_direction_dominant
+                - wind_wave_period_max
+                - wind_wave_peak_period_max
+                - swell_wave_height_max
+                - swell_wave_direction_dominant
+                - swell_wave_period_max
+                - swell_wave_peak_period_max
+                - invert_barometer_height
+        - name: current
+          in: query
+          description: >-
+            A list of variables for the current marine conditions.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - wave_height
+                - wave_direction
+                - wave_period
+                - wind_wave_height
+                - wind_wave_direction
+                - wind_wave_period
+                - wind_wave_peak_period
+                - swell_wave_height
+                - swell_wave_direction
+                - swell_wave_period
+                - swell_wave_peak_period
+                - sea_surface_temperature
+                - ocean_current_velocity
+                - ocean_current_direction
+        - name: minutely_15
+          in: query
+          description: >-
+            A list of marine variables at 15-minute intervals.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - ocean_current_velocity
+                - ocean_current_direction
+                - sea_level_height_msl
+        - name: temperature_unit
+          in: query
+          schema:
+            type: string
+            default: celsius
+            enum: [celsius, fahrenheit]
+        - name: wind_speed_unit
+          in: query
+          schema:
+            type: string
+            default: kmh
+            enum: [kmh, ms, mph, kn]
+        - name: length_unit
+          in: query
+          description: >-
+            Wave height and sea level unit.
+          schema:
+            type: string
+            default: metric
+            enum: [metric, imperial]
+        - name: timeformat
+          in: query
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          schema:
+            type: integer
+            default: 7
+            minimum: 0
+            maximum: 16
+        - name: start_date
+          in: query
+          description: >-
+            Start date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: cell_selection
+          in: query
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - best_match
+                - mfwave
+                - mfcurrents
+                - era5_ocean
+                - ewam
+                - gwam
+                - meteofrance_currents
+                - ncep_cfsr
+                - ncep_gfswave025
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  hourly:
+                    type: object
+                  hourly_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  daily:
+                    type: object
+                  daily_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  current:
+                    type: object
+                  current_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  minutely_15:
+                    type: object
+                  minutely_15_units:
+                    type: object
+                    additionalProperties:
+                      type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string
