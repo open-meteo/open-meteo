@@ -2,11 +2,14 @@ import Foundation
 import AsyncHTTPClient
 import NIOCore
 import Logging
+import NIOHTTP1
 
 enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
     case fileModifiedSinceLastDownload
     case forbidden
+    case badRequest
+    case other(HTTPResponseStatus)
 }
 
 enum CurlErrorRetry: Error {
@@ -43,6 +46,10 @@ extension HTTPClientResponse {
             throw CurlErrorNonRetry.fileModifiedSinceLastDownload
         case .forbidden:
             throw CurlErrorNonRetry.forbidden
+        case .badRequest:
+            throw CurlErrorNonRetry.badRequest
+        case .paymentRequired, .methodNotAllowed, .notAcceptable, .proxyAuthenticationRequired, .gone, .lengthRequired, .uriTooLong, .unsupportedMediaType, .rangeNotSatisfiable, .expectationFailed, .imATeapot, .misdirectedRequest, .unprocessableEntity, .locked, .failedDependency, .upgradeRequired, .preconditionRequired, .unavailableForLegalReasons:
+            throw CurlErrorNonRetry.other(status)
         default:
             break
         }
@@ -129,7 +136,10 @@ extension HTTPClient {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
-                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
+                logger.info("Download failed unrecoverable with \(error). URL \(url)\(request.rangePrettyPrint)")
+                throw error
+            } catch let error as CancellationError {
+                logger.debug("Download failed with cancellation. URL \(url)\(request.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
