@@ -610,9 +610,9 @@ paths:
               type: string
               enum:
                 - best_match
-                - ecmwf_ifs04
+                - ecmwf_ifs
                 - ecmwf_ifs025
-                - ecmwf_aifs025
+                - ecmwf_aifs025_single
                 - ecmwf_ifs_analysis
                 - ecmwf_ifs_analysis_long_window
                 - cma_grapes_global
@@ -620,10 +620,17 @@ paths:
                 - gfs_seamless
                 - gfs_global
                 - gfs_hrrr
+                - ncep_nbm_conus
+                - ncep_nam_conus
                 - gfs_graphcast025
+                - ncep_aigfs025
+                - ncep_hgefs025_ensemble_mean
                 - jma_seamless
                 - jma_msm
                 - jma_gsm
+                - kma_seamless
+                - kma_ldps
+                - kma_gdps
                 - icon_seamless
                 - icon_global
                 - icon_eu
@@ -632,14 +639,13 @@ paths:
                 - gem_global
                 - gem_regional
                 - gem_hrdps_continental
+                - gem_hrdps_west
                 - meteofrance_seamless
-                - meteofrance_arpege_world025
+                - meteofrance_arpege_world
                 - meteofrance_arpege_europe
                 - meteofrance_arome_france
                 - meteofrance_arome_france_hd
-                - arpae_cosmo_seamless
-                - arpae_cosmo_2i
-                - arpae_cosmo_5m
+                - italia_meteo_arpae_icon_2i
                 - metno_seamless
                 - metno_nordic
                 - knmi_seamless
@@ -650,6 +656,11 @@ paths:
                 - ukmo_seamless
                 - ukmo_global_deterministic_10km
                 - ukmo_uk_deterministic_2km
+                - meteoswiss_icon_seamless
+                - meteoswiss_icon_ch1
+                - meteoswiss_icon_ch2
+                - geosphere_seamless
+                - geosphere_arome_austria
       responses:
         '200':
           description: OK
