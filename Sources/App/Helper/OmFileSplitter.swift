@@ -589,6 +589,8 @@ struct OmFileSplitter {
 
                 let meanFileName = meanOmFile.getFilePath()
                 let spreadFileName = spreadOmFile.getFilePath()
+                try? meanOmFile.createDirectory()
+                try? spreadOmFile.createDirectory()
                 let meanFn = try FileHandle.createNewFile(file: meanFileName, overwrite: true, temporary: true)
                 let spreadFn = try FileHandle.createNewFile(file: spreadFileName, overwrite: true, temporary: true)
 
