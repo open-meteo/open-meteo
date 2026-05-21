@@ -14,8 +14,7 @@ enum S3Uploader {
         // executeRetry extracts credentials from the URL, signs the request with
         // AWS4-HMAC-SHA256 on each attempt, and retries on transient errors.
         let logger = Logger(label: "S3Uploader")
-        let response = try await client.executeRetry(request, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
-        _ = try await response.body.collect(upTo: 1024 * 1024)
+        let _ = try await client.executeRetry(request, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
     }
 
     /// Uploads files to S3 in 8 MB chunks
@@ -26,36 +25,43 @@ enum S3Uploader {
         let chunkSize = 8 * 1024 * 1024
 
         // Step 1: Initiate multipart upload
+        let timeInitiateRequestStart = DispatchTime.now().uptimeNanoseconds
         var initiateRequest = HTTPClientRequest(url: url + "?uploads")
         initiateRequest.method = .POST
         initiateRequest.headers.add(name: "Content-Type", value: "application/octet-stream")
         initiateRequest.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
         let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
-        let initiateBody = try await initiateResponse.body.collect(upTo: 1024 * 1024)
-        let initiateXml = String(buffer: initiateBody)
-        guard let uploadId = initiateXml.xmlValue(tag: "UploadId") else {
+        guard
+            let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
+            let uploadId = initiateXml.xmlValue(tag: "UploadId") else {
             throw S3UploaderError.missingUploadId
         }
+        let timeInitiateRequest = Double(DispatchTime.now().uptimeNanoseconds - timeInitiateRequestStart) / 1_000_000_000
+        
         // uploadId may contain '+', '/' or '=' — percent-encode for use in query strings
         let encodedUploadId = uploadId.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? uploadId
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
+        let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
         let partCount = (data.count + chunkSize - 1) / chunkSize
         do {
-            return S3MultiPartUploadPrepared(etags: try await stride(from: 1, through: partCount, by: 1).mapConcurrent(nConcurrent: nConcurrent) { (partNumber: Int) -> (Int, String) in
-                let offset = (partNumber - 1) * chunkSize
-                let chunk = data.dropFirst(offset).prefix(chunkSize)
-                var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber)&uploadId=\(encodedUploadId)")
+            let prepared = S3MultiPartUploadPrepared(etags: try await stride(from: 0, to: partCount, by: 1).mapConcurrent(nConcurrent: nConcurrent) { (partNumber: Int) -> String in
+                let offset = partNumber * chunkSize
+                let chunk = data[data.index(data.startIndex, offsetBy: offset)..<data.index(data.startIndex, offsetBy: min(offset + chunkSize, data.count))]
+                var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
                 req.method = .PUT
                 req.body = .bytes(ByteBuffer(bytes: chunk))
                 req.headers.add(name: "x-amz-content-sha256", value: chunk.sha256Hex)
                 let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
-                _ = try await response.body.collect(upTo: 1024 * 1024)
                 guard let etag = response.headers.first(name: "ETag") else {
                     throw S3UploaderError.missingETag(partNumber: partNumber)
                 }
-                return (partNumber, etag)
+                return etag
             }, url: url, encodedUploadId: encodedUploadId)
+            let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
+            let rate = Double(data.count) / timeChunkedRequest
+            logger.info("Upload \(data.count.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
+            return prepared
         } catch {
             var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
             abortRequest.method = .DELETE
@@ -68,7 +74,7 @@ enum S3Uploader {
 
 /// Intermediate representation
 struct S3MultiPartUploadPrepared {
-    let etags: [(partNumber: Int, etag: String)]
+    let etags: [String]
     let url: String
     let encodedUploadId: String
 
@@ -76,8 +82,9 @@ struct S3MultiPartUploadPrepared {
     func commit(client: HTTPClient) async throws {
         // Step 3: Complete multipart upload
         let logger = Logger(label: "S3Uploader")
-        let completionXml = "<CompleteMultipartUpload>" + etags.map {
-            "<Part><PartNumber>\($0.partNumber)</PartNumber><ETag>\($0.etag)</ETag></Part>"
+        let timeCommitRequestStart = DispatchTime.now().uptimeNanoseconds
+        let completionXml = "<CompleteMultipartUpload>" + etags.enumerated().map {
+            "<Part><PartNumber>\($0.0 + 1)</PartNumber><ETag>\($0.1)</ETag></Part>"
         }.joined() + "</CompleteMultipartUpload>"
         let completionData = Data(completionXml.utf8)
         var completeRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
@@ -87,6 +94,8 @@ struct S3MultiPartUploadPrepared {
         completeRequest.headers.add(name: "x-amz-content-sha256", value: completionData.sha256Hex)
         let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
+        let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000
+        logger.info("Upload committed upload in \(timeCommitRequest.asSecondsPrettyPrint)")
     }
 }
 
