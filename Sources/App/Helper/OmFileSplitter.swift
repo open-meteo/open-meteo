@@ -695,25 +695,14 @@ struct OmFileSplitter {
                 if let em = ensembleMean {
                     let nLoc = yRange.count * xRange.count
                     let nT = time.count
-                    var chunkMean   = [Float](repeating: 0, count: nLoc * nT)
-                    var chunkM2     = [Float](repeating: 0, count: nLoc * nT)
-
-                    // Welford's online algorithm — iterate only nMembersActual to avoid NaN from
-                    // uninitialized slots when fewer members were downloaded than domain.countEnsembleMember
-                    for member in 0..<em.nMembersActual {
-                        for loc in 0..<nLoc {
-                            for t in 0..<nT {
-                                let x = data[data.startIndex + loc * nMembers * nT + member * nT + t]
-                                let dstIdx = loc * nT + t
-                                let delta = x - chunkMean[dstIdx]
-                                chunkMean[dstIdx] += delta / Float(member + 1)
-                                chunkM2[dstIdx]   += delta * (x - chunkMean[dstIdx])
-                            }
-                        }
-                    }
-                    let chunkSpread = chunkM2.map {
-                        em.nMembersActual > 1 ? sqrt($0 / Float(em.nMembersActual - 1)) : 0
-                    }
+                    
+                    let (chunkMean, chunkSpread) = welfordMeanSpread(
+                        data3d: data,
+                        nLoc: nLoc,
+                        nMembers: nMembers,
+                        nMembersActual: em.nMembersActual,
+                        nTime: nT
+                    )
 
                     let ms = em.splitter
                     for cw in meanChunkWriters {
