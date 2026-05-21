@@ -5,11 +5,11 @@ import Logging
 
 enum S3Uploader {
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func upload<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String) async throws {
+    static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .PUT
         request.body = .bytes(ByteBuffer(bytes: data))
-        request.headers.add(name: "Content-Type", value: "application/octet-stream")
+        request.headers.add(name: "Content-Type", value: contentType)
         request.headers.add(name: "x-amz-content-sha256", value: data.sha256Hex)
         // executeRetry extracts credentials from the URL, signs the request with
         // AWS4-HMAC-SHA256 on each attempt, and retries on transient errors.
@@ -20,7 +20,7 @@ enum S3Uploader {
     /// Uploads files to S3 in 8 MB chunks
     /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String, nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
+    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
         let chunkSize = 8 * 1024 * 1024
 
@@ -28,8 +28,7 @@ enum S3Uploader {
         let timeInitiateRequestStart = DispatchTime.now().uptimeNanoseconds
         var initiateRequest = HTTPClientRequest(url: url + "?uploads")
         initiateRequest.method = .POST
-        initiateRequest.headers.add(name: "Content-Type", value: "application/octet-stream")
-        initiateRequest.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
+        initiateRequest.headers.add(name: "Content-Type", value: contentType)
         let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
         guard
             let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
@@ -53,6 +52,7 @@ enum S3Uploader {
                     req.method = .PUT
                     req.body = .bytes(ByteBuffer(bytes: chunk))
                     req.headers.add(name: "x-amz-content-sha256", value: chunk.sha256Hex)
+                    req.headers.add(name: .contentLength, value: "\(chunk.count)")
                     let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
                     guard let etag = response.headers.first(name: "ETag") else {
                         throw S3UploaderError.missingETag(partNumber: partNumber)
@@ -69,7 +69,6 @@ enum S3Uploader {
         } catch {
             var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
             abortRequest.method = .DELETE
-            abortRequest.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
             throw error
         }
