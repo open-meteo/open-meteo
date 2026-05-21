@@ -147,6 +147,19 @@ struct GenericVariableHandle: Sendable {
         }
     }
     
+    /// State for ensemble mean/spread file writers
+    private struct EnsembleMeanFileState {
+        let meanWriteFile: OmFileWriter<FileHandle>
+        let meanWriter: OmFileWriterArray<Float, FileHandle>
+        let meanFn: FileHandle
+        let meanFilePath: String
+        let spreadWriteFile: OmFileWriter<FileHandle>
+        let spreadWriter: OmFileWriterArray<Float, FileHandle>
+        let spreadFn: FileHandle
+        let spreadFilePath: String
+        let spreadVariable: any GenericVariable
+    }
+    
     /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
     /// If `ensembleMeanDomain` is provided, additionally computes ensemble mean and spread from multi-member handles and writes 3D files to that domain.
     static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
@@ -189,20 +202,11 @@ struct GenericVariableHandle: Sendable {
             )
             
             // Ensemble mean/spread files (additional, only if ensembleMeanDomain is provided)
-            var meanWriteFile: OmFileWriter<FileHandle>?
-            var meanWriter: OmFileWriterArray<Float, FileHandle>?
-            var meanFn: FileHandle?
-            var meanFilePath: String?
-            var spreadWriteFile: OmFileWriter<FileHandle>?
-            var spreadWriter: OmFileWriterArray<Float, FileHandle>?
-            var spreadFn: FileHandle?
-            var spreadFilePath: String?
-            var spreadVariable: (any GenericVariable)?
-            
-            if let emDomain = ensembleMeanDomain {
+            let ensembleMeanState: EnsembleMeanFileState? = try { () throws -> EnsembleMeanFileState? in
+                guard let emDomain = ensembleMeanDomain else { return nil }
                 guard nMembers > 1 else {
                     logger.warning("Cannot compute ensemble mean with only \(nMembers) member(s)")
-                    return
+                    return nil
                 }
                 
                 // Derived ensemble mean domain grid always same as original grid                
@@ -213,11 +217,11 @@ struct GenericVariableHandle: Sendable {
                 // Mean file - written to ensemble mean domain
                 let meanFile = OmFileType.run(domain: emDomain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
                 try meanFile.createDirectory()
-                meanFilePath = meanFile.getFilePath()
-                meanFn = try FileHandle.createNewFile(file: meanFilePath!, overwrite: true, temporary: true)
+                let meanFilePath = meanFile.getFilePath()
+                let meanFn = try FileHandle.createNewFile(file: meanFilePath, overwrite: true, temporary: true)
                 
-                meanWriteFile = OmFileWriter(fn: meanFn!, initialCapacity: 4 * 1024)
-                meanWriter = try meanWriteFile!.prepareArray(
+                let meanWriteFile = OmFileWriter(fn: meanFn, initialCapacity: 4 * 1024)
+                let meanWriter = try meanWriteFile.prepareArray(
                     type: Float.self,
                     dimensions: meanDimensions.map(UInt64.init),
                     chunkDimensions: meanChunks.map(UInt64.init),
@@ -227,22 +231,34 @@ struct GenericVariableHandle: Sendable {
                 )
                 
                 // Spread file - written to ensemble mean domain
-                spreadVariable = variable.asSpreadVariableGeneric
-                let spreadFile = OmFileType.run(domain: emDomain.domainRegistry, variable: spreadVariable!.omFileName.file, run: run.toIsoDateTime())
+                let spreadVariable = variable.asSpreadVariableGeneric
+                let spreadFile = OmFileType.run(domain: emDomain.domainRegistry, variable: spreadVariable.omFileName.file, run: run.toIsoDateTime())
                 try spreadFile.createDirectory()
-                spreadFilePath = spreadFile.getFilePath()
-                spreadFn = try FileHandle.createNewFile(file: spreadFilePath!, overwrite: true, temporary: true)
+                let spreadFilePath = spreadFile.getFilePath()
+                let spreadFn = try FileHandle.createNewFile(file: spreadFilePath, overwrite: true, temporary: true)
                 
-                spreadWriteFile = OmFileWriter(fn: spreadFn!, initialCapacity: 4 * 1024)
-                spreadWriter = try spreadWriteFile!.prepareArray(
+                let spreadWriteFile = OmFileWriter(fn: spreadFn, initialCapacity: 4 * 1024)
+                let spreadWriter = try spreadWriteFile.prepareArray(
                     type: Float.self,
                     dimensions: meanDimensions.map(UInt64.init),
                     chunkDimensions: meanChunks.map(UInt64.init),
                     compression: compression,
-                    scale_factor: spreadVariable!.scalefactor,
+                    scale_factor: spreadVariable.scalefactor,
                     add_offset: 0
                 )
-            }
+                
+                return EnsembleMeanFileState(
+                    meanWriteFile: meanWriteFile,
+                    meanWriter: meanWriter,
+                    meanFn: meanFn,
+                    meanFilePath: meanFilePath,
+                    spreadWriteFile: spreadWriteFile,
+                    spreadWriter: spreadWriter,
+                    spreadFn: spreadFn,
+                    spreadFilePath: spreadFilePath,
+                    spreadVariable: spreadVariable
+                )
+            }()
             
             // Single shared loop: read data once, write to all files
             for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
@@ -281,32 +297,22 @@ struct GenericVariableHandle: Sendable {
                     )
                     
                     // Additionally, compute and write ensemble mean/spread if ensembleMeanDomain is provided
-                    if ensembleMeanDomain != nil {
+                    if let state = ensembleMeanState {
                         let meanChunkDimensions: [UInt64] = [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTime)]
                         
-                        // Welford's online algorithm for mean and variance
-                        var chunkMean = [Float](repeating: 0, count: nLoc * nTime)
-                        var chunkM2 = [Float](repeating: 0, count: nLoc * nTime)
-                        for loc in 0..<nLoc {
-                            for member in 0..<nMembers {
-                                for t in 0..<nTime {
-                                    let x = data3d[loc, member, t]
-                                    let dstIdx = loc * nTime + t
-                                    let delta = x - chunkMean[dstIdx]
-                                    chunkMean[dstIdx] += delta / Float(member + 1)
-                                    chunkM2[dstIdx]   += delta * (x - chunkMean[dstIdx])
-                                }
-                            }
-                        }
-                        let chunkSpread = chunkM2.map {
-                            nMembers > 1 ? sqrt($0 / Float(nMembers - 1)) : 0
-                        }
+                        let (chunkMean, chunkSpread) = welfordMeanSpread(
+                            data3d: ArraySlice(data3d.data),
+                            nLoc: nLoc,
+                            nMembers: nMembers,
+                            nMembersActual: nMembers,
+                            nTime: nTime
+                        )
                         
-                        try meanWriter!.writeData(
+                        try state.meanWriter.writeData(
                             array: chunkMean,
                             arrayDimensions: meanChunkDimensions
                         )
-                        try spreadWriter!.writeData(
+                        try state.spreadWriter.writeData(
                             array: chunkSpread,
                             arrayDimensions: meanChunkDimensions
                         )
@@ -318,7 +324,7 @@ struct GenericVariableHandle: Sendable {
             
             // Always finalize regular file
             let arrayFinalised = try writer.finalise()
-            try finalizeOmFile(
+            try finalizeOmRunFile(
                 arrayFinalised: arrayFinalised,
                 writeFile: writeFile,
                 fn: fn,
@@ -332,13 +338,13 @@ struct GenericVariableHandle: Sendable {
             )
             
             // Additionally finalize ensemble mean/spread files if ensembleMeanDomain was provided
-            if let emDomain = ensembleMeanDomain {
-                let meanArrayFinalised = try meanWriter!.finalise()
-                try finalizeOmFile(
+            if let state = ensembleMeanState, let emDomain = ensembleMeanDomain {
+                let meanArrayFinalised = try state.meanWriter.finalise()
+                try finalizeOmRunFile(
                     arrayFinalised: meanArrayFinalised,
-                    writeFile: meanWriteFile!,
-                    fn: meanFn!,
-                    filePath: meanFilePath!,
+                    writeFile: state.meanWriteFile,
+                    fn: state.meanFn,
+                    filePath: state.meanFilePath,
                     run: run,
                     time: time,
                     nTime: nTime,
@@ -347,16 +353,16 @@ struct GenericVariableHandle: Sendable {
                     coordinatesString: "lat lon time"
                 )
                 
-                let spreadArrayFinalised = try spreadWriter!.finalise()
-                try finalizeOmFile(
+                let spreadArrayFinalised = try state.spreadWriter.finalise()
+                try finalizeOmRunFile(
                     arrayFinalised: spreadArrayFinalised,
-                    writeFile: spreadWriteFile!,
-                    fn: spreadFn!,
-                    filePath: spreadFilePath!,
+                    writeFile: state.spreadWriteFile,
+                    fn: state.spreadFn,
+                    filePath: state.spreadFilePath,
                     run: run,
                     time: time,
                     nTime: nTime,
-                    unit: spreadVariable!.unit.abbreviation,
+                    unit: state.spreadVariable.unit.abbreviation,
                     crsWkt: emDomain.grid.crsWkt2,
                     coordinatesString: "lat lon time"
                 )
@@ -371,7 +377,7 @@ struct GenericVariableHandle: Sendable {
     }
     
     /// Helper to finalize an OmFile with standard metadata
-    private static func finalizeOmFile(
+    private static func finalizeOmRunFile(
         arrayFinalised: OmFileWriterArrayFinalised,
         writeFile: OmFileWriter<FileHandle>,
         fn: FileHandle,
