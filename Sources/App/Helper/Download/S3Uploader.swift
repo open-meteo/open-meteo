@@ -4,15 +4,8 @@ import NIOCore
 import Logging
 
 enum S3Uploader {
-    // URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
-    static func upload<D: DataProtocol & Sendable>(client: HTTPClient, data: D, server: String, objectName: String) async throws {
-        // Percent-encode each path segment of the object name (preserving `/` separators),
-        // then append to the server base URL (which carries the embedded credentials).
-        let encodedObject = objectName
-            .split(separator: "/", omittingEmptySubsequences: false)
-            .map { $0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? String($0) }
-            .joined(separator: "/")
-        let url = server.hasSuffix("/") ? server + encodedObject : server + "/" + encodedObject
+    /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
+    static func upload<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String) async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .PUT
         request.body = .bytes(ByteBuffer(bytes: data))
@@ -25,18 +18,13 @@ enum S3Uploader {
         _ = try await response.body.collect(upTo: 1024 * 1024)
     }
 
-    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, server: String, objectName: String) async throws {
+    /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
+    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String) async throws {
         let logger = Logger(label: "S3Uploader")
         let chunkSize = 8 * 1024 * 1024
 
-        let encodedObject = objectName
-            .split(separator: "/", omittingEmptySubsequences: false)
-            .map { $0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? String($0) }
-            .joined(separator: "/")
-        let objectUrl = server.hasSuffix("/") ? server + encodedObject : server + "/" + encodedObject
-
         // Step 1: Initiate multipart upload
-        var initiateRequest = HTTPClientRequest(url: objectUrl + "?uploads")
+        var initiateRequest = HTTPClientRequest(url: url + "?uploads")
         initiateRequest.method = .POST
         initiateRequest.headers.add(name: "Content-Type", value: "application/octet-stream")
         initiateRequest.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
@@ -56,7 +44,7 @@ enum S3Uploader {
             etags = try await stride(from: 1, through: partCount, by: 1).mapConcurrent(nConcurrent: 8) { (partNumber: Int) -> (Int, String) in
                 let offset = (partNumber - 1) * chunkSize
                 let chunk = data.dropFirst(offset).prefix(chunkSize)
-                var req = HTTPClientRequest(url: objectUrl + "?partNumber=\(partNumber)&uploadId=\(encodedUploadId)")
+                var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber)&uploadId=\(encodedUploadId)")
                 req.method = .PUT
                 req.body = .bytes(ByteBuffer(bytes: chunk))
                 req.headers.add(name: "x-amz-content-sha256", value: chunk.sha256Hex)
@@ -68,7 +56,7 @@ enum S3Uploader {
                 return (partNumber, etag)
             }
         } catch {
-            var abortRequest = HTTPClientRequest(url: objectUrl + "?uploadId=\(encodedUploadId)")
+            var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
             abortRequest.method = .DELETE
             abortRequest.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
@@ -80,7 +68,7 @@ enum S3Uploader {
             "<Part><PartNumber>\($0.partNumber)</PartNumber><ETag>\($0.etag)</ETag></Part>"
         }.joined() + "</CompleteMultipartUpload>"
         let completionData = Data(completionXml.utf8)
-        var completeRequest = HTTPClientRequest(url: objectUrl + "?uploadId=\(encodedUploadId)")
+        var completeRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
         completeRequest.method = .POST
         completeRequest.body = .bytes(ByteBuffer(data: completionData))
         completeRequest.headers.add(name: "Content-Type", value: "application/xml")

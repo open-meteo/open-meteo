@@ -44,7 +44,7 @@ import AsyncHTTPClient
         defer { let _ = client.shutdown() }
 
         let data = randomData(byteCount: 1 * 1024 * 1024)
-        try await S3Uploader.upload(client: client, data: data, server: server, objectName: "test/s3uploader-single.bin")
+        try await S3Uploader.upload(client: client, data: data, url: "\(server)/test/s3uploader-single.bin")
     }
 
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
@@ -57,7 +57,7 @@ import AsyncHTTPClient
         defer { let _ = client.shutdown() }
 
         let data = randomData(byteCount: 10 * 1024 * 1024)
-        try await S3Uploader.uploadMultipart(client: client, data: data, server: server, objectName: "test/s3uploader-multipart.bin")
+        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)/test/s3uploader-multipart.bin")
     }
 }
 
