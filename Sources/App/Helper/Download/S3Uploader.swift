@@ -18,8 +18,10 @@ enum S3Uploader {
         _ = try await response.body.collect(upTo: 1024 * 1024)
     }
 
+    /// Uploads files to S3 in 8 MB chunks
+    /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String) async throws {
+    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String, nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
         let chunkSize = 8 * 1024 * 1024
 
@@ -39,9 +41,8 @@ enum S3Uploader {
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let partCount = (data.count + chunkSize - 1) / chunkSize
-        let etags: [(partNumber: Int, etag: String)]
         do {
-            etags = try await stride(from: 1, through: partCount, by: 1).mapConcurrent(nConcurrent: 8) { (partNumber: Int) -> (Int, String) in
+            return S3MultiPartUploadPrepared(etags: try await stride(from: 1, through: partCount, by: 1).mapConcurrent(nConcurrent: nConcurrent) { (partNumber: Int) -> (Int, String) in
                 let offset = (partNumber - 1) * chunkSize
                 let chunk = data.dropFirst(offset).prefix(chunkSize)
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber)&uploadId=\(encodedUploadId)")
@@ -54,7 +55,7 @@ enum S3Uploader {
                     throw S3UploaderError.missingETag(partNumber: partNumber)
                 }
                 return (partNumber, etag)
-            }
+            }, url: url, encodedUploadId: encodedUploadId)
         } catch {
             var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
             abortRequest.method = .DELETE
@@ -62,8 +63,19 @@ enum S3Uploader {
             let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
             throw error
         }
+    }
+}
 
+/// Intermediate representation
+struct S3MultiPartUploadPrepared {
+    let etags: [(partNumber: Int, etag: String)]
+    let url: String
+    let encodedUploadId: String
+
+    /// complete multipart upload. This may take longer than expected
+    func commit(client: HTTPClient) async throws {
         // Step 3: Complete multipart upload
+        let logger = Logger(label: "S3Uploader")
         let completionXml = "<CompleteMultipartUpload>" + etags.map {
             "<Part><PartNumber>\($0.partNumber)</PartNumber><ETag>\($0.etag)</ETag></Part>"
         }.joined() + "</CompleteMultipartUpload>"
