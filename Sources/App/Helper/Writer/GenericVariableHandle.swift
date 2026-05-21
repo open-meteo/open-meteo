@@ -201,15 +201,10 @@ struct GenericVariableHandle: Sendable {
                     return
                 }
                 
-                // Mean and spread use ensemble mean domain grid
-                let emGrid = emDomain.grid
-                let emNx = emGrid.nx
-                let emNy = emGrid.ny
-                
+                // Derived ensemble mean domain grid always same as original grid                
                 // Mean and spread are 3D (no member dimension)
-                let meanChunknLocations = max(1, min(1024 / nTime, emNx))
-                let meanChunks = [1, meanChunknLocations, nTime]
-                let meanDimensions = [emNy, emNx, nTime]
+                let meanChunks = [1, chunknLocations, nTime]
+                let meanDimensions = [ny, nx, nTime]
                 
                 // Mean file - written to ensemble mean domain
                 let meanFile = OmFileType.run(domain: emDomain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
