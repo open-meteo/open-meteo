@@ -64,7 +64,7 @@ enum S3Uploader {
             )
             let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
             let rate = Double(data.count) / timeChunkedRequest
-            logger.info("Upload \(data.count.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
+            logger.info("Upload \(url.asUrlGetQuery) \(data.count.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
         } catch {
             var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
@@ -99,7 +99,7 @@ struct S3MultiPartUploadPrepared {
         let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
         let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000
-        logger.info("Upload committed upload in \(timeCommitRequest.asSecondsPrettyPrint)")
+        logger.info("Upload \(url.asUrlGetQuery) committed in \(timeCommitRequest.asSecondsPrettyPrint)")
     }
 }
 
@@ -108,11 +108,20 @@ enum S3UploaderError: Error {
     case missingETag(partNumber: Int)
 }
 
-private extension String {
+fileprivate extension String {
     /// Extract the text content of the first occurrence of `<tag>…</tag>` in an XML string.
     func xmlValue(tag: String) -> String? {
         guard let start = range(of: "<\(tag)>"),
               let end = range(of: "</\(tag)>") else { return nil }
         return String(self[start.upperBound..<end.lowerBound])
+    }
+    
+    /// Assume self is a URL, return the query part
+    var asUrlGetQuery: Substring {
+        guard let schemaIndex = self.firstRange(of: "://"),
+                let queryStart = self[schemaIndex.upperBound...].firstIndex(of: "/") else {
+            return Substring(self)
+        }
+        return self[queryStart...]
     }
 }
