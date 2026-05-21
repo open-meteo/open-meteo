@@ -41,7 +41,7 @@ public struct AWSSigner {
         let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
         
         let canonicalQueryString = components.queryItems?
-            .map({ "\($0.name)\($0.value.map{"=\($0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed)!)"} ?? "")" })
+            .map({ "\($0.name)\($0.value.map{"=\($0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed)!)"} ?? "=")" })
             .sorted()
             .joined(separator: "&") ?? ""
 
@@ -124,7 +124,7 @@ fileprivate extension Date {
     }
 }
 
-fileprivate extension DataProtocol {
+extension DataProtocol {
     var sha256Hex: String {
         let hash = SHA256.hash(data: self)
         return hash.map { String(format: "%02x", $0) }.joined()

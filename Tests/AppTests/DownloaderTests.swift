@@ -1,4 +1,5 @@
 @testable import App
+import Foundation
 import Testing
 import AsyncHTTPClient
 
@@ -32,4 +33,46 @@ import AsyncHTTPClient
         #expect(request.headers.contains(name: "Authorization"))
         #expect(request.url == "https://examplebucket.s3.amazonaws.com/test.txt")
     }
+
+    /// Single-part PUT upload.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3Upload() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+
+        let data = randomData(byteCount: 1 * 1024 * 1024)
+        try await S3Uploader.upload(client: client, data: data, server: server, objectName: "test/s3uploader-single.bin")
+    }
+
+    /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3UploadMultipart() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+
+        let data = randomData(byteCount: 10 * 1024 * 1024)
+        try await S3Uploader.uploadMultipart(client: client, data: data, server: server, objectName: "test/s3uploader-multipart.bin")
+    }
+}
+
+/// Fill a `Data` buffer with cryptographically random bytes.
+private func randomData(byteCount: Int) -> Data {
+    var data = Data(count: byteCount)
+    data.withUnsafeMutableBytes { ptr in
+        var rng = SystemRandomNumberGenerator()
+        var i = ptr.startIndex
+        while i < ptr.endIndex {
+            let word = UInt64.random(in: .min ... .max, using: &rng)
+            let end = min(i + 8, ptr.endIndex)
+            withUnsafeBytes(of: word) { ptr[i..<end].copyBytes(from: $0.prefix(end - i)) }
+            i += 8
+        }
+    }
+    return data
 }
