@@ -45,19 +45,23 @@ enum S3Uploader {
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
         let partCount = (data.count + chunkSize - 1) / chunkSize
         do {
-            let prepared = S3MultiPartUploadPrepared(etags: try await stride(from: 0, to: partCount, by: 1).mapConcurrent(nConcurrent: nConcurrent) { (partNumber: Int) -> String in
-                let offset = partNumber * chunkSize
-                let chunk = data[data.index(data.startIndex, offsetBy: offset)..<data.index(data.startIndex, offsetBy: min(offset + chunkSize, data.count))]
-                var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
-                req.method = .PUT
-                req.body = .bytes(ByteBuffer(bytes: chunk))
-                req.headers.add(name: "x-amz-content-sha256", value: chunk.sha256Hex)
-                let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
-                guard let etag = response.headers.first(name: "ETag") else {
-                    throw S3UploaderError.missingETag(partNumber: partNumber)
-                }
-                return etag
-            }, url: url, encodedUploadId: encodedUploadId)
+            let prepared = S3MultiPartUploadPrepared(
+                etags: try await (0..<partCount).mapConcurrent(nConcurrent: nConcurrent) { (partNumber: Int) -> String in
+                    let offset = partNumber * chunkSize
+                    let chunk = data[data.index(data.startIndex, offsetBy: offset)..<data.index(data.startIndex, offsetBy: min(offset + chunkSize, data.count))]
+                    var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
+                    req.method = .PUT
+                    req.body = .bytes(ByteBuffer(bytes: chunk))
+                    req.headers.add(name: "x-amz-content-sha256", value: chunk.sha256Hex)
+                    let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
+                    guard let etag = response.headers.first(name: "ETag") else {
+                        throw S3UploaderError.missingETag(partNumber: partNumber)
+                    }
+                    return etag
+                },
+                url: url,
+                encodedUploadId: encodedUploadId
+            )
             let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
             let rate = Double(data.count) / timeChunkedRequest
             logger.info("Upload \(data.count.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
