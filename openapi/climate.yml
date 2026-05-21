@@ -153,7 +153,6 @@ paths:
                 - EC_Earth3P_HR
                 - MPI_ESM1_2_XR
                 - NICAM16_8S
-                - all
         - name: apikey
           in: query
           description: >-

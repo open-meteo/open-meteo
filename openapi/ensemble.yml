@@ -399,7 +399,6 @@ paths:
                 - bom_access_global_ensemble
                 - ncep_gefs025
                 - ukmo_global_ensemble_20km
-                - meteofrance_arpege_world025_ensemble
         - name: temporal_resolution
           in: query
           description: >-

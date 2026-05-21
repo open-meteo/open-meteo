@@ -197,13 +197,11 @@ paths:
               type: string
               enum:
                 - best_match
-                - mfwave
-                - mfcurrents
+                - meteofrance_wave
                 - era5_ocean
                 - ewam
                 - gwam
                 - meteofrance_currents
-                - ncep_cfsr
                 - ncep_gfswave025
         - name: apikey
           in: query
