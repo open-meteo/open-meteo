@@ -90,18 +90,46 @@ extension HTTPClient {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
         var n = 0
+        
+        // URL might contain password, strip them from logging
+        let url: String
+        let user: String?
+        let password: String?
+        if request.url.contains("@") && request.url.contains(":") {
+            let usernamePassword = request.url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0].split(separator: ":")
+            user = String(usernamePassword.first!)
+            password = usernamePassword.count > 1 ? String(usernamePassword[1]) : nil
+            url = request.url.stripHttpPassword()
+        } else {
+            url = request.url
+            user = nil
+            password = nil
+        }
+        
         while true {
             do {
                 n += 1
+                var request = request
+                if let user = user, let password = password {
+                    request.url = url
+                    // Request need to be signed in the retry loop because the signature expires after 15 minutes
+                    if url.contains(".your-objectstorage.com") || url.contains("s3.open-meteo.com") || url.contains("127.0.0.1:7480") {
+                        let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+                        try signer.sign(request: &request)
+                    } else {
+                        request.setBasicAuth(username: user, password: password)
+                    }
+                }
+                
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.rangePrettyPrint)")
+                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(url)\(request.rangePrettyPrint)")
                 try response.throwOnError()
                 return response
             } catch CurlErrorNonRetry.unauthorized {
-                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
-                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
+                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)

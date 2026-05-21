@@ -30,7 +30,8 @@ public struct AWSSigner {
         self.service = service
     }
 
-    public func sign(request: inout HTTPClientRequest, body: Data?, now: Date = Date()) throws {
+    /// If `request.body` contains payload, please set header `x-amz-content-sha256` before
+    public func sign(request: inout HTTPClientRequest, now: Date = Date()) throws {
         guard let components = URLComponents(string: request.url),
               let host = components.encodedHost else {
             throw SigningError.invalidURL
@@ -46,11 +47,17 @@ public struct AWSSigner {
 
         let amzDate = now.iso8601DateTime
         let dateStamp = now.shortDate
-
-        let payloadHash = (body ?? Data()).sha256Hex
         
         request.headers.add(name: "Host", value: host)
-        request.headers.add(name: "x-amz-content-sha256", value: payloadHash)
+        
+        let payloadHash: String
+        if let hash = request.headers.first(name: "x-amz-content-sha256") {
+            payloadHash = hash
+        } else {
+            payloadHash = Data().sha256Hex
+            request.headers.add(name: "x-amz-content-sha256", value: payloadHash)
+        }
+        
         request.headers.add(name: "x-amz-date", value: amzDate)
         
         let headersSorted = request.headers.sorted(by: {
@@ -196,6 +203,6 @@ extension HTTPClientRequest {
         }
         self.url = components.cleanUrl
         let signer = AWSSigner(accessKey: String(username), secretKey: String(password), region: "us-west-2", service: "s3")
-        try signer.sign(request: &self, body: nil)
+        try signer.sign(request: &self)
     }
 }
