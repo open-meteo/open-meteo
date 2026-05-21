@@ -16,6 +16,7 @@ paths:
   /v1/flood:
     servers:
       - url: https://flood-api.open-meteo.com
+      - url: https://customer-flood-api.open-meteo.com
     get:
       tags:
         - Flood APIs
@@ -151,10 +152,65 @@ paths:
                     type: string
                   daily:
                     type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      river_discharge:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_median:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_p25:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_p75:
+                        type: array
+                        items:
+                          type: number
+                          format: float
                   daily_units:
                     type: object
-                    additionalProperties:
-                      type: string
+                    properties:
+                      time:
+                        type: string
+                      river_discharge:
+                        type: string
+                      river_discharge_mean:
+                        type: string
+                      river_discharge_median:
+                        type: string
+                      river_discharge_max:
+                        type: string
+                      river_discharge_min:
+                        type: string
+                      river_discharge_p25:
+                        type: string
+                      river_discharge_p75:
+                        type: string
         '400':
           description: Bad Request
           content:

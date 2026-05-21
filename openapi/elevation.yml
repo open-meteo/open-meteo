@@ -16,6 +16,7 @@ paths:
   /v1/elevation:
     servers:
       - url: https://api.open-meteo.com
+      - url: https://customer-api.open-meteo.com
     get:
       tags:
         - Elevation API

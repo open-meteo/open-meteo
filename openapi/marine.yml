@@ -16,6 +16,7 @@ paths:
   /v1/marine:
     servers:
       - url: https://marine-api.open-meteo.com
+      - url: https://customer-marine-api.open-meteo.com
     get:
       tags:
         - Marine Weather APIs
@@ -86,7 +87,6 @@ paths:
                 - swell_wave_direction_dominant
                 - swell_wave_period_max
                 - swell_wave_peak_period_max
-                - invert_barometer_height
         - name: current
           in: query
           description: >-
@@ -239,28 +239,374 @@ paths:
                     type: string
                   hourly:
                     type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      wave_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wave_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wave_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wave_peak_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_peak_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_peak_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      secondary_swell_wave_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      secondary_swell_wave_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      secondary_swell_wave_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      tertiary_swell_wave_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      tertiary_swell_wave_period:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      tertiary_swell_wave_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_level_height_msl:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_surface_temperature:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ocean_current_velocity:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ocean_current_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
                   hourly_units:
                     type: object
-                    additionalProperties:
-                      type: string
+                    properties:
+                      time:
+                        type: string
+                      wave_height:
+                        type: string
+                      wave_direction:
+                        type: string
+                      wave_period:
+                        type: string
+                      wave_peak_period:
+                        type: string
+                      wind_wave_height:
+                        type: string
+                      wind_wave_direction:
+                        type: string
+                      wind_wave_period:
+                        type: string
+                      wind_wave_peak_period:
+                        type: string
+                      swell_wave_height:
+                        type: string
+                      swell_wave_direction:
+                        type: string
+                      swell_wave_period:
+                        type: string
+                      swell_wave_peak_period:
+                        type: string
+                      secondary_swell_wave_height:
+                        type: string
+                      secondary_swell_wave_period:
+                        type: string
+                      secondary_swell_wave_direction:
+                        type: string
+                      tertiary_swell_wave_height:
+                        type: string
+                      tertiary_swell_wave_period:
+                        type: string
+                      tertiary_swell_wave_direction:
+                        type: string
+                      sea_level_height_msl:
+                        type: string
+                      sea_surface_temperature:
+                        type: string
+                      ocean_current_velocity:
+                        type: string
+                      ocean_current_direction:
+                        type: string
                   daily:
                     type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      wave_height_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wave_direction_dominant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wave_period_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_height_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_direction_dominant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_period_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_wave_peak_period_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_height_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_direction_dominant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_period_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      swell_wave_peak_period_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
                   daily_units:
                     type: object
-                    additionalProperties:
-                      type: string
+                    properties:
+                      time:
+                        type: string
+                      wave_height_max:
+                        type: string
+                      wave_direction_dominant:
+                        type: string
+                      wave_period_max:
+                        type: string
+                      wind_wave_height_max:
+                        type: string
+                      wind_wave_direction_dominant:
+                        type: string
+                      wind_wave_period_max:
+                        type: string
+                      wind_wave_peak_period_max:
+                        type: string
+                      swell_wave_height_max:
+                        type: string
+                      swell_wave_direction_dominant:
+                        type: string
+                      swell_wave_period_max:
+                        type: string
+                      swell_wave_peak_period_max:
+                        type: string
                   current:
                     type: object
+                    properties:
+                      time:
+                        type: string
+                      interval:
+                        type: integer
+                      wave_height:
+                        type: number
+                        format: float
+                      wave_direction:
+                        type: number
+                        format: float
+                      wave_period:
+                        type: number
+                        format: float
+                      wind_wave_height:
+                        type: number
+                        format: float
+                      wind_wave_direction:
+                        type: number
+                        format: float
+                      wind_wave_period:
+                        type: number
+                        format: float
+                      wind_wave_peak_period:
+                        type: number
+                        format: float
+                      swell_wave_height:
+                        type: number
+                        format: float
+                      swell_wave_direction:
+                        type: number
+                        format: float
+                      swell_wave_period:
+                        type: number
+                        format: float
+                      swell_wave_peak_period:
+                        type: number
+                        format: float
+                      sea_surface_temperature:
+                        type: number
+                        format: float
+                      ocean_current_velocity:
+                        type: number
+                        format: float
+                      ocean_current_direction:
+                        type: number
+                        format: float
                   current_units:
                     type: object
-                    additionalProperties:
-                      type: string
+                    properties:
+                      time:
+                        type: string
+                      wave_height:
+                        type: string
+                      wave_direction:
+                        type: string
+                      wave_period:
+                        type: string
+                      wind_wave_height:
+                        type: string
+                      wind_wave_direction:
+                        type: string
+                      wind_wave_period:
+                        type: string
+                      wind_wave_peak_period:
+                        type: string
+                      swell_wave_height:
+                        type: string
+                      swell_wave_direction:
+                        type: string
+                      swell_wave_period:
+                        type: string
+                      swell_wave_peak_period:
+                        type: string
+                      sea_surface_temperature:
+                        type: string
+                      ocean_current_velocity:
+                        type: string
+                      ocean_current_direction:
+                        type: string
                   minutely_15:
                     type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      ocean_current_velocity:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ocean_current_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_level_height_msl:
+                        type: array
+                        items:
+                          type: number
+                          format: float
                   minutely_15_units:
                     type: object
-                    additionalProperties:
-                      type: string
+                    properties:
+                      time:
+                        type: string
+                      ocean_current_velocity:
+                        type: string
+                      ocean_current_direction:
+                        type: string
+                      sea_level_height_msl:
+                        type: string
         '400':
           description: Bad Request
           content:
