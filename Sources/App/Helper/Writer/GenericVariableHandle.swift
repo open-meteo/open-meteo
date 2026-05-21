@@ -36,7 +36,7 @@ struct GenericVariableHandle: Sendable {
 
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
-    static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true fullRunSkipMeta: Bool = false, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
+    static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
             
