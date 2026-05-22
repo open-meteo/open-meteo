@@ -5,7 +5,7 @@ import Testing
 
 @Suite struct AirQualityTests {
     @Test func europeanAirQuality() {
-        #expect(EuropeanAirQuality.indexNo2(no2: -1).isNaN)
+        #expect(EuropeanAirQuality.indexNo2(no2: -1) == -0.5)
         #expect(EuropeanAirQuality.indexNo2(no2: 0) == 0)
         #expect(EuropeanAirQuality.indexNo2(no2: 20) == 10)
         #expect(EuropeanAirQuality.indexNo2(no2: 65) == 30)

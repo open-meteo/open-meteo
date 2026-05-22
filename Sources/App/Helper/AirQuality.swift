@@ -103,14 +103,17 @@ extension Array where Element == Float {
     // Find the postion in an array and return a linear interpolated position in case it is between 2 values
     // If the search values is larger then the maximum, an extrapolated value will be returned
     fileprivate func positionExtrapolated(of search: Float) -> Float {
-        var previous = Float.nan
+        guard count >= 2 else {
+            return count == 1 ? 0 : .nan
+        }
+        var previous = self[0]
         var slope = Float.nan
-        for (i, value) in self.enumerated() {
-            slope = (value - previous)
-            if search < value {
+        for i in 1..<count {
+            slope = (self[i] - previous)
+            if search < self[i] {
                 return Float(i - 1) + (search - previous) / slope
             }
-            previous = value
+            previous = self[i]
         }
         return Float(count - 1) + (search - previous) / slope
     }

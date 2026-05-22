@@ -67,14 +67,14 @@ enum WeatherCode: Int {
         if (convectivePrecipitation ?? 0) > 0 || (cape ?? 0) >= 800 {
             switch snowfallCentimeters / modelDtHours {
             case 0.01..<0.2: return .slightSnowShowers
-            case 0.2..<0.8: return .slightSnowShowers
+            case 0.2..<0.8: return .heavySnowShowers
             case 0.8...: return .heavySnowShowers
             default: break
             }
             switch precipitation / modelDtHours {
             case 1.3..<2.5: return .slightRainShowers
             case 2.5..<7.6: return .moderateRainShowers
-            case 7.6...: return .moderateRainShowers
+            case 7.6...: return .heavyRainShowers
             default: break
             }
         }
