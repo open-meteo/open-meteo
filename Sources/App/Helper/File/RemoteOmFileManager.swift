@@ -128,12 +128,14 @@ fileprivate final actor RemoteFileManagerCache {
     final class Entry {
         var value: LocalOrRemote?
         var lastValidated: Timestamp
+        var lastValidatedLocal: Timestamp
         var lastAccessed: Timestamp
         
         init(value: LocalOrRemote?, lastValidated: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
             self.value = value
             self.lastValidated = lastValidated
             self.lastAccessed = lastAccessed
+            self.lastValidatedLocal = .now()
         }
     }
     
@@ -287,23 +289,23 @@ fileprivate final actor RemoteFileManagerCache {
             }
             
             // Check if local files got deleted or overwritten every minute
-            if case .local(let local) = entry.value, entry.lastValidated < now.subtract(minutes: 1) {
+            if case .local(let local) = entry.value, entry.lastValidatedLocal < now.subtract(minutes: 1) {
                 if local.fn.file.wasDeleted() {
                     statistics.localModified += 1
                     cache.removeValue(forKey: key)
                     continue
                 }
-                entry.lastValidated = now
+                entry.lastValidatedLocal = now
             }
             
             // Check if a local file is now available every minute
-            if entry.value == nil, entry.lastValidated < now.subtract(minutes: 1) {
+            if entry.value == nil, entry.lastValidatedLocal < now.subtract(minutes: 1) {
                 if FileManager.default.fileExists(atPath: key2.getFilePath()) {
                     statistics.localModified += 1
                     cache.removeValue(forKey: key)
                     continue
                 }
-                entry.lastValidated = now
+                entry.lastValidatedLocal = now
             }
             
             if let remoteFile = key2.getRemoteUrl() {
