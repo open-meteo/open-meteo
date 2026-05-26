@@ -112,28 +112,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let timestamps = domain.forecastTimestamps(for: run)
         logger.info("Processing \(timestamps.count) WeatherNext timesteps from Zarr")
 
-        let googleToken = try await GoogleCloudStorageAuth(
-            client: application.dedicatedHttpClient,
-            logger: application.logger
-        ).getAccessToken()
-
-        let storage = try S3CompatibleStorage(
-            baseURL: "https://storage.googleapis.com/weathernext",
-            additionalHeaders: ["Authorization": "Bearer \(googleToken)"]
-        )
-
-        let zarrRootPath = WeatherNextDomain.zarrRunPath(server: server, run: run)
-        logger.info("Opening Zarr: \(zarrRootPath)")
-        let root = try await ZarrGroup(storage: storage, path: zarrRootPath)
-
-        // Read the level coordinate array to map hPa → Zarr level index
-        let levelArray = try await root.openArray(name: "level")
-        let zarrLevelValuesRaw: [Int32] = try await levelArray.retrieveArraySubset([0..<levelArray.shape[0]])
-        let zarrLevelValues = zarrLevelValuesRaw.map(Int.init)
-        let levelIndexMap = zarrLevelValues.enumerated().reduce(into: [Int: Int]()) { $0[$1.element] = $1.offset }
-        logger.info("Zarr pressure levels: \(zarrLevelValues)")
-
-        // Zarr variable names → WeatherNext variable mapping with transforms
         let surfaceZarrNames: [(zarr: String, surfaceVar: WeatherNextSurfaceVariable, transform: @Sendable ([Float]) -> [Float])] = [
             ("2m_temperature", .temperature_2m, { $0.map { $0 - 273.15 } }),
             ("mean_sea_level_pressure", .pressure_msl, { $0.map { $0 * 0.01 } }),
@@ -154,6 +132,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             ("vertical_velocity", .vertical_velocity),
         ]
 
+        let zarrRootPath = WeatherNextDomain.zarrRunPath(server: server, run: run)
         let nLocations = domain.grid.ny * domain.grid.nx
 
         var allHandles = [GenericVariableHandle]()
@@ -161,6 +140,24 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         for (timeIdx, timestamp) in timestamps.enumerated() {
             logger.info("Processing timestep \(timeIdx) / \(timestamps.count): \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
+
+            // Fresh token + storage + Zarr group per timestep so the OAuth token
+            // never expires mid-run (token lifetime is 1 hour).
+            let googleToken = try await GoogleCloudStorageAuth(
+                client: application.dedicatedHttpClient,
+                logger: application.logger
+            ).getAccessToken()
+            let storage = try S3CompatibleStorage(
+                baseURL: "https://storage.googleapis.com/weathernext",
+                additionalHeaders: ["Authorization": "Bearer \(googleToken)"]
+            )
+            let root = try await ZarrGroup(storage: storage, path: zarrRootPath)
+
+            // Read the level coordinate array to map hPa → Zarr level index
+            let levelArray = try await root.openArray(name: "level")
+            let zarrLevelValuesRaw: [Int32] = try await levelArray.retrieveArraySubset([0..<levelArray.shape[0]])
+            let zarrLevelValues = zarrLevelValuesRaw.map(Int.init)
+            let levelIndexMap = zarrLevelValues.enumerated().reduce(into: [Int: Int]()) { $0[$1.element] = $1.offset }
 
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             let rhStorage = VariablePerMemberStorage<WeatherNextPressureVariable>()
