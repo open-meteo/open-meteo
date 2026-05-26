@@ -178,7 +178,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 }
             }
 
-            for member in 0..<domain.countEnsembleMember {
+            try await (0..<domain.countEnsembleMember).foreachConcurrent(nConcurrent: max(1, concurrent)) { member in
                 // ---- Read surface variables in parallel ----
                 try await zarrSurfaceArrays.foreachConcurrent(nConcurrent: max(1, concurrent)) { (zarrArray, surfaceVar, transform) in
                     let raw = try await zarrArray.retrieveArraySubset(
