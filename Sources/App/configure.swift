@@ -249,7 +249,7 @@ public func configure(_ app: Application) throws {
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
-        delay: .seconds(10),
+        delay: .seconds(1),
         RemoteFileManager.instance.backgroundTask
     )
 

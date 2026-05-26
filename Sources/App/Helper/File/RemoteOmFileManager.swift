@@ -62,7 +62,7 @@ final class RemoteFileManager: Sendable {
         }
     }
     
-    /// Called every 10 seconds from a life cycle handler on an available thread
+    /// Called every second from a life cycle handler on an available thread
     func backgroundTask(application: Application) async throws {
         try await cache.revalidate(client: application.http.client.shared, logger: application.logger)
     }
@@ -259,14 +259,16 @@ fileprivate final actor RemoteFileManagerCache {
     
     /**
      Remove entries that have not been accessed for more than 15 minutes
-     Revalidate entries older than 3 minutes.
-     Called every 10 seconds
+     Revalidate entries older than 1 minute
+     Called every second
      */
     func revalidate(client: HTTPClient, logger: Logger) async throws {
         var running = 0
         var total = 0
         statistics.ticks += 1
         let startRevalidation = DispatchTime.now()
+        
+        // TODO: Revalidation may take >100ms and could potentially block API calls. Implement a different caching system that does not block all entries while validating new entries.
         
         let now = Timestamp.now()
         let removeLastAccessedThan = now.subtract(minutes: 15)
@@ -284,18 +286,24 @@ fileprivate final actor RemoteFileManagerCache {
                 continue
             }
             
-            // Always check if local files got deleted or overwritten
-            if case .local(let local) = entry.value, local.fn.file.wasDeleted() {
-                statistics.localModified += 1
-                cache.removeValue(forKey: key)
-                continue
+            // Check if local files got deleted or overwritten every minute
+            if case .local(let local) = entry.value, entry.lastValidated < now.subtract(minutes: 1) {
+                if local.fn.file.wasDeleted() {
+                    statistics.localModified += 1
+                    cache.removeValue(forKey: key)
+                    continue
+                }
+                entry.lastValidated = now
             }
             
-            // Always check if a local file is now available
-            if entry.value == nil, FileManager.default.fileExists(atPath: key2.getFilePath()) {
-                statistics.localModified += 1
-                cache.removeValue(forKey: key)
-                continue
+            // Check if a local file is now available every minute
+            if entry.value == nil, entry.lastValidated < now.subtract(minutes: 1) {
+                if FileManager.default.fileExists(atPath: key2.getFilePath()) {
+                    statistics.localModified += 1
+                    cache.removeValue(forKey: key)
+                    continue
+                }
+                entry.lastValidated = now
             }
             
             if let remoteFile = key2.getRemoteUrl() {
