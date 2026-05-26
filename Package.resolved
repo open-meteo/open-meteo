@@ -1,5 +1,5 @@
 {
-  "originHash" : "e23c42b0641dc3edf8515f3e224ed96590e5c4e67e6ca2f66076cdb0bade2ed1",
+  "originHash" : "cde6c0f52fd9897618f4ed205c4f00ed6d8f12470b00ef1168d4d554ecabe437",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "6bbb83cbf9d886623a967a965c8fb1b73e6566f9",
         "version" : "1.22.0"
+      }
+    },
+    {
+      "identity" : "bitbytedata",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tsolomko/BitByteData",
+      "state" : {
+        "revision" : "e1a5443be67daf0833cbb5f4fa3a06a265ca3105",
+        "version" : "2.1.0"
       }
     },
     {
@@ -97,6 +106,15 @@
       "state" : {
         "revision" : "a29c4b62dd8445128e6db30f0a6fb5509fa1259c",
         "version" : "1.26.0"
+      }
+    },
+    {
+      "identity" : "swcompression",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tsolomko/SWCompression",
+      "state" : {
+        "revision" : "c729f0baa49e91bafef3921fea663db2b75acc46",
+        "version" : "4.9.0"
       }
     },
     {
@@ -295,6 +313,15 @@
       "state" : {
         "revision" : "7c6ad0fc39d0763e0b699210e4124afd5041c5df",
         "version" : "1.6.4"
+      }
+    },
+    {
+      "identity" : "swift-zarr",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-meteo/swift-zarr.git",
+      "state" : {
+        "revision" : "51eb993b0653faa0b5dc7145137a309fe334c4c6",
+        "version" : "0.0.1"
       }
     },
     {

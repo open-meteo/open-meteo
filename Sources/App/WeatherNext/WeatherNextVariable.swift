@@ -146,6 +146,7 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
 enum WeatherNextPressureVariableType: String, CaseIterable, Sendable {
     case geopotential_height
     case relative_humidity
+    case specific_humidity
     case temperature
     case wind_u_component
     case wind_v_component
@@ -187,6 +188,8 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
             return 20
         case .relative_humidity:
             return 1
+        case .specific_humidity:
+            return 1000
         case .geopotential_height:
             return 1
         case .wind_u_component, .wind_v_component:
@@ -204,7 +207,7 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
              .wind_v_component,
              .vertical_velocity:
             return .hermite(bounds: nil)
-        case .relative_humidity:
+        case .relative_humidity, .specific_humidity:
             return .hermite(bounds: 0...100)
         }
     }
@@ -215,6 +218,8 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
             return .celsius
         case .relative_humidity:
             return .percentage
+        case .specific_humidity:
+            return .gramPerKilogram
         case .geopotential_height:
             return .metre
         case .wind_u_component, .wind_v_component, .vertical_velocity:
@@ -236,7 +241,7 @@ typealias WeatherNextVariable = SurfaceAndPressureVariable<WeatherNextSurfaceVar
 extension WeatherNextVariable {
     private static let rawPressureVariableTypes: [WeatherNextPressureVariableType] = [
         .geopotential_height,
-        .relative_humidity,
+        .specific_humidity,
         .temperature,
         .wind_u_component,
         .wind_v_component,

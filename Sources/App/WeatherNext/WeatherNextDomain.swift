@@ -124,6 +124,39 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     /// Path to the marker file that signals the latest completed run.
     static let markerFilePath = "gs://om-weathernext/latestfinishedrun"
 
+    /// Build the Zarr root path for a given run.
+    /// Pattern: `weathernext_2_0_0/zarr/2025_to_present/{YYYYMMDD}_{HH}hr_01_preds/predictions.zarr/`
+    static func zarrRunPath(server: String, run: Timestamp) -> String {
+        let floored = run.floor(toNearest: 6 * 3600)
+        return "\(server)\(floored.format_YYYYMMdd)_\(floored.hour.zeroPadded(len: 2))hr_01_preds/predictions.zarr/"
+    }
+
+    /// Build the Zarr success marker path for a given run.
+    /// Pattern: `gs://weathernext/{server}{YYYYMMDD}_{HH}hr_01_preds/success`
+    static func zarrSuccessPath(server: String, run: Timestamp) -> String {
+        let floored = run.floor(toNearest: 6 * 3600)
+        return "gs://weathernext/\(server)\(floored.format_YYYYMMdd)_\(floored.hour.zeroPadded(len: 2))hr_01_preds/success"
+    }
+
+    static func parseRunTimestampFromZarrPath(_ runDirName: String) throws -> Timestamp {
+        let parts = runDirName.split(separator: "_")
+        guard parts.count >= 3 else {
+            throw WeatherNextDownloaderError.notImplemented("Invalid Zarr run directory: '\(runDirName)'")
+        }
+        let hourStr = String(parts[1].dropLast(2))
+        let dateStr = String(parts[0])
+        guard dateStr.count == 8 else {
+            throw WeatherNextDownloaderError.notImplemented("Invalid Zarr run date: '\(dateStr)'")
+        }
+        let yearStr = String(dateStr.prefix(4))
+        let monthStr = String(dateStr.dropFirst(4).prefix(2))
+        let dayStr = String(dateStr.dropFirst(6).prefix(2))
+        guard let year = Int(yearStr), let month = Int(monthStr), let day = Int(dayStr), let hour = Int(hourStr) else {
+            throw WeatherNextDownloaderError.notImplemented("Could not parse Zarr run: '\(runDirName)'")
+        }
+        return Timestamp(year, month, day, hour)
+    }
+
     /// Parse a WeatherNext marker string (e.g. `20260430_06hr_01_preds`) into a Timestamp.
     /// The format is `YYYYMMDD_HHhr_01_preds` where HH is the zero-padded hour (00–23).
     static func parseTimestampFromMarker(_ marker: String) throws -> Timestamp {

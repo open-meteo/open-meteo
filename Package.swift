@@ -28,6 +28,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
+        .package(url: "https://github.com/open-meteo/swift-zarr.git", from: "0.0.1"),
         .package(url: "https://github.com/vapor/jwt.git", from: "5.0.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
@@ -50,6 +51,7 @@ let package = Package(
         .target(
             name: "App",
             dependencies: [
+                .product(name: "SwiftZarr", package: "swift-zarr"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "JWT", package: "jwt"),
                 .product(name: "OpenMeteoSdk", package: "sdk"),
