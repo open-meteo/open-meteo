@@ -160,8 +160,8 @@ fileprivate final actor RemoteFileManagerCache {
     nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
         let localFile = key.getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
-            let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
             do {
+                let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
                 let reader = try await key.makeLocalReader(file: file)
                 return (.local(reader), .now())
             } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
