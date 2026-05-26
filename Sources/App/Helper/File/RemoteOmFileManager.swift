@@ -111,6 +111,8 @@ fileprivate final actor RemoteFileManagerCache {
         var remoteDeleted = 0
         var remoteRevalidated = 0
         var remoteCheckedExist = 0
+        var currentlyOpeningFiles = 0
+        var currentlyWaitingOnOpeningFiles = 0
         var lastPrint = Timestamp.now()
         
         mutating func reset() {
@@ -229,6 +231,7 @@ fileprivate final actor RemoteFileManagerCache {
             // Value not cached or needs to be refreshed
             cache[key] = .running([])
             do {
+                statistics.currentlyOpeningFiles += 1
                 let (data, lastValidated) = try await open(key: key.key, client: client, logger: logger, forceNew: forceNew)
                 guard case .running(let queued) = cache.updateValue(.cached(.init(value: data, lastValidated: lastValidated)), forKey: key) else {
                     fatalError("State was not .running()")
@@ -236,6 +239,7 @@ fileprivate final actor RemoteFileManagerCache {
                 queued.forEach {
                     $0.resume(with: .success(data))
                 }
+                statistics.currentlyOpeningFiles -= 1
                 return data
             } catch {
                 guard case .running(let queued) = cache.removeValue(forKey: key) else {
@@ -244,6 +248,7 @@ fileprivate final actor RemoteFileManagerCache {
                 queued.forEach({
                     $0.resume(with: .failure(error))
                 })
+                statistics.currentlyOpeningFiles -= 1
                 throw error
             }
         }
@@ -252,9 +257,11 @@ fileprivate final actor RemoteFileManagerCache {
             entry.lastAccessed = .now()
             return entry.value
         case .running(let running):
+            statistics.currentlyWaitingOnOpeningFiles += 1
             let value = try await withCheckedThrowingContinuation { continuation in
                 cache[key] = .running(running + [continuation])
             }
+            statistics.currentlyWaitingOnOpeningFiles -= 1
             return value
         }
     }
