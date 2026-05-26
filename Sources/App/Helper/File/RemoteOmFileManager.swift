@@ -366,7 +366,7 @@ fileprivate final actor RemoteFileManagerCache {
                 }
             }
         }
-        if total > 0, statistics.lastPrint > Timestamp.now().subtract(minutes: 5) {
+        if total > 0, statistics.lastPrint < Timestamp.now().subtract(minutes: 1) {
             logger.error("OmFileManager: \(total) open files, \(running) running. Revalidation took \(startRevalidation.timeElapsedPretty()). \(statistics)")
             if OpenMeteo.remoteDataDirectory != nil {
                 logger.error("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
