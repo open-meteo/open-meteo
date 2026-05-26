@@ -167,6 +167,9 @@ fileprivate final actor RemoteFileManagerCache {
             } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
                 print("[ ERROR ] Not an OpenMeteo file \(localFile)")
                 return (nil, .now())
+            } catch {
+                print("[ ERROR ] Error while opening file \(localFile): \(error.localizedDescription)")
+                throw error
             }
         }
         
