@@ -178,6 +178,7 @@ public func configure(_ app: Application) throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
+    app.asyncCommands.use(ReadOmCommand(), as: "read-test")
     app.asyncCommands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
     app.asyncCommands.use(DownloadCmaCommand(), as: "download-cma")
@@ -213,6 +214,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
+    app.asyncCommands.use(ReadOmCommand(), as: "read-om")
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
 
