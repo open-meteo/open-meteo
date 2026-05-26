@@ -46,30 +46,40 @@ struct ReadOmCommand: AsyncCommand {
 
             switch dims.count {
             case 2:
+                logger.warning("2D file in \(path)")
                 // Layout: [nLocations, nTime]
                 let nLocations = Int(dims[0])
                 let nTime = Int(dims[1])
                 guard nLocations > 0, nTime > 0 else { return }
-                let center = nLocations / 2
-                _ = try await reader.read(range: [
-                    UInt64(center) ..< UInt64(center + 1),
-                    0 ..< UInt64(nTime)
-                ])
+                for loc in 0..<nLocations {
+                    _ = try await reader.read(range: [
+                        UInt64(loc) ..< UInt64(loc+1),
+                        0 ..< UInt64(nTime)
+                    ])
+                }
+
             case 3:
                 // Layout: [ny, nx, nTime]
                 let ny = Int(dims[0])
                 let nx = Int(dims[1])
                 let nTime = Int(dims[2])
-                guard ny > 0, nx > 0, nTime > 0 else { return }
-                let cy = ny / 2
-                let cx = nx / 2
-                _ = try await reader.read(range: [
-                    UInt64(cy) ..< UInt64(cy + 1),
-                    UInt64(cx) ..< UInt64(cx + 1),
-                    0 ..< UInt64(nTime)
-                ])
+                guard ny > 0, nx > 0, nTime > 0 else { 
+                    logger.warning("Invalid dimensions in \(path)")
+                    return
+                }
+
+                // full scan
+                for y in 0..<ny {
+                    for x in 0..<nx {
+                        _ = try await reader.read(range: [
+                            UInt64(y) ..< UInt64(y+1),
+                            UInt64(x) ..< UInt64(x+1),
+                            0 ..< UInt64(nTime)
+                        ])
+                    }
+                }                
             default:
-                logger.debug("Skipping \(path): unsupported dimension count \(dims.count)")
+                logger.warning("Skipping \(path): unsupported dimension count \(dims.count)")
             }
         } catch {
             logger.warning("Failed to read \(path): \(error)")
