@@ -374,10 +374,12 @@ fileprivate final actor RemoteFileManagerCache {
             return entry.value
         case .running(let running):
             OmStatistics.currentlyWaitingOnOpeningFiles.add(1, ordering: .relaxed)
+            defer {
+                OmStatistics.currentlyWaitingOnOpeningFiles.subtract(1, ordering: .relaxed)
+            }
             let value = try await withCheckedThrowingContinuation { continuation in
                 cache[key] = .running(running + [continuation])
             }
-            OmStatistics.currentlyWaitingOnOpeningFiles.subtract(1, ordering: .relaxed)
             return value
         }
     }
