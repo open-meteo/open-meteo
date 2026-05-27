@@ -315,4 +315,28 @@ enum Meteorology {
     @inlinable static func pressureLevelHpA(altitudeAboveSeaLevelMeters: Float) -> Float {
         return 1013.25 * powf(1 - 2.25577 * 10e-6 * altitudeAboveSeaLevelMeters, 5.25588)
     }
+
+    /// Calculate moist air density in kg/m³
+    /// Uses the partial pressure approach: ρ = ρ_dry + ρ_vapour
+    /// - Parameters:
+    ///   - temperature: Temperature in Celsius
+    ///   - relativeHumidity: Relative humidity in percent (0–100)
+    ///   - pressure: Surface pressure in hPa
+    /// - Returns: Air density in kg/m³
+    @inlinable public static func airDensity(temperature: Float, relativeHumidity: Float, pressure: Float) -> Float {
+        let T = temperature + 273.15  // °C -> K
+        let p = pressure * 100        // hPa -> Pa
+
+        // Saturation vapour pressure (Pa), same formula used elsewhere in this file
+        let esat = 6.105 * exp(17.27 * temperature / (237.7 + temperature)) * 100
+        // Actual vapour pressure (Pa)
+        let e = (relativeHumidity / 100) * esat
+        // Partial pressure of dry air (Pa)
+        let pd = p - e
+
+        let Rd: Float = 287.058  // J/(kg·K) specific gas constant for dry air
+        let Rv: Float = 461.495  // J/(kg·K) specific gas constant for water vapour
+
+        return (pd / (Rd * T)) + (e / (Rv * T))
+    }
 }

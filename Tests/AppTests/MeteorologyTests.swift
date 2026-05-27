@@ -102,6 +102,17 @@ import Testing
         #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [24.06], temperature: [23.00], pressure: [1013.25]) == [100])
     }
 
+    @Test func airDensity() {
+        // ISA standard atmosphere: 15°C, 0% RH, 1013.25 hPa -> ~1.225 kg/m³
+        #expect(Meteorology.airDensity(temperature: 15, relativeHumidity: 0, pressure: 1013.25).isApproximatelyEqual(to: 1.225, absoluteTolerance: 0.001))
+        // Warm moist air is less dense
+        #expect(Meteorology.airDensity(temperature: 20, relativeHumidity: 50, pressure: 1013.25).isApproximatelyEqual(to: 1.1988, absoluteTolerance: 0.001))
+        // Cold dry air is denser
+        #expect(Meteorology.airDensity(temperature: 0, relativeHumidity: 0, pressure: 1013.25).isApproximatelyEqual(to: 1.2922, absoluteTolerance: 0.001))
+        // Low pressure
+        #expect(Meteorology.airDensity(temperature: 15, relativeHumidity: 0, pressure: 950).isApproximatelyEqual(to: 1.1485, absoluteTolerance: 0.001))
+    }
+
     @Test func pressureLevelAltitude() {
         #expect(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 1013.25).isApproximatelyEqual(to: 0, absoluteTolerance: 0.01))
         #expect(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 1012.04913).isApproximatelyEqual(to: 10, absoluteTolerance: 0.1))

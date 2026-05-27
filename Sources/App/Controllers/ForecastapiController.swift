@@ -17,7 +17,7 @@ public struct ForecastapiController: RouteCollection {
 
         categoriesRoute.getAndPost("forecast", use: WeatherApiController(
             defaultModel: .best_match,
-            alias: ["historical-forecast-api", "previous-runs-api", "single-runs-api", "seasonal-api"]).query
+            alias: ["historical-forecast-api", "previous-runs-api", "single-runs-api", "seasonal-api", "res1-api"]).query
         )
         categoriesRoute.getAndPost("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
@@ -154,7 +154,7 @@ struct WeatherApiController {
                 return .satellite
             case "seasonal-api.open-meteo.com", "customer-seasonal-api.open-meteo.com":
                 return .seasonal
-            case "api.open-meteo.com", "customer-api.open-meteo.com":
+            case "api.open-meteo.com", "customer-api.open-meteo.com", "customer-res1-api.open-meteo.com":
                 return .forecast
             case "marine-api.open-meteo.com", "customer-marine-api.open-meteo.com":
                 return .marine

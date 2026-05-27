@@ -113,6 +113,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case soil_temperature_486cm
     case soil_temperature_1458cm
     case surface_air_pressure
+    case air_density_2m
     case snowfall_height
     case surface_pressure
     case surface_temperature
@@ -793,6 +794,18 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .two(.raw(temperature), .raw(dew)) { temperature, dew, _ in
                 let relativeHumidity = zip(temperature.data, dew.data).map(Meteorology.relativeHumidity)
                 return DataAndUnit(relativeHumidity, .percentage)
+            }
+        case .air_density_2m:
+            guard
+                let temperature = Reader.variableFromString("temperature_2m"),
+                let relhum = getDeriverMap(variable: .relative_humidity_2m),
+                let pressure = getDeriverMap(variable: .surface_pressure)
+            else {
+                return nil
+            }
+            return .three(.raw(temperature), .mapped(relhum), .mapped(pressure)) { temperature, relhum, pressure, _ in
+                let airDensity = zip(temperature.data, zip(relhum.data, pressure.data)).map({Meteorology.airDensity(temperature: $0, relativeHumidity: $1.0, pressure: $1.1)})
+                return DataAndUnit(airDensity, .kilogramPerCubicMetre)
             }
         case .dewpoint_2m:
             return getDeriverMap(variable: .dew_point_2m)
