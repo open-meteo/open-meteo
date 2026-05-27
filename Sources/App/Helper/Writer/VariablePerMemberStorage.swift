@@ -50,6 +50,18 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
 }
 
 extension VariablePerMemberStorage {
+    /// Get 2 variables at once and remove them from storage, matching timestamp and member
+    func getTwoRemoving(first: V, second: V, timestamp: Timestamp, member: Int) -> (first: Array2D, second: Array2D, timestamp: Timestamp, member: Int)? {
+        let firstKey = VariableAndMember(variable: first, timestamp: timestamp, member: member)
+        let secondKey = VariableAndMember(variable: second, timestamp: timestamp, member: member)
+        guard self.data.keys.contains(firstKey) && self.data.keys.contains(secondKey) else {
+            return nil
+        }
+        let secondData = data.removeValue(forKey: secondKey)!
+        let firstData = data.removeValue(forKey: firstKey)!
+        return (firstData, secondData, timestamp, member)
+    }
+    
     /// Get 2 variables at once and remove them from storage
     func getTwoRemoving(first: V, second: V) -> (first: Array2D, second: Array2D, timestamp: Timestamp, member: Int)? {
         for key in data.keys {

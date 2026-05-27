@@ -160,7 +160,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             let levelIndexMap = zarrLevelValues.enumerated().reduce(into: [Int: Int]()) { $0[$1.element] = $1.offset }
 
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
-            let rhStorage = VariablePerMemberStorage<WeatherNextPressureVariable>()
             let precipStorage = VariablePerMemberStorage<WeatherNextSurfaceVariable>()
 
             // Pre-open Zarr arrays for this timestep
@@ -178,128 +177,137 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 }
             }
 
-            let memberConcurrency = max(1, concurrent)
-            let readConcurrency = max(8, concurrent * 4)
+            // Phase 1: members — reads, RH derivation, cloud cover.
+            // rhStorage is scoped tightly so its ~10 GB is freed before
+            // precipitation probability and finalise run.
+            let totalConcurrency = max(8, concurrent * 4)
+            do {
+                let rhStorage = VariablePerMemberStorage<WeatherNextPressureVariable>()
 
-            try await (0..<domain.countEnsembleMember).foreachConcurrent(nConcurrent: memberConcurrency) { member in
-                // Build a single flat list of read tasks so surface and pressure
-                // reads are pipelined together with no stall between the two phases.
-                var readTasks = [@Sendable () async throws -> Void]()
-                readTasks.reserveCapacity(zarrSurfaceArrays.count + allPressureReads.count)
+                var allTasks = [@Sendable () async throws -> Void]()
+                allTasks.reserveCapacity(domain.countEnsembleMember * (zarrSurfaceArrays.count + allPressureReads.count + WeatherNextPressureLevel.allCases.count + 4))
 
-                for (zarrArray, surfaceVar, transform) in zarrSurfaceArrays {
-                    readTasks.append {
-                        let raw = try await zarrArray.retrieveArraySubset(
-                            [member..<member+1, timeIdx..<timeIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                        ) as [Float]
-                        var data = transform(raw)
-                        data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+                for member in 0..<domain.countEnsembleMember {
+                    // Surface variable reads for this member
+                    for (zarrArray, surfaceVar, transform) in zarrSurfaceArrays {
+                        allTasks.append {
+                            let raw = try await zarrArray.retrieveArraySubset(
+                                [member..<member+1, timeIdx..<timeIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
+                            ) as [Float]
+                            var data = transform(raw)
+                            data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
-                        if surfaceVar == .total_precipitation_6hr && domain.countEnsembleMember > 1 {
-                            await precipStorage.set(variable: surfaceVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+                            if surfaceVar == .total_precipitation_6hr && domain.countEnsembleMember > 1 {
+                                await precipStorage.set(variable: surfaceVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+                            }
+                            try await writer.write(member: member, variable: surfaceVar, data: data)
                         }
-                        try await writer.write(member: member, variable: surfaceVar, data: data)
+                    }
+
+                    // Pressure level variable reads for this member
+                    for (zarrArray, pType, level, levelIdx) in allPressureReads {
+                        allTasks.append {
+                            var data: [Float] = try await zarrArray.retrieveArraySubset(
+                                [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
+                            )
+                            data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+
+                            let pVar = WeatherNextPressureVariable(variable: pType, level: level)
+                            let wnVar = WeatherNextVariable.pressure(pVar)
+
+                            switch pType {
+                            case .specific_humidity:
+                                await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+                            case .temperature:
+                                let celsiusData = data.map { $0 - 273.15 }
+                                await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: celsiusData, nx: domain.grid.nx, ny: domain.grid.ny))
+                            case .geopotential_height:
+                                let heightData = data.map { $0 / 9.80665 }
+                                try await writer.write(member: member, variable: wnVar, data: heightData)
+                            case .wind_u_component, .wind_v_component, .vertical_velocity:
+                                try await writer.write(member: member, variable: wnVar, data: data)
+                            case .relative_humidity:
+                                throw WeatherNextDownloaderError.notImplemented("relative humidity should not be fetched directly")
+                            }
+                        }
+                    }
+
+                    // RH derivation for this member — deletes SH + temp after use
+                    for level in WeatherNextPressureLevel.allCases {
+                        let shVar = WeatherNextPressureVariable(variable: .specific_humidity, level: level)
+                        let tempVar = WeatherNextPressureVariable(variable: .temperature, level: level)
+
+                        allTasks.append {
+                            guard let (shData, tempData, _, _) = await rhStorage.getTwoRemoving(first: shVar, second: tempVar, timestamp: timestamp, member: member) else {
+                                return
+                            }
+
+                            let rhVar = WeatherNextPressureVariable(variable: .relative_humidity, level: level)
+                            let pressure = Float(level.level)
+                            let rh = Meteorology.specificToRelativeHumidity(
+                                specificHumidity: shData.data,
+                                temperature: tempData.data,
+                                pressure: pressure
+                            )
+                            try await writer.write(member: member, variable: WeatherNextVariable.pressure(rhVar), data: rh)
+                            await rhStorage.set(variable: rhVar, timestamp: timestamp, member: member, data: Array2D(data: rh, nx: domain.grid.nx, ny: domain.grid.ny))
+                        }
+                    }
+
+                    // Cloud cover derivation for this member — deletes RH after use
+                    allTasks.append {
+                        guard await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover_low) else { return }
+                        guard let rh1000 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa1000), timestamp: timestamp, member: member)?.data,
+                              let rh925 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa925), timestamp: timestamp, member: member)?.data,
+                              let rh850 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa850), timestamp: timestamp, member: member)?.data,
+                              let rh700 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa700), timestamp: timestamp, member: member)?.data,
+                              let rh600 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa600), timestamp: timestamp, member: member)?.data,
+                              let rh500 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa500), timestamp: timestamp, member: member)?.data,
+                              let rh400 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa400), timestamp: timestamp, member: member)?.data,
+                              let rh300 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa300), timestamp: timestamp, member: member)?.data,
+                              let rh250 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa250), timestamp: timestamp, member: member)?.data,
+                              let rh200 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa200), timestamp: timestamp, member: member)?.data,
+                              let rh150 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa150), timestamp: timestamp, member: member)?.data,
+                              let rh100 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa100), timestamp: timestamp, member: member)?.data,
+                              let rh50 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa50), timestamp: timestamp, member: member)?.data else {
+                            logger.warning("Pressure level RH unavailable for cloud cover, member \(member)")
+                            return
+                        }
+
+                        let lowCC = Meteorology.cloudCoverFromRH([
+                            (rh: rh1000, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
+                            (rh: rh925,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
+                            (rh: rh850,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
+                        ])
+                        let midCC = Meteorology.cloudCoverFromRH([
+                            (rh: rh700,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
+                            (rh: rh600,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
+                            (rh: rh500,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
+                            (rh: rh400,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
+                        ])
+                        let highCC = Meteorology.cloudCoverFromRH([
+                            (rh: rh300,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
+                            (rh: rh250,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
+                            (rh: rh200,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
+                            (rh: rh150,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
+                            (rh: rh100,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
+                            (rh: rh50,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
+                        ])
+                        try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_low, data: lowCC)
+                        try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_mid, data: midCC)
+                        try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_high, data: highCC)
+                        if await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover) {
+                            let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
+                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
+                        }
                     }
                 }
 
-                for (zarrArray, pType, level, levelIdx) in allPressureReads {
-                    readTasks.append {
-                        var data: [Float] = try await zarrArray.retrieveArraySubset(
-                            [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                        )
-                        data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-
-                        let pVar = WeatherNextPressureVariable(variable: pType, level: level)
-                        let wnVar = WeatherNextVariable.pressure(pVar)
-
-                        switch pType {
-                        case .specific_humidity:
-                            await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
-                        case .temperature:
-                            let celsiusData = data.map { $0 - 273.15 }
-                            await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: celsiusData, nx: domain.grid.nx, ny: domain.grid.ny))
-                        case .geopotential_height:
-                            let heightData = data.map { $0 / 9.80665 }
-                            try await writer.write(member: member, variable: wnVar, data: heightData)
-                        case .wind_u_component, .wind_v_component, .vertical_velocity:
-                            try await writer.write(member: member, variable: wnVar, data: data)
-                        default:
-                            try await writer.write(member: member, variable: wnVar, data: data)
-                        }
-                    }
-                }
-
-                try await readTasks.foreachConcurrent(nConcurrent: readConcurrency) { task in
+                logger.info("Processing \(allTasks.count) tasks with concurrency \(totalConcurrency)")
+                try await allTasks.foreachConcurrent(nConcurrent: totalConcurrency) { task in
                     try await task()
                 }
-
-                // ---- Derive RH from specific_humidity + temperature ----
-                for level in WeatherNextPressureLevel.allCases {
-                    let shVar = WeatherNextPressureVariable(variable: .specific_humidity, level: level)
-                    let tempVar = WeatherNextPressureVariable(variable: .temperature, level: level)
-
-                    guard let shData = await rhStorage.get(variable: shVar, timestamp: timestamp, member: member)?.data,
-                          let tempData = await rhStorage.get(variable: tempVar, timestamp: timestamp, member: member)?.data else {
-                        continue
-                    }
-
-                    let rhVar = WeatherNextPressureVariable(variable: .relative_humidity, level: level)
-                    let pressure = Float(level.level)
-                    let rh = Meteorology.specificToRelativeHumidity(
-                        specificHumidity: shData,
-                        temperature: tempData,
-                        pressure: pressure
-                    )
-                    try await writer.write(member: member, variable: WeatherNextVariable.pressure(rhVar), data: rh)
-                    await rhStorage.set(variable: rhVar, timestamp: timestamp, member: member, data: Array2D(data: rh, nx: domain.grid.nx, ny: domain.grid.ny))
-                }
-
-                // ---- Derive cloud cover from RH for this member (overlaps with other members' reads) ----
-                if await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover_low) {
-                    guard let rh1000 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa1000), timestamp: timestamp, member: member)?.data,
-                          let rh925 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa925), timestamp: timestamp, member: member)?.data,
-                          let rh850 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa850), timestamp: timestamp, member: member)?.data,
-                          let rh700 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa700), timestamp: timestamp, member: member)?.data,
-                          let rh600 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa600), timestamp: timestamp, member: member)?.data,
-                          let rh500 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa500), timestamp: timestamp, member: member)?.data,
-                          let rh400 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa400), timestamp: timestamp, member: member)?.data,
-                          let rh300 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa300), timestamp: timestamp, member: member)?.data,
-                          let rh250 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa250), timestamp: timestamp, member: member)?.data,
-                          let rh200 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa200), timestamp: timestamp, member: member)?.data,
-                          let rh150 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa150), timestamp: timestamp, member: member)?.data,
-                          let rh100 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa100), timestamp: timestamp, member: member)?.data,
-                          let rh50 = await rhStorage.get(variable: .init(variable: .relative_humidity, level: .hPa50), timestamp: timestamp, member: member)?.data else {
-                        logger.warning("Pressure level RH unavailable for cloud cover, member \(member)")
-                        return
-                    }
-
-                    let lowCC = Meteorology.cloudCoverFromRH([
-                        (rh: rh1000, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
-                        (rh: rh925,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
-                        (rh: rh850,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
-                    ])
-                    let midCC = Meteorology.cloudCoverFromRH([
-                        (rh: rh700,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
-                        (rh: rh600,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
-                        (rh: rh500,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
-                        (rh: rh400,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
-                    ])
-                    let highCC = Meteorology.cloudCoverFromRH([
-                        (rh: rh300,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
-                        (rh: rh250,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
-                        (rh: rh200,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
-                        (rh: rh150,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
-                        (rh: rh100,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
-                        (rh: rh50,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
-                    ])
-                    try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_low, data: lowCC)
-                    try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_mid, data: midCC)
-                    try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_high, data: highCC)
-                    if await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover) {
-                        let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
-                        try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
-                    }
-                }
+                // rhStorage released here
             }
 
             // ---- Derive precipitation probability ----
