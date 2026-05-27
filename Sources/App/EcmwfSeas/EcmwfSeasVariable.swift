@@ -10,7 +10,7 @@ struct EcmwfSeasVariableAny: Hashable {
     let variable: any EcmwfSeasVariable
     
     static func == (lhs: EcmwfSeasVariableAny, rhs: EcmwfSeasVariableAny) -> Bool {
-        lhs.variable == rhs.variable
+        AnyHashable(lhs.variable) == AnyHashable(rhs.variable)
     }
     
     var hashValue: Int {
