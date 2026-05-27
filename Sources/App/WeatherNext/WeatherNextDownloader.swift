@@ -178,45 +178,59 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 }
             }
 
-            try await (0..<domain.countEnsembleMember).foreachConcurrent(nConcurrent: max(1, concurrent)) { member in
-                // ---- Read surface variables in parallel ----
-                try await zarrSurfaceArrays.foreachConcurrent(nConcurrent: max(1, concurrent)) { (zarrArray, surfaceVar, transform) in
-                    let raw = try await zarrArray.retrieveArraySubset(
-                        [member..<member+1, timeIdx..<timeIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                    ) as [Float]
-                    var data = transform(raw)
-                    data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+            let memberConcurrency = max(1, concurrent)
+            let readConcurrency = max(8, concurrent * 4)
 
-                    if surfaceVar == .total_precipitation_6hr && domain.countEnsembleMember > 1 {
-                        await precipStorage.set(variable: surfaceVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+            try await (0..<domain.countEnsembleMember).foreachConcurrent(nConcurrent: memberConcurrency) { member in
+                // Build a single flat list of read tasks so surface and pressure
+                // reads are pipelined together with no stall between the two phases.
+                var readTasks = [@Sendable () async throws -> Void]()
+                readTasks.reserveCapacity(zarrSurfaceArrays.count + allPressureReads.count)
+
+                for (zarrArray, surfaceVar, transform) in zarrSurfaceArrays {
+                    readTasks.append {
+                        let raw = try await zarrArray.retrieveArraySubset(
+                            [member..<member+1, timeIdx..<timeIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
+                        ) as [Float]
+                        var data = transform(raw)
+                        data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+
+                        if surfaceVar == .total_precipitation_6hr && domain.countEnsembleMember > 1 {
+                            await precipStorage.set(variable: surfaceVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+                        }
+                        try await writer.write(member: member, variable: surfaceVar, data: data)
                     }
-                    try await writer.write(member: member, variable: surfaceVar, data: data)
                 }
 
-                // ---- Read pressure level variables in parallel ----
-                try await allPressureReads.foreachConcurrent(nConcurrent: max(1, concurrent)) { (zarrArray, pType, level, levelIdx) in
-                    var data: [Float] = try await zarrArray.retrieveArraySubset(
-                        [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                    )
-                    data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+                for (zarrArray, pType, level, levelIdx) in allPressureReads {
+                    readTasks.append {
+                        var data: [Float] = try await zarrArray.retrieveArraySubset(
+                            [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
+                        )
+                        data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
-                    let pVar = WeatherNextPressureVariable(variable: pType, level: level)
-                    let wnVar = WeatherNextVariable.pressure(pVar)
+                        let pVar = WeatherNextPressureVariable(variable: pType, level: level)
+                        let wnVar = WeatherNextVariable.pressure(pVar)
 
-                    switch pType {
-                    case .specific_humidity:
-                        await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
-                    case .temperature:
-                        let celsiusData = data.map { $0 - 273.15 }
-                        await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: celsiusData, nx: domain.grid.nx, ny: domain.grid.ny))
-                    case .geopotential_height:
-                        let heightData = data.map { $0 / 9.80665 }
-                        try await writer.write(member: member, variable: wnVar, data: heightData)
-                    case .wind_u_component, .wind_v_component, .vertical_velocity:
-                        try await writer.write(member: member, variable: wnVar, data: data)
-                    default:
-                        try await writer.write(member: member, variable: wnVar, data: data)
+                        switch pType {
+                        case .specific_humidity:
+                            await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+                        case .temperature:
+                            let celsiusData = data.map { $0 - 273.15 }
+                            await rhStorage.set(variable: pVar, timestamp: timestamp, member: member, data: Array2D(data: celsiusData, nx: domain.grid.nx, ny: domain.grid.ny))
+                        case .geopotential_height:
+                            let heightData = data.map { $0 / 9.80665 }
+                            try await writer.write(member: member, variable: wnVar, data: heightData)
+                        case .wind_u_component, .wind_v_component, .vertical_velocity:
+                            try await writer.write(member: member, variable: wnVar, data: data)
+                        default:
+                            try await writer.write(member: member, variable: wnVar, data: data)
+                        }
                     }
+                }
+
+                try await readTasks.foreachConcurrent(nConcurrent: readConcurrency) { task in
+                    try await task()
                 }
 
                 // ---- Derive RH from specific_humidity + temperature ----
