@@ -63,6 +63,69 @@ final class RemoteFileManager: Sendable {
         }
     }
     
+    /// On cache miss this function is called to create a new reader
+    /// If `forceNew` is set, do not use cached meta data
+    static fileprivate func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
+        let localFile = key.getFilePath()
+        if FileManager.default.fileExists(atPath: localFile) {
+            do {
+                let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
+                let reader = try await key.makeLocalReader(file: file)
+                return (.local(reader), .now())
+            } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
+                print("[ ERROR ] Not an OpenMeteo file \(localFile)")
+                return (nil, .now())
+            } catch {
+                print("[ ERROR ] Error while opening file \(localFile): \(error.localizedDescription)")
+                throw error
+            }
+        }
+        
+        guard let client, let remoteFile = key.getRemoteUrl() else {
+            return (nil, .now())
+        }
+        let now = Timestamp.now()
+        let cachedFileMeta = forceNew ? HttpMetaCache.State.missing(lastValidated: Timestamp(0)) : HttpMetaCache.get(url: remoteFile)
+        switch cachedFileMeta {
+        case .missing(let lastValidated):
+            let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
+            if lastValidated >= now.subtract(seconds: revalidateSeconds) {
+                // safe to assume the file is still missing
+                return (nil, lastValidated)
+            }
+            // need to revalidate
+            guard let file = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), let reader = try await key.makeRemoteCaptureNotOmFile(file: file) else {
+                // file is still missing
+                return (nil, .now())
+            }
+            return (.remote(reader), lastValidated)
+            
+        case .available(let lastValidated, let count, let lastModified, let eTag):
+            let reader = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated)
+            let cached = OmReaderBlockCache(backend: reader, cache: OpenMeteo.dataBlockCache, cacheKey: reader.cacheKey)
+            let revalidateSeconds = key.revalidateEverySeconds(modificationTime: lastModified, now: now)
+            if lastValidated >= now.subtract(seconds: revalidateSeconds) {
+                /// Reuse cached meta attributes
+                guard let reader = try await key.makeRemoteCaptureNotOmFile(file: cached) else {
+                    return (nil, lastValidated)
+                }
+                return (.remote(reader), lastValidated)
+            }
+            // need to revalidate
+            guard let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) else {
+                return (nil, .now())
+            }
+            if new.cacheKey != cached.cacheKey {
+                let deletedBlocks = cached.deleteCachedBlocks(olderThanSeconds: 60)
+                logger.warning("OmFileManager: Opened stale file. New file version available. \(deletedBlocks) previously cached blocks have been deleted")
+            }
+            guard let reader = try await key.makeRemoteCaptureNotOmFile(file: new) else {
+                return (nil, .now())
+            }
+            return (.remote(reader), .now())
+        }
+    }
+    
     /**
      Remove entries that have not been accessed for more than 15 minutes
      Revalidate entries older than 1 minute
@@ -281,70 +344,7 @@ fileprivate final actor RemoteFileManagerCache {
         }
     }
     
-    var cache = [AnyRemoteFileManageable: State]()
-    
-    /// On cache miss, create a new reader
-    /// If `forceNew` is set, do not use cached meta data
-    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
-        let localFile = key.getFilePath()
-        if FileManager.default.fileExists(atPath: localFile) {
-            do {
-                let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
-                let reader = try await key.makeLocalReader(file: file)
-                return (.local(reader), .now())
-            } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
-                print("[ ERROR ] Not an OpenMeteo file \(localFile)")
-                return (nil, .now())
-            } catch {
-                print("[ ERROR ] Error while opening file \(localFile): \(error.localizedDescription)")
-                throw error
-            }
-        }
-        
-        guard let client, let remoteFile = key.getRemoteUrl() else {
-            return (nil, .now())
-        }
-        let now = Timestamp.now()
-        let cachedFileMeta = forceNew ? HttpMetaCache.State.missing(lastValidated: Timestamp(0)) : HttpMetaCache.get(url: remoteFile)
-        switch cachedFileMeta {
-        case .missing(let lastValidated):
-            let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
-            if lastValidated >= now.subtract(seconds: revalidateSeconds) {
-                // safe to assume the file is still missing
-                return (nil, lastValidated)
-            }
-            // need to revalidate
-            guard let file = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), let reader = try await key.makeRemoteCaptureNotOmFile(file: file) else {
-                // file is still missing
-                return (nil, .now())
-            }
-            return (.remote(reader), lastValidated)
-            
-        case .available(let lastValidated, let count, let lastModified, let eTag):
-            let reader = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated)
-            let cached = OmReaderBlockCache(backend: reader, cache: OpenMeteo.dataBlockCache, cacheKey: reader.cacheKey)
-            let revalidateSeconds = key.revalidateEverySeconds(modificationTime: lastModified, now: now)
-            if lastValidated >= now.subtract(seconds: revalidateSeconds) {
-                /// Reuse cached meta attributes
-                guard let reader = try await key.makeRemoteCaptureNotOmFile(file: cached) else {
-                    return (nil, lastValidated)
-                }
-                return (.remote(reader), lastValidated)
-            }
-            // need to revalidate
-            guard let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) else {
-                return (nil, .now())
-            }
-            if new.cacheKey != cached.cacheKey {
-                let deletedBlocks = cached.deleteCachedBlocks(olderThanSeconds: 60)
-                logger.warning("OmFileManager: Opened stale file. New file version available. \(deletedBlocks) previously cached blocks have been deleted")
-            }
-            guard let reader = try await key.makeRemoteCaptureNotOmFile(file: new) else {
-                return (nil, .now())
-            }
-            return (.remote(reader), .now())
-        }
-    }
+    private var cache = [AnyRemoteFileManageable: State]()
     
     /**
      Get a resource identified by a key. If the request is currently being requested, enqueue the request
@@ -356,7 +356,7 @@ fileprivate final actor RemoteFileManagerCache {
             cache[key] = .running([])
             do {
                 OmStatistics.currentlyOpeningFiles.add(1, ordering: .relaxed)
-                let (data, lastValidated) = try await open(key: key.key, client: client, logger: logger, forceNew: forceNew)
+                let (data, lastValidated) = try await RemoteFileManager.open(key: key.key, client: client, logger: logger, forceNew: forceNew)
                 guard case .running(let queued) = cache.updateValue(.cached(.init(value: data, lastValidated: lastValidated)), forKey: key) else {
                     fatalError("State was not .running()")
                 }
