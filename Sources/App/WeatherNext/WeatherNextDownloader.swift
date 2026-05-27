@@ -271,58 +271,49 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                             // If all 13 RH levels are now stored, push cloud cover.
                             // Double-execution is safe: the first CC removes the data,
                             // the second CC's `remove` returns nil → guard fails.
-                            var allPresent = true
-                            for level in WeatherNextPressureLevel.allCases {
-                                if !(await rhStorage.contains(variable: .init(variable: .relative_humidity, level: level), timestamp: timestamp, member: member)) {
-                                    allPresent = false
-                                    break
-                                }
+                            guard await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover_low) else { return }
+                            guard let rhData = await rhStorage.getAllRemoving(variables: [
+                                .init(variable: .relative_humidity, level: .hPa1000),
+                                .init(variable: .relative_humidity, level: .hPa925),
+                                .init(variable: .relative_humidity, level: .hPa850),
+                                .init(variable: .relative_humidity, level: .hPa700),
+                                .init(variable: .relative_humidity, level: .hPa600),
+                                .init(variable: .relative_humidity, level: .hPa500),
+                                .init(variable: .relative_humidity, level: .hPa400),
+                                .init(variable: .relative_humidity, level: .hPa300),
+                                .init(variable: .relative_humidity, level: .hPa250),
+                                .init(variable: .relative_humidity, level: .hPa200),
+                                .init(variable: .relative_humidity, level: .hPa150),
+                                .init(variable: .relative_humidity, level: .hPa100),
+                                .init(variable: .relative_humidity, level: .hPa50),
+                            ], timestamp: timestamp, member: member) else {
+                                return
                             }
-                            if allPresent {
-                                guard await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover_low) else { return }
-                                guard let rh1000 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa1000), timestamp: timestamp, member: member)?.data,
-                                      let rh925 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa925), timestamp: timestamp, member: member)?.data,
-                                      let rh850 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa850), timestamp: timestamp, member: member)?.data,
-                                      let rh700 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa700), timestamp: timestamp, member: member)?.data,
-                                      let rh600 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa600), timestamp: timestamp, member: member)?.data,
-                                      let rh500 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa500), timestamp: timestamp, member: member)?.data,
-                                      let rh400 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa400), timestamp: timestamp, member: member)?.data,
-                                      let rh300 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa300), timestamp: timestamp, member: member)?.data,
-                                      let rh250 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa250), timestamp: timestamp, member: member)?.data,
-                                      let rh200 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa200), timestamp: timestamp, member: member)?.data,
-                                      let rh150 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa150), timestamp: timestamp, member: member)?.data,
-                                      let rh100 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa100), timestamp: timestamp, member: member)?.data,
-                                      let rh50 = await rhStorage.remove(variable: .init(variable: .relative_humidity, level: .hPa50), timestamp: timestamp, member: member)?.data else {
-                                    return
-                                }
 
-                                let lowCC = Meteorology.cloudCoverFromRH([
-                                    (rh: rh1000, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
-                                    (rh: rh925,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
-                                    (rh: rh850,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
-                                ])
-                                let midCC = Meteorology.cloudCoverFromRH([
-                                    (rh: rh700,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
-                                    (rh: rh600,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
-                                    (rh: rh500,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
-                                    (rh: rh400,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
-                                ])
-                                let highCC = Meteorology.cloudCoverFromRH([
-                                    (rh: rh300,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
-                                    (rh: rh250,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
-                                    (rh: rh200,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
-                                    (rh: rh150,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
-                                    (rh: rh100,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
-                                    (rh: rh50,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
-                                ])
-                                try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_low, data: lowCC)
-                                try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_mid, data: midCC)
-                                try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_high, data: highCC)
-                                if await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover) {
-                                    let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
-                                    try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
-                                }
-                            }
+                            let lowCC = Meteorology.cloudCoverFromRH([
+                                (rh: rhData[0].data, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
+                                (rh: rhData[1].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
+                                (rh: rhData[2].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
+                            ])
+                            let midCC = Meteorology.cloudCoverFromRH([
+                                (rh: rhData[3].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
+                                (rh: rhData[4].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
+                                (rh: rhData[5].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
+                                (rh: rhData[6].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
+                            ])
+                            let highCC = Meteorology.cloudCoverFromRH([
+                                (rh: rhData[7].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
+                                (rh: rhData[8].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
+                                (rh: rhData[9].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
+                                (rh: rhData[10].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
+                                (rh: rhData[11].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
+                                (rh: rhData[12].data,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
+                            ])
+                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_low, data: lowCC)
+                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_mid, data: midCC)
+                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_high, data: highCC)
+                            let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
+                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
                         }
                     }
                 }

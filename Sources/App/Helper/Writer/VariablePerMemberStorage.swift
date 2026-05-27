@@ -32,10 +32,6 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
         self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
     }
 
-    func contains(variable: V, timestamp: Timestamp, member: Int) -> Bool {
-        data.keys.contains(.init(variable: variable, timestamp: timestamp, member: member))
-    }
-
     func get(variable: V, timestamp: Timestamp, member: Int) -> Array2D? {
         return data[.init(variable: variable, timestamp: timestamp, member: member)]
     }
@@ -54,6 +50,19 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
 }
 
 extension VariablePerMemberStorage {
+    func getAllRemoving(variables: [V], timestamp: Timestamp, member: Int) -> [Array2D]? {
+        let keys = variables.map { VariableAndMember(variable: $0, timestamp: timestamp, member: member) }
+        guard self.data.keys.contains(keys) else {
+            return nil
+        }
+        var output: [Array2D] = .init()
+        output.reserveCapacity(keys.count)
+        for key in keys {
+            output.append(data.removeValue(forKey: key)!)
+        }
+        return output
+    }
+    
     /// Get 2 variables at once and remove them from storage, matching timestamp and member
     func getTwoRemoving(first: V, second: V, timestamp: Timestamp, member: Int) -> (first: Array2D, second: Array2D, timestamp: Timestamp, member: Int)? {
         let firstKey = VariableAndMember(variable: first, timestamp: timestamp, member: member)
