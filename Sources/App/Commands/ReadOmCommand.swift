@@ -26,7 +26,7 @@ struct ReadOmCommand: AsyncCommand {
             return
         }
 
-        for case let fileURL as URL in enumerator {
+        for case let fileURL as URL in AnySequence(enumerator) {
             guard fileURL.pathExtension == "om" else { continue }
             let path = fileURL.path
             await readOmFile(path: path, logger: logger)
