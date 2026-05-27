@@ -127,117 +127,105 @@ final class RemoteFileManager: Sendable {
     }
     
     /**
-     Remove entries that have not been accessed for more than 15 minutes
-     Revalidate entries older than 1 minute
-     Called every second
-     Does not block the cache manager actor. Uses atomics to keep track of last access times.
-     Could consider some kind of tree structure with partial locks (maybe also atomic)
+     Check local and remote files for modifications
+     Called every second.
+     Removes entries that have not been accessed for more than 15 minutes.
+     Revalidates local files every minutes.
+     Revalidates remote files on demand.
+     Does not block the cache manager actor. Gets list of entries to check and validates them outside actor isolation.
      */
     func revalidate(client: HTTPClient, logger: Logger) async throws {
-        var running = 0
-        var total = 0
-        OmStatistics.ticks.add(1, ordering: .relaxed)
         let startRevalidation = DispatchTime.now()
-                
         let now = Timestamp.now()
-        let removeLastAccessedThan = now.subtract(minutes: 15)
-        for key in await cache.getKeys() {
-            let state = await cache.getEntry(key: key)
-            let key2 = key.key
-            total += 1
-            guard case .cached(let entry) = state else {
-                running += 1
-                continue
-            }
-            // Evict unused entries after 15 minutes
-            if entry.lastAccessed < removeLastAccessedThan {
-                OmStatistics.inactivity.add(1, ordering: .relaxed)
-                await cache.removeEntry(forKey: key)
-                continue
-            }
-            
-            // Check if local files got deleted or overwritten every minute
-            if case .local(let local) = entry.value, entry.lastValidatedLocal < now.subtract(minutes: 1) {
+        
+        // Remove unused entries
+        await cache.removeLastAccessed(olderThan: now.subtract(minutes: 15))
+        
+        // Every minute: Check if local files got added or deleted
+        // Local File IO is blocking, therefore we get a list of keys and check it outside actor isolation
+        for (key, entry) in await cache.entriesLastValidatedLocal(olderThan: now.subtract(minutes: 1)) {
+            if case .local(let local) = entry.value {
+                // Local file open. Check if it was deleted
                 if local.fn.file.wasDeleted() {
                     OmStatistics.localModified.add(1, ordering: .relaxed)
                     await cache.removeEntry(forKey: key)
                     continue
                 }
-                await cache.setEntry(forKey: key, value: entry.with(lastValidatedLocal: now))
-                continue
-            }
-            
-            // Check if a local file is now available every minute
-            if entry.value == nil, entry.lastValidatedLocal < now.subtract(minutes: 1) {
-                if FileManager.default.fileExists(atPath: key2.getFilePath()) {
+            } else {
+                // Local file is missing, or a remote file is open
+                // Check if a file is now available locally
+                if FileManager.default.fileExists(atPath: key.key.getFilePath()) {
                     OmStatistics.localModified.add(1, ordering: .relaxed)
                     await cache.removeEntry(forKey: key)
                     continue
                 }
-                await cache.setEntry(forKey: key, value: entry.with(lastValidatedLocal: now))
             }
-            
-            if let remoteFile = key2.getRemoteUrl() {
-                // Remote file is open
-                if case .remote(let old) = entry.value {
-                    let revalidateSeconds = key2.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
-                    if old.fn.backend.lastValidated > entry.lastValidated {
-                        /// Update meta cache to also reflect updates in `lastBackendFetchTimestamp`
-                        try HttpMetaCache.set(url: remoteFile, state: .available(lastValidated: old.fn.backend.lastValidated, contentLength: old.fn.backend.count, lastModified: old.fn.backend.lastModifiedTimestamp, eTag: old.fn.backend.eTag))
-                    }
-                    let lastValidated = max(entry.lastValidated, old.fn.backend.lastValidated)
-                    if lastValidated < now.subtract(seconds: revalidateSeconds) {
-                        await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
-                        if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) {
-                            guard old.fn.cacheKey != new.cacheKey else {
-                                await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
-                                continue // do not update if the existing entry is the same
-                            }
-                            OmStatistics.remoteModified.add(1, ordering: .relaxed)
-                            let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
-                            logger.error("OmFileManager: Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
-                            if activeBlocks.count > 0 {
-                                let startPreload = DispatchTime.now()
-                                try await new.preloadBlocks(blocks: activeBlocks)
-                                logger.error("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
-                            }
-                            guard let reader = try await key2.makeRemoteCaptureNotOmFile(file: new) else {
-                                await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
-                                continue
-                            }
-                            await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
-                        } else {
-                            // File was deleted on remote server
-                            logger.error("OmFileManager: Remote file deleted \(key).")
-                            OmStatistics.remoteDeleted.add(1, ordering: .relaxed)
-                            await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
-                        }
-                        // Remove data from local cache
-                        // Keep blocks that have been accessed less than 60 seconds ago, because they still could be used
-                        // If they are deleted, the cache might immediately write new data into the cached slot
-                        let deletedBlocks = old.fn.deleteCachedBlocks(olderThanSeconds: 60)
-                        if deletedBlocks > 0 {
-                            logger.error("OmFileManager: \(deletedBlocks) blocks have been deleted")
-                        }
-                    }
+            await cache.setEntry(forKey: key, value: entry.with(lastValidatedLocal: now))
+        }
+        
+        /// Update `HttpMetaCache` with latest `lastValidated` timestamps if required
+        /// `HttpMetaCache.set` could be blocking, therefore we perform this action outside actor isolation
+        for (remoteFile, state) in await cache.activeRemoteFilesToUpdateHttpMeta() {
+            /// Update meta cache to also reflect updates in `lastBackendFetchTimestamp`
+            try HttpMetaCache.set(url: remoteFile, state: state)
+        }
+        
+        /// Validate open remote files
+        for (key, entry) in await cache.activeRemoteFilesToValidate() {
+            // Remote file is open
+            guard let remoteFile = key.key.getRemoteUrl(), case .remote(let old) = entry.value  else {
+                continue
+            }
+            OmStatistics.remoteRevalidated.add(1, ordering: .relaxed)
+            if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) {
+                guard old.fn.cacheKey != new.cacheKey else {
+                    await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
+                    old.fn.backend.lastValidated = now
+                    continue // do not update if the existing entry is the same
                 }
-                if entry.value == nil {
-                    // Check if a remote file is now available on the remote server
-                    let revalidateSeconds = key2.revalidateEverySeconds(modificationTime: nil, now: now)
-                    if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
-                        OmStatistics.remoteCheckedExist.add(1, ordering: .relaxed)
-                        if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), let reader = try await key2.makeRemoteCaptureNotOmFile(file: new)  {
-                            OmStatistics.remoteModified.add(1, ordering: .relaxed)
-                            await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
-                        } else {
-                            await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
-                        }
-                    }
+                OmStatistics.remoteModified.add(1, ordering: .relaxed)
+                guard let reader = try await key.key.makeRemoteCaptureNotOmFile(file: new) else {
+                    await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
+                    continue
                 }
+                let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
+                logger.error("OmFileManager: Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
+                if activeBlocks.count > 0 {
+                    // TODO: Consider: While we are preloading, another call could fail and we fetch data twice. Solution could be some kind of preload manager
+                    let startPreload = DispatchTime.now()
+                    try await new.preloadBlocks(blocks: activeBlocks)
+                    logger.error("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
+                }
+                await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
+            } else {
+                // File was deleted on remote server
+                logger.error("OmFileManager: Remote file deleted \(key).")
+                OmStatistics.remoteDeleted.add(1, ordering: .relaxed)
+                await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
+            }
+            // Remove data from local cache
+            // Keep blocks that have been accessed less than 60 seconds ago, because they still could be used
+            // If they are deleted, the cache might immediately write new data into the cached slot
+            let deletedBlocks = old.fn.deleteCachedBlocks(olderThanSeconds: 60)
+            if deletedBlocks > 0 {
+                logger.error("OmFileManager: \(deletedBlocks) blocks have been deleted")
             }
         }
+        
+        /// Validate missing remote files
+        for (key, entry, remoteFile) in await cache.missingRemoteFilesToValidate() {
+            OmStatistics.remoteCheckedExist.add(1, ordering: .relaxed)
+            if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile),
+                let reader = try await key.key.makeRemoteCaptureNotOmFile(file: new)  {
+                OmStatistics.remoteModified.add(1, ordering: .relaxed)
+                await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
+            } else {
+                await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
+            }
+        }
+        let total = await cache.count()
         if total > 0, OmStatistics.lastPrintUnitTimestampSeconds.load(ordering: .relaxed) < Timestamp.now().subtract(minutes: 1).timeIntervalSince1970 {
-            logger.error("OmFileManager: \(total) open files, \(running) running. Revalidation took \(startRevalidation.timeElapsedPretty()). \(OmStatistics.toString())")
+            logger.error("OmFileManager: \(total) open files. Revalidation took \(startRevalidation.timeElapsedPretty()). \(OmStatistics.toString())")
             if OpenMeteo.remoteDataDirectory != nil {
                 logger.error("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
             }
@@ -255,7 +243,6 @@ final class RemoteFileManager: Sendable {
 /// Runtime statistics print to the console regularly
 /// Could be further improved
 enum OmStatistics {
-    static let ticks = Atomic(0)
     static let inactivity = Atomic(0)
     static let localModified = Atomic(0)
     static let remoteModified = Atomic(0)
@@ -265,7 +252,6 @@ enum OmStatistics {
     static let currentlyOpeningFiles = Atomic(0)
     static let currentlyWaitingOnOpeningFiles = Atomic(0)
     static let lastPrintUnitTimestampSeconds = Atomic(0)
-    
     
     static func reset() {
         inactivity.store(0, ordering: .relaxed)
@@ -396,12 +382,69 @@ fileprivate final actor RemoteFileManagerCache {
         }
     }
     
-    func getKeys() -> [AnyRemoteFileManageable] {
-        return cache.keys.map{$0}
+    /// If a file has not been used for 15 minutes, remove it from cache
+    func removeLastAccessed(olderThan: Timestamp) {
+        for (key, state) in cache {
+            guard case .cached(let entry) = state else {
+                continue
+            }
+            // Evict unused entries after 15 minutes
+            if entry.lastAccessed < olderThan {
+                OmStatistics.inactivity.add(1, ordering: .relaxed)
+                cache.removeValue(forKey: key)
+            }
+        }
     }
     
-    func getEntry(key: AnyRemoteFileManageable) -> State? {
-        return cache[key]
+    /// Get entries that have not been validated locally for a while
+    func entriesLastValidatedLocal(olderThan: Timestamp) -> [(key: AnyRemoteFileManageable, value: Entry)] {
+        return cache.compactMap({ (key, state) in
+            guard case .cached(let entry) = state else {
+                return nil
+            }
+            return entry.lastValidatedLocal < olderThan ? (key, entry) : nil
+        })
+    }
+    
+    /// Open files that need to be revalidated
+    func activeRemoteFilesToValidate() -> [(key: AnyRemoteFileManageable, value: Entry)] {
+        let now = Timestamp.now()
+        return cache.compactMap({ (key, state) in
+            guard case .cached(let entry) = state, case .remote(let old) = entry.value else {
+                return nil
+            }
+            let revalidateSeconds = key.key.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
+            let lastValidated = max(entry.lastValidated, old.fn.backend.lastValidated)
+            return lastValidated < now.subtract(seconds: revalidateSeconds) ? (key, entry) : nil
+        })
+    }
+    
+    /// If the backend was able to fetch data in the meantime, update the local cache
+    func activeRemoteFilesToUpdateHttpMeta() -> [(remoteFile: String, state: HttpMetaCache.State)] {
+        return cache.compactMap({ (key, state) in
+            guard case .cached(let entry) = state, case .remote(let old) = entry.value, let remoteFile = key.key.getRemoteUrl() else {
+                return nil
+            }
+            return old.fn.backend.lastValidated > entry.lastValidated ? (remoteFile, .available(
+                lastValidated: old.fn.backend.lastValidated,
+                contentLength: old.fn.backend.count,
+                lastModified: old.fn.backend.lastModifiedTimestamp,
+                eTag: old.fn.backend.eTag
+            )) : nil
+        })
+    }
+    
+    /// Files to check if they got added to the remote server
+    func missingRemoteFilesToValidate() -> [(key: AnyRemoteFileManageable, value: Entry, remoteFile: String)] {
+        let now = Timestamp.now()
+        return cache.compactMap({ (key, state) in
+            guard case .cached(let entry) = state, let remoteFile = key.key.getRemoteUrl(), entry.value == nil else {
+                return nil
+            }
+            // Check if a remote file is now available on the remote server
+            let revalidateSeconds = key.key.revalidateEverySeconds(modificationTime: nil, now: now)
+            return entry.lastValidated < now.subtract(seconds: revalidateSeconds) ? (key, entry, remoteFile) : nil
+        })
     }
     
     func setEntry(forKey key: AnyRemoteFileManageable, value: Entry) {
@@ -410,6 +453,10 @@ fileprivate final actor RemoteFileManagerCache {
     
     func removeEntry(forKey key: AnyRemoteFileManageable) {
         cache.removeValue(forKey: key)
+    }
+    
+    func count() -> Int {
+        cache.count
     }
 }
 
