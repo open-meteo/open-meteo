@@ -92,7 +92,11 @@ enum OmFileType: Hashable, RemoteFileManageable {
             }
         case .staticFile(_, _, _):
             return 24*3600
-        case .run(_, _, _):
+        case .run(_, _, let run):
+            // If run is younger than 24 hours, check every 3 minutes
+            if run.toTimestamp() > now.subtract(hours: 24) {
+                return 3*60
+            }
             return 24*3600
         }
     }

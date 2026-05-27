@@ -32,7 +32,12 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     
     /// Timestamp when the last data was successfully fetched from the backend.
     var lastValidated: Timestamp {
-        return Timestamp(lastValidatedAtomic.load(ordering: .relaxed))
+        get {
+            return Timestamp(lastValidatedAtomic.load(ordering: .relaxed))
+        }
+        set {
+            lastValidatedAtomic.store(newValue.timeIntervalSince1970, ordering: .relaxed)
+        }
     }
     
     typealias DataType = ByteBuffer
