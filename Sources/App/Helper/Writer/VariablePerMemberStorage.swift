@@ -32,6 +32,10 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
         self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
     }
 
+    func contains(variable: V, timestamp: Timestamp, member: Int) -> Bool {
+        data.keys.contains(.init(variable: variable, timestamp: timestamp, member: member))
+    }
+
     func get(variable: V, timestamp: Timestamp, member: Int) -> Array2D? {
         return data[.init(variable: variable, timestamp: timestamp, member: member)]
     }
