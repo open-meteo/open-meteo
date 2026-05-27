@@ -134,18 +134,16 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         let zarrRootPath = WeatherNextDomain.zarrRunPath(server: server, run: run)
         let nLocations = domain.grid.ny * domain.grid.nx
+        let httpClient = application.dedicatedHttpClient
 
-        var allHandles = [GenericVariableHandle]()
-        allHandles.reserveCapacity(timestamps.count * domain.countEnsembleMember * (surfaceZarrNames.count + pressureZarrNames.count * WeatherNextPressureLevel.allCases.count + 4 + 1))
-
-        for (timeIdx, timestamp) in timestamps.enumerated() {
+        let allHandles: [GenericVariableHandle] = try await timestamps.enumerated().mapConcurrent(nConcurrent: concurrent) { (timeIdx, timestamp) in
             logger.info("Processing timestep \(timeIdx) / \(timestamps.count): \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
 
             // Fresh token + storage + Zarr group per timestep so the OAuth token
             // never expires mid-run (token lifetime is 1 hour).
             let googleToken = try await GoogleCloudStorageAuth(
-                client: application.dedicatedHttpClient,
-                logger: application.logger
+                client: httpClient,
+                logger: logger
             ).getAccessToken()
             let storage = try S3CompatibleStorage(
                 baseURL: "https://storage.googleapis.com/weathernext",
@@ -184,7 +182,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             // arrives they push cloud cover inline.  No CC task in the pool.
             // rhStorage is scoped tightly so its ~10 GB is freed before
             // precipitation probability and finalise run.
-            let totalConcurrency = max(8, concurrent * 8)
+            let totalConcurrency = max(4, concurrent * 8)
             do {
                 let rhStorage = VariablePerMemberStorage<WeatherNextPressureVariable>()
                 // Look up SH and temp arrays once — deadline tasks read both per level
@@ -344,9 +342,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             }
 
             let handles = try await writer.finalise()
-            allHandles.append(contentsOf: handles)
             logger.info("Completed timestep \(timeIdx): \(handles.count) variable handles")
-        }
+            return handles
+        }.flatMap { $0 }
 
         guard !allHandles.isEmpty else {
             logger.warning("No WeatherNext data produced")
