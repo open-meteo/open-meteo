@@ -4,7 +4,7 @@ import OmFileFormat
 /// A geographic subset of a Gaussian grid backed by a flat 1D array.
 ///
 /// Local array indices `(0..<nx)` enumerate points north-to-south, then west-to-east within each
-/// latitude line — the same order as the subset extracted from the full grid.
+/// latitude line - the same order as the subset extracted from the full grid.
 struct GaussianGridArea: Gridable {
     typealias SliceType = GaussianGridAreaSlice
 
@@ -141,10 +141,10 @@ struct GaussianGridArea: Gridable {
         return GaussianGridAreaSlice(area: self, bb: bb)
     }
 
-    /// Get a 3×3 list of local indices surrounding a coordinate.
+    /// Get a 3x3 list of local indices surrounding a coordinate.
     /// Grid points are in strictly rising order, allowing optimised range reads.
-    /// Points outside the area bounds are stored as −1.
-    /// `minDistanceIndex` is −1 if no surrounding point lies within the area.
+    /// Points outside the area bounds are stored as -1.
+    /// `minDistanceIndex` is -1 if no surrounding point lies within the area.
     func getSurroundingGridpoints(lat: Float, lon: Float) -> (gridpoints: InlineArray<9, Int>, distances: InlineArray<9, Float>, minDistanceIndex: Int) {
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
@@ -194,7 +194,7 @@ struct GaussianGridArea: Gridable {
     /// Read elevation for surrounding grid points as returned from `getSurroundingGridpoints`.
     /// `onlyMinDistanceIndex`: only read elevation to cover this index. Therefore only a single read is performed.
     /// `firstPass` if false, only read data if `onlyMinDistanceIndex` does not match.
-    /// Entries with a −1 gridpoint index (outside the area) are skipped.
+    /// Entries with a -1 gridpoint index (outside the area) are skipped.
     func getSurroundingElevation(gridpoints: InlineArray<9, Int>, elevation: inout InlineArray<9, Float>, onlyMinDistanceIndex: Int, firstPass: Bool, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws {
         var start = 0
         /// Read grid elevation from list of gridpoints that might be consecutive.

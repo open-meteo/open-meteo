@@ -295,7 +295,7 @@ fileprivate final actor RemoteFileManagerCache {
     struct AnyRemoteFileManageable: Sendable, Hashable {
         let key: (any RemoteFileManageable)
         static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.key.hashValue == rhs.key.hashValue
+            return lhs.key == rhs.key
         }
         
         func hash(into hasher: inout Hasher) {

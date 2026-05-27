@@ -15,7 +15,7 @@ enum SoilTypeEra5: Int {
     case organic = 6
     case loamy = 7
 
-    /// Saturation, `θsat` in `m3^m−3`
+    /// Saturation, `θsat` in `m3^m-3`
     var saturation: Float {
         switch self {
         case .coarse:
@@ -35,7 +35,7 @@ enum SoilTypeEra5: Int {
         }
     }
 
-    /// Field Capacity, `θcap` in `m3^m−3`
+    /// Field Capacity, `θcap` in `m3^m-3`
     var fieldCapacity: Float {
         switch self {
         case .coarse:
@@ -55,7 +55,7 @@ enum SoilTypeEra5: Int {
         }
     }
 
-    /// Permanent wilting point, `θpwp` in `m3^m−3`
+    /// Permanent wilting point, `θpwp` in `m3^m-3`
     var permanentWiltingPoint: Float {
         switch self {
         case .coarse:
@@ -75,7 +75,7 @@ enum SoilTypeEra5: Int {
         }
     }
 
-    /// Residual Moisture , `θres` in `m3^m−3`
+    /// Residual Moisture , `θres` in `m3^m-3`
     var residualMoisture: Float {
         switch self {
         case .coarse:
@@ -85,7 +85,7 @@ enum SoilTypeEra5: Int {
         }
     }
 
-    /// Plant available soil moisture `θcap − θpwp` in `m3^m−3`
+    /// Plant available soil moisture `θcap - θpwp` in `m3^m-3`
     var plantAvailableSoilMoisture: Float {
         return fieldCapacity - permanentWiltingPoint
     }
