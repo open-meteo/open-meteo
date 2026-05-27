@@ -150,46 +150,47 @@ final class RemoteFileManager: Sendable {
                 continue
             }
             // Evict unused entries after 15 minutes
-            if entry.lastAccessed.load(ordering: .relaxed) < removeLastAccessedThan.timeIntervalSince1970 {
+            if entry.lastAccessed < removeLastAccessedThan {
                 OmStatistics.inactivity.add(1, ordering: .relaxed)
                 await cache.removeEntry(forKey: key)
                 continue
             }
             
             // Check if local files got deleted or overwritten every minute
-            if case .local(let local) = entry.value, entry.lastValidatedLocal.load(ordering: .relaxed) < now.subtract(minutes: 1).timeIntervalSince1970 {
+            if case .local(let local) = entry.value, entry.lastValidatedLocal < now.subtract(minutes: 1) {
                 if local.fn.file.wasDeleted() {
                     OmStatistics.localModified.add(1, ordering: .relaxed)
                     await cache.removeEntry(forKey: key)
                     continue
                 }
-                entry.lastValidatedLocal.store(now.timeIntervalSince1970, ordering: .relaxed)
+                await cache.setEntry(forKey: key, value: entry.with(lastValidatedLocal: now))
+                continue
             }
             
             // Check if a local file is now available every minute
-            if entry.value == nil, entry.lastValidatedLocal.load(ordering: .relaxed) < now.subtract(minutes: 1).timeIntervalSince1970 {
+            if entry.value == nil, entry.lastValidatedLocal < now.subtract(minutes: 1) {
                 if FileManager.default.fileExists(atPath: key2.getFilePath()) {
                     OmStatistics.localModified.add(1, ordering: .relaxed)
                     await cache.removeEntry(forKey: key)
                     continue
                 }
-                entry.lastValidatedLocal.store(now.timeIntervalSince1970, ordering: .relaxed)
+                await cache.setEntry(forKey: key, value: entry.with(lastValidatedLocal: now))
             }
             
             if let remoteFile = key2.getRemoteUrl() {
                 // Remote file is open
                 if case .remote(let old) = entry.value {
                     let revalidateSeconds = key2.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
-                    if old.fn.backend.lastValidated.timeIntervalSince1970 > entry.lastValidated.load(ordering: .relaxed) {
+                    if old.fn.backend.lastValidated > entry.lastValidated {
                         /// Update meta cache to also reflect updates in `lastBackendFetchTimestamp`
                         try HttpMetaCache.set(url: remoteFile, state: .available(lastValidated: old.fn.backend.lastValidated, contentLength: old.fn.backend.count, lastModified: old.fn.backend.lastModifiedTimestamp, eTag: old.fn.backend.eTag))
                     }
-                    let lastValidated = max(entry.lastValidated.load(ordering: .relaxed), old.fn.backend.lastValidated.timeIntervalSince1970)
-                    if lastValidated < now.subtract(seconds: revalidateSeconds).timeIntervalSince1970 {
-                        entry.lastValidated.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
-                        OmStatistics.remoteRevalidated.add(1, ordering: .relaxed)
+                    let lastValidated = max(entry.lastValidated, old.fn.backend.lastValidated)
+                    if lastValidated < now.subtract(seconds: revalidateSeconds) {
+                        await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
                         if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) {
                             guard old.fn.cacheKey != new.cacheKey else {
+                                await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
                                 continue // do not update if the existing entry is the same
                             }
                             OmStatistics.remoteModified.add(1, ordering: .relaxed)
@@ -201,15 +202,15 @@ final class RemoteFileManager: Sendable {
                                 logger.error("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
                             }
                             guard let reader = try await key2.makeRemoteCaptureNotOmFile(file: new) else {
-                                await cache.setEntry(forKey: key, value: nil)
+                                await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
                                 continue
                             }
-                            await cache.setEntry(forKey: key, value: .remote(reader))
+                            await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
                         } else {
                             // File was deleted on remote server
                             logger.error("OmFileManager: Remote file deleted \(key).")
                             OmStatistics.remoteDeleted.add(1, ordering: .relaxed)
-                            await cache.setEntry(forKey: key, value: nil)
+                            await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
                         }
                         // Remove data from local cache
                         // Keep blocks that have been accessed less than 60 seconds ago, because they still could be used
@@ -223,12 +224,13 @@ final class RemoteFileManager: Sendable {
                 if entry.value == nil {
                     // Check if a remote file is now available on the remote server
                     let revalidateSeconds = key2.revalidateEverySeconds(modificationTime: nil, now: now)
-                    if entry.lastValidated.load(ordering: .relaxed) < now.subtract(seconds: revalidateSeconds).timeIntervalSince1970 {
-                        entry.lastValidated.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+                    if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
                         OmStatistics.remoteCheckedExist.add(1, ordering: .relaxed)
                         if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), let reader = try await key2.makeRemoteCaptureNotOmFile(file: new)  {
                             OmStatistics.remoteModified.add(1, ordering: .relaxed)
-                            await cache.setEntry(forKey: key, value: .remote(reader))
+                            await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
+                        } else {
+                            await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
                         }
                     }
                 }
@@ -315,21 +317,25 @@ fileprivate final actor RemoteFileManagerCache {
         }
     }
     
-    final class Entry: Sendable {
+    struct Entry {
         let value: LocalOrRemote?
-        let lastValidated: Atomic<Int>
-        let lastValidatedLocal: Atomic<Int>
-        let lastAccessed: Atomic<Int>
+        let lastValidated: Timestamp
+        let lastValidatedLocal: Timestamp
+        let lastAccessed: Timestamp
         
-        init(value: LocalOrRemote?, lastValidated: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
+        init(value: LocalOrRemote?, lastValidated: Timestamp = .now(), lastValidatedLocal: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
             self.value = value
-            self.lastValidated = .init(lastValidated.timeIntervalSince1970)
-            self.lastAccessed = .init(lastAccessed.timeIntervalSince1970)
-            self.lastValidatedLocal = .init(Timestamp.now().timeIntervalSince1970)
+            self.lastValidated = lastValidated
+            self.lastValidatedLocal = lastValidatedLocal
+            self.lastAccessed = lastAccessed
+        }
+        
+        func with(value: LocalOrRemote? = nil, lastValidated: Timestamp? = nil, lastValidatedLocal: Timestamp? = nil, lastAccessed: Timestamp? = nil) -> Self {
+            return .init(value: value ?? self.value, lastValidated: lastValidated ?? self.lastValidated, lastValidatedLocal: lastValidatedLocal ?? self.lastValidatedLocal, lastAccessed: lastAccessed ?? self.lastAccessed)
         }
     }
     
-    enum State: Sendable {
+    enum State {
         /// Value and last accessed timestamp
         case cached(Entry)
         case running([CheckedContinuation<LocalOrRemote?, any Error>])
@@ -378,7 +384,7 @@ fileprivate final actor RemoteFileManagerCache {
         }
         switch state {
         case .cached(let entry):
-            entry.lastAccessed.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+            cache[key] = .cached(Entry(value: entry.value, lastValidated: entry.lastValidated, lastValidatedLocal: entry.lastValidatedLocal, lastAccessed: .now()))
             return entry.value
         case .running(let running):
             OmStatistics.currentlyWaitingOnOpeningFiles.add(1, ordering: .relaxed)
@@ -398,8 +404,8 @@ fileprivate final actor RemoteFileManagerCache {
         return cache[key]
     }
     
-    func setEntry(forKey key: AnyRemoteFileManageable, value: LocalOrRemote?) {
-        return cache[key] = State.cached(Entry(value: value))
+    func setEntry(forKey key: AnyRemoteFileManageable, value: Entry) {
+        return cache[key] = .cached(value)
     }
     
     func removeEntry(forKey key: AnyRemoteFileManageable) {
