@@ -613,8 +613,6 @@ paths:
                 - ecmwf_ifs
                 - ecmwf_ifs025
                 - ecmwf_aifs025_single
-                - ecmwf_ifs_analysis
-                - ecmwf_ifs_analysis_long_window
                 - cma_grapes_global
                 - bom_access_global
                 - gfs_seamless

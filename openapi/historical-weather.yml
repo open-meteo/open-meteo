@@ -274,10 +274,10 @@ paths:
                 - era5_seamless
                 - era5
                 - era5_land
-                - era5_ocean
                 - ecmwf_ifs
                 - cerra
                 - era5_ensemble
+                - ecmwf_ifs_analysis_long_window
       responses:
         '200':
           description: OK
