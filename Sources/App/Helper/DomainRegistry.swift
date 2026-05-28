@@ -46,6 +46,7 @@ enum DomainRegistry: String, CaseIterable {
     case cmc_gem_rdps
     case cmc_gem_rdps_10km
     case cmc_gem_gdps_15km
+    case cmc_gem_gdps_15km_upper_level
 
     case ncep_gfs013
     case ncep_gfs025
@@ -300,6 +301,8 @@ enum DomainRegistry: String, CaseIterable {
             return GemDomain.gem_rdps_10km
         case .cmc_gem_gdps_15km:
             return GemDomain.gem_gdps_15km
+        case .cmc_gem_gdps_15km_upper_level:
+            return GemDomain.gem_gdps_15km_upper_level
         case .ncep_gfs013:
             return GfsDomain.gfs013
         case .ncep_gfs025:

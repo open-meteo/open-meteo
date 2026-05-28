@@ -71,6 +71,13 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
 
     func gribName(domain: GemDomain) -> String? {
         switch domain {
+        case .gem_gdps_15km_upper_level:
+            switch self {
+            case .cape:
+                return "CAPE_Sfc"
+            default:
+                return nil
+            }
         case .gem_rdps_10km, .gem_gdps_15km:
             switch self {
             case .temperature_2m:
@@ -118,7 +125,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             case .precipitation:
                 return "Precip-Accum_Sfc"
             case .cape:
-                return "CAPE_Sfc"
+                return domain == .gem_gdps_15km ? nil : "CAPE_Sfc"
             case .snow_depth:
                 return "SnowDepth_Sfc" // todo check if actual snow depth or water equi
             }

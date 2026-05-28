@@ -94,6 +94,9 @@ struct GemDownload: AsyncCommand {
 
     // download seamask and height
     func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
+        if domain == .gem_gdps_15km_upper_level {
+            return
+        }
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -222,7 +225,7 @@ struct GemDownload: AsyncCommand {
                         // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                         // fatalError()
                         var grib2d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
-                        if domain == .gem_global_ensemble || domain == .gem_gdps_15km {
+                        if domain == .gem_global_ensemble || domain == .gem_gdps_15km || domain == .gem_gdps_15km_upper_level {
                             // Only ensemble model is shifted by 180°
                             grib2d.array.shift180Longitudee()
                         }

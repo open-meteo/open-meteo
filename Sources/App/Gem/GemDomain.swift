@@ -10,6 +10,8 @@ import OmFileFormat
 enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_global
     case gem_gdps_15km
+    /// pressure level data and some atmospheric variables use 3-hourly
+    case gem_gdps_15km_upper_level
     case gem_regional
     case gem_rdps_10km
     case gem_hrdps_continental
@@ -36,6 +38,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return .cmc_gem_rdps_10km
         case .gem_gdps_15km:
             return .cmc_gem_gdps_15km
+        case .gem_gdps_15km_upper_level:
+            return .cmc_gem_gdps_15km_upper_level
         case .gem_hrdps_continental:
             return .cmc_gem_hrdps
         case .gem_hrdps_west:
@@ -51,6 +55,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gem_global_ensemble_mean:
             return .cmc_gem_geps
+        case .gem_gdps_15km_upper_level:
+            return .cmc_gem_gdps_15km
         default:
             return domainRegistry
         }
@@ -66,7 +72,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
 
     var dtSeconds: Int {
         switch self {
-        case .gem_global:
+        case .gem_global, .gem_gdps_15km_upper_level:
             return 3 * 3600
         case .gem_gdps_15km:
             return 3600
@@ -82,7 +88,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     }
     var isGlobal: Bool {
         switch self {
-        case .gem_global, .gem_gdps_15km:
+        case .gem_global, .gem_gdps_15km, .gem_gdps_15km_upper_level:
             return true
         case .gem_regional, .gem_rdps_10km:
             return false
@@ -97,7 +103,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .gem_global, .gem_gdps_15km:
+        case .gem_global, .gem_gdps_15km, .gem_gdps_15km_upper_level:
             return 12 * 3600
         case .gem_regional, .gem_rdps_10km, .gem_hrdps_continental:
             return 6 * 3600
@@ -112,7 +118,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .gem_global, .gem_gdps_15km:
+        case .gem_global, .gem_gdps_15km, .gem_gdps_15km_upper_level:
             // First hours 3:40 h delay, second part 6.5 h delay
             // every 12 hours
             return t.add(-3 * 3600).floor(toNearest: 12 * 3600)
@@ -137,7 +143,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
 
     func getForecastHours(run: Timestamp) -> [Int] {
         switch self {
-        case .gem_global:
+        case .gem_global, .gem_gdps_15km_upper_level:
             return Array(stride(from: 0, through: 240, by: 3))
         case .gem_gdps_15km:
             // 1-hourly unril 84, then 3 hourly
@@ -159,8 +165,10 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     /// pressure levels
     var levels: [Int] {
         switch self {
-        case .gem_global, .gem_regional, .gem_rdps_10km, .gem_gdps_15km:
+        case .gem_global, .gem_regional, .gem_rdps_10km, .gem_gdps_15km_upper_level:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10/*, 5, 1*/].reversed() // 5 and 1 not available for dewpoint
+        case .gem_gdps_15km:
+            return []
         case .gem_hrdps_continental:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
         case .gem_hrdps_west:
@@ -173,7 +181,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
 
     var countEnsembleMember: Int {
         switch self {
-        case .gem_global, .gem_gdps_15km:
+        case .gem_global, .gem_gdps_15km, .gem_gdps_15km_upper_level:
             return 1
         case .gem_regional, .gem_rdps_10km:
             return 1
@@ -199,7 +207,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return "\(server)model_gem_regional/10km/grib2/\(run.hh)/\(h3)/CMC_reg_\(gribName)_ps10km_\(yyyymmddhh)_P\(h3).grib2"
         case .gem_rdps_10km:
             return "\(server)model_rdps/10km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_RDPS_\(gribName)_RLatLon0.09_PT\(h3)H.grib2"
-        case .gem_gdps_15km:
+        case .gem_gdps_15km, .gem_gdps_15km_upper_level:
             // https://hpfx.collab.science.gc.ca/20260527/WXO-DD/model_gdps/15km/00/000/20260527T00Z_MSC_GDPS_AirTemp_AGL-2m_LatLon0.15_PT000H.grib2
             return "\(server)model_gdps/15km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_GDPS_\(gribName)_LatLon0.15_PT\(h3)H.grib2"
         case .gem_hrdps_continental:
@@ -219,6 +227,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gem_global:
             return 110
+        case .gem_gdps_15km_upper_level:
+            return (240 + 24) / 3
         case .gem_gdps_15km:
             return 240 + 24
         case .gem_regional, .gem_rdps_10km:
@@ -234,12 +244,12 @@ enum GemDomain: String, GenericDomain, CaseIterable {
 
     var grid: any Gridable {
         switch self {
-        case .gem_global, .gem_gdps_15km:
+        case .gem_global, .gem_gdps_15km, .gem_gdps_15km_upper_level:
             return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
         case .gem_regional:
             return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
         case .gem_rdps_10km:
-            // TODO correct rotated latlon
+            // TODO validate rotated latlon
             /**
              latitudeOfFirstGridPointInDegrees = -48.806;
              longitudeOfFirstGridPointInDegrees = 306.141;
