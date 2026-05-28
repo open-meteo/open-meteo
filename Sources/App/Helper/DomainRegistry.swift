@@ -36,12 +36,16 @@ enum DomainRegistry: String, CaseIterable {
     case copernicus_era5_land_daily
     case copernicus_era5_ocean
 
+    /// retired 2026-05-27
     case cmc_gem_gdps
     case cmc_gem_geps
     case cmc_gem_geps_ensemble_mean
     case cmc_gem_hrdps
     case cmc_gem_hrdps_west
+    /// retired 2026-05-27
     case cmc_gem_rdps
+    case cmc_gem_rdps_10km
+    case cmc_gem_gdps_15km
 
     case ncep_gfs013
     case ncep_gfs025
@@ -292,6 +296,10 @@ enum DomainRegistry: String, CaseIterable {
             return GemDomain.gem_hrdps_west
         case .cmc_gem_rdps:
             return GemDomain.gem_regional
+        case .cmc_gem_rdps_10km:
+            return GemDomain.gem_rdps_10km
+        case .cmc_gem_gdps_15km:
+            return GemDomain.gem_gdps_15km
         case .ncep_gfs013:
             return GfsDomain.gfs013
         case .ncep_gfs025:

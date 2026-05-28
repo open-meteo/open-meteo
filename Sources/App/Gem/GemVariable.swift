@@ -71,6 +71,70 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
 
     func gribName(domain: GemDomain) -> String? {
         switch domain {
+        case .gem_rdps_10km, .gem_gdps_15km:
+            switch self {
+            case .temperature_2m:
+                return "AirTemp_AGL-2m"
+            case .temperature_40m:
+                return "AirTemp_AGL-40m"
+            case .temperature_80m:
+                return "AirTemp_AGL-80m"
+            case .temperature_120m:
+                return "AirTemp_AGL-120m"
+            case .relative_humidity_2m:
+                return "RelativeHumidity_AGL-2m"
+            case .cloud_cover:
+                return "TotalCloudCover_Sfc"
+            case .pressure_msl:
+                return "Pressure_MSL"
+            case .shortwave_radiation:
+                return "DownwardShortwaveRadiationFlux-Accum_Sfc"
+            case .wind_speed_10m:
+                return "WindSpeed_AGL-10m"
+            case .wind_direction_10m:
+                return "WindDir_AGL-10m"
+            case .wind_speed_40m:
+                return "WindSpeed_AGL-40m"
+            case .wind_direction_40m:
+                return "WindDir_AGL-40m"
+            case .wind_speed_80m:
+                return "WindSpeed_AGL-80m"
+            case .wind_direction_80m:
+                return "WindDir_AGL-80m"
+            case .wind_speed_120m:
+                return "WindSpeed_AGL-120m"
+            case .wind_direction_120m:
+                return "WindDir_AGL-120m"
+            case .wind_gusts_10m:
+                return "WindGust_AGL-10m"
+            case .showers:
+                return "ConvectivePrecip-Accum_Sfc"
+            case .snowfall_water_equivalent:
+                return "Snow-Accum_Sfc"
+            case .soil_temperature_0_to_10cm:
+                return "SoilTemp_DBS-0to10cm"
+            case .soil_moisture_0_to_10cm:
+                return "SoilVolumetricWaterContent_DBS-0to10cm"
+            case .precipitation:
+                return "Precip-Accum_Sfc"
+            case .cape:
+                return "CAPE_Sfc"
+            case .snow_depth:
+                return "SnowDepth_Sfc" // todo check if actual snow depth or water equi
+            }
+            // UVIndex_Sfc
+            // UVIndex-ClearSky_Sfc
+            // SoilTemp_Sfc
+            // ShowalterIndex_IsbL-0500
+            // SensibleHeatNetFlux_Sfc
+            // Runoff-Accum_Sfc
+            // Rain-Accum_Sfc
+            // KIndex_Sfc
+            // LatentHeatNetFlux_Sfc
+            // LiftedIndex-MU-VT_IsbL-0500
+            // PlanetaryBoundaryLayerHeight_Sfc
+            // SnowDensity_Sfc
+            
         case .gem_global, .gem_regional:
             switch self {
             case .temperature_2m:
@@ -476,18 +540,35 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         return (rawValue, 0)
     }
     func gribName(domain: GemDomain) -> String? {
-        let isbl = (domain == .gem_hrdps_continental || domain == .gem_hrdps_west || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
-        switch variable {
-        case .temperature:
-            return "TMP_\(isbl)"
-        case .wind_speed:
-            return "WIND_\(isbl)"
-        case .wind_direction:
-            return "WDIR_\(isbl)"
-        case .geopotential_height:
-            return "HGT_\(isbl)"
-        case .relative_humidity:
-            return "RH_\(isbl)"
+        switch domain {
+        case .gem_gdps_15km, .gem_rdps_10km:
+            let isbl = "Isbl-\(level.zeroPadded(len: 4))"
+            switch variable {
+            case .temperature:
+                return "AirTemp_\(isbl)"
+            case .wind_speed:
+                return "WindSpeed_\(isbl)"
+            case .wind_direction:
+                return "WindDir_\(isbl)"
+            case .geopotential_height:
+                return "GeopotentialHeight_\(isbl)"
+            case .relative_humidity:
+                return "RelativeHumidity_\(isbl)"
+            }
+        default:
+            let isbl = (domain == .gem_hrdps_continental || domain == .gem_hrdps_west || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
+            switch variable {
+            case .temperature:
+                return "TMP_\(isbl)"
+            case .wind_speed:
+                return "WIND_\(isbl)"
+            case .wind_direction:
+                return "WDIR_\(isbl)"
+            case .geopotential_height:
+                return "HGT_\(isbl)"
+            case .relative_humidity:
+                return "RH_\(isbl)"
+            }
         }
     }
 
