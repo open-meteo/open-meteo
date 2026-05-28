@@ -579,6 +579,12 @@ enum UkmoHeightVariableType: String, CaseIterable {
 struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: UkmoHeightVariableType
     let level: Int
+    
+    /// Only instantiate variable it level is valid
+    static func valid(level: Int) -> Bool {
+        return [20, 30, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 1000, 1250, 1500, 1750, 2000,
+         2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 5500, 6000].contains(level)
+    }
 
     var storePreviousForecast: Bool {
         switch variable {
