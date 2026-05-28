@@ -582,9 +582,6 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     }
 
     func includedFor(hour: Int, domain: GemDomain) -> Bool {
-        if domain == .gem_gdps_15km_upper_level || domain == .gem_rdps_10km {
-            return true
-        }
         if domain == .gem_global_ensemble {
             // temperature and RH is missing for level 300 hpa
             if (variable == .temperature || variable == .relative_humidity) && level == 300 {
@@ -596,9 +593,11 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         if (domain == .gem_hrdps_continental || domain == .gem_hrdps_west) && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
             return false
         }
+        /// Still not available even in newer GDPS_15km
         if hour >= 171 && hour % 6 != 0 && variable == .relative_humidity {
             return false
         }
+        /// Still not available even in newer GDPS_15km
         if hour >= 171 && hour % 6 != 0 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
             return false
         }
