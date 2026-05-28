@@ -325,7 +325,7 @@ paths:
             type: integer
             default: 7
             minimum: 0
-            maximum: 35
+            maximum: 36
         - name: past_hours
           in: query
           schema:
@@ -405,11 +405,11 @@ paths:
         - name: temporal_resolution
           in: query
           description: >-
-            Aggregate data into larger time intervals. Supported: hourly, 3_hourly,
-            6_hourly, 12_hourly, daily.
+            Aggregate data into larger time intervals. Supported: native, hourly, hourly_3,
+            hourly_6.
           schema:
             type: string
-            enum: [hourly, 3_hourly, 6_hourly, 12_hourly, daily]
+            enum: [native, hourly, hourly_3, hourly_6]
       responses:
         '200':
           description: OK

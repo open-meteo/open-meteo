@@ -50,7 +50,6 @@ paths:
                 - sea_surface_temperature
                 - snowfall_water_equivalent
                 - precipitation
-                - shortwave_radiation
                 - soil_temperature_0_to_7cm
                 - cloud_cover
                 - wind_speed_10m
@@ -314,12 +313,12 @@ paths:
         - name: forecast_days
           in: query
           description: >-
-            Number of forecast days. Up to 274 days (9 months).
+            Number of forecast days. Up to 217 days (7 months).
           schema:
             type: integer
-            default: 92
+            default: 183
             minimum: 0
-            maximum: 274
+            maximum: 217
         - name: start_date
           in: query
           description: >-

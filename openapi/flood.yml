@@ -72,12 +72,12 @@ paths:
         - name: forecast_days
           in: query
           description: >-
-            Number of forecast days. Up to 210 days.
+            Number of forecast days. Up to 366 days.
           schema:
             type: integer
             default: 92
             minimum: 0
-            maximum: 210
+            maximum: 366
         - name: start_date
           in: query
           description: >-
