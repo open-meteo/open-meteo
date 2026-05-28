@@ -249,8 +249,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_regional:
             return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
         case .gem_rdps_10km:
-            // TODO validate rotated latlon
             /**
+             Note: lat/lon coordinates are in projection space!
              latitudeOfFirstGridPointInDegrees = -48.806;
              longitudeOfFirstGridPointInDegrees = 306.141;
              latitudeOfLastGridPointInDegrees = 45.4649;
@@ -260,7 +260,15 @@ enum GemDomain: String, GenericDomain, CaseIterable {
              latitudeOfSouthernPoleInDegrees = -31.7583;
              longitudeOfSouthernPoleInDegrees = 267.597;
              */
-            return ProjectionGrid(nx: 1140, ny: 1045, latitude: -48.806...45.4649, longitude: -53.859...48.9906, projection: RotatedLatLonProjection(latitude: -31.7583, longitude: 267.597))
+            return ProjectionGrid(
+                nx: 1140,
+                ny: 1045,
+                latitudeProjectionOrigin: -48.806,
+                longitudeProjectionOrigin: 306.141 - 360,
+                dx: 0.090298,
+                dy: 0.090298,
+                projection: RotatedLatLonProjection(latitude: -31.7583 * -1, longitude: 267.597 + 180 - 360)
+            )
         case .gem_hrdps_continental:
             return ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
         case .gem_hrdps_west:
