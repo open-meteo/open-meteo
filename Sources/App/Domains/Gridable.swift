@@ -217,6 +217,11 @@ extension Gridable {
 
     /// Analyse 3x3 locations around the desired coordinate and return the best elevation match
     func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        guard !elevation.isNaN else {
+            // if no elevation is given, we cannot do terrain optimised matching, so just return nearest
+            return try await findPointNearest(lat: lat, lon: lon, elevationFile: elevationFile)
+        }
+        
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
