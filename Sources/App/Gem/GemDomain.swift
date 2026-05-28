@@ -5,6 +5,7 @@ import OmFileFormat
  Definition of GEM domains from the Canadian Weather Service
  
  Mailing list https://comm.collab.science.gc.ca/mailman3/hyperkitty/list/geomet-info@comm.collab.science.gc.ca/2026/5/
+ Docs: https://eccc-msc.github.io/open-data/readme_en/
  */
 enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_global
@@ -140,7 +141,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, through: 240, by: 3))
         case .gem_gdps_15km:
             // 1-hourly unril 84, then 3 hourly
-            return Array(stride(from: 0, to: 84, by: 31)) + Array(stride(from: 84, through: 240, by: 3))
+            return Array(stride(from: 0, to: 84, by: 1)) + Array(stride(from: 84, through: 240, by: 3))
         case .gem_regional, .gem_rdps_10km:
             return Array(stride(from: 0, through: 84, by: 1))
         case .gem_hrdps_continental:
@@ -200,7 +201,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return "\(server)model_rdps/10km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_RDPS_\(gribName)_RLatLon0.09_PT\(h3)H.grib2"
         case .gem_gdps_15km:
             // https://hpfx.collab.science.gc.ca/20260527/WXO-DD/model_gdps/15km/00/000/20260527T00Z_MSC_GDPS_AirTemp_AGL-2m_LatLon0.15_PT000H.grib2
-            return "\(server)model_rdps/10km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_GDPS_\(gribName)_LatLon0.15_PT\(h3)H.grib2"
+            return "\(server)model_gdps/15km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_GDPS_\(gribName)_LatLon0.15_PT\(h3)H.grib2"
         case .gem_hrdps_continental:
             return "\(server)model_hrdps/continental/2.5km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_HRDPS_\(gribName)_RLatLon0.0225_PT\(h3)H.grib2"
         case .gem_hrdps_west:

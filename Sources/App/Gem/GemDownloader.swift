@@ -86,7 +86,7 @@ struct GemDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        //try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadS3Bucket: signature.uploadS3Bucket, concurrent: signature.concurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -107,11 +107,14 @@ struct GemDownload: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         let terrainGribName: String
-        if domain == .gem_hrdps_west {
+        switch domain {
+        case .gem_hrdps_west:
             terrainGribName = "HGT_SFC_0"
-        } else if domain == .gem_hrdps_continental {
+        case .gem_hrdps_continental:
             terrainGribName = "HGT_Sfc"
-        } else {
+        case .gem_gdps_15km, .gem_rdps_10km:
+            terrainGribName = "GeopotentialHeight_Sfc"
+        default:
             terrainGribName = "LAND_SFC_0"
         }
         /// HGT file is not available for analysis in HRDPS
@@ -119,19 +122,40 @@ struct GemDownload: AsyncCommand {
         let terrainUrl = domain.getUrl(run: run, hour: hour, gribName: terrainGribName, server: server)
         let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
         try grib2d.load(message: message)
-        if domain == .gem_global_ensemble {
+        switch domain {
+        case .gem_global_ensemble:
             // Only ensemble model is shifted by 180° and uses geopotential
             grib2d.array.shift180Longitudee()
             grib2d.array.data.multiplyAdd(multiply: 9.80665, add: 0)
+        case .gem_gdps_15km:
+            grib2d.array.shift180Longitudee()
+        default:
+            break
         }
+        
         var height = grib2d.array.data
 
         if domain != .gem_global_ensemble {
-            let gribName = (domain == .gem_hrdps_continental) ? "LAND_Sfc" : "LAND_SFC_0"
+            let gribName: String
+            switch domain {
+            case .gem_gdps_15km, .gem_rdps_10km:
+                gribName = "LandWaterProportion_Sfc"
+            case .gem_hrdps_continental:
+                gribName = "LAND_Sfc"
+            default:
+                gribName = "LAND_SFC_0"
+            }
             let landmaskUrl = domain.getUrl(run: run, hour: 0, gribName: gribName, server: server)
             var landmask: Array2D?
             for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
                 try grib2d.load(message: message)
+                switch domain {
+                case .gem_global_ensemble, .gem_gdps_15km:
+                    // Only ensemble model is shifted by 180°
+                    grib2d.array.shift180Longitudee()
+                default:
+                    break
+                }
                 landmask = grib2d.array
             }
             if let landmask {
@@ -198,7 +222,7 @@ struct GemDownload: AsyncCommand {
                         // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                         // fatalError()
                         var grib2d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
-                        if domain == .gem_global_ensemble {
+                        if domain == .gem_global_ensemble || domain == .gem_gdps_15km {
                             // Only ensemble model is shifted by 180°
                             grib2d.array.shift180Longitudee()
                         }

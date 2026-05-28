@@ -542,7 +542,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     func gribName(domain: GemDomain) -> String? {
         switch domain {
         case .gem_gdps_15km, .gem_rdps_10km:
-            let isbl = "Isbl-\(level.zeroPadded(len: 4))"
+            let isbl = "IsbL-\(level.zeroPadded(len: 4))"
             switch variable {
             case .temperature:
                 return "AirTemp_\(isbl)"
