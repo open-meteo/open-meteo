@@ -548,7 +548,9 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     }
     func gribName(domain: GemDomain) -> String? {
         switch domain {
-        case .gem_gdps_15km, .gem_rdps_10km:
+        case .gem_gdps_15km:
+            return nil
+        case .gem_rdps_10km, .gem_gdps_15km_upper_level:
             let isbl = "IsbL-\(level.zeroPadded(len: 4))"
             switch variable {
             case .temperature:
@@ -580,6 +582,9 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     }
 
     func includedFor(hour: Int, domain: GemDomain) -> Bool {
+        if domain == .gem_gdps_15km_upper_level || domain == .gem_rdps_10km {
+            return true
+        }
         if domain == .gem_global_ensemble {
             // temperature and RH is missing for level 300 hpa
             if (variable == .temperature || variable == .relative_humidity) && level == 300 {
