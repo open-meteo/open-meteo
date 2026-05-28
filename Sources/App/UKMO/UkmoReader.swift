@@ -35,6 +35,7 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
+    case air_density_2m
 }
 
 /**
@@ -172,6 +173,10 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
         switch derived {
         case .surface(let surface):
             switch surface {
+            case .air_density_2m:
+                try await prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .pressure_msl, time: time)
             case .apparent_temperature:
                 try await prefetchData(variable: .temperature_2m, time: time)
                 try await prefetchData(variable: .wind_speed_10m, time: time)
@@ -250,6 +255,18 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
         switch derived {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
+            case .air_density_2m:
+                let temperature = try await get(raw: .temperature_2m, time: time).data
+                let relhum = try await get(raw: .relative_humidity_2m, time: time).data
+                let pressure = try await get(raw: .pressure_msl, time: time).data
+                let density = zip(temperature, zip(relhum, pressure)).map {
+                    let t = $0
+                    let relh = $1.0
+                    let pressureMsl = $1.1
+                    let surfacePressure = Meteorology.surfacePressure(temperature: t, pressure: pressureMsl, elevation: reader.targetElevation)
+                    return Meteorology.airDensity(temperature: t, relativeHumidity: relh, pressure: surfacePressure)
+                }
+                return DataAndUnit(density, .kilogramPerCubicMetre)
             case .windspeed_10m:
                 return try await get(raw: .wind_speed_10m, time: time)
             case .winddirection_10m:

@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 import CHelper
 
 enum Meteorology {
@@ -47,6 +47,17 @@ enum Meteorology {
             let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
             return p / factor
         }
+    }
+    
+    /// Calculate surface pressure, corrected by temperature.
+    static func surfacePressure(temperature: Float, pressure: Float, elevation: Float) -> Float {
+        let elevation = elevation.isNaN ? 0 : elevation
+        /// Sea level temperature in kelvin
+        let t0 = (temperature + 273.15 + 0.0065 * elevation)
+        // https://physics.stackexchange.com/questions/14678/pressure-at-a-given-altitude
+        // exponent = (g*M/r*L) = (9.80665 * 0.0289644) / (8.31447 * 0.0065)
+        let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
+        return pressure / factor
     }
     
     /// Estimate elevation from sea and surface level pressure
