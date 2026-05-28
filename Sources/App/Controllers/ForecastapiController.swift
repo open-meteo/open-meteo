@@ -925,6 +925,37 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             default: return nil
             }
         }
+        
+        func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?)? {
+            switch self {
+            case .single(let domain, let variable):
+                return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
+                guard let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                    return nil
+                }
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, prob].compactMap({$0}))
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
+                let readers = try await domains.asyncCompactMap { d in
+                    let domain: any GenericDomain = d.0
+                    let variable: any GenericVariable.Type = d.1
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers + [prob].compactMap({$0}))
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            case .multiple(let domains):
+                let readers = try await domains.asyncCompactMap { d in
+                    let domain: any GenericDomain = d.0
+                    let variable: any GenericVariable.Type = d.1
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            }
+        }
     }
     
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
@@ -1017,10 +1048,23 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
         case .bom_access_global_ensemble_mean:
             return .single(BomDomain.access_global_ensemble, VariableOrSpread<BomVariable>.self)
+        case .ukmo_global_ensemble_20km:
+            return .single(UkmoDomain.global_ensemble_20km, UkmoGlobalEnsembleVariable.self)
+        case .ukmo_uk_ensemble_2km:
+            return .single(UkmoDomain.uk_ensemble_2km, UkmoUkvEnsembleVariable.self)
         case .ukmo_global_ensemble_mean_20km:
-            return .single(UkmoDomain.global_ensemble_mean_20km, VariableOrSpread<UkmoVariable>.self)
+            return .single(UkmoDomain.global_ensemble_mean_20km, VariableOrSpread<UkmoGlobalEnsembleVariable>.self)
         case .ukmo_uk_ensemble_mean_2km:
-            return .single(UkmoDomain.uk_ensemble_mean_2km, VariableOrSpread<UkmoVariable>.self)
+            return .single(UkmoDomain.uk_ensemble_mean_2km, VariableOrSpread<UkmoUkvEnsembleVariable>.self)
+        case .ukmo_seamless:
+                return .multiple([
+                    (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
+                    (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+                ])// , precipitationProb: UkmoDomain.global_ensemble_20km) // probabilities are not calculated for UK global ens
+        case .ukmo_uk_deterministic_2km:
+            return .single(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+        case .ukmo_global_deterministic_10km:
+            return .single(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self)
         case .meteoswiss_icon_ch1_ensemble_mean:
             return .single(MeteoSwissDomain.icon_ch1_ensemble_mean, VariableOrSpread<MeteoSwissVariable>.self)
         case .meteoswiss_icon_ch2_ensemble_mean:
@@ -1087,34 +1131,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?)? {
         
         if let d = getDomainAndVariable() {
-            switch d {
-            case .single(let domain, let variable):
-                return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
-                guard let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                    return nil
-                }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
-                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, prob].compactMap({$0}))
-                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
-            case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
-                let readers = try await domains.asyncCompactMap { d in
-                    let domain: any GenericDomain = d.0
-                    let variable: any GenericVariable.Type = d.1
-                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
-                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers + [prob].compactMap({$0}))
-                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
-            case .multiple(let domains):
-                let readers = try await domains.asyncCompactMap { d in
-                    let domain: any GenericDomain = d.0
-                    let variable: any GenericVariable.Type = d.1
-                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                }
-                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
-                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
-            }
+            return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
         }
         
         switch self {
@@ -1145,10 +1162,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMulti(Array([ifsProbabilities, gfs, icon, iconEu, iconD2, ifs025, ifsHres, metno].compacted()))
             }
             // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
-            if RegionGeometry.isInUKVArea(lat: lat, lon: lon), let ukmoUk = try await UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let ukmoGlobal: (any GenericReaderProtocol)? = try await UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMulti(Array([ifsProbabilities, gfs, icon, iconEu, ifs025, ifsHres, ukmoGlobal, ukmoUk].compacted()))
+            if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
+                let mapping = DomainReaderMapping.multipleWithPrecipitationProbability([
+                    (EcmwfDomain.ifs025, EcmwfVariable.self),
+                    (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
+                    (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
+                    (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+                ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
             }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
@@ -1548,15 +1569,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .era5_ensemble, .copernicus_era5_ensemble:
             return [try await Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ukmo_seamless:
-            let ukmoGlobal: (any GenericReaderProtocol)? = try await UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ukmoUk = try await UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoGlobal, ukmoUk].compactMap({ $0 })
+            return [] // migrated to upper level
         case .ukmo_global_deterministic_10km:
-            let ukmoGlobal: (any GenericReaderProtocol)? = try await UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoGlobal].compactMap({ $0 })
+            return [] // migrated to upper level
         case .ukmo_uk_deterministic_2km:
-            let ukmoUk = try await UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoUk].compactMap({ $0 })
+            return [] // migrated to upper level
         case .ncep_nbm_conus:
             return try await NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .eumetsat_sarah3:
@@ -1623,9 +1640,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .bom_access_global_ensemble:
             return [] // migrated
         case .ukmo_global_ensemble_20km:
-            return try await UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .ukmo_uk_ensemble_2km:
-            return try await UkmoReader(domain: .uk_ensemble_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .meteoswiss_icon_ch1_ensemble:
             return try await MeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteoswiss_icon_ch2_ensemble:
@@ -1880,11 +1897,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .metno_seamless:
             return nil
         case .ukmo_seamless:
-            return nil
+            return nil // migrated
         case .ukmo_global_deterministic_10km:
-            return UkmoDomain.global_deterministic_10km
+            return nil // migrated
         case .ukmo_uk_deterministic_2km:
-            return UkmoDomain.uk_deterministic_2km
+            return nil // migrated
         case .satellite_radiation_seamless:
             return nil
         case .eumetsat_sarah3:
@@ -2144,11 +2161,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .metno_seamless:
             return nil
         case .ukmo_seamless:
-            return nil
+            return nil // migrated
         case .ukmo_global_deterministic_10km:
-            return try await UkmoReader(domain: .global_deterministic_10km, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .ukmo_uk_deterministic_2km:
-            return try await UkmoReader(domain: .uk_deterministic_2km, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .satellite_radiation_seamless:
             return nil
         case .eumetsat_sarah3:
