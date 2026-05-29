@@ -66,6 +66,7 @@ public struct ForecastapiController: RouteCollection {
             hasCurrentWeather: true,
             defaultModel: .air_quality_best_match,
             subdomain: "air-quality-api",
+            alias: ["res1-api"],
             type: .airQuality
         ).query)
         categoriesRoute.getAndPost("seasonal", use: WeatherApiController(
