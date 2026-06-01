@@ -740,6 +740,9 @@ struct TimezoneWithOffset {
 
 extension TimeZone {
     static func initWithFallback(_ identifier: String) throws -> TimeZone {
+        if let tz = TimeZone(identifier: identifier) {
+            return tz
+        }
         // Some older timezone databases may still use the old name for Kyiv
         if identifier == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiev") {
             return tz
@@ -754,12 +757,9 @@ extension TimeZone {
             return tz
         }
 
-        guard let tz = TimeZone(identifier: identifier) else {
-            if identifier == "America/Ciudad_Juarez", let tz = TimeZone(identifier: "America/Mexico_City") {
-                return tz
-            }
-            throw ForecastApiError.invalidTimezone
+        if identifier == "America/Ciudad_Juarez", let tz = TimeZone(identifier: "America/Mexico_City") {
+            return tz
         }
-        return tz
+        throw ForecastApiError.invalidTimezone
     }
 }
