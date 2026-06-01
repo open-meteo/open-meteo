@@ -1165,6 +1165,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
             if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
                 let mapping = DomainReaderMapping.multipleWithPrecipitationProbability([
+                    (GfsDomain.gfs013, GfsUvIndexVariable.self),
                     (EcmwfDomain.ifs025, EcmwfVariable.self),
                     (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                     (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),

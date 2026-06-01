@@ -147,7 +147,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .convective_inhibition:
             return .hermite(bounds: 0...10e9)
         case .uv_index:
-            return .hermite(bounds: 0...1000)
+            return .solar_backwards_averaged
         }
     }
 
