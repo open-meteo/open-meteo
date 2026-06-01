@@ -43,6 +43,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         
         @Option(name: "params", help: "ECMWF params list for downloading")
         var downloadParams: String?
+        
+        @Option(name: "short-cut-off-hour", help: "Forecast hour which to generate a short cut off and upload data_run earlier to S3")
+        var shortCutOff: String?
 
     }
 
@@ -76,9 +79,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         }
 
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        let shortCutOff = signature.shortCutOff.map(Int.init) ?? nil
 
         try await downloadEcmwfElevation(application: context.application, domain: domain, run: run)
-        let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3BucketSpatial)
+        let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3BucketSpatial, shortCutOffHour: shortCutOff)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
     }
 
@@ -340,7 +344,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, shortCutOffHour: Int?) async throws -> [GenericVariableHandle] {
         if domain == .wam {
             return try await downloadEcmwfWam(application: application, domain: domain, server: server, run: run, concurrent: concurrent, maxForecastHour: maxForecastHour, uploadS3Bucket: uploadS3Bucket)
         }
@@ -361,8 +365,13 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         let storeOnDisk = true
         /// Run AWS upload in the background
         var uploadTask: Task<(), any Error>? = nil
+        
+        /// Run AWS upload in the background
+        var uploadTaskShortCutOff: Task<(), any Error>? = nil
+        
+        var handles = [GenericVariableHandle]()
 
-        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+        for (i,timestamp) in timestamps.enumerated() {
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let time = DispatchTime.now()
             logger.info("Downloading hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
@@ -465,14 +474,22 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             logger.info("Completed hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm), elapsed \(time.timeElapsedPretty())]")
             
             let completed = i == timestamps.count - 1            
-            let handles = try await writer.finalise()
+            handles.append(contentsOf: try await writer.finalise())
             try await uploadTask?.value
             uploadTask = Task {
                 try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
-            return handles
+            
+            if hour == shortCutOffHour {
+                let handles = handles
+                uploadTaskShortCutOff = Task {
+                    try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: true, generateTimeSeries: false)
+                }
+            }
+            
         }
         try await uploadTask?.value
+        try await uploadTaskShortCutOff?.value
         await curl.printStatistics()
         return handles
     }
