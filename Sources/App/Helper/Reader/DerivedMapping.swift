@@ -27,6 +27,24 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         fatalError("DerivedMapping must not be used via string initializer")
     }
     
+    
+    static func direct(_ variable: Variable?) -> Self? {
+        guard let variable else {
+            return nil
+        }
+        return .direct(variable)
+    }
+    
+    static func windSpeed(speed: Variable?, levelFrom: Float, levelTo: Float) -> Self? {
+        guard let speed else {
+            return nil
+        }
+        let factor = Meteorology.scaleWindFactor(from: levelFrom, to: levelTo)
+        return .one(.raw(speed), {speed, _ in
+            return DataAndUnit(speed.data.map{$0*factor}, .metrePerSecond)
+        })
+    }
+    
     static func windSpeed(u: Variable?, v: Variable?) -> Self? {
         guard let u, let v else {
             return nil
