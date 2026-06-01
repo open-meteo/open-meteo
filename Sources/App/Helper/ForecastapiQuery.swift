@@ -419,20 +419,20 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         // If a single run is selected, start time-range from run
         if let run {
             let current = run.toTimestamp()
-            let daily = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_days ?? forecastDaysDefault, initialStep: 0, dtSeconds: 86400)
+            let daily = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_days ?? forecastDaysDefault, initialStep: 0, dtSeconds: 86400)
 
             let defaultForecastHours = (forecast_days ?? forecastDaysDefault)*24
-            let hourly = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_hours ?? defaultForecastHours, initialStep: run.hour, dtSeconds: 3600)
+            let hourly = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_hours ?? defaultForecastHours, initialStep: run.hour, dtSeconds: 3600)
 
             let defaultForecastMinutely15 = (forecast_hours ?? defaultForecastHours)*4
-            let minutely_15 = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_minutely_15 ?? defaultForecastMinutely15, initialStep: run.hour*4, dtSeconds: 900)
+            let minutely_15 = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_minutely_15 ?? defaultForecastMinutely15, initialStep: run.hour*4, dtSeconds: 900)
 
             return ForecastApiTimeRange(
-                dailyDisplay: daily.add(-1 * actualUtcOffset),
-                dailyRead: daily.add(-1 * utcOffset),
-                hourlyDisplay: hourly.add(-1 * actualUtcOffset),
-                hourlyRead: hourly.add(-1 * utcOffset),
-                minutely15: minutely_15.add(-1 * actualUtcOffset)
+                dailyDisplay: daily,
+                dailyRead: daily,
+                hourlyDisplay: hourly,
+                hourlyRead: hourly,
+                minutely15: minutely_15
             )
         }
 
