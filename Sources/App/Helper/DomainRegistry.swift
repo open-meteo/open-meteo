@@ -1,4 +1,5 @@
 import Foundation
+import AsyncHTTPClient
 import Logging
 
 /**
@@ -533,6 +534,15 @@ enum DomainRegistry: String, CaseIterable {
         case .ukmo_uk_ensemble_mean_2km:
             return UkmoDomain.uk_ensemble_mean_2km
         }
+    }
+    
+    /// Get meta information of a specific run
+    func getFullRunMeta(client: HTTPClient?, logger: Logger, run: Timestamp) async throws -> FullRunMetaJson? {
+        return try await RemoteFileManager.instance.get(
+            file: FullRunMetaFile.run(self, run),
+            client: client,
+            logger: logger
+        )
     }
 }
 

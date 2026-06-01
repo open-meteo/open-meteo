@@ -84,6 +84,9 @@ struct OmFileSplitter {
         
         /// Read individual runs from dedicated database
         if let run = time.run {
+            guard try await domain.getFullRunMeta(client: httpClient, logger: logger, run: run.toTimestamp()) != nil else {
+                throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
+            }
             let file = OmFileType.run(domain: domain, variable: variable, run: run)
             try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps, _) in
                 guard let timestamps else {
@@ -185,6 +188,9 @@ struct OmFileSplitter {
         
         /// Read individual runs from dedicated database
         if let run = time.run {
+            guard try await domain.getFullRunMeta(client: httpClient, logger: logger, run: run.toTimestamp()) != nil else {
+                throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
+            }
             let file = OmFileType.run(domain: domain, variable: variable.omFileName.file, run: run)
             try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps, _) in
                 guard let timestamps else {
