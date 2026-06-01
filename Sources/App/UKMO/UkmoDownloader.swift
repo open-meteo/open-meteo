@@ -341,7 +341,7 @@ struct UkmoDownload: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles
