@@ -1116,6 +1116,25 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .ocean_current_direction:
             return .windDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
+        case .soil_temperature_0cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))
+        case .soil_temperature_6cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_0_to_10cm.rawValue))
+        case .soil_temperature_18cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_10_to_40cm.rawValue))
+        case .soil_temperature_54cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_40_to_100cm.rawValue))
+            
+        case .soil_moisture_0_to_1cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
+        case .soil_moisture_1_to_3cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
+        case .soil_moisture_3_to_9cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
+        case .soil_moisture_9_to_27cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_10_to_40cm.rawValue))
+        case .soil_moisture_27_to_81cm:
+            return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_40_to_100cm.rawValue))
             
         case .soil_moisture_0_to_100cm:
             guard

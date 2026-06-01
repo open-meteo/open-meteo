@@ -1357,13 +1357,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 //            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourly, allowMinMaxTwoAggregations: true)
 //            return (hourly, daily, nil, nil)
         default:
-            let readers: [any GenericReaderProtocol] = try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, include15Min: include15Min)
-            guard readers.count > 0 else {
-                return nil
-            }
-            let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: readers)
-            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
-            return (hourlyReader, daily, nil, nil)
+            return MultiDomains.hourlyToMulti(try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, include15Min: include15Min))
         }
         
     }
