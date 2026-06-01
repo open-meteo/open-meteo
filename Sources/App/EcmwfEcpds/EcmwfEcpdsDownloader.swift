@@ -151,7 +151,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
     
     /// Download multiple runs from ECMWF MARS archives, convert them and upload to S3
-    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadS3Bucket: String?, params: String?) async throws {
+    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadS3Bucket: String?, params paramsOverwrite: String?) async throws {
         let logger = application.logger
         let dtSeconds = domain.dtSeconds
         
@@ -204,7 +204,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let paramsMain = "\(paramsSide)/rsn/sd/98.174/ocu/ocv/145.151/130.151/34.128"
             // "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/130.151/34.128"
             
-            let params = params ?? (isMainRun ? paramsMain : paramsSide)
+            let params = paramsOverwrite ?? (isMainRun ? paramsMain : paramsSide)
             
             logger.info("Downloading run \(run.iso8601_YYYY_MM_dd_HH_mm)")
             
@@ -281,6 +281,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                             while true {
                                 let lastStep = await deaverager.lastStep(variable, member) ?? 0
                                 let step = lastStep + (lastStep >= 144 ? 6 : lastStep >= 90 ? 3 : 1)
+                                
+                                /// Delta time seconds considering irregular timesteps
+                                let dtSeconds = (step - lastStep) * 3600
+                                
                                 let time = run.add(hours: step)
                                 guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
                                     break
@@ -300,8 +304,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                             return
                         }
                         
-                        // Scaling before compression with scalefactor
-                        if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                        // Scaling before compression with scalefactor. Note: does not set dtSeconds because aggregated data is processed above
+                        if let fma = variable.multiplyAdd(dtSeconds: 0) {
                             grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         
@@ -325,7 +329,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
                         let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
-                        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false)
+                        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
 
                         if let directory = OpenMeteo.dataRunDirectory, uploadS3Bucket != nil {
                             // Delete run directory after S3 upload
