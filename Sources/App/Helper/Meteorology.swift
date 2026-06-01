@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 import CHelper
 
 enum Meteorology {
@@ -47,6 +47,17 @@ enum Meteorology {
             let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
             return p / factor
         }
+    }
+    
+    /// Calculate surface pressure, corrected by temperature.
+    static func surfacePressure(temperature: Float, pressure: Float, elevation: Float) -> Float {
+        let elevation = elevation.isNaN ? 0 : elevation
+        /// Sea level temperature in kelvin
+        let t0 = (temperature + 273.15 + 0.0065 * elevation)
+        // https://physics.stackexchange.com/questions/14678/pressure-at-a-given-altitude
+        // exponent = (g*M/r*L) = (9.80665 * 0.0289644) / (8.31447 * 0.0065)
+        let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
+        return pressure / factor
     }
     
     /// Estimate elevation from sea and surface level pressure
@@ -314,5 +325,29 @@ enum Meteorology {
     /// Approximate pressure level from altitude
     @inlinable static func pressureLevelHpA(altitudeAboveSeaLevelMeters: Float) -> Float {
         return 1013.25 * powf(1 - 2.25577 * 10e-6 * altitudeAboveSeaLevelMeters, 5.25588)
+    }
+
+    /// Calculate moist air density in kg/m³
+    /// Uses the partial pressure approach: ρ = ρ_dry + ρ_vapour
+    /// - Parameters:
+    ///   - temperature: Temperature in Celsius
+    ///   - relativeHumidity: Relative humidity in percent (0–100)
+    ///   - pressure: Surface pressure in hPa
+    /// - Returns: Air density in kg/m³
+    @inlinable public static func airDensity(temperature: Float, relativeHumidity: Float, pressure: Float) -> Float {
+        let T = temperature + 273.15  // °C -> K
+        let p = pressure * 100        // hPa -> Pa
+
+        // Saturation vapour pressure (Pa), same formula used elsewhere in this file
+        let esat = 6.105 * exp(17.27 * temperature / (237.7 + temperature)) * 100
+        // Actual vapour pressure (Pa)
+        let e = (relativeHumidity / 100) * esat
+        // Partial pressure of dry air (Pa)
+        let pd = p - e
+
+        let Rd: Float = 287.058  // J/(kg·K) specific gas constant for dry air
+        let Rv: Float = 461.495  // J/(kg·K) specific gas constant for water vapour
+
+        return (pd / (Rd * T)) + (e / (Rv * T))
     }
 }

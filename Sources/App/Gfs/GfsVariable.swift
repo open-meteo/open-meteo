@@ -1,5 +1,36 @@
 import Foundation
 
+enum GfsUvIndexVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    /// only GFS013
+    case uv_index
+    case uv_index_clear_sky
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    var scalefactor: Float {
+        return 20
+    }
+
+    var interpolation: ReaderInterpolation {
+        return .solar_backwards_averaged
+    }
+
+    var unit: SiUnit {
+        return .dimensionless
+    }
+
+    var isElevationCorrectable: Bool {
+        return false
+    }
+}
+
+
 /**
  List of all surface GFS variables to download
  */
@@ -227,9 +258,9 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .diffuse_radiation:
             return .solar_backwards_averaged
         case .uv_index:
-            return .hermite(bounds: 0...1000)
+            return .solar_backwards_averaged
         case .uv_index_clear_sky:
-            return .hermite(bounds: 0...1000)
+            return .solar_backwards_averaged
         case .cape:
             return .hermite(bounds: 0...10e9)
         case .lifted_index:

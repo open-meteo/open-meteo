@@ -188,8 +188,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         case .uk_ensemble_2km:
             return Array(TimerangeDt(start: run, nTime: 127, dtSeconds: 3600))
         case .global_ensemble_20km:
-            let through = run.hour % 12 == 6 ? 180 : 198
-            return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: through, by: 6)).map({ run.add(hours: $0) })
+            let through = run.hour % 12 == 6 ? 180 : 246
+            return (Array(0..<132) + stride(from: 132, through: through, by: 3)).map({ run.add(hours: $0) })
         case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
             fatalError()
         }

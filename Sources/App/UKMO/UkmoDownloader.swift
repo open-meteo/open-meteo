@@ -265,10 +265,14 @@ struct UkmoDownload: AsyncCommand {
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
+            let inMemory = VariablePerMemberStorage<UkmoSurfaceVariable>()
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 if variable.skipHour0, timestamp == run {
                     return
@@ -281,8 +285,8 @@ struct UkmoDownload: AsyncCommand {
                 let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
                 let data = try memory.readUkmoNetCDF()
                 logger.info("Processing \(data.name) [\(data.unit)]")
-                for (level, member, data) in data.data {
-                    var data = data.data
+                for (level, member, array2d) in data.data {
+                    var data = array2d.data
                     if let scaling = variable.multiplyAdd {
                         data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                     }
@@ -318,13 +322,26 @@ struct UkmoDownload: AsyncCommand {
                                 }
                             }
                         }
+                        // Keep precip in memory for probability
+                        if domain.countEnsembleMember > 1 && variable == .precipitation {
+                            await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
+                        }
                     }
                     let variable = variable.withLevel(level: level)
                     try await writer.write(member: member, variable: variable, data: data)
                 }
             }
+            if let writerProbabilities {
+                logger.info("Calculating precipitation probability")
+                try await inMemory.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    dtHoursOfCurrentStep: forecastHour - previousHour,
+                    writer: writerProbabilities
+                )
+            }
+            
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles

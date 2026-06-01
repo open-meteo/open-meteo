@@ -661,6 +661,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .total_column_water:
             // TODO register in SDK
             return .init(variable: .totalColumnIntegratedWaterVapour, previousDay: previousDay)
+        case .air_density_2m:
+            // TODO register in SDK
+            return .init(variable: .massDensity, altitude: 2)
         }
     }
 }

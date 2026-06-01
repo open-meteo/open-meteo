@@ -74,7 +74,7 @@ enum WeatherCode: Int {
             switch precipitation / modelDtHours {
             case 1.3..<2.5: return .slightRainShowers
             case 2.5..<7.6: return .moderateRainShowers
-            case 7.6...: return .moderateRainShowers
+            case 7.6...: return .heavyRainShowers
             default: break
             }
         }

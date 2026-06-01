@@ -213,6 +213,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
+    app.asyncCommands.use(ValidateOmFilesCommand(), as: "validate-om-files")
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
 
@@ -247,7 +248,7 @@ public func configure(_ app: Application) throws {
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
-        delay: .seconds(10),
+        delay: .seconds(1),
         RemoteFileManager.instance.backgroundTask
     )
 

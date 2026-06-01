@@ -147,7 +147,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .convective_inhibition:
             return .hermite(bounds: 0...10e9)
         case .uv_index:
-            return .hermite(bounds: 0...1000)
+            return .solar_backwards_averaged
         }
     }
 
@@ -211,31 +211,44 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             }
         case .global_ensemble_20km:
             switch self {
-            case .showers, .hail:
-                // Global has only instantaneous rates for snow and showers
-                return nil
-                // case .cloud_base:
-                //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
-                // case .freezing_level_height:
-                //    return "height_ASL_at_freezing_level"
-            case .shortwave_radiation, .direct_radiation:
-                // Radiation is only available until hour 30 for runs 6z and 18z
-                if run.hour % 12 == 6 && forecastHour >= 31 {
-                    return nil
-                }
+            case .temperature_2m:
+                return "temperature_at_screen_level"
+            case .surface_temperature:
+                return "temperature_at_surface"
+            case .cloud_cover:
+                return "cloud_amount_of_total_cloud"
+            case .relative_humidity_2m:
+                return "relative_humidity_at_screen_level"
             case .precipitation:
-                // precipitation not available for ensemble
-                return nil
-            case .rain, .snowfall_water_equivalent:
-                if forecastHour >= 57 {
-                    /// Only has 1 hourly aggregations, but time-intervals are actually 3 or 6 hourly
-                    return nil
-                }
-            case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .uv_index:
-                // Actually available, but not processed for ensembles
-                return nil
+                return forecastHour <= 132 ? "precipitation_accumulation-PT01H" : "precipitation_accumulation-PT03H"
+            case .showers:
+                return forecastHour <= 132 ? "rainfall_accumulation_from_convection-PT01H" : "rainfall_accumulation_from_convection-PT03H"
+            case .wind_gusts_10m:
+                return "wind_gust_at_10m"
+            case .pressure_msl:
+                return "pressure_at_mean_sea_level"
+            case .shortwave_radiation:
+                // Solar radiation is instant. De-averaging only produces acceptable results for 1-hourly data.
+                // Data after 132 hours is 3 hourly
+                return forecastHour <= 132 ? "radiation_flux_in_shortwave_total_downward_at_surface" : nil
+            case .direct_radiation:
+                // Solar radiation is instant. De-averaging only produces acceptable results for 1-hourly data.
+                // Data after 132 hours is 3 hourly
+                return forecastHour <= 132 ? "radiation_flux_in_shortwave_direct_downward_at_surface" : nil
+            case .snowfall_water_equivalent:
+                return forecastHour <= 132 ? "snowfall_accumulation-PT01H" : "snowfall_accumulation-PT03H"
+            case .wind_speed_10m:
+                return "wind_speed_at_10m"
+            case .snow_depth_water_equivalent:
+                return "snow_depth_water_equivalent"
+            case .wind_direction_10m:
+                return "wind_direction_at_10m"
+            case .visibility:
+                return "visibility_at_screen_level"
+            case .cape:
+                return "CAPE_surface"
             default:
-                break
+                return nil
             }
         case .uk_deterministic_2km:
             switch self {
@@ -245,22 +258,45 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 break
             }
         case .uk_ensemble_2km:
-            // No total precipitation available for uk ensemble
             switch self {
-            case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .wind_gusts_10m, .cape, .surface_temperature, .snow_depth_water_equivalent, .rain, .snowfall_water_equivalent, .direct_radiation:
-                /// Hour0 not available for clouds, but total clouds IS available for hour 0
-                if forecastHour == 0 {
-                    return nil
-                }
-                break
+            case .temperature_2m:
+                return "temperature_at_screen_level"
+            case .surface_temperature:
+                return "temperature_at_surface"
+            case .cloud_cover:
+                return "cloud_amount_of_total_cloud"
+            case .cloud_cover_low:
+                return "cloud_amount_of_low_cloud"
+            case .cloud_cover_mid:
+                return "cloud_amount_of_medium_cloud"
+            case .cloud_cover_high:
+                return "cloud_amount_of_high_cloud"
+            case .relative_humidity_2m:
+                return "relative_humidity_at_screen_level"
+            case .precipitation:
+                return "precipitation_accumulation-PT01H"
+            case .showers:
+                return "rainfall_accumulation_from_convection-PT01H"
+            case .wind_gusts_10m:
+                return "wind_gust_at_10m"
+            case .pressure_msl:
+                return "pressure_at_mean_sea_level"
             case .shortwave_radiation:
-                // Hours 126 is missing for shortwave radiation
-                if forecastHour == 0 || forecastHour == 126 {
-                    return nil
-                }
-                break
-            case .temperature_2m, .cloud_cover, .pressure_msl, .relative_humidity_2m, .wind_speed_10m, .wind_direction_10m, .visibility:
-                break
+                return "radiation_flux_in_shortwave_total_downward_at_surface"
+            case .direct_radiation:
+                return "radiation_flux_in_shortwave_direct_downward_at_surface"
+            case .snowfall_water_equivalent:
+                return "snowfall_accumulation-PT01H"
+            case .wind_speed_10m:
+                return "wind_speed_at_10m"
+            case .snow_depth_water_equivalent:
+                return "snow_depth_water_equivalent"
+            case .wind_direction_10m:
+                return "wind_direction_at_10m"
+            case .visibility:
+                return "visibility_at_screen_level"
+            case .cape:
+                return "CAPE_surface"
             default:
                 return nil
             }
@@ -352,7 +388,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
 
     var skipHour0: Bool {
         switch self {
-        case .precipitation, .rain, .hail, .snowfall_water_equivalent:
+        case .precipitation, .rain, .hail, .snowfall_water_equivalent, .showers:
             return true
         default:
             return false
@@ -543,6 +579,12 @@ enum UkmoHeightVariableType: String, CaseIterable {
 struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: UkmoHeightVariableType
     let level: Int
+    
+    /// Only instantiate variable it level is valid
+    static func valid(level: Int) -> Bool {
+        return [20, 30, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 1000, 1250, 1500, 1750, 2000,
+         2250, 2500, 2750, 3000, 3250, 3500, 3750, 4000, 4500, 5000, 5500, 6000].contains(level)
+    }
 
     var storePreviousForecast: Bool {
         switch variable {
@@ -652,4 +694,504 @@ protocol UkmoVariableDownloadable: GenericVariable {
     var multiplyAdd: (offset: Float, scalefactor: Float)? { get }
     func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String?
     func withLevel(level: Float) -> Self
+}
+
+enum UkmoGlobalDeterministicSurfaceVariable: String, CaseIterable, GenericVariable {
+    case temperature_2m
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+    case cloud_cover_2m
+//    case cloud_base
+    // case cloud_top
+
+    case pressure_msl
+    case relative_humidity_2m
+
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_gusts_10m
+
+    case precipitation
+//    case snowfall_water_equivalent
+    case showers
+//    case hail
+//    case showers
+//    case freezing_level_height
+
+    case cape
+    case convective_inhibition
+
+    case surface_temperature
+    case visibility
+    case snow_depth_water_equivalent
+
+    case shortwave_radiation
+    case direct_radiation
+//    case uv_index
+
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .showers, .precipitation: return true
+        case .wind_speed_10m, .wind_direction_10m: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .cape: return true
+        case .shortwave_radiation, .direct_radiation: return true
+        case .wind_gusts_10m: return true
+        case .visibility: return true
+        default: return false
+        }
+    }
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    var scalefactor: Float {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return 20
+        case .cloud_cover:
+            return 1
+        case .cloud_cover_low:
+            return 1
+        case .cloud_cover_mid:
+            return 1
+        case .cloud_cover_high:
+            return 1
+        case .relative_humidity_2m:
+            return 1
+        case .showers:
+            return 10
+        case .wind_gusts_10m:
+            return 10
+        case .pressure_msl:
+            return 10
+        case .shortwave_radiation, .direct_radiation:
+            return 1
+        case .wind_speed_10m:
+            return 10
+        case .snow_depth_water_equivalent:
+            return 1
+        case .wind_direction_10m:
+            return 1
+        case .visibility:
+            return 0.05 // 50 meter
+        case .cloud_cover_2m:
+            return 1
+        case .precipitation:
+            return 10
+        case .cape:
+            return 0.1
+        case .convective_inhibition: return 1
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return .hermite(bounds: nil)
+        case .cloud_cover, .cloud_cover_2m:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_low:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_mid:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_high:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .wind_speed_10m:
+            return .hermite(bounds: 0...10e9)
+        case .showers, .precipitation:
+            return .backwards_sum
+        case .snow_depth_water_equivalent:
+            return .backwards_sum
+        case .wind_gusts_10m:
+            return .hermite(bounds: 0...10e9)
+        case .shortwave_radiation, .direct_radiation:
+            return .solar_backwards_averaged
+        case .wind_direction_10m:
+            return .linearDegrees
+        case .visibility:
+            return .linear
+        case .cape:
+            return .hermite(bounds: 0...10e9)
+        case .convective_inhibition:
+            return .hermite(bounds: 0...10e9)
+        }
+    }
+
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return .celsius
+        case .cloud_cover, .cloud_cover_2m:
+            return .percentage
+        case .cloud_cover_low:
+            return .percentage
+        case .cloud_cover_mid:
+            return .percentage
+        case .cloud_cover_high:
+            return .percentage
+        case .relative_humidity_2m:
+            return .percentage
+        case .showers, .snow_depth_water_equivalent, .precipitation:
+            return .millimetre
+        case .wind_gusts_10m:
+            return .metrePerSecond
+        case .pressure_msl:
+            return .hectopascal
+        case .shortwave_radiation, .direct_radiation:
+            return .wattPerSquareMetre
+        case .wind_speed_10m:
+            return .metrePerSecond
+        case .wind_direction_10m:
+            return .degreeDirection
+        case .visibility:
+            return .metre
+        case .convective_inhibition: return .joulePerKilogram
+        case .cape:
+            return .joulePerKilogram
+        }
+    }
+
+    var isElevationCorrectable: Bool {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+
+
+enum UkmoUkvEnsembleVariable: String, CaseIterable, GenericVariable {
+    case temperature_2m
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+//    case cloud_cover_2m
+//    case cloud_base
+//    // case cloud_top
+//
+    case pressure_msl
+    case relative_humidity_2m
+//
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_gusts_10m
+//
+//    case precipitation
+    case snowfall_water_equivalent
+    case precipitation
+//    case hail
+//    case showers
+//    case freezing_level_height
+//
+    case cape
+//    case convective_inhibition
+//
+    case surface_temperature
+    case visibility
+    case snow_depth_water_equivalent
+//
+    case shortwave_radiation
+    case direct_radiation
+////    case uv_index
+
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .precipitation, .snowfall_water_equivalent: return true
+        case .wind_speed_10m, .wind_direction_10m: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .cape: return true
+        case .shortwave_radiation, .direct_radiation: return true
+        case .wind_gusts_10m: return true
+        case .visibility: return true
+        default: return false
+        }
+    }
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    var scalefactor: Float {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return 20
+        case .cloud_cover:
+            return 1
+        case .cloud_cover_low:
+            return 1
+        case .cloud_cover_mid:
+            return 1
+        case .cloud_cover_high:
+            return 1
+        case .relative_humidity_2m:
+            return 1
+        case .precipitation:
+            return 10
+        case .wind_gusts_10m:
+            return 10
+        case .pressure_msl:
+            return 10
+        case .shortwave_radiation, .direct_radiation:
+            return 1
+        case .snowfall_water_equivalent:
+            return 10
+        case .wind_speed_10m:
+            return 10
+        case .snow_depth_water_equivalent:
+            return 1
+        case .wind_direction_10m:
+            return 1
+        case .visibility:
+            return 0.05 // 50 meter
+        case .cape:
+            return 0.1
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return .hermite(bounds: nil)
+        case .cloud_cover:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_low:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_mid:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_high:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .wind_speed_10m:
+            return .hermite(bounds: 0...10e9)
+        case .precipitation:
+            return .backwards_sum
+        case .snowfall_water_equivalent, .snow_depth_water_equivalent:
+            return .backwards_sum
+        case .wind_gusts_10m:
+            return .hermite(bounds: 0...10e9)
+        case .shortwave_radiation, .direct_radiation:
+            return .solar_backwards_averaged
+        case .wind_direction_10m:
+            return .linearDegrees
+        case .visibility:
+            return .linear
+        case .cape:
+            return .hermite(bounds: 0...10e9)
+        }
+    }
+
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return .celsius
+        case .cloud_cover:
+            return .percentage
+        case .cloud_cover_low:
+            return .percentage
+        case .cloud_cover_mid:
+            return .percentage
+        case .cloud_cover_high:
+            return .percentage
+        case .relative_humidity_2m:
+            return .percentage
+        case .precipitation, .snow_depth_water_equivalent:
+            return .millimetre
+        case .wind_gusts_10m:
+            return .metrePerSecond
+        case .pressure_msl:
+            return .hectopascal
+        case .shortwave_radiation, .direct_radiation:
+            return .wattPerSquareMetre
+        case .snowfall_water_equivalent:
+            return .millimetre
+        case .wind_speed_10m:
+            return .metrePerSecond
+        case .wind_direction_10m:
+            return .degreeDirection
+        case .visibility:
+            return .metre
+        case .cape:
+            return .joulePerKilogram
+        }
+    }
+    var isElevationCorrectable: Bool {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+
+enum UkmoGlobalEnsembleVariable: String, CaseIterable, GenericVariable {
+    case temperature_2m
+    case cloud_cover
+//    case cloud_cover_low
+//    case cloud_cover_mid
+//    case cloud_cover_high
+//    case cloud_cover_2m
+//    case cloud_base
+//    // case cloud_top
+//
+    case pressure_msl
+    case relative_humidity_2m
+//
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_gusts_10m
+//
+//    case precipitation
+    case snowfall_water_equivalent
+    case precipitation
+//    case hail
+//    case showers
+//    case freezing_level_height
+//
+    case cape
+//    case convective_inhibition
+//
+    case surface_temperature
+    case visibility
+    case snow_depth_water_equivalent
+//
+    case shortwave_radiation
+    case direct_radiation
+////    case uv_index
+
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .precipitation, .snowfall_water_equivalent: return true
+        case .wind_speed_10m, .wind_direction_10m: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .cape: return true
+        case .shortwave_radiation, .direct_radiation: return true
+        case .wind_gusts_10m: return true
+        case .visibility: return true
+        default: return false
+        }
+    }
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    var scalefactor: Float {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return 20
+        case .cloud_cover:
+            return 1
+        case .relative_humidity_2m:
+            return 1
+        case .precipitation:
+            return 10
+        case .wind_gusts_10m:
+            return 10
+        case .pressure_msl:
+            return 10
+        case .shortwave_radiation, .direct_radiation:
+            return 1
+        case .snowfall_water_equivalent:
+            return 10
+        case .wind_speed_10m:
+            return 10
+        case .snow_depth_water_equivalent:
+            return 1
+        case .wind_direction_10m:
+            return 1
+        case .visibility:
+            return 0.05 // 50 meter
+        case .cape:
+            return 0.1
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return .hermite(bounds: nil)
+        case .cloud_cover:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .wind_speed_10m:
+            return .hermite(bounds: 0...10e9)
+        case .precipitation:
+            return .backwards_sum
+        case .snowfall_water_equivalent, .snow_depth_water_equivalent:
+            return .backwards_sum
+        case .wind_gusts_10m:
+            return .hermite(bounds: 0...10e9)
+        case .shortwave_radiation, .direct_radiation:
+            return .solar_backwards_averaged
+        case .wind_direction_10m:
+            return .linearDegrees
+        case .visibility:
+            return .linear
+        case .cape:
+            return .hermite(bounds: 0...10e9)
+        }
+    }
+
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return .celsius
+        case .cloud_cover:
+            return .percentage
+        case .relative_humidity_2m:
+            return .percentage
+        case .precipitation, .snow_depth_water_equivalent:
+            return .millimetre
+        case .wind_gusts_10m:
+            return .metrePerSecond
+        case .pressure_msl:
+            return .hectopascal
+        case .shortwave_radiation, .direct_radiation:
+            return .wattPerSquareMetre
+        case .snowfall_water_equivalent:
+            return .millimetre
+        case .wind_speed_10m:
+            return .metrePerSecond
+        case .wind_direction_10m:
+            return .degreeDirection
+        case .visibility:
+            return .metre
+        case .cape:
+            return .joulePerKilogram
+        }
+    }
+    var isElevationCorrectable: Bool {
+        switch self {
+        case .temperature_2m, .surface_temperature:
+            return true
+        default:
+            return false
+        }
+    }
 }

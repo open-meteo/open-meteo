@@ -226,13 +226,17 @@ extension Request {
             throw ApiKeyManagerError.apiKeyInvalid
         }
         let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api.", "seasonal-api."]
+        let resNode = host.starts(with: "customer-res1-api.")
         if limit > 0 && limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
+            throw ApiKeyManagerError.apiProfessionalRequired
+        }
+        if limit > 0 && limit < 50_000_000 && resNode {
             throw ApiKeyManagerError.apiProfessionalRequired
         }
         let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
         let maxConcurrent = max(2, limit / 5_000_000)
         let slot = apikey.hash
-        try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: 256)
+        try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
         defer {
             apiConcurrencyLimiter.release(slot: slot)
         }
@@ -251,6 +255,8 @@ enum ApiKeyManagerError: Error {
     case apiKeyRequired
     case apiKeyInvalid
     case apiProfessionalRequired
+    case apiEnterpriseRequired
+    
 }
 
 extension ApiKeyManagerError: AbortError {
@@ -261,6 +267,8 @@ extension ApiKeyManagerError: AbortError {
         case .apiKeyInvalid:
             return .badRequest
         case .apiProfessionalRequired:
+            return .forbidden
+        case .apiEnterpriseRequired:
             return .forbidden
         }
     }
@@ -273,6 +281,8 @@ extension ApiKeyManagerError: AbortError {
             return "The supplied API key is invalid."
         case .apiProfessionalRequired:
             return "This API endpoint requires the API Professional or Enterprise plan"
+        case .apiEnterpriseRequired:
+            return "This API endpoint requires the API Enterprise plan"
         }
     }
 }
