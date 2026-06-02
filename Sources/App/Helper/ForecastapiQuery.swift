@@ -554,6 +554,7 @@ enum ForecastApiError: Error {
     case latitudeAndLongitudeMaximum(max: Int)
     case latitudeAndLongitudeCountMustBeTheSame
     case coordinatesAndTimezoneCountMustBeTheSame
+    case modelRunUnavailable(model: DomainRegistry, run: Timestamp)
     case locationIdCountMustBeTheSame
     case startAndEndDateCountMustBeTheSame
     case coordinatesAndStartEndDatesCountMustBeTheSame
@@ -617,6 +618,8 @@ extension ForecastApiError: AbortError {
             return "Parameter '\(name)' is required"
         case .parameterMustNotBeSet(let name):
             return "Parameter '\(name)' must not be set"
+        case .modelRunUnavailable(model: let model, run: let run):
+            return "The requested model run is not available. Model: \(model), run: \(run.iso8601_YYYY_MM_dd_HH_mmZ)"
         }
     }
 }

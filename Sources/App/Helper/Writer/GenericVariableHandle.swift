@@ -36,7 +36,8 @@ struct GenericVariableHandle: Sendable {
 
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
-    static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true) async throws {
+    /// If `fullRunSkipMeta` do not generate meta.json for each run
+    static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
             
@@ -116,14 +117,15 @@ struct GenericVariableHandle: Sendable {
             if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
-                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
+                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta)
                 logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 if let uploadS3Bucket {
                     try domain.domainRegistry.syncToS3PerRun(
                         logger: logger,
                         bucket: uploadS3Bucket,
-                        run:run
+                        run:run,
+                        skipMeta: fullRunSkipMeta
                     )
                 }
             }
@@ -131,7 +133,7 @@ struct GenericVariableHandle: Sendable {
     }
     
     /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
-    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType) async throws {
+    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -224,7 +226,9 @@ struct GenericVariableHandle: Sendable {
             progress.finish()
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()
-        try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
+        if !skipMeta {
+            try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
+        }
     }
 
     private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
