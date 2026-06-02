@@ -1,4 +1,5 @@
 import Foundation
+import AsyncHTTPClient
 import Logging
 
 /**
@@ -534,6 +535,15 @@ enum DomainRegistry: String, CaseIterable {
             return UkmoDomain.uk_ensemble_mean_2km
         }
     }
+    
+    /// Get meta information of a specific run
+    func getFullRunMeta(client: HTTPClient?, logger: Logger, run: Timestamp) async throws -> FullRunMetaJson? {
+        return try await RemoteFileManager.instance.get(
+            file: FullRunMetaFile.run(self, run),
+            client: client,
+            logger: logger
+        )
+    }
 }
 
 extension Process {
@@ -651,7 +661,7 @@ extension DomainRegistry {
     }
     
     /// Upload time-series optimised per RUN files to S3 `/data_run/<domain>/<run>/<variable>.om`
-    func syncToS3PerRun(logger: Logger, bucket: String, run: Timestamp) throws {
+    func syncToS3PerRun(logger: Logger, bucket: String, run: Timestamp, skipMeta: Bool) throws {
         let dir = rawValue
         guard let directory = OpenMeteo.dataRunDirectory else {
             return
@@ -671,11 +681,13 @@ extension DomainRegistry {
                 exclude: ["*~", "meta.json"],
                 profile: profile
             )
-            try Process.awsCopy(
-                src: "\(src)meta.json",
-                dest: "\(dest)meta.json",
-                profile: profile
-            )
+            if !skipMeta {
+                try Process.awsCopy(
+                    src: "\(src)meta.json",
+                    dest: "\(dest)meta.json",
+                    profile: profile
+                )
+            }
             // Additional sync to make sure everything is synced
             try Process.awsSync(
                 src: "\(directory)\(dir)/",

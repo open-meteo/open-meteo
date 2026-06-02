@@ -210,6 +210,14 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 break
             }
         case .global_ensemble_20km:
+            if forecastHour == 0 {
+                switch self {
+                case .precipitation, .rain, .hail, .snowfall_water_equivalent, .showers:
+                    return nil
+                default:
+                    break
+                }
+            }
             switch self {
             case .temperature_2m:
                 return "temperature_at_screen_level"
@@ -258,6 +266,14 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 break
             }
         case .uk_ensemble_2km:
+            if forecastHour == 0 {
+                switch self {
+                case .precipitation, .rain, .hail, .snowfall_water_equivalent, .showers, .shortwave_radiation, .direct_radiation, .wind_gusts_10m, .cape, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .surface_temperature, .snow_depth_water_equivalent:
+                    return nil
+                default:
+                    break
+                }
+            }
             switch self {
             case .temperature_2m:
                 return "temperature_at_screen_level"
@@ -275,8 +291,8 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 return "relative_humidity_at_screen_level"
             case .precipitation:
                 return "precipitation_accumulation-PT01H"
-            case .showers:
-                return "rainfall_accumulation_from_convection-PT01H"
+            case .rain:
+                return "rainfall_accumulation-PT01H"
             case .wind_gusts_10m:
                 return "wind_gust_at_10m"
             case .pressure_msl:
@@ -893,6 +909,7 @@ enum UkmoUkvEnsembleVariable: String, CaseIterable, GenericVariable {
 //    case precipitation
     case snowfall_water_equivalent
     case precipitation
+    case rain
 //    case hail
 //    case showers
 //    case freezing_level_height
@@ -911,7 +928,7 @@ enum UkmoUkvEnsembleVariable: String, CaseIterable, GenericVariable {
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .precipitation, .snowfall_water_equivalent: return true
+        case .precipitation, .snowfall_water_equivalent, .rain: return true
         case .wind_speed_10m, .wind_direction_10m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
@@ -941,7 +958,7 @@ enum UkmoUkvEnsembleVariable: String, CaseIterable, GenericVariable {
             return 1
         case .relative_humidity_2m:
             return 1
-        case .precipitation:
+        case .precipitation ,.rain:
             return 10
         case .wind_gusts_10m:
             return 10
@@ -982,7 +999,7 @@ enum UkmoUkvEnsembleVariable: String, CaseIterable, GenericVariable {
             return .hermite(bounds: 0...100)
         case .wind_speed_10m:
             return .hermite(bounds: 0...10e9)
-        case .precipitation:
+        case .precipitation ,.rain:
             return .backwards_sum
         case .snowfall_water_equivalent, .snow_depth_water_equivalent:
             return .backwards_sum
@@ -1013,7 +1030,7 @@ enum UkmoUkvEnsembleVariable: String, CaseIterable, GenericVariable {
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .precipitation, .snow_depth_water_equivalent:
+        case .precipitation, .snow_depth_water_equivalent, .rain:
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond
