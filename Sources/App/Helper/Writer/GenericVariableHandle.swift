@@ -109,6 +109,18 @@ struct GenericVariableHandle: Sendable {
                         bucket: uploadS3Bucket,
                         variables: nil
                     )
+
+                    // Also sync ensemble mean domain if it was generated
+                    if let emDomain = ensembleMeanDomain {
+                        let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
+                        if nMembers > 1 {
+                            try await emDomain.domainRegistry.syncToS3(
+                                logger: logger,
+                                bucket: uploadS3Bucket,
+                                variables: nil
+                            )
+                        }
+                    }
                 }
             }
         }
