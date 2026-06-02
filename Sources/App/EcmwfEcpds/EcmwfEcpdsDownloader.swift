@@ -153,7 +153,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     /// Download multiple runs from ECMWF MARS archives, convert them and upload to S3
     func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadS3Bucket: String?, params paramsOverwrite: String?) async throws {
         let logger = application.logger
-        let dtSeconds = domain.dtSeconds
         
         struct EcmwfQuery: Encodable {
             let `class` = "od"
@@ -295,7 +294,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                                 }
                                 // Scaling before compression with scalefactor
                                 if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                                    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                                 }
                                 let count = await inMemoryAccumulated.data.count
                                 logger.info("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
