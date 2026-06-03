@@ -186,7 +186,7 @@ struct SyncCommand: AsyncCommand {
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
         /// Get a list of all variables from all models
-        let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
+        let remoteDirectories = try await S3List.s3list(client: client, server: server, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
         
         /// Filter variables to download
         let toDownload: [S3List.ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3List.ListV2File] in
@@ -205,7 +205,7 @@ struct SyncCommand: AsyncCommand {
                     variables.contains(where: { $0 == variable }) else {
                 return []
             }
-            let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
+            let remote = try await S3List.s3list(client: client, server: server, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
             let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
             return Array(filtered)
         }.flatMap({$0})

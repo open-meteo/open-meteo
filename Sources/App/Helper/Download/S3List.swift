@@ -25,20 +25,20 @@ enum S3List {
         let modificationTime: Date
         let fileSize: Int
     }
-}
-
-
-extension Curl {
+    
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
-    func s3list(server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
+    static func s3list(client: HTTPClient, server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
         var allFiles: [S3List.ListV2File] = []
         var allDirectories: [String] = []
         var continuation: String? = nil
+        let logger = Logger(label: "S3List")
         while true {
             var request = ClientRequest(method: .GET, url: URI("\(server)"))
             let params = S3List.ListV2Query(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey, continuation_token: continuation)
             try request.query.encode(params)
-            var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours, quiet: true)
+            // could later migrate to HTTPClient.executeRetry
+            let curl = Curl(logger: logger, client: client)
+            var response = try await curl.downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours, quiet: true)
             guard let body = response.readString(length: response.readableBytes) else {
                 return (allFiles, allDirectories)
             }
