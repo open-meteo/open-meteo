@@ -79,10 +79,18 @@ enum S3Uploader {
         try await uploadMultipart(client: client, file: FilePath(file), url: url, contentType: contentType, nConcurrent: nConcurrent)
     }
     
-    /// Multipart upload to S3. Read files using SwiftNIO Filesystem
     static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let fh = try await FileSystem.shared.openFile(forReadingAt: file, options: .init())
-        
+        do {
+            return try await uploadMultipart(client: client, file: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
+        } catch {
+            try await fh.close()
+            throw error
+        }
+    }
+    
+    /// Multipart upload to S3. Read files using SwiftNIO Filesystem
+    static func uploadMultipart(client: HTTPClient, file: ReadableFileHandleProtocol, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
 
         // Step 1: Initiate multipart upload
@@ -103,7 +111,7 @@ enum S3Uploader {
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let chunks = fh.readChunks(chunkLength: .megabytes(8))
+        let chunks = file.readChunks(chunkLength: .megabytes(8))
         do {
             let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(nConcurrent: nConcurrent) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
@@ -156,25 +164,29 @@ enum S3Uploader {
         func collectLocally(localPath: String, remotePrefix: String) async throws {
             let dir = try await FileSystem.shared.openDirectory(atPath: FilePath(localPath))
             var subdirs: [(String, String)] = []
-            for try await entry in dir.listContents() {
-                guard let name = entry.path.lastComponent?.string else { continue }
-                if entry.type == .regular {
-                    if let info = try await FileSystem.shared.info(forFileAt: entry.path) {
-                        let modTime = Date(timeIntervalSince1970: Double(info.lastDataModificationTime.seconds) + Double(info.lastDataModificationTime.nanoseconds) / 1_000_000_000)
-                        localFiles.append(LocalFile(
-                            absolutePath: entry.path.string,
-                            remoteKey: remotePrefix + name,
-                            size: Int(info.size),
-                            modificationTime: modTime
-                        ))
+            do {
+                for try await entry in dir.listContents() {
+                    guard let name = entry.path.lastComponent?.string else { continue }
+                    if entry.type == .regular {
+                        if let info = try await FileSystem.shared.info(forFileAt: entry.path) {
+                            let modTime = Date(timeIntervalSince1970: Double(info.lastDataModificationTime.seconds) + Double(info.lastDataModificationTime.nanoseconds) / 1_000_000_000)
+                            localFiles.append(LocalFile(
+                                absolutePath: entry.path.string,
+                                remoteKey: remotePrefix + name,
+                                size: Int(info.size),
+                                modificationTime: modTime
+                            ))
+                        }
+                    } else if entry.type == .directory {
+                        let subPrefix = remotePrefix + name + "/"
+                        remotePrefixes.append(subPrefix)
+                        subdirs.append((entry.path.string, subPrefix))
                     }
-                } else if entry.type == .directory {
-                    let subPrefix = remotePrefix + name + "/"
-                    remotePrefixes.append(subPrefix)
-                    subdirs.append((entry.path.string, subPrefix))
                 }
+            } catch {
+                try await dir.close()
+                throw error
             }
-            try await dir.close()
             for (subPath, subPrefix) in subdirs {
                 try await collectLocally(localPath: subPath, remotePrefix: subPrefix)
             }
