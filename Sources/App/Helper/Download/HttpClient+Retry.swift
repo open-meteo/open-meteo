@@ -94,6 +94,27 @@ extension HTTPClient {
                       timeoutPerRequest: TimeAmount = .seconds(30),
                       backOffSettings: ExponentialBackOff = .init(),
                       error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse {
+        return try await executeMapRetry(
+            request,
+            logger: logger,
+            deadline: deadline,
+            timeoutPerRequest: timeoutPerRequest,
+            backOffSettings: backOffSettings,
+            error404WaitTime:error404WaitTime, {$0}
+        )
+    }
+    
+    /**
+     Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
+     */
+    func executeMapRetry<T>(_ request: HTTPClientRequest,
+                      logger: Logger,
+                      deadline: Date = .minutes(60),
+                      timeoutPerRequest: TimeAmount = .seconds(30),
+                      backOffSettings: ExponentialBackOff = .init(),
+                      error404WaitTime: TimeAmount? = nil,
+                            _ body: @escaping (HTTPClientResponse) async throws -> T
+                        ) async throws -> T {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
         var n = 0
@@ -131,7 +152,7 @@ extension HTTPClient {
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
                 logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(url)\(request.rangePrettyPrint)")
                 try response.throwOnError()
-                return response
+                return try await body(response)
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
@@ -168,6 +189,24 @@ extension HTTPClient {
                 try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
             }
         }
+    }
+    
+    func executeRetryAndCollect(_ request: HTTPClientRequest,
+                      logger: Logger,
+                      upTo maxBytes: Int,
+                      deadline: Date = .minutes(60),
+                      timeoutPerRequest: TimeAmount = .seconds(30),
+                      backOffSettings: ExponentialBackOff = .init(),
+                      error404WaitTime: TimeAmount? = nil) async throws -> ByteBuffer {
+        return try await executeMapRetry(
+            request,
+            logger: logger,
+            deadline: deadline,
+            timeoutPerRequest: timeoutPerRequest,
+            backOffSettings: backOffSettings,
+            error404WaitTime:error404WaitTime,
+            { try await $0.body.collect(upTo: maxBytes) }
+        )
     }
 }
 

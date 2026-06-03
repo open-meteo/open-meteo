@@ -451,7 +451,7 @@ struct DownloadEra5Command: AsyncCommand {
 
             do {
                 let h = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { messages in
-                    return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    return try await messages.mapConcurrent(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                         let attributes = try GribAttributes(message: message)
                         let timestamp = attributes.timestamp
                         guard let variable = Era5Variable.fromGrib(attributes: attributes) else {
@@ -478,7 +478,7 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return try await GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, domain: domain)
-                    }.collect().compactMap({ $0 })
+                    }.compactMap({ $0 })
                 }
                 handles.append(contentsOf: h)
             } catch CdsApiError.restrictedAccessToValidData {
@@ -602,7 +602,7 @@ struct DownloadEra5Command: AsyncCommand {
             do {
                 let h = try await curl.withEcmwfApi(query: query, email: email, apikey: key) { messages in
                     let deaverager = GribDeaverager()
-                    return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    return try await messages.mapConcurrent(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                         let attributes = try GribAttributes(message: message)
                         let timestamp = attributes.timestamp
                         guard let variable = Era5Variable.fromGrib(attributes: attributes) else {
@@ -644,7 +644,7 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return try await GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, domain: domain)
-                    }.collect().compactMap({ $0 })
+                    }.compactMap({ $0 })
                 }
                 handles.append(contentsOf: h)
             } catch EcmwfApiError.restrictedAccessToValidData {
@@ -720,7 +720,7 @@ struct DownloadEra5Command: AsyncCommand {
                     // Deaccumulate data on the fly. Keep previous timestep in memory
                     let deaverager = GribDeaverager()
 
-                    return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    return try await messages.mapConcurrent(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
                               let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType")
@@ -755,7 +755,7 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return try await GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, domain: domain)
-                    }.collect().compactMap({ $0 })
+                    }.compactMap({ $0 })
                 }
                 handles.append(contentsOf: h)
             }

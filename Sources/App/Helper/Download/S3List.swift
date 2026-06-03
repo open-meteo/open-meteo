@@ -1,4 +1,5 @@
 import AsyncHTTPClient
+import Foundation
 import Vapor
 
 
@@ -33,12 +34,22 @@ enum S3List {
         var continuation: String? = nil
         let logger = Logger(label: "S3List")
         while true {
-            var request = ClientRequest(method: .GET, url: URI("\(server)"))
+            /*var vaporRequest = ClientRequest(method: .GET, url: URI("\(server)"))
             let params = S3List.ListV2Query(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey, continuation_token: continuation)
-            try request.query.encode(params)
-            // could later migrate to HTTPClient.executeRetry
-            let curl = Curl(logger: logger, client: client)
-            var response = try await curl.downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours, quiet: true)
+            try vaporRequest.query.encode(params)
+            let request = HTTPClientRequest(url: vaporRequest.url.string)*/
+            
+            var urlComponents = URLComponents(string: server)!
+            urlComponents.queryItems = [
+                URLQueryItem(name: "list-type", value: "2"),
+                URLQueryItem(name: "delimiter", value: "/"),
+                URLQueryItem(name: "prefix", value: prefix),
+                continuation.map { URLQueryItem(name: "continuation-token", value: $0) },
+                apikey.map { URLQueryItem(name: "apikey", value: $0) }
+            ].compactMap { $0 }
+            let request = HTTPClientRequest(url: urlComponents.url!.absoluteString)
+            
+            var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
             guard let body = response.readString(length: response.readableBytes) else {
                 return (allFiles, allDirectories)
             }
