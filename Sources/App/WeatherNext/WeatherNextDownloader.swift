@@ -138,6 +138,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         let allHandles: [GenericVariableHandle] = try await timestamps.enumerated().mapConcurrent(nConcurrent: concurrent) { (timeIdx, timestamp) in
             logger.info("Processing timestep \(timeIdx) / \(timestamps.count): \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
+            do {
 
             // Fresh token + storage + Zarr group per timestep so the OAuth token
             // never expires mid-run (token lifetime is 1 hour).
@@ -147,6 +148,16 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             ).getAccessToken()
             let storage = try S3CompatibleStorage(
                 baseURL: "https://storage.googleapis.com/weathernext",
+                retryingClient: .init(
+                    httpClient: httpClient, 
+                    config: .init(
+                        maxAttempts: 5, 
+                        baseDelay: .milliseconds(500), 
+                        maxDelay: .seconds(60), 
+                        jitter: 0.2, 
+                        timeout: .seconds(180)
+                    ),
+                ),
                 additionalHeaders: ["Authorization": "Bearer \(googleToken)"]
             )
             let root = try await ZarrGroup(storage: storage, path: zarrRootPath)
@@ -318,7 +329,12 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
                 logger.info("Processing \(allTasks.count) tasks with concurrency \(totalConcurrency)")
                 try await allTasks.foreachConcurrent(nConcurrent: totalConcurrency) { task in
-                    try await task()
+                    do {
+                        try await task()
+                    } catch {
+                        logger.error("Task failed in timestep \(timeIdx) (root cause): \(error)")
+                        throw error
+                    }
                 }
                 // rhStorage released here
             }
@@ -344,6 +360,10 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             let handles = try await writer.finalise()
             logger.info("Completed timestep \(timeIdx): \(handles.count) variable handles")
             return handles
+            } catch {
+                logger.error("Timestep \(timeIdx) (\(timestamp.iso8601_YYYY_MM_dd_HH_mm)) failed (root cause): \(error)")
+                throw error
+            }
         }.flatMap { $0 }
 
         guard !allHandles.isEmpty else {
