@@ -118,7 +118,7 @@ enum ProbabilityReader {
 extension VariablePerMemberStorage {
     /// Calculate precipitation >0.1mm/h probability
     /// `precipitationVariable` is used to filter only precipitation variables
-    /// `domain` must be set to generate a temporary file handle afterwards
+    /// `writer` produces the temporary file handle afterwards
     /// `dtHoursOfCurrentStep` should be set to the correct delta time in hours for this timestep if the step width changes. E.g. 3 to 6 hours after 120h. If no dt switching takes place, just use `domain.dtHours`.
     func calculatePrecipitationProbability(precipitationVariable: V, dtHoursOfCurrentStep: Int, writer: OmSpatialTimestepWriter) async throws {
         // Usefull probs, precip >0.1, >1, clouds <20%, clouds 20-50, 50-80, >80, snowfall eq >0.1, >1.0, wind >20kt, temp <0, temp >25

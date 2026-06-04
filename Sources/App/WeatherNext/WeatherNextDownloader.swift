@@ -123,7 +123,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         ]
 
         let zarrRootPath = WeatherNextDomain.zarrRunPath(server: server, run: run)
-        let nLocations = domain.grid.ny * domain.grid.nx
         let httpClient = application.dedicatedHttpClient
 
         let allHandles: [GenericVariableHandle] = try await timestamps.enumerated().mapConcurrent(nConcurrent: concurrent) { (timeIdx, timestamp) in
@@ -159,6 +158,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             let levelIndexMap = zarrLevelValues.enumerated().reduce(into: [Int: Int]()) { $0[$1.element] = $1.offset }
 
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            
             let precipStorage = VariablePerMemberStorage<WeatherNextSurfaceVariable>()
 
             // Pre-open Zarr arrays for this timestep
@@ -181,7 +182,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             // with no barriers.  Deadline tasks read SH + temp from Zarr,
             // compute RH, store it, and when the last RH level for a member
             // arrives they push cloud cover inline.  No CC task in the pool.
-            // rhStorage is scoped tightly so its ~10 GB is freed before
+            // rhStorage is scoped tightly so its memory is freed before
             // precipitation probability and finalise run.
             let totalConcurrency = max(4, concurrent * 8)
             do {
@@ -330,24 +331,12 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             }
 
             // ---- Derive precipitation probability ----
-            if domain.countEnsembleMember > 1 {
+            if let writerProbabilities {
                 logger.info("Calculating precipitation probability for timestep \(timeIdx)")
-                let threshold = Float(0.1) * Float(domain.dtHours)
-                var probability = [Float](repeating: 0, count: nLocations)
-
-                for member in 0..<domain.countEnsembleMember {
-                    guard let precip = await precipStorage.get(variable: .total_precipitation_6hr, timestamp: timestamp, member: member)?.data else {
-                        continue
-                    }
-                    for i in precip.indices where precip[i] >= threshold {
-                        probability[i] += 1
-                    }
-                }
-                probability.multiplyAdd(multiply: 100 / Float(domain.countEnsembleMember), add: 0)
-                try await writer.write(member: 1, variable: ProbabilityVariable.precipitation_probability, data: probability)
+                try await precipStorage.calculatePrecipitationProbability(precipitationVariable: .total_precipitation_6hr, dtHoursOfCurrentStep: domain.dtHours, writer: writerProbabilities)
             }
 
-            let handles = try await writer.finalise()
+            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
             logger.info("Completed timestep \(timeIdx): \(handles.count) variable handles")
             return handles
             } catch {
