@@ -83,11 +83,13 @@ public final actor ApiKeyManager {
         guard let apiKeysPath = Environment.get("API_APIKEYS_PATH") else {
             return
         }
-        let concurrencyLimit = await ConcurrencyGroupLimiter.instance.stats()
+
         let logger = application.logger
         if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
-            logger.error("API key usage: \(usage). Concurrency \(concurrencyLimit)")
+            let timeStats = DispatchTime.now()
+            let concurrencyLimit = await ConcurrencyGroupLimiter.instance.stats()
+            logger.error("API key usage: \(usage). Concurrency \(concurrencyLimit) (collection time \(timeStats.timeElapsedPretty()))")
         }
         let keys = KeyAndLimit.readApiKeys(path: apiKeysPath)
         guard keys.count > 0 else {
@@ -158,7 +160,7 @@ extension Request {
             let params = try parseApiParams()
             let responder = try await fn(nil, params)
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10)
+            return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: { host.starts(with: $0) }) == true || isDevNode
@@ -207,7 +209,7 @@ extension Request {
                 guard weight <= RateLimiter.limitHourly else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
                 }
-                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
+                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
                 if isCFWorker {
                     await RateLimiter.instance.increment(int64: slot, count: weight)
                 } else {
@@ -247,7 +249,7 @@ extension Request {
                 throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
+            response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
             await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         }
         catch {
