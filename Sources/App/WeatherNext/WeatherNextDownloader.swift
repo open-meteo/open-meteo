@@ -31,12 +31,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
 
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
-
-        @Flag(name: "process-local-only", help: "Only process files already downloaded to the local directory")
-        var processLocalOnly: Bool
-
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
@@ -86,8 +80,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             run: run,
             server: server,
             concurrent: nConcurrent,
-            skipFilesIfExisting: signature.skipExisting,
-            processLocalOnly: signature.processLocalOnly,
             uploadS3Bucket: signature.uploadS3Bucket,
             uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities,
             createNetcdf: signature.createNetcdf
@@ -102,8 +94,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         run: Timestamp,
         server: String,
         concurrent: Int,
-        skipFilesIfExisting: Bool,
-        processLocalOnly: Bool,
         uploadS3Bucket: String?,
         uploadS3OnlyProbabilities: Bool,
         createNetcdf: Bool
@@ -280,7 +270,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                             // If all 13 RH levels are now stored, push cloud cover.
                             // Double-execution is safe: the first CC removes the data,
                             // the second CC's `remove` returns nil → guard fails.
-                            guard await !writer.contains(member: member, variable: WeatherNextVariable.cloud_cover_low) else { return }
+                            guard await !writer.contains(member: member, variable: WeatherNextSurfaceVariable.cloud_cover_low) else { return }
                             guard let rhData = await rhStorage.getAllRemoving(variables: [
                                 .init(variable: .relative_humidity, level: .hPa1000),
                                 .init(variable: .relative_humidity, level: .hPa925),
@@ -318,11 +308,11 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                                 (rh: rhData[11].data,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
                                 (rh: rhData[12].data,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
                             ])
-                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_low, data: lowCC)
-                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_mid, data: midCC)
-                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover_high, data: highCC)
+                            try await writer.write(member: member, variable: WeatherNextSurfaceVariable.cloud_cover_low, data: lowCC)
+                            try await writer.write(member: member, variable: WeatherNextSurfaceVariable.cloud_cover_mid, data: midCC)
+                            try await writer.write(member: member, variable: WeatherNextSurfaceVariable.cloud_cover_high, data: highCC)
                             let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
-                            try await writer.write(member: member, variable: WeatherNextVariable.cloud_cover, data: cloudcover)
+                            try await writer.write(member: member, variable: WeatherNextSurfaceVariable.cloud_cover, data: cloudcover)
                         }
                     }
                 }
@@ -389,7 +379,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
     // MARK: – Marker polling
 
-    /// Poll the Zarr `success` marker file instead of the old OM marker.
+    /// Poll the Zarr `success` marker file.
     func waitForZarrMarker(
         client: HTTPClient,
         logger: Logger,

@@ -3,21 +3,39 @@ import Foundation
 /**
  Google DeepMind WeatherNext-2 domains.
 
- Source layout:
- `gs://om-weathernext/output/{modelrun-in-iso8601}/{timestamp-in-iso8601}.om`
-
- The source files are already preprocessed OM files and currently represent a
- global regular latitude/longitude grid with dimensions:
- - members: 64
- - latitude: 721
- - longitude: 1440
-
+ The source files are zarr files with the following structure:
+ gcloud storage cat gs://weathernext/weathernext_2_0_0/zarr/2025_to_present/20260331_06hr_01_preds/predictions.zarr/2m_temperature/.zarray
+ {
+   "shape": [
+     64, // members
+     60, // timesteps
+     721, // lat
+     1440 // lon
+   ],
+   "chunks": [
+     1,
+     1,
+     721,
+     1440
+   ],
+   "dtype": "<f4",
+   "fill_value": "NaN",
+   "order": "C",
+   "filters": null,
+   "dimension_separator": ".",
+   "compressor": {
+     "id": "blosc",
+     "cname": "lz4",
+     "clevel": 5,
+     "shuffle": 1,
+     "blocksize": 0
+   },
+   "zarr_format": 2
+ }
+ 
  Notes:
- - The grid is 0.25° regular lat/lon.
- - The downloader skeleton is expected to ingest per-timestep spatial OM files
-   and then convert them into the code base's standard run/chunk layout.
- - We model the native ensemble domain and a derived ensemble-mean domain
-   separately, following existing code base conventions.
+ - The grid is 0.25° regular lat/lon from 0 to 360 degrees, -90 to 90 degrees -> We remap to -180 to 180 longitude.
+ - Static files come from ecmwf_ifs025, which weathernext is based on. The grids of both outputs have to be the same.
  */
 enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     /// Native 64-member WeatherNext-2 ensemble
@@ -113,16 +131,12 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     }
 
     /// Weathernext dissemination schedule: https://developers.google.com/weathernext/guides/dissemination
-    /// We add 45 minutes for the Python processing for zarr to .om conversion
-    /// 6 hours 50 min + 45 min ~ 8 hours
+    /// 6 hours 50 min ~ 7 hours
     /// When `--run` is not provided, the downloader will poll the marker file instead.
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        return t.add(hours: -8).floor(toNearest: self.updateIntervalSeconds)
+        return t.add(hours: -7).floor(toNearest: self.updateIntervalSeconds)
     }
-
-    /// Path to the marker file that signals the latest completed run.
-    static let markerFilePath = "gs://om-weathernext/latestfinishedrun"
 
     /// Build the Zarr root path for a given run.
     /// Pattern: `weathernext_2_0_0/zarr/2025_to_present/{YYYYMMDD}_{HH}hr_01_preds/predictions.zarr/`
@@ -136,46 +150,5 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     static func zarrSuccessPath(server: String, run: Timestamp) -> String {
         let floored = run.floor(toNearest: 6 * 3600)
         return "gs://weathernext/\(server)\(floored.format_YYYYMMdd)_\(floored.hour.zeroPadded(len: 2))hr_01_preds/success"
-    }
-
-    static func parseRunTimestampFromZarrPath(_ runDirName: String) throws -> Timestamp {
-        let parts = runDirName.split(separator: "_")
-        guard parts.count >= 3 else {
-            throw WeatherNextDownloaderError.notImplemented("Invalid Zarr run directory: '\(runDirName)'")
-        }
-        let hourStr = String(parts[1].dropLast(2))
-        let dateStr = String(parts[0])
-        guard dateStr.count == 8 else {
-            throw WeatherNextDownloaderError.notImplemented("Invalid Zarr run date: '\(dateStr)'")
-        }
-        let yearStr = String(dateStr.prefix(4))
-        let monthStr = String(dateStr.dropFirst(4).prefix(2))
-        let dayStr = String(dateStr.dropFirst(6).prefix(2))
-        guard let year = Int(yearStr), let month = Int(monthStr), let day = Int(dayStr), let hour = Int(hourStr) else {
-            throw WeatherNextDownloaderError.notImplemented("Could not parse Zarr run: '\(runDirName)'")
-        }
-        return Timestamp(year, month, day, hour)
-    }
-
-    /// Parse a WeatherNext marker string (e.g. `20260430_06hr_01_preds`) into a Timestamp.
-    /// The format is `YYYYMMDD_HHhr_01_preds` where HH is the zero-padded hour (00–23).
-    static func parseTimestampFromMarker(_ marker: String) throws -> Timestamp {
-        guard marker.count >= 10 else {
-            throw WeatherNextDownloaderError.notImplemented("Invalid marker format: '\(marker)'")
-        }
-
-        let yearStr  = String(marker.prefix(4))
-        let monthStr = String(marker.dropFirst(4).prefix(2))
-        let dayStr   = String(marker.dropFirst(6).prefix(2))
-        let hourStr  = String(marker.dropFirst(9).prefix(2))
-
-        guard let year  = Int(yearStr),
-              let month = Int(monthStr),
-              let day   = Int(dayStr),
-              let hour  = Int(hourStr) else {
-            throw WeatherNextDownloaderError.notImplemented("Could not parse marker: '\(marker)'")
-        }
-
-        return Timestamp(year, month, day, hour)
     }
 }
