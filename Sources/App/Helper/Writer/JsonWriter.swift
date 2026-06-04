@@ -16,12 +16,12 @@ extension AsyncBodyStreamWriter {
             if let concurrencySlot {
                 await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
             }
-            logger.info("Error during streaming", error: error)
+            logger.info("Error during streaming. Error \(error)")
             do {
                 try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
                 try await write(.end)
             } catch {
-                logger.info("Error during streaming end", error: error)
+                logger.info("Error during streaming end. Error \(error)")
             }
         }
     }
