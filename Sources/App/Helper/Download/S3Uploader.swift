@@ -4,6 +4,41 @@ import NIOCore
 import Logging
 import NIOFileSystem
 
+protocol S3UploadAble {
+    associatedtype ByteBufferSequence: AsyncSequence where ByteBufferSequence.Element == ByteBuffer, ByteBufferSequence: Sendable
+    func readChunks(chunkLength: ByteCount) -> ByteBufferSequence
+}
+
+extension ReadFileHandle: S3UploadAble { }
+
+extension ByteBuffer: S3UploadAble {
+    func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
+        let chunkSize = Int(chunkLength.bytes)
+        var copy = self
+        return AsyncStream { continuation in
+            while copy.readableBytes > 0 {
+                let slice = copy.readSlice(length: min(chunkSize, copy.readableBytes))!
+                continuation.yield(slice)
+            }
+            continuation.finish()
+        }
+    }
+}
+
+extension Foundation.FileHandle: S3UploadAble {
+    public func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
+        let chunkSize = Int(chunkLength.bytes)
+        return AsyncStream { continuation in
+            while true {
+                let data = self.readData(ofLength: chunkSize)
+                if data.isEmpty { break }
+                continuation.yield(ByteBuffer(bytes: data))
+            }
+            continuation.finish()
+        }
+    }
+}
+
 enum S3Uploader {
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
     static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
@@ -17,63 +52,6 @@ enum S3Uploader {
         let logger = Logger(label: "S3Uploader")
         let _ = try await client.executeRetry(request, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
     }
-
-    /// Uploads files to S3 in 8 MB chunks
-    /// Returns the `UploadId` which needs to be committed in a second step
-    /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func uploadMultipart<D: DataProtocol & Sendable>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
-        let logger = Logger(label: "S3Uploader")
-        let chunkSize = 8 * 1024 * 1024
-
-        // Step 1: Initiate multipart upload
-        let timeInitiateRequestStart = DispatchTime.now().uptimeNanoseconds
-        var initiateRequest = HTTPClientRequest(url: url + "?uploads")
-        initiateRequest.method = .POST
-        initiateRequest.headers.add(name: "Content-Type", value: contentType)
-        let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
-        guard
-            let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
-            let uploadId = initiateXml.xmlValue(tag: "UploadId") else {
-            throw S3UploaderError.missingUploadId
-        }
-        let timeInitiateRequest = Double(DispatchTime.now().uptimeNanoseconds - timeInitiateRequestStart) / 1_000_000_000
-        
-        // uploadId may contain '+', '/' or '=' — percent-encode for use in query strings
-        let encodedUploadId = uploadId.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? uploadId
-
-        // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
-        let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let partCount = (data.count + chunkSize - 1) / chunkSize
-        do {
-            let prepared = S3MultiPartUploadPrepared(
-                etags: try await (0..<partCount).mapConcurrent(nConcurrent: nConcurrent) { (partNumber: Int) -> String in
-                    let offset = partNumber * chunkSize
-                    let chunk = data[data.index(data.startIndex, offsetBy: offset)..<data.index(data.startIndex, offsetBy: min(offset + chunkSize, data.count))]
-                    var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
-                    req.method = .PUT
-                    req.body = .bytes(ByteBuffer(bytes: chunk))
-                    req.headers.add(name: "x-amz-content-sha256", value: chunk.sha256Hex)
-                    req.headers.add(name: .contentLength, value: "\(chunk.count)")
-                    let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
-                    guard let etag = response.headers.first(name: "ETag") else {
-                        throw S3UploaderError.missingETag(partNumber: partNumber)
-                    }
-                    return etag
-                },
-                url: url,
-                encodedUploadId: encodedUploadId
-            )
-            let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
-            let rate = Double(data.count) / timeChunkedRequest
-            logger.info("Upload \(url.asUrlGetQuery) \(data.count.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
-            return prepared
-        } catch {
-            var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
-            abortRequest.method = .DELETE
-            let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
-            throw error
-        }
-    }
     
     static func uploadMultipart(client: HTTPClient, file: String, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         try await uploadMultipart(client: client, file: FilePath(file), url: url, contentType: contentType, nConcurrent: nConcurrent)
@@ -82,15 +60,17 @@ enum S3Uploader {
     static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let fh = try await FileSystem.shared.openFile(forReadingAt: file, options: .init())
         do {
-            return try await uploadMultipart(client: client, file: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
+            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
         } catch {
             try await fh.close()
             throw error
         }
     }
     
-    /// Multipart upload to S3. Read files using SwiftNIO Filesystem
-    static func uploadMultipart(client: HTTPClient, file: ReadableFileHandleProtocol, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
+    /// Uploads files to S3 in 8 MB chunks
+    /// Returns the `UploadId` which needs to be committed in a second step
+    /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
+    static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
 
         // Step 1: Initiate multipart upload
@@ -111,7 +91,7 @@ enum S3Uploader {
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let chunks = file.readChunks(chunkLength: .megabytes(8))
+        let chunks = data.readChunks(chunkLength: .megabytes(8))
         do {
             let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(nConcurrent: nConcurrent) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
@@ -150,7 +130,7 @@ enum S3Uploader {
         let serverBase = server.hasSuffix("/") ? String(server.dropLast()) : server
 
         struct LocalFile {
-            let absolutePath: String
+            let absolutePath: FilePath
             let remoteKey: String
             let size: Int
             let modificationTime: Date
@@ -171,7 +151,7 @@ enum S3Uploader {
                         if let info = try await FileSystem.shared.info(forFileAt: entry.path) {
                             let modTime = Date(timeIntervalSince1970: Double(info.lastDataModificationTime.seconds) + Double(info.lastDataModificationTime.nanoseconds) / 1_000_000_000)
                             localFiles.append(LocalFile(
-                                absolutePath: entry.path.string,
+                                absolutePath: entry.path,
                                 remoteKey: remotePrefix + name,
                                 size: Int(info.size),
                                 modificationTime: modTime

@@ -2,6 +2,7 @@
 import Foundation
 import Testing
 import AsyncHTTPClient
+import NIOCore
 
 @Suite struct DownloaderTests {
     @Test func testAwsSign() async throws {
@@ -56,7 +57,7 @@ import AsyncHTTPClient
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }
 
-        let data = randomData(byteCount: 10 * 1024 * 1024)
+        let data = ByteBuffer(data: randomData(byteCount: 10 * 1024 * 1024))
         try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)/test/s3uploader-multipart.bin").commit(client: client)
     }
 }
