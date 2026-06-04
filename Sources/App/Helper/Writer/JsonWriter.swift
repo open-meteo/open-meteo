@@ -3,20 +3,26 @@ import Vapor
 
 extension AsyncBodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(concurrencySlot: Int?, _ task: @escaping () async throws -> Void) async throws {
+    func submit(concurrencySlot: Int?, logger: Logger, _ task: @escaping () async throws -> Void) async throws {
         if let concurrencySlot {
-            try await apiConcurrencyLimiter.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
-        }
-        defer {
-            if let concurrencySlot {
-                apiConcurrencyLimiter.release(slot: concurrencySlot)
-            }
+            try await ConcurrencyGroupLimiter.instance.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
         }
         do {
             try await task()
+            if let concurrencySlot {
+                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
+            }
         } catch {
-            try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
-            try await write(.end)
+            if let concurrencySlot {
+                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
+            }
+            logger.info("Error during streaming. Error \(error)")
+            do {
+                try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
+                try await write(.end)
+            } catch {
+                logger.info("Error during streaming end. Error \(error)")
+            }
         }
     }
 }
@@ -28,11 +34,11 @@ extension ForecastapiResult {
      Memory footprint is therefore much smaller and fits better into L2/L3 caches.
      Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
      */
-    func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?) throws -> Response {
+    func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, logger: Logger) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in
-            try await writer.submit(concurrencySlot: concurrencySlot) {
+            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
                 var b = BufferAndAsyncWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1
@@ -103,9 +109,8 @@ extension ForecastapiResult.PerLocation {
             b.buffer.writeString(",\"interval\":\(current.dtSeconds)")
             /// Write data
             for e in current.columns {
-                let format = "%.\(e.unit.significantDigits)f"
                 b.buffer.writeString(",")
-                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? String(format: format, e.value) : "null")")
+                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? e.value.formatted(decimals: e.unit.significantDigits) : "null")")
             }
             b.buffer.writeString("}")
             try await b.flushIfRequired()
@@ -151,7 +156,6 @@ extension ForecastapiResult.PerLocation {
                 var firstValue = true
                 switch e.data {
                 case .float(let floats):
-                    let format = "%.\(e.unit.significantDigits)f"
                     for v in floats {
                         if firstValue {
                             firstValue = false
@@ -159,7 +163,7 @@ extension ForecastapiResult.PerLocation {
                             b.buffer.writeString(",")
                         }
                         if v.isFinite {
-                            b.buffer.writeString(String(format: format, v))
+                            b.buffer.writeString(v.formatted(decimals: e.unit.significantDigits))
                         } else {
                             b.buffer.writeString("null")
                         }

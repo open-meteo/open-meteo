@@ -4,9 +4,9 @@ import Vapor
 
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    func toCsvResponse(concurrencySlot: Int? = nil, withLocationHeader: Bool = true) throws -> Response {
+    func toCsvResponse(concurrencySlot: Int?, withLocationHeader: Bool = true, logger: Logger) throws -> Response {
         let response = Response(body: .init(asyncStream: { writer in
-            try await writer.submit(concurrencySlot: concurrencySlot) {
+            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
                 var b = BufferAndAsyncWriter(writer: writer)
                 let multiLocation = results.count > 1
 
@@ -81,7 +81,7 @@ extension ApiSectionSingle {
         b.buffer.writeString(time)
         for e in columns {
             if e.value.isFinite {
-                b.buffer.writeString(",\(String(format: "%.\(e.unit.significantDigits)f", e.value))")
+                b.buffer.writeString(",\(e.value.formatted(decimals: e.unit.significantDigits))")
             } else {
                 b.buffer.writeString(",NaN")
             }
@@ -119,7 +119,7 @@ extension ApiSectionString {
                 switch e.data {
                 case .float(let a):
                     if a[i].isFinite {
-                        b.buffer.writeString(",\(String(format: "%.\(e.unit.significantDigits)f", a[i]))")
+                        b.buffer.writeString(",\(a[i].formatted(decimals: e.unit.significantDigits))")
                     } else {
                         b.buffer.writeString(",NaN")
                     }
