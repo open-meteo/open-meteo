@@ -5,18 +5,19 @@ extension AsyncBodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
     func submit(concurrencySlot: Int?, _ task: @escaping () async throws -> Void) async throws {
         if let concurrencySlot {
-            try await apiConcurrencyLimiter.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
-        }
-        defer {
-            if let concurrencySlot {
-                apiConcurrencyLimiter.release(slot: concurrencySlot)
-            }
+            try await ConcurrencyGroupLimiter.instance.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
         }
         do {
             try await task()
+            if let concurrencySlot {
+                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
+            }
         } catch {
             try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
             try await write(.end)
+            if let concurrencySlot {
+                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
+            }
         }
     }
 }

@@ -83,7 +83,7 @@ public final actor ApiKeyManager {
         guard let apiKeysPath = Environment.get("API_APIKEYS_PATH") else {
             return
         }
-        let concurrencyLimit = apiConcurrencyLimiter.stats()
+        let concurrencyLimit = await ConcurrencyGroupLimiter.instance.stats()
         let logger = application.logger
         if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
@@ -180,41 +180,44 @@ extension Request {
             } else {
                 slot = address.rateLimitSlot
             }
-            try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: 1, maxConcurrentHard: 5)
-            defer {
-                apiConcurrencyLimiter.release(slot: slot)
-            }
             if isCFWorker {
                 try await RateLimiter.instance.check(int64: slot)
             } else {
                 try await RateLimiter.instance.check(address: address)
             }
-            
-            let params = try parseApiParams()
-            guard params.apikey == nil && headers.contains(name: "X-Api-Key") == false else {
-                guard self.method != .POST else {
-                    throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
+            try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: 1, maxConcurrentHard: 5)
+            let response: Response
+            do {
+                let params = try parseApiParams()
+                guard params.apikey == nil && headers.contains(name: "X-Api-Key") == false else {
+                    guard self.method != .POST else {
+                        throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
+                    }
+                    let url = "\(scheme)://customer-\(host)/\(url.string)"
+                    guard url.count < 3500 else {
+                        throw ForecastApiError.generic(message: "Your API URL is too long for automatic redirection from the open-access API to the commercial endpoints. Instead, use the 'customer-' prefixed URLs directly. Refer to the API documentation and select 'Usage -> Commercial' to obtain the correct customer URLs.")
+                    }
+                    return self.redirect(to: url)
                 }
-                let url = "\(scheme)://customer-\(host)/\(url.string)"
-                guard url.count < 3500 else {
-                    throw ForecastApiError.generic(message: "Your API URL is too long for automatic redirection from the open-access API to the commercial endpoints. Instead, use the 'customer-' prefixed URLs directly. Refer to the API documentation and select 'Usage -> Commercial' to obtain the correct customer URLs.")
+                let responder = try await fn(host, params)
+                if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
+                    throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
                 }
-                return self.redirect(to: url)
+                let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+                guard weight <= RateLimiter.limitHourly else {
+                    throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
+                }
+                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
+                if isCFWorker {
+                    await RateLimiter.instance.increment(int64: slot, count: weight)
+                } else {
+                    await RateLimiter.instance.increment(address: address, count: weight)
+                }
+            } catch {
+                await ConcurrencyGroupLimiter.instance.release(slot: slot)
+                throw error
             }
-            let responder = try await fn(host, params)
-            if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
-                throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
-            }
-            let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            guard weight <= RateLimiter.limitHourly else {
-                throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
-            }
-            let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
-            if isCFWorker {
-                await RateLimiter.instance.increment(int64: slot, count: weight)
-            } else {
-                await RateLimiter.instance.increment(address: address, count: weight)
-            }
+            await ConcurrencyGroupLimiter.instance.release(slot: slot)
             return response
         }
 
@@ -236,17 +239,22 @@ extension Request {
         let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
         let maxConcurrent = max(2, limit / 5_000_000)
         let slot = apikey.hash
-        try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
-        defer {
-            apiConcurrencyLimiter.release(slot: slot)
+        try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
+        let response: Response
+        do {
+            let responder = try await fn(host, params)
+            if responder.numberOfLocations > numberOfLocationsMaximum {
+                throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+            }
+            let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+            response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
+            await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         }
-        let responder = try await fn(host, params)
-        if responder.numberOfLocations > numberOfLocationsMaximum {
-            throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+        catch {
+            await ConcurrencyGroupLimiter.instance.release(slot: slot)
+            throw error
         }
-        let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-        let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
-        await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
+        await ConcurrencyGroupLimiter.instance.release(slot: slot)
         return response
     }
 }

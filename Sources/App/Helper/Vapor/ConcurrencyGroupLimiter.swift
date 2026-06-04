@@ -1,74 +1,50 @@
-import NIOConcurrencyHelpers
-
-let apiConcurrencyLimiter = ConcurrencyGroupLimiter()
-
 /**
  Limit concurrency in different slots
- 
- See: https://forums.swift.org/t/semaphore-alternatives-for-structured-concurrency/59353/3
  */
-final class ConcurrencyGroupLimiter: @unchecked Sendable {
-    let lock = NIOLock()
+actor ConcurrencyGroupLimiter {
+    static let instance = ConcurrencyGroupLimiter()
+    
     /// Number of running per slot
     private var counts: [Int: Int] = [:]
     private var waiters: [Int: [CheckedContinuation<Void, Never>]] = [:]
 
-    init() {}
-
     func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
-        lock.withLock {
-            return (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.reduce(0, { $0 + $1.value.count }))
-        }
+        (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.reduce(0, { $0 + $1.value.count }))
     }
 
     func wait(slot: Int, maxConcurrent: Int, maxConcurrentHard: Int) async throws {
-        lock.lock()
-        guard let count = self.counts[slot] else {
-            self.counts[slot] = 1
-            lock.unlock()
+        guard let count = counts[slot] else {
+            counts[slot] = 1
             // print("Single request slot \(slot)")
             return
         }
         guard count < maxConcurrentHard else {
-            lock.unlock()
             throw RateLimitError.tooManyConcurrentRequests
         }
         counts[slot] = count + 1
-        guard count < maxConcurrent else {
-            await withCheckedContinuation {
-                // print("Queuing request slot \(slot)")
-                waiters[slot, default: []].append($0)
-                lock.unlock()
-            }
-            return
+        if count >= maxConcurrent {
+            // print("Queuing request slot \(slot)")
+            await withCheckedContinuation { waiters[slot, default: []].append($0) }
         }
-        lock.unlock()
     }
 
     func release(slot: Int) {
-        lock.lock()
-        guard let count = self.counts[slot] else {
+        guard let count = counts[slot] else {
             fatalError("Released slot \(slot) but it was not in use")
         }
         guard count > 1 else {
             // print("All requests finished for slot \(slot)")
-            self.counts.removeValue(forKey: slot)
-            lock.unlock()
+            counts.removeValue(forKey: slot)
             return
         }
-        self.counts[slot] = count - 1
-        guard var slotWaiters = waiters[slot], !slotWaiters.isEmpty else {
-            lock.unlock()
+        counts[slot] = count - 1
+        guard let cont = waiters[slot]?.removeFirst() else {
             return // no other requests are queued
         }
-        // print("Running queued request at slot \(slot)")
-        let cont = slotWaiters.removeFirst()
-        if slotWaiters.isEmpty {
+        if waiters[slot]?.isEmpty == true {
             waiters.removeValue(forKey: slot)
-        } else {
-            waiters[slot] = slotWaiters
         }
-        lock.unlock()
+        // print("Running queued request at slot \(slot)")
         cont.resume()
     }
 }
