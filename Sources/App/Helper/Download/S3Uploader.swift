@@ -125,12 +125,13 @@ enum S3Uploader {
             throw error
         }
     }
-    
+        
     /// Sync a local directory to a remote S3 directory. Compares if size is different or local modification time is larger then remote modification time for each file
     /// local directory in form `/home/user/some-bucket/some-path/`
     /// `server` in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
     /// `basePath` offsets the object names relative to the local directory .e.g. `some-path/` in this example
-    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String) async throws {
+    /// `exclude` can be used to exclude file names. Supports "*" and "?" wildcards
+    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
         let logger = Logger(label: "S3Uploader")
         let remoteRoot = basePath.hasSuffix("/") ? basePath : basePath + "/"
         let serverBase = server.hasSuffix("/") ? String(server.dropLast()) : server
@@ -153,6 +154,7 @@ enum S3Uploader {
             do {
                 for try await entry in dir.listContents() {
                     guard let name = entry.path.lastComponent?.string else { continue }
+                    if !exclude.isEmpty && exclude.contains(where: { name.matchesGlob($0) }) { continue }
                     if entry.type == .regular {
                         if let info = try await FileSystem.shared.info(forFileAt: entry.path) {
                             let modTime = Date(timeIntervalSince1970: Double(info.lastDataModificationTime.seconds) + Double(info.lastDataModificationTime.nanoseconds) / 1_000_000_000)
@@ -202,6 +204,11 @@ enum S3Uploader {
             guard let remote = remoteFiles[local.remoteKey] else { return true }
             return remote.fileSize != local.size || local.modificationTime > remote.modificationTime
         }
+        
+        guard toUpload.count > 0 else {
+            logger.info("No files to upload. Exiting.")
+            return
+        }
 
         let totalBytes = toUpload.reduce(0) { $0 + $1.size }
         let uploadStart = DispatchTime.now()
@@ -223,6 +230,35 @@ enum S3Uploader {
         }
         
         logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
+    }
+}
+
+extension String {
+    /// Match a filename against a glob pattern supporting `*` (any sequence) and `?` (single character).
+    /// E.g. `".*"`, `"*~"`, `"*_previous_day*"`
+    func matchesGlob(_ pattern: String) -> Bool {
+        var p = pattern.startIndex
+        var s = self.startIndex
+        var starP: String.Index? = nil
+        var starS: String.Index? = nil
+        while s < self.endIndex {
+            if p < pattern.endIndex && (pattern[p] == "?" || pattern[p] == self[s]) {
+                p = pattern.index(after: p)
+                s = self.index(after: s)
+            } else if p < pattern.endIndex && pattern[p] == "*" {
+                starP = p
+                starS = s
+                p = pattern.index(after: p)
+            } else if let sp = starP {
+                p = pattern.index(after: sp)
+                starS = self.index(after: starS!)
+                s = starS!
+            } else {
+                return false
+            }
+        }
+        while p < pattern.endIndex && pattern[p] == "*" { p = pattern.index(after: p) }
+        return p == pattern.endIndex
     }
 }
 
