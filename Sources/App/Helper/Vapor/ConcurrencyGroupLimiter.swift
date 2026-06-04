@@ -11,13 +11,13 @@ final class ConcurrencyGroupLimiter: @unchecked Sendable {
     let lock = NIOLock()
     /// Number of running per slot
     private var counts: [Int: Int] = [:]
-    private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
+    private var waiters: [Int: [CheckedContinuation<Void, Never>]] = [:]
 
     init() {}
 
     func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
         lock.withLock {
-            return (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.count)
+            return (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.reduce(0, { $0 + $1.value.count }))
         }
     }
 
@@ -37,7 +37,7 @@ final class ConcurrencyGroupLimiter: @unchecked Sendable {
         guard count < maxConcurrent else {
             await withCheckedContinuation {
                 // print("Queuing request slot \(slot)")
-                waiters.append((slot, $0))
+                waiters[slot, default: []].append($0)
                 lock.unlock()
             }
             return
@@ -57,13 +57,17 @@ final class ConcurrencyGroupLimiter: @unchecked Sendable {
             return
         }
         self.counts[slot] = count - 1
-        guard let index = waiters.firstIndex(where: { $0.0 == slot }) else {
+        guard var slotWaiters = waiters[slot], !slotWaiters.isEmpty else {
             lock.unlock()
             return // no other requests are queued
         }
         // print("Running queued request at slot \(slot)")
-        let cont = waiters[index].1
-        waiters.remove(at: index)
+        let cont = slotWaiters.removeFirst()
+        if slotWaiters.isEmpty {
+            waiters.removeValue(forKey: slot)
+        } else {
+            waiters[slot] = slotWaiters
+        }
         lock.unlock()
         cont.resume()
     }
