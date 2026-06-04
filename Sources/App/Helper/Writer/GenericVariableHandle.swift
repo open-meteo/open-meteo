@@ -121,7 +121,7 @@ struct GenericVariableHandle: Sendable {
                 logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 if let uploadS3Bucket {
-                    try domain.domainRegistry.syncToS3PerRun(
+                    try await domain.domainRegistry.syncToS3PerRun(
                         logger: logger,
                         bucket: uploadS3Bucket,
                         run:run,

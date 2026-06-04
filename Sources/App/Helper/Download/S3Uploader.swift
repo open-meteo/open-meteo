@@ -193,8 +193,18 @@ enum S3Uploader {
         logger.info("Upload completed in \(uploadTime.asSecondsPrettyPrint) \(rate.asRatePrettyPrint). Commit changes now")
         let commitStart = DispatchTime.now()
         
-        // Commit all file changes
+        // Commit all OM file changes
         try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
+            if prepared.url.hasSuffix(".json") {
+                return
+            }
+            try await prepared.commit(client: client)
+        }
+        // Commit all json files. E.g. meta.json which should be committed last
+        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
+            if prepared.url.hasSuffix(".json") == false {
+                return
+            }
             try await prepared.commit(client: client)
         }
         

@@ -628,16 +628,25 @@ extension DomainRegistry {
                 }
                 try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
                     let startTimeAws = DispatchTime.now()
-                    if variable.contains("_previous_day") && bucket == "openmeteo" && profile == nil {
+                    if variable.contains("_previous_day") && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
                         // do not upload data from past days yet
                         return
                     }
                     logger.info("AWS upload [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    try Process.awsSync(
-                        src: src,
-                        dest: "s3://\(bucket)/data/\(dir)/\(variable)",
-                        profile: profile
-                    )
+                    if bucket.starts(with: "http") {
+                        try await S3Uploader.uploadSync(
+                            client: HTTPClient.shared,
+                            localDirectory: src,
+                            server: bucket,
+                            basePath: "data/\(dir)/\(variable)"
+                        )
+                    } else {
+                        try Process.awsSync(
+                            src: src,
+                            dest: "s3://\(bucket)/data/\(dir)/\(variable)",
+                            profile: profile
+                        )
+                    }
                     logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 }
             }
@@ -646,22 +655,32 @@ extension DomainRegistry {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
                 logger.info("AWS upload [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                let exclude = bucket == "openmeteo" && profile == nil ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
+                let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket)")
                 let startTimeAws = DispatchTime.now()
-                try Process.awsSync(
-                    src: src,
-                    dest: "s3://\(bucket)/data/\(dir)",
-                    exclude: exclude,
-                    profile: profile
-                )
+                if bucket.starts(with: "http") {
+                    try await S3Uploader.uploadSync(
+                        client: HTTPClient.shared,
+                        localDirectory: src,
+                        server: bucket,
+                        basePath: "data/\(dir)",
+                        exclude: exclude
+                    )
+                } else {
+                    try Process.awsSync(
+                        src: src,
+                        dest: "s3://\(bucket)/data/\(dir)",
+                        exclude: exclude,
+                        profile: profile
+                    )
+                }
                 logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
         }
     }
     
     /// Upload time-series optimised per RUN files to S3 `/data_run/<domain>/<run>/<variable>.om`
-    func syncToS3PerRun(logger: Logger, bucket: String, run: Timestamp, skipMeta: Bool) throws {
+    func syncToS3PerRun(logger: Logger, bucket: String, run: Timestamp, skipMeta: Bool) async throws {
         let dir = rawValue
         guard let directory = OpenMeteo.dataRunDirectory else {
             return
@@ -669,32 +688,45 @@ extension DomainRegistry {
         let timeFormatted = run.format_directoriesYYYYMMddhhmm
         for (bucket, profile) in parseBucket(bucket) {
             let src = "\(directory)\(dir)/\(timeFormatted)/"
-            let dest = "s3://\(bucket)/data_run/\(dir)/\(timeFormatted)/"
+            let destRel = "data_run/\(dir)/\(timeFormatted)/"
+            let dest = "s3://\(bucket)/\(destRel)"
+            
             if !FileManager.default.fileExists(atPath: src) {
                 continue
             }
             let startTimeAws = DispatchTime.now()
             logger.info("AWS upload to bucket \(bucket)")
-            try Process.awsSync(
-                src: src,
-                dest: dest,
-                exclude: ["*~", "meta.json"],
-                profile: profile
-            )
-            if !skipMeta {
-                try Process.awsCopy(
-                    src: "\(src)meta.json",
-                    dest: "\(dest)meta.json",
+            
+            if bucket.starts(with: "http") {
+                /// Only one sync required, because JSON files are committed last and on error, the process would die
+                try await S3Uploader.uploadSync(
+                    client: HTTPClient.shared,
+                    localDirectory: src,
+                    server: bucket,
+                    basePath: destRel
+                )
+            } else {
+                try Process.awsSync(
+                    src: src,
+                    dest: dest,
+                    exclude: ["*~", "meta.json"],
+                    profile: profile
+                )
+                if !skipMeta {
+                    try Process.awsCopy(
+                        src: "\(src)meta.json",
+                        dest: "\(dest)meta.json",
+                        profile: profile
+                    )
+                }
+                // Additional sync to make sure everything is synced
+                try Process.awsSync(
+                    src: "\(directory)\(dir)/",
+                    dest: "s3://\(bucket)/data_run/\(dir)/",
+                    exclude: ["*~"],
                     profile: profile
                 )
             }
-            // Additional sync to make sure everything is synced
-            try Process.awsSync(
-                src: "\(directory)\(dir)/",
-                dest: "s3://\(bucket)/data_run/\(dir)/",
-                exclude: ["*~"],
-                profile: profile
-            )
             logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
