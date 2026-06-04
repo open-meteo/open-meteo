@@ -60,6 +60,18 @@ import NIOCore
         let data = ByteBuffer(data: randomData(byteCount: 10 * 1024 * 1024))
         try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)/test/s3uploader-multipart.bin").commit(client: client)
     }
+    
+    /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3SyncUpload() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+
+        try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "data/ecmwf_ifs025_ensemble_mean/")
+    }
 }
 
 /// Fill a `Data` buffer with cryptographically random bytes.

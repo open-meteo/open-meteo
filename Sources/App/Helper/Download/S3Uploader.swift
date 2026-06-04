@@ -59,12 +59,15 @@ enum S3Uploader {
     
     static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
         let fh = try await FileSystem.shared.openFile(forReadingAt: file, options: .init())
+        let prepared: S3MultiPartUploadPrepared
         do {
-            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
+            prepared = try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
         } catch {
             try await fh.close()
             throw error
         }
+        try await fh.close()
+        return prepared
     }
     
     /// Uploads files to S3 in 8 MB chunks
@@ -124,6 +127,9 @@ enum S3Uploader {
     }
     
     /// Sync a local directory to a remote S3 directory. Compares if size is different or local modification time is larger then remote modification time for each file
+    /// local directory in form `/home/user/some-bucket/some-path/`
+    /// `server` in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
+    /// `basePath` offsets the object names relative to the local directory .e.g. `some-path/` in this example
     static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String) async throws {
         let logger = Logger(label: "S3Uploader")
         let remoteRoot = basePath.hasSuffix("/") ? basePath : basePath + "/"
@@ -167,12 +173,19 @@ enum S3Uploader {
                 try await dir.close()
                 throw error
             }
+            try await dir.close()
             for (subPath, subPrefix) in subdirs {
                 try await collectLocally(localPath: subPath, remotePrefix: subPrefix)
             }
         }
+        
+        logger.info("Collecting local files in \(localDirectory)")
+        let startLocal = DispatchTime.now()
 
         try await collectLocally(localPath: localDirectory, remotePrefix: remoteRoot)
+        
+        logger.info("Checked local files in \(startLocal.timeElapsedPretty()). Collecting remote files now.")
+        let startRemote = DispatchTime.now()
 
         // Step 2: Fetch remote directory listings concurrently, max 4 S3 list operations at a time.
         let remoteListings = try await remotePrefixes.mapConcurrent(nConcurrent: 4) { prefix in
@@ -191,14 +204,25 @@ enum S3Uploader {
         }
 
         let totalBytes = toUpload.reduce(0) { $0 + $1.size }
-        logger.info("Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
+        let uploadStart = DispatchTime.now()
+        logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
 
         // Step 4: Upload 2 files concurrently.
-        try await toUpload.foreachConcurrent(nConcurrent: 2) { file in
+        let prepared = try await toUpload.mapConcurrent(nConcurrent: 4) { file in
             let url = serverBase + "/" + file.remoteKey
-            let prepared = try await uploadMultipart(client: client, file: file.absolutePath, url: url)
+            return try await uploadMultipart(client: client, file: file.absolutePath, url: url, nConcurrent: 4)
+        }
+        let uploadTime = Double(DispatchTime.now().uptimeNanoseconds - uploadStart.uptimeNanoseconds) / 1_000_000_000
+        let rate = Double(totalBytes) / uploadTime
+        logger.info("Upload completed in \(uploadTime.asSecondsPrettyPrint) \(rate.asRatePrettyPrint). Commit changes now")
+        let commitStart = DispatchTime.now()
+        
+        // Commit all file changes
+        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
             try await prepared.commit(client: client)
         }
+        
+        logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
     }
 }
 
