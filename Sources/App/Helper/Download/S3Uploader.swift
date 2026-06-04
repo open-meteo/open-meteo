@@ -4,41 +4,10 @@ import NIOCore
 import Logging
 import NIOFileSystem
 
-protocol S3UploadAble {
-    associatedtype ByteBufferSequence: AsyncSequence where ByteBufferSequence.Element == ByteBuffer, ByteBufferSequence: Sendable
-    func readChunks(chunkLength: ByteCount) -> ByteBufferSequence
-}
-
-extension ReadFileHandle: S3UploadAble { }
-
-extension ByteBuffer: S3UploadAble {
-    func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
-        let chunkSize = Int(chunkLength.bytes)
-        var copy = self
-        return AsyncStream { continuation in
-            while copy.readableBytes > 0 {
-                let slice = copy.readSlice(length: min(chunkSize, copy.readableBytes))!
-                continuation.yield(slice)
-            }
-            continuation.finish()
-        }
-    }
-}
-
-extension Foundation.FileHandle: S3UploadAble {
-    public func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
-        let chunkSize = Int(chunkLength.bytes)
-        return AsyncStream { continuation in
-            while true {
-                let data = self.readData(ofLength: chunkSize)
-                if data.isEmpty { break }
-                continuation.yield(ByteBuffer(bytes: data))
-            }
-            continuation.finish()
-        }
-    }
-}
-
+/**
+ Utility to upload files to S3. Supports simple file uploads, multipart uploads and syncing local directories.
+ Uses NIOFileSystem for async file IO and AsyncHTTPClient for async HTTP.
+ */
 enum S3Uploader {
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
     static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
@@ -232,6 +201,43 @@ enum S3Uploader {
         logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
     }
 }
+
+/// Protocol of how a file can be chunked into 8 MB parts and upload as individual ByteBuffers. Unfortunately, `AsyncHTTPClient` only accepts ByteBuffers so a memory copy can not be avoided.
+protocol S3UploadAble {
+    associatedtype ByteBufferSequence: AsyncSequence where ByteBufferSequence.Element == ByteBuffer, ByteBufferSequence: Sendable
+    func readChunks(chunkLength: ByteCount) -> ByteBufferSequence
+}
+
+extension ReadFileHandle: S3UploadAble { }
+
+extension ByteBuffer: S3UploadAble {
+    func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
+        let chunkSize = Int(chunkLength.bytes)
+        var copy = self
+        return AsyncStream { continuation in
+            while copy.readableBytes > 0 {
+                let slice = copy.readSlice(length: min(chunkSize, copy.readableBytes))!
+                continuation.yield(slice)
+            }
+            continuation.finish()
+        }
+    }
+}
+
+//extension Foundation.FileHandle: S3UploadAble {
+//    /// Note: Blocking implementation
+//    public func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
+//        let chunkSize = Int(chunkLength.bytes)
+//        return AsyncStream { continuation in
+//            while true {
+//                let data = self.readData(ofLength: chunkSize)
+//                if data.isEmpty { break }
+//                continuation.yield(ByteBuffer(bytes: data))
+//            }
+//            continuation.finish()
+//        }
+//    }
+//}
 
 extension String {
     /// Match a filename against a glob pattern supporting `*` (any sequence) and `?` (single character).
