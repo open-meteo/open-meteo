@@ -185,7 +185,7 @@ extension Request {
             } else {
                 try await RateLimiter.instance.check(address: address)
             }
-            try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: 1, maxConcurrentHard: 5)
+            try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
             let response: Response
             do {
                 let params = try parseApiParams()
