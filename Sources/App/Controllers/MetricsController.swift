@@ -72,7 +72,7 @@ struct MetricsController: RouteCollection {
         lines.append("# TYPE om_block_cache_accessed_24h_bytes gauge")
         lines.append("om_block_cache_accessed_24h_bytes \(cacheStats.accessed_24hours)")
 
-        let concurrencyStats = apiConcurrencyLimiter.stats()
+        let concurrencyStats = await ConcurrencyGroupLimiter.instance.stats()
 
         lines.append("# HELP om_concurrency_monitored_ips Distinct IPs currently rate-limited")
         lines.append("# TYPE om_concurrency_monitored_ips gauge")
