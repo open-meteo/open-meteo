@@ -65,9 +65,9 @@ extension ModelFlatbufferSerialisable {
 
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
-        let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-        let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
-        return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
+        let lat = latitude < 0 ? "\(abs(latitude).formatted(decimals: 2))S" : "\(latitude.formatted(decimals: 2))N"
+        let ele = elevation.map { $0.isFinite ? "\($0.formatted(decimals: 0))m" : "" } ?? ""
+        return longitude < 0 ? "\(lat)\(abs(longitude).formatted(decimals: 2))W\(ele)" : "\(lat)\(longitude.formatted(decimals: 2))E\(ele)"
     }
 }
 

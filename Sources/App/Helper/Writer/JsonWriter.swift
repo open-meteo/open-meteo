@@ -104,9 +104,8 @@ extension ForecastapiResult.PerLocation {
             b.buffer.writeString(",\"interval\":\(current.dtSeconds)")
             /// Write data
             for e in current.columns {
-                let format = "%.\(e.unit.significantDigits)f"
                 b.buffer.writeString(",")
-                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? String(format: format, e.value) : "null")")
+                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? e.value.formatted(decimals: e.unit.significantDigits) : "null")")
             }
             b.buffer.writeString("}")
             try await b.flushIfRequired()
@@ -152,7 +151,6 @@ extension ForecastapiResult.PerLocation {
                 var firstValue = true
                 switch e.data {
                 case .float(let floats):
-                    let format = "%.\(e.unit.significantDigits)f"
                     for v in floats {
                         if firstValue {
                             firstValue = false
@@ -160,7 +158,7 @@ extension ForecastapiResult.PerLocation {
                             b.buffer.writeString(",")
                         }
                         if v.isFinite {
-                            b.buffer.writeString(String(format: format, v))
+                            b.buffer.writeString(v.formatted(decimals: e.unit.significantDigits))
                         } else {
                             b.buffer.writeString("null")
                         }
