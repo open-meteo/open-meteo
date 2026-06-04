@@ -146,7 +146,8 @@ struct GenericVariableHandle: Sendable {
                             try emDomain.domainRegistry.syncToS3PerRun(
                                 logger: logger,
                                 bucket: uploadS3Bucket,
-                                run: run
+                                run: run,
+                                skipMeta: false
                             )
                         }
                     }
