@@ -1,0 +1,1420 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Seasonal Weather Forecast API
+  description: >-
+    Seasonal weather forecasts based on ECMWF SEAS5 and other ensemble models providing probabilistic long-range forecasts up to 9 months ahead.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/seasonal:
+    servers:
+      - url: https://seasonal-api.open-meteo.com
+      - url: https://customer-seasonal-api.open-meteo.com
+    get:
+      tags:
+        - Seasonal Forecast APIs
+      summary: Seasonal weather forecast up to 9 months
+      description: >-
+        Long-range seasonal forecasts from multiple ensemble models with 6-hourly and daily data.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hourly
+          in: query
+          description: >-
+            A list of weather variables (6-hourly resolution).
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - dew_point_2m
+                - pressure_msl
+                - sea_surface_temperature
+                - snowfall_water_equivalent
+                - precipitation
+                - soil_temperature_0_to_7cm
+                - cloud_cover
+                - wind_speed_10m
+                - wind_speed_100m
+                - wind_speed_200m
+                - wind_direction_10m
+                - wind_direction_100m
+                - wind_direction_200m
+                - wind_gusts_10m
+                - rain
+                - showers
+                - snowfall
+                - relative_humidity_2m
+                - apparent_temperature
+                - et0_fao_evapotranspiration
+                - vapour_pressure_deficit
+                - weather_code
+                - sunshine_duration
+                - wave_height
+                - wave_direction
+                - wave_period
+                - wave_peak_period
+                - soil_temperature_7_to_28cm
+                - soil_temperature_28_to_100cm
+                - soil_temperature_100_to_255cm
+                - soil_moisture_0_to_7cm
+                - soil_moisture_7_to_28cm
+                - soil_moisture_28_to_100cm
+                - soil_moisture_100_to_255cm
+                - shortwave_radiation
+                - direct_radiation
+                - diffuse_radiation
+                - direct_normal_irradiance
+                - global_tilted_irradiance
+                - terrestrial_radiation
+                - shortwave_radiation_instant
+                - direct_radiation_instant
+                - diffuse_radiation_instant
+                - direct_normal_irradiance_instant
+                - global_tilted_irradiance_instant
+                - terrestrial_radiation_instant
+        - name: daily
+          in: query
+          description: >-
+            A list of daily weather variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - sunrise
+                - sunset
+                - weather_code
+                - et0_fao_evapotranspiration
+                - vapour_pressure_deficit_max
+                - temperature_2m_max
+                - temperature_2m_min
+                - temperature_2m_mean
+                - sunshine_duration
+                - dew_point_2m_mean
+                - pressure_msl_mean
+                - sea_surface_temperature_mean
+                - cloud_cover_mean
+                - wind_speed_10m_mean
+                - wind_speed_100m_mean
+                - snow_depth_mean
+                - soil_temperature_0_to_7cm_mean
+        - name: weekly
+          in: query
+          description: >-
+            A list of weekly weather variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - wind_speed_10m_mean
+                - wind_speed_10m_anomaly
+                - wind_speed_100m_mean
+                - wind_speed_100m_anomaly
+                - wind_direction_10m_mean
+                - wind_direction_10m_anomaly
+                - wind_direction_100m_mean
+                - wind_direction_100m_anomaly
+                - snow_depth_mean
+                - snow_depth_anomaly
+                - snowfall_mean
+                - snowfall_anomaly
+                - temperature_2m_anomaly_gt0
+                - temperature_2m_anomaly_gt1
+                - temperature_2m_anomaly_gt2
+                - temperature_2m_anomaly_ltm1
+                - temperature_2m_anomaly_ltm2
+                - pressure_msl_anomaly_gt0
+                - surface_temperature_anomaly_gt0
+                - precipitation_anomaly_gt0
+                - precipitation_anomaly_gt10
+                - precipitation_anomaly_gt20
+                - temperature_2m_sot10
+                - temperature_2m_sot90
+                - temperature_2m_efi
+                - precipitation_efi
+                - precipitation_sot90
+                - showers_mean
+                - snow_density_mean
+                - snow_density_anomaly
+                - snow_depth_water_equivalent_mean
+                - snow_depth_water_equivalent_anomaly
+                - total_column_integrated_water_vapour_mean
+                - total_column_integrated_water_vapour_anomaly
+                - temperature_2m_mean
+                - temperature_2m_anomaly
+                - dew_point_2m_mean
+                - dew_point_2m_anomaly
+                - pressure_msl_mean
+                - pressure_msl_anomaly
+                - sea_surface_temperature_mean
+                - sea_surface_temperature_anomaly
+                - wind_u_component_10m_mean
+                - wind_u_component_10m_anomaly
+                - wind_v_component_10m_mean
+                - wind_v_component_10m_anomaly
+                - wind_u_component_100m_mean
+                - wind_u_component_100m_anomaly
+                - wind_v_component_100m_mean
+                - wind_v_component_100m_anomaly
+                - snowfall_water_equivalent_mean
+                - snowfall_water_equivalent_anomaly
+                - precipitation_mean
+                - precipitation_anomaly
+                - cloud_cover_mean
+                - cloud_cover_anomaly
+                - sunshine_duration_mean
+                - sunshine_duration_anomaly
+                - soil_temperature_0_to_7cm_mean
+                - soil_temperature_0_to_7cm_anomaly
+                - temperature_max6h_2m_mean
+                - temperature_max6h_2m_anomaly
+                - temperature_min6h_2m_mean
+                - temperature_min6h_2m_anomaly
+        - name: monthly
+          in: query
+          description: >-
+            A list of monthly weather variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - wind_gusts_10m_anomaly
+                - wind_speed_10m_mean
+                - wind_speed_10m_anomaly
+                - albedo_mean
+                - albedo_anomaly
+                - cloud_cover_low_mean
+                - cloud_cover_low_anomaly
+                - showers_mean
+                - showers_anomaly
+                - runoff_mean
+                - runoff_anomaly
+                - snow_density_mean
+                - snow_density_anomaly
+                - snow_depth_water_equivalent_mean
+                - snow_depth_water_equivalent_anomaly
+                - total_column_integrated_water_vapour_mean
+                - total_column_integrated_water_vapour_anomaly
+                - temperature_2m_mean
+                - temperature_2m_anomaly
+                - dew_point_2m_mean
+                - dew_point_2m_anomaly
+                - pressure_msl_mean
+                - pressure_msl_anomaly
+                - sea_surface_temperature_mean
+                - sea_surface_temperature_anomaly
+                - wind_u_component_10m_mean
+                - wind_u_component_10m_anomaly
+                - wind_v_component_10m_mean
+                - wind_v_component_10m_anomaly
+                - snowfall_water_equivalent_mean
+                - snowfall_water_equivalent_anomaly
+                - precipitation_mean
+                - precipitation_anomaly
+                - shortwave_radiation_mean
+                - shortwave_radiation_anomaly
+                - longwave_radiation_mean
+                - longwave_radiation_anomaly
+                - cloud_cover_mean
+                - cloud_cover_anomaly
+                - sunshine_duration_mean
+                - sunshine_duration_anomaly
+                - soil_temperature_0_to_7cm_mean
+                - soil_temperature_0_to_7cm_anomaly
+                - soil_temperature_7_to_28cm_mean
+                - soil_temperature_7_to_28cm_anomaly
+                - soil_temperature_28_to_100cm_mean
+                - soil_temperature_28_to_100cm_anomaly
+                - soil_temperature_100_to_255cm_mean
+                - soil_temperature_100_to_255cm_anomaly
+                - soil_moisture_0_to_7cm_mean
+                - soil_moisture_0_to_7cm_anomaly
+                - soil_moisture_7_to_28cm_mean
+                - soil_moisture_7_to_28cm_anomaly
+                - soil_moisture_28_to_100cm_mean
+                - soil_moisture_28_to_100cm_anomaly
+                - soil_moisture_100_to_255cm_mean
+                - soil_moisture_100_to_255cm_anomaly
+                - temperature_max24h_2m_mean
+                - temperature_max24h_2m_anomaly
+                - temperature_min24h_2m_mean
+                - temperature_min24h_2m_anomaly
+                - sea_ice_cover_mean
+                - sea_ice_cover_anomaly
+                - latent_heat_flux_mean
+                - latent_heat_flux_anomaly
+                - sensible_heat_flux_mean
+                - sensible_heat_flux_anomaly
+                - evapotranspiration_mean
+                - evapotranspiration_anomaly
+                - snowfall_mean
+                - snowfall_anomaly
+                - snow_depth_mean
+                - snow_depth_anomaly
+        - name: temperature_unit
+          in: query
+          schema:
+            type: string
+            default: celsius
+            enum: [celsius, fahrenheit]
+        - name: wind_speed_unit
+          in: query
+          schema:
+            type: string
+            default: kmh
+            enum: [kmh, ms, mph, kn]
+        - name: precipitation_unit
+          in: query
+          schema:
+            type: string
+            default: mm
+            enum: [mm, inch]
+        - name: timeformat
+          in: query
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          description: >-
+            Number of forecast days. Up to 217 days (7 months).
+          schema:
+            type: integer
+            default: 183
+            minimum: 0
+            maximum: 217
+        - name: start_date
+          in: query
+          description: >-
+            Start date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: cell_selection
+          in: query
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - best_match
+                - ecmwf_seasonal_seamless
+                - ecmwf_seas5
+                - ecmwf_ec46
+                - ecmwf_seasonal_ensemble_mean_seamless
+                - ecmwf_seas5_ensemble_mean
+                - ecmwf_ec46_ensemble_mean
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  hourly:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: number
+                        format: float
+                  hourly_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                    additionalProperties:
+                      type: string
+                  daily:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: number
+                        format: float
+                  daily_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                    additionalProperties:
+                      type: string
+                  weekly:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      wind_speed_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_100m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_100m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_100m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_100m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly_gt0:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly_gt1:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly_gt2:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly_ltm1:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly_ltm2:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pressure_msl_anomaly_gt0:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      surface_temperature_anomaly_gt0:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_anomaly_gt0:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_anomaly_gt10:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_anomaly_gt20:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_sot10:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_sot90:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_efi:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_efi:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_sot90:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      showers_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_density_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_density_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_water_equivalent_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_water_equivalent_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      total_column_integrated_water_vapour_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      total_column_integrated_water_vapour_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pressure_msl_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pressure_msl_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_surface_temperature_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_surface_temperature_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_u_component_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_u_component_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_v_component_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_v_component_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_u_component_100m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_u_component_100m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_v_component_100m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_v_component_100m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_water_equivalent_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_water_equivalent_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunshine_duration_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunshine_duration_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_7cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_7cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_max6h_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_max6h_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_min6h_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_min6h_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                  weekly_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      wind_speed_10m_mean:
+                        type: string
+                      wind_speed_10m_anomaly:
+                        type: string
+                      wind_speed_100m_mean:
+                        type: string
+                      wind_speed_100m_anomaly:
+                        type: string
+                      wind_direction_10m_mean:
+                        type: string
+                      wind_direction_10m_anomaly:
+                        type: string
+                      wind_direction_100m_mean:
+                        type: string
+                      wind_direction_100m_anomaly:
+                        type: string
+                      snow_depth_mean:
+                        type: string
+                      snow_depth_anomaly:
+                        type: string
+                      snowfall_mean:
+                        type: string
+                      snowfall_anomaly:
+                        type: string
+                      temperature_2m_anomaly_gt0:
+                        type: string
+                      temperature_2m_anomaly_gt1:
+                        type: string
+                      temperature_2m_anomaly_gt2:
+                        type: string
+                      temperature_2m_anomaly_ltm1:
+                        type: string
+                      temperature_2m_anomaly_ltm2:
+                        type: string
+                      pressure_msl_anomaly_gt0:
+                        type: string
+                      surface_temperature_anomaly_gt0:
+                        type: string
+                      precipitation_anomaly_gt0:
+                        type: string
+                      precipitation_anomaly_gt10:
+                        type: string
+                      precipitation_anomaly_gt20:
+                        type: string
+                      temperature_2m_sot10:
+                        type: string
+                      temperature_2m_sot90:
+                        type: string
+                      temperature_2m_efi:
+                        type: string
+                      precipitation_efi:
+                        type: string
+                      precipitation_sot90:
+                        type: string
+                      showers_mean:
+                        type: string
+                      snow_density_mean:
+                        type: string
+                      snow_density_anomaly:
+                        type: string
+                      snow_depth_water_equivalent_mean:
+                        type: string
+                      snow_depth_water_equivalent_anomaly:
+                        type: string
+                      total_column_integrated_water_vapour_mean:
+                        type: string
+                      total_column_integrated_water_vapour_anomaly:
+                        type: string
+                      temperature_2m_mean:
+                        type: string
+                      temperature_2m_anomaly:
+                        type: string
+                      dew_point_2m_mean:
+                        type: string
+                      dew_point_2m_anomaly:
+                        type: string
+                      pressure_msl_mean:
+                        type: string
+                      pressure_msl_anomaly:
+                        type: string
+                      sea_surface_temperature_mean:
+                        type: string
+                      sea_surface_temperature_anomaly:
+                        type: string
+                      wind_u_component_10m_mean:
+                        type: string
+                      wind_u_component_10m_anomaly:
+                        type: string
+                      wind_v_component_10m_mean:
+                        type: string
+                      wind_v_component_10m_anomaly:
+                        type: string
+                      wind_u_component_100m_mean:
+                        type: string
+                      wind_u_component_100m_anomaly:
+                        type: string
+                      wind_v_component_100m_mean:
+                        type: string
+                      wind_v_component_100m_anomaly:
+                        type: string
+                      snowfall_water_equivalent_mean:
+                        type: string
+                      snowfall_water_equivalent_anomaly:
+                        type: string
+                      precipitation_mean:
+                        type: string
+                      precipitation_anomaly:
+                        type: string
+                      cloud_cover_mean:
+                        type: string
+                      cloud_cover_anomaly:
+                        type: string
+                      sunshine_duration_mean:
+                        type: string
+                      sunshine_duration_anomaly:
+                        type: string
+                      soil_temperature_0_to_7cm_mean:
+                        type: string
+                      soil_temperature_0_to_7cm_anomaly:
+                        type: string
+                      temperature_max6h_2m_mean:
+                        type: string
+                      temperature_max6h_2m_anomaly:
+                        type: string
+                      temperature_min6h_2m_mean:
+                        type: string
+                      temperature_min6h_2m_anomaly:
+                        type: string
+                  monthly:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      wind_gusts_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      albedo_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      albedo_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_low_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_low_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      showers_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      showers_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      runoff_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      runoff_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_density_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_density_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_water_equivalent_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_water_equivalent_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      total_column_integrated_water_vapour_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      total_column_integrated_water_vapour_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pressure_msl_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pressure_msl_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_surface_temperature_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_surface_temperature_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_u_component_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_u_component_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_v_component_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_v_component_10m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_water_equivalent_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_water_equivalent_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      shortwave_radiation_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      shortwave_radiation_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      longwave_radiation_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      longwave_radiation_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunshine_duration_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunshine_duration_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_7cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_7cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_7_to_28cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_7_to_28cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_28_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_28_to_100cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_100_to_255cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_100_to_255cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_7cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_7cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_7_to_28cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_7_to_28cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_28_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_28_to_100cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_100_to_255cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_100_to_255cm_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_max24h_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_max24h_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_min24h_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_min24h_2m_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_ice_cover_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_ice_cover_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      latent_heat_flux_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      latent_heat_flux_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sensible_heat_flux_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sensible_heat_flux_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      evapotranspiration_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      evapotranspiration_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_anomaly:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                  monthly_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      wind_gusts_10m_anomaly:
+                        type: string
+                      wind_speed_10m_mean:
+                        type: string
+                      wind_speed_10m_anomaly:
+                        type: string
+                      albedo_mean:
+                        type: string
+                      albedo_anomaly:
+                        type: string
+                      cloud_cover_low_mean:
+                        type: string
+                      cloud_cover_low_anomaly:
+                        type: string
+                      showers_mean:
+                        type: string
+                      showers_anomaly:
+                        type: string
+                      runoff_mean:
+                        type: string
+                      runoff_anomaly:
+                        type: string
+                      snow_density_mean:
+                        type: string
+                      snow_density_anomaly:
+                        type: string
+                      snow_depth_water_equivalent_mean:
+                        type: string
+                      snow_depth_water_equivalent_anomaly:
+                        type: string
+                      total_column_integrated_water_vapour_mean:
+                        type: string
+                      total_column_integrated_water_vapour_anomaly:
+                        type: string
+                      temperature_2m_mean:
+                        type: string
+                      temperature_2m_anomaly:
+                        type: string
+                      dew_point_2m_mean:
+                        type: string
+                      dew_point_2m_anomaly:
+                        type: string
+                      pressure_msl_mean:
+                        type: string
+                      pressure_msl_anomaly:
+                        type: string
+                      sea_surface_temperature_mean:
+                        type: string
+                      sea_surface_temperature_anomaly:
+                        type: string
+                      wind_u_component_10m_mean:
+                        type: string
+                      wind_u_component_10m_anomaly:
+                        type: string
+                      wind_v_component_10m_mean:
+                        type: string
+                      wind_v_component_10m_anomaly:
+                        type: string
+                      snowfall_water_equivalent_mean:
+                        type: string
+                      snowfall_water_equivalent_anomaly:
+                        type: string
+                      precipitation_mean:
+                        type: string
+                      precipitation_anomaly:
+                        type: string
+                      shortwave_radiation_mean:
+                        type: string
+                      shortwave_radiation_anomaly:
+                        type: string
+                      longwave_radiation_mean:
+                        type: string
+                      longwave_radiation_anomaly:
+                        type: string
+                      cloud_cover_mean:
+                        type: string
+                      cloud_cover_anomaly:
+                        type: string
+                      sunshine_duration_mean:
+                        type: string
+                      sunshine_duration_anomaly:
+                        type: string
+                      soil_temperature_0_to_7cm_mean:
+                        type: string
+                      soil_temperature_0_to_7cm_anomaly:
+                        type: string
+                      soil_temperature_7_to_28cm_mean:
+                        type: string
+                      soil_temperature_7_to_28cm_anomaly:
+                        type: string
+                      soil_temperature_28_to_100cm_mean:
+                        type: string
+                      soil_temperature_28_to_100cm_anomaly:
+                        type: string
+                      soil_temperature_100_to_255cm_mean:
+                        type: string
+                      soil_temperature_100_to_255cm_anomaly:
+                        type: string
+                      soil_moisture_0_to_7cm_mean:
+                        type: string
+                      soil_moisture_0_to_7cm_anomaly:
+                        type: string
+                      soil_moisture_7_to_28cm_mean:
+                        type: string
+                      soil_moisture_7_to_28cm_anomaly:
+                        type: string
+                      soil_moisture_28_to_100cm_mean:
+                        type: string
+                      soil_moisture_28_to_100cm_anomaly:
+                        type: string
+                      soil_moisture_100_to_255cm_mean:
+                        type: string
+                      soil_moisture_100_to_255cm_anomaly:
+                        type: string
+                      temperature_max24h_2m_mean:
+                        type: string
+                      temperature_max24h_2m_anomaly:
+                        type: string
+                      temperature_min24h_2m_mean:
+                        type: string
+                      temperature_min24h_2m_anomaly:
+                        type: string
+                      sea_ice_cover_mean:
+                        type: string
+                      sea_ice_cover_anomaly:
+                        type: string
+                      latent_heat_flux_mean:
+                        type: string
+                      latent_heat_flux_anomaly:
+                        type: string
+                      sensible_heat_flux_mean:
+                        type: string
+                      sensible_heat_flux_anomaly:
+                        type: string
+                      evapotranspiration_mean:
+                        type: string
+                      evapotranspiration_anomaly:
+                        type: string
+                      snowfall_mean:
+                        type: string
+                      snowfall_anomaly:
+                        type: string
+                      snow_depth_mean:
+                        type: string
+                      snow_depth_anomaly:
+                        type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string

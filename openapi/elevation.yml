@@ -1,0 +1,66 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Elevation API
+  description: >-
+    Look up terrain elevation for coordinates using a 90-metre digital elevation model.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/elevation:
+    servers:
+      - url: https://api.open-meteo.com
+      - url: https://customer-api.open-meteo.com
+    get:
+      tags:
+        - Elevation API
+      summary: Get terrain elevation for coordinates
+      description: >-
+        Returns terrain elevation using a 90-metre digital elevation model.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          description: Comma-separated list of latitude values in WGS84.
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          description: Comma-separated list of longitude values in WGS84.
+          schema:
+            type: string
+        - name: apikey
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  elevation:
+                    type: array
+                    items:
+                      type: number
+                      format: float
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string
