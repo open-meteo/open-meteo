@@ -146,48 +146,12 @@ fileprivate extension String {
     }
 }
 
-
-/**
- Extract username and password from URL. Cannot use `URLComponents` because some functions are not available on linux
- */
-struct HttpUrlParts {
-    let url: String
-    let schema: Substring
-    let user: Substring?
-    let password: Substring?
-    let hostRange: Range<String.Index>
-    
-    public init?(url: String) {
-        guard let rangeSchema = url.firstRange(of: "://") else {
-            return nil
-        }
-        let posSchema = rangeSchema.upperBound
-        schema = url[url.startIndex ..< rangeSchema.lowerBound]
-        if let posAt = url[posSchema..<url.endIndex].firstIndex(of: "@"), url[posSchema..<posAt].contains(".") == false {
-            if let posColon = url[posSchema..<posAt].firstIndex(of: ":") {
-                user = url[posSchema..<posColon]
-                password = url[url.index(after: posColon)..<posAt]
-            } else {
-                user = url[posSchema..<posAt]
-                password = nil
-            }
-            guard let posSlash = url[posAt...].firstIndex(of: "/") else {
-                return nil
-            }
-            hostRange = url.index(after: posAt)..<posSlash
-        } else {
-            guard let posSlash = url[posSchema...].firstIndex(of: "/") else {
-                return nil
-            }
-            hostRange = posSchema..<posSlash
-            user = nil
-            password = nil
-        }
-        self.url = url
-    }
-    
-    var cleanUrl: String {
-        return "\(schema)://\(url[hostRange.lowerBound...])"
+extension URLComponents {
+    var withoutCredentials: URLComponents {
+        var result = self
+        result.user = nil
+        result.password = nil
+        return result
     }
 }
 
@@ -195,13 +159,13 @@ extension HTTPClientRequest {
     /// Check for basic auth or S3 auth
     mutating func applyS3Credentials() throws {
         guard
-            let components = HttpUrlParts(url: url),
+            let components = URLComponents(string: url),
             let username = components.user,
             let password = components.password
         else {
             return
         }
-        self.url = components.cleanUrl
+        self.url = components.withoutCredentials.url!.absoluteString
         let signer = AWSSigner(accessKey: String(username), secretKey: String(password), region: "us-west-2", service: "s3")
         try signer.sign(request: &self)
     }

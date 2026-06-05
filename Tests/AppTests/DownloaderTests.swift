@@ -34,6 +34,14 @@ import NIOCore
         #expect(request.headers.contains(name: "Authorization"))
         #expect(request.url == "https://examplebucket.s3.amazonaws.com/test.txt")
     }
+    
+    @Test func testAwsSignClient2() throws {
+        let url = "https://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt"
+        var request = HTTPClientRequest(url: url)
+        try request.applyS3Credentials()
+        #expect(request.headers.contains(name: "Authorization"))
+        #expect(request.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
+    }
 
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
