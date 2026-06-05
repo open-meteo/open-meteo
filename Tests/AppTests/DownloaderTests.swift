@@ -28,7 +28,8 @@ import NIOCore
     }
     
     @Test func testAwsSignClient() async throws {
-        let url = "https://AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY@examplebucket.s3.amazonaws.com/test.txt"
+        // slash in password needs to be URL encoded
+        let url = "https://AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI%2FK7MDENG%2FbPxRfiCYEXAMPLEKEY@examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)
         try request.applyS3Credentials()
         #expect(request.headers.contains(name: "Authorization"))
