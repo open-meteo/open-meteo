@@ -52,9 +52,10 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
 extension VariablePerMemberStorage {
     func getAllRemoving(variables: [V], timestamp: Timestamp, member: Int) -> [Array2D]? {
         let keys = variables.map { VariableAndMember(variable: $0, timestamp: timestamp, member: member) }
-        guard self.data.keys.contains(keys) else {
-            return nil
+        for key in keys {
+            guard data.keys.contains(key) else { return nil }
         }
+        
         var output: [Array2D] = .init()
         output.reserveCapacity(keys.count)
         for key in keys {
