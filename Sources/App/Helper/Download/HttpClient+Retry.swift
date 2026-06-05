@@ -141,7 +141,7 @@ extension HTTPClient {
                 if let user = user, let password = password {
                     request.url = url
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if url.contains(".your-objectstorage.com") || url.contains("s3.open-meteo.com") || url.contains("127.0.0.1:7480") {
+                    if url.contains(".your-objectstorage.com") || url.contains("s3.open-meteo.com") || url.contains("127.0.0.1:7480") || url.contains("s3.amazonaws.com") {
                         let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                         try signer.sign(request: &request)
                     } else {
@@ -151,12 +151,14 @@ extension HTTPClient {
                 
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
                 logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(url)\(request.rangePrettyPrint)")
+                //print(try await response.readStringImmutable())
                 try response.throwOnError()
                 return try await body(response)
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
+                
                 logger.info("Download failed unrecoverable with \(error). URL \(url)\(request.rangePrettyPrint)")
                 throw error
             } catch let error as CancellationError {
