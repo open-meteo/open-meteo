@@ -12,31 +12,6 @@ enum GoogleCloudStorageError: Error {
     case couldNotDecode
 }
 
-struct GoogleCloudStoragePath: Sendable {
-    let bucket: String
-    let object: String
-
-    init(_ gsPath: String) throws {
-        guard gsPath.hasPrefix("gs://") else {
-            throw GoogleCloudStorageError.invalidGcsPath("Expected gs:// path, got \(gsPath)")
-        }
-        let withoutScheme = String(gsPath.dropFirst("gs://".count))
-        let parts = withoutScheme.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
-        guard let bucket = parts.first, !bucket.isEmpty else {
-            throw GoogleCloudStorageError.invalidGcsPath("Missing bucket in \(gsPath)")
-        }
-        self.bucket = String(bucket)
-        self.object = parts.count > 1 ? String(parts[1]) : ""
-    }
-
-    var authenticatedDownloadUrl: String {
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "-._~")
-        let encodedObject = object.addingPercentEncoding(withAllowedCharacters: allowed) ?? object
-        return "https://storage.googleapis.com/download/storage/v1/b/\(bucket)/o/\(encodedObject)?alt=media"
-    }
-}
-
 actor GoogleCloudStorageAuth {
     private let client: HTTPClient
     private let logger: Logger
@@ -153,85 +128,5 @@ actor GoogleCloudStorageAuth {
         func verify(using algorithm: some JWTAlgorithm) async throws {
             try exp.verifyNotExpired()
         }
-    }
-}
-
-enum GoogleCloudStorage {
-    static func download(
-        client: HTTPClient,
-        logger: Logger,
-        remotePath: String,
-        localFile: String
-    ) async throws {
-        logger.info("Fetching \(remotePath) -> \(localFile)")
-
-        let token = try await GoogleCloudStorageAuth(
-            client: client,
-            logger: logger
-        ).getAccessToken()
-
-        let url = try GoogleCloudStoragePath(remotePath).authenticatedDownloadUrl
-        var request = HTTPClientRequest(url: url)
-        request.method = .GET
-        request.headers.add(name: "Authorization", value: "Bearer \(token)")
-
-        let response = try await client.execute(request, timeout: .seconds(300))
-        guard response.status == .ok else {
-            let error = try await response.readStringImmutable() ?? ""
-            throw GoogleCloudStorageError.httpError(
-                status: Int(response.status.code),
-                message: "Could not download \(remotePath): \(error)"
-            )
-        }
-
-        try FileManager.default.createDirectory(
-            atPath: URL(fileURLWithPath: localFile).deletingLastPathComponent().path,
-            withIntermediateDirectories: true
-        )
-
-        let fileHandle = try FileHandle.createNewFile(file: localFile, overwrite: true, temporary: true)
-        do {
-            for try await chunk in response.body {
-                try Task.checkCancellation()
-                try fileHandle.write(contentsOf: Data(buffer: chunk))
-            }
-            try fileHandle.linkTemporary(file: localFile)
-        } catch {
-            try? fileHandle.close()
-            throw error
-        }
-        try fileHandle.close()
-    }
-
-    /// Read a small file from GCS and return its contents as a ByteBuffers
-    static func readAndDecode<T: Decodable>(
-        _ type: T.Type,
-        client: HTTPClient,
-        logger: Logger,
-        remotePath: String,
-    ) async throws -> T {
-        let token = try await GoogleCloudStorageAuth(
-            client: client,
-            logger: logger
-        ).getAccessToken()
-
-        let url = try GoogleCloudStoragePath(remotePath).authenticatedDownloadUrl
-        var request = HTTPClientRequest(url: url)
-        request.method = .GET
-        request.headers.add(name: "Authorization", value: "Bearer \(token)")
-
-        let response = try await client.execute(request, timeout: .seconds(60))
-        guard response.status == .ok else {
-            let error = try await response.readStringImmutable() ?? ""
-            throw GoogleCloudStorageError.httpError(
-                status: Int(response.status.code),
-                message: "Could not read \(remotePath): \(error)"
-            )
-        }
-
-        guard let result = try await response.readJSONDecodable(type) else {
-            throw GoogleCloudStorageError.couldNotDecode
-        }
-        return result
     }
 }
