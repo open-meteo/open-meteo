@@ -199,6 +199,7 @@ extension Request {
                     guard url.count < 3500 else {
                         throw ForecastApiError.generic(message: "Your API URL is too long for automatic redirection from the open-access API to the commercial endpoints. Instead, use the 'customer-' prefixed URLs directly. Refer to the API documentation and select 'Usage -> Commercial' to obtain the correct customer URLs.")
                     }
+                    await ConcurrencyGroupLimiter.instance.release(slot: slot)
                     return self.redirect(to: url)
                 }
                 let responder = try await fn(host, params)
