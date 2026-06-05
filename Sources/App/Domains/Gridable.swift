@@ -95,6 +95,10 @@ extension Gridable {
 
         switch mode {
         case .land:
+            guard !elevation.isNaN else {
+                // if no elevation is given, we cannot do terrain optimised matching, so just return nearest
+                return try await findPointNearest(lat: lat, lon: lon, elevationFile: elevationFile)
+            }
             return try await findPointTerrainOptimised(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile)
         case .sea:
             return try await findPointInSea(lat: lat, lon: lon, elevationFile: elevationFile)

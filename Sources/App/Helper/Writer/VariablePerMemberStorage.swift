@@ -17,7 +17,7 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
         }
     }
 
-    struct TimestampAndMember: Equatable {
+    struct TimestampAndMember: Equatable, Hashable {
         let timestamp: Timestamp
         let member: Int
     }
