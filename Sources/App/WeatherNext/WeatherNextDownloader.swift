@@ -379,6 +379,10 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let baseInterval: TimeInterval = 60
         let maxInterval: TimeInterval = 300
         var attempt = 0
+        let authProvider = GoogleCloudStorageAuth(
+            client: client,
+            logger: logger
+        )
 
         while true {
             attempt += 1
@@ -388,10 +392,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             logger.info("Checking Zarr success marker: \(successPath)")
 
             do {
-                let token = try await GoogleCloudStorageAuth(
-                    client: client,
-                    logger: logger
-                ).getAccessToken()
+                let token = try await authProvider.getAccessToken()
                 let storage = try S3CompatibleStorage(
                     baseURL: "https://storage.googleapis.com/weathernext",
                     additionalHeaders: ["Authorization": "Bearer \(token)"]
