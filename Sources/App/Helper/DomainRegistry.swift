@@ -637,7 +637,7 @@ extension DomainRegistry {
                         return
                     }
                     logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    if bucket.starts(with: "http") {
+                    if bucket.starts(with: "s3") {
                         try await S3Uploader.uploadSync(
                             client: HTTPClient.shared,
                             localDirectory: src,
@@ -662,7 +662,7 @@ extension DomainRegistry {
                 let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
                 let startTimeAws = DispatchTime.now()
-                if bucket.starts(with: "http") {
+                if bucket.starts(with: "s3") {
                     try await S3Uploader.uploadSync(
                         client: HTTPClient.shared,
                         localDirectory: src,
@@ -701,7 +701,7 @@ extension DomainRegistry {
             let startTimeAws = DispatchTime.now()
             logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
             
-            if bucket.starts(with: "http") {
+            if bucket.starts(with: "s3") {
                 /// Only one sync required, because JSON files are committed last and on error, the process would die
                 try await S3Uploader.uploadSync(
                     client: HTTPClient.shared,

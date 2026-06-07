@@ -185,13 +185,13 @@ actor OmSpatialTimestepWriter {
                 return // skip upload to ceph storage for now
             }
             let start = DispatchTime.now()
-            let bucketPrefixed = bucket.starts(with: "http") ? bucket : "s3://\(bucket)/"
+            let bucketPrefixed = bucket.starts(with: "s3") ? bucket : "s3://\(bucket)/"
             let destDomain = "\(bucketPrefixed)data_spatial/\(domain.domainRegistry.rawValue)/"
             let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
             let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
             
             if forceAllTimestampUpload {
-                if bucket.starts(with: "http") {
+                if bucket.starts(with: "s3") {
                     try await S3Uploader.uploadSync(
                         client: .shared,
                         localDirectory: directorySpatial,
@@ -203,7 +203,7 @@ actor OmSpatialTimestepWriter {
                     try Process.awsSync(src: directorySpatial, dest: destDomain, profile: profile)
                 }
             } else {
-                if bucket.starts(with: "http") {
+                if bucket.starts(with: "s3") {
                     try await S3Uploader.uploadMultipart(client: .shared, file: filename, url: destFile).commit(client: .shared)
                 } else {
                     try Process.awsCopy(src: filename, dest: destFile, profile: profile)
@@ -212,14 +212,14 @@ actor OmSpatialTimestepWriter {
             
             if uploadMeta {
                 let destMeta = "\(destRun)meta\(realm).json"
-                if bucket.starts(with: "http") {
+                if bucket.starts(with: "s3") {
                     try await S3Uploader.uploadMultipart(client: .shared, file: metaRunMeta, url: destMeta).commit(client: .shared)
                 } else {
                     try Process.awsCopy(src: metaRunMeta, dest: destMeta, profile: profile)
                 }
                 if canUpdateInProgress {
                     let destInProgress = "\(destDomain)in-progress\(realm).json"
-                    if bucket.starts(with: "http") {
+                    if bucket.starts(with: "s3") {
                         try await S3Uploader.uploadMultipart(client: .shared, file: metaInProgress, url: destInProgress).commit(client: .shared)
                     } else {
                         try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
@@ -227,7 +227,7 @@ actor OmSpatialTimestepWriter {
                 }
                 if completed {
                     let destLatest = "\(destDomain)latest\(realm).json"
-                    if bucket.starts(with: "http") {
+                    if bucket.starts(with: "s3") {
                         try await S3Uploader.uploadMultipart(client: .shared, file: metaLatest, url: destLatest).commit(client: .shared)
                     } else {
                         try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)

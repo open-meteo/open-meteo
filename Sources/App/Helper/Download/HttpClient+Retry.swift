@@ -127,7 +127,7 @@ extension HTTPClient {
         let user = urlComponents.user
         let schema = urlComponents.scheme
         if schema == "s3" {
-            urlComponents.scheme = "https"
+            urlComponents.scheme = request.url.contains("127.0.0.1:7480") ? "http" : "https"
         }
         urlComponents.password = nil
         urlComponents.user = nil
@@ -141,7 +141,7 @@ extension HTTPClient {
                 var request = request
                 if let user, let password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if schema == "s3" || request.url.contains("127.0.0.1:7480") {
+                    if schema == "s3" {
                         let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                         try signer.sign(request: &request)
                     } else {
