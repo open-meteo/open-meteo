@@ -27,16 +27,9 @@ enum S3Uploader {
     }
     
     static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
-        let fh = try await FileSystem.shared.openFile(forReadingAt: file, options: .init())
-        let prepared: S3MultiPartUploadPrepared
-        do {
-            prepared = try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
-        } catch {
-            try await fh.close()
-            throw error
+        return try await FileSystem.shared.withFileHandle(forReadingAt: file) { fh in
+            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
         }
-        try await fh.close()
-        return prepared
     }
     
     /// Uploads files to S3 in 8 MB chunks
@@ -118,9 +111,8 @@ enum S3Uploader {
         var remotePrefixes: [String] = [remoteRoot]
 
         func collectLocally(localPath: String, remotePrefix: String) async throws {
-            let dir = try await FileSystem.shared.openDirectory(atPath: FilePath(localPath))
-            var subdirs: [(String, String)] = []
-            do {
+            let subdirs = try await FileSystem.shared.withDirectoryHandle(atPath: FilePath(localPath)) { dir in
+                var subdirs: [(String, String)] = []
                 for try await entry in dir.listContents() {
                     guard let name = entry.path.lastComponent?.string else { continue }
                     if !exclude.isEmpty && exclude.contains(where: { name.matchesGlob($0) }) { continue }
@@ -140,11 +132,8 @@ enum S3Uploader {
                         subdirs.append((entry.path.string, subPrefix))
                     }
                 }
-            } catch {
-                try await dir.close()
-                throw error
+                return subdirs
             }
-            try await dir.close()
             for (subPath, subPrefix) in subdirs {
                 try await collectLocally(localPath: subPath, remotePrefix: subPrefix)
             }
