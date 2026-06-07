@@ -182,7 +182,7 @@ actor OmSpatialTimestepWriter {
         let run = run
         let time = time
         try await domain.domainRegistry.parseBucket(uploadS3Bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-            if bucket == "openmeteo" && profile == "ceph" {
+            if /*bucket == "openmeteo" &&*/ profile == "ceph" {
                 return // skip upload to ceph storage for now
             }
             let start = DispatchTime.now()
