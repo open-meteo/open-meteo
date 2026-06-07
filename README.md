@@ -56,6 +56,7 @@ Apps:
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
+- [Meteograph](https://github.com/timbortnik/widget) Open-source Android home-screen weather widget showing a meteogram with 48-hour and 7-day forecasts; no ads, no tracking, no account. ([Google Play](https://play.google.com/store/apps/details?id=org.bortnik.meteogram))
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
 - [monkeysnow](https://github.com/kcluit/monkeysnow) The most customizable resort/snow forecast website for ski and board!
 - [Mousam](https://amit9838.github.io/mousam/) A weather app for GNU/Linux that displays the weather at a glance
