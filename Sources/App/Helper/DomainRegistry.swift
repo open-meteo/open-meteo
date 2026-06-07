@@ -569,6 +569,27 @@ extension Process {
     }
 }
 
+extension HTTPClient {
+    static let sharedHttp1: HTTPClient = {
+        var configuration = HTTPClient.Configuration(
+            certificateVerification: .fullVerification,
+            redirectConfiguration: .follow(max: 20, allowCycles: false),
+            timeout: .init(connect: .seconds(90), read: .seconds(90)),
+            connectionPool: .seconds(600),
+            proxy: nil,
+            ignoreUncleanSSLShutdown: false,
+            decompression: .enabled(limit: .ratio(25)),
+            backgroundActivityLogger: nil,
+        )
+        configuration.httpVersion = .http1Only
+        let httpClient = HTTPClient(
+            eventLoopGroup: HTTPClient.defaultEventLoopGroup,
+            configuration: configuration
+        )
+        return httpClient
+    }()
+}
+
 extension DomainRegistry {
     var bucketName: String {
         switch self {
@@ -639,7 +660,7 @@ extension DomainRegistry {
                     logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                     if bucket.starts(with: "s3") {
                         try await S3Uploader.uploadSync(
-                            client: HTTPClient.shared,
+                            client: .sharedHttp1,
                             localDirectory: src,
                             server: bucket,
                             basePath: "data/\(dir)/\(variable)"
@@ -664,7 +685,7 @@ extension DomainRegistry {
                 let startTimeAws = DispatchTime.now()
                 if bucket.starts(with: "s3") {
                     try await S3Uploader.uploadSync(
-                        client: HTTPClient.shared,
+                        client: .sharedHttp1,
                         localDirectory: src,
                         server: bucket,
                         basePath: "data/\(dir)",
@@ -704,7 +725,7 @@ extension DomainRegistry {
             if bucket.starts(with: "s3") {
                 /// Only one sync required, because JSON files are committed last and on error, the process would die
                 try await S3Uploader.uploadSync(
-                    client: HTTPClient.shared,
+                    client: .sharedHttp1,
                     localDirectory: src,
                     server: bucket,
                     basePath: destRel
