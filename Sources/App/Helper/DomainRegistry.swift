@@ -617,6 +617,13 @@ extension DomainRegistry {
             }
             let bucket = String(bucketSplit[0].replacing("MODEL", with: bucketName))
             let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
+            let profileUpper = profile.map {"_\($0.uppercased())"} ?? ""
+            
+            // An environment variable may overwrite the S3 credentials
+            if let credentials = Environment.get("S3_CREDENTIALS_\(bucket.uppercased())\(profileUpper)") {
+                return (credentials, profile)
+            }
+            
             return (bucket, profile)
         }
     }
