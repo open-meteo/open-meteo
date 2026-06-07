@@ -79,7 +79,7 @@ import NIOCore
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }
 
-        try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "data/ecmwf_ifs025_ensemble_mean/")
+        try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "test/ecmwf_ifs025_ensemble_mean/")
     }
 }
 

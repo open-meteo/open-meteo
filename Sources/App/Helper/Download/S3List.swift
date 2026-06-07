@@ -39,7 +39,9 @@ enum S3List {
             try vaporRequest.query.encode(params)
             let request = HTTPClientRequest(url: vaporRequest.url.string)*/
             
-            var urlComponents = URLComponents(string: server)!
+            guard var urlComponents = URLComponents(string: server) else {
+                fatalError("Could not parse URL \(server) to URLComponents")
+            }
             urlComponents.queryItems = [
                 URLQueryItem(name: "list-type", value: "2"),
                 URLQueryItem(name: "delimiter", value: "/"),

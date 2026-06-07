@@ -7,7 +7,7 @@ import NIOHTTP1
 enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
     case fileModifiedSinceLastDownload
-    case forbidden
+    case forbidden(body: String?)
     case badRequest
     case other(HTTPResponseStatus)
 }
@@ -24,7 +24,7 @@ enum CurlErrorRetry: Error {
 extension HTTPClientResponse {
     /// Throw if a transient error occurred. A retry could be successful. E.g. Gateway timeout or too many requests
     /// `CurlErrorNonRetry` is thrown for error that should not be retried
-    func throwOnError() throws {
+    func throwOnError() async throws {
         switch status {
         case .notFound:
             throw CurlError.fileNotFound
@@ -45,7 +45,7 @@ extension HTTPClientResponse {
         case .preconditionFailed:
             throw CurlErrorNonRetry.fileModifiedSinceLastDownload
         case .forbidden:
-            throw CurlErrorNonRetry.forbidden
+            throw CurlErrorNonRetry.forbidden(body: try await self.readStringImmutable())
         case .badRequest:
             throw CurlErrorNonRetry.badRequest
         case .paymentRequired, .methodNotAllowed, .notAcceptable, .proxyAuthenticationRequired, .gone, .lengthRequired, .uriTooLong, .unsupportedMediaType, .rangeNotSatisfiable, .expectationFailed, .imATeapot, .misdirectedRequest, .unprocessableEntity, .locked, .failedDependency, .upgradeRequired, .preconditionRequired, .unavailableForLegalReasons:
@@ -120,28 +120,24 @@ extension HTTPClient {
         var n = 0
         
         // URL might contain password, strip them from logging
-        let url: String
-        let user: String?
-        let password: String?
-        if request.url.contains("@") && request.url.contains(":") {
-            let usernamePassword = request.url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0].split(separator: ":")
-            user = String(usernamePassword.first!)
-            password = usernamePassword.count > 1 ? String(usernamePassword[1]) : nil
-            url = request.url.stripHttpPassword()
-        } else {
-            url = request.url
-            user = nil
-            password = nil
+        guard var urlComponents = URLComponents(string: request.url) else {
+            throw HTTPClientError.invalidURL
         }
+        let password = urlComponents.password
+        let user = urlComponents.user
+        urlComponents.password = nil
+        urlComponents.user = nil
+        var request = request
+        // Set URL without username and password
+        request.url = urlComponents.url!.absoluteString
         
         while true {
             do {
                 n += 1
                 var request = request
-                if let user = user, let password = password {
-                    request.url = url
+                if let user, let password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if url.contains(".your-objectstorage.com") || url.contains("s3.open-meteo.com") || url.contains("127.0.0.1:7480") || url.contains("s3.amazonaws.com") {
+                    if request.url.contains(".your-objectstorage.com") || request.url.contains("s3.open-meteo.com") || request.url.contains("127.0.0.1:7480") || request.url.contains("s3.amazonaws.com") {
                         let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                         try signer.sign(request: &request)
                     } else {
@@ -150,19 +146,19 @@ extension HTTPClient {
                 }
                 
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(url)\(request.rangePrettyPrint)")
+                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.rangePrettyPrint)")
                 //print(try await response.readStringImmutable())
-                try response.throwOnError()
+                try await response.throwOnError()
                 return try await body(response)
             } catch CurlErrorNonRetry.unauthorized {
-                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.rangePrettyPrint)")
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
                 
-                logger.info("Download failed unrecoverable with \(error). URL \(url)\(request.rangePrettyPrint)")
+                logger.info("Download failed unrecoverable with \(error). URL \(request.url)\(request.rangePrettyPrint)")
                 throw error
             } catch let error as CancellationError {
-                logger.debug("Download failed with cancellation. URL \(url)\(request.rangePrettyPrint)")
+                logger.debug("Download failed with cancellation. URL \(request.url)\(request.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
