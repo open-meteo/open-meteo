@@ -636,7 +636,7 @@ extension DomainRegistry {
                         // do not upload data from past days yet
                         return
                     }
-                    logger.info("AWS upload [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                     if bucket.starts(with: "http") {
                         try await S3Uploader.uploadSync(
                             client: HTTPClient.shared,
@@ -651,16 +651,16 @@ extension DomainRegistry {
                             profile: profile
                         )
                     }
-                    logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 }
             }
 
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-                logger.info("AWS upload [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
-                logger.info("AWS upload to bucket \(bucket)")
+                logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
                 let startTimeAws = DispatchTime.now()
                 if bucket.starts(with: "http") {
                     try await S3Uploader.uploadSync(
@@ -678,7 +678,7 @@ extension DomainRegistry {
                         profile: profile
                     )
                 }
-                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
         }
     }
@@ -699,7 +699,7 @@ extension DomainRegistry {
                 continue
             }
             let startTimeAws = DispatchTime.now()
-            logger.info("AWS upload to bucket \(bucket)")
+            logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
             
             if bucket.starts(with: "http") {
                 /// Only one sync required, because JSON files are committed last and on error, the process would die
@@ -731,7 +731,7 @@ extension DomainRegistry {
                     profile: profile
                 )
             }
-            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
 }

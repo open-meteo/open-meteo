@@ -236,7 +236,7 @@ actor OmSpatialTimestepWriter {
                     }
                 }
             }
-            self.logger.info("AWS Upload to \(bucket) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+            self.logger.info("AWS Upload to \(bucket.stripHttpPassword()) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
     
