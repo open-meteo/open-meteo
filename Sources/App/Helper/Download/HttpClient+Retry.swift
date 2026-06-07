@@ -8,7 +8,7 @@ enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
     case fileModifiedSinceLastDownload
     case forbidden(body: String?)
-    case badRequest
+    case badRequest(body: String?)
     case other(HTTPResponseStatus)
 }
 
@@ -47,7 +47,7 @@ extension HTTPClientResponse {
         case .forbidden:
             throw CurlErrorNonRetry.forbidden(body: try await self.readStringImmutable())
         case .badRequest:
-            throw CurlErrorNonRetry.badRequest
+            throw CurlErrorNonRetry.badRequest(body: try await self.readStringImmutable())
         case .paymentRequired, .methodNotAllowed, .notAcceptable, .proxyAuthenticationRequired, .gone, .lengthRequired, .uriTooLong, .unsupportedMediaType, .rangeNotSatisfiable, .expectationFailed, .imATeapot, .misdirectedRequest, .unprocessableEntity, .locked, .failedDependency, .upgradeRequired, .preconditionRequired, .unavailableForLegalReasons:
             throw CurlErrorNonRetry.other(status)
         default:
@@ -125,6 +125,10 @@ extension HTTPClient {
         }
         let password = urlComponents.password
         let user = urlComponents.user
+        let schema = urlComponents.scheme
+        if schema == "s3" {
+            urlComponents.scheme = "https"
+        }
         urlComponents.password = nil
         urlComponents.user = nil
         var request = request
@@ -137,7 +141,7 @@ extension HTTPClient {
                 var request = request
                 if let user, let password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if request.url.contains(".your-objectstorage.com") || request.url.contains("s3.open-meteo.com") || request.url.contains("127.0.0.1:7480") || request.url.contains("s3.amazonaws.com") {
+                    if schema == "s3" || request.url.contains("127.0.0.1:7480") {
                         let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                         try signer.sign(request: &request)
                     } else {
