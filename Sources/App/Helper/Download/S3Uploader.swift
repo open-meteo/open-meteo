@@ -43,6 +43,8 @@ enum S3Uploader {
         var initiateRequest = HTTPClientRequest(url: url + "?uploads")
         initiateRequest.method = .POST
         initiateRequest.headers.add(name: "Content-Type", value: contentType)
+        // custom header to set the total expected upload file size. Might be used by a custom upload implementation in the future
+        initiateRequest.headers.add(name: "x-file-size", value: "\(try await data.getFileSize())")
         let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
         guard
             let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
@@ -205,11 +207,21 @@ enum S3Uploader {
 protocol S3UploadAble {
     associatedtype ByteBufferSequence: AsyncSequence where ByteBufferSequence.Element == ByteBuffer, ByteBufferSequence: Sendable
     func readChunks(chunkLength: ByteCount) -> ByteBufferSequence
+    
+    func getFileSize() async throws -> Int64
 }
 
-extension ReadFileHandle: S3UploadAble { }
+extension ReadFileHandle: S3UploadAble {
+    func getFileSize() async throws -> Int64 {
+        return try await self.info().size
+    }
+}
 
 extension ByteBuffer: S3UploadAble {
+    func getFileSize() async throws -> Int64 {
+        return Int64(self.readableBytes)
+    }
+    
     func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
         let chunkSize = Int(chunkLength.bytes)
         var copy = self
@@ -316,3 +328,4 @@ fileprivate extension String {
         return self[queryStart...]
     }
 }
+
