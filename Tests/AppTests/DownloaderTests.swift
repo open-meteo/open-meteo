@@ -27,6 +27,22 @@ import NIOCore
         //print(try await response.body.collect(upTo: 10000).readStringImmutable()!)
     }
     
+    @Test func testAwsSignClientVerify() async throws {
+        let url = "https://@examplebucket.s3.amazonaws.com/test.txt"
+        var request = HTTPClientRequest(url: url)
+        try request.applyS3Credentials()
+        let signer = AWSSigner(accessKey: String("AKIAIOSFODNN7EXAMPLE"), secretKey: String("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"), region: "us-west-2", service: "s3")
+        try signer.sign(request: &request, now: Date(timeIntervalSince1970: 12345))
+        #expect(request.headers["Authorization"].first == "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=d88b4ffeba0ad306663853a7280ffeda745d25ead6c775ab59af84a272dc853a")
+        
+        try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+        
+        request.headers.replaceOrAdd(name: "Authorization", value: "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=d88b4ffeba0ad306663853a7280ffeda745d25ead6c775ab59af84a272dc853b")
+        #expect(throws: AWSSigner.SigningError.invalidSignature) {
+            try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+        }
+    }
+    
     @Test func testAwsSignClient() async throws {
         // slash in password needs to be URL encoded
         let url = "https://AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI%2FK7MDENG%2FbPxRfiCYEXAMPLEKEY@examplebucket.s3.amazonaws.com/test.txt"

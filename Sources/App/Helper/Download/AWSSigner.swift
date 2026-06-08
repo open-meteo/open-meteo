@@ -94,9 +94,135 @@ public struct AWSSigner {
 
         request.headers.add(name: "Authorization", value: authorizationHeader)
     }
+    
+    public func verify(url: String, method: HTTPMethod, headers: HTTPHeaders, payloadHashSha256: String, now: Date = Date()) throws {
+        guard let components = URLComponents(string: url),
+              let host = components.encodedHost else {
+            throw SigningError.invalidURL
+        }
 
-    enum SigningError: Error {
+        guard let authorization = headers.first(name: "Authorization") else {
+            throw SigningError.missingAuthorization
+        }
+        guard authorization.hasPrefix("AWS4-HMAC-SHA256 ") else {
+            throw SigningError.unsupportedAuthorizationType
+        }
+
+        let authPayload = String(authorization.dropFirst("AWS4-HMAC-SHA256 ".count))
+        var authFields: [String: String] = [:]
+        for pair in authPayload.split(separator: ",") {
+            let trimmed = pair.trimmingCharacters(in: .whitespaces)
+            let parts = trimmed.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2 else {
+                throw SigningError.invalidAuthorizationHeader
+            }
+            authFields[String(parts[0])] = String(parts[1])
+        }
+
+        guard let credential = authFields["Credential"],
+              let signedHeadersString = authFields["SignedHeaders"],
+              let expectedSignature = authFields["Signature"] else {
+            throw SigningError.invalidAuthorizationHeader
+        }
+
+        let credentialParts = credential.split(separator: "/")
+        guard credentialParts.count == 5 else {
+            throw SigningError.invalidCredentialScope
+        }
+        guard String(credentialParts[0]) == accessKey else {
+            throw SigningError.invalidAccessKey
+        }
+        let dateStamp = String(credentialParts[1])
+        guard String(credentialParts[2]) == region,
+              String(credentialParts[3]) == service,
+              String(credentialParts[4]) == "aws4_request" else {
+            throw SigningError.invalidCredentialScope
+        }
+
+        guard let amzDate = headers.first(name: "x-amz-date") else {
+            throw SigningError.missingXAmzDate
+        }
+        guard amzDate.count >= 8, String(amzDate.prefix(8)) == dateStamp else {
+            throw SigningError.invalidCredentialScope
+        }
+        guard let requestDate = Date.awsIso8601DateTime(amzDate) else {
+            throw SigningError.invalidXAmzDate
+        }
+        if abs(requestDate.timeIntervalSince(now)) > 15 * 60 {
+            throw SigningError.requestDateOutOfRange
+        }
+
+        guard let headerPayloadHash = headers.first(name: "x-amz-content-sha256") else {
+            throw SigningError.missingPayloadHash
+        }
+        guard headerPayloadHash.lowercased() == payloadHashSha256.lowercased() else {
+            throw SigningError.payloadHashMismatch
+        }
+
+        let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+        let canonicalQueryString = components.queryItems?
+            .map({ "\($0.name)\($0.value.map{"=\($0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed)!)"} ?? "=")" })
+            .sorted()
+            .joined(separator: "&") ?? ""
+
+        let signedHeaderNames = signedHeadersString
+            .split(separator: ";")
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+
+        var headerLookup: [String: String] = [:]
+        for header in headers {
+            let name = header.name.lowercased()
+            if headerLookup[name] == nil {
+                headerLookup[name] = header.value
+            }
+        }
+        headerLookup["host"] = host
+
+        let canonicalHeaders = try signedHeaderNames.map { name in
+            guard let value = headerLookup[name] else {
+                throw SigningError.missingSignedHeader(name)
+            }
+            return "\(name):\(value.trimmingCharacters(in: .whitespaces))\n"
+        }.joined()
+
+        let canonicalRequest = [
+            method.rawValue,
+            path,
+            canonicalQueryString,
+            canonicalHeaders,
+            signedHeadersString,
+            headerPayloadHash
+        ].joined(separator: "\n")
+
+        let credentialScope = "\(dateStamp)/\(region)/\(service)/aws4_request"
+        let stringToSign = [
+            "AWS4-HMAC-SHA256",
+            amzDate,
+            credentialScope,
+            (canonicalRequest.data(using: .utf8) ?? Data()).sha256Hex
+        ].joined(separator: "\n")
+
+        let signingKey = getSignatureKey(date: dateStamp)
+        let computedSignature = stringToSign.hmacSHA256(key: signingKey).hex
+        guard computedSignature == expectedSignature else {
+            throw SigningError.invalidSignature
+        }
+    }
+
+    public enum SigningError: Error, Equatable {
         case invalidURL
+        case missingAuthorization
+        case unsupportedAuthorizationType
+        case invalidAuthorizationHeader
+        case invalidCredentialScope
+        case invalidAccessKey
+        case missingXAmzDate
+        case invalidXAmzDate
+        case requestDateOutOfRange
+        case missingPayloadHash
+        case payloadHashMismatch
+        case missingSignedHeader(String)
+        case invalidSignature
     }
 
     func getSignatureKey(date: String) -> HashedAuthenticationCode<SHA256> {
@@ -109,6 +235,13 @@ public struct AWSSigner {
 }
 
 fileprivate extension Date {
+    static func awsIso8601DateTime(_ value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        return formatter.date(from: value)
+    }
+
     var iso8601DateTime: String {
         let formatter = DateFormatter()
         formatter.timeZone = TimeZone(identifier: "UTC")
