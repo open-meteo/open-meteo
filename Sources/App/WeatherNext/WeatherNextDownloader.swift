@@ -249,15 +249,12 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                             // Read SH and temp for this level
                             var shData: [Float] = try await shArray.retrieveArraySubset(
                                 [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                            )
+                            ).map { $0 * 1000 } // convert from kg/kg to g/kg
                             var tempData: [Float] = try await tempArray.retrieveArraySubset(
                                 [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                            )
+                            ).map { $0 - 273.15 } // convert from K to C
                             shData.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
                             tempData.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-
-                            // Temp comes in Kelvin → convert to Celsius for RH formula
-                            tempData = tempData.map { $0 - 273.15 }
 
                             let rh = Meteorology.specificToRelativeHumidity(
                                 specificHumidity: shData,
