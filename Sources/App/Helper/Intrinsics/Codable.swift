@@ -6,7 +6,9 @@ extension Data {
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(T.self, from: self)
     }
-    
+}
+
+extension DataProtocol {
     func writeAtomic(path: String) throws {
         let fn = try FileHandle.createNewFile(file: path, size: self.count, overwrite: true, temporary: true)
         try fn.write(contentsOf: self)

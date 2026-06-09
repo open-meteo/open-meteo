@@ -2,6 +2,7 @@ import OmFileFormat
 import Logging
 import Foundation
 import AsyncHTTPClient
+import NIOCore
 
 /**
  multiple files
@@ -164,7 +165,8 @@ actor OmSpatialTimestepWriter {
         let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
         let metaLatest = "\(directorySpatial)latest\(realm).json"
         
-        let metaData = try meta.jsonEncodedData()
+        /// Note: ByteBuffer+readableBytesView fixes a release build issue
+        let metaData = ByteBuffer(data: try meta.jsonEncodedData()).readableBytesView
         try metaData.writeAtomic(path: metaRunMeta)
         
         /// Only update `in-progress.json` if there is no older run currently generating files. E.g. HRRR downloads 2 runs in parallel with ~20 minutes overlap
