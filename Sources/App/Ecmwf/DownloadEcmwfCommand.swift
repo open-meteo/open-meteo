@@ -213,6 +213,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                             return true
                         }
                         if let level = entry.level {
+                            // AIFS started using "z" instead of "gh" with cycle 50r1
+                            if variable.gribName == "gh" && entry.param == "z" && variable.level == level {
+                                return true
+                            }
                             // entry is a pressure level variable
                             return variable.level == level && entry.param == variable.gribName
                         }
@@ -271,6 +275,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // Deaccumulate precipitation
                     guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return
+                    }
+                    
+                    if shortName == "z" {
+                        grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
                     }
                     
                     // Scaling before compression with scalefactor

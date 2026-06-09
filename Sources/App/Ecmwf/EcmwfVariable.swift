@@ -533,6 +533,9 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             if ["mn2t6", "min_2t", "mn2t3"].contains(shortName) && variable == .temperature_2m_min {
                 return true
             }
+            if variable.gribName == "gh" && shortName == "z" && variable.level == levelhPa {
+                return true
+            }
             if let level = variable.level {
                 return shortName == variable.gribName && levelhPa == level
             }
