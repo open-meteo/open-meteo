@@ -41,7 +41,7 @@ enum ChmiDomain: String, GenericDomain, CaseIterable {
 
     /// Runs every 6 hours (00, 06, 12, 18 UTC). Files arrive roughly 3.5h after the run.
     var lastRun: Timestamp {
-        return Timestamp.now().add(hours: -4).floor(toNearestHour: 6)
+        return Timestamp.now().add(hours: -3).floor(toNearestHour: 6)
     }
 
     /// 72h forecast + 2 days buffer
