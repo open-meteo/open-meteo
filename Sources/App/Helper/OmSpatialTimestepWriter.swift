@@ -139,6 +139,7 @@ actor OmSpatialTimestepWriter {
         return handles
     }
     
+    /// Note: Meta JSON files are now uploaded using in-memory data. It is now safe to call this function out of sync with model downloading. Ideally one queue per bucket.
     func writeMetaAndAWSUpload(client: HTTPClient, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true, forceAllTimestampUpload: Bool = false) async throws {
         try await ensembleMean?.writer.writeMetaAndAWSUpload(client: client, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: forceAllTimestampUpload)
         
@@ -163,16 +164,17 @@ actor OmSpatialTimestepWriter {
         let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
         let metaLatest = "\(directorySpatial)latest\(realm).json"
         
-        try meta.writeTo(path: metaRunMeta)
+        let metaData = try meta.jsonEncodedData()
+        try metaData.writeAtomic(path: metaRunMeta)
         
         /// Only update `in-progress.json` if there is no older run currently generating files. E.g. HRRR downloads 2 runs in parallel with ~20 minutes overlap
         let canUpdateInProgress = completed || (try? DataSpatialJson.readFrom(path: metaInProgress).sameRunOrOlderThan5Minutes(run: run)) ?? true
         
         if canUpdateInProgress {
-            try meta.writeTo(path: metaInProgress)
+            try metaData.writeAtomic(path: metaInProgress)
         }
         if completed {
-            try meta.writeTo(path: metaLatest)
+            try metaData.writeAtomic(path: metaLatest)
         }
         
         guard let uploadS3Bucket else {
@@ -204,14 +206,14 @@ actor OmSpatialTimestepWriter {
             
             if uploadMeta {
                 let destMeta = "\(destRun)meta\(realm).json"
-                try await S3Uploader.uploadMultipart(client: client, file: metaRunMeta, url: destMeta).commit(client: client)
+                try await S3Uploader.upload(client: client, data: metaData, url: destMeta)
                 if canUpdateInProgress {
                     let destInProgress = "\(destDomain)in-progress\(realm).json"
-                    try await S3Uploader.uploadMultipart(client: client, file: metaInProgress, url: destInProgress).commit(client: client)
+                    try await S3Uploader.upload(client: client, data: metaData, url: destInProgress)
                 }
                 if completed {
                     let destLatest = "\(destDomain)latest\(realm).json"
-                    try await S3Uploader.uploadMultipart(client: client, file: metaLatest, url: destLatest).commit(client: client)
+                    try await S3Uploader.upload(client: client, data: metaData, url: destLatest)
                 }
             }
             self.logger.info("AWS Upload to \(bucket.stripHttpPassword()) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
