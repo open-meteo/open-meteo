@@ -2,14 +2,11 @@ import Foundation
 import AsyncHTTPClient
 import NIOCore
 import Logging
-import NIOHTTP1
 
 enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
     case fileModifiedSinceLastDownload
-    case forbidden(body: String?)
-    case badRequest(body: String?)
-    case other(HTTPResponseStatus)
+    case forbidden
 }
 
 enum CurlErrorRetry: Error {
@@ -24,7 +21,7 @@ enum CurlErrorRetry: Error {
 extension HTTPClientResponse {
     /// Throw if a transient error occurred. A retry could be successful. E.g. Gateway timeout or too many requests
     /// `CurlErrorNonRetry` is thrown for error that should not be retried
-    func throwOnError() async throws {
+    func throwOnError() throws {
         switch status {
         case .notFound:
             throw CurlError.fileNotFound
@@ -45,11 +42,7 @@ extension HTTPClientResponse {
         case .preconditionFailed:
             throw CurlErrorNonRetry.fileModifiedSinceLastDownload
         case .forbidden:
-            throw CurlErrorNonRetry.forbidden(body: try await self.readStringImmutable())
-        case .badRequest:
-            throw CurlErrorNonRetry.badRequest(body: try await self.readStringImmutable())
-        case .paymentRequired, .methodNotAllowed, .notAcceptable, .proxyAuthenticationRequired, .gone, .lengthRequired, .uriTooLong, .unsupportedMediaType, .rangeNotSatisfiable, .expectationFailed, .imATeapot, .misdirectedRequest, .unprocessableEntity, .locked, .failedDependency, .upgradeRequired, .preconditionRequired, .unavailableForLegalReasons:
-            throw CurlErrorNonRetry.other(status)
+            throw CurlErrorNonRetry.forbidden
         default:
             break
         }
@@ -94,75 +87,21 @@ extension HTTPClient {
                       timeoutPerRequest: TimeAmount = .seconds(30),
                       backOffSettings: ExponentialBackOff = .init(),
                       error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse {
-        return try await executeMapRetry(
-            request,
-            logger: logger,
-            deadline: deadline,
-            timeoutPerRequest: timeoutPerRequest,
-            backOffSettings: backOffSettings,
-            error404WaitTime:error404WaitTime, {$0}
-        )
-    }
-    
-    /**
-     Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
-     */
-    func executeMapRetry<T>(_ request: HTTPClientRequest,
-                      logger: Logger,
-                      deadline: Date = .minutes(60),
-                      timeoutPerRequest: TimeAmount = .seconds(30),
-                      backOffSettings: ExponentialBackOff = .init(),
-                      error404WaitTime: TimeAmount? = nil,
-                            _ body: @escaping (HTTPClientResponse) async throws -> T
-                        ) async throws -> T {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
         var n = 0
-        
-        // URL might contain password, strip them from logging
-        guard var urlComponents = URLComponents(string: request.url) else {
-            throw HTTPClientError.invalidURL
-        }
-        let password = urlComponents.password
-        let user = urlComponents.user
-        let schema = urlComponents.scheme
-        if schema == "s3" {
-            urlComponents.scheme = request.url.contains("127.0.0.1:7480") ? "http" : "https"
-        }
-        urlComponents.password = nil
-        urlComponents.user = nil
-        var request = request
-        // Set URL without username and password
-        request.url = urlComponents.url!.absoluteString
-        
         while true {
             do {
                 n += 1
-                var request = request
-                if let user, let password {
-                    // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if schema == "s3" {
-                        let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
-                        try signer.sign(request: &request)
-                    } else {
-                        request.setBasicAuth(username: user, password: password)
-                    }
-                }
-                
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
                 logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.rangePrettyPrint)")
-                //print(try await response.readStringImmutable())
-                try await response.throwOnError()
-                return try await body(response)
+                try response.throwOnError()
+                return response
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
-                
-                logger.info("Download failed unrecoverable with \(error). URL \(request.url)\(request.rangePrettyPrint)")
-                throw error
-            } catch let error as CancellationError {
-                logger.debug("Download failed with cancellation. URL \(request.url)\(request.rangePrettyPrint)")
+                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
@@ -191,24 +130,6 @@ extension HTTPClient {
                 try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
             }
         }
-    }
-    
-    func executeRetryAndCollect(_ request: HTTPClientRequest,
-                      logger: Logger,
-                      upTo maxBytes: Int,
-                      deadline: Date = .minutes(60),
-                      timeoutPerRequest: TimeAmount = .seconds(30),
-                      backOffSettings: ExponentialBackOff = .init(),
-                      error404WaitTime: TimeAmount? = nil) async throws -> ByteBuffer {
-        return try await executeMapRetry(
-            request,
-            logger: logger,
-            deadline: deadline,
-            timeoutPerRequest: timeoutPerRequest,
-            backOffSettings: backOffSettings,
-            error404WaitTime:error404WaitTime,
-            { try await $0.body.collect(upTo: maxBytes) }
-        )
     }
 }
 

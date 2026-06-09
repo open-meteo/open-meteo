@@ -76,7 +76,7 @@ struct GloFasDownloader: AsyncCommand {
             let nConcurrent = signature.concurrent ?? 1
             let handles = try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword, concurrent: nConcurrent)
             let logger = context.application.logger
-            try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_int16_logarithmic)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_int16_logarithmic)
         }
     }
 
@@ -95,7 +95,7 @@ struct GloFasDownloader: AsyncCommand {
             let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH)\(memberUrlStr).grib"
 
             return try await curl.withGribStream(url: remote, bzip2Decode: false, nConcurrent: concurrent) { messages in
-                return try await messages.mapConcurrent(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     let attributes = try message.getAttributes()
                     let member = Int(message.get(attribute: "number")!)!
                     logger.info("Processing \(attributes.timestamp.format_YYYYMMddHH) member \(member)")
@@ -108,7 +108,7 @@ struct GloFasDownloader: AsyncCommand {
                     let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
                     let variable = GloFasVariableAndMember(member: member)
                     return try await GenericVariableHandle(variable: variable, time: attributes.timestamp, member: 0, fn: fn, domain: domain)
-                }.compactMap({ $0 })
+                }.collect().compactMap({ $0 })
             }
         }
         await curl.printStatistics()

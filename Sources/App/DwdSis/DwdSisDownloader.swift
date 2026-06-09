@@ -52,7 +52,7 @@ struct DwdSisDownloader: AsyncCommand {
         let last = downloadRange.range.upperBound.subtract(seconds: domain.dtSeconds)
         try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         Process.alarm(seconds: 0)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: DwdSisDomain) async throws -> [GenericVariableHandle] {

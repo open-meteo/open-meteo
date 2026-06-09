@@ -63,7 +63,7 @@ struct MfWaveDownload: AsyncCommand {
                     logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                     return try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadS3Bucket: nil)
                 }
-                try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
         }
@@ -72,7 +72,7 @@ struct MfWaveDownload: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let handles = try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files
@@ -268,7 +268,7 @@ struct MfWaveDownload: AsyncCommand {
                 }
             }
         }
-        let handles = try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         await curl.printStatistics()
         return handles
     }

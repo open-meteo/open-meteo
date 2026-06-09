@@ -34,7 +34,28 @@ struct S3DataController: RouteCollection {
         routes.get("data", "**", use: self.get)
     }
 
+    /// https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
+    struct S3ListV2: Codable {
+        let list_type: Int
+        let delimiter: String
+        let prefix: String
+        let apikey: String?
+        let continuation_token: String?
 
+        enum CodingKeys: String, CodingKey {
+            case list_type = "list-type"
+            case delimiter
+            case prefix
+            case apikey
+            case continuation_token = "continuation-token"
+        }
+    }
+
+    struct S3ListV2File {
+        let name: String
+        let modificationTime: Date
+        let fileSize: Int
+    }
 
     struct DownloadParams: Codable {
         let apikey: String?
@@ -44,7 +65,7 @@ struct S3DataController: RouteCollection {
 
     /// List all files in a specified directory
     func list(_ req: Request) async throws -> Response {
-        let params = try req.query.decode(S3List.ListV2Query.self)
+        let params = try req.query.decode(S3ListV2.self)
         guard let apikey = params.apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) else {
             throw SyncError.invalidApiKey
         }
@@ -63,7 +84,7 @@ struct S3DataController: RouteCollection {
             throw Abort(.forbidden)
         }
 
-        var files = [S3List.ListV2File]()
+        var files = [S3ListV2File]()
         var directories = [String]()
         /// Note: Maybe at some point a async version of the directory enumerator should be used.
         /// https://forums.swift.org/t/xcode-16-3-cant-use-makeiterator-via-filemanagers-enumerator-at-in-async-function/78976
@@ -83,7 +104,7 @@ struct S3DataController: RouteCollection {
                 else {
                     continue
                 }
-                files.append(S3List.ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
+                files.append(S3ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
             }
         }
 

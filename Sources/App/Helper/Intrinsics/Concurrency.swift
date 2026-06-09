@@ -1,5 +1,5 @@
 import Foundation
-//import AsyncAlgorithms
+import AsyncAlgorithms
 
 /*extension Optional {
     func asyncMap<T>(
@@ -127,59 +127,6 @@ extension AsyncSequence where Element: Sendable, Self: Sendable {
             try await group.waitForAll()
         }
     }
-    
-    /// Execute a closure for each element concurrently and return a new value
-    /// `nConcurrent` limits the number of concurrent tasks
-    /// Note: Results are ordered which may have a performance penalty
-    func mapConcurrent<T: Sendable>(
-        nConcurrent: Int,
-        body: @escaping @Sendable (Element) async throws -> T
-    ) async rethrows -> [T] {
-        assert(nConcurrent > 0)
-        return try await withThrowingTaskGroup(of: (Int, T).self) { group in
-            var results = [(Int, T)]()
-            var index = 0
-            for try await element in self {
-                if index >= nConcurrent, let result = try await group.next() {
-                    results.append(result)
-                }
-                let i = index
-                group.addTask { return (i, try await body(element)) }
-                index += 1
-            }
-            while let result = try await group.next() {
-                results.append(result)
-            }
-            return results.sorted(by: { $0.0 < $1.0 }).map { $0.1 }
-        }
-    }
-    
-    /// Execute a closure for each element concurrently and return a new value
-    /// `nConcurrent` limits the number of concurrent tasks
-    /// Note: Results are ordered which may have a performance penalty
-    func mapEnumeratedConcurrent<T: Sendable>(
-        nConcurrent: Int,
-        body: @escaping @Sendable (Int, Element) async throws -> T
-    ) async rethrows -> [T] {
-        assert(nConcurrent > 0)
-        return try await withThrowingTaskGroup(of: (Int, T).self) { group in
-            var results = [(Int, T)]()
-            var index = 0
-            for try await element in self {
-                if index >= nConcurrent, let result = try await group.next() {
-                    results.append(result)
-                }
-                let i = index
-                group.addTask { return (i, try await body(i, element)) }
-                index += 1
-            }
-            while let result = try await group.next() {
-                results.append(result)
-            }
-            return results.sorted(by: { $0.0 < $1.0 }).map { $0.1 }
-        }
-    }
-    
 }
 
 /// Thread safe dictionary

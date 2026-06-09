@@ -42,18 +42,17 @@ struct MetNoDownloader: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(logger: logger, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// Process each variable and update time-series optimised files
-    func download(application: Application, domain: MetNoDomain, variables: [MetNoVariable], run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(logger: Logger, domain: MetNoDomain, variables: [MetNoVariable], run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
-        let logger = application.logger
 
         let useArchive = run.olderThan(days: 2)
 
@@ -155,7 +154,7 @@ struct MetNoDownloader: AsyncCommand {
                 try await writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
             }
         }
-        return try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
     }
 }
 

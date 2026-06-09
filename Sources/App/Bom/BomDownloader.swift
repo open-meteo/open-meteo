@@ -61,7 +61,7 @@ struct DownloadBomCommand: AsyncCommand {
         try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) : signature.upperLevel ?
             try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) :
             try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
     }
 
     func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp) async throws {
@@ -170,7 +170,7 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         Process.alarm(seconds: 0)
         return handles
     }
@@ -310,7 +310,7 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: nil) + writerProbabilities.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil) + writerProbabilities.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         Process.alarm(seconds: 0)
         return handles
     }
@@ -422,7 +422,7 @@ struct DownloadBomCommand: AsyncCommand {
             try await writer.writeBom(time: timestamp, member: 0, variable: .wind_direction_10m, data: direction)
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         Process.alarm(seconds: 0)
         return handles
     }

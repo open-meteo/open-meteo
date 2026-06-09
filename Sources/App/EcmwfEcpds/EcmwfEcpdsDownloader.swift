@@ -83,7 +83,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
 
         try await downloadEcmwfElevation(application: context.application, domain: domain, run: run)
         let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3BucketSpatial, shortCutOffHour: shortCutOff)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// Download elevation file
@@ -327,8 +327,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
-                        let handles = try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: nil)
-                        try await GenericVariableHandle.convert(logger: logger, client: application.http1Client, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
+                        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
+                        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
 
                         if let directory = OpenMeteo.dataRunDirectory, uploadS3Bucket != nil {
                             // Delete run directory after S3 upload
@@ -480,13 +480,13 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             handles.append(contentsOf: try await writer.finalise())
             try await uploadTask?.value
             uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
             
             if hour == shortCutOffHour {
                 let handles = handles
                 uploadTaskShortCutOff = Task {
-                    try await GenericVariableHandle.convert(logger: logger, client: application.http1Client, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: true, generateTimeSeries: false)
+                    try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: true, generateTimeSeries: false)
                 }
             }
             
@@ -552,7 +552,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let handles = try await writer.finalise()
             try await uploadTask?.value
             uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
             return handles
         }

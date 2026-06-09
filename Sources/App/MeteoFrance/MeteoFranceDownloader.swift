@@ -94,7 +94,7 @@ struct MeteoFranceDownload: AsyncCommand {
         try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, packages: gribPackages) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -227,7 +227,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
                 }
                 let completed = i == timestamps.count - 1
-                return try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
         }
         await curl.printStatistics()
@@ -383,7 +383,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 validTimes.insert(writer.time)
             }
             let completed = packageTime == domain.mfApiPackageTimes.last
-            return try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles
@@ -550,7 +550,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             return handles
         }
         // await curl.printStatistics()
