@@ -102,6 +102,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let timestamps = domain.forecastTimestamps(for: run)
         logger.info("Processing \(timestamps.count) WeatherNext timesteps from Zarr")
 
+        // Units are specified in https://developers.google.com/weathernext/guides/model-specs-vmg#data_at_6hr_forecast_granularity
         let surfaceZarrNames: [(zarr: String, surfaceVar: WeatherNextSurfaceVariable, transform: @Sendable ([Float]) -> [Float])] = [
             ("2m_temperature", .temperature_2m, { $0.map { $0 - 273.15 } }),
             ("mean_sea_level_pressure", .pressure_msl, { $0.map { $0 * 0.01 } }),
