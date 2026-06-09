@@ -1,0 +1,224 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Flood Forecast API
+  description: >-
+    Daily river discharge forecasts using the Copernicus GloFAS hydrological model for rivers worldwide.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/flood:
+    servers:
+      - url: https://flood-api.open-meteo.com
+      - url: https://customer-flood-api.open-meteo.com
+    get:
+      tags:
+        - Flood APIs
+      summary: Daily river discharge forecast
+      description: >-
+        Daily river discharge forecasts from the Copernicus Emergency Management Service
+        GloFAS hydrological model.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: daily
+          in: query
+          description: >-
+            A list of river discharge variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - river_discharge
+                - river_discharge_mean
+                - river_discharge_median
+                - river_discharge_max
+                - river_discharge_min
+                - river_discharge_p25
+                - river_discharge_p75
+        - name: timeformat
+          in: query
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          description: >-
+            Number of forecast days. Up to 366 days.
+          schema:
+            type: integer
+            default: 92
+            minimum: 0
+            maximum: 366
+        - name: start_date
+          in: query
+          description: >-
+            Start date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: ensemble
+          in: query
+          description: >-
+            Return ensemble members instead of only the ensemble mean.
+          schema:
+            type: boolean
+        - name: cell_selection
+          in: query
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - seamless_v4
+                - forecast_v4
+                - consolidated_v4
+                - seamless_v3
+                - forecast_v3
+                - consolidated_v3
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  daily:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      river_discharge:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_median:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_p25:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      river_discharge_p75:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                  daily_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      river_discharge:
+                        type: string
+                      river_discharge_mean:
+                        type: string
+                      river_discharge_median:
+                        type: string
+                      river_discharge_max:
+                        type: string
+                      river_discharge_min:
+                        type: string
+                      river_discharge_p25:
+                        type: string
+                      river_discharge_p75:
+                        type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string

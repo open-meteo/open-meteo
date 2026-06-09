@@ -9,7 +9,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool) async throws -> Response
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response
 
     var numberOfLocations: Int { get }
 }
@@ -65,9 +65,9 @@ extension ModelFlatbufferSerialisable {
 
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
-        let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-        let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
-        return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
+        let lat = latitude < 0 ? "\(abs(latitude).formatted(decimals: 2))S" : "\(latitude.formatted(decimals: 2))N"
+        let ele = elevation.map { $0.isFinite ? "\($0.formatted(decimals: 0))m" : "" } ?? ""
+        return longitude < 0 ? "\(lat)\(abs(longitude).formatted(decimals: 2))W\(ele)" : "\(lat)\(longitude.formatted(decimals: 2))E\(ele)"
     }
 }
 
@@ -208,7 +208,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true) async throws -> Response {
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true, logger: Logger) async throws -> Response {
         if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
@@ -221,7 +221,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
         switch format ?? .json() {
         case .json(let fixedGenerationTime):
-            return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
+            return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
         case .xlsx(let timestamp, let locationInformation):
             switch locationInformation {
             case .omit:
@@ -232,12 +232,12 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         case .csv(let locationInformation):
             switch locationInformation {
                 case .omit:
-                    return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false)
+                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false, logger: logger)
                 case .section:
-                    return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true)
+                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true, logger: logger)
             }
         case .flatbuffers(let fixedGenerationTime):
-            return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
+            return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
         }
     }
 

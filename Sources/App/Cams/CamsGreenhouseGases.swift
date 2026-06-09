@@ -67,7 +67,7 @@ extension DownloadCamsCommand {
                 grib2d.array.shift180LongitudeAndFlipLatitude()
                 try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
             }
-            return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         }
     }
 }

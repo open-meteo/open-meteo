@@ -87,7 +87,7 @@ public final class XlsxWriter {
         if float.isInfinite || float.isNaN {
             sheet_xml.write("<c t=\"e\"><v>#NUM!</v></c>")
         } else {
-            sheet_xml.write("<c><v>\(String(format: "%.\(significantDigits)f", float))</v></c>")
+            sheet_xml.write("<c><v>\(float.formatted(decimals: significantDigits))</v></c>")
         }
     }
 

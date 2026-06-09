@@ -9,6 +9,7 @@ extension DispatchTime {
 }
 
 extension Double {
+    /// Assume current value is time in seconds
     var asSecondsPrettyPrint: String {
         let milliseconds = self * 1000
         let seconds = self
@@ -36,5 +37,27 @@ extension Double {
             return "\(Int(minutes.round(digits: 0)))m"
         }
         return "\(Int(hours).zeroPadded(len: 2)):\((Int(minutes) % 60).zeroPadded(len: 2))"
+    }
+    
+    /// Assume current value is bytes/second
+    var asRatePrettyPrint: String {
+        let kb = self / 1024
+        let mb = self / 1024 / 1024
+        if kb < 5 {
+            return "\(kb.round(digits: 2))KB/s"
+        }
+        if kb < 20 {
+            return "\(kb.round(digits: 1))KB/s"
+        }
+        if kb < 800 {
+            return "\(Int(kb.round(digits: 0)))KB/s"
+        }
+        if mb < 1 {
+            return "\(mb.round(digits: 2))MB/s"
+        }
+        if mb < 10 {
+            return "\(mb.round(digits: 1))MB/s"
+        }
+        return "\(Int(mb.round(digits: 0)))MB/s"
     }
 }

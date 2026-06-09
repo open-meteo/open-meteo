@@ -1,0 +1,619 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Air Quality API
+  description: >-
+    Hourly air quality forecasts for PM2.5, PM10, ozone, nitrogen dioxide, pollen, and other pollutants from the Copernicus Atmosphere Monitoring Service (CAMS).
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/air-quality:
+    servers:
+      - url: https://air-quality-api.open-meteo.com
+      - url: https://customer-air-quality-api.open-meteo.com
+    get:
+      tags:
+        - Air Quality APIs
+      summary: Hourly air quality forecast
+      description: >-
+        Provides hourly air quality forecasts including PM2.5, PM10, ozone, nitrogen dioxide,
+        pollen concentrations, and AQI indices from CAMS.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hourly
+          in: query
+          description: >-
+            A list of air quality variables which should be returned.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - pm10
+                - pm2_5
+                - carbon_monoxide
+                - carbon_dioxide
+                - nitrogen_dioxide
+                - sulphur_dioxide
+                - ozone
+                - aerosol_optical_depth
+                - dust
+                - uv_index
+                - uv_index_clear_sky
+                - ammonia
+                - methane
+                - alder_pollen
+                - birch_pollen
+                - grass_pollen
+                - mugwort_pollen
+                - olive_pollen
+                - ragweed_pollen
+                - formaldehyde
+                - glyoxal
+                - non_methane_volatile_organic_compounds
+                - pm10_wildfires
+                - peroxyacyl_nitrates
+                - secondary_inorganic_aerosol
+                - residential_elementary_carbon
+                - total_elementary_carbon
+                - pm2_5_total_organic_matter
+                - sea_salt_aerosol
+                - nitrogen_monoxide
+                - european_aqi
+                - european_aqi_pm2_5
+                - european_aqi_pm10
+                - european_aqi_nitrogen_dioxide
+                - european_aqi_ozone
+                - european_aqi_sulphur_dioxide
+                - us_aqi
+                - us_aqi_pm2_5
+                - us_aqi_pm10
+                - us_aqi_nitrogen_dioxide
+                - us_aqi_carbon_monoxide
+                - us_aqi_ozone
+                - us_aqi_sulphur_dioxide
+                - is_day
+        - name: current
+          in: query
+          description: >-
+            A list of variables to return for the current conditions.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - european_aqi
+                - us_aqi
+                - pm10
+                - pm2_5
+                - carbon_monoxide
+                - nitrogen_dioxide
+                - sulphur_dioxide
+                - ozone
+                - aerosol_optical_depth
+                - dust
+                - uv_index
+                - uv_index_clear_sky
+                - ammonia
+                - alder_pollen
+                - birch_pollen
+                - grass_pollen
+                - mugwort_pollen
+                - olive_pollen
+                - ragweed_pollen
+        - name: timeformat
+          in: query
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          schema:
+            type: integer
+            default: 5
+            minimum: 0
+            maximum: 7
+        - name: start_date
+          in: query
+          description: >-
+            Start date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: domains
+          in: query
+          description: >-
+            CAMS domain: auto, cams_europe, or cams_global.
+          schema:
+            type: string
+            enum: [auto, cams_europe, cams_global]
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  hourly:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      pm10:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pm2_5:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      carbon_monoxide:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      carbon_dioxide:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      nitrogen_dioxide:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sulphur_dioxide:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ozone:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      aerosol_optical_depth:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dust:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      uv_index:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      uv_index_clear_sky:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ammonia:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      methane:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      alder_pollen:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      birch_pollen:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      grass_pollen:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      mugwort_pollen:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      olive_pollen:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ragweed_pollen:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      formaldehyde:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      glyoxal:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      non_methane_volatile_organic_compounds:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pm10_wildfires:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      peroxyacyl_nitrates:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      secondary_inorganic_aerosol:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      residential_elementary_carbon:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      total_elementary_carbon:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pm2_5_total_organic_matter:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_salt_aerosol:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      nitrogen_monoxide:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      european_aqi:
+                        type: array
+                        items:
+                          type: integer
+                      european_aqi_pm2_5:
+                        type: array
+                        items:
+                          type: integer
+                      european_aqi_pm10:
+                        type: array
+                        items:
+                          type: integer
+                      european_aqi_nitrogen_dioxide:
+                        type: array
+                        items:
+                          type: integer
+                      european_aqi_ozone:
+                        type: array
+                        items:
+                          type: integer
+                      european_aqi_sulphur_dioxide:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi_pm2_5:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi_pm10:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi_nitrogen_dioxide:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi_carbon_monoxide:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi_ozone:
+                        type: array
+                        items:
+                          type: integer
+                      us_aqi_sulphur_dioxide:
+                        type: array
+                        items:
+                          type: integer
+                      is_day:
+                        type: array
+                        items:
+                          type: integer
+                  hourly_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      pm10:
+                        type: string
+                      pm2_5:
+                        type: string
+                      carbon_monoxide:
+                        type: string
+                      carbon_dioxide:
+                        type: string
+                      nitrogen_dioxide:
+                        type: string
+                      sulphur_dioxide:
+                        type: string
+                      ozone:
+                        type: string
+                      aerosol_optical_depth:
+                        type: string
+                      dust:
+                        type: string
+                      uv_index:
+                        type: string
+                      uv_index_clear_sky:
+                        type: string
+                      ammonia:
+                        type: string
+                      methane:
+                        type: string
+                      alder_pollen:
+                        type: string
+                      birch_pollen:
+                        type: string
+                      grass_pollen:
+                        type: string
+                      mugwort_pollen:
+                        type: string
+                      olive_pollen:
+                        type: string
+                      ragweed_pollen:
+                        type: string
+                      formaldehyde:
+                        type: string
+                      glyoxal:
+                        type: string
+                      non_methane_volatile_organic_compounds:
+                        type: string
+                      pm10_wildfires:
+                        type: string
+                      peroxyacyl_nitrates:
+                        type: string
+                      secondary_inorganic_aerosol:
+                        type: string
+                      residential_elementary_carbon:
+                        type: string
+                      total_elementary_carbon:
+                        type: string
+                      pm2_5_total_organic_matter:
+                        type: string
+                      sea_salt_aerosol:
+                        type: string
+                      nitrogen_monoxide:
+                        type: string
+                      european_aqi:
+                        type: string
+                      european_aqi_pm2_5:
+                        type: string
+                      european_aqi_pm10:
+                        type: string
+                      european_aqi_nitrogen_dioxide:
+                        type: string
+                      european_aqi_ozone:
+                        type: string
+                      european_aqi_sulphur_dioxide:
+                        type: string
+                      us_aqi:
+                        type: string
+                      us_aqi_pm2_5:
+                        type: string
+                      us_aqi_pm10:
+                        type: string
+                      us_aqi_nitrogen_dioxide:
+                        type: string
+                      us_aqi_carbon_monoxide:
+                        type: string
+                      us_aqi_ozone:
+                        type: string
+                      us_aqi_sulphur_dioxide:
+                        type: string
+                      is_day:
+                        type: string
+                  current:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      interval:
+                        type: integer
+                      european_aqi:
+                        type: integer
+                      us_aqi:
+                        type: integer
+                      pm10:
+                        type: number
+                        format: float
+                      pm2_5:
+                        type: number
+                        format: float
+                      carbon_monoxide:
+                        type: number
+                        format: float
+                      nitrogen_dioxide:
+                        type: number
+                        format: float
+                      sulphur_dioxide:
+                        type: number
+                        format: float
+                      ozone:
+                        type: number
+                        format: float
+                      aerosol_optical_depth:
+                        type: number
+                        format: float
+                      dust:
+                        type: number
+                        format: float
+                      uv_index:
+                        type: number
+                        format: float
+                      uv_index_clear_sky:
+                        type: number
+                        format: float
+                      ammonia:
+                        type: number
+                        format: float
+                      alder_pollen:
+                        type: number
+                        format: float
+                      birch_pollen:
+                        type: number
+                        format: float
+                      grass_pollen:
+                        type: number
+                        format: float
+                      mugwort_pollen:
+                        type: number
+                        format: float
+                      olive_pollen:
+                        type: number
+                        format: float
+                      ragweed_pollen:
+                        type: number
+                        format: float
+                  current_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      european_aqi:
+                        type: string
+                      us_aqi:
+                        type: string
+                      pm10:
+                        type: string
+                      pm2_5:
+                        type: string
+                      carbon_monoxide:
+                        type: string
+                      nitrogen_dioxide:
+                        type: string
+                      sulphur_dioxide:
+                        type: string
+                      ozone:
+                        type: string
+                      aerosol_optical_depth:
+                        type: string
+                      dust:
+                        type: string
+                      uv_index:
+                        type: string
+                      uv_index_clear_sky:
+                        type: string
+                      ammonia:
+                        type: string
+                      alder_pollen:
+                        type: string
+                      birch_pollen:
+                        type: string
+                      grass_pollen:
+                        type: string
+                      mugwort_pollen:
+                        type: string
+                      olive_pollen:
+                        type: string
+                      ragweed_pollen:
+                        type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string
