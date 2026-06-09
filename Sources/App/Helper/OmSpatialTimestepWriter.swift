@@ -192,49 +192,26 @@ actor OmSpatialTimestepWriter {
             let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
             
             if forceAllTimestampUpload {
-                if bucket.starts(with: "s3") {
-                    try await S3Uploader.uploadSync(
-                        client: client,
-                        localDirectory: directorySpatial,
-                        server: bucket,
-                        basePath: "data_spatial/\(domain.domainRegistry.rawValue)/"
-                    )
-                } else {
-                    // Sync entire run directory
-                    try Process.awsSync(src: directorySpatial, dest: destDomain, profile: profile)
-                }
+                try await S3Uploader.uploadSync(
+                    client: client,
+                    localDirectory: directorySpatial,
+                    server: bucket,
+                    basePath: "data_spatial/\(domain.domainRegistry.rawValue)/"
+                )
             } else {
-                if bucket.starts(with: "s3") {
-                    try await S3Uploader.uploadMultipart(client: client, file: filename, url: destFile).commit(client: client)
-                } else {
-                    try Process.awsCopy(src: filename, dest: destFile, profile: profile)
-                }
+                try await S3Uploader.uploadMultipart(client: client, file: filename, url: destFile).commit(client: client)
             }
             
             if uploadMeta {
                 let destMeta = "\(destRun)meta\(realm).json"
-                if bucket.starts(with: "s3") {
-                    try await S3Uploader.uploadMultipart(client: client, file: metaRunMeta, url: destMeta).commit(client: client)
-                } else {
-                    try Process.awsCopy(src: metaRunMeta, dest: destMeta, profile: profile)
-                }
+                try await S3Uploader.uploadMultipart(client: client, file: metaRunMeta, url: destMeta).commit(client: client)
                 if canUpdateInProgress {
                     let destInProgress = "\(destDomain)in-progress\(realm).json"
-                    if bucket.starts(with: "s3") {
-                        try await S3Uploader.uploadMultipart(client: client, file: metaInProgress, url: destInProgress).commit(client: client)
-                    } else {
-                        try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
-                    }
+                    try await S3Uploader.uploadMultipart(client: client, file: metaInProgress, url: destInProgress).commit(client: client)
                 }
                 if completed {
                     let destLatest = "\(destDomain)latest\(realm).json"
-                    if bucket.starts(with: "s3") {
-                        try await S3Uploader.uploadMultipart(client: client, file: metaLatest, url: destLatest).commit(client: client)
-                    } else {
-                        try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)
-                        // Additional sync to make sure everything is uploaded
-                        try Process.awsSync(src: directorySpatial, dest: destDomain, profile: profile)
-                    }
+                    try await S3Uploader.uploadMultipart(client: client, file: metaLatest, url: destLatest).commit(client: client)
                 }
             }
             self.logger.info("AWS Upload to \(bucket.stripHttpPassword()) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")

@@ -547,28 +547,28 @@ enum DomainRegistry: String, CaseIterable {
     }
 }
 
-extension Process {
-    static func awsSync(src: String, dest: String, exclude: [String] = ["*~"], profile: String? = nil) throws {
-        var args = ["s3", "sync", "--no-progress"]
-        for exclude in exclude {
-            args.append(contentsOf: ["--exclude", exclude])
-        }
-        if let profile {
-            args.append(contentsOf: ["--profile", profile])
-        }
-        args.append(contentsOf: [src, dest])
-        try spawnRetriedNoFail(cmd: "aws", args: args)
-    }
-    
-    static func awsCopy(src: String, dest: String, profile: String? = nil) throws {
-        var args = ["s3", "cp", "--no-progress"]
-        if let profile {
-            args.append(contentsOf: ["--profile", profile])
-        }
-        args.append(contentsOf: [src, dest])
-        try spawnRetriedNoFail(cmd: "aws", args: args)
-    }
-}
+//extension Process {
+//    static func awsSync(src: String, dest: String, exclude: [String] = ["*~"], profile: String? = nil) throws {
+//        var args = ["s3", "sync", "--no-progress"]
+//        for exclude in exclude {
+//            args.append(contentsOf: ["--exclude", exclude])
+//        }
+//        if let profile {
+//            args.append(contentsOf: ["--profile", profile])
+//        }
+//        args.append(contentsOf: [src, dest])
+//        try spawnRetriedNoFail(cmd: "aws", args: args)
+//    }
+//    
+//    static func awsCopy(src: String, dest: String, profile: String? = nil) throws {
+//        var args = ["s3", "cp", "--no-progress"]
+//        if let profile {
+//            args.append(contentsOf: ["--profile", profile])
+//        }
+//        args.append(contentsOf: [src, dest])
+//        try spawnRetriedNoFail(cmd: "aws", args: args)
+//    }
+//}
 
 extension DomainRegistry {
     var bucketName: String {
@@ -645,20 +645,12 @@ extension DomainRegistry {
                         return
                     }
                     logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    if bucket.starts(with: "s3") {
-                        try await S3Uploader.uploadSync(
-                            client: client,
-                            localDirectory: src,
-                            server: bucket,
-                            basePath: "data/\(dir)/\(variable)"
-                        )
-                    } else {
-                        try Process.awsSync(
-                            src: src,
-                            dest: "s3://\(bucket)/data/\(dir)/\(variable)",
-                            profile: profile
-                        )
-                    }
+                    try await S3Uploader.uploadSync(
+                        client: client,
+                        localDirectory: src,
+                        server: bucket,
+                        basePath: "data/\(dir)/\(variable)"
+                    )
                     logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 }
             }
@@ -670,22 +662,13 @@ extension DomainRegistry {
                 let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
                 let startTimeAws = DispatchTime.now()
-                if bucket.starts(with: "s3") {
-                    try await S3Uploader.uploadSync(
-                        client: client,
-                        localDirectory: src,
-                        server: bucket,
-                        basePath: "data/\(dir)",
-                        exclude: exclude
-                    )
-                } else {
-                    try Process.awsSync(
-                        src: src,
-                        dest: "s3://\(bucket)/data/\(dir)",
-                        exclude: exclude,
-                        profile: profile
-                    )
-                }
+                try await S3Uploader.uploadSync(
+                    client: client,
+                    localDirectory: src,
+                    server: bucket,
+                    basePath: "data/\(dir)",
+                    exclude: exclude
+                )
                 logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
         }
@@ -701,7 +684,6 @@ extension DomainRegistry {
         for (bucket, profile) in parseBucket(bucket) {
             let src = "\(directory)\(dir)/\(timeFormatted)/"
             let destRel = "data_run/\(dir)/\(timeFormatted)/"
-            let dest = "s3://\(bucket)/\(destRel)"
             
             if !FileManager.default.fileExists(atPath: src) {
                 continue
@@ -709,36 +691,13 @@ extension DomainRegistry {
             let startTimeAws = DispatchTime.now()
             logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
             
-            if bucket.starts(with: "s3") {
-                /// Only one sync required, because JSON files are committed last and on error, the process would die
-                try await S3Uploader.uploadSync(
-                    client: client,
-                    localDirectory: src,
-                    server: bucket,
-                    basePath: destRel
-                )
-            } else {
-                try Process.awsSync(
-                    src: src,
-                    dest: dest,
-                    exclude: ["*~", "meta.json"],
-                    profile: profile
-                )
-                if !skipMeta {
-                    try Process.awsCopy(
-                        src: "\(src)meta.json",
-                        dest: "\(dest)meta.json",
-                        profile: profile
-                    )
-                }
-                // Additional sync to make sure everything is synced
-                try Process.awsSync(
-                    src: "\(directory)\(dir)/",
-                    dest: "s3://\(bucket)/data_run/\(dir)/",
-                    exclude: ["*~"],
-                    profile: profile
-                )
-            }
+            /// Only one sync required, because JSON files are committed last and on error, the process would die
+            try await S3Uploader.uploadSync(
+                client: client,
+                localDirectory: src,
+                server: bucket,
+                basePath: destRel
+            )
             logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
