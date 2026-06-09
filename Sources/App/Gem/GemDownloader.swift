@@ -176,7 +176,8 @@ struct GemDownload: AsyncCommand {
     func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadS3Bucket: String?, concurrent: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
+        // HRDPS west domain uploads files not atomically -> causing corrupted files if downloaded too early
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: domain == .gem_hrdps_west ? TimeInterval(300) : nil) // 12 hours and 6 hours interval so we let 1 hour for data conversion
         let isEnsemble = domain.countEnsembleMember > 1
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
