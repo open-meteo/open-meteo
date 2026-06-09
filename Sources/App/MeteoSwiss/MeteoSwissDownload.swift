@@ -52,7 +52,7 @@ struct MeteoSwissDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -194,7 +194,7 @@ struct MeteoSwissDownload: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let handles = try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
             return handles
         }
         await curl.printStatistics()

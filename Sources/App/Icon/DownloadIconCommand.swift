@@ -430,10 +430,10 @@ struct DownloadIconCommand: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let handles = try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
             
             // TODO valid times and S3 upload for 15min data
-            let handles15min = try await writer15Min.finalise(completed: false, validTimes: [], uploadS3Bucket: nil)
+            let handles15min = try await writer15Min.finalise(client: application.http1Client, completed: false, validTimes: [], uploadS3Bucket: nil)
             return (handles, handles15min)
         }
         
@@ -521,9 +521,9 @@ struct DownloadIconCommand: AsyncCommand {
 
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+            try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         }
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }

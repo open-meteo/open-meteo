@@ -49,7 +49,7 @@ struct KmaDownload: AsyncCommand {
         try await downloadElevation(application: context.application, domain: domain, run: run, server: server)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -184,7 +184,7 @@ struct KmaDownload: AsyncCommand {
                 try await inMemory.sumUp(var1: .precipitation, var2: .snowfall_water_equivalent, outVariable: KmaSurfaceVariable.precipitation, writer: writer)
             }
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
     }
 }

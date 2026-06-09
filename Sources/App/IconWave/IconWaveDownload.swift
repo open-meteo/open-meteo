@@ -56,7 +56,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let variables = onlyVariables ?? IconWaveVariable.allCases
         let handles = try await download(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files
@@ -109,7 +109,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                 try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles
