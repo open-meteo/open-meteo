@@ -190,6 +190,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                 // Look up SH and temp arrays once — deadline tasks read both per level
                 let shArray = pressureZarrArrays.first(where: { $0.1 == .specific_humidity })!.0
                 let tempArray = pressureZarrArrays.first(where: { $0.1 == .temperature })!.0
+                let verticalVelocityArray = pressureZarrArrays.first(where: { $0.1 == .vertical_velocity })!.0
 
                 // Surface + other pressure reads + deadline tasks — single flat list
                 var allTasks = [@Sendable () async throws -> Void]()
@@ -213,7 +214,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                     }
 
                     // Other pressure variable reads (everything except SH and temp)
-                    for (zarrArray, pType, level, levelIdx) in allPressureReads where pType != .specific_humidity && pType != .temperature {
+                    for (zarrArray, pType, level, levelIdx) in allPressureReads where pType != .specific_humidity && pType != .temperature && pType != .vertical_velocity {
                         allTasks.append {
                             var data: [Float] = try await zarrArray.retrieveArraySubset(
                                 [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
@@ -227,7 +228,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                             case .geopotential_height:
                                 let heightData = data.map { $0 / 9.80665 }
                                 try await writer.write(member: member, variable: wnVar, data: heightData)
-                            case .wind_u_component, .wind_v_component, .vertical_velocity:
+                            case .wind_u_component, .wind_v_component:
                                 try await writer.write(member: member, variable: wnVar, data: data)
                             default:
                                 try await writer.write(member: member, variable: wnVar, data: data)
@@ -243,26 +244,40 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
                         let rhVar = WeatherNextPressureVariable(variable: .relative_humidity, level: level)
                         let tempVar = WeatherNextPressureVariable(variable: .temperature, level: level)
+                        let verticalVelocityVar = WeatherNextPressureVariable(variable: .vertical_velocity, level: level)
                         let pressure = Float(level.level)
 
                         allTasks.append {
-                            // Read SH and temp for this level
-                            var shData: [Float] = try await shArray.retrieveArraySubset(
-                                [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
-                            ).map { $0 * 1000 } // convert from kg/kg to g/kg
+                            // Read SH, temp and vertical velocity for this level
                             var tempData: [Float] = try await tempArray.retrieveArraySubset(
                                 [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
                             ).map { $0 - 273.15 } // convert from K to C
-                            shData.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
                             tempData.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+                            
+                            var verticalVelocityData: [Float] = try await verticalVelocityArray.retrieveArraySubset(
+                                 [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
+                            )
+                            verticalVelocityData.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
+                            verticalVelocityData = Meteorology.verticalVelocityPressureToGeometric(omega: verticalVelocityData, temperature: tempData, pressureLevel: pressure)
+                            try await writer.write(member: member, variable: WeatherNextVariable.pressure(verticalVelocityVar), data: verticalVelocityData)
+                            _ = consume verticalVelocityData
+
+                            var shData: [Float] = try await shArray.retrieveArraySubset(
+                                [member..<member+1, timeIdx..<timeIdx+1, levelIdx..<levelIdx+1, 0..<domain.grid.ny, 0..<domain.grid.nx]
+                            ).map { $0 * 1000 } // convert from kg/kg to g/kg
+                            shData.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
                             let rh = Meteorology.specificToRelativeHumidity(
                                 specificHumidity: shData,
                                 temperature: tempData,
                                 pressure: pressure
                             )
+                            _ = consume shData
+                            
                             try await writer.write(member: member, variable: WeatherNextVariable.pressure(tempVar), data: tempData)
+
                             try await writer.write(member: member, variable: WeatherNextVariable.pressure(rhVar), data: rh)
+                            
                             await rhStorage.set(variable: rhVar, timestamp: timestamp, member: member, data: Array2D(data: rh, nx: domain.grid.nx, ny: domain.grid.ny))
 
                             // If all 13 RH levels are now stored, push cloud cover.
