@@ -24,6 +24,21 @@ actor S3UploadManager {
             try await S3Uploader.upload(client: client, data: data, url: url, contentType: contentType)
         }
     }
+    
+    
+    /// Enqueue a single-part upload and return immediately.
+    func uploadMultipart(
+        client: HTTPClient,
+        bucketEndpoint: String,
+        file: String,
+        url: String,
+        contentType: String = "application/octet-stream"
+    ) {
+        enqueue(endpoint: normalizeEndpoint(bucketEndpoint)) {
+            try await S3Uploader.uploadMultipart(client: client, file: file, url: url, contentType: contentType).commit(client: client)
+        }
+    }
+
 
     /// Enqueue a directory sync and return immediately.
     func sync(

@@ -205,7 +205,12 @@ actor OmSpatialTimestepWriter {
                     basePath: "data_spatial/\(domain.domainRegistry.rawValue)/"
                 )
             } else {
-                try await S3Uploader.uploadMultipart(client: application.http1Client, file: filename, url: destFile).commit(client: application.http1Client)
+                await application.s3UploadManager.uploadMultipart(
+                    client: application.http1Client,
+                    bucketEndpoint: bucket,
+                    file: filename,
+                    url: destFile
+                )
             }
             
             if uploadMeta {
