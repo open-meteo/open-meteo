@@ -366,8 +366,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         
         let storeOnDisk = true
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
         
         /// Run AWS upload in the background
         var uploadTaskShortCutOff: Task<(), any Error>? = nil
@@ -477,11 +475,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             logger.info("Completed hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm), elapsed \(time.timeElapsedPretty())]")
             
             let completed = i == timestamps.count - 1            
-            handles.append(contentsOf: try await writer.finalise())
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket))
             
             if hour == shortCutOffHour {
                 let handles = handles
@@ -491,7 +485,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             }
             
         }
-        try await uploadTask?.value
         try await uploadTaskShortCutOff?.value
         await curl.printStatistics()
         return handles
@@ -512,8 +505,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         }
         let timestamps = forecastHours.map { run.add(hours: $0) }
         let storeOnDisk = true
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -549,14 +540,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise()
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
-        try await uploadTask?.value
         await curl.printStatistics()
         return handles
     }

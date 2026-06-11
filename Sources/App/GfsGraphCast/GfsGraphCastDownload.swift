@@ -129,9 +129,6 @@ struct GfsGraphCastDownload: AsyncCommand {
         let timestamps = domain.forecastHours(run: run.hour).map { run.add(hours: $0) }
         let isEnsemble = domain.countEnsembleMember > 1
         let members = 0..<domain.countEnsembleMember
-        
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
                 
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -289,16 +286,8 @@ struct GfsGraphCastDownload: AsyncCommand {
             }
                         
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-                try await writerProbabilities?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
-        try await uploadTask?.value
         await curl.printStatistics()
         Process.alarm(seconds: 0)
         

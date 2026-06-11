@@ -140,9 +140,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         var validTimes = [Timestamp]()
         var handles = [GenericVariableHandle]()
         
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
-        
         let package: String
         let types: [String]
         let streams: [String]
@@ -230,14 +227,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise())
-            try await uploadTask?.value
-            let validTimes = validTimes
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
-            }
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
         }
-        try await uploadTask?.value
         return handles
     }
 
@@ -258,9 +249,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         var validTimes = [Timestamp]()
         var handles = [GenericVariableHandle]()
-        
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
         
         let deaverager = GribDeaverager()
         for month in 0...6 {
@@ -343,14 +331,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise())
-            try await uploadTask?.value
-            let validTimes = validTimes
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
-            }
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
         }
-        try await uploadTask?.value
         return handles
     }
 }

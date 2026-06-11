@@ -175,8 +175,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         
         let storeOnDisk = domain == .ifs025 || domain == .aifs025_single || domain == .wam025
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -425,13 +423,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-                try await writerProbabilities?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles
@@ -453,8 +445,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
         let timestamps = forecastHours.map { run.add(hours: $0) }
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -493,12 +483,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise()
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles

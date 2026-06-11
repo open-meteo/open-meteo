@@ -290,9 +290,6 @@ struct GfsDownload: AsyncCommand {
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
         let deaverager = GribDeaverager()
-        
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
 
         /// Variables that are kept in memory
         /// For GFS013, keep pressure and temperature in memory to convert specific humidity to relative
@@ -468,13 +465,7 @@ struct GfsDownload: AsyncCommand {
                 )
             }
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-                try await writerProbabilities?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles
