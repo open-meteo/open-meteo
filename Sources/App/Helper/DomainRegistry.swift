@@ -643,10 +643,10 @@ extension DomainRegistry {
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }
-                await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
+                for (bucket, profile) in parseBucket(bucket) {
                     if variable.contains("_previous_day") && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
                         // do not upload data from past days yet
-                        return
+                        continue
                     }
                     logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                     await application.s3UploadManager.sync(
@@ -662,7 +662,7 @@ extension DomainRegistry {
 
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
+            for (bucket, profile) in parseBucket(bucket) {
                 logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
