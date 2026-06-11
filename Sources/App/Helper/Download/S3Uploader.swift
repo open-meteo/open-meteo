@@ -19,7 +19,7 @@ enum S3Uploader {
         // executeRetry extracts credentials from the URL, signs the request with
         // AWS4-HMAC-SHA256 on each attempt, and retries on transient errors.
         let logger = Logger(label: "S3Uploader")
-        let _ = try await client.executeRetry(request, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
+        let _ = try await client.executeRetry(request, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
     }
     
     static func uploadMultipart(client: HTTPClient, file: String, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
@@ -45,7 +45,7 @@ enum S3Uploader {
         initiateRequest.headers.add(name: "Content-Type", value: contentType)
         // custom header to set the total expected upload file size. Might be used by a custom upload implementation in the future
         initiateRequest.headers.add(name: "x-file-size", value: "\(try await data.getFileSize())")
-        let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
+        let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
         guard
             let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
             let uploadId = initiateXml.xmlValue(tag: "UploadId") else {
@@ -66,7 +66,7 @@ enum S3Uploader {
                 req.body = .bytes(chunk)
                 req.headers.add(name: "x-amz-content-sha256", value: chunk.readableBytesView.sha256Hex)
                 req.headers.add(name: .contentLength, value: "\(chunk.readableBytes)")
-                let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
+                let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(120))
                 guard let etag = response.headers.first(name: "ETag") else {
                     throw S3UploaderError.missingETag(partNumber: partNumber)
                 }
@@ -85,7 +85,7 @@ enum S3Uploader {
         } catch {
             var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
             abortRequest.method = .DELETE
-            let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
+            let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
             throw error
         }
     }
