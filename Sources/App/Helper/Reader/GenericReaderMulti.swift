@@ -31,12 +31,14 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
 
     func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
         for variable in variables {
+            try Task.checkCancellation()
             let _ = try await prefetchData(variable: variable, time: time)
         }
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
         for reader in reader {
+            try Task.checkCancellation()
             if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
                 break
             }

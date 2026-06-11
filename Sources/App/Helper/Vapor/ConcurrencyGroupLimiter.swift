@@ -6,7 +6,7 @@ actor ConcurrencyGroupLimiter {
     
     /// Number of running per slot
     private var counts: [Int: Int] = [:]
-    private var waiters: [Int: [CheckedContinuation<Void, Never>]] = [:]
+    private var waiters: [Int: [CheckedContinuation<Void, any Error>]] = [:]
 
     func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
         (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.reduce(0, { $0 + $1.value.count }))
@@ -24,8 +24,22 @@ actor ConcurrencyGroupLimiter {
         counts[slot] = count + 1
         if count >= maxConcurrent {
             // print("Queuing request slot \(slot)")
-            await withCheckedContinuation { waiters[slot, default: []].append($0) }
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, any Error>) in
+                    waiters[slot, default: []].append(cont)
+                }
+            } onCancel: {
+                Task { await self.cancelWaiter(slot: slot) }
+            }
         }
+    }
+
+    private func cancelWaiter(slot: Int) {
+        guard var list = waiters[slot], !list.isEmpty else { return }
+        let cont = list.removeFirst()
+        waiters[slot] = list.isEmpty ? nil : list
+        counts[slot] = (counts[slot] ?? 1) - 1
+        cont.resume(throwing: CancellationError())
     }
 
     func release(slot: Int) {
