@@ -38,7 +38,8 @@ struct GenericVariableHandle: Sendable {
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
     /// If `fullRunSkipMeta` do not generate meta.json for each run
-    static func convert(logger: Logger, client: HTTPClient, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+        let logger = application.logger
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
             
@@ -84,8 +85,7 @@ struct GenericVariableHandle: Sendable {
             
             if generateTimeSeries, let uploadS3Bucket = uploadS3Bucket {
                 try await domain.domainRegistry.syncToS3(
-                    logger: logger,
-                    client: client,
+                    application: application,
                     bucket: uploadS3Bucket,
                     variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : nil
                 )
@@ -105,8 +105,7 @@ struct GenericVariableHandle: Sendable {
                 /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
                 if !uploadS3OnlyProbabilities, let uploadS3Bucket {
                     try await domain.domainRegistry.syncToS3(
-                        logger: logger,
-                        client: client,
+                        application: application,
                         bucket: uploadS3Bucket,
                         variables: nil
                     )
@@ -125,10 +124,9 @@ struct GenericVariableHandle: Sendable {
                 
                 if let uploadS3Bucket {
                     try await domain.domainRegistry.syncToS3PerRun(
-                        logger: logger,
-                        client: client,
+                        application: application,
                         bucket: uploadS3Bucket,
-                        run:run,
+                        run: run,
                         skipMeta: fullRunSkipMeta
                     )
                 }

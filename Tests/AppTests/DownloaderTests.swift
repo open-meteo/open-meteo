@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import AsyncHTTPClient
 import NIOCore
+import Logging
 
 @Suite struct DownloaderTests {
     @Test func testAwsSign() async throws {
@@ -71,6 +72,35 @@ import NIOCore
 
         let data = randomData(byteCount: 1 * 1024 * 1024)
         try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin")
+    }
+
+    /// Upload three files using single-part PUT uploads.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3UploadThreeFiles() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+        let manager = S3UploadManager(logger: Logger(label: "DownloaderTests.S3UploadManager"))
+
+        let uploads: [(suffix: String, data: Data)] = [
+            ("a", randomData(byteCount: 128 * 1024)),
+            ("b", randomData(byteCount: 256 * 1024)),
+            ("c", randomData(byteCount: 512 * 1024))
+        ]
+
+        for upload in uploads {
+            await manager.upload(
+                client: client,
+                bucketEndpoint: server,
+                data: upload.data,
+                url: "\(server)test/s3uploader-three-\(upload.suffix).bin"
+            )
+        }
+
+        // Ensure all queued uploads complete before ending the test.
+        await manager.shutdown()
     }
 
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
