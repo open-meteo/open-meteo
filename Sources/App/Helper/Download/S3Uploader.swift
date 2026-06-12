@@ -299,7 +299,7 @@ struct S3MultiPartUploadPrepared {
         completeRequest.body = .bytes(ByteBuffer(data: completionData))
         completeRequest.headers.add(name: "Content-Type", value: "application/xml")
         completeRequest.headers.add(name: "x-amz-content-sha256", value: completionData.sha256Hex)
-        let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(2), timeoutPerRequest: .seconds(30))
+        let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
         let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000
         logger.info("Upload \(url.asUrlGetQuery) committed in \(timeCommitRequest.asSecondsPrettyPrint)")

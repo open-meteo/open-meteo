@@ -219,10 +219,12 @@ struct SyncCommand: AsyncCommand {
         let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
         let curlStartBytes = curl.totalBytesTransfered.load(ordering: .relaxed)
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
-            var client = ClientRequest(url: URI("\(server)\(download.name)"))
+            var request = ClientRequest(url: URI("\(server)\(download.name)"))
             if apikey != nil {
-                try client.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
+                try request.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
             }
+            let url = URLComponents(string: request.url.string)!
+            
             let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
             let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
             let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
@@ -232,12 +234,13 @@ struct SyncCommand: AsyncCommand {
             if localFile.hasSuffix("/meta.json") {
                 /// Update the `last_run_availability_time` within meta.json
                 try await curl
-                    .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
+                    .downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: 0.1)
                     .readJSONDecodable(ModelUpdateMetaJson.self)?
                     .with(last_run_availability_time: .now())
                     .writeTo(path: localFile)
             } else {
-                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                let response = try await client.executeRetryChunked(logger: logger, url: url)
+                try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
             }
             progress.set(curl.totalBytesTransfered.load(ordering: .relaxed) - curlStartBytes)
         }

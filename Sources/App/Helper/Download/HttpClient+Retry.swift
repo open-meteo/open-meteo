@@ -10,6 +10,8 @@ enum CurlErrorNonRetry: NonRetryError {
     case forbidden(body: String?)
     case badRequest(body: String?)
     case other(HTTPResponseStatus)
+    case timeoutReached
+    case chunkSizeMismatch
 }
 
 enum CurlErrorRetry: Error {
@@ -19,6 +21,11 @@ enum CurlErrorRetry: Error {
     case badGateway
     case serviceUnavailable
     case gatewayTimeout
+    case chunkTimeoutReached
+}
+
+extension CancellationError: NonRetryError {
+    
 }
 
 extension HTTPClientResponse {
@@ -86,7 +93,8 @@ struct ExponentialBackOff {
 
 extension HTTPClient {
     /**
-     Retry HTTP requests on error
+     Retry HTTP requests on error. Note this function returns as soon as the HTTP header arrives. Only connection setup + initial header retrieve is retried
+     The underlaying HTTP body might still fail to download
      */
     func executeRetry(_ request: HTTPClientRequest,
                       logger: Logger,
@@ -123,23 +131,53 @@ extension HTTPClient {
         guard var urlComponents = URLComponents(string: request.url) else {
             throw HTTPClientError.invalidURL
         }
-        let password = urlComponents.password
-        let user = urlComponents.user
-        let schema = urlComponents.scheme
+        
+        return try await self.executeMapRetry(logger: logger, url: urlComponents, method: request.method, headers: request.headers, body: request.body, body)
+    }
+    
+    /**
+     Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
+     */
+    func executeMapRetry<T>(
+        logger: Logger,
+        url: URLComponents,
+        method: HTTPMethod = .GET,
+        headers: HTTPHeaders = .init(),
+        body: HTTPClientRequest.Body? = nil,
+        deadline: Date = .minutes(60),
+        timeoutPerRequest: TimeAmount = .seconds(30),
+        backOffSettings: ExponentialBackOff = .init(),
+        error404WaitTime: TimeAmount? = nil,
+        _ callback: @escaping (HTTPClientResponse) async throws -> T
+    ) async throws -> T {
+        var lastPrint = Date(timeIntervalSince1970: 0)
+        let startTime = Date()
+        var n = 0
+        var url = url
+        
+        /// Grab user+password from URL and remove from components object
+        let password = url.password
+        let user = url.user
+        let schema = url.scheme
         if schema == "s3" {
             /// If S3 is running on localhost, use http
-            urlComponents.scheme = request.url.contains("127.0.0.1") ? "http" : "https"
+            url.scheme = url.host?.contains("127.0.0.1") == true ? "http" : "https"
         }
-        urlComponents.password = nil
-        urlComponents.user = nil
-        var request = request
-        // Set URL without username and password
-        request.url = urlComponents.url!.absoluteString
+        url.password = nil
+        url.user = nil
+        
+        /// clean url without password
+        guard let requestUrl = url.url?.absoluteString else {
+            throw HTTPClientError.invalidURL
+        }
         
         while true {
             do {
                 n += 1
-                var request = request
+                var request = HTTPClientRequest(url: requestUrl)
+                request.method = method
+                request.headers = headers
+                request.body = body
                 if let user, let password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
                     if schema == "s3" {
@@ -151,19 +189,15 @@ extension HTTPClient {
                 }
                 
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.rangePrettyPrint)")
+                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(headers.rangePrettyPrint)")
                 //print(try await response.readStringImmutable())
                 try await response.throwOnError()
-                return try await body(response)
+                return try await callback(response)
             } catch CurlErrorNonRetry.unauthorized {
-                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(requestUrl)\(headers.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
-            } catch let error as CurlErrorNonRetry {
-                
-                logger.info("Download failed unrecoverable with \(error). URL \(request.url)\(request.rangePrettyPrint)")
-                throw error
-            } catch let error as CancellationError {
-                logger.debug("Download failed with cancellation. URL \(request.url)\(request.rangePrettyPrint)")
+            } catch let error as NonRetryError {
+                logger.info("Download failed unrecoverable with \(error). URL \(requestUrl)\(headers.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
@@ -182,11 +216,11 @@ extension HTTPClient {
 
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(request.url)\(request.rangePrettyPrint)")
+                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(requestUrl)\(headers.rangePrettyPrint)")
                     lastPrint = Date()
                 }
                 if Date() > deadline {
-                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(request.url)\(request.rangePrettyPrint)")
+                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(requestUrl)\(headers.rangePrettyPrint)")
                     throw CurlError.timeoutReached
                 }
                 try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
@@ -211,11 +245,86 @@ extension HTTPClient {
             { try await $0.body.collect(upTo: maxBytes) }
         )
     }
+    
+    /// Download a file and chunk it into 8 MB parts. If HTTP range is set, use this. Otherwise perform a head request, get the content size and divide it info 8MB parts
+    /// Returns a HTTPClientResponse with a body stream. The stream does not need to be retried, because each chunk is retried individually
+    func executeRetryChunked(
+        logger: Logger,
+        url: URLComponents,
+        headers: HTTPHeaders = .init(),
+        chunkSize: Int = 8*1024*1024,
+        nConcurrent: Int = 4,
+        range: String? = nil,
+        deadline: Date = .minutes(60),
+        timeoutPerRequest: TimeAmount = .seconds(30),
+        backOffSettings: ExponentialBackOff = .init(),
+        error404WaitTime: TimeAmount? = nil
+    ) async throws -> HTTPClientResponse {
+        let chunks: [Range<Int>]
+        let responseHeaders: HTTPHeaders
+        let length: Int
+        if let range = range {
+            let parts = range.split(separator: ",")
+            chunks = parts.flatMap { part in
+                guard let (start, stop) = String(part).splitTo2Integer() else {
+                    fatalError()
+                }
+                let length = (stop - start + 1)
+                return (0..<length.divideRoundedUp(divisor: chunkSize)).map {
+                    return (start + $0 * chunkSize) ..< (start + min(($0 + 1) * chunkSize, length))
+                }
+            }
+            length = chunks.reduce(0, { $0 + $1.count })
+            responseHeaders = HTTPHeaders([("content-length", "\(length)")])
+        } else {
+            let head = try await executeMapRetry(logger: logger, url: url, method: .HEAD, headers: headers, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) {$0}
+            responseHeaders = head.headers
+            guard let lengthHeader = try head.contentLength(), lengthHeader >= nConcurrent else {
+                throw CurlError.couldNotGetContentLengthForConcurrentDownload
+            }
+            length = lengthHeader
+            chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
+                return $0 * chunkSize ..< min(($0 + 1) * chunkSize, length)
+            }
+        }
+        
+        logger.info("Initiate concurrent download nConcurrent=\(nConcurrent) nChunks=\(chunks.count) length=\(length.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)")
+
+        let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
+            let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
+            var headers = headers
+            headers.add(name: "range", value: "bytes=\(range)")
+            return try await self.executeMapRetry(logger: logger, url: url, method: .GET, headers: headers, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) { response in
+                var buffer = ByteBuffer()
+                if let contentLength = try response.contentLength(), contentLength != chunk.count {
+                    throw CurlErrorNonRetry.chunkSizeMismatch
+                }
+                buffer.reserveCapacity(chunk.count)
+                // Allow 5 minutes per chunk, then restart
+                let deadLineChunk = Date.minutes(5)
+                for try await fragement in response.body {
+                    if Date() > deadLineChunk {
+                        throw CurlErrorRetry.chunkTimeoutReached
+                    }
+                    if Date() > deadline {
+                        throw CurlErrorNonRetry.timeoutReached
+                    }
+                    buffer.writeImmutableBuffer(fragement)
+                }
+                guard buffer.readableBytes == chunk.count else {
+                    throw CurlErrorNonRetry.chunkSizeMismatch
+                }
+                return buffer
+            }
+        }
+        
+        return HTTPClientResponse(status: .ok, headers: responseHeaders, body: .stream(stream))
+    }
 }
 
-fileprivate extension HTTPClientRequest {
+fileprivate extension HTTPHeaders {
     var rangePrettyPrint: String {
-        guard let range = headers.range else {
+        guard let range = self.range else {
             return ""
         }
         let count = range.ranges.reduce(0, {
@@ -231,6 +340,7 @@ fileprivate extension HTTPClientRequest {
         return " [\(count.bytesHumanReadable) Range: \(range.serialize())]"
     }
 }
+
 
 extension TimeAmount {
     var prettyPrint: String {
