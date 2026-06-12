@@ -127,7 +127,8 @@ extension HTTPClient {
         let user = urlComponents.user
         let schema = urlComponents.scheme
         if schema == "s3" {
-            urlComponents.scheme = request.url.contains("127.0.0.1:7480") ? "http" : "https"
+            /// If S3 is running on localhost, use http
+            urlComponents.scheme = request.url.contains("127.0.0.1") ? "http" : "https"
         }
         urlComponents.password = nil
         urlComponents.user = nil

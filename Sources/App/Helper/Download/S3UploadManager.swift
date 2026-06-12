@@ -20,7 +20,7 @@ actor S3UploadManager {
         url: String,
         contentType: String = "application/octet-stream"
     ) {
-        enqueue(endpoint: normalizeEndpoint(bucketEndpoint)) {
+        enqueue(endpoint: bucketEndpoint) {
             try await S3Uploader.upload(client: client, data: data, url: url, contentType: contentType)
         }
     }
@@ -34,7 +34,7 @@ actor S3UploadManager {
         url: String,
         contentType: String = "application/octet-stream"
     ) {
-        enqueue(endpoint: normalizeEndpoint(bucketEndpoint)) {
+        enqueue(endpoint: bucketEndpoint) {
             try await S3Uploader.uploadMultipart(client: client, file: file, url: url, contentType: contentType).commit(client: client)
         }
     }
@@ -49,7 +49,7 @@ actor S3UploadManager {
         basePath: String,
         exclude: [String] = [".*", "*~"]
     ) {
-        enqueue(endpoint: normalizeEndpoint(bucketEndpoint)) {
+        enqueue(endpoint: bucketEndpoint) {
             try await S3Uploader.uploadSync(
                 client: client,
                 localDirectory: localDirectory,
@@ -86,15 +86,6 @@ actor S3UploadManager {
             }
         }
         endpointQueues[endpoint] = task
-    }
-
-    private func normalizeEndpoint(_ raw: String) -> String {
-        if let components = URLComponents(string: raw), let host = components.host {
-            let scheme = components.scheme ?? "https"
-            let port = components.port.map { ":\($0)" } ?? ""
-            return "\(scheme)://\(host)\(port)"
-        }
-        return raw
     }
 }
 

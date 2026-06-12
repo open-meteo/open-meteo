@@ -116,9 +116,11 @@ final class Curl: Sendable {
             let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0].split(separator: ":")
             user = String(usernamePassword.first!)
             password = usernamePassword.count > 1 ? String(usernamePassword[1]) : nil
-            url = _url.stripHttpPassword().replacing("s3://", with: "https://")
+            /// If S3 is running on localhost, use http
+            url = _url.stripHttpPassword().replacing("s3://", with: _url.contains("127.0.0.1") ? "http://" : "https://")
         } else {
-            url = _url.replacing("s3://", with: "https://")
+            /// If S3 is running on localhost, use http
+            url = _url.replacing("s3://", with: _url.contains("127.0.0.1") ? "http://" : "https://")
             user = nil
             password = nil
         }
