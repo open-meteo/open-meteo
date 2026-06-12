@@ -185,13 +185,15 @@ extension HTTPClient {
         }
     }
     
-    func executeRetryAndCollect(_ request: HTTPClientRequest,
-                      logger: Logger,
-                      upTo maxBytes: Int,
-                      deadline: Date = .minutes(60),
-                      timeoutPerRequest: TimeAmount = .seconds(30),
-                      backOffSettings: ExponentialBackOff = .init(),
-                      error404WaitTime: TimeAmount? = nil) async throws -> ByteBuffer {
+    func executeRetryAndCollect(
+        _ request: HTTPClientRequest,
+        logger: Logger,
+        upTo maxBytes: Int,
+        deadline: Date = .minutes(60),
+        timeoutPerRequest: TimeAmount = .seconds(30),
+        backOffSettings: ExponentialBackOff = .init(),
+        error404WaitTime: TimeAmount? = nil
+    ) async throws -> ByteBuffer {
         return try await executeMapRetry(
             request,
             logger: logger,

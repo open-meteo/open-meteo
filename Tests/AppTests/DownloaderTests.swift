@@ -62,11 +62,23 @@ import Logging
     }
     
     @Test func urlExtraction() throws {
-        let a = "s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        var a = "s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".extractSchemaUserNamePasswordCleanUrl()
         #expect(a?.schema == "s3")
         #expect(a?.user == "AKIAYawfawfawed5jdrh")
         #expect(a?.password == "FgseawfawfrVU8Dk1zTsesefsegsgW1I/WJ6")
         #expect(a?.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
+        
+        a = "s3://AKIAYawfawfawed5jdrh@openmeteo.s3.amazonaws.com:8080/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "s3")
+        #expect(a?.user == "AKIAYawfawfawed5jdrh")
+        #expect(a?.password == nil)
+        #expect(a?.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
+        
+        a = "s3://127.0.0.1/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "s3")
+        #expect(a?.user == nil)
+        #expect(a?.password == nil)
+        #expect(a?.url == "http://127.0.0.1/text.txt")
     }
 
     /// Single-part PUT upload.
