@@ -222,9 +222,7 @@ struct SyncCommand: AsyncCommand {
             var request = ClientRequest(url: URI("\(server)\(download.name)"))
             if apikey != nil {
                 try request.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
-            }
-            let url = URLComponents(string: request.url.string)!
-            
+            }            
             let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
             let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
             let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
@@ -239,7 +237,7 @@ struct SyncCommand: AsyncCommand {
                     .with(last_run_availability_time: .now())
                     .writeTo(path: localFile)
             } else {
-                let response = try await client.executeRetryChunked(logger: logger, url: url)
+                let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
                 try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
             }
             progress.set(curl.totalBytesTransfered.load(ordering: .relaxed) - curlStartBytes)

@@ -116,88 +116,45 @@ extension HTTPClient {
      Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
      */
     func executeMapRetry<T>(_ request: HTTPClientRequest,
-                      logger: Logger,
-                      deadline: Date = .minutes(60),
-                      timeoutPerRequest: TimeAmount = .seconds(30),
-                      backOffSettings: ExponentialBackOff = .init(),
-                      error404WaitTime: TimeAmount? = nil,
-                            _ body: @escaping (HTTPClientResponse) async throws -> T
-                        ) async throws -> T {
-        var lastPrint = Date(timeIntervalSince1970: 0)
-        let startTime = Date()
-        var n = 0
-        
-        // URL might contain password, strip them from logging
-        guard var urlComponents = URLComponents(string: request.url) else {
-            throw HTTPClientError.invalidURL
-        }
-        
-        return try await self.executeMapRetry(logger: logger, url: urlComponents, method: request.method, headers: request.headers, body: request.body, body)
-    }
-    
-    /**
-     Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
-     */
-    func executeMapRetry<T>(
         logger: Logger,
-        url: URLComponents,
-        method: HTTPMethod = .GET,
-        headers: HTTPHeaders = .init(),
-        body: HTTPClientRequest.Body? = nil,
         deadline: Date = .minutes(60),
         timeoutPerRequest: TimeAmount = .seconds(30),
         backOffSettings: ExponentialBackOff = .init(),
         error404WaitTime: TimeAmount? = nil,
-        _ callback: @escaping (HTTPClientResponse) async throws -> T
+        _ body: @escaping (HTTPClientResponse) async throws -> T
     ) async throws -> T {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
         var n = 0
-        var url = url
-        
-        /// Grab user+password from URL and remove from components object
-        let password = url.password
-        let user = url.user
-        let schema = url.scheme
-        if schema == "s3" {
-            /// If S3 is running on localhost, use http
-            url.scheme = url.host?.contains("127.0.0.1") == true ? "http" : "https"
-        }
-        url.password = nil
-        url.user = nil
-        
-        /// clean url without password
-        guard let requestUrl = url.url?.absoluteString else {
+        guard let (schema, user, password, url) = request.url.extractSchemaUserNamePasswordCleanUrl() else {
             throw HTTPClientError.invalidURL
         }
         
         while true {
             do {
                 n += 1
-                var request = HTTPClientRequest(url: requestUrl)
-                request.method = method
-                request.headers = headers
-                request.body = body
+                var request = request
+                request.url = url
                 if let user, let password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
                     if schema == "s3" {
-                        let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+                        let signer = AWSSigner(accessKey: String(user), secretKey: String(password), region: "us-west-2", service: "s3")
                         try signer.sign(request: &request)
                     } else {
-                        request.setBasicAuth(username: user, password: password)
+                        request.setBasicAuth(username: String(user), password: String(password))
                     }
                 }
                 
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(headers.rangePrettyPrint)")
+                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
                 //print(try await response.readStringImmutable())
                 try await response.throwOnError()
-                return try await callback(response)
+                return try await body(response)
             } catch CurlErrorNonRetry.unauthorized {
-                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(requestUrl)\(headers.rangePrettyPrint)")
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.headers.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as NonRetryError {
-                logger.info("Download failed unrecoverable with \(error). URL \(requestUrl)\(headers.rangePrettyPrint)")
+                logger.info("Download failed unrecoverable with \(error). URL \(url)\(request.headers.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
@@ -216,11 +173,11 @@ extension HTTPClient {
 
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(requestUrl)\(headers.rangePrettyPrint)")
+                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(url)\(request.headers.rangePrettyPrint)")
                     lastPrint = Date()
                 }
                 if Date() > deadline {
-                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(requestUrl)\(headers.rangePrettyPrint)")
+                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(url)\(request.headers.rangePrettyPrint)")
                     throw CurlError.timeoutReached
                 }
                 try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
@@ -249,9 +206,8 @@ extension HTTPClient {
     /// Download a file and chunk it into 8 MB parts. If HTTP range is set, use this. Otherwise perform a head request, get the content size and divide it info 8MB parts
     /// Returns a HTTPClientResponse with a body stream. The stream does not need to be retried, because each chunk is retried individually
     func executeRetryChunked(
+        _ request: HTTPClientRequest,
         logger: Logger,
-        url: URLComponents,
-        headers: HTTPHeaders = .init(),
         chunkSize: Int = 8*1024*1024,
         nConcurrent: Int = 4,
         range: String? = nil,
@@ -277,7 +233,9 @@ extension HTTPClient {
             length = chunks.reduce(0, { $0 + $1.count })
             responseHeaders = HTTPHeaders([("content-length", "\(length)")])
         } else {
-            let head = try await executeMapRetry(logger: logger, url: url, method: .HEAD, headers: headers, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) {$0}
+            var request = request
+            request.method = .HEAD
+            let head = try await executeMapRetry(request, logger: logger, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) {$0}
             responseHeaders = head.headers
             guard let lengthHeader = try head.contentLength(), lengthHeader >= nConcurrent else {
                 throw CurlError.couldNotGetContentLengthForConcurrentDownload
@@ -292,9 +250,9 @@ extension HTTPClient {
 
         let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
             let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
-            var headers = headers
-            headers.add(name: "range", value: "bytes=\(range)")
-            return try await self.executeMapRetry(logger: logger, url: url, method: .GET, headers: headers, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) { response in
+            var request = request
+            request.headers.add(name: "range", value: "bytes=\(range)")
+            return try await self.executeMapRetry(request, logger: logger, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) { response in
                 var buffer = ByteBuffer()
                 if let contentLength = try response.contentLength(), contentLength != chunk.count {
                     throw CurlErrorNonRetry.chunkSizeMismatch
@@ -363,5 +321,63 @@ extension Date {
     }
     static func seconds(_ seconds: Double) -> Date {
         return Date(timeIntervalSinceNow: seconds)
+    }
+}
+
+extension String {
+    // Expected formats:
+    //   schema://host/path
+    //   schema://user:pass@host/path
+    //   schema://user@host/path
+    // Username and password are percent-encoded and must be decoded.
+    // If there is no schema (no "://"), return nil.
+    // Replaces schema "s3://" with "https://". On 127.0.0.1 regular http is used
+    public func extractSchemaUserNamePasswordCleanUrl() -> (schema: Substring, user: Substring?, password: Substring?, url: String)? {
+        guard let schemeRange = self.range(of: "://") else {
+            return nil
+        }
+        let schema = self[..<schemeRange.lowerBound]
+
+        // Split credentials (if any) from host/path by looking for '@' before the first '/'
+        let firstSlashIndex = self[schemeRange.upperBound...].firstIndex(of: "/") ?? self.endIndex
+        let credsAndHost = self[schemeRange.upperBound..<firstSlashIndex]
+
+        let user: Substring?
+        let password: Substring?
+        let atIndex = credsAndHost.firstIndex(of: "@")
+        let hostPortAndPathStart = atIndex.map { credsAndHost.index(after: $0) } ?? schemeRange.upperBound
+
+        if let atIndex {
+            // Credentials are present before '@'
+            let creds = self[schemeRange.upperBound..<atIndex]
+
+            if let colonInCreds = creds.firstIndex(of: ":") {
+                let u = creds[..<colonInCreds]
+                let p = creds[creds.index(after: colonInCreds)..<creds.endIndex]
+                user = u.firstIndex(of: "%") == nil ? u : u.removingPercentEncoding.map({Substring($0)}) ?? u
+                password = p.firstIndex(of: "%") == nil ? p : p.removingPercentEncoding.map({Substring($0)}) ?? p
+            } else {
+                let u = creds
+                user = u.firstIndex(of: "%") == nil ? u : u.removingPercentEncoding.map({Substring($0)}) ?? u
+                password = nil
+            }
+        } else {
+            user = nil
+            password = nil
+        }
+
+        // Build the clean URL without credentials
+        let hostAndPath = self[hostPortAndPathStart...]
+        
+        let url: String
+        if schema == "s3" {
+            /// If S3 is running on localhost, use http
+            url = (hostAndPath.starts(with: "127.0.0.1") ? "http://" : "https://") + hostAndPath
+        } else {
+            // If username and password are empty, the current string is already a clean URL
+            url = (user == nil && password == nil) ? self : "\(schema)://\(hostAndPath)"
+        }
+
+        return (schema: schema, user: user, password: password, url: url)
     }
 }

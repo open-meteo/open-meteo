@@ -475,3 +475,4 @@ actor GribDeaverager {
         return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &grib2d.array)
     }
 }
+

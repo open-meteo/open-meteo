@@ -60,6 +60,14 @@ import Logging
         #expect(request.headers.contains(name: "Authorization"))
         #expect(request.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
     }
+    
+    @Test func urlExtraction() throws {
+        let a = "s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "s3")
+        #expect(a?.user == "AKIAYawfawfawed5jdrh")
+        #expect(a?.password == "FgseawfawfrVU8Dk1zTsesefsegsgW1I/WJ6")
+        #expect(a?.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
+    }
 
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
