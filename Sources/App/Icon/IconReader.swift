@@ -34,6 +34,17 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func get(raw: IconVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        // Model-level geometric height: computed from the static HHL stack, constant over time.
+        if case let .height(modelLevel) = raw {
+            let height: Float?
+            switch modelLevel.variable {
+            case .height:
+                height = try await fullLevelHeightASL(fullLevel: modelLevel.level)
+            case .height_agl:
+                height = try await fullLevelHeightAGL(fullLevel: modelLevel.level)
+            }
+            return DataAndUnit([Float](repeating: height ?? .nan, count: time.time.count), .metre)
+        }
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
@@ -146,6 +157,10 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func prefetchData(raw: IconVariable, time: TimerangeDtAndSettings) async throws {
+        // Model-level height is computed lazily from the static HHL file; nothing to prefetch.
+        if case .height = raw {
+            return
+        }
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
