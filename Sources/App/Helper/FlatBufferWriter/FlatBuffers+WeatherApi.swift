@@ -694,6 +694,19 @@ extension ForecastPressureVariable: FlatBuffersVariable {
     }
 }
 
+extension ForecastHeightOrModelLevelVariable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .height(let v):
+            return v.getFlatBuffersMeta()
+        case .modelLevel:
+            // FlatBuffers meta for model levels is not modelled yet; JSON/CSV is the supported
+            // output for height_levelN. Surface a generic geometric-height variable for now.
+            return .init(variable: .geopotentialHeight)
+        }
+    }
+}
+
 extension ForecastHeightVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch variable {

@@ -460,7 +460,49 @@ struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixa
     let level: Int
 }
 
-typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, VariableOrSpread<ForecastPressureVariable>, ForecastHeightVariable>
+/// Variables available on native model (full) levels, named `<variable>_level<N>`.
+enum ForecastModelLevelVariableType: String, GenericVariableMixable {
+    case height
+    case height_agl
+}
+
+struct ForecastModelLevelVariable: ModelLevelVariableRespresentable, GenericVariableMixable {
+    let variable: ForecastModelLevelVariableType
+    let level: Int
+}
+
+/// The third arm of `ForecastVariable`: either a height-above-ground variable (`_Nm`)
+/// or a native model-level variable (`_levelN`). Dispatch is by `rawValue`, which each
+/// model reader re-parses, so this only needs to parse + round-trip both forms.
+enum ForecastHeightOrModelLevelVariable: RawRepresentableString, GenericVariableMixable, Hashable, Sendable {
+    case height(ForecastHeightVariable)
+    case modelLevel(ForecastModelLevelVariable)
+
+    init?(rawValue: String) {
+        // model level (`_levelN`) is unambiguous; try it before the `_Nm` height form
+        if let modelLevel = ForecastModelLevelVariable(rawValue: rawValue) {
+            self = .modelLevel(modelLevel)
+            return
+        }
+        if let height = ForecastHeightVariable(rawValue: rawValue) {
+            self = .height(height)
+            return
+        }
+        return nil
+    }
+
+    var rawValue: String {
+        switch self {
+        case .height(let v): return v.rawValue
+        case .modelLevel(let v): return v.rawValue
+        }
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.rawValue == rhs.rawValue }
+    func hash(into hasher: inout Hasher) { hasher.combine(rawValue) }
+}
+
+typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, VariableOrSpread<ForecastPressureVariable>, ForecastHeightOrModelLevelVariable>
 
 extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
@@ -636,7 +678,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
     }
     
-    func getDeriverMap(variable: ForecastHeightVariable) -> DerivedMapping<Reader.MixingVar>? {
+    func getDeriverMap(variable: ForecastHeightOrModelLevelVariable) -> DerivedMapping<Reader.MixingVar>? {
+        // Both height-above-ground and model-level variables dispatch by rawValue; the model
+        // reader resolves it (e.g. Icon computes height_levelN from the static HHL stack).
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }
