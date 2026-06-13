@@ -179,11 +179,13 @@ struct DownloadIconCommand: AsyncCommand {
         // Chunk spatial like makeSpatialWriter, full vertical in each chunk for column reads.
         let chunkY = min(ny, 32)
         let chunkX = min(nx, max(1, 1024 / chunkY))
+        // 32-bit pfor (not _int16): global half levels reach 75000 m ASL, which overflows the
+        // 16-bit signed range (±32767) and produces NaN above ~32 km. 1 m resolution is plenty.
         try stacked.writeOmFile(
             file: hhlFile,
             dimensions: [ny, nx, nlev],
             chunks: [chunkY, chunkX, nlev],
-            compression: .pfor_delta2d_int16,
+            compression: .pfor_delta2d,
             scalefactor: 1.0,
             createNetCdf: false
         )
