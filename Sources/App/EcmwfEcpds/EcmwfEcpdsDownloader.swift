@@ -83,7 +83,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
 
         try await downloadEcmwfElevation(application: context.application, domain: domain, run: run)
         let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3BucketSpatial, shortCutOffHour: shortCutOff)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries, ensembleMeanDomain: domain.ensembleMeanDomain)
     }
 
     /// Download elevation file
@@ -207,7 +207,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             
             logger.info("Downloading run \(run.iso8601_YYYY_MM_dd_HH_mm)")
             
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
             let deaverager = GribDeaverager()
             let stepsArray = isMainRun ? fullRunSteps : [sideRunSteps]
             for steps in stepsArray {
@@ -382,7 +382,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             /// Delta time seconds considering irregular timesteps
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
 
             let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
             let urls = domain.getUrl(run: run, timestamp: timestamp, server: server)
@@ -519,7 +519,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
             // ope_d2_ifs-ens-cf_od_scwv_fc_20251116T180000Z_20251116T180000Z_0h.bz2
             // ope_d2_ifs-ens-cf_od_wave_fc_20251109T000000Z_20251109T000000Z_0h.bz2
             let url = domain.getUrl(run: run, timestamp: timestamp, server: server)[0]
