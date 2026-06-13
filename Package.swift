@@ -28,6 +28,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
+        .package(url: "https://github.com/open-meteo/swift-zarr.git", from: "0.1.4"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.26.0"),
@@ -49,7 +51,9 @@ let package = Package(
         .target(
             name: "App",
             dependencies: [
+                .product(name: "SwiftZarr", package: "swift-zarr"),
                 .product(name: "Vapor", package: "vapor"),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "OpenMeteoSdk", package: "sdk"),
                 .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
                 .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),

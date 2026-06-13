@@ -144,6 +144,8 @@ enum DomainRegistry: String, CaseIterable {
 
     case bom_access_global
     case bom_access_global_ensemble
+    case google_weathernext2_ensemble
+    case google_weathernext2_ensemble_mean
 
     case cmip_CMCC_CM2_VHR4
     case cmip_EC_Earth3P_HR
@@ -223,6 +225,8 @@ enum DomainRegistry: String, CaseIterable {
         case .ukmo_global_ensemble_20km, .ukmo_uk_ensemble_2km:
             return 3
         case .bom_access_global_ensemble:
+            return 3
+        case .google_weathernext2_ensemble:
             return 3
         case .meteoswiss_icon_ch1_ensemble, .meteoswiss_icon_ch2_ensemble:
             return 3
@@ -429,6 +433,10 @@ enum DomainRegistry: String, CaseIterable {
             return BomDomain.access_global
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble
+        case .google_weathernext2_ensemble:
+            return WeatherNextDomain.weathernext_global
+        case .google_weathernext2_ensemble_mean:
+            return WeatherNextDomain.weathernext_global_ensemble_mean
         case .meteofrance_arome_france0025_15min:
             return MeteoFranceDomain.arome_france_15min
         case .meteofrance_arome_france_hd_15min:
@@ -663,7 +671,7 @@ extension DomainRegistry {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
                 logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
+                let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : self == .google_weathernext2_ensemble ? ["*~"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
                 let startTimeAws = DispatchTime.now()
                 try await S3Uploader.uploadSync(
