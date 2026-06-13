@@ -79,6 +79,12 @@ import Logging
         #expect(a?.user == nil)
         #expect(a?.password == nil)
         #expect(a?.url == "http://127.0.0.1/text.txt")
+        
+        a = "file:///user/home/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "file")
+        #expect(a?.user == nil)
+        #expect(a?.password == nil)
+        #expect(a?.url == "/user/home/text.txt")
     }
 
     /// Single-part PUT upload.

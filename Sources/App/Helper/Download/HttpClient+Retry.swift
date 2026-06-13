@@ -1,4 +1,5 @@
 import Foundation
+import NIOFileSystem
 import AsyncHTTPClient
 import NIOCore
 import Logging
@@ -12,6 +13,7 @@ enum CurlErrorNonRetry: NonRetryError {
     case other(HTTPResponseStatus)
     case timeoutReached
     case chunkSizeMismatch
+    case rangeQueriesNotSupportedForFiles
 }
 
 enum CurlErrorRetry: Error {
@@ -130,6 +132,20 @@ extension HTTPClient {
             throw HTTPClientError.invalidURL
         }
         
+        if schema == "file" {
+            guard request.headers.first(name: .init("range")) == nil else {
+                throw CurlErrorNonRetry.rangeQueriesNotSupportedForFiles
+            }
+            return try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(url)) { handle in
+                let info = try await handle.info()
+                var headers = HTTPHeaders()
+                headers.add(name: "content-length", value: "\(info.size)")
+                headers.lastModified?.value = Date(timeIntervalSince1970: TimeInterval(info.lastDataModificationTime.seconds))
+                let response = HTTPClientResponse(status: .ok, headers: headers, body: .stream(handle.readChunks()))
+                return try await body(response)
+            }
+        }
+        
         while true {
             do {
                 n += 1
@@ -207,6 +223,8 @@ extension HTTPClient {
     
     /// Download a file and chunk it into 8 MB parts. If HTTP range is set, use this. Otherwise perform a head request, get the content size and divide it info 8MB parts
     /// Returns a HTTPClientResponse with a body stream. The stream does not need to be retried, because each chunk is retried individually
+    ///
+    /// IMPORTANT: iIt may throw `CurlErrorNonRetry.fileModifiedSinceLastDownload` if the remote file was modified during download
     func executeRetryChunked(
         _ request: HTTPClientRequest,
         logger: Logger,
@@ -254,6 +272,12 @@ extension HTTPClient {
             let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
             var request = request
             request.headers.add(name: "range", value: "bytes=\(range)")
+            if let lastModified = responseHeaders.first(name: "Last-Modified") {
+                request.headers.replaceOrAdd(name: "Last-Modified", value: lastModified)
+            }
+            if let etag = responseHeaders.first(name: "ETag") {
+                request.headers.replaceOrAdd(name: "If-Match", value: etag)
+            }
             return try await self.executeMapRetry(request, logger: logger, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) { response in
                 var buffer = ByteBuffer()
                 if let contentLength = try response.contentLength(), contentLength != chunk.count {
@@ -339,6 +363,10 @@ extension String {
             return nil
         }
         let schema = self[..<schemeRange.lowerBound]
+        
+        if schema == "file" {
+            return (schema: schema, user: nil, password: nil, url: String(self[schemeRange.upperBound...]))
+        }
 
         // Split credentials (if any) from host/path by looking for '@' before the first '/'
         let firstSlashIndex = self[schemeRange.upperBound...].firstIndex(of: "/") ?? self.endIndex
@@ -372,14 +400,15 @@ extension String {
         let hostAndPath = self[hostPortAndPathStart...]
         
         let url: String
-        if schema == "s3" {
+        /// Hard coded overwrite to use S3 for certain URLs
+        if schema == "s3" || hostAndPath.contains(".your-objectstorage.com") || hostAndPath.starts(with: "s3.open-meteo.com") || hostAndPath.starts(with: "127.0.0.1:7480") {
             /// If S3 is running on localhost, use http
             url = (hostAndPath.starts(with: "127.0.0.1") ? "http://" : "https://") + hostAndPath
+            return (schema: "s3", user: user, password: password, url: url)
         } else {
             // If username and password are empty, the current string is already a clean URL
             url = (user == nil && password == nil) ? self : "\(schema)://\(hostAndPath)"
+            return (schema: schema, user: user, password: password, url: url)
         }
-
-        return (schema: schema, user: user, password: password, url: url)
     }
 }

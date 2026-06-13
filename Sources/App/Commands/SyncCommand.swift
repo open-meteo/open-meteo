@@ -235,10 +235,18 @@ struct SyncCommand: AsyncCommand {
                 /// Update the `last_run_availability_time` within meta.json
                 try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
             } else {
-                /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
-                let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
-                try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
-                progress.add(try response.contentLength() ?? 0)
+                for _ in 0..<10 {
+                    do {
+                        let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
+                        /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
+                        try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
+                        progress.add(try response.contentLength() ?? 0)
+                        break
+                    } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+                        /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
+                        try FileManager.default.removeItemIfExists(at: localFile)
+                    }
+                }
             }
         }
         progress.finish()
