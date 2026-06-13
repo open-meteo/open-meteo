@@ -42,6 +42,7 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 
 Apps:
 
+- [AirIndex Today](https://airindex.today/) Air quality forecasts across the globe.
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [BusyRunner](https://busyrunner.com/) Allows users to plan their weekly runs based on the weather.
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
@@ -56,6 +57,7 @@ Apps:
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
+- [Meteograph](https://github.com/timbortnik/widget) Open-source Android home-screen weather widget showing a meteogram with 48-hour and 7-day forecasts; no ads, no tracking, no account. ([Google Play](https://play.google.com/store/apps/details?id=org.bortnik.meteogram))
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
 - [monkeysnow](https://github.com/kcluit/monkeysnow) The most customizable resort/snow forecast website for ski and board!
 - [Mousam](https://amit9838.github.io/mousam/) A weather app for GNU/Linux that displays the weather at a glance
@@ -83,6 +85,7 @@ Apps:
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 - [WeatherMaster](https://github.com/PranshulGG/WeatherMaster) A Weather app for android inspired by the Google Pixel weather app.
 - [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
+- [Weather Journey](https://weatherjourney.com/) Historical weather records, temperature trends & climate anomalies for 6,000+ cities since 1940.
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
 - [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
 - [WorldWeatherMonitor](https://world-weather-monitor.vercel.app/) An interactive world weather map that displays real-time weather conditions for cities around the globe.

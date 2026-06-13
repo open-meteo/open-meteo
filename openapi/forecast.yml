@@ -1,0 +1,3632 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Weather Forecast API
+  description: >-
+    Open-Meteo offers free weather forecast APIs for open-source developers and non-commercial use.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/forecast:
+    servers:
+      - url: https://api.open-meteo.com
+      - url: https://customer-api.open-meteo.com
+    get:
+      tags:
+        - Weather Forecast APIs
+      summary: Open-Meteo Weather Forecast API
+      description: >-
+        Open-Meteo offers free weather forecast APIs for open-source developers and non-commercial use.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          description: >-
+            Geographical WGS84 coordinates. Multiple coordinates can be comma separated.
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: hourly
+          in: query
+          description: >-
+            A list of weather variables which should be returned.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - temperature_2m_min
+                - temperature_2m_max
+                - relative_humidity_2m
+                - dew_point_2m
+                - apparent_temperature
+                - precipitation_probability
+                - precipitation
+                - rain
+                - showers
+                - snowfall
+                - snow_depth
+                - snowfall_water_equivalent
+                - snow_depth_water_equivalent
+                - weather_code
+                - pressure_msl
+                - surface_pressure
+                - cloud_cover
+                - cloud_cover_low
+                - cloud_cover_mid
+                - cloud_cover_high
+                - visibility
+                - evapotranspiration
+                - et0_fao_evapotranspiration
+                - vapour_pressure_deficit
+                - runoff
+                - precipitation_type
+                - rain_probability
+                - snowfall_probability
+                - freezing_rain_probability
+                - ice_pellets_probability
+                - thunderstorm_probability
+                - wind_speed_10m
+                - wind_speed_20m
+                - wind_speed_30m
+                - wind_speed_40m
+                - wind_speed_50m
+                - wind_speed_70m
+                - wind_speed_80m
+                - wind_speed_100m
+                - wind_speed_120m
+                - wind_speed_140m
+                - wind_speed_150m
+                - wind_speed_160m
+                - wind_speed_180m
+                - wind_speed_200m
+                - wind_direction_10m
+                - wind_direction_20m
+                - wind_direction_30m
+                - wind_direction_40m
+                - wind_direction_50m
+                - wind_direction_70m
+                - wind_direction_80m
+                - wind_direction_100m
+                - wind_direction_120m
+                - wind_direction_140m
+                - wind_direction_150m
+                - wind_direction_160m
+                - wind_direction_180m
+                - wind_direction_200m
+                - wind_gusts_10m
+                - temperature_20m
+                - temperature_40m
+                - temperature_50m
+                - temperature_80m
+                - temperature_100m
+                - temperature_120m
+                - temperature_150m
+                - temperature_180m
+                - temperature_200m
+                - soil_temperature_0cm
+                - soil_temperature_6cm
+                - soil_temperature_18cm
+                - soil_temperature_54cm
+                - soil_temperature_162cm
+                - soil_temperature_486cm
+                - soil_temperature_1458cm
+                - soil_temperature_0_to_7cm
+                - soil_temperature_7_to_28cm
+                - soil_temperature_28_to_100cm
+                - soil_temperature_100_to_255cm
+                - soil_temperature_0_to_10cm
+                - soil_temperature_10_to_40cm
+                - soil_temperature_40_to_100cm
+                - soil_temperature_100_to_200cm
+                - soil_temperature_10_to_35cm
+                - soil_temperature_35_to_100cm
+                - soil_temperature_100_to_300cm
+                - soil_moisture_0_to_1cm
+                - soil_moisture_1_to_3cm
+                - soil_moisture_3_to_9cm
+                - soil_moisture_9_to_27cm
+                - soil_moisture_27_to_81cm
+                - soil_moisture_81_to_243cm
+                - soil_moisture_243_to_729cm
+                - soil_moisture_729_to_2187cm
+                - soil_moisture_0_to_7cm
+                - soil_moisture_7_to_28cm
+                - soil_moisture_28_to_100cm
+                - soil_moisture_100_to_255cm
+                - soil_moisture_0_to_10cm
+                - soil_moisture_10_to_40cm
+                - soil_moisture_40_to_100cm
+                - soil_moisture_100_to_200cm
+                - soil_moisture_10_to_35cm
+                - soil_moisture_35_to_100cm
+                - soil_moisture_100_to_300cm
+                - uv_index
+                - uv_index_clear_sky
+                - is_day
+                - sunshine_duration
+                - wet_bulb_temperature_2m
+                - total_column_integrated_water_vapour
+                - cape
+                - lifted_index
+                - convective_inhibition
+                - freezing_level_height
+                - boundary_layer_height
+                - surface_temperature
+                - mass_density_8m
+                - snowfall_height
+                - convective_cloud_base
+                - convective_cloud_top
+                - updraft
+                - lightning_potential
+                - lightning_density
+                - snow_height
+                - roughness_length
+                - albedo
+                - k_index
+                - sea_level_height_msl
+                - sea_ice_thickness
+                - sea_surface_temperature
+                - ocean_current_velocity
+                - ocean_current_direction
+                - shortwave_radiation
+                - direct_radiation
+                - diffuse_radiation
+                - direct_normal_irradiance
+                - global_tilted_irradiance
+                - terrestrial_radiation
+                - shortwave_radiation_instant
+                - direct_radiation_instant
+                - diffuse_radiation_instant
+                - direct_normal_irradiance_instant
+                - global_tilted_irradiance_instant
+                - terrestrial_radiation_instant
+                - temperature_1000hPa
+                - temperature_950hPa
+                - temperature_925hPa
+                - temperature_900hPa
+                - temperature_850hPa
+                - temperature_800hPa
+                - temperature_750hPa
+                - temperature_700hPa
+                - temperature_650hPa
+                - temperature_600hPa
+                - temperature_550hPa
+                - temperature_500hPa
+                - temperature_450hPa
+                - temperature_400hPa
+                - temperature_350hPa
+                - temperature_300hPa
+                - temperature_275hPa
+                - temperature_250hPa
+                - temperature_225hPa
+                - temperature_200hPa
+                - temperature_175hPa
+                - temperature_150hPa
+                - temperature_125hPa
+                - temperature_100hPa
+                - temperature_50hPa
+                - temperature_10hPa
+                - dew_point_1000hPa
+                - dew_point_950hPa
+                - dew_point_925hPa
+                - dew_point_900hPa
+                - dew_point_850hPa
+                - dew_point_800hPa
+                - dew_point_750hPa
+                - dew_point_700hPa
+                - dew_point_650hPa
+                - dew_point_600hPa
+                - dew_point_550hPa
+                - dew_point_500hPa
+                - dew_point_450hPa
+                - dew_point_400hPa
+                - dew_point_350hPa
+                - dew_point_300hPa
+                - dew_point_275hPa
+                - dew_point_250hPa
+                - dew_point_225hPa
+                - dew_point_200hPa
+                - dew_point_175hPa
+                - dew_point_150hPa
+                - dew_point_125hPa
+                - dew_point_100hPa
+                - dew_point_50hPa
+                - dew_point_10hPa
+                - relative_humidity_1000hPa
+                - relative_humidity_950hPa
+                - relative_humidity_925hPa
+                - relative_humidity_900hPa
+                - relative_humidity_850hPa
+                - relative_humidity_800hPa
+                - relative_humidity_750hPa
+                - relative_humidity_700hPa
+                - relative_humidity_650hPa
+                - relative_humidity_600hPa
+                - relative_humidity_550hPa
+                - relative_humidity_500hPa
+                - relative_humidity_450hPa
+                - relative_humidity_400hPa
+                - relative_humidity_350hPa
+                - relative_humidity_300hPa
+                - relative_humidity_275hPa
+                - relative_humidity_250hPa
+                - relative_humidity_225hPa
+                - relative_humidity_200hPa
+                - relative_humidity_175hPa
+                - relative_humidity_150hPa
+                - relative_humidity_125hPa
+                - relative_humidity_100hPa
+                - relative_humidity_50hPa
+                - relative_humidity_10hPa
+                - cloud_cover_1000hPa
+                - cloud_cover_950hPa
+                - cloud_cover_925hPa
+                - cloud_cover_900hPa
+                - cloud_cover_850hPa
+                - cloud_cover_800hPa
+                - cloud_cover_750hPa
+                - cloud_cover_700hPa
+                - cloud_cover_650hPa
+                - cloud_cover_600hPa
+                - cloud_cover_550hPa
+                - cloud_cover_500hPa
+                - cloud_cover_450hPa
+                - cloud_cover_400hPa
+                - cloud_cover_350hPa
+                - cloud_cover_300hPa
+                - cloud_cover_275hPa
+                - cloud_cover_250hPa
+                - cloud_cover_225hPa
+                - cloud_cover_200hPa
+                - cloud_cover_175hPa
+                - cloud_cover_150hPa
+                - cloud_cover_125hPa
+                - cloud_cover_100hPa
+                - cloud_cover_50hPa
+                - cloud_cover_10hPa
+                - wind_speed_1000hPa
+                - wind_speed_950hPa
+                - wind_speed_925hPa
+                - wind_speed_900hPa
+                - wind_speed_850hPa
+                - wind_speed_800hPa
+                - wind_speed_750hPa
+                - wind_speed_700hPa
+                - wind_speed_650hPa
+                - wind_speed_600hPa
+                - wind_speed_550hPa
+                - wind_speed_500hPa
+                - wind_speed_450hPa
+                - wind_speed_400hPa
+                - wind_speed_350hPa
+                - wind_speed_300hPa
+                - wind_speed_275hPa
+                - wind_speed_250hPa
+                - wind_speed_225hPa
+                - wind_speed_200hPa
+                - wind_speed_175hPa
+                - wind_speed_150hPa
+                - wind_speed_125hPa
+                - wind_speed_100hPa
+                - wind_speed_50hPa
+                - wind_speed_10hPa
+                - wind_direction_1000hPa
+                - wind_direction_950hPa
+                - wind_direction_925hPa
+                - wind_direction_900hPa
+                - wind_direction_850hPa
+                - wind_direction_800hPa
+                - wind_direction_750hPa
+                - wind_direction_700hPa
+                - wind_direction_650hPa
+                - wind_direction_600hPa
+                - wind_direction_550hPa
+                - wind_direction_500hPa
+                - wind_direction_450hPa
+                - wind_direction_400hPa
+                - wind_direction_350hPa
+                - wind_direction_300hPa
+                - wind_direction_275hPa
+                - wind_direction_250hPa
+                - wind_direction_225hPa
+                - wind_direction_200hPa
+                - wind_direction_175hPa
+                - wind_direction_150hPa
+                - wind_direction_125hPa
+                - wind_direction_100hPa
+                - wind_direction_50hPa
+                - wind_direction_10hPa
+                - vertical_velocity_1000hPa
+                - vertical_velocity_950hPa
+                - vertical_velocity_925hPa
+                - vertical_velocity_900hPa
+                - vertical_velocity_850hPa
+                - vertical_velocity_800hPa
+                - vertical_velocity_750hPa
+                - vertical_velocity_700hPa
+                - vertical_velocity_650hPa
+                - vertical_velocity_600hPa
+                - vertical_velocity_550hPa
+                - vertical_velocity_500hPa
+                - vertical_velocity_450hPa
+                - vertical_velocity_400hPa
+                - vertical_velocity_350hPa
+                - vertical_velocity_300hPa
+                - vertical_velocity_275hPa
+                - vertical_velocity_250hPa
+                - vertical_velocity_225hPa
+                - vertical_velocity_200hPa
+                - vertical_velocity_175hPa
+                - vertical_velocity_150hPa
+                - vertical_velocity_125hPa
+                - vertical_velocity_100hPa
+                - vertical_velocity_50hPa
+                - vertical_velocity_10hPa
+                - geopotential_height_1000hPa
+                - geopotential_height_950hPa
+                - geopotential_height_925hPa
+                - geopotential_height_900hPa
+                - geopotential_height_850hPa
+                - geopotential_height_800hPa
+                - geopotential_height_750hPa
+                - geopotential_height_700hPa
+                - geopotential_height_650hPa
+                - geopotential_height_600hPa
+                - geopotential_height_550hPa
+                - geopotential_height_500hPa
+                - geopotential_height_450hPa
+                - geopotential_height_400hPa
+                - geopotential_height_350hPa
+                - geopotential_height_300hPa
+                - geopotential_height_275hPa
+                - geopotential_height_250hPa
+                - geopotential_height_225hPa
+                - geopotential_height_200hPa
+                - geopotential_height_175hPa
+                - geopotential_height_150hPa
+                - geopotential_height_125hPa
+                - geopotential_height_100hPa
+                - geopotential_height_50hPa
+                - geopotential_height_10hPa
+        - name: daily
+          in: query
+          description: >-
+            A list of daily weather variable aggregations.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - weather_code
+                - temperature_2m_max
+                - temperature_2m_min
+                - apparent_temperature_max
+                - apparent_temperature_min
+                - sunrise
+                - sunset
+                - daylight_duration
+                - sunshine_duration
+                - uv_index_max
+                - uv_index_clear_sky_max
+                - rain_sum
+                - showers_sum
+                - snowfall_sum
+                - precipitation_sum
+                - precipitation_hours
+                - precipitation_probability_max
+                - wind_speed_10m_max
+                - wind_gusts_10m_max
+                - wind_direction_10m_dominant
+                - shortwave_radiation_sum
+                - et0_fao_evapotranspiration
+        - name: current
+          in: query
+          description: >-
+            A list of variables to return for the current conditions.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - relative_humidity_2m
+                - apparent_temperature
+                - is_day
+                - precipitation
+                - rain
+                - showers
+                - snowfall
+                - weather_code
+                - cloud_cover
+                - pressure_msl
+                - surface_pressure
+                - wind_speed_10m
+                - wind_direction_10m
+                - wind_gusts_10m
+        - name: minutely_15
+          in: query
+          description: >-
+            A list of weather variables at 15-minute intervals.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m
+                - relative_humidity_2m
+                - dew_point_2m
+                - apparent_temperature
+                - precipitation
+                - rain
+                - snowfall
+                - snowfall_height
+                - freezing_level_height
+                - sunshine_duration
+                - weather_code
+                - wind_speed_10m
+                - wind_speed_20m
+                - wind_speed_50m
+                - wind_speed_80m
+                - wind_speed_100m
+                - wind_direction_10m
+                - wind_direction_20m
+                - wind_direction_50m
+                - wind_direction_80m
+                - wind_direction_100m
+                - wind_gusts_10m
+                - visibility
+                - cape
+                - lightning_potential
+                - is_day
+        - name: elevation
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: temperature_unit
+          in: query
+          schema:
+            type: string
+            default: celsius
+            enum: [celsius, fahrenheit]
+        - name: wind_speed_unit
+          in: query
+          schema:
+            type: string
+            default: kmh
+            enum: [kmh, ms, mph, kn]
+        - name: precipitation_unit
+          in: query
+          schema:
+            type: string
+            default: mm
+            enum: [mm, inch]
+        - name: timeformat
+          in: query
+          description: >-
+            If format unixtime is selected, all time values are returned in UNIX epoch time.
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          description: >-
+            Any IANA time zone name is supported. Use auto to resolve the local time zone.
+          schema:
+            type: string
+        - name: past_days
+          in: query
+          description: >-
+            Return past days of data.
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+            maximum: 92
+        - name: forecast_days
+          in: query
+          description: >-
+            Number of forecast days.
+          schema:
+            type: integer
+            default: 7
+            minimum: 0
+            maximum: 16
+        - name: past_hours
+          in: query
+          schema:
+            type: integer
+        - name: forecast_hours
+          in: query
+          schema:
+            type: integer
+        - name: start_date
+          in: query
+          description: >-
+            Start date of the time interval in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date of the time interval in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+        - name: tilt
+          in: query
+          description: >-
+            Slope tilt in degrees for global_tilted_irradiance calculation.
+          schema:
+            type: number
+            format: float
+            default: 0
+        - name: azimuth
+          in: query
+          description: >-
+            Azimuth for global_tilted_irradiance. North=0, East=90, South=180, West=270.
+          schema:
+            type: number
+            format: float
+            default: 0
+        - name: cell_selection
+          in: query
+          description: >-
+            Grid cell selection preference: land, sea, or nearest.
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - best_match
+                - ecmwf_ifs
+                - ecmwf_ifs025
+                - ecmwf_aifs025_single
+                - cma_grapes_global
+                - bom_access_global
+                - gfs_seamless
+                - gfs_global
+                - gfs_hrrr
+                - ncep_nbm_conus
+                - ncep_nam_conus
+                - gfs_graphcast025
+                - ncep_aigfs025
+                - ncep_hgefs025_ensemble_mean
+                - jma_seamless
+                - jma_msm
+                - jma_gsm
+                - kma_seamless
+                - kma_ldps
+                - kma_gdps
+                - icon_seamless
+                - icon_global
+                - icon_eu
+                - icon_d2
+                - gem_seamless
+                - gem_global
+                - gem_regional
+                - gem_hrdps_continental
+                - gem_hrdps_west
+                - meteofrance_seamless
+                - meteofrance_arpege_world
+                - meteofrance_arpege_europe
+                - meteofrance_arome_france
+                - meteofrance_arome_france_hd
+                - italia_meteo_arpae_icon_2i
+                - metno_seamless
+                - metno_nordic
+                - knmi_seamless
+                - knmi_harmonie_arome_europe
+                - knmi_harmonie_arome_netherlands
+                - dmi_seamless
+                - dmi_harmonie_arome_europe
+                - ukmo_seamless
+                - ukmo_global_deterministic_10km
+                - ukmo_uk_deterministic_2km
+                - meteoswiss_icon_seamless
+                - meteoswiss_icon_ch1
+                - meteoswiss_icon_ch2
+                - geosphere_seamless
+                - geosphere_arome_austria
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  hourly:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      temperature_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      apparent_temperature:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_probability:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      rain:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      showers:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_water_equivalent:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_depth_water_equivalent:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      weather_code:
+                        type: array
+                        items:
+                          type: integer
+                      pressure_msl:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      surface_pressure:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_low:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_mid:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_high:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      visibility:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      evapotranspiration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      et0_fao_evapotranspiration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vapour_pressure_deficit:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      runoff:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_type:
+                        type: array
+                        items:
+                          type: integer
+                      rain_probability:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_probability:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      freezing_rain_probability:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ice_pellets_probability:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      thunderstorm_probability:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_20m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_30m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_40m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_50m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_70m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_80m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_100m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_120m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_140m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_150m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_160m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_180m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_200m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_10m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_20m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_30m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_40m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_50m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_70m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_80m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_100m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_120m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_140m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_150m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_160m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_180m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_200m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_gusts_10m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_20m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_40m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_50m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_80m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_100m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_120m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_150m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_180m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_200m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_6cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_18cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_54cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_162cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_486cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_1458cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_7cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_7_to_28cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_28_to_100cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_100_to_255cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_10cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_10_to_40cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_40_to_100cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_100_to_200cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_10_to_35cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_35_to_100cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_100_to_300cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_1cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_1_to_3cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_3_to_9cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_9_to_27cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_27_to_81cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_81_to_243cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_243_to_729cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_729_to_2187cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_7cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_7_to_28cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_28_to_100cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_100_to_255cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_10cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_10_to_40cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_40_to_100cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_100_to_200cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_10_to_35cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_35_to_100cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_100_to_300cm:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      uv_index:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      uv_index_clear_sky:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      is_day:
+                        type: array
+                        items:
+                          type: integer
+                      sunshine_duration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wet_bulb_temperature_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      total_column_integrated_water_vapour:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cape:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      lifted_index:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      convective_inhibition:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      freezing_level_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      boundary_layer_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      surface_temperature:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      mass_density_8m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      convective_cloud_base:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      convective_cloud_top:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      updraft:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      lightning_potential:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      lightning_density:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snow_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      roughness_length:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      albedo:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      k_index:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_level_height_msl:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_ice_thickness:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sea_surface_temperature:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ocean_current_velocity:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      ocean_current_direction:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      shortwave_radiation:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      direct_radiation:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      diffuse_radiation:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      direct_normal_irradiance:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      global_tilted_irradiance:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      terrestrial_radiation:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      shortwave_radiation_instant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      direct_radiation_instant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      diffuse_radiation_instant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      direct_normal_irradiance_instant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      global_tilted_irradiance_instant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      terrestrial_radiation_instant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vertical_velocity_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_1000hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_950hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_925hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_900hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_850hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_800hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_750hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_700hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_650hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_600hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_550hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_500hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_450hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_400hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_350hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_300hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_275hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_250hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_225hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_200hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_175hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_150hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_125hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_100hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_50hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      geopotential_height_10hPa:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                  hourly_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      temperature_2m:
+                        type: string
+                      temperature_2m_min:
+                        type: string
+                      temperature_2m_max:
+                        type: string
+                      relative_humidity_2m:
+                        type: string
+                      dew_point_2m:
+                        type: string
+                      apparent_temperature:
+                        type: string
+                      precipitation_probability:
+                        type: string
+                      precipitation:
+                        type: string
+                      rain:
+                        type: string
+                      showers:
+                        type: string
+                      snowfall:
+                        type: string
+                      snow_depth:
+                        type: string
+                      snowfall_water_equivalent:
+                        type: string
+                      snow_depth_water_equivalent:
+                        type: string
+                      weather_code:
+                        type: string
+                      pressure_msl:
+                        type: string
+                      surface_pressure:
+                        type: string
+                      cloud_cover:
+                        type: string
+                      cloud_cover_low:
+                        type: string
+                      cloud_cover_mid:
+                        type: string
+                      cloud_cover_high:
+                        type: string
+                      visibility:
+                        type: string
+                      evapotranspiration:
+                        type: string
+                      et0_fao_evapotranspiration:
+                        type: string
+                      vapour_pressure_deficit:
+                        type: string
+                      runoff:
+                        type: string
+                      precipitation_type:
+                        type: string
+                      rain_probability:
+                        type: string
+                      snowfall_probability:
+                        type: string
+                      freezing_rain_probability:
+                        type: string
+                      ice_pellets_probability:
+                        type: string
+                      thunderstorm_probability:
+                        type: string
+                      wind_speed_10m:
+                        type: string
+                      wind_speed_20m:
+                        type: string
+                      wind_speed_30m:
+                        type: string
+                      wind_speed_40m:
+                        type: string
+                      wind_speed_50m:
+                        type: string
+                      wind_speed_70m:
+                        type: string
+                      wind_speed_80m:
+                        type: string
+                      wind_speed_100m:
+                        type: string
+                      wind_speed_120m:
+                        type: string
+                      wind_speed_140m:
+                        type: string
+                      wind_speed_150m:
+                        type: string
+                      wind_speed_160m:
+                        type: string
+                      wind_speed_180m:
+                        type: string
+                      wind_speed_200m:
+                        type: string
+                      wind_direction_10m:
+                        type: string
+                      wind_direction_20m:
+                        type: string
+                      wind_direction_30m:
+                        type: string
+                      wind_direction_40m:
+                        type: string
+                      wind_direction_50m:
+                        type: string
+                      wind_direction_70m:
+                        type: string
+                      wind_direction_80m:
+                        type: string
+                      wind_direction_100m:
+                        type: string
+                      wind_direction_120m:
+                        type: string
+                      wind_direction_140m:
+                        type: string
+                      wind_direction_150m:
+                        type: string
+                      wind_direction_160m:
+                        type: string
+                      wind_direction_180m:
+                        type: string
+                      wind_direction_200m:
+                        type: string
+                      wind_gusts_10m:
+                        type: string
+                      temperature_20m:
+                        type: string
+                      temperature_40m:
+                        type: string
+                      temperature_50m:
+                        type: string
+                      temperature_80m:
+                        type: string
+                      temperature_100m:
+                        type: string
+                      temperature_120m:
+                        type: string
+                      temperature_150m:
+                        type: string
+                      temperature_180m:
+                        type: string
+                      temperature_200m:
+                        type: string
+                      soil_temperature_0cm:
+                        type: string
+                      soil_temperature_6cm:
+                        type: string
+                      soil_temperature_18cm:
+                        type: string
+                      soil_temperature_54cm:
+                        type: string
+                      soil_temperature_162cm:
+                        type: string
+                      soil_temperature_486cm:
+                        type: string
+                      soil_temperature_1458cm:
+                        type: string
+                      soil_temperature_0_to_7cm:
+                        type: string
+                      soil_temperature_7_to_28cm:
+                        type: string
+                      soil_temperature_28_to_100cm:
+                        type: string
+                      soil_temperature_100_to_255cm:
+                        type: string
+                      soil_temperature_0_to_10cm:
+                        type: string
+                      soil_temperature_10_to_40cm:
+                        type: string
+                      soil_temperature_40_to_100cm:
+                        type: string
+                      soil_temperature_100_to_200cm:
+                        type: string
+                      soil_temperature_10_to_35cm:
+                        type: string
+                      soil_temperature_35_to_100cm:
+                        type: string
+                      soil_temperature_100_to_300cm:
+                        type: string
+                      soil_moisture_0_to_1cm:
+                        type: string
+                      soil_moisture_1_to_3cm:
+                        type: string
+                      soil_moisture_3_to_9cm:
+                        type: string
+                      soil_moisture_9_to_27cm:
+                        type: string
+                      soil_moisture_27_to_81cm:
+                        type: string
+                      soil_moisture_81_to_243cm:
+                        type: string
+                      soil_moisture_243_to_729cm:
+                        type: string
+                      soil_moisture_729_to_2187cm:
+                        type: string
+                      soil_moisture_0_to_7cm:
+                        type: string
+                      soil_moisture_7_to_28cm:
+                        type: string
+                      soil_moisture_28_to_100cm:
+                        type: string
+                      soil_moisture_100_to_255cm:
+                        type: string
+                      soil_moisture_0_to_10cm:
+                        type: string
+                      soil_moisture_10_to_40cm:
+                        type: string
+                      soil_moisture_40_to_100cm:
+                        type: string
+                      soil_moisture_100_to_200cm:
+                        type: string
+                      soil_moisture_10_to_35cm:
+                        type: string
+                      soil_moisture_35_to_100cm:
+                        type: string
+                      soil_moisture_100_to_300cm:
+                        type: string
+                      uv_index:
+                        type: string
+                      uv_index_clear_sky:
+                        type: string
+                      is_day:
+                        type: string
+                      sunshine_duration:
+                        type: string
+                      wet_bulb_temperature_2m:
+                        type: string
+                      total_column_integrated_water_vapour:
+                        type: string
+                      cape:
+                        type: string
+                      lifted_index:
+                        type: string
+                      convective_inhibition:
+                        type: string
+                      freezing_level_height:
+                        type: string
+                      boundary_layer_height:
+                        type: string
+                      surface_temperature:
+                        type: string
+                      mass_density_8m:
+                        type: string
+                      snowfall_height:
+                        type: string
+                      convective_cloud_base:
+                        type: string
+                      convective_cloud_top:
+                        type: string
+                      updraft:
+                        type: string
+                      lightning_potential:
+                        type: string
+                      lightning_density:
+                        type: string
+                      snow_height:
+                        type: string
+                      roughness_length:
+                        type: string
+                      albedo:
+                        type: string
+                      k_index:
+                        type: string
+                      sea_level_height_msl:
+                        type: string
+                      sea_ice_thickness:
+                        type: string
+                      sea_surface_temperature:
+                        type: string
+                      ocean_current_velocity:
+                        type: string
+                      ocean_current_direction:
+                        type: string
+                      shortwave_radiation:
+                        type: string
+                      direct_radiation:
+                        type: string
+                      diffuse_radiation:
+                        type: string
+                      direct_normal_irradiance:
+                        type: string
+                      global_tilted_irradiance:
+                        type: string
+                      terrestrial_radiation:
+                        type: string
+                      shortwave_radiation_instant:
+                        type: string
+                      direct_radiation_instant:
+                        type: string
+                      diffuse_radiation_instant:
+                        type: string
+                      direct_normal_irradiance_instant:
+                        type: string
+                      global_tilted_irradiance_instant:
+                        type: string
+                      terrestrial_radiation_instant:
+                        type: string
+                      temperature_1000hPa:
+                        type: string
+                      temperature_950hPa:
+                        type: string
+                      temperature_925hPa:
+                        type: string
+                      temperature_900hPa:
+                        type: string
+                      temperature_850hPa:
+                        type: string
+                      temperature_800hPa:
+                        type: string
+                      temperature_750hPa:
+                        type: string
+                      temperature_700hPa:
+                        type: string
+                      temperature_650hPa:
+                        type: string
+                      temperature_600hPa:
+                        type: string
+                      temperature_550hPa:
+                        type: string
+                      temperature_500hPa:
+                        type: string
+                      temperature_450hPa:
+                        type: string
+                      temperature_400hPa:
+                        type: string
+                      temperature_350hPa:
+                        type: string
+                      temperature_300hPa:
+                        type: string
+                      temperature_275hPa:
+                        type: string
+                      temperature_250hPa:
+                        type: string
+                      temperature_225hPa:
+                        type: string
+                      temperature_200hPa:
+                        type: string
+                      temperature_175hPa:
+                        type: string
+                      temperature_150hPa:
+                        type: string
+                      temperature_125hPa:
+                        type: string
+                      temperature_100hPa:
+                        type: string
+                      temperature_50hPa:
+                        type: string
+                      temperature_10hPa:
+                        type: string
+                      dew_point_1000hPa:
+                        type: string
+                      dew_point_950hPa:
+                        type: string
+                      dew_point_925hPa:
+                        type: string
+                      dew_point_900hPa:
+                        type: string
+                      dew_point_850hPa:
+                        type: string
+                      dew_point_800hPa:
+                        type: string
+                      dew_point_750hPa:
+                        type: string
+                      dew_point_700hPa:
+                        type: string
+                      dew_point_650hPa:
+                        type: string
+                      dew_point_600hPa:
+                        type: string
+                      dew_point_550hPa:
+                        type: string
+                      dew_point_500hPa:
+                        type: string
+                      dew_point_450hPa:
+                        type: string
+                      dew_point_400hPa:
+                        type: string
+                      dew_point_350hPa:
+                        type: string
+                      dew_point_300hPa:
+                        type: string
+                      dew_point_275hPa:
+                        type: string
+                      dew_point_250hPa:
+                        type: string
+                      dew_point_225hPa:
+                        type: string
+                      dew_point_200hPa:
+                        type: string
+                      dew_point_175hPa:
+                        type: string
+                      dew_point_150hPa:
+                        type: string
+                      dew_point_125hPa:
+                        type: string
+                      dew_point_100hPa:
+                        type: string
+                      dew_point_50hPa:
+                        type: string
+                      dew_point_10hPa:
+                        type: string
+                      relative_humidity_1000hPa:
+                        type: string
+                      relative_humidity_950hPa:
+                        type: string
+                      relative_humidity_925hPa:
+                        type: string
+                      relative_humidity_900hPa:
+                        type: string
+                      relative_humidity_850hPa:
+                        type: string
+                      relative_humidity_800hPa:
+                        type: string
+                      relative_humidity_750hPa:
+                        type: string
+                      relative_humidity_700hPa:
+                        type: string
+                      relative_humidity_650hPa:
+                        type: string
+                      relative_humidity_600hPa:
+                        type: string
+                      relative_humidity_550hPa:
+                        type: string
+                      relative_humidity_500hPa:
+                        type: string
+                      relative_humidity_450hPa:
+                        type: string
+                      relative_humidity_400hPa:
+                        type: string
+                      relative_humidity_350hPa:
+                        type: string
+                      relative_humidity_300hPa:
+                        type: string
+                      relative_humidity_275hPa:
+                        type: string
+                      relative_humidity_250hPa:
+                        type: string
+                      relative_humidity_225hPa:
+                        type: string
+                      relative_humidity_200hPa:
+                        type: string
+                      relative_humidity_175hPa:
+                        type: string
+                      relative_humidity_150hPa:
+                        type: string
+                      relative_humidity_125hPa:
+                        type: string
+                      relative_humidity_100hPa:
+                        type: string
+                      relative_humidity_50hPa:
+                        type: string
+                      relative_humidity_10hPa:
+                        type: string
+                      cloud_cover_1000hPa:
+                        type: string
+                      cloud_cover_950hPa:
+                        type: string
+                      cloud_cover_925hPa:
+                        type: string
+                      cloud_cover_900hPa:
+                        type: string
+                      cloud_cover_850hPa:
+                        type: string
+                      cloud_cover_800hPa:
+                        type: string
+                      cloud_cover_750hPa:
+                        type: string
+                      cloud_cover_700hPa:
+                        type: string
+                      cloud_cover_650hPa:
+                        type: string
+                      cloud_cover_600hPa:
+                        type: string
+                      cloud_cover_550hPa:
+                        type: string
+                      cloud_cover_500hPa:
+                        type: string
+                      cloud_cover_450hPa:
+                        type: string
+                      cloud_cover_400hPa:
+                        type: string
+                      cloud_cover_350hPa:
+                        type: string
+                      cloud_cover_300hPa:
+                        type: string
+                      cloud_cover_275hPa:
+                        type: string
+                      cloud_cover_250hPa:
+                        type: string
+                      cloud_cover_225hPa:
+                        type: string
+                      cloud_cover_200hPa:
+                        type: string
+                      cloud_cover_175hPa:
+                        type: string
+                      cloud_cover_150hPa:
+                        type: string
+                      cloud_cover_125hPa:
+                        type: string
+                      cloud_cover_100hPa:
+                        type: string
+                      cloud_cover_50hPa:
+                        type: string
+                      cloud_cover_10hPa:
+                        type: string
+                      wind_speed_1000hPa:
+                        type: string
+                      wind_speed_950hPa:
+                        type: string
+                      wind_speed_925hPa:
+                        type: string
+                      wind_speed_900hPa:
+                        type: string
+                      wind_speed_850hPa:
+                        type: string
+                      wind_speed_800hPa:
+                        type: string
+                      wind_speed_750hPa:
+                        type: string
+                      wind_speed_700hPa:
+                        type: string
+                      wind_speed_650hPa:
+                        type: string
+                      wind_speed_600hPa:
+                        type: string
+                      wind_speed_550hPa:
+                        type: string
+                      wind_speed_500hPa:
+                        type: string
+                      wind_speed_450hPa:
+                        type: string
+                      wind_speed_400hPa:
+                        type: string
+                      wind_speed_350hPa:
+                        type: string
+                      wind_speed_300hPa:
+                        type: string
+                      wind_speed_275hPa:
+                        type: string
+                      wind_speed_250hPa:
+                        type: string
+                      wind_speed_225hPa:
+                        type: string
+                      wind_speed_200hPa:
+                        type: string
+                      wind_speed_175hPa:
+                        type: string
+                      wind_speed_150hPa:
+                        type: string
+                      wind_speed_125hPa:
+                        type: string
+                      wind_speed_100hPa:
+                        type: string
+                      wind_speed_50hPa:
+                        type: string
+                      wind_speed_10hPa:
+                        type: string
+                      wind_direction_1000hPa:
+                        type: string
+                      wind_direction_950hPa:
+                        type: string
+                      wind_direction_925hPa:
+                        type: string
+                      wind_direction_900hPa:
+                        type: string
+                      wind_direction_850hPa:
+                        type: string
+                      wind_direction_800hPa:
+                        type: string
+                      wind_direction_750hPa:
+                        type: string
+                      wind_direction_700hPa:
+                        type: string
+                      wind_direction_650hPa:
+                        type: string
+                      wind_direction_600hPa:
+                        type: string
+                      wind_direction_550hPa:
+                        type: string
+                      wind_direction_500hPa:
+                        type: string
+                      wind_direction_450hPa:
+                        type: string
+                      wind_direction_400hPa:
+                        type: string
+                      wind_direction_350hPa:
+                        type: string
+                      wind_direction_300hPa:
+                        type: string
+                      wind_direction_275hPa:
+                        type: string
+                      wind_direction_250hPa:
+                        type: string
+                      wind_direction_225hPa:
+                        type: string
+                      wind_direction_200hPa:
+                        type: string
+                      wind_direction_175hPa:
+                        type: string
+                      wind_direction_150hPa:
+                        type: string
+                      wind_direction_125hPa:
+                        type: string
+                      wind_direction_100hPa:
+                        type: string
+                      wind_direction_50hPa:
+                        type: string
+                      wind_direction_10hPa:
+                        type: string
+                      vertical_velocity_1000hPa:
+                        type: string
+                      vertical_velocity_950hPa:
+                        type: string
+                      vertical_velocity_925hPa:
+                        type: string
+                      vertical_velocity_900hPa:
+                        type: string
+                      vertical_velocity_850hPa:
+                        type: string
+                      vertical_velocity_800hPa:
+                        type: string
+                      vertical_velocity_750hPa:
+                        type: string
+                      vertical_velocity_700hPa:
+                        type: string
+                      vertical_velocity_650hPa:
+                        type: string
+                      vertical_velocity_600hPa:
+                        type: string
+                      vertical_velocity_550hPa:
+                        type: string
+                      vertical_velocity_500hPa:
+                        type: string
+                      vertical_velocity_450hPa:
+                        type: string
+                      vertical_velocity_400hPa:
+                        type: string
+                      vertical_velocity_350hPa:
+                        type: string
+                      vertical_velocity_300hPa:
+                        type: string
+                      vertical_velocity_275hPa:
+                        type: string
+                      vertical_velocity_250hPa:
+                        type: string
+                      vertical_velocity_225hPa:
+                        type: string
+                      vertical_velocity_200hPa:
+                        type: string
+                      vertical_velocity_175hPa:
+                        type: string
+                      vertical_velocity_150hPa:
+                        type: string
+                      vertical_velocity_125hPa:
+                        type: string
+                      vertical_velocity_100hPa:
+                        type: string
+                      vertical_velocity_50hPa:
+                        type: string
+                      vertical_velocity_10hPa:
+                        type: string
+                      geopotential_height_1000hPa:
+                        type: string
+                      geopotential_height_950hPa:
+                        type: string
+                      geopotential_height_925hPa:
+                        type: string
+                      geopotential_height_900hPa:
+                        type: string
+                      geopotential_height_850hPa:
+                        type: string
+                      geopotential_height_800hPa:
+                        type: string
+                      geopotential_height_750hPa:
+                        type: string
+                      geopotential_height_700hPa:
+                        type: string
+                      geopotential_height_650hPa:
+                        type: string
+                      geopotential_height_600hPa:
+                        type: string
+                      geopotential_height_550hPa:
+                        type: string
+                      geopotential_height_500hPa:
+                        type: string
+                      geopotential_height_450hPa:
+                        type: string
+                      geopotential_height_400hPa:
+                        type: string
+                      geopotential_height_350hPa:
+                        type: string
+                      geopotential_height_300hPa:
+                        type: string
+                      geopotential_height_275hPa:
+                        type: string
+                      geopotential_height_250hPa:
+                        type: string
+                      geopotential_height_225hPa:
+                        type: string
+                      geopotential_height_200hPa:
+                        type: string
+                      geopotential_height_175hPa:
+                        type: string
+                      geopotential_height_150hPa:
+                        type: string
+                      geopotential_height_125hPa:
+                        type: string
+                      geopotential_height_100hPa:
+                        type: string
+                      geopotential_height_50hPa:
+                        type: string
+                      geopotential_height_10hPa:
+                        type: string
+                  daily:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      weather_code:
+                        type: array
+                        items:
+                          type: integer
+                      temperature_2m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      apparent_temperature_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      apparent_temperature_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunrise:
+                        type: array
+                        items:
+                          type: string
+                      sunset:
+                        type: array
+                        items:
+                          type: string
+                      daylight_duration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunshine_duration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      uv_index_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      uv_index_clear_sky_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      rain_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      showers_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_hours:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_probability_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_gusts_10m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_10m_dominant:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      shortwave_radiation_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      et0_fao_evapotranspiration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                  daily_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      weather_code:
+                        type: string
+                      temperature_2m_max:
+                        type: string
+                      temperature_2m_min:
+                        type: string
+                      apparent_temperature_max:
+                        type: string
+                      apparent_temperature_min:
+                        type: string
+                      sunrise:
+                        type: string
+                      sunset:
+                        type: string
+                      daylight_duration:
+                        type: string
+                      sunshine_duration:
+                        type: string
+                      uv_index_max:
+                        type: string
+                      uv_index_clear_sky_max:
+                        type: string
+                      rain_sum:
+                        type: string
+                      showers_sum:
+                        type: string
+                      snowfall_sum:
+                        type: string
+                      precipitation_sum:
+                        type: string
+                      precipitation_hours:
+                        type: string
+                      precipitation_probability_max:
+                        type: string
+                      wind_speed_10m_max:
+                        type: string
+                      wind_gusts_10m_max:
+                        type: string
+                      wind_direction_10m_dominant:
+                        type: string
+                      shortwave_radiation_sum:
+                        type: string
+                      et0_fao_evapotranspiration:
+                        type: string
+                  current:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      interval:
+                        type: integer
+                      temperature_2m:
+                        type: number
+                        format: float
+                      relative_humidity_2m:
+                        type: number
+                        format: float
+                      apparent_temperature:
+                        type: number
+                        format: float
+                      is_day:
+                        type: integer
+                      precipitation:
+                        type: number
+                        format: float
+                      rain:
+                        type: number
+                        format: float
+                      showers:
+                        type: number
+                        format: float
+                      snowfall:
+                        type: number
+                        format: float
+                      weather_code:
+                        type: integer
+                      cloud_cover:
+                        type: number
+                        format: float
+                      pressure_msl:
+                        type: number
+                        format: float
+                      surface_pressure:
+                        type: number
+                        format: float
+                      wind_speed_10m:
+                        type: number
+                        format: float
+                      wind_direction_10m:
+                        type: number
+                        format: float
+                      wind_gusts_10m:
+                        type: number
+                        format: float
+                  current_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      temperature_2m:
+                        type: string
+                      relative_humidity_2m:
+                        type: string
+                      apparent_temperature:
+                        type: string
+                      is_day:
+                        type: string
+                      precipitation:
+                        type: string
+                      rain:
+                        type: string
+                      showers:
+                        type: string
+                      snowfall:
+                        type: string
+                      weather_code:
+                        type: string
+                      cloud_cover:
+                        type: string
+                      pressure_msl:
+                        type: string
+                      surface_pressure:
+                        type: string
+                      wind_speed_10m:
+                        type: string
+                      wind_direction_10m:
+                        type: string
+                      wind_gusts_10m:
+                        type: string
+                  minutely_15:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      temperature_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      apparent_temperature:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      rain:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      freezing_level_height:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      sunshine_duration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      weather_code:
+                        type: array
+                        items:
+                          type: integer
+                      wind_speed_10m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_20m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_50m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_80m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_100m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_10m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_20m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_50m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_80m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_direction_100m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_gusts_10m:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      visibility:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cape:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      lightning_potential:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      is_day:
+                        type: array
+                        items:
+                          type: integer
+                  minutely_15_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      temperature_2m:
+                        type: string
+                      relative_humidity_2m:
+                        type: string
+                      dew_point_2m:
+                        type: string
+                      apparent_temperature:
+                        type: string
+                      precipitation:
+                        type: string
+                      rain:
+                        type: string
+                      snowfall:
+                        type: string
+                      snowfall_height:
+                        type: string
+                      freezing_level_height:
+                        type: string
+                      sunshine_duration:
+                        type: string
+                      weather_code:
+                        type: string
+                      wind_speed_10m:
+                        type: string
+                      wind_speed_20m:
+                        type: string
+                      wind_speed_50m:
+                        type: string
+                      wind_speed_80m:
+                        type: string
+                      wind_speed_100m:
+                        type: string
+                      wind_direction_10m:
+                        type: string
+                      wind_direction_20m:
+                        type: string
+                      wind_direction_50m:
+                        type: string
+                      wind_direction_80m:
+                        type: string
+                      wind_direction_100m:
+                        type: string
+                      wind_gusts_10m:
+                        type: string
+                      visibility:
+                        type: string
+                      cape:
+                        type: string
+                      lightning_potential:
+                        type: string
+                      is_day:
+                        type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string

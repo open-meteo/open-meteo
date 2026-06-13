@@ -1,4 +1,5 @@
 @preconcurrency import OmFileFormat
+import Vapor
 import SwiftNetCDF
 import Foundation
 import Logging
@@ -36,7 +37,8 @@ struct GenericVariableHandle: Sendable {
 
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
-    static func convert(logger: Logger, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
+    /// If `fullRunSkipMeta` do not generate meta.json for each run
+    static func convert(logger: Logger, client: HTTPClient, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
             
@@ -83,6 +85,7 @@ struct GenericVariableHandle: Sendable {
             if generateTimeSeries, let uploadS3Bucket = uploadS3Bucket {
                 try await domain.domainRegistry.syncToS3(
                     logger: logger,
+                    client: client,
                     bucket: uploadS3Bucket,
                     variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : nil
                 )
@@ -103,6 +106,7 @@ struct GenericVariableHandle: Sendable {
                 if !uploadS3OnlyProbabilities, let uploadS3Bucket {
                     try await domain.domainRegistry.syncToS3(
                         logger: logger,
+                        client: client,
                         bucket: uploadS3Bucket,
                         variables: nil
                     )
@@ -113,6 +117,7 @@ struct GenericVariableHandle: Sendable {
                         if nMembers > 1 {
                             try await emDomain.domainRegistry.syncToS3(
                                 logger: logger,
+                                client: client,
                                 bucket: uploadS3Bucket,
                                 variables: nil
                             )
@@ -132,8 +137,9 @@ struct GenericVariableHandle: Sendable {
                 logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 if let uploadS3Bucket {
-                    try domain.domainRegistry.syncToS3PerRun(
+                    try await domain.domainRegistry.syncToS3PerRun(
                         logger: logger,
+                        client: client,
                         bucket: uploadS3Bucket,
                         run:run,
                         skipMeta: fullRunSkipMeta
@@ -143,8 +149,9 @@ struct GenericVariableHandle: Sendable {
                     if let emDomain = ensembleMeanDomain {
                         let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
                         if nMembers > 1 {
-                            try emDomain.domainRegistry.syncToS3PerRun(
+                            try await emDomain.domainRegistry.syncToS3PerRun(
                                 logger: logger,
+                                client: client,
                                 bucket: uploadS3Bucket,
                                 run: run,
                                 skipMeta: false

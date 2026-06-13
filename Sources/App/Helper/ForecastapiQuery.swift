@@ -449,10 +449,10 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
                 throw ForecastApiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
             }
             guard allowedRange.contains(hourly.range.lowerBound) else {
-                throw ForecastApiError.dateOutOfRange(parameter: "start_hourly", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "start_hour", allowed: allowedRange)
             }
             guard allowedRange.contains(hourly.range.upperBound.add(-1 * hourly.dtSeconds)) else {
-                throw ForecastApiError.dateOutOfRange(parameter: "end_hourly", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "end_hour", allowed: allowedRange)
             }
             guard allowedRange.contains(minutely_15.range.lowerBound) else {
                 throw ForecastApiError.dateOutOfRange(parameter: "start_minutely_15", allowed: allowedRange)

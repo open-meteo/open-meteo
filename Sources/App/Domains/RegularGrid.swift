@@ -36,6 +36,18 @@ struct RegularGrid: Gridable {
         self.searchRadius = searchRadius
     }
 
+    /// Initialise from the coordinates of the first and last grid point. `dx`/`dy` are derived so that the
+    /// last grid point lands exactly on the upper bound, avoiding drift.
+    public init(nx: Int, ny: Int, latitude: ClosedRange<Float>, longitude: ClosedRange<Float>, searchRadius: Int = 1) {
+        self.nx = nx
+        self.ny = ny
+        self.latMin = latitude.lowerBound
+        self.lonMin = longitude.lowerBound
+        self.dx = (longitude.upperBound - longitude.lowerBound) / Float(nx - 1)
+        self.dy = (latitude.upperBound - latitude.lowerBound) / Float(ny - 1)
+        self.searchRadius = searchRadius
+    }
+
     var isGlobal: Bool {
         return (Float(nx) * dx) >= 360 && (Float(ny) * dy) >= 180
     }

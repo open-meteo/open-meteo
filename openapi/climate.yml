@@ -1,0 +1,476 @@
+openapi: '3.1.0'
+info:
+  title: Open-Meteo Climate Change API
+  description: >-
+    Daily climate data from downscaled CMIP6 models bias-corrected to ERA5. Available from 1950 to 2050.
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/climate:
+    servers:
+      - url: https://climate-api.open-meteo.com
+      - url: https://customer-climate-api.open-meteo.com
+    get:
+      tags:
+        - Climate Change APIs
+      summary: Daily climate data from CMIP6 models
+      description: >-
+        Historical and future climate data from downscaled CMIP6 models bias-corrected to ERA5.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          description: >-
+            Start date in ISO 8601 format. Minimum is 1950-01-01.
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: >-
+            End date in ISO 8601 format. Maximum is 2050-12-31.
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: daily
+          in: query
+          description: >-
+            A list of daily climate variables.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - temperature_2m_max
+                - temperature_2m_min
+                - temperature_2m_mean
+                - pressure_msl_mean
+                - cloud_cover_mean
+                - precipitation_sum
+                - snowfall_water_equivalent_sum
+                - snowfall_sum
+                - rain_sum
+                - relative_humidity_2m_min
+                - relative_humidity_2m_max
+                - relative_humidity_2m_mean
+                - wind_speed_10m_mean
+                - wind_speed_10m_max
+                - wind_gusts_10m_mean
+                - wind_gusts_10m_max
+                - soil_moisture_0_to_10cm_mean
+                - soil_moisture_0_to_100cm_mean
+                - soil_moisture_0_to_7cm_mean
+                - soil_moisture_7_to_28cm_mean
+                - soil_moisture_28_to_100cm_mean
+                - soil_moisture_index_0_to_7cm_mean
+                - soil_moisture_index_0_to_100cm_mean
+                - soil_moisture_index_7_to_28cm_mean
+                - soil_moisture_index_28_to_100cm_mean
+                - soil_temperature_0_to_100cm_mean
+                - soil_temperature_0_to_7cm_mean
+                - soil_temperature_7_to_28cm_mean
+                - soil_temperature_28_to_100cm_mean
+                - shortwave_radiation_sum
+                - et0_fao_evapotranspiration_sum
+                - vapour_pressure_deficit_max
+                - dew_point_2m_mean
+                - dew_point_2m_max
+                - dew_point_2m_min
+                - growing_degree_days_base_0_limit_50
+                - leaf_wetness_probability_mean
+                - daylight_duration
+        - name: temperature_unit
+          in: query
+          schema:
+            type: string
+            default: celsius
+            enum: [celsius, fahrenheit]
+        - name: wind_speed_unit
+          in: query
+          schema:
+            type: string
+            default: kmh
+            enum: [kmh, ms, mph, kn]
+        - name: precipitation_unit
+          in: query
+          schema:
+            type: string
+            default: mm
+            enum: [mm, inch]
+        - name: timeformat
+          in: query
+          schema:
+            type: string
+            default: iso8601
+            enum: [iso8601, unixtime]
+        - name: timezone
+          in: query
+          schema:
+            type: string
+        - name: disable_bias_correction
+          in: query
+          description: >-
+            Disable statistical downscaling and bias correction onto ERA5 climate data.
+          schema:
+            type: boolean
+        - name: cell_selection
+          in: query
+          schema:
+            type: string
+            enum: [land, sea, nearest]
+        - name: models
+          in: query
+          description: Manually select one or more weather models.
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - CMCC_CM2_VHR4
+                - FGOALS_f3_H
+                - HiRAM_SIT_HR
+                - MRI_AGCM3_2_S
+                - EC_Earth3P_HR
+                - MPI_ESM1_2_XR
+                - NICAM16_8S
+        - name: apikey
+          in: query
+          description: >-
+            Only required for commercial subscriptions.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    format: float
+                  longitude:
+                    type: number
+                    format: float
+                  elevation:
+                    type: number
+                    format: float
+                  generationtime_ms:
+                    type: number
+                    format: float
+                  utc_offset_seconds:
+                    type: integer
+                  timezone:
+                    type: string
+                  timezone_abbreviation:
+                    type: string
+                  daily:
+                    type: object
+                    properties:
+                      time:
+                        type: array
+                        items:
+                          type: string
+                      temperature_2m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      temperature_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      pressure_msl_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      cloud_cover_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      precipitation_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_water_equivalent_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      snowfall_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      rain_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_2m_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_2m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      relative_humidity_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_speed_10m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_gusts_10m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      wind_gusts_10m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_10cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_0_to_7cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_7_to_28cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_28_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_index_0_to_7cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_index_0_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_index_7_to_28cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_moisture_index_28_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_0_to_7cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_7_to_28cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      soil_temperature_28_to_100cm_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      shortwave_radiation_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      et0_fao_evapotranspiration_sum:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      vapour_pressure_deficit_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_max:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      dew_point_2m_min:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      growing_degree_days_base_0_limit_50:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      leaf_wetness_probability_mean:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                      daylight_duration:
+                        type: array
+                        items:
+                          type: number
+                          format: float
+                  daily_units:
+                    type: object
+                    properties:
+                      time:
+                        type: string
+                      temperature_2m_max:
+                        type: string
+                      temperature_2m_min:
+                        type: string
+                      temperature_2m_mean:
+                        type: string
+                      pressure_msl_mean:
+                        type: string
+                      cloud_cover_mean:
+                        type: string
+                      precipitation_sum:
+                        type: string
+                      snowfall_water_equivalent_sum:
+                        type: string
+                      snowfall_sum:
+                        type: string
+                      rain_sum:
+                        type: string
+                      relative_humidity_2m_min:
+                        type: string
+                      relative_humidity_2m_max:
+                        type: string
+                      relative_humidity_2m_mean:
+                        type: string
+                      wind_speed_10m_mean:
+                        type: string
+                      wind_speed_10m_max:
+                        type: string
+                      wind_gusts_10m_mean:
+                        type: string
+                      wind_gusts_10m_max:
+                        type: string
+                      soil_moisture_0_to_10cm_mean:
+                        type: string
+                      soil_moisture_0_to_100cm_mean:
+                        type: string
+                      soil_moisture_0_to_7cm_mean:
+                        type: string
+                      soil_moisture_7_to_28cm_mean:
+                        type: string
+                      soil_moisture_28_to_100cm_mean:
+                        type: string
+                      soil_moisture_index_0_to_7cm_mean:
+                        type: string
+                      soil_moisture_index_0_to_100cm_mean:
+                        type: string
+                      soil_moisture_index_7_to_28cm_mean:
+                        type: string
+                      soil_moisture_index_28_to_100cm_mean:
+                        type: string
+                      soil_temperature_0_to_100cm_mean:
+                        type: string
+                      soil_temperature_0_to_7cm_mean:
+                        type: string
+                      soil_temperature_7_to_28cm_mean:
+                        type: string
+                      soil_temperature_28_to_100cm_mean:
+                        type: string
+                      shortwave_radiation_sum:
+                        type: string
+                      et0_fao_evapotranspiration_sum:
+                        type: string
+                      vapour_pressure_deficit_max:
+                        type: string
+                      dew_point_2m_mean:
+                        type: string
+                      dew_point_2m_max:
+                        type: string
+                      dew_point_2m_min:
+                        type: string
+                      growing_degree_days_base_0_limit_50:
+                        type: string
+                      leaf_wetness_probability_mean:
+                        type: string
+                      daylight_duration:
+                        type: string
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                  reason:
+                    type: string
