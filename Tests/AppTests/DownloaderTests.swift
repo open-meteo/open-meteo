@@ -85,6 +85,8 @@ import Logging
         #expect(a?.user == nil)
         #expect(a?.password == nil)
         #expect(a?.url == "/user/home/text.txt")
+        
+        #expect("s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".stripHttpPassword() == "s3://openmeteo.s3.amazonaws.com:8080/text.txt")
     }
 
     /// Single-part PUT upload.

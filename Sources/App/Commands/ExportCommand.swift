@@ -404,11 +404,11 @@ struct ExportCommand: AsyncCommand {
                 for try await chunk in stream {
                     for (rows, gridpoint, latitude, longitude, elevation) in chunk {
                         try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
-                        progress.add(time.count * 4 * variables.count)
+                        await progress.add(time.count * 4 * variables.count)
                     }
                 }
                 try writer.flush(closeFile: true)
-                progress.finish()
+                await progress.finish()
             } catch {
                 logger.report(error: error)
                 // Always close file before throwing errors
@@ -483,11 +483,11 @@ struct ExportCommand: AsyncCommand {
             for try await chunk in stream {
                 for (rows, gridpoint, latitude, longitude, elevation) in chunk {
                     try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
-                    progress.add(time.count * 4 * variables.count)
+                    await progress.add(time.count * 4 * variables.count)
                 }
             }
             try writer.flush(closeFile: true)
-            progress.finish()
+            await progress.finish()
         } catch {
             logger.report(error: error)
             try writer.forceCloseFile()
@@ -579,9 +579,9 @@ struct ExportCommand: AsyncCommand {
                     }
                     let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                     try ncVariable.write(normals, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
-                    progress.add(time.count * 4)
+                    await progress.add(time.count * 4)
                 }
-                progress.finish()
+                await progress.finish()
             }
             return
         }
@@ -631,10 +631,10 @@ struct ExportCommand: AsyncCommand {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
-                progress.add(time.count * 4)
+                await progress.add(time.count * 4)
             }
 
-            progress.finish()
+            await progress.finish()
         }
     }
 }

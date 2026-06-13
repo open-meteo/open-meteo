@@ -227,7 +227,7 @@ struct SyncCommand: AsyncCommand {
             FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
             if localFile.hasSuffix("/meta.json") {
                 let body = try await client.executeRetryAndCollect(.init(url: request.url.string), logger: logger, upTo: 2*1024*1024, deadline: .minutes(5))
-                progress.add(body.readableBytes)
+                await progress.add(body.readableBytes)
                 guard let json = try body.readJSONDecodable(ModelUpdateMetaJson.self) else {
                     logger.error("Not a valid ModelUpdateMetaJson \(pathNoData)")
                     return
@@ -240,7 +240,7 @@ struct SyncCommand: AsyncCommand {
                         let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
                         /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
                         try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
-                        progress.add(try response.contentLength() ?? 0)
+                        await progress.add(try response.contentLength() ?? 0)
                         break
                     } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
                         /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
@@ -249,7 +249,7 @@ struct SyncCommand: AsyncCommand {
                 }
             }
         }
-        progress.finish()
+        await progress.finish()
     }
 }
 

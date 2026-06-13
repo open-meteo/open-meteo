@@ -203,7 +203,7 @@ struct GenericVariableHandle: Sendable {
                         array: data3d.data,
                         arrayDimensions: thisChunkDimensions
                     )
-                    progress.add(data3d.data.count * MemoryLayout<Float>.size)
+                    await progress.add(data3d.data.count * MemoryLayout<Float>.size)
                 }
             }
             let arrayFinalised = try writer.finalise()
@@ -225,7 +225,7 @@ struct GenericVariableHandle: Sendable {
             let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
             try fn.linkTemporary(file: filePath)
-            progress.finish()
+            await progress.finish()
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()
         if !skipMeta {
@@ -372,10 +372,10 @@ struct GenericVariableHandle: Sendable {
                     locationRange: locationRange1D
                 )
 
-                progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
+                await progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
                 return ArraySlice(data3d.data)
             }
-            progress.finish()
+            await progress.finish()
         }
     }
 }

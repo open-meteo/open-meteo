@@ -266,8 +266,9 @@ extension HTTPClient {
             }
         }
         
-        logger.info("Initiate concurrent download nConcurrent=\(nConcurrent) nChunks=\(chunks.count) length=\(length.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)")
-
+        logger.info("Download \(request.url.stripHttpPassword()) [nConcurrent=\(nConcurrent) nChunks=\(chunks.count) size=\(length.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)]")
+        let progress = TransferAmountTracker(logger: logger, totalSize: length, name: "Download \(request.url.stripHttpPassword())")
+        
         let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
             let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
             var request = request
@@ -293,16 +294,24 @@ extension HTTPClient {
                     if Date() > deadline {
                         throw CurlErrorNonRetry.timeoutReached
                     }
+                    await progress.add(fragement.readableBytes)
                     buffer.writeImmutableBuffer(fragement)
                 }
                 guard buffer.readableBytes == chunk.count else {
                     throw CurlErrorNonRetry.chunkSizeMismatch
                 }
+                if chunk.upperBound == length {
+                    await progress.finish()
+                }
                 return buffer
             }
         }
         
-        return HTTPClientResponse(status: .ok, headers: responseHeaders, body: .stream(stream))
+        return HTTPClientResponse(
+            status: .ok,
+            headers: responseHeaders,
+            body: .stream(stream)
+        )
     }
 }
 
