@@ -133,9 +133,10 @@ struct DownloadIconCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
+        // HHL is published on the same grid as hsurf: regular-lat-lon for nests (d2/eu), icosahedral
+        // (remapped via CDO) for global. d2 also offers an icosahedral native variant, but that grid
+        // has no remap weights here (cdo == nil) so it cannot be reshaped to the regular target grid.
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
-        // HHL source GRIBs for d2 use "icosahedral" in filename (native), even for regular target grid.
-        let hhlGridType = (domain == .iconD2 || domain == .iconD2_15min || domain == .iconD2Eps || domain == .iconD2EpsEnsembleMean) ? "icosahedral" : gridType
 
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
@@ -148,7 +149,7 @@ struct DownloadIconCommand: AsyncCommand {
         var hhl2D: [Array2D] = []
         for lev in 1...nHalf {
             let levelPart = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_\(lev)" : "_\(lev)"
-            let hhlUrl = "\(serverPrefix)hhl/\(domainPrefix)_\(hhlGridType)_time-invariant_\(dateStr)\(levelPart)_\(hhlVar).grib2.bz2"
+            let hhlUrl = "\(serverPrefix)hhl/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(levelPart)_\(hhlVar).grib2.bz2"
             let msgs = try await cdo.downloadAndRemap(hhlUrl)
             guard msgs.count == 1 else {
                 logger.warning("Expected 1 message for HHL lev \(lev), got \(msgs.count) for \(hhlUrl)")
