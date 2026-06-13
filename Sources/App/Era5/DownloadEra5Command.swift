@@ -59,8 +59,6 @@ struct DownloadEra5Command: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
-
         let domain = try CdsDomain.load(rawValue: signature.domain)
 
         let variables: [any GenericVariable]
