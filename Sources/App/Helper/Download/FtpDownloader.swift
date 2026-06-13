@@ -79,9 +79,12 @@ public final class FtpDownloader: Sendable {
 extension String {
     /// Remove the auth part from a HTTP or FTP resource
     func stripHttpPassword() -> String {
-        guard contains("://") && contains("@") else {
+        guard
+            let slashIndex = self.firstRange(of: "://")?.lowerBound,
+            let atIndex = self[slashIndex...].firstIndex(of: "@")
+        else {
             return self
         }
-        return split(separator: "/")[0] + "//" + split(separator: "@")[1]
+        return "\(self[..<slashIndex])://\(self[self.index(after: atIndex)...])"
     }
 }

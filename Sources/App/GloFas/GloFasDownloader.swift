@@ -75,8 +75,7 @@ struct GloFasDownloader: AsyncCommand {
 
             let nConcurrent = signature.concurrent ?? 1
             let handles = try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword, concurrent: nConcurrent)
-            let logger = context.application.logger
-            try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_int16_logarithmic)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_int16_logarithmic)
         }
     }
 

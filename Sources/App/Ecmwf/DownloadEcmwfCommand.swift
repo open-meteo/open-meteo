@@ -77,7 +77,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile)
-                try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
         }
@@ -88,7 +88,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let generateFullRun = domain.countEnsembleMember == 1
         let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
     }
 
     /// Download elevation file
@@ -175,8 +175,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         
         let storeOnDisk = domain == .ifs025 || domain == .aifs025_single || domain == .wam025
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -425,13 +423,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-                try await writerProbabilities?.writeMetaAndAWSUpload(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles
@@ -453,8 +445,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
         let timestamps = forecastHours.map { run.add(hours: $0) }
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -493,12 +483,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise()
-            try await uploadTask?.value
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(client: application.http1Client, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
-            }
-            return handles
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles

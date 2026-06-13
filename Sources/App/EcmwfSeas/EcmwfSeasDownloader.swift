@@ -64,7 +64,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
             fatalError()
         }
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: true)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: true)
     }
     
     func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool) async throws {
@@ -139,9 +139,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         var validTimes = [Timestamp]()
         var handles = [GenericVariableHandle]()
-        
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
         
         let package: String
         let types: [String]
@@ -230,14 +227,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise())
-            try await uploadTask?.value
-            let validTimes = validTimes
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(client: application.http1Client, completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
-            }
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
         }
-        try await uploadTask?.value
         return handles
     }
 
@@ -258,9 +249,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         var validTimes = [Timestamp]()
         var handles = [GenericVariableHandle]()
-        
-        /// Run AWS upload in the background
-        var uploadTask: Task<(), any Error>? = nil
         
         let deaverager = GribDeaverager()
         for month in 0...6 {
@@ -343,14 +331,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise())
-            try await uploadTask?.value
-            let validTimes = validTimes
-            uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(client: application.http1Client, completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
-            }
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
         }
-        try await uploadTask?.value
         return handles
     }
 }

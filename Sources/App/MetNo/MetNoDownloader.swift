@@ -44,7 +44,7 @@ struct MetNoDownloader: AsyncCommand {
 
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -155,7 +155,7 @@ struct MetNoDownloader: AsyncCommand {
                 try await writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
             }
         }
-        return try await writer.finalise(client: application.http1Client, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
     }
 }
 
