@@ -114,6 +114,80 @@ struct DownloadIconCommand: AsyncCommand {
         try hsurf.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
     }
 
+    /// Convert HHL (half-level heights ASL) to single 3D static OM file [ny, nx, nHalf] (level last).
+    /// One file per domain (no per-level chunks). Derived full-level heights are computed on read (lazy).
+    /// Follows exact convertSurfaceElevation patterns for URL/Cdo/idempotency.
+    func convertHhlHeights(application: Application, domain: IconDomains, run: Timestamp) async throws {
+        let logger = application.logger
+        let hhlFile = domain.hhlFileOm.getFilePath()
+        if FileManager.default.fileExists(atPath: hhlFile) {
+            return
+        }
+        logger.info("Converting HHL for \(domain) (will download \(domain.numberOfModelHalfLevels) small per-level files)")
+        try domain.hhlFileOm.createDirectory()
+
+        let downloadDirectory = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
+        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
+        let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
+        // HHL source GRIBs for d2 use "icosahedral" in filename (native), even for regular target grid.
+        let hhlGridType = (domain == .iconD2 || domain == .iconD2_15min || domain == .iconD2Eps || domain == .iconD2EpsEnsembleMean) ? "icosahedral" : gridType
+
+        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let dateStr = run.format_YYYYMMddHH
+
+        // HHL: published as one small GRIB per half level (see Key Data Facts).
+        // https://opendata.dwd.de/weather/nwp/icon/grib/00/hhl/...
+        let hhlVar = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "hhl" : "HHL"
+        let nHalf = domain.numberOfModelHalfLevels
+
+        var hhl2D: [Array2D] = []
+        for lev in 1...nHalf {
+            let levelPart = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_\(lev)" : "_\(lev)"
+            let hhlUrl = "\(serverPrefix)hhl/\(domainPrefix)_\(hhlGridType)_time-invariant_\(dateStr)\(levelPart)_\(hhlVar).grib2.bz2"
+            let msgs = try await cdo.downloadAndRemap(hhlUrl)
+            guard msgs.count == 1 else {
+                logger.warning("Expected 1 message for HHL lev \(lev), got \(msgs.count) for \(hhlUrl)")
+                continue
+            }
+            hhl2D.append(msgs[0].data)
+        }
+        logger.info("HHL downloaded \(hhl2D.count)/\(nHalf) levels for \(domain)")
+        guard hhl2D.count == nHalf else {
+            throw NSError(domain: "HHL", code: 1, userInfo: [NSLocalizedDescriptionKey: "Incomplete HHL levels for \(domain)"])
+        }
+
+        // Stack to [ny, nx, nlev] layout (level innermost/fastest varying) so that
+        // for a fixed (y,x) the nlev values are contiguous. Matches chunks [y, x, nlev].
+        let ny = domain.grid.ny
+        let nx = domain.grid.nx
+        let nlev = nHalf
+        var stacked = [Float](repeating: .nan, count: ny * nx * nlev)
+        for (levIdx, levData) in hhl2D.enumerated() {
+            precondition(levData.data.count == ny * nx)
+            for (spIdx, val) in levData.data.enumerated() {
+                // spatialIdx * nlev + lev  => levels contiguous per spatial point
+                stacked[spIdx * nlev + levIdx] = val
+            }
+        }
+
+        // Chunk spatial like makeSpatialWriter, full vertical in each chunk for column reads.
+        let chunkY = min(ny, 32)
+        let chunkX = min(nx, max(1, 1024 / chunkY))
+        try stacked.writeOmFile(
+            file: hhlFile,
+            dimensions: [ny, nx, nlev],
+            chunks: [chunkY, chunkX, nlev],
+            compression: .pfor_delta2d_int16,
+            scalefactor: 1.0,
+            createNetCdf: false
+        )
+    }
+
     /// Download ICON global, eu and d2 *.grid2.bz2 files
     func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
@@ -511,6 +585,7 @@ struct DownloadIconCommand: AsyncCommand {
         let generateFullRun = domain.countEnsembleMember == 1
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
+        try await convertHhlHeights(application: context.application, domain: domain, run: run)
 
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
 

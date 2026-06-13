@@ -81,6 +81,7 @@ extension TimerangeDt {
 enum ReaderStaticVariable {
     case soilType
     case elevation
+    case hhl  // half-level heights ASL; single 3D static file (read full column via helper)
 }
 
 struct DomainInitContext {
@@ -222,6 +223,11 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        if type == .hhl {
+            // HHL is 3D; scalar access (if any) falls back to surface elevation (bottom half-level ≈ surface).
+            // Preferred API: domain.grid.readColumnFromStaticFile(...) or reader hhlColumnASL() for full vertical.
+            return try await getStatic(type: .elevation)
+        }
         guard let file = await domain.getStaticFile(type: type, httpClient: httpClient, logger: logger) else {
             return nil
         }

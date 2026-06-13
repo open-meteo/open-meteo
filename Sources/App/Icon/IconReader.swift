@@ -621,6 +621,38 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
+
+    // MARK: - HHL (column from single 3D static hhl.om [ny, nx, nlev] level-last; called on demand for height queries)
+
+    /// Full half-level heights ASL at this grid point (from 3D file).
+    func hhlColumnASL() async throws -> [Float] {
+        guard let iconDomain = reader.domain as? IconDomains else { return [] }
+        guard let file = await reader.domain.getStaticFile(type: .hhl, httpClient: options.httpClient, logger: options.logger) else { return [] }
+        // 3D column read (one I/O)
+        let col = try await reader.domain.grid.readColumnFromStaticFile(gridpoint: reader.reader.position, file: file)
+        let nlev = iconDomain.numberOfModelHalfLevels
+        return col.count == nlev ? col : Array(col.prefix(nlev)) + Array(repeating: .nan, count: max(0, nlev - col.count))
+    }
+
+    /// Geometric height ASL of full level N (1-based, top=1) = avg of enclosing half levels.
+    func fullLevelHeightASL(fullLevel: Int) async throws -> Float? {
+        let hs = try await hhlColumnASL()
+        guard fullLevel >= 1, fullLevel < hs.count else { return nil }
+        let h1 = hs[fullLevel - 1]
+        let h2 = hs[fullLevel]
+        guard h1.isFinite, h2.isFinite else { return .nan }
+        return (h1 + h2) / 2
+    }
+
+    /// AGL version (subtract model surface elevation).
+    func fullLevelHeightAGL(fullLevel: Int) async throws -> Float? {
+        guard let asl = try await fullLevelHeightASL(fullLevel: fullLevel) else { return nil }
+        let surf = reader.modelElevation.numeric
+        if surf.isFinite && surf > -999 {
+            return asl - surf
+        }
+        return asl  // sea or no data: ASL is the reference
+    }
 }
 
 struct IconMixer: GenericReaderMixer {
@@ -628,5 +660,18 @@ struct IconMixer: GenericReaderMixer {
 
     static func makeReader(domain: IconReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> IconReader? {
         return try await IconReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    }
+
+    // Forward HHL (static, same across mix)
+    func hhlColumnASL() async throws -> [Float] {
+        return try await reader.first?.hhlColumnASL() ?? []
+    }
+
+    func fullLevelHeightASL(fullLevel: Int) async throws -> Float? {
+        return try await reader.first?.fullLevelHeightASL(fullLevel: fullLevel)
+    }
+
+    func fullLevelHeightAGL(fullLevel: Int) async throws -> Float? {
+        return try await reader.first?.fullLevelHeightAGL(fullLevel: fullLevel)
     }
 }

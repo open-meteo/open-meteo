@@ -151,6 +151,22 @@ extension Gridable {
         return value
     }
 
+    /// Read full vertical column from a 3D static file [ny, nx, nlev] (level last/fastest varying).
+    /// Returns [nlev] values for the point in one I/O (leverages chunk with full vertical).
+    /// Infers nlev from the file's third dimension.
+    func readColumnFromStaticFile(gridpoint: Int, file: any OmFileReaderArrayProtocol<Float>) async throws -> [Float] {
+        guard file.getDimensionsCount() == 3 else {
+            return try await readFromStaticFile(gridpoint: gridpoint, file: file).isNaN ? [] : [try await readFromStaticFile(gridpoint: gridpoint, file: file)]
+        }
+        let dims: InlineArray<3, UInt64> = file.getDimensionsInline()
+        let nlev = Int(dims[2])
+        let x = UInt64(gridpoint % nx)
+        let y = UInt64(gridpoint / nx)
+        var column = [Float](repeating: .nan, count: nlev)
+        try await file.read(into: &column, range: [y..<y + 1, x..<x + 1, 0..<UInt64(nlev)], intoCubeOffset: [0, 0, 0], intoCubeDimension: [1, 1, UInt64(nlev)])
+        return column
+    }
+
     /// Get nearest grid point
     func findPointNearest(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let center = findPoint(lat: lat, lon: lon) else {

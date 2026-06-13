@@ -201,10 +201,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// model level standard heights, full levels
-    /// icon wind level 1-90 88=98m, 87-174m
-    /// icon-eu 1-60 58,57
-    /// icon-d2 1-65.... 63=78m, 62=126m
+    /// Number of full levels (DWD-native 1=top ... N=lowest near surface).
+    /// Used for model-level variable indexing.
     var numberOfModelFullLevels: Int {
         switch self {
         case .iconEps, .icon, .iconEpsEnsembleMean:
@@ -214,6 +212,18 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
             return 65
         }
+    }
+
+    /// Number of half levels (DWD-native 1=top ... N+1=surface).
+    /// HHL GRIBs provide one field per half level.
+    var numberOfModelHalfLevels: Int {
+        numberOfModelFullLevels + 1
+    }
+
+    /// HHL (half-level heights ASL) as single 3D static file [ny, nx, nHalf].
+    /// (Level dimension last for efficient vertical column reads.)
+    var hhlFileOm: OmFileType {
+        .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "hhl", chunk: nil)
     }
 
     /// ICON uses 1.5°C melting point temperature: https://gitlab.dkrz.de/icon/icon-model/-/blob/release-2024.01-public/src/atm_phy_nwp/mo_nh_interface_nwp.f90?ref_type=heads#L2232
