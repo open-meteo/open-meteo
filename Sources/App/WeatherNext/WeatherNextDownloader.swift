@@ -107,7 +107,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             ("2m_temperature", .temperature_2m, { $0.map { $0 - 273.15 } }),
             ("mean_sea_level_pressure", .pressure_msl, { $0.map { $0 * 0.01 } }),
             ("sea_surface_temperature", .sea_surface_temperature, { $0.map { $0 - 273.15 } }),
-            ("total_precipitation_6hr", .total_precipitation_6hr, { $0.map { $0 * 1000.0 } }),
+            ("total_precipitation_6hr", .precipitation, { $0.map { $0 * 1000.0 } }),
             ("100m_u_component_of_wind", .wind_u_component_100m, { $0 }),
             ("100m_v_component_of_wind", .wind_v_component_100m, { $0 }),
             ("10m_u_component_of_wind", .wind_u_component_10m, { $0 }),
@@ -207,7 +207,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
                             var data = transform(raw)
                             data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
-                            if surfaceVar == .total_precipitation_6hr && domain.countEnsembleMember > 1 {
+                            if surfaceVar == .precipitation && domain.countEnsembleMember > 1 {
                                 await precipStorage.set(variable: surfaceVar, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
                             }
                             try await writer.write(member: member, variable: surfaceVar, data: data)
@@ -346,7 +346,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             // ---- Derive precipitation probability ----
             if let writerProbabilities {
                 logger.info("Calculating precipitation probability for timestep \(timeIdx)")
-                try await precipStorage.calculatePrecipitationProbability(precipitationVariable: .total_precipitation_6hr, dtHoursOfCurrentStep: domain.dtHours, writer: writerProbabilities)
+                try await precipStorage.calculatePrecipitationProbability(precipitationVariable: .precipitation, dtHoursOfCurrentStep: domain.dtHours, writer: writerProbabilities)
             }
 
             let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])

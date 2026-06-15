@@ -37,7 +37,7 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
     case temperature_2m
     case pressure_msl
     case sea_surface_temperature
-    case total_precipitation_6hr
+    case precipitation
     case cloud_cover
     case cloud_cover_low
     case cloud_cover_mid
@@ -57,7 +57,7 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
             return .temperature
         case .pressure_msl:
             return .pressureMsl
-        case .total_precipitation_6hr:
+        case .precipitation:
             return .precipitation
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             return .cloudCover
@@ -71,7 +71,7 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
 
     var omFileName: (file: String, level: Int) {
         switch self {
-        case .total_precipitation_6hr:
+        case .precipitation:
             return ("precipitation", 0)
         default:
             return (rawValue, 0)
@@ -127,7 +127,7 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
         switch self {
         case .temperature_2m,
              .pressure_msl,
-             .total_precipitation_6hr,
+             .precipitation,
              .cloud_cover,
              .cloud_cover_low,
              .cloud_cover_mid,
