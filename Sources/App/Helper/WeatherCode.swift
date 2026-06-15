@@ -151,13 +151,13 @@ enum WeatherCode: Int {
         if let li = liftedIndex, li > 2.0 { return 0.0 }
         
         // 2. LATITUDE SCALING FACTOR
-        // 1.0 at mid-latitudes (>= 30°), scales down to 0.7 at the equator (0°)
+        // 1.0 at mid-latitudes (>= 30°), scales down to 0.8 at the equator (0°)
         let absLat = Swift.abs(latitude)
         let latitudeFactor: Float
         if absLat >= 30.0 {
             latitudeFactor = 1.0
         } else {
-            latitudeFactor = 0.7 + (0.3 * (absLat / 30.0))
+            latitudeFactor = 0.8 + (0.2 * (absLat / 30.0))
         }
         
         // Dynamic weight accumulation tracking
@@ -168,7 +168,7 @@ enum WeatherCode: Int {
         // Shifting CAPE baseline higher in tropics to account for naturally high baseline environments.
         let capeWeight: Float = 0.25
         let maxCapeThreshold: Float = 2500.0 + (1500.0 * (1.0 - (Swift.min(absLat, 30.0) / 30.0)))
-        let capeScore = Swift.max(0.0, Swift.min((cape - 100.0) / (maxCapeThreshold - 100.0), 1.0))
+        let capeScore = Swift.max(0.0, Swift.min((cape - 300.0) / (maxCapeThreshold - 300.0), 1.0))
         accumulatedScore += (capeScore * capeWeight)
         totalWeight += capeWeight
         
@@ -193,9 +193,9 @@ enum WeatherCode: Int {
             totalWeight += liWeight
         }
         
-        // 6. Convective Precipitation Score (Base Weight: 15%)
+        // 6. Convective Precipitation Score (Base Weight: 25%)
         if let precip = convectivePrecipitation {
-            let precipWeight: Float = 0.15
+            let precipWeight: Float = 0.25
             let dtHours = Float(modelDtSeconds) / 3600.0
             
             // Require higher precipitation rates near the equator (2.0mm/hr up to 5.0mm/hr)
