@@ -364,8 +364,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         }
 
         try await GenericVariableHandle.convert(
-            logger: logger,
-            client: application.http1Client,
+            application: application,
             domain: domain,
             createNetcdf: createNetcdf,
             run: run,
