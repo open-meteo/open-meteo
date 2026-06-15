@@ -158,11 +158,11 @@ struct MergeYearlyCommand: AsyncCommand {
                         arrayOffset: nil,
                         arrayCount: nil
                     )
-                    progress.add(data.count * 4)
+                    await progress.add(data.count * 4)
                 }
             }
         }
-        progress.finish()
+        await progress.finish()
         let variable = try fileWriter.write(
             array: try writer.finalise(),
             name: "",
@@ -214,11 +214,11 @@ struct MergeYearlyCommand: AsyncCommand {
                         logger.error("Data does not match \(yRange) \(xRange) \(tRange)")
                         throw MergeYearlyError.validationFailed
                     }
-                    progressVerify.add(data.count * 4)
+                    await progressVerify.add(data.count * 4)
                 }
             }
         }
-        progressVerify.finish()
+        await progressVerify.finish()
         try FileManager.default.moveFileOverwrite(from: temporary, to: yearlyFilePath)
     }
 }

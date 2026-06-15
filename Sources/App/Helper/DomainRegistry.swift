@@ -633,7 +633,8 @@ extension DomainRegistry {
     }
     
     /// Upload all data to a specified S3 bucket
-    func syncToS3(logger: Logger, client: HTTPClient, bucket: String, variables: [any GenericVariable]?) async throws {
+    func syncToS3(application: Application, bucket: String, variables: [any GenericVariable]?) async throws {
+        let logger = application.logger
         let dir = rawValue
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
@@ -642,44 +643,45 @@ extension DomainRegistry {
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }
-                try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-                    let startTimeAws = DispatchTime.now()
+                for (bucket, profile) in parseBucket(bucket) {
                     if variable.contains("_previous_day") && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
                         // do not upload data from past days yet
-                        return
+                        continue
                     }
                     logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    try await S3Uploader.uploadSync(
-                        client: client,
+                    await application.s3UploadManager.sync(
+                        client: application.http1Client,
+                        bucketEndpoint: bucket,
                         localDirectory: src,
                         server: bucket,
                         basePath: "data/\(dir)/\(variable)"
                     )
-                    logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    logger.info("AWS upload queued [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 }
             }
 
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
+            for (bucket, profile) in parseBucket(bucket) {
                 logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
-                let startTimeAws = DispatchTime.now()
-                try await S3Uploader.uploadSync(
-                    client: client,
+                await application.s3UploadManager.sync(
+                    client: application.http1Client,
+                    bucketEndpoint: bucket,
                     localDirectory: src,
                     server: bucket,
                     basePath: "data/\(dir)",
                     exclude: exclude
                 )
-                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                logger.info("AWS upload queued [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
         }
     }
     
     /// Upload time-series optimised per RUN files to S3 `/data_run/<domain>/<run>/<variable>.om`
-    func syncToS3PerRun(logger: Logger, client: HTTPClient, bucket: String, run: Timestamp, skipMeta: Bool) async throws {
+    func syncToS3PerRun(application: Application, bucket: String, run: Timestamp, skipMeta: Bool) async throws {
+        let logger = application.logger
         let dir = rawValue
         guard let directory = OpenMeteo.dataRunDirectory else {
             return
@@ -692,17 +694,17 @@ extension DomainRegistry {
             if !FileManager.default.fileExists(atPath: src) {
                 continue
             }
-            let startTimeAws = DispatchTime.now()
             logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
             
             /// Only one sync required, because JSON files are committed last and on error, the process would die
-            try await S3Uploader.uploadSync(
-                client: client,
+            await application.s3UploadManager.sync(
+                client: application.http1Client,
+                bucketEndpoint: bucket,
                 localDirectory: src,
                 server: bucket,
                 basePath: destRel
             )
-            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty()) [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+            logger.info("AWS upload queued [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
 }
