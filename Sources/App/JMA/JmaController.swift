@@ -278,7 +278,8 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
-                    modelDtSeconds: time.dtSeconds), .wmoCode
+                    modelDtSeconds: time.dtSeconds,
+                    latitude: reader.modelLat), .wmoCode
                 )
             case .snowfall:
                 let temperature = try await get(raw: .temperature_2m, time: time)

@@ -219,7 +219,8 @@ extension GenericDeriverProtocol {
                 pblHeight: try await get(variable: boundaryLayerHeight, time: time)?.data,
                 visibilityMeters: try await get(variable: visibilityMeters, time: time)?.data,
                 categoricalFreezingRain: try await get(variable: categoricalFreezingRain, time: time)?.data,
-                modelDtSeconds: time.dtSeconds), .wmoCode
+                modelDtSeconds: time.dtSeconds,
+                latitude: reader.modelLat), .wmoCode
             )
         }
     }
@@ -400,7 +401,8 @@ extension GenericDeriverOptionalProtocol {
                 pblHeight: try await get(variable: boundaryLayerHeight, time: time)?.data,
                 visibilityMeters: try await get(variable: visibilityMeters, time: time)?.data,
                 categoricalFreezingRain: try await get(variable: categoricalFreezingRain, time: time)?.data,
-                modelDtSeconds: time.dtSeconds), .wmoCode
+                modelDtSeconds: time.dtSeconds,
+                latitude: reader.modelLat), .wmoCode
             )
         }
     }

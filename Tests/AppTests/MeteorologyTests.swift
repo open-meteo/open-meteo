@@ -5,8 +5,9 @@ import Testing
 
 @Suite struct MeteorologyTests {
     @Test func thunderstormProbability() {
-        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 3, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600) == 64.6)
-        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600) == 54.8)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 3, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 65.714294)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 55.00496)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 30.830555)
     }
     
     @Test func wetbulbTemperature() {

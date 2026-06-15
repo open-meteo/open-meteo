@@ -98,7 +98,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
-                    modelDtSeconds: time.dtSeconds), .wmoCode
+                    modelDtSeconds: time.dtSeconds,
+                    latitude: reader.modelLat), .wmoCode
                 )
             }
 

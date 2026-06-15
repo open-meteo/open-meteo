@@ -269,7 +269,8 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
-                    modelDtSeconds: time.dtSeconds), .wmoCode
+                    modelDtSeconds: time.dtSeconds,
+                    latitude: reader.modelLat), .wmoCode
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)

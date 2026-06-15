@@ -33,7 +33,7 @@ enum WeatherCode: Int {
     /// Calculate weather interpretation code
     /// http://www.cosmo-model.org/content/model/documentation/newsLetters/newsLetter06/cnl6_hoffmann.pdf
     /// https://www.dwd.de/DE/leistungen/pbfb_verlag_promet/pdf_promethefte/28_1_2_pdf.pdf?__blob=publicationFile&v=8
-    public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, convectiveInhibition: Float?, pblHeight: Float?, visibilityMeters: Float?, categoricalFreezingRain: Float?, modelDtSeconds: Int) -> WeatherCode? {
+    public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, convectiveInhibition: Float?, pblHeight: Float?, visibilityMeters: Float?, categoricalFreezingRain: Float?, modelDtSeconds: Int, latitude: Float) -> WeatherCode? {
         guard cloudcover.isFinite, precipitation.isFinite, snowfallCentimeters.isFinite else {
             return nil
         }
@@ -43,7 +43,7 @@ enum WeatherCode: Int {
         // let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / modelDtHours) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / modelDtHours) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
         
         if let cape {
-            let thunderstroms = calculateThunderstormProbability(convectivePrecipitation: convectivePrecipitation, gusts: gusts, cape: cape, liftedIndex: liftedIndex, convectiveInhibition: convectiveInhibition, pblHeight: pblHeight, modelDtSeconds: modelDtSeconds)
+            let thunderstroms = calculateThunderstormProbability(convectivePrecipitation: convectivePrecipitation, gusts: gusts, cape: cape, liftedIndex: liftedIndex, convectiveInhibition: convectiveInhibition, pblHeight: pblHeight, modelDtSeconds: modelDtSeconds, latitude: latitude)
             if thunderstroms > 90 {
                 return .thunderstormHeavy
             }
@@ -114,7 +114,7 @@ enum WeatherCode: Int {
         return nil
     }
 
-    public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, convectiveInhibition: [Float]?, pblHeight: [Float]?, visibilityMeters: [Float]?, categoricalFreezingRain: [Float]?, modelDtSeconds: Int) -> [Float] {
+    public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, convectiveInhibition: [Float]?, pblHeight: [Float]?, visibilityMeters: [Float]?, categoricalFreezingRain: [Float]?, modelDtSeconds: Int, latitude: Float) -> [Float] {
         return cloudcover.indices.map { i in
             return calculate(
                 cloudcover: cloudcover[i],
@@ -128,7 +128,8 @@ enum WeatherCode: Int {
                 pblHeight: pblHeight?[i],
                 visibilityMeters: visibilityMeters?[i],
                 categoricalFreezingRain: categoricalFreezingRain?[i],
-                modelDtSeconds: modelDtSeconds
+                modelDtSeconds: modelDtSeconds,
+                latitude: latitude
             ).map({ Float($0.rawValue) }) ?? .nan
         }
     }
@@ -140,39 +141,40 @@ enum WeatherCode: Int {
         liftedIndex: Float?,
         convectiveInhibition: Float?,
         pblHeight: Float?,
-        modelDtSeconds: Int
+        modelDtSeconds: Int,
+        latitude: Float // Added latitude to scale tropical behavior
     ) -> Float {
         
         // 1. HARD BLOCKERS
-        if cape <= 10.0 {
-            return 0.0
+        if cape <= 10.0 { return 0.0 }
+        if let cin = convectiveInhibition, cin > 250.0 { return 0.0 }
+        if let li = liftedIndex, li > 2.0 { return 0.0 }
+        
+        // 2. LATITUDE SCALING FACTOR
+        // 1.0 at mid-latitudes (>= 30°), scales down to 0.7 at the equator (0°)
+        let absLat = Swift.abs(latitude)
+        let latitudeFactor: Float
+        if absLat >= 30.0 {
+            latitudeFactor = 1.0
+        } else {
+            latitudeFactor = 0.7 + (0.3 * (absLat / 30.0))
         }
         
-        // ECMWF Convention: CIN is stored as a positive value. Higher = stronger cap.
-        if let cin = convectiveInhibition, cin > 250.0 {
-            return 0.0
-        }
-        
-        // Lifted Index Blocker: Positive values indicate high atmospheric stability
-        if let li = liftedIndex, li > 2.0 {
-            return 0.0
-        }
-
         // Dynamic weight accumulation tracking
         var accumulatedScore: Float = 0.0
         var totalWeight: Float = 0.0
-
-        // 2. CAPE Score (Base Weight: 35%)
-        // Scale from 0.0 (at 100 J/kg) to 1.0 (at 2500+ J/kg)
-        let capeWeight: Float = 0.35
-        let capeScore = Swift.max(0.0, Swift.min((cape - 100.0) / 2400.0, 1.0))
+        
+        // 3. CAPE Score (Base Weight: 25%)
+        // Shifting CAPE baseline higher in tropics to account for naturally high baseline environments.
+        let capeWeight: Float = 0.25
+        let maxCapeThreshold: Float = 2500.0 + (1500.0 * (1.0 - (Swift.min(absLat, 30.0) / 30.0)))
+        let capeScore = Swift.max(0.0, Swift.min((cape - 100.0) / (maxCapeThreshold - 100.0), 1.0))
         accumulatedScore += (capeScore * capeWeight)
         totalWeight += capeWeight
-
-        // 3. CIN Score (Base Weight: 20%)
-        // 0 to 15 J/kg is un-capped (Score: 1.0). Scales to 0.0 at 150+ J/kg.
+        
+        // 4. CIN Score (Base Weight: 15%)
         if let cin = convectiveInhibition {
-            let cinWeight: Float = 0.20
+            let cinWeight: Float = 0.15
             let cinScore: Float
             if cin <= 15.0 {
                 cinScore = 1.0
@@ -182,24 +184,25 @@ enum WeatherCode: Int {
             accumulatedScore += (cinScore * cinWeight)
             totalWeight += cinWeight
         }
-
-        // 4. Lifted Index Score (Base Weight: 15%)
-        // Scale from 0.0 (at LI = 0) to 1.0 (at severe LI = -8 or lower)
+        
+        // 5. Lifted Index Score (Base Weight: 15%)
         if let li = liftedIndex {
             let liWeight: Float = 0.15
             let liScore = Swift.max(0.0, Swift.min((0.0 - li) / 8.0, 1.0))
             accumulatedScore += (liScore * liWeight)
             totalWeight += liWeight
         }
-
-        // 5. Convective Precipitation Score (Base Weight: 15%)
-        // Convert the reference 2.0 mm/hour threshold to match the model time-step
+        
+        // 6. Convective Precipitation Score (Base Weight: 15%)
         if let precip = convectivePrecipitation {
             let precipWeight: Float = 0.15
             let dtHours = Float(modelDtSeconds) / 3600.0
-            let referencePrecipThreshold = 2.0 * dtHours
             
-            let precipScore = Swift.max(0.0, Swift.min(precip / referencePrecipThreshold, 1.0))
+            // Require higher precipitation rates near the equator (2.0mm/hr up to 5.0mm/hr)
+            let referencePrecipPerHour: Float = 2.0 + (3.0 * (1.0 - (Swift.min(absLat, 30.0) / 30.0)))
+            let referencePrecip = referencePrecipPerHour * dtHours
+            
+            let precipScore = Swift.max(0.0, Swift.min(precip / referencePrecip, 1.0))
             accumulatedScore += (precipScore * precipWeight)
             totalWeight += precipWeight
         }
@@ -222,11 +225,6 @@ enum WeatherCode: Int {
             totalWeight += gustWeight
         }
 
-        // Prevent potential division by zero if everything except CAPE was missing and skipped
-        if totalWeight == 0.0 {
-            return 0.0
-        }
-
         // Calculate base probability normalized to the actual weights available
         var baseProbability = (accumulatedScore / totalWeight) * 100.0
 
@@ -244,9 +242,11 @@ enum WeatherCode: Int {
         if let cin = convectiveInhibition, cin > 100.0 {
             baseProbability *= 0.3
         }
-
-        // Round to 1 decimal place
-        return (baseProbability * 10.0).rounded() / 10.0
+        
+        // 9. APPLY FINAL LATITUDE DAMPENING
+        baseProbability *= latitudeFactor
+        
+        return Swift.max(0.0, Swift.min(baseProbability, 100.0))
     }
 
     /// True if weather code is an precipitation event. Thunderstorm, return false as they may only indicate potential

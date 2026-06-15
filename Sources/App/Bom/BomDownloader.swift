@@ -277,7 +277,8 @@ struct DownloadBomCommand: AsyncCommand {
                 let (((conv_snow, ls_snow), (ttl_cld, precipitation)), ((conv_rain, wndgust10m), visibility)) = arg
                 let timestamp = conv_snow.0
                 let snow = zip(conv_snow.1, ls_snow.1).map(+)
-                let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds)
+                // TODO fix latitude if BOM is available again
+                let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds, latitude: 45)
                 try await writer.writeBom(time: timestamp, member: member, variable: BomVariable.snowfall_water_equivalent, data: snow)
                 try await writer.writeBom(time: timestamp, member: member, variable: BomVariable.weather_code, data: weather_code)
             }
@@ -405,7 +406,8 @@ struct DownloadBomCommand: AsyncCommand {
             let (((conv_snow, ls_snow), (ttl_cld, precipitation)), ((conv_rain, wndgust10m), (cld_phys_thunder_p, visibility))) = arg
             let timestamp = conv_snow.0
             let snow = zip(conv_snow.1, ls_snow.1).map(+)
-            let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: cld_phys_thunder_p.1.map({ $0 * 3 }), liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds)
+            // TODO fix latitude if BOM is available again
+            let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: cld_phys_thunder_p.1.map({ $0 * 3 }), liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds, latitude: 45)
             try await writer.writeBom(time: timestamp, member: 0, variable: BomVariable.snowfall_water_equivalent, data: snow)
             try await writer.writeBom(time: timestamp, member: 0, variable: BomVariable.weather_code, data: weather_code)
         }
