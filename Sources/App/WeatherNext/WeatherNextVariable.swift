@@ -22,12 +22,6 @@ enum WeatherNextPressureLevel: Int, CaseIterable, Sendable {
 
 /**
  WeatherNext surface variables.
-
- Naming notes:
- - `rawValue` is used to address the source OM child in the upstream WeatherNext files.
- - `omFileName.file` is the canonical Open-Meteo output/storage name.
- - Most variables use the same name for both, but `total_precipitation_6hr` is intentionally
-   mapped to the canonical output name `precipitation`.
  */
 enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
     case wind_u_component_100m
@@ -70,12 +64,7 @@ enum WeatherNextSurfaceVariable: String, CaseIterable, GenericVariableMixable, G
     }
 
     var omFileName: (file: String, level: Int) {
-        switch self {
-        case .precipitation:
-            return ("precipitation", 0)
-        default:
-            return (rawValue, 0)
-        }
+        return (rawValue, 0)
     }
 
     var scalefactor: Float {
