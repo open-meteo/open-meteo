@@ -116,7 +116,7 @@ struct SyncCommand: AsyncCommand {
             let end = yearRange.upperBound.toComponents().year - 1
             logger.info("Checking for files within year \(start)-\(end)")
         } else {
-            logger.info("Checking for files to with more than \(pastDays) past days data")
+            logger.info("Checking for files with more than \(pastDays) past days data")
         }
         
         let serverModelVariable: [(server: String, model: DomainRegistry, variables: [String])] = zip(serverSet, zip(modelsSet, variablesSet)).flatMap { server, arg1 -> [(server: String, model: DomainRegistry, variables: [String])] in
