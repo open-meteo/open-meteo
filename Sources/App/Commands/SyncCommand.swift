@@ -180,9 +180,6 @@ struct SyncCommand: AsyncCommand {
         // See: https://github.com/swift-server/async-http-client/issues/602
         let client = server.contains(".your-objectstorage.com") || server.contains("s3.open-meteo.com") || server.contains("127.0.0.1:7480") ? application.http1Client : application.dedicatedHttpClient
         
-        /// 2025-07-28 For whatever reason, the hetzner s3 storage returns 404 from time to time. Maybe updates are not perfectly atomic
-        let curl = Curl(logger: logger, client: client, retryError4xx: true)
-        
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
         /// Get a list of all variables from all models
@@ -217,11 +214,10 @@ struct SyncCommand: AsyncCommand {
         let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
         logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
         let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
-        let curlStartBytes = curl.totalBytesTransfered.load(ordering: .relaxed)
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
-            var client = ClientRequest(url: URI("\(server)\(download.name)"))
+            var request = ClientRequest(url: URI("\(server)\(download.name)"))
             if apikey != nil {
-                try client.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
+                try request.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
             }
             let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
             let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
@@ -230,19 +226,30 @@ struct SyncCommand: AsyncCommand {
             // Another process might be updating this file right now. E.g. Second sync operation
             FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
             if localFile.hasSuffix("/meta.json") {
+                let body = try await client.executeRetryAndCollect(.init(url: request.url.string), logger: logger, upTo: 2*1024*1024, deadline: .minutes(5))
+                await progress.add(body.readableBytes)
+                guard let json = try body.readJSONDecodable(ModelUpdateMetaJson.self) else {
+                    logger.error("Not a valid ModelUpdateMetaJson \(pathNoData)")
+                    return
+                }
                 /// Update the `last_run_availability_time` within meta.json
-                try await curl
-                    .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
-                    .readJSONDecodable(ModelUpdateMetaJson.self)?
-                    .with(last_run_availability_time: .now())
-                    .writeTo(path: localFile)
+                try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
             } else {
-                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                for _ in 0..<10 {
+                    do {
+                        let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
+                        /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
+                        try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
+                        await progress.add(try response.contentLength() ?? 0)
+                        break
+                    } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+                        /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
+                        try FileManager.default.removeItemIfExists(at: localFile)
+                    }
+                }
             }
-            progress.set(curl.totalBytesTransfered.load(ordering: .relaxed) - curlStartBytes)
         }
-        progress.finish()
-        await curl.printStatistics()
+        await progress.finish()
     }
 }
 

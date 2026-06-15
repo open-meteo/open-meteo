@@ -59,8 +59,6 @@ struct DownloadEra5Command: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
-
         let domain = try CdsDomain.load(rawValue: signature.domain)
 
         let variables: [any GenericVariable]
@@ -87,7 +85,7 @@ struct DownloadEra5Command: AsyncCommand {
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
-        try await GenericVariableHandle.convert(logger: logger, client: context.application.http1Client, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
     /// Generate seasonal averages for bias corrections for CMIP climate data

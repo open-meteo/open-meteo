@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import AsyncHTTPClient
 import NIOCore
+import Logging
 
 @Suite struct DownloaderTests {
     @Test func testAwsSign() async throws {
@@ -59,6 +60,34 @@ import NIOCore
         #expect(request.headers.contains(name: "Authorization"))
         #expect(request.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
     }
+    
+    @Test func urlExtraction() throws {
+        var a = "s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "s3")
+        #expect(a?.user == "AKIAYawfawfawed5jdrh")
+        #expect(a?.password == "FgseawfawfrVU8Dk1zTsesefsegsgW1I/WJ6")
+        #expect(a?.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
+        
+        a = "s3://AKIAYawfawfawed5jdrh@openmeteo.s3.amazonaws.com:8080/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "s3")
+        #expect(a?.user == "AKIAYawfawfawed5jdrh")
+        #expect(a?.password == nil)
+        #expect(a?.url == "https://openmeteo.s3.amazonaws.com:8080/text.txt")
+        
+        a = "s3://127.0.0.1/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "s3")
+        #expect(a?.user == nil)
+        #expect(a?.password == nil)
+        #expect(a?.url == "http://127.0.0.1/text.txt")
+        
+        a = "file:///user/home/text.txt".extractSchemaUserNamePasswordCleanUrl()
+        #expect(a?.schema == "file")
+        #expect(a?.user == nil)
+        #expect(a?.password == nil)
+        #expect(a?.url == "/user/home/text.txt")
+        
+        #expect("s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".stripHttpPassword() == "s3://openmeteo.s3.amazonaws.com:8080/text.txt")
+    }
 
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
@@ -71,6 +100,35 @@ import NIOCore
 
         let data = randomData(byteCount: 1 * 1024 * 1024)
         try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin")
+    }
+
+    /// Upload three files using single-part PUT uploads.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3UploadThreeFiles() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+        let manager = S3UploadManager(logger: Logger(label: "DownloaderTests.S3UploadManager"))
+
+        let uploads: [(suffix: String, data: Data)] = [
+            ("a", randomData(byteCount: 128 * 1024)),
+            ("b", randomData(byteCount: 256 * 1024)),
+            ("c", randomData(byteCount: 512 * 1024))
+        ]
+
+        for upload in uploads {
+            await manager.upload(
+                client: client,
+                bucketEndpoint: server,
+                data: upload.data,
+                url: "\(server)test/s3uploader-three-\(upload.suffix).bin"
+            )
+        }
+
+        // Ensure all queued uploads complete before ending the test.
+        await manager.shutdown()
     }
 
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
