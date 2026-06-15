@@ -55,6 +55,27 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             let rh = Meteorology.specificToRelativeHumidity(specificHumidity: qv.data, temperature: t.data, pressure: p.data)
             return DataAndUnit(rh, .percentage)
         }
+        if case let .height(modelLevel) = raw, modelLevel.variable == .wind_speed {
+            let level = modelLevel.level
+            let u = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_u_component, level: level)), time: time).data
+            let v = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_v_component, level: level)), time: time).data
+            let speed = zip(u, v).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        }
+        if case let .height(modelLevel) = raw, modelLevel.variable == .wind_direction {
+            let level = modelLevel.level
+            let u = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_u_component, level: level)), time: time).data
+            let v = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_v_component, level: level)), time: time).data
+            let direction = Meteorology.windirectionFast(u: u, v: v)
+            return DataAndUnit(direction, .degreeDirection)
+        }
+        if case let .height(modelLevel) = raw, modelLevel.variable == .dew_point {
+            let level = modelLevel.level
+            let t = try await reader.get(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            let rh = try await get(raw: .height(IconModelLevelVariable(variable: .relative_humidity, level: level)), time: time)
+            let dp = zip(t.data, rh.data).map(Meteorology.dewpoint)
+            return DataAndUnit(dp, .celsius)
+        }
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
@@ -171,6 +192,19 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             return
         }
         if case let .height(ml) = raw, ml.variable == .relative_humidity {
+            let level = ml.level
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .pressure, level: level)), time: time)
+            return
+        }
+        if case let .height(ml) = raw, ml.variable == .wind_speed || ml.variable == .wind_direction {
+            let level = ml.level
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .wind_u_component, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .wind_v_component, level: level)), time: time)
+            return
+        }
+        if case let .height(ml) = raw, ml.variable == .dew_point {
             let level = ml.level
             try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
             try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)

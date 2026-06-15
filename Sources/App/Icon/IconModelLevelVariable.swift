@@ -13,6 +13,9 @@ enum IconModelLevelVariableType: String, CaseIterable, Sendable {
     case specific_humidity
     case relative_humidity
     case pressure
+    case wind_speed
+    case wind_direction
+    case dew_point
 }
 
 /// A variable on a native ICON model full level, named `<variable>_level<N>`
@@ -37,6 +40,7 @@ struct IconModelLevelVariable: ModelLevelVariableRespresentable, IconVariableDow
         case .specific_humidity: return 1000
         case .relative_humidity: return 1
         case .pressure: return 10
+        case .wind_speed, .wind_direction, .dew_point: return 10
         }
     }
 
@@ -46,6 +50,8 @@ struct IconModelLevelVariable: ModelLevelVariableRespresentable, IconVariableDow
         case .wind_u_component, .wind_v_component, .temperature, .pressure: return .hermite(bounds: nil)
         case .specific_humidity: return .linear
         case .relative_humidity: return .hermite(bounds: 0...100)
+        case .wind_speed, .dew_point: return .hermite(bounds: nil)
+        case .wind_direction: return .linearDegrees
         }
     }
 
@@ -57,6 +63,9 @@ struct IconModelLevelVariable: ModelLevelVariableRespresentable, IconVariableDow
         case .specific_humidity: return .gramPerKilogram
         case .relative_humidity: return .percentage
         case .pressure: return .hectopascal
+        case .wind_speed: return .metrePerSecond
+        case .wind_direction: return .degreeDirection
+        case .dew_point: return .celsius
         }
     }
 
@@ -95,6 +104,8 @@ struct IconModelLevelVariable: ModelLevelVariableRespresentable, IconVariableDow
             return nil  // derived on read from specific_humidity_levelN + temperature_levelN + pressure_levelN
         case .pressure:
             return ("p", "model-level", level)
+        case .wind_speed, .wind_direction, .dew_point:
+            return nil  // derived on read
         }
     }
 }
