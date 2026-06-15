@@ -1031,6 +1031,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 gusts: Reader.variableFromString("wind_gusts_10m"),
                 cape: Reader.variableFromString("cape"),
                 liftedIndex: Reader.variableFromString("lifted_index"),
+                convectiveInhibition: Reader.variableFromString("convective_inhibition"),
+                boundaryLayerHeight: Reader.variableFromString("boundary_layer_height"),
                 visibilityMeters: Reader.variableFromString("visibility"),
                 categoricalFreezingRain: Reader.variableFromString("categorical_freezing_rain")
             )

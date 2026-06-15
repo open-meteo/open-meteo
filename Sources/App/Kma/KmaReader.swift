@@ -302,6 +302,8 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                     gusts: gusts,
                     cape: cape,
                     liftedIndex: nil,
+                    convectiveInhibition: nil,
+                    pblHeight: nil,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
                     modelDtSeconds: time.dtSeconds), .wmoCode

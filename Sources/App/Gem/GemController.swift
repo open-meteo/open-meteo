@@ -307,6 +307,8 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                     gusts: gusts,
                     cape: cape,
                     liftedIndex: nil,
+                    convectiveInhibition: nil,
+                    pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
                     modelDtSeconds: time.dtSeconds), .wmoCode

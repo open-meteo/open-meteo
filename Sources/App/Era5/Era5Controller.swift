@@ -359,6 +359,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 gusts: nil,
                 cape: nil,
                 liftedIndex: nil,
+                convectiveInhibition: nil,
+                pblHeight: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
                 modelDtSeconds: time.dtSeconds), .wmoCode

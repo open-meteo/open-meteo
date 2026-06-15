@@ -210,6 +210,8 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 gusts: nil,
                 cape: cape,
                 liftedIndex: nil,
+                convectiveInhibition: nil,
+                pblHeight: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
                 modelDtSeconds: time.dtSeconds), .wmoCode

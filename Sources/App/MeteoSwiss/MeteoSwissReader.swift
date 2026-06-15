@@ -138,6 +138,7 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                 try await prefetchData(variable: .snowfall_height, time: time)
                 try await prefetchData(variable: .cape, time: time)
                 try await prefetchData(variable: .wind_gusts_10m, time: time)
+                try await prefetchData(variable: .convective_inhibition, time: time)
             case .is_day:
                 break
             case .wet_bulb_temperature_2m:
@@ -255,6 +256,7 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                 let snowfall = try await get(derived: .surface(.snowfall), time: time).data
                 let cape = try await get(raw: .cape, time: time).data
                 let gusts = try await get(raw: .wind_gusts_10m, time: time).data
+                let convectiveInhibition = try await get(raw: .convective_inhibition, time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -263,6 +265,8 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                     gusts: gusts,
                     cape: cape,
                     liftedIndex: nil,
+                    convectiveInhibition: convectiveInhibition,
+                    pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
                     modelDtSeconds: time.dtSeconds), .wmoCode
