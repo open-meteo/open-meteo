@@ -659,11 +659,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .snow_depth_water_equivalent_spread:
             return .init(variable: .snowDepthWaterEquivalent, aggregation: .spread)
         case .total_column_water:
-            // TODO register in SDK
-            return .init(variable: .totalColumnIntegratedWaterVapour, previousDay: previousDay)
+            return .init(variable: .totalColumnWater, previousDay: previousDay)
         case .air_density_2m:
-            // TODO register in SDK
-            return .init(variable: .massDensity, altitude: 2)
+            return .init(variable: .airDensity, altitude: 2)
         }
     }
 }
@@ -999,8 +997,7 @@ extension MultiDomains {
         case .geosphere_arome_austria:
             return .geosphereAromeAustria
         case .chmi_aladin_cz_1km:
-            // TODO: register chmi_aladin_cz_1km in the OpenMeteoSdk model enum
-            return .geosphereAromeAustria
+            return .chmiAladinCz1km
         case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
         case .era5, .copernicus_era5:
@@ -1046,13 +1043,13 @@ extension MultiDomains {
         case .ecmwf_aifs025:
             return .ecmwfAifs025
         case .ecmwf_ifs_europe_ensemble:
-            return .ecmwfIfs // TODO register in SDK
+            return .ecmwfIfsEuropeEnsemble
         case .ecmwf_ifs_europe_ensemble_mean:
-            return .ecmwfIfs // TODO register in SDK
+            return .ecmwfIfsEuropeEnsembleMean
         case .ecmwf_aifs_europe_ensemble:
-            return .ecmwfIfs // TODO register in SDK
+            return .ecmwfAifsEuropeEnsemble
         case .ecmwf_aifs_europe_ensemble_mean:
-            return .ecmwfIfs // TODO register in SDK
+            return .ecmwfAifsEuropeEnsembleMean
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return .gfsGraphcast025
         case .gfs025, .ncep_gfs025:
@@ -1140,7 +1137,7 @@ extension MultiDomains {
         case .bom_access_global_ensemble:
             return .bomAccessGlobalEnsemble
         case .google_weathernext2_ensemble:
-            return .bomAccessGlobalEnsemble // FIXME: Needs to be added
+            return .googleWeathernext2Ensemble
         case .ukmo_global_ensemble_20km:
             return .ukmoGlobalEnsemble20km
         case .ukmo_uk_ensemble_2km:
@@ -1250,7 +1247,7 @@ extension MultiDomains {
         case .bom_access_global_ensemble_mean:
             return .bomAccessGlobalEnsembleMean
         case .google_weathernext2_ensemble_mean:
-            return .bomAccessGlobalEnsembleMean // FIXME: Needs to be added
+            return .googleWeathernext2EnsembleMean
         case .ukmo_global_ensemble_mean_20km:
             return .ukmoGlobalEnsembleMean20km
         case .ukmo_uk_ensemble_mean_2km:
@@ -1264,8 +1261,7 @@ extension MultiDomains {
         case .ncep_gefswave025_ensemble_mean:
             return .ncepGefswave025EnsembleMean
         case .geosphere_seamless:
-            // TODO register in SDK
-            return .geosphereAromeAustria
+            return .geosphereSeamless
         }
     }
 }
