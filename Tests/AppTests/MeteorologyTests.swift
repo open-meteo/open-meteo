@@ -4,6 +4,12 @@ import Testing
 @preconcurrency import SwiftEccodes
 
 @Suite struct MeteorologyTests {
+    @Test func thunderstormProbability() {
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 3, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 70.7493)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 53.099743)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 31.831455)
+    }
+    
     @Test func wetbulbTemperature() {
         #expect(Meteorology.wetBulbTemperature(temperature: 10, relativeHumidity: 50).isApproximatelyEqual(to: 5.10125499, absoluteTolerance: 0.001))
         #expect(Meteorology.wetBulbTemperature(temperature: 5, relativeHumidity: 90).isApproximatelyEqual(to: 3.99465138, absoluteTolerance: 0.001))

@@ -164,19 +164,25 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
         case .weather_code, .weathercode:
             let cloudcover = try await get(raw: .cloud_cover, time: time).data
             let precipitation = try await get(raw: .precipitation, time: time).data
+            let showers = try await get(raw: .showers, time: time).data
             let snowfall = try await get(derived: .snowfall, time: time).data
             let cape = try await get(raw: .cape, time: time).data
+            let cin = try await get(raw: .convective_inhibition, time: time).data
+            let pbl = try await get(raw: .boundary_layer_height, time: time).data
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
-                convectivePrecipitation: nil,
+                convectivePrecipitation: showers,
                 snowfallCentimeters: snowfall,
                 gusts: nil,
                 cape: cape,
                 liftedIndex: nil,
+                convectiveInhibition: cin,
+                pblHeight: pbl,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
-                modelDtSeconds: time.dtSeconds), .wmoCode
+                modelDtSeconds: time.dtSeconds,
+                latitude: reader.modelLat), .wmoCode
             )
         case .snowfall:
             let snow = try await get(raw: .snowfall_water_equivalent, time: time).data.map({ $0 * 0.7 })
@@ -400,9 +406,12 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
         case .weather_code, .weathercode:
             try await prefetchData(raw: .cloud_cover, time: time)
+            try await prefetchData(raw: .showers, time: time)
             try await prefetchData(derived: .snowfall, time: time)
             try await prefetchData(raw: .precipitation, time: time)
             try await prefetchData(raw: .cape, time: time)
+            try await prefetchData(raw: .convective_inhibition, time: time)
+            try await prefetchData(raw: .boundary_layer_height, time: time)
         case .rain:
             try await prefetchData(raw: .precipitation, time: time)
             try await prefetchData(raw: .snowfall_water_equivalent, time: time)
