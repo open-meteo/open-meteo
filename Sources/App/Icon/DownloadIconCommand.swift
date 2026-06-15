@@ -52,6 +52,9 @@ struct DownloadIconCommand: AsyncCommand {
         @Option(name: "only-variables")
         var onlyVariables: String?
 
+        @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
+        var maxForecastHour: Int?
+
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
@@ -195,7 +198,7 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?, maxForecastHour: Int?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
         let downloadDirectory = domain.downloadDirectory
@@ -227,7 +230,11 @@ struct DownloadIconCommand: AsyncCommand {
             return elevation
         }()
         
-        let timestamps = domain.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
+        var forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        if let maxForecastHour {
+            forecastSteps = forecastSteps.filter { $0 <= maxForecastHour }
+        }
+        let timestamps = forecastSteps.map { run.add(hours: $0) }
         let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
@@ -618,7 +625,7 @@ struct DownloadIconCommand: AsyncCommand {
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
         try await convertHhlHeights(application: context.application, domain: domain, run: run)
 
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm, maxForecastHour: signature.maxForecastHour)
 
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
