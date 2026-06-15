@@ -17,10 +17,13 @@ struct DownloadIconCommand: AsyncCommand {
         case pressureLevel
         case pressureLevelGt500
         case pressureLevelLtE500
+        case hiresTemp = "hires-temp"
+        case hiresTempBelowFL180 = "hires-temp-below-fl180"
+        case hiresTempAllLevels = "hires-temp-all-levels"
         
         var realm: String? {
             switch self {
-            case .modelLevel:
+            case .modelLevel, .hiresTemp, .hiresTempBelowFL180, .hiresTempAllLevels:
                 return "model-level"
             case .pressureLevel:
                 return "pressure-level"
@@ -539,7 +542,7 @@ struct DownloadIconCommand: AsyncCommand {
 
         /// 3 different variables sets to optimise download time:
         /// - surface variables with soil
-        /// - model-level: all native model level u/v/t/qv/p (rh derived on read from qv+t+p) (1=top to N=lowest)
+        /// - model-level / hires-temp: focused model level profile vars (u/v + t + p + rh derived from qv+t+p) below FL180 (or all-levels variant)
         /// - pressure level which take forever to download because it is too much data
         var groupVariables: [any IconVariableDownloadable]
         switch group {
@@ -562,6 +565,21 @@ struct DownloadIconCommand: AsyncCommand {
                 }
             }
         case .modelLevel:
+            // legacy alias to the practical hires model level profile set (below FL180)
+            fallthrough
+        case .hiresTemp, .hiresTempBelowFL180:
+            let n = domain.numberOfModelFullLevels
+            let start = domain.hiresTempBelowFL180StartLevel
+            groupVariables = (start...n).reversed().flatMap { level in
+                [
+                    IconModelLevelVariable(variable: .wind_u_component, level: level),
+                    IconModelLevelVariable(variable: .wind_v_component, level: level),
+                    IconModelLevelVariable(variable: .temperature, level: level),
+                    IconModelLevelVariable(variable: .specific_humidity, level: level),
+                    IconModelLevelVariable(variable: .pressure, level: level)
+                ]
+            }
+        case .hiresTempAllLevels:
             let n = domain.numberOfModelFullLevels
             groupVariables = (1...n).reversed().flatMap { level in
                 [
