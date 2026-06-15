@@ -699,10 +699,44 @@ extension ForecastHeightOrModelLevelVariable: FlatBuffersVariable {
         switch self {
         case .height(let v):
             return v.getFlatBuffersMeta()
-        case .modelLevel:
-            // FlatBuffers meta for model levels is not modelled yet; JSON/CSV is the supported
-            // output for height_levelN. Surface a generic geometric-height variable for now.
+        case .modelLevel(let ml):
+            switch ml.variable {
+            case .height, .height_agl:
+                return .init(variable: .geopotentialHeight)
+            case .wind_u_component:
+                return .init(variable: .windUComponent)
+            case .wind_v_component:
+                return .init(variable: .windVComponent)
+            case .temperature:
+                return .init(variable: .temperature)
+            case .specific_humidity:
+                return .init(variable: .relativeHumidity)
+            case .relative_humidity:
+                return .init(variable: .relativeHumidity)
+            case .pressure:
+                return .init(variable: .surfacePressure)
+            }
+        }
+    }
+}
+
+extension IconModelLevelVariable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch variable {
+        case .height, .height_agl:
             return .init(variable: .geopotentialHeight)
+        case .wind_u_component:
+            return .init(variable: .windUComponent)
+        case .wind_v_component:
+            return .init(variable: .windVComponent)
+        case .temperature:
+            return .init(variable: .temperature)
+        case .specific_humidity:
+            return .init(variable: .relativeHumidity)
+        case .relative_humidity:
+            return .init(variable: .relativeHumidity)
+        case .pressure:
+            return .init(variable: .surfacePressure)
         }
     }
 }

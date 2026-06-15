@@ -530,13 +530,16 @@ struct DownloadIconCommand: AsyncCommand {
                 if let variable = IconPressureVariable(rawValue: String($0)) {
                     return variable
                 }
+                if let variable = IconModelLevelVariable(rawValue: String($0)), variable.variable != .height, variable.variable != .height_agl {
+                    return variable
+                }
                 return try IconSurfaceVariable.load(rawValue: String($0))
             }
         }
 
         /// 3 different variables sets to optimise download time:
         /// - surface variables with soil
-        /// - model-level e.g. for 180m wind, they have a much larger dalay and sometimes are aborted
+        /// - model-level: all native model level u/v/t/qv/p (rh derived on read from qv+t+p) (1=top to N=lowest)
         /// - pressure level which take forever to download because it is too much data
         var groupVariables: [any IconVariableDownloadable]
         switch group {
@@ -559,8 +562,15 @@ struct DownloadIconCommand: AsyncCommand {
                 }
             }
         case .modelLevel:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                $0.getVarAndLevel(domain: domain)?.cat == "model-level"
+            let n = domain.numberOfModelFullLevels
+            groupVariables = (1...n).reversed().flatMap { level in
+                [
+                    IconModelLevelVariable(variable: .wind_u_component, level: level),
+                    IconModelLevelVariable(variable: .wind_v_component, level: level),
+                    IconModelLevelVariable(variable: .temperature, level: level),
+                    IconModelLevelVariable(variable: .specific_humidity, level: level),
+                    IconModelLevelVariable(variable: .pressure, level: level)
+                ]
             }
         case .pressureLevel:
             groupVariables = domain.levels.reversed().flatMap { level in

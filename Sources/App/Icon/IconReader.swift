@@ -34,16 +34,26 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func get(raw: IconVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        // Model-level geometric height: computed from the static HHL stack, constant over time.
         if case let .height(modelLevel) = raw {
-            let height: Float?
             switch modelLevel.variable {
             case .height:
-                height = try await fullLevelHeightASL(fullLevel: modelLevel.level)
+                let height = try await fullLevelHeightASL(fullLevel: modelLevel.level)
+                return DataAndUnit([Float](repeating: height ?? .nan, count: time.time.count), .metre)
             case .height_agl:
-                height = try await fullLevelHeightAGL(fullLevel: modelLevel.level)
+                let height = try await fullLevelHeightAGL(fullLevel: modelLevel.level)
+                return DataAndUnit([Float](repeating: height ?? .nan, count: time.time.count), .metre)
+            default:
+                break
             }
-            return DataAndUnit([Float](repeating: height ?? .nan, count: time.time.count), .metre)
+        }
+        // Model-level relative humidity derived on read (no native relhum grib on model levels; use qv + t + p)
+        if case let .height(modelLevel) = raw, modelLevel.variable == .relative_humidity {
+            let level = modelLevel.level
+            let qv = try await reader.get(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
+            let t = try await reader.get(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            let p = try await reader.get(variable: .height(IconModelLevelVariable(variable: .pressure, level: level)), time: time)
+            let rh = Meteorology.specificToRelativeHumidity(specificHumidity: qv.data, temperature: t.data, pressure: p.data)
+            return DataAndUnit(rh, .percentage)
         }
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw {
@@ -157,8 +167,14 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func prefetchData(raw: IconVariable, time: TimerangeDtAndSettings) async throws {
-        // Model-level height is computed lazily from the static HHL file; nothing to prefetch.
-        if case .height = raw {
+        if case let .height(ml) = raw, ml.variable == .height || ml.variable == .height_agl {
+            return
+        }
+        if case let .height(ml) = raw, ml.variable == .relative_humidity {
+            let level = ml.level
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .pressure, level: level)), time: time)
             return
         }
         // icon-d2 has no levels 800, 900, 925
