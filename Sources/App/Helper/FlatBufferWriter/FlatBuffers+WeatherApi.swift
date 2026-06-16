@@ -968,7 +968,7 @@ extension MultiDomains {
             return .meteofranceAromeFranceHd
         case .jma_seamless, .jma_mix:
             return .jmaSeamless
-        case .jma_msm:
+        case .jma_msm, .jma_msm_upper_level:
             return .jmaMsm
         case .jms_gsm, .jma_gsm:
             return .jmaGsm

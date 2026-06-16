@@ -738,6 +738,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case jma_seamless
     case jma_mix
     case jma_msm
+    case jma_msm_upper_level
     case jms_gsm
     case jma_gsm
 
@@ -1479,6 +1480,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 try await JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             ].compactMap({ $0 })
+        case .jma_msm_upper_level:
+            return [
+                try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+            ].compactMap({ $0 })
         case .jms_gsm, .jma_gsm:
             return try await JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
@@ -1872,6 +1877,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .jma_msm:
             return JmaDomain.msm
+        case .jma_msm_upper_level:
+            return JmaDomain.msm_upper_level
         case .jms_gsm, .jma_gsm:
             return JmaDomain.gsm
         case .gem_seamless:
@@ -2143,6 +2150,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .jma_msm:
             return try await JmaReader(domain: .msm, gridpoint: gridpoint, options: options)
+        case .jma_msm_upper_level:
+            return try await JmaReader(domain: .msm_upper_level, gridpoint: gridpoint, options: options)
         case .jms_gsm, .jma_gsm:
             return try await JmaReader(domain: .gsm, gridpoint: gridpoint, options: options)
         case .gem_seamless:
