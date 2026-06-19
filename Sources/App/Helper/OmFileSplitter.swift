@@ -2,6 +2,31 @@ import Foundation
 import OmFileFormat
 import Vapor
 
+/// Parameters for writing ensemble mean and spread into a separate mean domain,
+/// computed inline during the ensemble rolling-file write pass.
+struct EnsembleMeanOutput {
+    let splitter: OmFileSplitter
+    let meanVariable: String
+    let meanScalefactor: Float
+    let spreadVariable: String
+    let spreadScalefactor: Float
+    /// Actual number of downloaded members; may be less than `domain.countEnsembleMember`
+    /// when a model delivers a partial set (e.g. MeteoSwiss). Welford iterates only up to this.
+    let nMembersActual: Int
+}
+
+/// Represents a single chunk file writer with its read handle, write handle, and offsets.
+/// Used for the read-merge-write pattern in chunked archive updates.
+struct WriterPerStep {
+    let read: OmFileReader<MmapFile>?
+    let writeFile: OmFileWriter<FileHandle>
+    let write: OmFileWriterArray<Float, FileHandle>
+    let writeFn: FileHandle
+    let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
+    let fileName: String
+    let skip: Int
+}
+
 /// Read any time from multiple files
 struct OmFileSplitter {
     let domain: DomainRegistry
@@ -326,47 +351,26 @@ struct OmFileSplitter {
         }
     }
 
-    /**
-     Write new data to archived storage and combine it with existing data.
-     `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
-     */
-    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
-        
-        if nMembers > 1, let retainDays = domain.useRollingDays {
-            // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
-            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, supplyChunk: supplyChunk)
-        }
-        
-        let indexTime = time.toIndexTime()
+    /// Creates chunk writers for all time chunks and previous days.
+    /// Opens existing files for reading and creates new temp files for writing.
+    private func makeChunkWriters(
+        variable: String,
+        indexTime: CountableRange<Int>,
+        scalefactor: Float,
+        compression: OmCompressionType,
+        previousDaysRange: Range<Int>,
+        dtSeconds: Int
+    ) async throws -> [WriterPerStep] {
         let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)
-
-        /// Previous days of forecast to keep. Max 7 past days
-        /// `0..<1` if previous days are not generated
-        /// `1..<n` for all previous days
-        let previousDaysRange: Range<Int> = onlyGeneratePreviousDays ? (1..<max(1, min(8, time.range.count / 86400))) : (0..<1)
-        if previousDaysRange.isEmpty {
-            return
-        }
-
-        struct WriterPerStep {
-            let read: OmFileReader<MmapFile>?
-            let writeFile: OmFileWriter<FileHandle>
-            let write: OmFileWriterArray<Float, FileHandle>
-            let writeFn: FileHandle
-            let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
-            let fileName: String
-            let skip: Int
-        }
-
-        // open all files for all timeranges and write a header
-        let writers: [WriterPerStep] = try await indextimeChunked.asyncFlatMap { timeChunk -> [WriterPerStep] in
+        
+        return try await indextimeChunked.asyncFlatMap { timeChunk -> [WriterPerStep] in
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 return []
             }
 
             return try await previousDaysRange.asyncMap { previousDay -> WriterPerStep in
-                let skip = previousDay * 86400 / time.dtSeconds
+                let skip = previousDay * 86400 / dtSeconds
                 let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
                 let fileName = readFile.getFilePath()
@@ -389,6 +393,129 @@ struct OmFileSplitter {
                 return WriterPerStep(read: omRead, writeFile: writeFile, write: writer, writeFn: fn, offsets: offsets, fileName: fileName, skip: skip)
             }
         }
+    }
+    
+    /// Applies the read-merge-write logic for a single spatial chunk to all writers.
+    /// Reads existing data into fileData buffer, merges with newData, and writes back.
+    private func applyToChunkWriters(
+        _ writers: [WriterPerStep],
+        fileData: inout [Float],
+        newData: ArraySlice<Float>,
+        nIndexTime: Int,
+        yRange: Range<UInt64>,
+        xRange: Range<UInt64>,
+        memberRange: Range<UInt64>?
+    ) async throws {
+        
+        for writer in writers {
+            if let omRead = writer.read?.asArray(of: Float.self) {
+                // Read existing data for a range of locations
+                let nDimensions = omRead.getDimensionsCount()
+                switch nDimensions {
+                case 2: // Old legacy file
+                    let dimensions: InlineArray<2, UInt64> = omRead.getDimensionsInline()
+                    if dimensions[0] == UInt64(ny * nx) {
+                        // Dimensions are ok, read data. Ignores legacy ensemble files
+                        let start = yRange.lowerBound * UInt64(nx) + xRange.lowerBound
+                        let count = UInt64(yRange.count * xRange.count)
+                        try await omRead.read(
+                            into: &fileData,
+                            range: [start ..< start + count, 0..<UInt64(nTimePerFile)]
+                        )
+                    }
+                case 3:
+                    //let dimensions: InlineArray<3, UInt64> = omRead.getDimensionsInline()
+                    try await omRead.read(
+                        into: &fileData,
+                        range: [yRange, xRange, 0..<UInt64(nTimePerFile)]
+                    )
+                case 4: // ensemble files
+                    //let dimensions: InlineArray<4, UInt64> = omRead.getDimensionsInline()
+                    guard let memberRange else {
+                        fatalError("memberRange needs to be set for ensemble files")
+                    }
+                    try await omRead.read(
+                        into: &fileData,
+                        range: [yRange, xRange, memberRange, 0..<UInt64(nTimePerFile)]
+                    )
+                default:
+                    fatalError("Unexpected number of dimensions (\(nDimensions))")
+                }
+            } else {
+                // If the old file does not exist, just make sure it is filled with NaNs
+                for i in fileData.indices {
+                    fileData[i] = .nan
+                }
+            }
+            
+            // write "new" data into existing data
+            for l in 0 ..< (yRange.count * xRange.count * nMembers) {
+                for (tFile, tArray) in zip(writer.offsets.file, writer.offsets.array) {
+                    if tArray < writer.skip {
+                        continue
+                    }
+                    if newData[newData.startIndex + l * nIndexTime + tArray].isNaN {
+                        continue
+                    }
+                    fileData[nTimePerFile * l + tFile] = newData[newData.startIndex + l * nIndexTime + tArray]
+                }
+            }
+
+            // Write data
+            try fileData.withUnsafeBufferPointer { fileData in
+                // Write does not support array slices. Use pointer instead
+                try writer.write.writeData(
+                    pointer: UnsafeBufferPointer(start: fileData.baseAddress, count: yRange.count * xRange.count * nMembers * nTimePerFile),
+                    arrayDimensions: nMembers <= 1 ?
+                    [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTimePerFile)] :
+                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(nTimePerFile)]
+                )
+            }
+        }
+    }
+    
+    /// Finalizes all chunk writers by writing trailers and linking temp files.
+    private func finalizeChunkWriters(_ writers: [WriterPerStep]) throws {
+        /// Write end of file and move it in position
+        for writer in writers {
+            let root = try writer.writeFile.write(array: writer.write.finalise(), name: "", children: [])
+            try writer.writeFile.writeTrailer(rootVariable: root)
+            // Overwrite existing file, with newly created
+            try writer.writeFn.linkTemporary(file: writer.fileName)
+            try writer.writeFn.close()
+        }
+    }
+
+    /**
+     Write new data to archived storage and combine it with existing data.
+     `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
+     */
+    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, ensembleMean: EnsembleMeanOutput? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+        
+        if nMembers > 1, let retainDays = domain.useRollingDays {
+            // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
+            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, ensembleMean: ensembleMean, supplyChunk: supplyChunk)
+        }
+        
+        let indexTime = time.toIndexTime()
+
+        /// Previous days of forecast to keep. Max 7 past days
+        /// `0..<1` if previous days are not generated
+        /// `1..<n` for all previous days
+        let previousDaysRange: Range<Int> = onlyGeneratePreviousDays ? (1..<max(1, min(8, time.range.count / 86400))) : (0..<1)
+        if previousDaysRange.isEmpty {
+            return
+        }
+
+        // open all files for all timeranges and write a header
+        let writers = try await makeChunkWriters(
+            variable: variable,
+            indexTime: indexTime,
+            scalefactor: scalefactor,
+            compression: compression,
+            previousDaysRange: previousDaysRange,
+            dtSeconds: time.dtSeconds
+        )
 
         let nIndexTime = indexTime.count
 
@@ -405,79 +532,20 @@ struct OmFileSplitter {
 
                 // Contains the entire time-series to be updated for a chunk of locations
                 let data = try await supplyChunk(yRange, xRange, memberRange)
-
-                for writer in writers {
-                    if let omRead = writer.read?.asArray(of: Float.self) {
-                        // Read existing data for a range of locations
-                        let nDimensions = omRead.getDimensionsCount()
-                        switch nDimensions {
-                        case 2: // Old legacy file
-                            let dimensions: InlineArray<2, UInt64> = omRead.getDimensionsInline()
-                            if dimensions[0] == UInt64(ny * nx) {
-                                // Dimensions are ok, read data. Ignores legacy ensemble files
-                                let start = yRange.lowerBound * UInt64(nx) + xRange.lowerBound
-                                let count = UInt64(yRange.count * xRange.count)
-                                try await omRead.read(
-                                    into: &fileData,
-                                    range: [start ..< start + count, 0..<UInt64(nTimePerFile)]
-                                )
-                            }
-                        case 3:
-                            //let dimensions: InlineArray<3, UInt64> = omRead.getDimensionsInline()
-                            try await omRead.read(
-                                into: &fileData,
-                                range: [yRange, xRange, 0..<UInt64(nTimePerFile)]
-                            )
-                        case 4: // ensemble files
-                            //let dimensions: InlineArray<4, UInt64> = omRead.getDimensionsInline()
-                            try await omRead.read(
-                                into: &fileData,
-                                range: [yRange, xRange, memberRange, 0..<UInt64(nTimePerFile)]
-                            )
-                        default:
-                            fatalError("Unexpected number of dimensions (\(nDimensions))")
-                        }
-                    } else {
-                        // If the old file does not exist, just make sure it is filled with NaNs
-                        for i in fileData.indices {
-                            fileData[i] = .nan
-                        }
-                    }
-                    // write "new" data into existing data
-                    for l in 0 ..< (yRange.count * xRange.count * nMembers) {
-                        for (tFile, tArray) in zip(writer.offsets.file, writer.offsets.array) {
-                            if tArray < writer.skip {
-                                continue
-                            }
-                            if data[data.startIndex + l * nIndexTime + tArray].isNaN {
-                                continue
-                            }
-                            fileData[nTimePerFile * l + tFile] = data[data.startIndex + l * nIndexTime + tArray]
-                        }
-                    }
-
-                    // Write data
-                    try fileData.withUnsafeBufferPointer { fileData in
-                        // Write does not support array slices. Use pointer instead
-                        try writer.write.writeData(
-                            pointer: UnsafeBufferPointer(start: fileData.baseAddress, count: yRange.count * xRange.count * nMembers * nTimePerFile),
-                            arrayDimensions: nMembers <= 1 ?
-                            [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTimePerFile)] :
-                                [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(nTimePerFile)]
-                        )
-                    }
-                }
+                
+                try await applyToChunkWriters(
+                    writers,
+                    fileData: &fileData,
+                    newData: data,
+                    nIndexTime: nIndexTime,
+                    yRange: yRange,
+                    xRange: xRange, 
+                    memberRange: memberRange
+                )
             }
         }
 
-        /// Write end of file and move it in position
-        for writer in writers {
-            let root = try writer.writeFile.write(array: writer.write.finalise(), name: "", children: [])
-            try writer.writeFile.writeTrailer(rootVariable: root)
-            // Overwrite existing file, with newly created
-            try writer.writeFn.linkTemporary(file: writer.fileName)
-            try writer.writeFn.close()
-        }
+        try finalizeChunkWriters(writers)
     }
     
     
@@ -487,7 +555,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, ensembleMean: EnsembleMeanOutput? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: 0, previousDay: 0)
         try readFile.createDirectory()
@@ -536,6 +604,42 @@ struct OmFileSplitter {
         // print("Chunks [\(processChunkY),\(processChunkX)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         
         var fileData = [Float](repeating: .nan, count: processChunkY * processChunkX * fileTime.count * nMembers)
+
+        let meanWriters: [WriterPerStep]
+        let spreadWriters: [WriterPerStep]
+        var meanFileData: [Float]
+        var spreadFileData: [Float]
+
+        if let em = ensembleMean {
+            let ms = em.splitter
+            let indexTime = time.toIndexTime()
+
+            meanWriters = try await ms.makeChunkWriters(
+                variable: em.meanVariable,
+                indexTime: indexTime,
+                scalefactor: em.meanScalefactor,
+                compression: compression,
+                previousDaysRange: 0..<1,  // Mean/spread never write previous-day variants
+                dtSeconds: time.dtSeconds
+            )
+            
+            spreadWriters = try await ms.makeChunkWriters(
+                variable: em.spreadVariable,
+                indexTime: indexTime,
+                scalefactor: em.spreadScalefactor,
+                compression: compression,
+                previousDaysRange: 0..<1,
+                dtSeconds: time.dtSeconds
+            )
+            
+            meanFileData   = [Float](repeating: .nan, count: processChunkY * processChunkX * ms.nTimePerFile)
+            spreadFileData = [Float](repeating: .nan, count: processChunkY * processChunkX * ms.nTimePerFile)
+        } else {
+            meanWriters = []
+            spreadWriters = []
+            meanFileData   = []
+            spreadFileData = []
+        }
 
         for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
             for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
@@ -590,11 +694,45 @@ struct OmFileSplitter {
                     try writer.writeData(
                         pointer: UnsafeBufferPointer(start: fileData.baseAddress, count: yRange.count * xRange.count * nMembers * fileTime.count),
                         arrayDimensions: nMembers <= 1 ?
-                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(time.count)] :
+                            [UInt64(yRange.count), UInt64(xRange.count), UInt64(time.count)] :
                             [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(fileTime.count)]
                     )
                 }
 
+                // Compute ensemble mean and spread for this chunk, then write to mean domain's chunked files.
+                // data layout (Array3DFastTime): [loc * nMembers * nT + member * nT + t]
+                if let em = ensembleMean {
+                    let nLoc = yRange.count * xRange.count
+                    let nT = time.count
+                    
+                    let (chunkMean, chunkSpread) = welfordMeanSpread(
+                        data3d: data,
+                        nLoc: nLoc,
+                        nMembers: nMembers,
+                        nMembersActual: em.nMembersActual,
+                        nTime: nT
+                    )
+
+                    let ms = em.splitter
+                    try await ms.applyToChunkWriters(
+                        meanWriters,
+                        fileData: &meanFileData,
+                        newData: ArraySlice(chunkMean),
+                        nIndexTime: nT,
+                        yRange: yRange,
+                        xRange: xRange,
+                        memberRange: nil
+                    )
+                    try await ms.applyToChunkWriters(
+                        spreadWriters,
+                        fileData: &spreadFileData,
+                        newData: ArraySlice(chunkSpread),
+                        nIndexTime: nT,
+                        yRange: yRange,
+                        xRange: xRange,
+                        memberRange: nil
+                    )
+                }
             }
         }
 
@@ -608,6 +746,12 @@ struct OmFileSplitter {
         try writeFile.writeTrailer(rootVariable: root)
         try writeFn.linkTemporary(file: fileName)
         try writeFn.close()
+
+        // Finalise and link mean/spread chunked files
+        if ensembleMean != nil {
+            try ensembleMean!.splitter.finalizeChunkWriters(meanWriters)
+            try ensembleMean!.splitter.finalizeChunkWriters(spreadWriters)
+        }
     }
 }
 

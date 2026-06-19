@@ -38,7 +38,7 @@ struct GenericVariableHandle: Sendable {
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
     /// If `fullRunSkipMeta` do not generate meta.json for each run
-    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
         let logger = application.logger
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
             let domain = handles[0].domain
@@ -48,7 +48,7 @@ struct GenericVariableHandle: Sendable {
             if generateTimeSeries {
                 let startTime = DispatchTime.now()
                 logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
+                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
                 logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
             
@@ -99,7 +99,7 @@ struct GenericVariableHandle: Sendable {
                 // if run is nil, do not attempt to generate previous days files
                 logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimePreviousDays = DispatchTime.now()
-                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression)
+                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
                 logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
@@ -109,6 +109,18 @@ struct GenericVariableHandle: Sendable {
                         bucket: uploadS3Bucket,
                         variables: nil
                     )
+
+                    // Also sync ensemble mean domain if it was generated
+                    if let emDomain = ensembleMeanDomain {
+                        let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
+                        if nMembers > 1 {
+                            try await emDomain.domainRegistry.syncToS3(
+                                application: application,
+                                bucket: uploadS3Bucket,
+                                variables: nil
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -119,7 +131,7 @@ struct GenericVariableHandle: Sendable {
             if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
-                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta)
+                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta, ensembleMeanDomain: ensembleMeanDomain)
                 logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 
                 if let uploadS3Bucket {
@@ -129,13 +141,40 @@ struct GenericVariableHandle: Sendable {
                         run: run,
                         skipMeta: fullRunSkipMeta
                     )
+                    
+                    // Also sync ensemble mean domain if it was generated
+                    if let emDomain = ensembleMeanDomain {
+                        let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
+                        if nMembers > 1 {
+                            try await emDomain.domainRegistry.syncToS3PerRun(
+                                application: application,
+                                bucket: uploadS3Bucket,
+                                run: run,
+                                skipMeta: false
+                            )
+                        }
+                    }
                 }
             }
         }
     }
     
+    /// State for ensemble mean/spread file writers
+    private struct EnsembleMeanFileState {
+        let meanWriteFile: OmFileWriter<FileHandle>
+        let meanWriter: OmFileWriterArray<Float, FileHandle>
+        let meanFn: FileHandle
+        let meanFilePath: String
+        let spreadWriteFile: OmFileWriter<FileHandle>
+        let spreadWriter: OmFileWriterArray<Float, FileHandle>
+        let spreadFn: FileHandle
+        let spreadFilePath: String
+        let spreadVariable: any GenericVariable
+    }
+    
     /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
-    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool) async throws {
+    /// If `ensembleMeanDomain` is provided, additionally computes ensemble mean and spread from multi-member handles and writes 3D files to that domain.
+    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, ensembleMeanDomain: (any GenericDomain)? = nil) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -149,18 +188,20 @@ struct GenericVariableHandle: Sendable {
             
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * nTime * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(nTime) timesteps")
             
+            // Setup: Regular file is always created
+            let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
+            let chunks = nMembers > 1 ? [1, 1, chunknLocations, nTime] : [1, chunknLocations, nTime]
+            let dimensions = nMembers > 1 ? [ny, nx, nMembers, nTime] : [ny, nx, nTime]
+            let coordinatesString = nMembers > 1 ? "lat lon member time" : "lat lon time"
+            
+            let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTime / nMembers / chunknLocations * chunknLocations))
+            let processChunkY = max(1, min(ny, 2 * 1024 * 1024 / nTime / nMembers / processChunkX))
+            
+            // Regular file (always created)
             let file = OmFileType.run(domain: domain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
             try file.createDirectory()
             let filePath = file.getFilePath()
             let fn = try FileHandle.createNewFile(file: filePath, overwrite: true, temporary: true)
-            
-            let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
-            let chunks = nMembers > 1 ? [1, 1, chunknLocations, nTime] : [1, chunknLocations, nTime]
-            let dimensions = nMembers > 1 ? [ny, nx, nMembers, nTime] : [ny, nx, nTime]
-            let coordinatesString =  nMembers > 1 ? "lat lon member time" : "lat lon time"
-            
-            let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTime / nMembers / chunknLocations * chunknLocations))
-            let processChunkY = max(1, min(ny, 2 * 1024 * 1024 / nTime / nMembers / processChunkX))
             
             let writeFile = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
             let writer = try writeFile.prepareArray(
@@ -172,15 +213,72 @@ struct GenericVariableHandle: Sendable {
                 add_offset: 0
             )
             
+            // Ensemble mean/spread files (additional, only if ensembleMeanDomain is provided)
+            let ensembleMeanState: EnsembleMeanFileState? = try { () throws -> EnsembleMeanFileState? in
+                guard let emDomain = ensembleMeanDomain else { return nil }
+                guard nMembers > 1 else {
+                    logger.warning("Cannot compute ensemble mean with only \(nMembers) member(s)")
+                    return nil
+                }
+                
+                // Derived ensemble mean domain grid always same as original grid                
+                // Mean and spread are 3D (no member dimension)
+                let meanChunks = [1, chunknLocations, nTime]
+                let meanDimensions = [ny, nx, nTime]
+                
+                // Mean file - written to ensemble mean domain
+                let meanFile = OmFileType.run(domain: emDomain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
+                try meanFile.createDirectory()
+                let meanFilePath = meanFile.getFilePath()
+                let meanFn = try FileHandle.createNewFile(file: meanFilePath, overwrite: true, temporary: true)
+                
+                let meanWriteFile = OmFileWriter(fn: meanFn, initialCapacity: 4 * 1024)
+                let meanWriter = try meanWriteFile.prepareArray(
+                    type: Float.self,
+                    dimensions: meanDimensions.map(UInt64.init),
+                    chunkDimensions: meanChunks.map(UInt64.init),
+                    compression: compression,
+                    scale_factor: variable.scalefactor,
+                    add_offset: 0
+                )
+                
+                // Spread file - written to ensemble mean domain
+                let spreadVariable = variable.asSpreadVariableGeneric
+                let spreadFile = OmFileType.run(domain: emDomain.domainRegistry, variable: spreadVariable.omFileName.file, run: run.toIsoDateTime())
+                try spreadFile.createDirectory()
+                let spreadFilePath = spreadFile.getFilePath()
+                let spreadFn = try FileHandle.createNewFile(file: spreadFilePath, overwrite: true, temporary: true)
+                
+                let spreadWriteFile = OmFileWriter(fn: spreadFn, initialCapacity: 4 * 1024)
+                let spreadWriter = try spreadWriteFile.prepareArray(
+                    type: Float.self,
+                    dimensions: meanDimensions.map(UInt64.init),
+                    chunkDimensions: meanChunks.map(UInt64.init),
+                    compression: compression,
+                    scale_factor: spreadVariable.scalefactor,
+                    add_offset: 0
+                )
+                
+                return EnsembleMeanFileState(
+                    meanWriteFile: meanWriteFile,
+                    meanWriter: meanWriter,
+                    meanFn: meanFn,
+                    meanFilePath: meanFilePath,
+                    spreadWriteFile: spreadWriteFile,
+                    spreadWriter: spreadWriter,
+                    spreadFn: spreadFn,
+                    spreadFilePath: spreadFilePath,
+                    spreadVariable: spreadVariable
+                )
+            }()
+            
+            // Single shared loop: read data once, write to all files
             for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
                 for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
                     let memberRange = 0 ..< UInt64(nMembers)
-                    
-                    let thisChunkDimensions = nMembers <= 1 ?
-                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTime)] :
-                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(nTime)]
-                    
                     let nLoc = yRange.count * xRange.count
+                    
+                    // Read data into data3d (shared logic)
                     var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: nTime)
                     for reader in handles {
                         let dimensions = reader.reader.getDimensions()
@@ -199,32 +297,89 @@ struct GenericVariableHandle: Sendable {
                             data3d[0..<nLoc, reader.member, timeArrayIndex] = read[0..<nLoc]
                         }
                     }
+                    
+                    // Always write regular file
+                    let thisChunkDimensions = nMembers <= 1 ?
+                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTime)] :
+                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(nTime)]
+                    
                     try writer.writeData(
                         array: data3d.data,
                         arrayDimensions: thisChunkDimensions
                     )
+                    
+                    // Additionally, compute and write ensemble mean/spread if ensembleMeanDomain is provided
+                    if let state = ensembleMeanState {
+                        let meanChunkDimensions: [UInt64] = [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTime)]
+                        
+                        let (chunkMean, chunkSpread) = welfordMeanSpread(
+                            data3d: ArraySlice(data3d.data),
+                            nLoc: nLoc,
+                            nMembers: nMembers,
+                            nMembersActual: nMembers,
+                            nTime: nTime
+                        )
+                        
+                        try state.meanWriter.writeData(
+                            array: chunkMean,
+                            arrayDimensions: meanChunkDimensions
+                        )
+                        try state.spreadWriter.writeData(
+                            array: chunkSpread,
+                            arrayDimensions: meanChunkDimensions
+                        )
+                    }
+                    
                     await progress.add(data3d.data.count * MemoryLayout<Float>.size)
                 }
             }
-            let arrayFinalised = try writer.finalise()
-            let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
-            let coordinates = try writeFile.write(value: coordinatesString, name: "coordinates", children: [])
-            let runTime: OmOffsetSize? = try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
-            let crs = try writeFile.write(value: domain.grid.crsWkt2, name: "crs_wkt", children: [])
-            let unit = try writeFile.write(value: variable.unit.abbreviation, name: "unit", children: [])
             
-            let validTimeArray = try writeFile.writeArray(
-                data: time.map(\.timeIntervalSince1970),
-                dimensions: [UInt64(nTime)],
-                chunkDimensions: [UInt64(nTime)],
-                compression: .pfor_delta2d,
-                scale_factor: 1,
-                add_offset: 0
+            // Always finalize regular file
+            let arrayFinalised = try writer.finalise()
+            try finalizeOmRunFile(
+                arrayFinalised: arrayFinalised,
+                writeFile: writeFile,
+                fn: fn,
+                filePath: filePath,
+                run: run,
+                time: time,
+                nTime: nTime,
+                unit: variable.unit.abbreviation,
+                crsWkt: domain.grid.crsWkt2,
+                coordinatesString: coordinatesString
             )
-            let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
-            let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
-            try writeFile.writeTrailer(rootVariable: root)
-            try fn.linkTemporary(file: filePath)
+            
+            // Additionally finalize ensemble mean/spread files if ensembleMeanDomain was provided
+            if let state = ensembleMeanState, let emDomain = ensembleMeanDomain {
+                let meanArrayFinalised = try state.meanWriter.finalise()
+                try finalizeOmRunFile(
+                    arrayFinalised: meanArrayFinalised,
+                    writeFile: state.meanWriteFile,
+                    fn: state.meanFn,
+                    filePath: state.meanFilePath,
+                    run: run,
+                    time: time,
+                    nTime: nTime,
+                    unit: variable.unit.abbreviation,
+                    crsWkt: emDomain.grid.crsWkt2,
+                    coordinatesString: "lat lon time"
+                )
+                
+                let spreadArrayFinalised = try state.spreadWriter.finalise()
+                try finalizeOmRunFile(
+                    arrayFinalised: spreadArrayFinalised,
+                    writeFile: state.spreadWriteFile,
+                    fn: state.spreadFn,
+                    filePath: state.spreadFilePath,
+                    run: run,
+                    time: time,
+                    nTime: nTime,
+                    unit: state.spreadVariable.unit.abbreviation,
+                    crsWkt: emDomain.grid.crsWkt2,
+                    coordinatesString: "lat lon time"
+                )
+            }
+            
             await progress.finish()
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()
@@ -232,27 +387,62 @@ struct GenericVariableHandle: Sendable {
             try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
         }
     }
+    
+    /// Helper to finalize an OmFile with standard metadata
+    private static func finalizeOmRunFile(
+        arrayFinalised: OmFileWriterArrayFinalised,
+        writeFile: OmFileWriter<FileHandle>,
+        fn: FileHandle,
+        filePath: String,
+        run: Timestamp,
+        time: [Timestamp],
+        nTime: Int,
+        unit: String,
+        crsWkt: String,
+        coordinatesString: String
+    ) throws {
+        let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+        let coordinates = try writeFile.write(value: coordinatesString, name: "coordinates", children: [])
+        let runTime: OmOffsetSize? = try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
+        let crs = try writeFile.write(value: crsWkt, name: "crs_wkt", children: [])
+        let unitOffset = try writeFile.write(value: unit, name: "unit", children: [])
+        let validTimeArray = try writeFile.writeArray(
+            data: time.map(\.timeIntervalSince1970),
+            dimensions: [UInt64(nTime)],
+            chunkDimensions: [UInt64(nTime)],
+            compression: .pfor_delta2d,
+            scale_factor: 1,
+            add_offset: 0
+        )
+        let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
+        let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unitOffset, runTime, validTime, coordinates, createdAt].compactMap({$0}))
+        try writeFile.writeTrailer(rootVariable: root)
+        try fn.linkTemporary(file: filePath)
+    }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, ensembleMeanDomain: (any GenericDomain)?) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
                 .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
             })
         } else {
-            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, ensembleMeanDomain: ensembleMeanDomain)
         }
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType) async throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, ensembleMeanDomain: (any GenericDomain)?) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
         // let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
+        
+        // Construct mean domain splitter once if needed, reuse for all variables
+        let meanDomainSplitter = ensembleMeanDomain.map { OmFileSplitter($0, nMembers: 1) }
 
         for (_, handles) in handles.groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" }) {
             guard let timeMin = handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound else {
@@ -337,7 +527,18 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
+            let ensembleMeanOutput: EnsembleMeanOutput? = (meanDomainSplitter != nil && nMembers > 1)
+                ? EnsembleMeanOutput(
+                    splitter: meanDomainSplitter!,
+                    meanVariable: variable.omFileName.file,
+                    meanScalefactor: variable.scalefactor,
+                    spreadVariable: variable.asSpreadVariableGeneric.omFileName.file,
+                    spreadScalefactor: variable.asSpreadVariableGeneric.scalefactor,
+                    nMembersActual: nMembersInVariables
+                )
+                : nil
+
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, ensembleMean: ensembleMeanOutput) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
@@ -480,4 +681,3 @@ actor GribDeaverager {
         return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &grib2d.array)
     }
 }
-

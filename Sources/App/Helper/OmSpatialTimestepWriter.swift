@@ -33,10 +33,6 @@ actor OmSpatialTimestepWriter {
     let storeOnDisk: Bool
     let logger: Logger
     
-    /// Separate ensemble mean+spread calculator and writer. Data is automatically ingested on write() call
-    /// AWS upload and finalise also process ensemble mean
-    let ensembleMean: (writer: OmSpatialTimestepWriter, calculator: EnsembleMeanCalculator)?
-    
     struct VariableWithOffset {
         let variable: any GenericVariable
         let member: Int
@@ -49,7 +45,7 @@ actor OmSpatialTimestepWriter {
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger) {
         self.writer = nil
         self.domain = domain
         self.run = run
@@ -58,9 +54,6 @@ actor OmSpatialTimestepWriter {
         self.storeOnDisk = storeOnDisk
         self.fn = nil
         self.logger = logger
-        self.ensembleMean = ensembleMeanDomain.map { ens in
-            (OmSpatialTimestepWriter(domain: ens, run: run, time: time, storeOnDisk: false, realm: nil, logger: logger), EnsembleMeanCalculator())
-        }
     }
     
     var variableString: [String] {
@@ -127,8 +120,6 @@ actor OmSpatialTimestepWriter {
         )
         try arrayWriter.writeData(array: data)
         self.variables.append(VariableWithOffset(variable: variable, member: member, writer: arrayWriter))
-        
-        await ensembleMean?.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data)
     }
     
     /// Finalize and upload
@@ -141,10 +132,9 @@ actor OmSpatialTimestepWriter {
         return handles
     }
     
-    /// Note: Meta JSON files are now uploaded using in-memory data. It is now safe to call this function out of sync with model downloading. Ideally one queue per bucket.
     func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true, forceAllTimestampUpload: Bool = false) async throws {
-        try await ensembleMean?.writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: forceAllTimestampUpload)
-        
+        // try await ensembleMean?.writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: forceAllTimestampUpload)
+
         // Upload to AWS S3
         // The single OM file will be uploaded + meta JSON files
         guard let filename, let directorySpatial = domain.domainRegistry.directorySpatial else {
@@ -231,17 +221,15 @@ actor OmSpatialTimestepWriter {
     
     /// Finalize the time step
     func finalise() async throws -> [GenericVariableHandle] {
-        let ensembleMean = try await finaliseEnsembleMean()
-        
         guard let writer, let fn else {
-            return ensembleMean
+            return []
         }
         
         guard variables.count > 0 else {
             if let filename = filename {
                 try FileManager.default.removeItemIfExists(at: "\(filename)~")
             }
-            return ensembleMean
+            return []
         }
         
         let runTime = try writer.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
@@ -277,16 +265,9 @@ actor OmSpatialTimestepWriter {
             }
             return GenericVariableHandle(variable: variable.variable, time: TimerangeDt(start: time, nTime: 1, dtSeconds: dtSeconds), member: variable.member, reader: arrayReader, domain: domain)
         }
-        return handles + ensembleMean
+        return handles
     }
     
-    private func finaliseEnsembleMean() async throws -> [GenericVariableHandle] {
-        guard let ensembleMean else {
-            return []
-        }
-        try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
-        return try await ensembleMean.writer.finalise()
-    }
 }
 
 
@@ -297,16 +278,14 @@ actor OmSpatialMultistepWriter {
     let realm: String?
     let run: Timestamp
     let domain: GenericDomain
-    let ensembleMeanDomain: GenericDomain?
     let logger: Logger
     
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger) {
         self.storeOnDisk = storeOnDisk
         self.realm = realm
         self.domain = domain
         self.run = run
-        self.ensembleMeanDomain = ensembleMeanDomain
         self.logger = logger
     }
     
@@ -319,7 +298,7 @@ actor OmSpatialMultistepWriter {
         if let writer = writer.first(where: {$0.time == time}) {
             return writer
         }
-        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, logger: logger, ensembleMeanDomain: ensembleMeanDomain)
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, logger: logger)
         self.writer.append(writer)
         return writer
     }
@@ -350,4 +329,3 @@ actor OmSpatialMultistepWriter {
         try await writer.last?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: true)
     }
 }
-
