@@ -423,6 +423,7 @@ where Variable: FlatBuffersVariable {
             aggregation: isSpread ? .spread : f.aggregation,
             probability: f.probability,
             altitude: f.altitude,
+            pressureLevel: f.pressureLevel,
             depth: f.depth,
             depthTo: f.depthTo,
             previousDay: f.previousDay
