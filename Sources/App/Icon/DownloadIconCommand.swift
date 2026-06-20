@@ -17,7 +17,7 @@ struct DownloadIconCommand: AsyncCommand {
         case pressureLevel
         case pressureLevelGt500
         case pressureLevelLtE500
-        case hiresTemp = "hires-temp"
+        case hiresTemp
 
         var realm: String? {
             switch self {
