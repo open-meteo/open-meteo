@@ -51,4 +51,38 @@ import OmFileFormat
         #expect(fullAsl(1) == (22000 + 19402) / 2)
         #expect(fullAsl(3) == (18013 + 531) / 2)
     }
+
+    /// `hires-temp` is the unified full model-level profile: every level 1…N (top..surface),
+    /// each carrying exactly the five downloaded variables. Locks in the FL180-split removal.
+    @Test func hiresTempCoversAllLevels() {
+        let expectedVars: Set<IconModelLevelVariableType> = [
+            .wind_u_component, .wind_v_component, .temperature, .specific_humidity, .pressure
+        ]
+        for domain in [IconDomains.iconD2, .iconEu, .icon] {
+            let n = domain.numberOfModelFullLevels
+            let vars = DownloadIconCommand.VariableGroup.hiresTemp.variables(domain: domain)
+            let levelVars = vars.compactMap { $0 as? IconModelLevelVariable }
+            // every selected variable is a model-level variable (no surface/pressure leakage)
+            #expect(levelVars.count == vars.count)
+            #expect(levelVars.count == n * expectedVars.count)
+            #expect(Set(levelVars.map { $0.level }) == Set(1...n))
+            for level in 1...n {
+                #expect(Set(levelVars.filter { $0.level == level }.map { $0.variable }) == expectedVars)
+            }
+        }
+    }
+
+    /// `modelLevel` must keep its *upstream* meaning: surface variables flagged `cat == "model-level"`,
+    /// NOT the hires profile stack. Regression guard for the merge-back-upstream constraint.
+    @Test func modelLevelKeepsUpstreamSemantics() {
+        for domain in [IconDomains.iconD2, .iconEu, .icon] {
+            let vars = DownloadIconCommand.VariableGroup.modelLevel.variables(domain: domain)
+            // not a single IconModelLevelVariable — these are surface vars
+            #expect(vars.allSatisfy { ($0 as? IconModelLevelVariable) == nil })
+            #expect(vars.allSatisfy { ($0 as? IconSurfaceVariable)?.getVarAndLevel(domain: domain)?.cat == "model-level" })
+            // and it is exactly the surface model-level filter
+            let expected = IconSurfaceVariable.allCases.filter { $0.getVarAndLevel(domain: domain)?.cat == "model-level" }
+            #expect(vars.count == expected.count)
+        }
+    }
 }

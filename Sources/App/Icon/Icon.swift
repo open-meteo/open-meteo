@@ -214,18 +214,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// For hires-temp groups, the starting (highest altitude) model full level (1=top) for the "below FL180" option (~5.5 km / 18k ft).
-    var hiresTempBelowFL180StartLevel: Int {
-        switch self {
-        case .iconEps, .icon, .iconEpsEnsembleMean:
-            return 93
-        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean:
-            return 47
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
-            return 28
-        }
-    }
-
     /// Number of half levels (DWD-native 1=top ... N+1=surface).
     /// HHL GRIBs provide one field per half level.
     var numberOfModelHalfLevels: Int {
