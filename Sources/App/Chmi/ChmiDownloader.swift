@@ -97,7 +97,7 @@ struct ChmiDownload: AsyncCommand {
     static let pressureLevels = [100, 150, 200, 250, 275, 300, 350, 400, 450, 500, 600, 700, 800, 850, 925, 950, 1000]
 
     /// Generate pressure level parameters for the Lambert 2.3km model.
-    static var lambert23kmPressureParameters: [ChmiParameter] {
+    static let lambert23kmPressureParameters: [ChmiParameter] = {
         var params: [ChmiParameter] = []
         for level in pressureLevels {
             let code = levelCode(for: level)
@@ -106,7 +106,7 @@ struct ChmiDownload: AsyncCommand {
             params.append(.init(token: "P\(code)HUMI_RELAT", variable: .pressure(.init(variable: .relative_humidity, level: level)), multiplyAdd: (100, 0), isAccumulated: false))
         }
         return params
-    }
+    }()
 
     static func levelCode(for pressureLevel: Int) -> String {
         return String(format: "%05d", (pressureLevel * 100) % 100000)
