@@ -121,7 +121,9 @@ actor OmSpatialTimestepWriter {
             type: Float.self,
             dimensions: dimensions.map(UInt64.init),
             chunkDimensions: chunks.map(UInt64.init),
-            compression: compressionType,
+            // Per-variable compression (e.g. logarithmic int16 for specific humidity); falls back to the
+            // caller's compressionType for variables that don't override the default.
+            compression: variable.omFileCompression == .pfor_delta2d_int16 ? compressionType : variable.omFileCompression,
             scale_factor: variable.scalefactor,
             add_offset: 0
         )

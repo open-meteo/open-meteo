@@ -1,4 +1,5 @@
 import Foundation
+import OmFileFormat
 
 /// Variables available on ICON native model (full) levels.
 /// Currently only geometric height, derived on read from the static HHL stack.
@@ -37,10 +38,26 @@ struct IconModelLevelVariable: ModelLevelVariableRespresentable, IconVariableDow
         case .height, .height_agl: return 1
         case .wind_u_component, .wind_v_component: return 10
         case .temperature: return 10
-        case .specific_humidity: return 1000
+        // Stored logarithmically (see omFileCompression): scalefactor multiplies log10(1+g/kg).
+        // Max ~30 g/kg → log10≈1.5 → ~14900 (< INT16_MAX 32767, reserved for NaN); ~0.02% relative steps.
+        case .specific_humidity: return 10000
         case .relative_humidity: return 1
         case .pressure: return 10
         case .wind_speed, .wind_direction, .dew_point: return 10
+        }
+    }
+
+    /// Specific humidity spans ~4–5 orders of magnitude (surface ~20 g/kg → stratosphere ~10⁻³ g/kg).
+    /// Linear int16 (`pfor_delta2d_int16`, scalefactor 1000) loses dry-layer precision and rounds tiny
+    /// values to 0 — which makes the derived dew point NaN above ~200 hPa. Logarithmic int16
+    /// (`log10(1+x)` before packing) fixes that: tiny values stay non-zero and the mid-level dry range
+    /// (qv ≳ 0.05 g/kg) gets ~0.1–1 % relative precision at the same size. Note `log10(1+x)` is
+    /// near-linear for x≪1, so it is not truly constant-relative below ~0.05 g/kg, but it degrades
+    /// gracefully instead of truncating. (Precedent: GloFas river_discharge.)
+    var omFileCompression: OmCompressionType {
+        switch variable {
+        case .specific_humidity: return .pfor_delta2d_int16_logarithmic
+        default: return .pfor_delta2d_int16
         }
     }
 

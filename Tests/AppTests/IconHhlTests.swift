@@ -111,4 +111,37 @@ import OmFileFormat
         #expect(msg.contains("1...65"))
         #expect(msg.contains("dwd_icon_d2"))
     }
+
+    /// Model-level specific humidity is stored logarithmically (constant relative precision over its
+    /// 4–5-order range); other model-level vars keep the default int16. Checked through the
+    /// `any GenericVariable` existential the write/convert sinks actually use (dynamic dispatch).
+    @Test func specificHumidityUsesLogarithmicCompression() {
+        let qv: any GenericVariable = IconModelLevelVariable(variable: .specific_humidity, level: 60)
+        let t:  any GenericVariable = IconModelLevelVariable(variable: .temperature, level: 60)
+        #expect(qv.omFileCompression == .pfor_delta2d_int16_logarithmic)
+        #expect(qv.scalefactor == 10000)
+        #expect(t.omFileCompression == .pfor_delta2d_int16)
+        // default for an unrelated variable
+        #expect((IconSurfaceVariable.temperature_2m as any GenericVariable).omFileCompression == .pfor_delta2d_int16)
+    }
+
+    /// Round-trip proof of the qv storage fix. The key win: a near-zero stratospheric qv stays
+    /// **non-zero** (linear int16 × 1000 rounds 0.0004 g/kg to 0 → dew point becomes NaN aloft).
+    /// `log10(1+x)` is near-linear for x≪1, so relative precision is excellent in the mid-level dry
+    /// range (qv ≳ 0.05 g/kg, the Stiwoll concern) and degrades gracefully — without truncating — below.
+    @Test func logarithmicCompressionPreservesDryLayerQv() async throws {
+        let values: [Float] = [0.0004, 0.05, 0.5, 5.0, 25.0]   // g/kg: stratosphere → moist surface
+        let file = "test_qv_log.om"
+        try FileManager.default.removeItemIfExists(at: file)
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        try values.writeOmFile(file: file, dimensions: [values.count], chunks: [values.count],
+                               compression: .pfor_delta2d_int16_logarithmic, scalefactor: 10000)
+        let reader = try await OmFileReader(file: file).expectArray(of: Float.self)
+        let back = try await reader.read()
+        #expect(back[0] > 0)                      // no truncation to zero (the bug)
+        #expect(abs(back[0] - 0.0004) < 3e-4)     // within one log-quantisation step near zero
+        for (a, b) in zip(values, back) where a >= 0.05 {
+            #expect(abs(a - b) / a < 0.01)        // <1% relative through the meaningful range
+        }
+    }
 }

@@ -167,11 +167,11 @@ struct GenericVariableHandle: Sendable {
                 type: Float.self,
                 dimensions: dimensions.map(UInt64.init),
                 chunkDimensions: chunks.map(UInt64.init),
-                compression: compression,
+                compression: variable.omFileCompression,
                 scale_factor: variable.scalefactor,
                 add_offset: 0
             )
-            
+
             for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
                 for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
                     let memberRange = 0 ..< UInt64(nMembers)
@@ -337,7 +337,7 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: variable.omFileCompression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
