@@ -73,11 +73,14 @@ struct ChmiDownload: AsyncCommand {
     static let pressureLevels = [100, 150, 200, 250, 275, 300, 350, 400, 450, 500, 600, 700, 800, 850, 925, 950, 1000]
 
     /// Generate pressure level parameters for the Lambert 2.3km model.
+    /// TEMPERATUR and VITESSE_VE are adjacent per level so the temperature
+    /// cache is consumed within the same level iteration.
     static let lambert23kmPressureParameters: [ChmiParameter] = {
         var params: [ChmiParameter] = []
         for level in pressureLevels {
             let code = levelCode(for: level)
             params.append(.init(token: "P\(code)TEMPERATUR", variable: .pressure(.init(variable: .temperature, level: level)), multiplyAdd: (1, -273.15), isAccumulated: false))
+            params.append(.init(token: "P\(code)VITESSE_VE", variable: .pressure(.init(variable: .vertical_velocity, level: level)), multiplyAdd: nil, isAccumulated: false))
             params.append(.init(token: "P\(code)GEOPOTENTI", variable: .pressure(.init(variable: .geopotential_height, level: level)), multiplyAdd: (1 / 9.80665, 0), isAccumulated: false))
             params.append(.init(token: "P\(code)HUMI_RELAT", variable: .pressure(.init(variable: .relative_humidity, level: level)), multiplyAdd: (100, 0), isAccumulated: false))
             params.append(.init(token: "P\(code)WIND_U_COM", variable: .pressure(.init(variable: .wind_u_component, level: level)), multiplyAdd: nil, isAccumulated: false))
@@ -205,11 +208,10 @@ struct ChmiDownload: AsyncCommand {
         }
     }
 
-    /// Process a single parameter: download, decode, convert units, de-accumulate, write.
-    private func processParameter(parameter: ChmiParameter, domain: ChmiDomain, run: Timestamp, nx: Int, ny: Int, nTime: Int, curl: Curl, writer: OmSpatialMultistepWriter, logger: Logger) async throws {
-        logger.info("Processing \(parameter.variable)")
+    /// Download + decode + convert units + de-accumulate a single parameter.
+    private func readAndDecode(parameter: ChmiParameter, domain: ChmiDomain, run: Timestamp, nx: Int, ny: Int, nTime: Int, curl: Curl, logger: Logger) async throws -> Array2DFastSpace {
+        logger.info("Reading \(parameter.variable)")
         let raw = try await readGribFile(domain: domain, run: run, token: parameter.token, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
-
         var spatial = Array2DFastSpace(data: raw, nLocations: nx * ny, nTime: nTime)
         if let fma = parameter.multiplyAdd {
             spatial.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
@@ -217,36 +219,14 @@ struct ChmiDownload: AsyncCommand {
         if parameter.isAccumulated {
             spatial.data.deaccumulateOverTimeSpatial(nTime: nTime)
         }
+        return spatial
+    }
 
+    /// Write processed data to the output store.
+    private func writeParameter(parameter: ChmiParameter, spatial: Array2DFastSpace, nx: Int, ny: Int, nTime: Int, run: Timestamp, writer: OmSpatialMultistepWriter) async throws {
         for t in 0..<nTime {
             let slice = Array(spatial[t, 0..<nx * ny])
             try await writer.write(time: run.add(hours: t), member: 0, variable: parameter.variable, data: slice)
-        }
-    }
-
-    /// Process pressure level vertical velocity: convert VITESSE_VE (Pa/s) → m/s
-    /// using temperature at the same level for the hydrostatic conversion.
-    private func processPressureVerticalVelocity(domain: ChmiDomain, run: Timestamp, nx: Int, ny: Int, nTime: Int, curl: Curl, writer: OmSpatialMultistepWriter, logger: Logger) async throws {
-        guard case .aladin_lambert_2_3km = domain else { return }
-
-        for level in Self.pressureLevels {
-            let code = Self.levelCode(for: level)
-            let vvToken = "P\(code)VITESSE_VE"
-            let tempToken = "P\(code)TEMPERATUR"
-
-            logger.info("Processing vertical velocity at \(level) hPa")
-            let omega = try await readGribFile(domain: domain, run: run, token: vvToken, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
-            let temperature = try await readGribFile(domain: domain, run: run, token: tempToken, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
-
-            for t in 0..<nTime {
-                let base = t * nx * ny
-                let omegaSlice = Array(omega[base..<base + nx * ny])
-                let tempSlice = Array(temperature[base..<base + nx * ny])
-                let tempCelsius = tempSlice.map { $0 - 273.15 }
-                let w = Meteorology.verticalVelocityPressureToGeometric(omega: omegaSlice, temperature: tempCelsius, pressureLevel: Float(level))
-
-                try await writer.write(time: run.add(hours: t), member: 0, variable: ChmiVariable.pressure(ChmiPressureVariable(variable: .vertical_velocity, level: level)), data: w)
-            }
         }
     }
 
@@ -284,20 +264,35 @@ struct ChmiDownload: AsyncCommand {
                     try await writer.write(time: run.add(hours: t), member: 0, variable: ChmiVariable.surface(.wind_gusts_10m), data: slice)
                 }
             }
-
-            // Pressure level vertical velocity (Pa/s → m/s using temperature)
-            try await processPressureVerticalVelocity(domain: domain, run: run, nx: nx, ny: ny, nTime: nTime, curl: curl, writer: writer, logger: logger)
         }
 
+        var temperatureCache: (level: Int, data: [Float])?
+
         for parameter in Self.parameters(for: domain) {
-            // Skip vertical velocity tokens — handled by processPressureVerticalVelocity
-            if case .pressure(let pv) = parameter.variable, pv.variable == .vertical_velocity {
-                continue
-            }
             if let onlyVariables, !onlyVariables.contains(parameter.variable) {
                 continue
             }
-            try await processParameter(parameter: parameter, domain: domain, run: run, nx: nx, ny: ny, nTime: nTime, curl: curl, writer: writer, logger: logger)
+
+            let raw = try await readAndDecode(parameter: parameter, domain: domain, run: run, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
+
+            let spatial: Array2DFastSpace
+
+            if case .pressure(let pv) = parameter.variable, pv.variable == .temperature {
+                temperatureCache = (pv.level, raw.data)
+                spatial = consume raw
+            } else if case .pressure(let pv) = parameter.variable, pv.variable == .vertical_velocity {
+                guard let temperature = temperatureCache, temperature.level == pv.level else {
+                    logger.warning("No cached temperature for vertical velocity at \(pv.level) hPa")
+                    continue
+                }
+                logger.info("Processing vertical velocity at \(pv.level) hPa")
+                spatial = Array2DFastSpace(data: Meteorology.verticalVelocityPressureToGeometric(omega: raw.data, temperature: temperature.data, pressureLevel: Float(pv.level)), nLocations: nLocations, nTime: nTime)
+                temperatureCache = nil
+            } else {
+                spatial = consume raw
+            }
+
+            try await writeParameter(parameter: parameter, spatial: spatial, nx: nx, ny: ny, nTime: nTime, run: run, writer: writer)
         }
 
         await curl.printStatistics()
