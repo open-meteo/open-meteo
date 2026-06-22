@@ -43,13 +43,8 @@ enum ChmiDomain: String, GenericDomain, CaseIterable {
     }
 
     var lastRun: Timestamp {
-        switch self {
-        case .aladin_cz_1km:
-            // Runs every 6 hours (00, 06, 12, 18 UTC). Files arrive roughly 3.5h after the run.
-            return Timestamp.now().add(hours: -3).floor(toNearestHour: 6)
-        case .aladin_lambert_2_3km:
-            return Timestamp.now().add(-4 * 3600 - 23 * 60).floor(toNearestHour: 6)
-        }
+        // Runs every 6 hours (00, 06, 12, 18 UTC). Files arrive roughly 3.5h after the run.
+        return Timestamp.now().add(-3 * 3600 - 30 * 60).floor(toNearestHour: 6)
     }
 
     /// 72h forecast + 2 days buffer
