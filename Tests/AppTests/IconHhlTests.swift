@@ -85,4 +85,22 @@ import OmFileFormat
             #expect(vars.count == expected.count)
         }
     }
+
+    /// HHL column cache is a reference type: a stored column is shared across value copies of the reader,
+    /// so the static `hhl.om` is read once, not per height/RH/dew-point query.
+    @Test func hhlColumnCacheMemoisesByReference() {
+        let cache = HhlColumnCache()
+        #expect(cache.column == nil)
+        cache.column = [1, 2, 3]
+        let copy = cache                 // reference semantics
+        copy.column = [9, 8]
+        #expect(cache.column == [9, 8])  // shared mutation visible through the original
+    }
+
+    /// Missing `hhl.om` surfaces a descriptive error (model-level heights) instead of silent NaN.
+    @Test func hhlMissingFileErrorIsDescriptive() {
+        let msg = "\(IconHhlError.staticFileMissing(domain: "dwd_icon"))"
+        #expect(msg.contains("hhl.om"))
+        #expect(msg.contains("dwd_icon"))
+    }
 }

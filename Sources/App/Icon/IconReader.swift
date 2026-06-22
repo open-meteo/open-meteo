@@ -10,6 +10,10 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 
     let options: GenericReaderOptions
 
+    /// Memoises the HHL half-level column for this reader's grid point so it is read once, not per
+    /// height/RH/dew-point query. Reference type → shared across value copies of the same reader.
+    let hhlColumnCache = HhlColumnCache()
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
@@ -689,14 +693,24 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 
     // MARK: - HHL (column from single 3D static hhl.om [ny, nx, nlev] level-last; called on demand for height queries)
 
-    /// Full half-level heights ASL at this grid point (from 3D file).
+    /// Full half-level heights ASL at this grid point (from 3D file). Read once and memoised; throws a
+    /// descriptive error instead of silently returning `[]`/NaN when the static `hhl.om` is unavailable.
     func hhlColumnASL() async throws -> [Float] {
-        guard let iconDomain = reader.domain as? IconDomains else { return [] }
-        guard let file = await reader.domain.getStaticFile(type: .hhl, httpClient: options.httpClient, logger: options.logger) else { return [] }
-        // 3D column read (one I/O)
+        if let cached = hhlColumnCache.column {
+            return cached
+        }
+        guard let iconDomain = reader.domain as? IconDomains else {
+            throw IconHhlError.notIconDomain(domain: "\(reader.domain)")
+        }
+        guard let file = await reader.domain.getStaticFile(type: .hhl, httpClient: options.httpClient, logger: options.logger) else {
+            throw IconHhlError.staticFileMissing(domain: iconDomain.rawValue)
+        }
+        // 3D column read (one I/O), memoised so subsequent levels/variables do not re-read.
         let col = try await reader.domain.grid.readColumnFromStaticFile(gridpoint: reader.reader.position, file: file)
         let nlev = iconDomain.numberOfModelHalfLevels
-        return col.count == nlev ? col : Array(col.prefix(nlev)) + Array(repeating: .nan, count: max(0, nlev - col.count))
+        let column = col.count == nlev ? col : Array(col.prefix(nlev)) + Array(repeating: .nan, count: max(0, nlev - col.count))
+        hhlColumnCache.column = column
+        return column
     }
 
     /// Geometric height ASL of full level N (1-based, top=1) = avg of enclosing half levels.
@@ -738,5 +752,25 @@ struct IconMixer: GenericReaderMixer {
 
     func fullLevelHeightAGL(fullLevel: Int) async throws -> Float? {
         return try await reader.first?.fullLevelHeightAGL(fullLevel: fullLevel)
+    }
+}
+
+/// Reference-type cache holding the per-grid-point HHL half-level column, so it is read from the static
+/// `hhl.om` exactly once per `IconReader` instead of on every height/RH/dew-point derivation.
+final class HhlColumnCache {
+    var column: [Float]?
+}
+
+enum IconHhlError: Error, CustomStringConvertible {
+    case staticFileMissing(domain: String)
+    case notIconDomain(domain: String)
+
+    var description: String {
+        switch self {
+        case .staticFileMissing(let d):
+            return "ICON HHL static file (hhl.om) is missing for domain '\(d)' — cannot derive model-level heights. Generate it via the model-level download (convertHhlHeights)."
+        case .notIconDomain(let d):
+            return "HHL column requested for non-ICON domain '\(d)'."
+        }
     }
 }
