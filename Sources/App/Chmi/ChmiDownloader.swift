@@ -44,8 +44,8 @@ struct ChmiDownload: AsyncCommand {
         let isAccumulated: Bool
     }
 
-    /// CZ_1km surface parameters.
-    static let cz1kmParameters: [ChmiParameter] = [
+    /// Surface parameters shared by both domains. Wind gusts are handled separately (U/V components for Lambert).
+    static let surfaceParameters: [ChmiParameter] = [
         .init(token: "CLSTEMPERATURE", variable: .surface(.temperature_2m), multiplyAdd: (1, -273.15), isAccumulated: false),
         .init(token: "SURFTEMPERATURE", variable: .surface(.surface_temperature), multiplyAdd: (1, -273.15), isAccumulated: false),
         .init(token: "CLSDEW_P_TEMPER", variable: .surface(.dew_point_2m), multiplyAdd: (1, -273.15), isAccumulated: false),
@@ -53,30 +53,6 @@ struct ChmiDownload: AsyncCommand {
         .init(token: "CLSWIND_SPEED", variable: .surface(.wind_speed_10m), multiplyAdd: nil, isAccumulated: false),
         .init(token: "CLSWIND_DIREC", variable: .surface(.wind_direction_10m), multiplyAdd: nil, isAccumulated: false),
         .init(token: "CLSRAFAL_MOD_XFU", variable: .surface(.wind_gusts_10m), multiplyAdd: nil, isAccumulated: false),
-        .init(token: "MSLPRESSURE", variable: .surface(.pressure_msl), multiplyAdd: (1.0 / 100.0, 0), isAccumulated: false),
-        .init(token: "SURFNEBUL_TOTALE", variable: .surface(.cloud_cover), multiplyAdd: (100, 0), isAccumulated: false),
-        .init(token: "SURFNEBUL_BASSE", variable: .surface(.cloud_cover_low), multiplyAdd: (100, 0), isAccumulated: false),
-        .init(token: "SURFNEBUL_MOYENN", variable: .surface(.cloud_cover_mid), multiplyAdd: (100, 0), isAccumulated: false),
-        .init(token: "SURFNEBUL_HAUTE", variable: .surface(.cloud_cover_high), multiplyAdd: (100, 0), isAccumulated: false),
-        .init(token: "SURFPREC_TOTAL", variable: .surface(.precipitation), multiplyAdd: nil, isAccumulated: true),
-        .init(token: "SURFRAINFALL", variable: .surface(.rain), multiplyAdd: nil, isAccumulated: true),
-        .init(token: "SURFSNOWFALL", variable: .surface(.snowfall_water_equivalent), multiplyAdd: nil, isAccumulated: true),
-        .init(token: "SURFRESERV_NEIGE", variable: .surface(.snow_depth_water_equivalent), multiplyAdd: nil, isAccumulated: false),
-        .init(token: "SURFRF_SHORT_DO", variable: .surface(.shortwave_radiation), multiplyAdd: (1.0 / 3600.0, 0), isAccumulated: true),
-        .init(token: "SURF_RAYT_DIR", variable: .surface(.direct_radiation), multiplyAdd: (1.0 / 3600.0, 0), isAccumulated: true),
-        .init(token: "SURFCAPE_POS_F00", variable: .surface(.cape), multiplyAdd: nil, isAccumulated: false),
-        .init(token: "CLS_VISICLD", variable: .surface(.visibility), multiplyAdd: nil, isAccumulated: false),
-        .init(token: "SUNSHINE_DUR", variable: .surface(.sunshine_duration), multiplyAdd: nil, isAccumulated: true),
-    ]
-
-    /// Lambert 2.3km surface parameters. Gusts are handled separately (U/V components combined into speed).
-    static let lambert23kmSurfaceParameters: [ChmiParameter] = [
-        .init(token: "CLSTEMPERATURE", variable: .surface(.temperature_2m), multiplyAdd: (1, -273.15), isAccumulated: false),
-        .init(token: "SURFTEMPERATURE", variable: .surface(.surface_temperature), multiplyAdd: (1, -273.15), isAccumulated: false),
-        .init(token: "CLSDEW_P_TEMPER", variable: .surface(.dew_point_2m), multiplyAdd: (1, -273.15), isAccumulated: false),
-        .init(token: "CLSHUMI_RELATIVE", variable: .surface(.relative_humidity_2m), multiplyAdd: (100, 0), isAccumulated: false),
-        .init(token: "CLSWIND_SPEED", variable: .surface(.wind_speed_10m), multiplyAdd: nil, isAccumulated: false),
-        .init(token: "CLSWIND_DIREC", variable: .surface(.wind_direction_10m), multiplyAdd: nil, isAccumulated: false),
         .init(token: "MSLPRESSURE", variable: .surface(.pressure_msl), multiplyAdd: (1.0 / 100.0, 0), isAccumulated: false),
         .init(token: "SURFNEBUL_TOTALE", variable: .surface(.cloud_cover), multiplyAdd: (100, 0), isAccumulated: false),
         .init(token: "SURFNEBUL_BASSE", variable: .surface(.cloud_cover_low), multiplyAdd: (100, 0), isAccumulated: false),
@@ -115,9 +91,11 @@ struct ChmiDownload: AsyncCommand {
     static func parameters(for domain: ChmiDomain) -> [ChmiParameter] {
         switch domain {
         case .aladin_cz_1km:
-            return Self.cz1kmParameters
+            return Self.surfaceParameters
         case .aladin_lambert_2_3km:
-            return Self.lambert23kmSurfaceParameters + Self.lambert23kmPressureParameters
+            // For Lambert, gusts are read as U/V components and combined separately.
+            // Filter out CLSRAFAL_MOD_XFU to avoid double-processing.
+            return Self.surfaceParameters.filter { $0.variable != .surface(.wind_gusts_10m) } + Self.lambert23kmPressureParameters
         }
     }
 
