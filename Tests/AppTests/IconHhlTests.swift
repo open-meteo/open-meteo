@@ -103,4 +103,12 @@ import OmFileFormat
         #expect(msg.contains("hhl.om"))
         #expect(msg.contains("dwd_icon"))
     }
+
+    /// Out-of-range model level surfaces a descriptive error (valid range stated) instead of silent NaN.
+    @Test func modelLevelOutOfRangeErrorIsDescriptive() {
+        let msg = "\(IconModelLevelError.levelOutOfRange(level: 200, max: 65, domain: "dwd_icon_d2"))"
+        #expect(msg.contains("200"))
+        #expect(msg.contains("1...65"))
+        #expect(msg.contains("dwd_icon_d2"))
+    }
 }

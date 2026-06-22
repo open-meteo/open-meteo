@@ -38,6 +38,16 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func get(raw: IconVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        // Domain-aware validity guard for native model levels. The `<var>_level<N>` parser is
+        // domain-agnostic (PressureVariableRespresentable), so an out-of-range level (e.g.
+        // temperature_level200 on a 65-level domain) would otherwise hit a missing .om file and
+        // silently return NaN. Reject it up front with a clear error.
+        if case let .height(modelLevel) = raw {
+            let nLevels = reader.domain.numberOfModelFullLevels
+            guard modelLevel.level >= 1, modelLevel.level <= nLevels else {
+                throw IconModelLevelError.levelOutOfRange(level: modelLevel.level, max: nLevels, domain: reader.domain.rawValue)
+            }
+        }
         if case let .height(modelLevel) = raw {
             switch modelLevel.variable {
             case .height:
@@ -759,6 +769,17 @@ struct IconMixer: GenericReaderMixer {
 /// `hhl.om` exactly once per `IconReader` instead of on every height/RH/dew-point derivation.
 final class HhlColumnCache {
     var column: [Float]?
+}
+
+enum IconModelLevelError: Error, CustomStringConvertible {
+    case levelOutOfRange(level: Int, max: Int, domain: String)
+
+    var description: String {
+        switch self {
+        case .levelOutOfRange(let level, let max, let domain):
+            return "Model level \(level) is out of range for domain '\(domain)' (valid 1...\(max))."
+        }
+    }
 }
 
 enum IconHhlError: Error, CustomStringConvertible {
