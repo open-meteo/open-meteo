@@ -97,8 +97,8 @@ struct ChmiDownload: AsyncCommand {
         switch domain {
         case .aladin_cz_1km:
             return Self.surfaceParameters
-        case .aladin_lambert_2_3km:
-            // For Lambert, gusts are read as U/V components and combined separately.
+        case .aladin_central_europe_2km:
+            // For Aladin Lambert 2.3km, gusts are read as U/V components and combined separately.
             // Filter out CLSRAFAL_MOD_XFU to avoid double-processing.
             return Self.surfaceParameters.filter { $0.variable != .surface(.wind_gusts_10m) } + Self.lambert23kmPressureParameters
         }
@@ -131,7 +131,7 @@ struct ChmiDownload: AsyncCommand {
         switch domain {
         case .aladin_cz_1km:
             dir = "CZ_1km"
-        case .aladin_lambert_2_3km:
+        case .aladin_central_europe_2km:
             dir = "Lambert_2.3km"
         }
         return "https://opendata.chmi.cz/meteorology/weather/nwp_aladin/\(dir)/\(hourStr)/"
@@ -142,7 +142,7 @@ struct ChmiDownload: AsyncCommand {
         switch domain {
         case .aladin_cz_1km:
             prefix = "ALADCZ1K4opendata"
-        case .aladin_lambert_2_3km:
+        case .aladin_central_europe_2km:
             prefix = "ALADLAMB4opendata"
         }
         return "\(baseUrl(domain: domain, run: run))\(prefix)_\(run.format_YYYYMMddHH)_\(token).grb.bz2"
@@ -248,7 +248,7 @@ struct ChmiDownload: AsyncCommand {
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
         // For Lambert 2.3km, surface gusts are provided as U/V components and must be combined into speed.
-        if case .aladin_lambert_2_3km = domain {
+        if case .aladin_central_europe_2km = domain {
             if onlyVariables?.contains(ChmiVariable.surface(.wind_gusts_10m)) ?? true {
                 logger.info("Processing wind_gusts_10m (U/V combination)")
                 let uData = try await readGribFile(domain: domain, run: run, token: "CLSU_RAF_MOD_XFU", nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
@@ -274,7 +274,6 @@ struct ChmiDownload: AsyncCommand {
             }
 
             let raw = try await readAndDecode(parameter: parameter, domain: domain, run: run, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
-
             let spatial: Array2DFastSpace
 
             if case .pressure(let pv) = parameter.variable, pv.variable == .temperature {

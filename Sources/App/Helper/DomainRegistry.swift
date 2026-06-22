@@ -137,7 +137,7 @@ enum DomainRegistry: String, CaseIterable {
     case geosphere_arome_austria
 
     case chmi_aladin_cz_1km
-    case chmi_aladin_lambert_2_3km
+    case chmi_aladin_central_europe_2km
 
     case nasa_imerg_daily
 
@@ -408,8 +408,8 @@ enum DomainRegistry: String, CaseIterable {
             return GeoSphereDomain.arome_austria
         case .chmi_aladin_cz_1km:
             return ChmiDomain.aladin_cz_1km
-        case .chmi_aladin_lambert_2_3km:
-            return ChmiDomain.aladin_lambert_2_3km
+        case .chmi_aladin_central_europe_2km:
+            return ChmiDomain.aladin_central_europe_2km
         case .nasa_imerg_daily:
             return SatelliteDomain.imerg_daily
         case .cmip_CMCC_CM2_VHR4:

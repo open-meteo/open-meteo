@@ -7,14 +7,14 @@ import Vapor
 /// 72h hourly forecast, 4 runs/day (00/06/12/18 UTC)
 enum ChmiDomain: String, GenericDomain, CaseIterable {
     case aladin_cz_1km
-    case aladin_lambert_2_3km
+    case aladin_central_europe_2km
 
     var domainRegistry: DomainRegistry {
         switch self {
         case .aladin_cz_1km:
             return .chmi_aladin_cz_1km
-        case .aladin_lambert_2_3km:
-            return .chmi_aladin_lambert_2_3km
+        case .aladin_central_europe_2km:
+            return .chmi_aladin_central_europe_2km
         }
     }
 
@@ -59,7 +59,7 @@ enum ChmiDomain: String, GenericDomain, CaseIterable {
             // Corner coordinates from the GRIB header; dx/dy are derived to land the last
             // grid point on (51.098, 18.995).
             return RegularGrid(nx: 501, ny: 290, latitude: 48.5...51.098, longitude: 12.0...18.995)
-        case .aladin_lambert_2_3km:
+        case .aladin_central_europe_2km:
             // Lambert Conformal Conic, Ni=1053, Nj=837, Dx=Dy=2325m.
             // First grid point: 38.599N, 1.334E. LaD=46.244°, LoV=17°. Earth radius=6371229m.
             return ProjectionGrid(
