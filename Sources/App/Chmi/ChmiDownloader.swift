@@ -80,6 +80,8 @@ struct ChmiDownload: AsyncCommand {
             params.append(.init(token: "P\(code)TEMPERATUR", variable: .pressure(.init(variable: .temperature, level: level)), multiplyAdd: (1, -273.15), isAccumulated: false))
             params.append(.init(token: "P\(code)GEOPOTENTI", variable: .pressure(.init(variable: .geopotential_height, level: level)), multiplyAdd: (1 / 9.80665, 0), isAccumulated: false))
             params.append(.init(token: "P\(code)HUMI_RELAT", variable: .pressure(.init(variable: .relative_humidity, level: level)), multiplyAdd: (100, 0), isAccumulated: false))
+            params.append(.init(token: "P\(code)WIND_U_COM", variable: .pressure(.init(variable: .wind_u_component, level: level)), multiplyAdd: nil, isAccumulated: false))
+            params.append(.init(token: "P\(code)WIND_V_COM", variable: .pressure(.init(variable: .wind_v_component, level: level)), multiplyAdd: nil, isAccumulated: false))
         }
         return params
     }()
@@ -222,53 +224,6 @@ struct ChmiDownload: AsyncCommand {
         }
     }
 
-    /// Process pressure level wind for Lambert 2.3km: download U/V components and combine into speed/direction
-    /// with true north correction.
-    private func processPressureWind(domain: ChmiDomain, run: Timestamp, nx: Int, ny: Int, nTime: Int, curl: Curl, writer: OmSpatialMultistepWriter, logger: Logger) async throws {
-        guard case .aladin_lambert_2_3km = domain else { return }
-
-        let trueNorth: [Float]? = (domain.grid as? ProjectionGrid<LambertConformalConicProjection>)?.getTrueNorthDirection()
-
-        for level in Self.pressureLevels {
-            let code = Self.levelCode(for: level)
-            let uToken = "P\(code)WIND_U_COM"
-            let vToken = "P\(code)WIND_V_COM"
-
-            logger.info("Processing pressure wind at \(level) hPa")
-            let uData = try await readGribFile(domain: domain, run: run, token: uToken, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
-            let vData = try await readGribFile(domain: domain, run: run, token: vToken, nx: nx, ny: ny, nTime: nTime, curl: curl, logger: logger)
-
-            for t in 0..<nTime {
-                var speed = [Float](repeating: .nan, count: nx * ny)
-                var direction = [Float](repeating: .nan, count: nx * ny)
-                let base = t * nx * ny
-
-                if let trueNorth {
-                    for i in 0..<nx * ny {
-                        let u = uData[base + i]
-                        let v = vData[base + i]
-                        let rot = trueNorth[i].degreesToRadians
-                        let uTrue = u * cos(rot) - v * sin(rot)
-                        let vTrue = u * sin(rot) + v * cos(rot)
-                        speed[i] = sqrt(uTrue * uTrue + vTrue * vTrue)
-                        direction[i] = (atan2(-uTrue, -vTrue).radiansToDegrees + 180).truncatingRemainder(dividingBy: 360)
-                    }
-                } else {
-                    for i in 0..<nx * ny {
-                        let u = uData[base + i]
-                        let v = vData[base + i]
-                        speed[i] = sqrt(u * u + v * v)
-                        direction[i] = (atan2(-u, -v).radiansToDegrees + 180).truncatingRemainder(dividingBy: 360)
-                    }
-                }
-
-                let tstamp = run.add(hours: t)
-                try await writer.write(time: tstamp, member: 0, variable: ChmiVariable.pressure(ChmiPressureVariable(variable: .wind_speed, level: level)), data: speed)
-                try await writer.write(time: tstamp, member: 0, variable: ChmiVariable.pressure(ChmiPressureVariable(variable: .wind_direction, level: level)), data: direction)
-            }
-        }
-    }
-
     /// Process pressure level vertical velocity: convert VITESSE_VE (Pa/s) → m/s
     /// using temperature at the same level for the hydrostatic conversion.
     private func processPressureVerticalVelocity(domain: ChmiDomain, run: Timestamp, nx: Int, ny: Int, nTime: Int, curl: Curl, writer: OmSpatialMultistepWriter, logger: Logger) async throws {
@@ -330,18 +285,11 @@ struct ChmiDownload: AsyncCommand {
                 }
             }
 
-            // Pressure level wind (U/V components → speed + direction with true north correction)
-            try await processPressureWind(domain: domain, run: run, nx: nx, ny: ny, nTime: nTime, curl: curl, writer: writer, logger: logger)
-
             // Pressure level vertical velocity (Pa/s → m/s using temperature)
             try await processPressureVerticalVelocity(domain: domain, run: run, nx: nx, ny: ny, nTime: nTime, curl: curl, writer: writer, logger: logger)
         }
 
         for parameter in Self.parameters(for: domain) {
-            // Skip U/V wind tokens — they are handled by processPressureWind
-            if case .pressure(let pv) = parameter.variable, pv.variable == .wind_u_component || pv.variable == .wind_v_component {
-                continue
-            }
             // Skip vertical velocity tokens — handled by processPressureVerticalVelocity
             if case .pressure(let pv) = parameter.variable, pv.variable == .vertical_velocity {
                 continue
