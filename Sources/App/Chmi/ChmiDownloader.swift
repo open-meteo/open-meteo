@@ -166,6 +166,8 @@ struct ChmiDownload: AsyncCommand {
     }
 
     /// Static geopotential field -> elevation in metre. Single GRIB message.
+    /// TODO: This currently does not encode sea-points as -999
+    /// -> There is a separate GRIB land-sea mask variable `SURFIND_TERREMER` (land=1, sea=0) which should be processed as well!
     func downloadElevation(application: Application, domain: ChmiDomain, run: Timestamp, curl: Curl) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
