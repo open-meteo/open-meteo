@@ -92,7 +92,7 @@ extension ApiSectionString {
             for e in columns {
                 switch e.data {
                 case .float(let a):
-                    sheet.write(a[i], significantDigits: e.unit.significantDigits)
+                    sheet.write(a[i], significantDigits: e.unit.apiSignificantDigits)
                 case .timestamp(let a):
                     sheet.writeTimestamp(a[i].add(utc_offset_seconds))
                 }
@@ -126,7 +126,7 @@ extension ApiSectionSingle {
         }
         sheet.writeTimestamp(time.add(utc_offset_seconds))
         for e in columns {
-            sheet.write(e.value, significantDigits: e.unit.significantDigits)
+            sheet.write(e.value, significantDigits: e.unit.apiSignificantDigits)
         }
         sheet.endRow()
     }

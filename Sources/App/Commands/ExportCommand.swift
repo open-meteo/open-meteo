@@ -373,7 +373,7 @@ struct ExportCommand: AsyncCommand {
                         guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                             fatalError("Invalid variable \(variable)")
                         }
-                        return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
+                        return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.apiSignificantDigits), data.unit)
                     }
                     try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                     progress.add(time.count * 4 * variables.count)
@@ -396,7 +396,7 @@ struct ExportCommand: AsyncCommand {
                             guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
                                 fatalError("Invalid variable \(variable)")
                             }
-                            return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
+                            return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.apiSignificantDigits), data.unit)
                         }
                         return (rows, gridpoint, coords.latitude, coords.longitude, elevation)
                     }

@@ -110,7 +110,7 @@ extension ForecastapiResult.PerLocation {
             /// Write data
             for e in current.columns {
                 b.buffer.writeString(",")
-                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? e.value.formatted(decimals: e.unit.significantDigits) : "null")")
+                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? e.value.formatted(decimals: e.unit.apiSignificantDigits) : "null")")
             }
             b.buffer.writeString("}")
             try await b.flushIfRequired()
@@ -163,7 +163,7 @@ extension ForecastapiResult.PerLocation {
                             b.buffer.writeString(",")
                         }
                         if v.isFinite {
-                            b.buffer.writeString(v.formatted(decimals: e.unit.significantDigits))
+                            b.buffer.writeString(v.formatted(decimals: e.unit.apiSignificantDigits))
                         } else {
                             b.buffer.writeString("null")
                         }
