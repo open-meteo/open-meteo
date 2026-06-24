@@ -1018,6 +1018,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(MetNoDomain.nordic_pp, MetNoVariable.self)
         case .metno_seamless:
             return .multipleWithPrecipitationProbability([
+                (GfsDomain.gfs013, GfsUvIndexVariable.self),
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
                 (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 (MetNoDomain.nordic_pp, MetNoVariable.self)
@@ -1175,26 +1176,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMulti(Array([ifsProbabilities, gfs, icon, iconEu, iconD2, ifs025, ifsHres, knmiNetherlands].compacted()))
             }
-            // Scandinavian region, combine MetNo Nordic with IFS and ICON
-            if lat >= 54.9, let metno = try await MetNoDomain.nordic_pp.makeDerivedHourly(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                var readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
-                    ifsProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
-                    icon.asOptionalReader
-                ]
-                if let iconEu {
-                    readers.append(iconEu.asOptionalReader)
+            // Scandinavian region, combine MetNo Nordic with IFS HRES
+            if lat >= 54.9, let _ = try await MetNoDomain.nordic_pp.makeHourlyReader(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                guard let mapping = Self.metno_seamless.getDomainAndVariable() else {
+                    throw ModelError.domainInitFailed(domain: Self.metno_seamless.rawValue)
                 }
-                if let iconD2 {
-                    readers.append(iconD2.asOptionalReader)
-                }
-                readers.append(ifs025.asOptionalReader)
-                readers.append(ifsHres.asOptionalReader)
-                readers.append(metno)
-                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
-                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
             }
             // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
             if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
