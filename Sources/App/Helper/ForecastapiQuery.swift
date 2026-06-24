@@ -419,7 +419,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         // If a single run is selected, start time-range from run
         if let run {
             let current = run.toTimestamp()
-            let daily = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_days ?? forecastDaysDefault, initialStep: 0, dtSeconds: 86400)
+            let daily = TimerangeDt(start: current, nTime: forecast_days ?? forecastDaysDefault, dtSeconds: 86400)
 
             let defaultForecastHours = (forecast_days ?? forecastDaysDefault)*24
             let hourly = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_hours ?? defaultForecastHours, initialStep: run.hour, dtSeconds: 3600)
@@ -486,6 +486,24 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             hourlyRead: hourly.add(-1 * utcOffset),
             minutely15: minutely_15.add(-1 * actualUtcOffset)
         )
+    }
+
+    func validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: TimezoneWithOffset) throws {
+        guard let run else {
+            return
+        }
+        let localRun = run.toTimestamp().add(timezone.utcOffsetSeconds)
+        let localRunDate = localRun.toComponents()
+        let isLocalMidnight = localRun.hour == 0 && localRun.minute == 0 && localRun.second == 0
+        if daily?.isEmpty == false && !isLocalMidnight {
+            throw ForecastApiError.generic(message: "Parameter 'daily' is only supported for single-runs-api if 'run' starts at 00:00 in the requested timezone")
+        }
+        if weekly?.isEmpty == false && (!isLocalMidnight || localRun.weekday != .monday) {
+            throw ForecastApiError.generic(message: "Parameter 'weekly' is only supported for single-runs-api if 'run' starts at Monday 00:00 in the requested timezone")
+        }
+        if monthly?.isEmpty == false && (!isLocalMidnight || localRunDate.day != 1) {
+            throw ForecastApiError.generic(message: "Parameter 'monthly' is only supported for single-runs-api if 'run' starts on day 1 at 00:00 in the requested timezone")
+        }
     }
 
     /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time. UTC offset has not been subtracted.

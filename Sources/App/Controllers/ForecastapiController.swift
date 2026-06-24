@@ -315,6 +315,9 @@ struct WeatherApiController {
                 locations = try await coordinates.asyncMap { prepared in
                     let coordinates = prepared.coordinate
                     let timezone = prepared.timezone
+                    if params.run != nil {
+                        try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+                    }
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
                         guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
@@ -342,6 +345,9 @@ struct WeatherApiController {
                     let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
 
                     if dates.count == 0 {
+                        if params.run != nil {
+                            try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+                        }
                         let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                         let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                         var locationId = -1
@@ -354,6 +360,9 @@ struct WeatherApiController {
                     }
                     
                     return try await dates.asyncFlatMap({ date -> [ForecastapiResult<MultiDomainsReader>.PerLocation] in
+                        if params.run != nil {
+                            try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+                        }
                         let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                         let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                         var locationId = -1
