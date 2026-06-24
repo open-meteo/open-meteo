@@ -263,47 +263,37 @@ actor S3UploadSession {
         let data: ByteBufferView
     }
 
-    private enum UploadResult: Sendable {
-        case success(PreparedUpload)
-        case failure(S3UploadTarget, String)
-    }
-
     private let client: HTTPClient
     private let logger: Logger
-    private var endpointQueues: [String: Task<Void, Never>] = [:]
-    private var uploadTasks: [Task<UploadResult, Never>] = []
+    private let maxConcurrentFileUploads: Int
+    private var pendingUploads: [S3UploadTarget] = []
+    private var waitingWorkers: [CheckedContinuation<S3UploadTarget?, Never>] = []
+    private var workers: [Task<Void, Never>] = []
+    private var isClosed = false
+    private var preparedUploads: [PreparedUpload] = []
+    private var failures: [String] = []
     private var metadataUploads: [MetadataUpload] = []
 
-    init(client: HTTPClient, logger: Logger) {
+    init(client: HTTPClient, logger: Logger, maxConcurrentFileUploads: Int = 4) {
         self.client = client
         self.logger = logger
+        self.maxConcurrentFileUploads = max(1, maxConcurrentFileUploads)
     }
 
     func uploadMultipart(_ target: S3UploadTarget) {
-        let previous = endpointQueues[target.bucketEndpoint]
-        let client = client
-        let task = Task<UploadResult, Never> {
-            await previous?.value
-            do {
-                let prepared = try await S3Uploader.uploadMultipart(
-                    client: client,
-                    file: target.localFile,
-                    url: target.url,
-                    contentType: target.contentType,
-                    nConcurrent: 4
-                )
-                return .success(PreparedUpload(target: target, prepared: prepared))
-            } catch {
-                return .failure(target, error.localizedDescription)
-            }
+        guard !isClosed else {
+            logger.warning("S3 upload session is closed. Rejecting multipart upload for: \(target.url.asUrlGetQueryForLogging)")
+            return
         }
-        endpointQueues[target.bucketEndpoint] = Task<Void, Never> {
-            _ = await task.value
-        }
-        uploadTasks.append(task)
+        enqueueUpload(target)
+        startWorkersIfNeeded()
     }
 
     func uploadMetadataAfterCommits(_ target: S3UploadTarget, data: ByteBufferView) {
+        guard !isClosed else {
+            logger.warning("S3 upload session is closed. Rejecting metadata upload for: \(target.url.asUrlGetQueryForLogging)")
+            return
+        }
         metadataUploads.append(MetadataUpload(target: target, data: data))
     }
 
@@ -323,7 +313,13 @@ actor S3UploadSession {
     }
 
     func finish() async throws {
-        let prepared = try await collectPreparedUploads()
+        closeUploadQueue()
+        for worker in workers {
+            await worker.value
+        }
+        try throwIfNeeded()
+
+        let prepared = preparedUploads
         guard prepared.isEmpty == false || metadataUploads.isEmpty == false else {
             return
         }
@@ -339,22 +335,70 @@ actor S3UploadSession {
         }
     }
 
-    private func collectPreparedUploads() async throws -> [PreparedUpload] {
-        var prepared = [PreparedUpload]()
-        var failures = [String]()
-        for task in uploadTasks {
-            switch await task.value {
-            case .success(let upload):
-                prepared.append(upload)
-            case .failure(let target, let message):
-                failures.append("\(target.url.asUrlGetQueryForLogging): \(message)")
+    private func enqueueUpload(_ target: S3UploadTarget) {
+        if waitingWorkers.isEmpty {
+            pendingUploads.append(target)
+        } else {
+            waitingWorkers.removeFirst().resume(returning: target)
+        }
+    }
+
+    private func startWorkersIfNeeded() {
+        guard workers.isEmpty else {
+            return
+        }
+        for _ in 0..<maxConcurrentFileUploads {
+            workers.append(Task { await self.runUploadWorker() })
+        }
+    }
+
+    private func runUploadWorker() async {
+        while let target = await nextUploadTarget() {
+            do {
+                let prepared = try await S3Uploader.uploadMultipart(
+                    client: client,
+                    file: target.localFile,
+                    url: target.url,
+                    contentType: target.contentType,
+                    nConcurrent: 4
+                )
+                preparedUploads.append(PreparedUpload(target: target, prepared: prepared))
+            } catch {
+                failures.append("\(target.url.asUrlGetQueryForLogging): \(error.localizedDescription)")
             }
         }
-        if !failures.isEmpty {
-            logger.error("S3 multipart upload preparation failed: \(failures.joined(separator: "; "))")
-            throw S3UploadSessionError(failures: failures)
+    }
+
+    private func nextUploadTarget() async -> S3UploadTarget? {
+        if !pendingUploads.isEmpty {
+            return pendingUploads.removeFirst()
         }
-        return prepared
+        if isClosed {
+            return nil
+        }
+        return await withCheckedContinuation { continuation in
+            waitingWorkers.append(continuation)
+        }
+    }
+
+    private func closeUploadQueue() {
+        guard !isClosed else {
+            return
+        }
+        isClosed = true
+        let waiting = waitingWorkers
+        waitingWorkers.removeAll(keepingCapacity: true)
+        for worker in waiting {
+            worker.resume(returning: nil)
+        }
+    }
+
+    private func throwIfNeeded() throws {
+        guard !failures.isEmpty else {
+            return
+        }
+        logger.error("S3 multipart upload preparation failed: \(failures.joined(separator: "; "))")
+        throw S3UploadSessionError(failures: failures)
     }
 }
 
