@@ -183,50 +183,73 @@ actor OmSpatialTimestepWriter {
         guard let uploadS3Bucket else {
             return
         }
-        let domain = domain
-        let run = run
-        let time = time
-        for (bucket, profile) in domain.domainRegistry.parseBucket(uploadS3Bucket) {
-            if /*bucket == "openmeteo" &&*/ profile == "ceph" {
-                continue // skip upload to ceph storage for now
-            }
-            let start = DispatchTime.now()
-            let bucketPrefixed = bucket.starts(with: "s3") ? bucket : "s3://\(bucket)/"
-            let destDomain = "\(bucketPrefixed)data_spatial/\(domain.domainRegistry.rawValue)/"
-            let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
-            let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
-            
-            if forceAllTimestampUpload {
+        let domainRegistry = domain.domainRegistry
+        if forceAllTimestampUpload {
+            let targets = S3UploadPlan.spatialSyncTargets(
+                buckets: uploadS3Bucket,
+                domain: domainRegistry,
+                localDirectory: directorySpatial
+            )
+            for target in targets {
+                let start = DispatchTime.now()
                 await application.s3UploadManager.sync(
                     client: application.http1Client,
-                    bucketEndpoint: bucket,
-                    localDirectory: directorySpatial,
-                    server: bucket,
-                    basePath: "data_spatial/\(domain.domainRegistry.rawValue)/"
+                    bucketEndpoint: target.bucketEndpoint,
+                    localDirectory: target.localDirectory,
+                    server: target.server,
+                    basePath: target.basePath
                 )
-            } else {
-                await application.s3UploadManager.uploadMultipart(
-                    client: application.http1Client,
-                    bucketEndpoint: bucket,
-                    file: filename,
-                    url: destFile
-                )
+                logger.info("AWS Upload to \(target.bucketEndpoint.stripHttpPassword()) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
-            
-            if uploadMeta {
-                let destMeta = "\(destRun)meta\(realm).json"
-                await application.s3UploadManager.upload(client: application.http1Client, bucketEndpoint: bucket, data: metaData, url: destMeta)
-                if canUpdateInProgress {
-                    let destInProgress = "\(destDomain)in-progress\(realm).json"
-                    await application.s3UploadManager.upload(client: application.http1Client, bucketEndpoint: bucket, data: metaData, url: destInProgress)
-                }
-                if completed {
-                    let destLatest = "\(destDomain)latest\(realm).json"
-                    await application.s3UploadManager.upload(client: application.http1Client, bucketEndpoint: bucket, data: metaData, url: destLatest)
-                }
-            }
-            self.logger.info("AWS Upload to \(bucket.stripHttpPassword()) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+            return
         }
+
+        let uploadSession = S3UploadSession(client: application.http1Client, logger: logger)
+        await uploadSession.upload(
+            buckets: uploadS3Bucket,
+            artifact: .spatialFile(
+                domain: domainRegistry,
+                localFile: filename,
+                run: run,
+                time: time,
+                realm: realm
+            )
+        )
+
+        if uploadMeta {
+            var metaArtifacts: [S3UploadArtifact] = [
+                .spatialMeta(
+                    domain: domainRegistry,
+                    localFile: metaRunMeta,
+                    remote: .run(run: run, realm: realm),
+                    data: metaData
+                )
+            ]
+            if canUpdateInProgress {
+                metaArtifacts.append(.spatialMeta(
+                    domain: domainRegistry,
+                    localFile: metaInProgress,
+                    remote: .inProgress(realm: realm),
+                    data: metaData
+                ))
+            }
+            if completed {
+                metaArtifacts.append(.spatialMeta(
+                    domain: domainRegistry,
+                    localFile: metaLatest,
+                    remote: .latest(realm: realm),
+                    data: metaData
+                ))
+            }
+
+            for artifact in metaArtifacts {
+                await uploadSession.upload(buckets: uploadS3Bucket, artifact: artifact)
+            }
+        }
+
+        let start = DispatchTime.now()
+        try await uploadSession.finish()
+        logger.info("AWS Upload to \(uploadS3Bucket.stripHttpPassword()) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
     }
     
     /// Finalize the time step
@@ -350,4 +373,3 @@ actor OmSpatialMultistepWriter {
         try await writer.last?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: true)
     }
 }
-

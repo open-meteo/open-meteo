@@ -113,7 +113,7 @@ import Logging
             buckets: "openmeteo,s3://aws-bucket/@aws,s3://ceph-bucket/@ceph",
             localFile: "/tmp/chunk_1.om",
             remotePath: "data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
-            isPreviousDay: true
+            kind: .previousDay
         )
 
         #expect(targets == [
