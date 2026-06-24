@@ -2,6 +2,135 @@ import Foundation
 import Vapor
 import AsyncHTTPClient
 
+struct S3UploadTarget: Sendable, Equatable {
+    let bucketEndpoint: String
+    let localFile: String
+    let url: String
+    let contentType: String
+}
+
+enum S3UploadPlan {
+    static func targets(
+        domain: DomainRegistry,
+        buckets: String,
+        localFile: String,
+        remotePath: String,
+        isPreviousDay: Bool = false,
+        isRolling: Bool = false,
+        contentType: String = "application/octet-stream"
+    ) -> [S3UploadTarget] {
+        guard !isRolling else {
+            return []
+        }
+        return domain.parseBucket(buckets).compactMap { bucket, profile in
+            if isPreviousDay && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
+                return nil
+            }
+            return S3UploadTarget(
+                bucketEndpoint: bucket,
+                localFile: localFile,
+                url: bucket.s3UploadUrlPrefix + remotePath,
+                contentType: contentType
+            )
+        }
+    }
+}
+
+struct S3UploadBatchError: Error, CustomStringConvertible {
+    let failures: [String]
+
+    var description: String {
+        "S3 upload batch failed: \(failures.joined(separator: "; "))"
+    }
+}
+
+actor S3UploadBatch {
+    private struct PreparedUpload: Sendable {
+        let target: S3UploadTarget
+        let prepared: S3MultiPartUploadPrepared
+    }
+
+    private enum UploadResult: Sendable {
+        case success(PreparedUpload)
+        case failure(S3UploadTarget, String)
+    }
+
+    private let client: HTTPClient
+    private let logger: Logger
+    private var endpointQueues: [String: Task<Void, Never>] = [:]
+    private var uploadTasks: [Task<UploadResult, Never>] = []
+    private var metadataUploads: [S3UploadTarget] = []
+
+    init(client: HTTPClient, logger: Logger) {
+        self.client = client
+        self.logger = logger
+    }
+
+    func uploadMultipart(_ target: S3UploadTarget) {
+        let previous = endpointQueues[target.bucketEndpoint]
+        let client = client
+        let task = Task<UploadResult, Never> {
+            await previous?.value
+            do {
+                let prepared = try await S3Uploader.uploadMultipart(
+                    client: client,
+                    file: target.localFile,
+                    url: target.url,
+                    contentType: target.contentType,
+                    nConcurrent: 4
+                )
+                return .success(PreparedUpload(target: target, prepared: prepared))
+            } catch {
+                return .failure(target, error.localizedDescription)
+            }
+        }
+        endpointQueues[target.bucketEndpoint] = Task<Void, Never> {
+            _ = await task.value
+        }
+        uploadTasks.append(task)
+    }
+
+    func uploadMetadataAfterCommits(_ target: S3UploadTarget) {
+        metadataUploads.append(target)
+    }
+
+    func finish() async throws {
+        let prepared = try await collectPreparedUploads()
+        guard prepared.isEmpty == false || metadataUploads.isEmpty == false else {
+            return
+        }
+
+        let commitStart = DispatchTime.now()
+        try await prepared.foreachConcurrent(nConcurrent: 8) { upload in
+            try await upload.prepared.commit(client: self.client)
+        }
+        logger.info("S3 multipart commits completed in \(commitStart.timeElapsedPretty())")
+
+        try await metadataUploads.foreachConcurrent(nConcurrent: 8) { upload in
+            let data = try Data(contentsOf: URL(fileURLWithPath: upload.localFile))
+            try await S3Uploader.upload(client: self.client, data: data, url: upload.url, contentType: upload.contentType)
+        }
+    }
+
+    private func collectPreparedUploads() async throws -> [PreparedUpload] {
+        var prepared = [PreparedUpload]()
+        var failures = [String]()
+        for task in uploadTasks {
+            switch await task.value {
+            case .success(let upload):
+                prepared.append(upload)
+            case .failure(let target, let message):
+                failures.append("\(target.url.asUrlGetQueryForLogging): \(message)")
+            }
+        }
+        if !failures.isEmpty {
+            logger.error("S3 multipart upload preparation failed: \(failures.joined(separator: "; "))")
+            throw S3UploadBatchError(failures: failures)
+        }
+        return prepared
+    }
+}
+
 /// Queues S3 operations per endpoint so slow endpoints do not block faster ones.
 actor S3UploadManager {
     private let logger: Logger
@@ -86,6 +215,24 @@ actor S3UploadManager {
             }
         }
         endpointQueues[endpoint] = task
+    }
+}
+
+private extension String {
+    var s3UploadUrlPrefix: String {
+        let withSlash = hasSuffix("/") ? self : self + "/"
+        if withSlash.starts(with: "s3://") || withSlash.starts(with: "http://") || withSlash.starts(with: "https://") {
+            return withSlash
+        }
+        return "s3://\(withSlash)"
+    }
+
+    var asUrlGetQueryForLogging: Substring {
+        guard let schemaIndex = firstRange(of: "://"),
+              let queryStart = self[schemaIndex.upperBound...].firstIndex(of: "/") else {
+            return Substring(self)
+        }
+        return self[queryStart...]
     }
 }
 
