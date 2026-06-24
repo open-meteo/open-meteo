@@ -1014,6 +1014,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 (DmiDomain.harmonie_arome_europe, DmiVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .metno_nordic:
+            return .single(MetNoDomain.nordic_pp, MetNoVariable.self)
+        case .metno_seamless:
+            return .multipleWithPrecipitationProbability([
+                (EcmwfDomain.ifs025, EcmwfVariable.self),
+                (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
+                (MetNoDomain.nordic_pp, MetNoVariable.self)
+            ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .multiple([
                 (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
@@ -1168,10 +1176,25 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMulti(Array([ifsProbabilities, gfs, icon, iconEu, iconD2, ifs025, ifsHres, knmiNetherlands].compacted()))
             }
             // Scandinavian region, combine MetNo Nordic with IFS and ICON
-            if lat >= 54.9, let metno = try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if lat >= 54.9, let metno = try await MetNoDomain.nordic_pp.makeDerivedHourly(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMulti(Array([ifsProbabilities, gfs, icon, iconEu, iconD2, ifs025, ifsHres, metno].compacted()))
+                var readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
+                    ifsProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    icon.asOptionalReader
+                ]
+                if let iconEu {
+                    readers.append(iconEu.asOptionalReader)
+                }
+                if let iconD2 {
+                    readers.append(iconD2.asOptionalReader)
+                }
+                readers.append(ifs025.asOptionalReader)
+                readers.append(ifsHres.asOptionalReader)
+                readers.append(metno)
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             }
             // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
             if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
@@ -1510,7 +1533,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025_single:
             return try await EcmwfReader(domain: .aifs025_single, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .metno_nordic:
-            return try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .geosphere_arome_austria:
             return [] // migrated
         case .chmi_aladin_cz_1km:
@@ -1568,11 +1591,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dmi_seamless:
             return [] // migrated
         case .metno_seamless:
-            let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let metno: (any GenericReaderProtocol)? = try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ecmwf = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, ecmwf, ifsHres, metno].compactMap({ $0 })
+            return [] // migrated
         case .ecmwf_ifs_analysis_long_window:
             return [try await Era5Factory.makeReader(domain: .ecmwf_ifs_analysis_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ecmwf_ifs_analysis:
@@ -1816,7 +1835,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025:
             return EcmwfDomain.aifs025
         case .metno_nordic:
-            return MetNoDomain.nordic_pp
+            return nil // migrated
         case .geosphere_arome_austria:
             return GeoSphereDomain.arome_austria
         case .chmi_aladin_cz_1km:
@@ -1918,7 +1937,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dmi_seamless:
             return nil // migrated
         case .metno_seamless:
-            return nil
+            return nil // migrated
         case .ukmo_seamless:
             return nil // migrated
         case .ukmo_global_deterministic_10km:
@@ -2105,7 +2124,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025:
             return try await EcmwfReader(domain: .aifs025, gridpoint: gridpoint, options: options)
         case .metno_nordic:
-            return try await MetNoReader(domain: .nordic_pp, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .geosphere_arome_austria:
             return nil // migrated
         case .chmi_aladin_cz_1km:
@@ -2190,7 +2209,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dmi_seamless:
             return nil // migrated
         case .metno_seamless:
-            return nil
+            return nil // migrated
         case .ukmo_seamless:
             return nil // migrated
         case .ukmo_global_deterministic_10km:
