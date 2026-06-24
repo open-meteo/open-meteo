@@ -360,12 +360,19 @@ struct GenericVariableHandle: Sendable {
             let uploadWrittenFile: ((OmFileType) async -> Void)?
             if let uploadS3Bucket, let uploadBatch, !uploadS3OnlyProbabilities || variable.omFileName.file == ProbabilityVariable.precipitation_probability.omFileName.file {
                 uploadWrittenFile = { file in
+                    let isRolling: Bool
+                    if case .domainChunk(_, _, .rolling, _, _, _) = file {
+                        isRolling = true
+                    } else {
+                        isRolling = false
+                    }
                     for target in S3UploadPlan.targets(
                         domain: domain.domainRegistry,
                         buckets: uploadS3Bucket,
                         localFile: file.getFilePath(),
                         remotePath: "data/\(file.getRelativeFilePath())",
-                        isPreviousDay: onlyGeneratePreviousDays
+                        isPreviousDay: onlyGeneratePreviousDays,
+                        isRolling: isRolling
                     ) {
                         await uploadBatch.uploadMultipart(target)
                     }

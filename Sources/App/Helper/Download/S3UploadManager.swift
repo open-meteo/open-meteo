@@ -20,11 +20,14 @@ enum S3UploadPlan {
         isRolling: Bool = false,
         contentType: String = "application/octet-stream"
     ) -> [S3UploadTarget] {
-        guard !isRolling else {
+        if isRolling, domain != .google_weathernext2_ensemble {
             return []
         }
         return domain.parseBucket(buckets).compactMap { bucket, profile in
             if isPreviousDay && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
+                return nil
+            }
+            if isRolling && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
                 return nil
             }
             return S3UploadTarget(
