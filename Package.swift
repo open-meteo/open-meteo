@@ -79,8 +79,8 @@ let package = Package(
         ),
         .systemLibrary(
             name: "CZlib",
-            pkgConfig: "z",
-            providers: [.brew(["zlib"]), .apt(["libz-dev"])]
+            pkgConfig: "zlib",
+            providers: [.brew(["zlib"]), .apt(["libz-dev"]), .yum(["zlib-devel"])]
         ),
         .target(
             name: "CHelper",
