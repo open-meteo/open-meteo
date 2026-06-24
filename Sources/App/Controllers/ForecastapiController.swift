@@ -788,6 +788,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case geosphere_seamless
 
     case chmi_aladin_cz_1km
+    case chmi_aladin_central_europe_2km
+    case chmi_aladin_seamless
 
     case cma_grapes_global
 
@@ -1095,7 +1097,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .geosphere_arome_austria:
             return .single(GeoSphereDomain.arome_austria, GeoSphereVariable.self)
         case .chmi_aladin_cz_1km:
-            return .single(ChmiDomain.aladin_cz_1km, ChmiVariable.self)
+            return .single(ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
+        case .chmi_aladin_central_europe_2km:
+            return .single(ChmiDomain.aladin_central_europe_2km, ChmiVariable.self)
+        case .chmi_aladin_seamless:
+            return .multiple([
+                (ChmiDomain.aladin_central_europe_2km, ChmiSurfaceVariable.self),
+                (ChmiDomain.aladin_cz_1km, ChmiVariable.self)
+            ])
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
@@ -1525,6 +1534,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .chmi_aladin_cz_1km:
             return [] // migrated
+        case .chmi_aladin_central_europe_2km:
+            return [] // migrated
+        case .chmi_aladin_seamless:
+            return [] // migrated
         case .gem_seamless:
             let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await GemMixer(domains: [.gem_gdps_15km_upper_level, .gem_global, .gem_gdps_15km, .gem_regional, .gem_rdps_10km, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
@@ -1827,6 +1840,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GeoSphereDomain.arome_austria
         case .chmi_aladin_cz_1km:
             return ChmiDomain.aladin_cz_1km
+        case .chmi_aladin_central_europe_2km:
+            return ChmiDomain.aladin_central_europe_2km
+        case .chmi_aladin_seamless: 
+            return nil
         case .gem_global, .cmc_gem_gdps:
             return GemDomain.gem_global
         case .gem_regional, .cmc_gem_rdps:
@@ -2116,6 +2133,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .chmi_aladin_cz_1km:
             return nil // migrated
+        case .chmi_aladin_central_europe_2km:
+            return nil // migrated
+        case .chmi_aladin_seamless:
+            return nil //migrated
         case .gem_global, .cmc_gem_gdps:
             return try await GemReader(domain: .gem_global, gridpoint: gridpoint, options: options)
         case .gem_regional, .cmc_gem_rdps:

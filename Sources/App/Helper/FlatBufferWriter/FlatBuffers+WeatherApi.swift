@@ -998,6 +998,9 @@ extension MultiDomains {
             return .geosphereAromeAustria
         case .chmi_aladin_cz_1km:
             return .chmiAladinCz1km
+        case .chmi_aladin_central_europe_2km, .chmi_aladin_seamless:
+            // TODO: add chmiAladinLambert23km to flatbuffers schema
+            return .chmiAladinCz1km
         case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
         case .era5, .copernicus_era5:
