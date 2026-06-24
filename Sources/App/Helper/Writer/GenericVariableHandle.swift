@@ -80,10 +80,11 @@ struct GenericVariableHandle: Sendable {
                  ]
                  }
                  let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
-                 try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
-                try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
+                try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
+                let metaData = try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
                 if let uploadS3Bucket, let uploadBatch {
                     let file = ModelUpdateMetaFile(domain: domain.domainRegistry)
+                    let metaBytes = ByteBuffer(data: metaData).readableBytesView
                     for target in S3UploadPlan.targets(
                         domain: domain.domainRegistry,
                         buckets: uploadS3Bucket,
@@ -91,7 +92,7 @@ struct GenericVariableHandle: Sendable {
                         remotePath: "data/\(domain.domainRegistry.rawValue)/static/meta.json",
                         contentType: "application/json"
                     ) {
-                        await uploadBatch.uploadMetadataAfterCommits(target)
+                        await uploadBatch.uploadMetadataAfterCommits(target, data: metaBytes)
                     }
                 }
             }
@@ -228,21 +229,24 @@ struct GenericVariableHandle: Sendable {
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()
         if !skipMeta {
-            try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
+            let metaFiles = try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
             if let uploadS3Bucket, let uploadBatch {
-                let metaFiles: [(file: FullRunMetaFile, remotePath: String)] = [
-                    (.run(domain.domainRegistry, run), "data_run/\(domain.domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta.json"),
-                    (.latest(domain.domainRegistry), "data_run/\(domain.domainRegistry.rawValue)/latest.json")
-                ]
                 for meta in metaFiles {
+                    let remotePath: String
+                    switch meta.file {
+                    case .run:
+                        remotePath = "data_run/\(domain.domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta.json"
+                    case .latest:
+                        remotePath = "data_run/\(domain.domainRegistry.rawValue)/latest.json"
+                    }
                     for target in S3UploadPlan.targets(
                         domain: domain.domainRegistry,
                         buckets: uploadS3Bucket,
                         localFile: meta.file.getFilePath(),
-                        remotePath: meta.remotePath,
+                        remotePath: remotePath,
                         contentType: "application/json"
                     ) {
-                        await uploadBatch.uploadMetadataAfterCommits(target)
+                        await uploadBatch.uploadMetadataAfterCommits(target, data: ByteBuffer(data: meta.data).readableBytesView)
                     }
                 }
             }

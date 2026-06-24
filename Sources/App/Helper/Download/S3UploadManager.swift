@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import AsyncHTTPClient
+import NIOCore
 
 struct S3UploadTarget: Sendable, Equatable {
     let bucketEndpoint: String
@@ -50,6 +51,11 @@ actor S3UploadBatch {
         let prepared: S3MultiPartUploadPrepared
     }
 
+    private struct MetadataUpload: Sendable {
+        let target: S3UploadTarget
+        let data: ByteBufferView
+    }
+
     private enum UploadResult: Sendable {
         case success(PreparedUpload)
         case failure(S3UploadTarget, String)
@@ -59,7 +65,7 @@ actor S3UploadBatch {
     private let logger: Logger
     private var endpointQueues: [String: Task<Void, Never>] = [:]
     private var uploadTasks: [Task<UploadResult, Never>] = []
-    private var metadataUploads: [S3UploadTarget] = []
+    private var metadataUploads: [MetadataUpload] = []
 
     init(client: HTTPClient, logger: Logger) {
         self.client = client
@@ -90,8 +96,8 @@ actor S3UploadBatch {
         uploadTasks.append(task)
     }
 
-    func uploadMetadataAfterCommits(_ target: S3UploadTarget) {
-        metadataUploads.append(target)
+    func uploadMetadataAfterCommits(_ target: S3UploadTarget, data: ByteBufferView) {
+        metadataUploads.append(MetadataUpload(target: target, data: data))
     }
 
     func finish() async throws {
@@ -107,8 +113,7 @@ actor S3UploadBatch {
         logger.info("S3 multipart commits completed in \(commitStart.timeElapsedPretty())")
 
         try await metadataUploads.foreachConcurrent(nConcurrent: 8) { upload in
-            let data = try Data(contentsOf: URL(fileURLWithPath: upload.localFile))
-            try await S3Uploader.upload(client: self.client, data: data, url: upload.url, contentType: upload.contentType)
+            try await S3Uploader.upload(client: self.client, data: upload.data, url: upload.target.url, contentType: upload.target.contentType)
         }
     }
 
