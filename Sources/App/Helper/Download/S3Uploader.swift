@@ -280,7 +280,7 @@ extension String {
 }
 
 /// Intermediate representation
-struct S3MultiPartUploadPrepared {
+struct S3MultiPartUploadPrepared: Sendable {
     let etags: [String]
     let url: String
     let encodedUploadId: String
@@ -328,4 +328,3 @@ fileprivate extension String {
         return self[queryStart...]
     }
 }
-

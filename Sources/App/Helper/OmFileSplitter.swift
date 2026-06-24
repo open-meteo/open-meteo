@@ -330,7 +330,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, onFileWritten: ((OmFileType) async -> Void)? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         if nMembers > 1, let retainDays = domain.useRollingDays {
             // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
@@ -354,6 +354,7 @@ struct OmFileSplitter {
             let write: OmFileWriterArray<Float, FileHandle>
             let writeFn: FileHandle
             let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
+            let file: OmFileType
             let fileName: String
             let skip: Int
         }
@@ -386,7 +387,7 @@ struct OmFileSplitter {
                     scale_factor: scalefactor,
                     add_offset: 0
                 )
-                return WriterPerStep(read: omRead, writeFile: writeFile, write: writer, writeFn: fn, offsets: offsets, fileName: fileName, skip: skip)
+                return WriterPerStep(read: omRead, writeFile: writeFile, write: writer, writeFn: fn, offsets: offsets, file: readFile, fileName: fileName, skip: skip)
             }
         }
 
@@ -477,6 +478,7 @@ struct OmFileSplitter {
             // Overwrite existing file, with newly created
             try writer.writeFn.linkTemporary(file: writer.fileName)
             try writer.writeFn.close()
+            await onFileWritten?(writer.file)
         }
     }
     

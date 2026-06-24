@@ -89,6 +89,54 @@ import Logging
         #expect("s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".stripHttpPassword() == "s3://openmeteo.s3.amazonaws.com:8080/text.txt")
     }
 
+    @Test func s3UploadPlanKeepsRegularDataForAwsProfile() throws {
+        let targets = S3UploadPlan.targets(
+            domain: .ncep_gfs025,
+            buckets: "s3://aws-bucket/@aws",
+            localFile: "/tmp/chunk_1.om",
+            remotePath: "data/ncep_gfs025/temperature_2m/chunk_1.om"
+        )
+
+        #expect(targets == [
+            S3UploadTarget(
+                bucketEndpoint: "s3://aws-bucket/",
+                localFile: "/tmp/chunk_1.om",
+                url: "s3://aws-bucket/data/ncep_gfs025/temperature_2m/chunk_1.om",
+                contentType: "application/octet-stream"
+            )
+        ])
+    }
+
+    @Test func s3UploadPlanSkipsPreviousDayForAwsProfileAndDefaultOpenmeteo() throws {
+        let targets = S3UploadPlan.targets(
+            domain: .ncep_gfs025,
+            buckets: "openmeteo,s3://aws-bucket/@aws,s3://ceph-bucket/@ceph",
+            localFile: "/tmp/chunk_1.om",
+            remotePath: "data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
+            isPreviousDay: true
+        )
+
+        #expect(targets == [
+            S3UploadTarget(
+                bucketEndpoint: "s3://ceph-bucket/",
+                localFile: "/tmp/chunk_1.om",
+                url: "s3://ceph-bucket/data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
+                contentType: "application/octet-stream"
+            )
+        ])
+    }
+
+    @Test func s3UploadPlanUsesDataRunPrefix() throws {
+        let targets = S3UploadPlan.targets(
+            domain: .ncep_gfs025,
+            buckets: "openmeteo",
+            localFile: "/tmp/temperature_2m.om",
+            remotePath: "data_run/ncep_gfs025/20260101/00/temperature_2m.om"
+        )
+
+        #expect(targets.first?.url == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
+    }
+
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
