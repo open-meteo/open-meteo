@@ -202,6 +202,11 @@ struct DmiDownload: AsyncCommand {
                     if stepType == "accum" && timestamp == run {
                         return // skip precipitation at timestep 0
                     }
+                    
+                    if timestamp == run, let variable = variable as? DmiSurfaceVariable, [DmiSurfaceVariable.direct_radiation, .shortwave_radiation, .precipitation, .snowfall_water_equivalent].contains(variable) {
+                        /// Make absolutely sure to skip accumulated variables. Direct radiation was not skipped correctly using `stepType == "accum"`
+                        return
+                    }
 
                     var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
