@@ -59,6 +59,7 @@ Apps:
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 - [Meteograph](https://github.com/timbortnik/widget) Open-source Android home-screen weather widget showing a meteogram with 48-hour and 7-day forecasts; no ads, no tracking, no account. ([Google Play](https://play.google.com/store/apps/details?id=org.bortnik.meteogram))
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
+- [MeteoNerd](https://meteonerd.pages.dev) A Hyperlocal Weather web app offering detailed forecasts, real-time conditions, and worldwide location search — built for weather enthusiasts who want data, not clutter.
 - [monkeysnow](https://github.com/kcluit/monkeysnow) The most customizable resort/snow forecast website for ski and board!
 - [Mousam](https://amit9838.github.io/mousam/) A weather app for GNU/Linux that displays the weather at a glance
 - [Munetios Weather](https://weather.munetios.com) A privacy-first, non-commercial weather web app using Open-Meteo data with no tracking.
