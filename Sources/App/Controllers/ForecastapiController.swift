@@ -1239,6 +1239,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMulti(Array([gfsProbabilites, nbmProbabilities, icon, gfs, hrrr].compacted()))
             }
+            // For Canada, use GEM if the location is covered by the regional model.
+            if let _ = try await GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                return try await Self.gem_seamless.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
+            }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if (22.4 + 5..<47.65 - 5).contains(lat), (120 + 5..<150 - 5).contains(lon), let jma_msm = try await JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options), let jma_msm_upper = try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 return MultiDomains.hourlyToMulti([gfsProbabilites, ifsProbabilities, gfs, icon, ifsHres, jma_msm_upper, jma_msm])
