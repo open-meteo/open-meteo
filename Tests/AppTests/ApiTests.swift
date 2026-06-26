@@ -27,6 +27,31 @@ import VaporTesting
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
     }
 
+    @Test func singleRunDailyRequiresLocalMidnight() throws {
+        let timezone = TimezoneWithOffset(utcOffsetSeconds: -4 * 3600, identifier: "America/New_York", abbreviation: "GMT-4")
+        let invalidDaily = try JSONDecoder().decode(ApiQueryParameter.self, from: Data("""
+        {"run":"2026-06-01T00:00","daily":["temperature_2m_mean"]}
+        """.utf8))
+
+        #expect(throws: ForecastApiError.self) {
+            try invalidDaily.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+        }
+
+        let valid = try JSONDecoder().decode(ApiQueryParameter.self, from: Data("""
+        {"run":"2026-06-01T04:00","forecast_days":3,"daily":["temperature_2m_mean"]}
+        """.utf8))
+        try valid.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+
+        let current = Timestamp(2026, 6, 24)
+        let allowedRange = Timestamp(2023, 1, 1)..<Timestamp(2026, 7, 1)
+        let time = try valid.getTimerange2(timezone: timezone, current: current, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: 3650)
+        let dailyDates = Array(time.dailyDisplay.iterate(format: .iso8601, utc_offset_seconds: timezone.utcOffsetSeconds, quotedString: false, onlyDate: true))
+
+        #expect(dailyDates == ["2026-06-01", "2026-06-02", "2026-06-03"])
+        #expect(time.dailyRead.range.lowerBound == Timestamp(2026, 6, 1, 4))
+        #expect(time.hourlyRead.range.lowerBound == Timestamp(2026, 6, 1, 4))
+    }
+
     @Test func timeAlignmentMinutely15() throws {
         // Test that unaligned timestamps are properly rounded to 15-minute boundaries
         let start = Timestamp(2025, 12, 03, 0, 20)  // 00:20 should round down to 00:15
