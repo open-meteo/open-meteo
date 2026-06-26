@@ -212,6 +212,12 @@ extension api_result_VariableType {
             "sunrise"
         case .sunset:
             "sunset"
+        case .moonrise:
+            "moonrise"
+        case .moonset:
+            "moonset"
+        case .moonPhase:
+            "moon_phase"
         case .pm10:
             "pm10"
         case .pm25:

@@ -819,6 +819,12 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .sunrise)
         case .sunset:
             return .init(variable: .sunset)
+        case .moonrise:
+            return .init(variable: .moonrise)
+        case .moonset:
+            return .init(variable: .moonset)
+        case .moon_phase:
+            return .init(variable: .moonPhase)
         case .surface_pressure_max:
             return .init(variable: .surfacePressure, aggregation: .maximum)
         case .surface_pressure_mean:

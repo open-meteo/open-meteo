@@ -571,6 +571,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         let members = 0..<domain.countEnsembleMember
         
         var riseSet: (rise: [Timestamp], set: [Timestamp])?
+        var moonRiseSet: (rise: [Timestamp], set: [Timestamp])?
         return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncMap { variable -> ApiColumn<ForecastVariableDaily> in
             /// Flood API uses a boolean flag to enable ensemble members for river_discharge
             /// /// Also, flood API uses `ensembleMember` instead of `ensembleMemberLevel`, because members are stored in different files
@@ -585,6 +586,20 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 } else {
                     return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
                 }
+            }
+            if variable == .moonrise || variable == .moonset {
+                // only calculate moonrise/set once. Uses `dailyDisplay` (local midnight in UTC) like sunrise/set
+                let times = moonRiseSet ?? Moon.calculateMoonRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon)
+                moonRiseSet = times
+                if variable == .moonset {
+                    return ApiColumn(variable: .moonset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
+                } else {
+                    return ApiColumn(variable: .moonrise, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
+                }
+            }
+            if variable == .moon_phase {
+                let phase = Moon.calculateMoonPhase(timeRange: time.dailyDisplay.range)
+                return ApiColumn(variable: .moon_phase, unit: .fraction, variables: [.float(phase)])
             }
             if variable == .daylight_duration {
                 let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerDaily.modelLat)
