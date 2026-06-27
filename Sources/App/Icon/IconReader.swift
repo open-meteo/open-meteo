@@ -85,6 +85,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let snowfall = try await get(variable: .derived(.surface(.snowfall)), time: time).data
                 let showers = reader.domain != .iconD2Eps ? nil : try await get(raw: .surface(.showers), time: time).data
                 let cape = reader.domain == .iconEps ? nil : try await get(raw: .surface(.cape), time: time).data
+                let convectiveInhibition = reader.domain == .iconD2Eps ? try await get(raw: .surface(.convective_inhibition), time: time).data : nil
                 let gusts = reader.domain == .iconEps ? nil : try await get(raw: .surface(.wind_gusts_10m), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
@@ -94,7 +95,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     gusts: gusts,
                     cape: cape,
                     liftedIndex: nil,
-                    convectiveInhibition: nil,
+                    convectiveInhibition: convectiveInhibition,
                     pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
@@ -199,6 +200,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 }
                 if reader.domain == .iconD2Eps {
                     try await reader.prefetchData(variable: .surface(.showers), time: time)
+                    try await reader.prefetchData(variable: .surface(.convective_inhibition), time: time)
                 }
                 return
             }

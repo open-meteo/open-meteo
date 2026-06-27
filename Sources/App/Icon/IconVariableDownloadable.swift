@@ -88,14 +88,15 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .wind_v_component_10m:
                 break
-                // all variables below are not in the global EPS model
+                // In EPS domains, these variables are not available in global ICON-EPS.
             case .wind_u_component_80m, .wind_v_component_80m, .temperature_80m, .wind_gusts_10m, .snowfall_convective_water_equivalent, .snowfall_water_equivalent, .cape:
                 if domain == .iconEps {
                     return nil // not in global
                 }
 
-                // all variables below are only in the D2 EPS model
-            case .wind_u_component_120m, .wind_v_component_120m, .temperature_120m, .wind_u_component_180m, .wind_v_component_180m, .rain, .showers, .snow_depth, .temperature_180m:
+                // In EPS domains, these variables are only available in ICON-D2-EPS.
+                // Deterministic ICON-EU/ICON-D2 bypass this EPS-only block.
+            case .wind_u_component_120m, .wind_v_component_120m, .temperature_120m, .wind_u_component_180m, .wind_v_component_180m, .rain, .showers, .snow_depth, .temperature_180m, .convective_inhibition:
                 if domain != .iconD2Eps {
                     return nil
                 }
@@ -178,6 +179,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .snowfall_convective_water_equivalent: return ("snow_con", "single-level", nil)
         case .snowfall_water_equivalent: return ("snow_gsp", "single-level", nil)
         case .cape: return ("cape_ml", "single-level", nil)
+        case .convective_inhibition:
+            return [IconDomains.iconEu, .iconD2, .iconD2Eps].contains(domain) ? ("cin_ml", "single-level", nil) : nil
         case .lightning_potential:
             return domain == .iconD2 ? ("lpi", "single-level", nil) : nil // only in icon d2
         case .snowfall_height:
