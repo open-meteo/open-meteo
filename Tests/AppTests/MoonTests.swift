@@ -53,25 +53,64 @@ import Testing
         }
     }
 
-    /// Berlin 2024-01-01 (UTC+1). A few days after the 2023-12-27 full moon the moon is a waning
-    /// gibbous that rises in the evening and sets in the late morning. `timeRange` is local midnight
-    /// expressed in UTC, exactly like `dailyDisplay`.
+    /// Assert the computed rise/set for each day against reference times from timeanddate.com.
+    ///
+    /// `firstLocalDay` is local midnight of the first reference day labelled as if it were UTC
+    /// (e.g. `Timestamp(2024, 1, 1)`); the actual UTC window is recovered by removing the offset,
+    /// exactly like `dailyDisplay`. `reference` times are likewise the local clock times labelled
+    /// as UTC, so the comparison subtracts the offset back out. A `nil` entry asserts no event.
+    /// The compact MiniMoon series reproduces the references to within ~1 minute, hence the ±2 minute tolerance.
+    private func expectMoonRiseSet(lat: Float, lon: Float, utcOffsetSeconds: Int, firstLocalDay: Timestamp, reference: [(rise: Timestamp?, set: Timestamp?)], sourceLocation: SourceLocation = #_sourceLocation) {
+        let toleranceSeconds = 120
+        let start = firstLocalDay.add(-utcOffsetSeconds)
+        let times = Moon.calculateMoonRiseSet(timeRange: start..<start.add(reference.count * 86400), lat: lat, lon: lon)
+        #expect(times.rise.count == reference.count, sourceLocation: sourceLocation)
+        for (day, expected) in reference.enumerated() {
+            if let expectedRise = expected.rise {
+                #expect(!times.rise[day].isNoData, "day \(day): expected a moonrise", sourceLocation: sourceLocation)
+                #expect(abs(times.rise[day].add(utcOffsetSeconds).timeIntervalSince1970 - expectedRise.timeIntervalSince1970) <= toleranceSeconds, "day \(day): moonrise off by more than \(toleranceSeconds)s", sourceLocation: sourceLocation)
+            } else {
+                #expect(times.rise[day].isNoData, "day \(day): expected no moonrise", sourceLocation: sourceLocation)
+            }
+            if let expectedSet = expected.set {
+                #expect(!times.set[day].isNoData, "day \(day): expected a moonset", sourceLocation: sourceLocation)
+                #expect(abs(times.set[day].add(utcOffsetSeconds).timeIntervalSince1970 - expectedSet.timeIntervalSince1970) <= toleranceSeconds, "day \(day): moonset off by more than \(toleranceSeconds)s", sourceLocation: sourceLocation)
+            } else {
+                #expect(times.set[day].isNoData, "day \(day): expected no moonset", sourceLocation: sourceLocation)
+            }
+        }
+    }
+
+    /// Berlin (52.52°N, 13.41°E, UTC+1), 2026-01-01..08. Reference moonrise/moonset (local CET) from
+    /// timeanddate.com/moon/germany/berlin. The week brackets the 2026-01-03 full moon: a waxing
+    /// gibbous rising in the afternoon/evening and setting in the morning, with the rise drifting later
+    /// each day as the moon wanes.
     @Test func moonRiseSetBerlin() {
-        let utcOffsetSeconds = 3600
-        // local midnight 2024-01-01 00:00 CET == 2023-12-31 23:00 UTC
-        let localMidnightInUtc = Timestamp(2023, 12, 31, 23)
-        let times = Moon.calculateMoonRiseSet(timeRange: localMidnightInUtc..<localMidnightInUtc.add(86400), lat: 52.52, lon: 13.41)
-        #expect(times.rise.count == 1)
-        let rise = times.rise[0].add(utcOffsetSeconds)
-        let set = times.set[0].add(utcOffsetSeconds)
-        #expect(!times.rise[0].isNoData)
-        #expect(!times.set[0].isNoData)
-        // both events fall on the requested local day
-        #expect(rise.iso8601_YYYY_MM_dd == "2024-01-01")
-        #expect(set.iso8601_YYYY_MM_dd == "2024-01-01")
-        // waning gibbous: rises in the evening, sets in the late morning (local time)
-        #expect((20...23).contains(rise.hour))
-        #expect((10...12).contains(set.hour))
+        expectMoonRiseSet(lat: 52.52, lon: 13.41, utcOffsetSeconds: 3600, firstLocalDay: Timestamp(2026, 1, 1), reference: [
+            (rise: Timestamp(2026, 1, 1, 13, 21), set: Timestamp(2026, 1, 1, 06, 38)),
+            (rise: Timestamp(2026, 1, 2, 14, 22), set: Timestamp(2026, 1, 2, 07, 57)),
+            (rise: Timestamp(2026, 1, 3, 15, 43), set: Timestamp(2026, 1, 3, 08, 54)),
+            (rise: Timestamp(2026, 1, 4, 17, 14), set: Timestamp(2026, 1, 4, 09, 31)),
+            (rise: Timestamp(2026, 1, 5, 18, 46), set: Timestamp(2026, 1, 5, 09, 55)),
+            (rise: Timestamp(2026, 1, 6, 20, 13), set: Timestamp(2026, 1, 6, 10, 11)),
+            (rise: Timestamp(2026, 1, 7, 21, 34), set: Timestamp(2026, 1, 7, 10, 24)),
+            (rise: Timestamp(2026, 1, 8, 22, 51), set: Timestamp(2026, 1, 8, 10, 34)),
+        ])
+    }
+
+    /// Sydney (33.87°S, 151.21°E, UTC+11 AEDT), 2026-01-01..08 — southern hemisphere cross-check.
+    /// Reference moonrise/moonset (local AEDT) from timeanddate.com/moon/australia/sydney.
+    @Test func moonRiseSetSydney() {
+        expectMoonRiseSet(lat: -33.87, lon: 151.21, utcOffsetSeconds: 11 * 3600, firstLocalDay: Timestamp(2026, 1, 1), reference: [
+            (rise: Timestamp(2026, 1, 1, 18, 08), set: Timestamp(2026, 1, 1, 02, 52)),
+            (rise: Timestamp(2026, 1, 2, 19, 19), set: Timestamp(2026, 1, 2, 03, 48)),
+            (rise: Timestamp(2026, 1, 3, 20, 21), set: Timestamp(2026, 1, 3, 04, 54)),
+            (rise: Timestamp(2026, 1, 4, 21, 12), set: Timestamp(2026, 1, 4, 06, 06)),
+            (rise: Timestamp(2026, 1, 5, 21, 53), set: Timestamp(2026, 1, 5, 07, 21)),
+            (rise: Timestamp(2026, 1, 6, 22, 27), set: Timestamp(2026, 1, 6, 08, 32)),
+            (rise: Timestamp(2026, 1, 7, 22, 56), set: Timestamp(2026, 1, 7, 09, 40)),
+            (rise: Timestamp(2026, 1, 8, 23, 22), set: Timestamp(2026, 1, 8, 10, 43)),
+        ])
     }
 
     /// At high latitudes the moon can remain above or below the horizon for a whole day,
