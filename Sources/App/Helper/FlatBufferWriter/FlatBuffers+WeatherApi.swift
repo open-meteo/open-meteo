@@ -948,7 +948,7 @@ extension MultiDomains {
         switch self {
         case .best_match:
             return .bestMatch
-        case .gfs_seamless, .ncep_seamless:
+        case .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .gfsSeamless
         case .gfs_mix, .gfs_global, .ncep_gfs_global:
             return .gfsGlobal
@@ -972,7 +972,7 @@ extension MultiDomains {
             return .jmaMsm
         case .jms_gsm, .jma_gsm:
             return .jmaGsm
-        case .gem_seamless:
+        case .gem_seamless, .cmc_gem_seamless:
             return .gemSeamless
         case .gem_global, .cmc_gem_gdps:
             return .gemGlobal
@@ -1119,17 +1119,17 @@ extension MultiDomains {
             return .meteoswissIconSeamless
         case .ncep_nam_conus:
             return .ncepNamConus
-        case .icon_seamless_eps:
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .iconSeamless
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return .iconGlobal
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return .iconEu
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return .iconD2
         case .ecmwf_ifs025_ensemble:
             return .ecmwfIfs025
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .cmc_gem_geps:
             return .gemGlobal
         case .ncep_gefs_seamless:
             return .gfsSeamless
@@ -1161,9 +1161,9 @@ extension MultiDomains {
             return .ecmwfEc46
         case .marine_best_match:
             return .bestMatch
-        case .gwam:
+        case .gwam, .dwd_gwam:
             return .gwam
-        case .ewam:
+        case .ewam, .dwd_ewam:
             return .ewam
         case .era5_ocean:
             return .era5Ocean
