@@ -1019,6 +1019,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(CmaDomain.grapes_global, CmaVariable.self)
         case .dmi_harmonie_arome_europe:
             return .single(DmiDomain.harmonie_arome_europe, DmiVariable.self)
+        case .italia_meteo_arpae_icon_2i:
+            return .single(ItaliaMeteoArpaeDomain.icon_2i, ItaliaMeteoArpaeVariable.self)
         case .dmi_seamless:
             return .multipleWithPrecipitationProbability([
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
@@ -1640,8 +1642,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let reader = try await KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [reader].compactMap({ $0 })
         case .italia_meteo_arpae_icon_2i:
-            let reader = try await ItaliaMeteoArpaeReader(domain: .icon_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [reader].compactMap({ $0 })
+            return [] // migrated
         case .meteoswiss_icon_ch1:
             let probabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let reader: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1976,7 +1977,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .kma_ldps:
             return KmaDomain.ldps
         case .italia_meteo_arpae_icon_2i:
-            return ItaliaMeteoArpaeDomain.icon_2i
+            return nil // migrated
         case .meteoswiss_icon_ch1:
             return MeteoSwissDomain.icon_ch1
         case .meteoswiss_icon_ch2:
@@ -2252,7 +2253,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .kma_ldps:
             return try await KmaReader(domain: .ldps, gridpoint: gridpoint, options: options)
         case .italia_meteo_arpae_icon_2i:
-            return try await ItaliaMeteoArpaeReader(domain: .icon_2i, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .meteoswiss_icon_ch1:
             return try await MeteoSwissReader(domain: .icon_ch1, gridpoint: gridpoint, options: options)
         case .meteoswiss_icon_ch2:

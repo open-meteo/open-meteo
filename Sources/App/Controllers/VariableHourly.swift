@@ -1015,7 +1015,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 })
                 return DataAndUnit(rain, precip.unit)
             }
-        case .weather_code, .weathercode:
+        case .weathercode:
+            return getDeriverMap(variable: .weather_code)
+        case .weather_code:
             guard
                 let cloudCover = getDeriverMap(variable: .cloud_cover),
                 let snowfall = getDeriverMap(variable: .snowfall),
@@ -1110,6 +1112,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation.data, diffuseRadiation: diffuseRadiation.data, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             }
+        case .surface_temperature:
+            return getDeriverMap(variable: .soil_temperature_0cm)
         case .freezinglevel_height:
             return getDeriverMap(variable: .freezing_level_height)
             

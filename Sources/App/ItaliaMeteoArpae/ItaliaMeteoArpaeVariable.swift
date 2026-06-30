@@ -179,7 +179,6 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     case shortwave_radiation
     case direct_radiation
 
-    // case surface_temperature
     case cape
 
     /// Soil temperature
