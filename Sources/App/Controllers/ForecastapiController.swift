@@ -1019,6 +1019,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(CmaDomain.grapes_global, CmaVariable.self)
         case .dmi_harmonie_arome_europe:
             return .single(DmiDomain.harmonie_arome_europe, DmiVariable.self)
+        case .knmi_harmonie_arome_europe:
+            return .single(KnmiDomain.harmonie_arome_europe, KnmiVariable.self)
+        case .knmi_harmonie_arome_netherlands:
+            return .single(KnmiDomain.harmonie_arome_netherlands, KnmiVariable.self)
         case .italia_meteo_arpae_icon_2i:
             return .single(ItaliaMeteoArpaeDomain.icon_2i, ItaliaMeteoArpaeVariable.self)
         case .dmi_seamless:
@@ -1035,6 +1039,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
                 (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 (MetNoDomain.nordic_pp, MetNoVariable.self)
+            ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .knmi_seamless:
+            return .multipleWithPrecipitationProbability([
+                (EcmwfDomain.ifs025, EcmwfVariable.self),
+                (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
+                (KnmiDomain.harmonie_arome_europe, KnmiVariable.self),
+                (KnmiDomain.harmonie_arome_netherlands, KnmiVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .multiple([
@@ -1168,7 +1179,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
         return (hourlyReader, daily, nil, nil)
     }
-    
+
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?)? {
         
         if let d = getDomainAndVariable() {
@@ -1190,11 +1201,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
-            // For Netherlands and Belgium use KNMI, IFS and ICON
-            if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMulti(Array([ifsProbabilities, gfs, icon, iconEu, iconD2, ifs025, ifsHres, knmiNetherlands].compacted()))
+            // For Netherlands and Belgium use KNMI seamless
+            if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let _ = try await KnmiDomain.harmonie_arome_netherlands.makeHourlyReader(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                guard let mapping = Self.knmi_seamless.getDomainAndVariable() else {
+                    throw ModelError.domainInitFailed(domain: Self.knmi_seamless.rawValue)
+                }
+                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
             }
             // Scandinavian region, combine MetNo Nordic with IFS HRES
             if lat >= 54.9, let _ = try await MetNoDomain.nordic_pp.makeHourlyReader(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
@@ -1587,18 +1599,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .knmi_harmonie_arome_europe:
-            return try await KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .knmi_harmonie_arome_netherlands:
-            return try await KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .dmi_harmonie_arome_europe:
             return [] // migrated
         case .knmi_seamless:
-            let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let knmiNetherlands: (any GenericReaderProtocol)? = try await KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let knmiEurope = try await KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ecmwf = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, ecmwf, ifsHres, knmiEurope, knmiNetherlands].compactMap({ $0 })
+            return [] // migrated
         case .dmi_seamless:
             return [] // migrated
         case .metno_seamless:
@@ -1941,13 +1948,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .arpae_cosmo_5m:
             return nil
         case .knmi_harmonie_arome_europe:
-            return KnmiDomain.harmonie_arome_europe
+            return nil // migrated
         case .knmi_harmonie_arome_netherlands:
-            return KnmiDomain.harmonie_arome_netherlands
+            return nil // migrated
         case .dmi_harmonie_arome_europe:
             return nil // migrated
         case .knmi_seamless:
-            return nil
+            return nil // migrated
         case .dmi_seamless:
             return nil // migrated
         case .metno_seamless:
@@ -2217,13 +2224,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_ifs_long_window:
             return try await Era5Factory.makeReader(domain: .ecmwf_ifs_long_window, gridpoint: gridpoint, options: options)
         case .knmi_harmonie_arome_europe:
-            return try await KnmiReader(domain: .harmonie_arome_europe, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .knmi_harmonie_arome_netherlands:
-            return try await KnmiReader(domain: .harmonie_arome_netherlands, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .dmi_harmonie_arome_europe:
             return nil // migrated
         case .knmi_seamless:
-            return nil
+            return nil // migrated
         case .dmi_seamless:
             return nil // migrated
         case .metno_seamless:
