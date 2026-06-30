@@ -137,6 +137,45 @@ import Logging
         #expect(targets.first?.url == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
     }
 
+    @Test func s3UploadSessionLimitsFileUploadsPerEndpoint() async throws {
+        let slowEndpoint = "s3://slow-bucket/"
+        let fastEndpoint = "s3://fast-bucket/"
+        let probe = S3UploadSessionSchedulerProbe()
+        let session = S3UploadSession(
+            logger: Logger(label: "DownloaderTests.S3UploadSession"),
+            maxConcurrentFileUploads: 2,
+            prepareMultipartUpload: { target in
+                await probe.prepare(target: target)
+            },
+            commitMultipartUpload: { _ in },
+            uploadMetadata: { _, _ in }
+        )
+
+        do {
+            for index in 0..<4 {
+                await session.uploadMultipart(s3UploadTarget(endpoint: slowEndpoint, name: "slow-\(index)"))
+            }
+            try await waitForStarted(probe: probe, endpoint: slowEndpoint, count: 2, timeoutSeconds: 2)
+
+            for index in 0..<2 {
+                await session.uploadMultipart(s3UploadTarget(endpoint: fastEndpoint, name: "fast-\(index)"))
+            }
+            try await waitForStarted(probe: probe, endpoint: fastEndpoint, count: 2, timeoutSeconds: 2)
+
+            let maxActiveByEndpoint = await probe.getMaxActiveByEndpoint()
+            #expect(maxActiveByEndpoint[slowEndpoint] == 2)
+            #expect(maxActiveByEndpoint[fastEndpoint] == 2)
+            #expect(await probe.getMaxTotalActive() == 4)
+
+            await probe.release()
+            try await session.finish()
+        } catch {
+            await probe.release()
+            try? await session.finish()
+            throw error
+        }
+    }
+
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
@@ -219,4 +258,76 @@ private func randomData(byteCount: Int) -> Data {
         }
     }
     return data
+}
+
+private func s3UploadTarget(endpoint: String, name: String) -> S3UploadTarget {
+    S3UploadTarget(
+        bucketEndpoint: endpoint,
+        localFile: "/tmp/\(name).om",
+        url: "\(endpoint)data/\(name).om",
+        contentType: "application/octet-stream"
+    )
+}
+
+private enum TestTimeoutError: Error {
+    case timedOut
+}
+
+private func waitForStarted(probe: S3UploadSessionSchedulerProbe, endpoint: String, count: Int, timeoutSeconds: Double) async throws {
+    let stepNanoseconds: UInt64 = 10_000_000
+    let maxAttempts = Int(timeoutSeconds * 1_000_000_000 / Double(stepNanoseconds))
+    for _ in 0..<maxAttempts {
+        if await probe.getStarted(endpoint: endpoint) >= count {
+            return
+        }
+        try await Task.sleep(nanoseconds: stepNanoseconds)
+    }
+    throw TestTimeoutError.timedOut
+}
+
+private actor S3UploadSessionSchedulerProbe {
+    private var startedByEndpoint: [String: Int] = [:]
+    private var activeByEndpoint: [String: Int] = [:]
+    private var maxActiveByEndpoint: [String: Int] = [:]
+    private var maxTotalActive = 0
+    private var isReleased = false
+    private var releaseContinuations: [CheckedContinuation<Void, Never>] = []
+
+    func prepare(target: S3UploadTarget) async -> S3MultiPartUploadPrepared {
+        let endpoint = target.bucketEndpoint
+        startedByEndpoint[endpoint, default: 0] += 1
+        activeByEndpoint[endpoint, default: 0] += 1
+        maxActiveByEndpoint[endpoint] = max(maxActiveByEndpoint[endpoint, default: 0], activeByEndpoint[endpoint, default: 0])
+        maxTotalActive = max(maxTotalActive, activeByEndpoint.values.reduce(0, +))
+
+        if !isReleased {
+            await withCheckedContinuation { continuation in
+                releaseContinuations.append(continuation)
+            }
+        }
+
+        activeByEndpoint[endpoint, default: 0] -= 1
+        return S3MultiPartUploadPrepared(etags: ["etag"], url: target.url, encodedUploadId: "upload-id")
+    }
+
+    func release() {
+        isReleased = true
+        let continuations = releaseContinuations
+        releaseContinuations.removeAll(keepingCapacity: true)
+        for continuation in continuations {
+            continuation.resume()
+        }
+    }
+
+    func getMaxActiveByEndpoint() -> [String: Int] {
+        maxActiveByEndpoint
+    }
+
+    func getMaxTotalActive() -> Int {
+        maxTotalActive
+    }
+
+    func getStarted(endpoint: String) -> Int {
+        startedByEndpoint[endpoint, default: 0]
+    }
 }
