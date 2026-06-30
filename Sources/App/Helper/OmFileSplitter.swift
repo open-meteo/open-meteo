@@ -127,6 +127,7 @@ struct OmFileSplitter {
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
             for year in startYear ... endYear {
+                try Task.checkCancellation()
                 let yeartime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year + 1, 1, 1), dtSeconds: time.dtSeconds)
                 /// as index
                 let fileTime = yeartime.toIndexTime()
@@ -163,6 +164,7 @@ struct OmFileSplitter {
         
         let subring = start ..< indexTime.upperBound
         for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile) {
+            try Task.checkCancellation()
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
@@ -254,6 +256,7 @@ struct OmFileSplitter {
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
             for year in startYear ... endYear {
+                try Task.checkCancellation()
                 let yeartime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year + 1, 1, 1), dtSeconds: time.dtSeconds)
                 /// as index
                 let fileTime = yeartime.toIndexTime()
@@ -291,6 +294,7 @@ struct OmFileSplitter {
         
         let subring = start ..< indexTime.upperBound
         for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile) {
+            try Task.checkCancellation()
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
