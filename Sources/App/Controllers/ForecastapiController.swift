@@ -2161,7 +2161,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .cerra, .copernicus_cerra:
             return try await CerraReader(domain: .cerra, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs:
-            return try await Era5Factory.makeReader(domain: .ecmwf_ifs, gridpoint: gridpoint, options: options)
+            return try await EcmwfEcpdsReader(domain: .ifs, gridpoint: gridpoint, options: options)
         case .ecmwf_wam:
             return try await GenericReader<EcmwfEcpdsDomain, EcmwfEcdpsWamVariable>(domain: .wam, position: gridpoint, options: options)
         case .cma_grapes_global:
