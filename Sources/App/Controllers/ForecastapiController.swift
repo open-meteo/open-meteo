@@ -712,6 +712,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case gfs_graphcast025
     
     case ncep_seamless
+    case ncep_gfs_seamless
     case ncep_gfs_global
     case ncep_nbm_conus
     case ncep_gfs025
@@ -756,6 +757,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case gem_regional
     case gem_hrdps_continental
     case gem_hrdps_west
+    case cmc_gem_seamless
     case cmc_gem_gdps
     case cmc_gem_hrdps
     case cmc_gem_hrdps_west
@@ -859,11 +861,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case icon_global_eps
     case icon_eu_eps
     case icon_d2_eps
+    case dwd_icon_seamless_eps
+    case dwd_icon_global_eps
+    case dwd_icon_eu_eps
+    case dwd_icon_d2_eps
 
     case ecmwf_ifs025_ensemble
     case ecmwf_aifs025_ensemble
 
     case gem_global_ensemble
+    case cmc_gem_geps
 
     case bom_access_global_ensemble
     case google_weathernext2_ensemble
@@ -880,6 +887,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     
     case ewam
     case gwam
+    case dwd_ewam
+    case dwd_gwam
     case era5_ocean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
@@ -1041,11 +1050,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
                 (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
             ])
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return .single(IconDomains.iconEps, DwdIconEpsGlobalVariable.self)
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return .single(IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self)
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return .single(IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self)
         case .dwd_icon_eps_ensemble_mean:
             return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self)
@@ -1445,7 +1454,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         switch self {
         case .best_match:
             return [] // migrated
-        case .gfs_mix, .gfs_seamless, .ncep_seamless:
+        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return [
                 try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as any GenericReaderProtocol,
                 try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
@@ -1549,7 +1558,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .chmi_aladin_seamless:
             return [] // migrated
-        case .gem_seamless:
+        case .gem_seamless, .cmc_gem_seamless:
             let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await GemMixer(domains: [.gem_gdps_15km_upper_level, .gem_global, .gem_gdps_15km, .gem_regional, .gem_rdps_10km, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .gem_global, .cmc_gem_gdps:
@@ -1657,15 +1666,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let ch1: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ch2: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilitiesCh2, probabilitiesCh1, ch2, ch1].compactMap({ $0 })
-        case .icon_seamless_eps:
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
             /// Note: ICON D2 EPS has been excluded, because it only provides 20 members and noticable different results compared to ICON EU EPS
             /// See: https://github.com/open-meteo/open-meteo/issues/876
             return try await IconMixer(domains: [.iconEps, .iconEuEps], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return [] // migrated
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return [] // migrated
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return [] // migrated
         case .ecmwf_ifs025_ensemble:
             return try await EcmwfReader(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -1677,7 +1686,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GfsReader(domains: [.gfs05_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ncep_gefs_seamless:
             return try await GfsReader(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .cmc_gem_geps:
             return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global_ensemble:
             return [] // migrated
@@ -1727,9 +1736,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let readers: [(any GenericReaderProtocol)?] = [ewam, ecmwfWam025, gwam]
             return readers.compactMap({$0})*/
-        case .ewam:
+        case .ewam, .dwd_ewam:
             return try await IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gwam:
+        case .gwam, .dwd_gwam:
             return try await IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .era5_ocean:
             return try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -1882,7 +1891,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return WeatherNextDomain.weathernext_global_ensemble_mean
         case .best_match:
             return nil
-        case .gfs_seamless, .gfs_mix, .ncep_seamless:
+        case .gfs_seamless, .gfs_mix, .ncep_seamless, .ncep_gfs_seamless:
             return nil
         case .gfs_global, .ncep_gfs_global:
             return nil
@@ -1914,7 +1923,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return JmaDomain.msm_upper_level
         case .jms_gsm, .jma_gsm:
             return JmaDomain.gsm
-        case .gem_seamless:
+        case .gem_seamless, .cmc_gem_seamless:
             return nil
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return nil
@@ -1986,19 +1995,19 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .gfs05:
             return nil
-        case .icon_seamless_eps:
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return nil
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return nil
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return nil
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return nil
         case .ecmwf_ifs025_ensemble:
             return nil
         case .ecmwf_aifs025_ensemble:
             return nil
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .cmc_gem_geps:
             return nil
         case .bom_access_global_ensemble:
             return nil
@@ -2030,9 +2039,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .marine_best_match:
             return nil
-        case .ewam:
+        case .ewam, .dwd_ewam:
             return IconWaveDomain.ewam
-        case .gwam:
+        case .gwam, .dwd_gwam:
             return IconWaveDomain.gwam
         case .era5_ocean:
             return CdsDomain.era5_ocean
@@ -2177,7 +2186,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
             return nil
-        case .gfs_seamless, .ncep_seamless, .gfs_mix:
+        case .gfs_seamless, .ncep_seamless, .gfs_mix, .ncep_gfs_seamless:
             return nil
         case .gfs_global, .ncep_gfs_global:
             return nil
@@ -2191,7 +2200,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await JmaReader(domain: .msm_upper_level, gridpoint: gridpoint, options: options)
         case .jms_gsm, .jma_gsm:
             return try await JmaReader(domain: .gsm, gridpoint: gridpoint, options: options)
-        case .gem_seamless:
+        case .gem_seamless, .cmc_gem_seamless:
             return nil
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return nil
@@ -2262,19 +2271,19 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .gfs05:
             return nil
-        case .icon_seamless_eps:
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return nil
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return nil
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return nil
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return nil
         case .ecmwf_ifs025_ensemble:
             return nil
         case .ecmwf_aifs025_ensemble:
             return nil
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .cmc_gem_geps:
             return nil
         case .bom_access_global_ensemble:
             return nil
@@ -2306,9 +2315,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .marine_best_match:
             return nil
-        case .ewam:
+        case .ewam, .dwd_ewam:
             return try await GenericReader<IconWaveDomain, IconWaveVariable>(domain: .ewam, position: gridpoint, options: options)
-        case .gwam:
+        case .gwam, .dwd_gwam:
             return try await GenericReader<IconWaveDomain, IconWaveVariable>(domain: .gwam, position: gridpoint, options: options)
         case .era5_ocean:
             return try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, position: gridpoint, options: options)
@@ -2357,13 +2366,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     var countEnsembleMember: Int {
         switch self {
-        case .icon_seamless_eps:
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return IconDomains.iconEps.countEnsembleMember
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return IconDomains.iconEps.countEnsembleMember
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return IconDomains.iconEuEps.countEnsembleMember
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps.countEnsembleMember
         case .ecmwf_ifs025_ensemble:
             return EcmwfDomain.ifs025_ensemble.countEnsembleMember
@@ -2379,7 +2388,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GfsDomain.gfs05_ens.countEnsembleMember
         case .ncep_gefs_seamless:
             return GfsDomain.gfs05_ens.countEnsembleMember
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .cmc_gem_geps:
             return GemDomain.gem_global_ensemble.countEnsembleMember
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble.countEnsembleMember

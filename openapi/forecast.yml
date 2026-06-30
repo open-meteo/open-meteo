@@ -615,12 +615,12 @@ paths:
                 - ecmwf_aifs025_single
                 - cma_grapes_global
                 - bom_access_global
-                - gfs_seamless
-                - gfs_global
-                - gfs_hrrr
+                - ncep_gfs_seamless
+                - ncep_gfs_global
+                - ncep_hrrr_conus
                 - ncep_nbm_conus
                 - ncep_nam_conus
-                - gfs_graphcast025
+                - ncep_gfs_graphcast025
                 - ncep_aigfs025
                 - ncep_hgefs025_ensemble_mean
                 - jma_seamless
@@ -633,11 +633,11 @@ paths:
                 - icon_global
                 - icon_eu
                 - icon_d2
-                - gem_seamless
-                - gem_global
-                - gem_regional
-                - gem_hrdps_continental
-                - gem_hrdps_west
+                - cmc_gem_seamless
+                - cmc_gem_gdps
+                - cmc_gem_rdps
+                - cmc_gem_hrdps
+                - cmc_gem_hrdps_west
                 - meteofrance_seamless
                 - meteofrance_arpege_world
                 - meteofrance_arpege_europe
