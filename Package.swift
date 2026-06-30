@@ -42,7 +42,8 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", .upToNextMinor(from: "0.5.0"))
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.3")
@@ -71,7 +72,10 @@ let package = Package(
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
             cSettings: cFlags,
-            swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
+            swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : []),
+            plugins: [
+                .plugin(name: "GitVersionPlugin")
+            ]
             //plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
         .target(
@@ -86,6 +90,20 @@ let package = Package(
             name: "CHelper",
             cSettings: cFlags,
             swiftSettings: swiftFlags
+        ),
+        .executableTarget(
+            name: "GitVersionGenerator",
+            dependencies: [
+                .product(name: "Subprocess", package: "swift-subprocess")
+            ],
+            path: "Tools/GitVersionGenerator"
+        ),
+        .plugin(
+            name: "GitVersionPlugin",
+            capability: .buildTool(),
+            dependencies: [
+                "GitVersionGenerator"
+            ]
         ),
         .executableTarget(
             name: "openmeteo-api",
