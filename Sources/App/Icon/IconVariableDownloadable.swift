@@ -212,6 +212,23 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return nil
         }
     }
+
+    func correctDownloadedValues(data: inout [Float]) {
+        switch self {
+        case .direct_radiation, .diffuse_radiation:
+            for i in data.indices {
+                data[i] = max(data[i], 0)
+            }
+        case .convective_inhibition:
+            for i in data.indices {
+                if data[i] <= -999 {
+                    data[i] = 0
+                }
+            }
+        default:
+            break
+        }
+    }
 }
 
 extension IconPressureVariable: IconVariableDownloadable {
