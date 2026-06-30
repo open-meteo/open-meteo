@@ -258,26 +258,78 @@ actor S3UploadSession {
         let prepared: S3MultiPartUploadPrepared
     }
 
+    private struct EndpointUploadQueue {
+        var pendingUploads: [S3UploadTarget] = []
+        var waitingWorkers: [CheckedContinuation<S3UploadTarget?, Never>] = []
+        var workers: [Task<Void, Never>] = []
+    }
+
     private struct MetadataUpload: Sendable {
         let target: S3UploadTarget
         let data: ByteBufferView
     }
 
-    private let client: HTTPClient
+    typealias MultipartUploadPrepare = @Sendable (S3UploadTarget) async throws -> S3MultiPartUploadPrepared
+    typealias MultipartUploadCommit = @Sendable (S3MultiPartUploadPrepared) async throws -> Void
+    typealias MetadataUploader = @Sendable (S3UploadTarget, ByteBufferView) async throws -> Void
+
     private let logger: Logger
     private let maxConcurrentFileUploads: Int
-    private var pendingUploads: [S3UploadTarget] = []
-    private var waitingWorkers: [CheckedContinuation<S3UploadTarget?, Never>] = []
-    private var workers: [Task<Void, Never>] = []
+    private let prepareMultipartUpload: MultipartUploadPrepare
+    private let commitMultipartUpload: MultipartUploadCommit
+    private let uploadMetadata: MetadataUploader
+    private var endpointQueues: [String: EndpointUploadQueue] = [:]
     private var isClosed = false
     private var preparedUploads: [PreparedUpload] = []
     private var failures: [String] = []
     private var metadataUploads: [MetadataUpload] = []
 
     init(client: HTTPClient, logger: Logger, maxConcurrentFileUploads: Int = 4) {
-        self.client = client
+        self.init(
+            logger: logger,
+            maxConcurrentFileUploads: maxConcurrentFileUploads,
+            prepareMultipartUpload: Self.prepareMultipartUpload(client: client),
+            commitMultipartUpload: Self.commitMultipartUpload(client: client),
+            uploadMetadata: Self.uploadMetadata(client: client)
+        )
+    }
+
+    init(
+        logger: Logger,
+        maxConcurrentFileUploads: Int = 4,
+        prepareMultipartUpload: @escaping MultipartUploadPrepare,
+        commitMultipartUpload: @escaping MultipartUploadCommit,
+        uploadMetadata: @escaping MetadataUploader
+    ) {
         self.logger = logger
         self.maxConcurrentFileUploads = max(1, maxConcurrentFileUploads)
+        self.prepareMultipartUpload = prepareMultipartUpload
+        self.commitMultipartUpload = commitMultipartUpload
+        self.uploadMetadata = uploadMetadata
+    }
+
+    private static func prepareMultipartUpload(client: HTTPClient) -> MultipartUploadPrepare {
+        return { target in
+            try await S3Uploader.uploadMultipart(
+                client: client,
+                file: target.localFile,
+                url: target.url,
+                contentType: target.contentType,
+                nConcurrent: 4
+            )
+        }
+    }
+
+    private static func commitMultipartUpload(client: HTTPClient) -> MultipartUploadCommit {
+        return { prepared in
+            try await prepared.commit(client: client)
+        }
+    }
+
+    private static func uploadMetadata(client: HTTPClient) -> MetadataUploader {
+        return { target, data in
+            try await S3Uploader.upload(client: client, data: data, url: target.url, contentType: target.contentType)
+        }
     }
 
     func uploadMultipart(_ target: S3UploadTarget) {
@@ -286,7 +338,7 @@ actor S3UploadSession {
             return
         }
         enqueueUpload(target)
-        startWorkersIfNeeded()
+        startWorkersIfNeeded(endpoint: target.bucketEndpoint)
     }
 
     func uploadMetadataAfterCommits(_ target: S3UploadTarget, data: ByteBufferView) {
@@ -314,6 +366,7 @@ actor S3UploadSession {
 
     func finish() async throws {
         closeUploadQueue()
+        let workers = endpointQueues.values.flatMap { $0.workers }
         for worker in workers {
             await worker.value
         }
@@ -326,42 +379,40 @@ actor S3UploadSession {
 
         let commitStart = DispatchTime.now()
         try await prepared.foreachConcurrent(nConcurrent: 8) { upload in
-            try await upload.prepared.commit(client: self.client)
+            try await self.commitMultipartUpload(upload.prepared)
         }
         logger.info("S3 multipart commits completed in \(commitStart.timeElapsedPretty())")
 
         try await metadataUploads.foreachConcurrent(nConcurrent: 8) { upload in
-            try await S3Uploader.upload(client: self.client, data: upload.data, url: upload.target.url, contentType: upload.target.contentType)
+            try await self.uploadMetadata(upload.target, upload.data)
         }
     }
 
     private func enqueueUpload(_ target: S3UploadTarget) {
-        if waitingWorkers.isEmpty {
-            pendingUploads.append(target)
+        var queue = endpointQueues[target.bucketEndpoint] ?? EndpointUploadQueue()
+        if queue.waitingWorkers.isEmpty {
+            queue.pendingUploads.append(target)
         } else {
-            waitingWorkers.removeFirst().resume(returning: target)
+            queue.waitingWorkers.removeFirst().resume(returning: target)
         }
+        endpointQueues[target.bucketEndpoint] = queue
     }
 
-    private func startWorkersIfNeeded() {
-        guard workers.isEmpty else {
+    private func startWorkersIfNeeded(endpoint: String) {
+        var queue = endpointQueues[endpoint] ?? EndpointUploadQueue()
+        guard queue.workers.isEmpty else {
             return
         }
         for _ in 0..<maxConcurrentFileUploads {
-            workers.append(Task { await self.runUploadWorker() })
+            queue.workers.append(Task { await self.runUploadWorker(endpoint: endpoint) })
         }
+        endpointQueues[endpoint] = queue
     }
 
-    private func runUploadWorker() async {
-        while let target = await nextUploadTarget() {
+    private func runUploadWorker(endpoint: String) async {
+        while let target = await nextUploadTarget(endpoint: endpoint) {
             do {
-                let prepared = try await S3Uploader.uploadMultipart(
-                    client: client,
-                    file: target.localFile,
-                    url: target.url,
-                    contentType: target.contentType,
-                    nConcurrent: 4
-                )
+                let prepared = try await prepareMultipartUpload(target)
                 preparedUploads.append(PreparedUpload(target: target, prepared: prepared))
             } catch {
                 failures.append("\(target.url.asUrlGetQueryForLogging): \(error.localizedDescription)")
@@ -369,15 +420,19 @@ actor S3UploadSession {
         }
     }
 
-    private func nextUploadTarget() async -> S3UploadTarget? {
-        if !pendingUploads.isEmpty {
-            return pendingUploads.removeFirst()
+    private func nextUploadTarget(endpoint: String) async -> S3UploadTarget? {
+        var queue = endpointQueues[endpoint] ?? EndpointUploadQueue()
+        if !queue.pendingUploads.isEmpty {
+            let target = queue.pendingUploads.removeFirst()
+            endpointQueues[endpoint] = queue
+            return target
         }
         if isClosed {
             return nil
         }
         return await withCheckedContinuation { continuation in
-            waitingWorkers.append(continuation)
+            queue.waitingWorkers.append(continuation)
+            endpointQueues[endpoint] = queue
         }
     }
 
@@ -386,10 +441,14 @@ actor S3UploadSession {
             return
         }
         isClosed = true
-        let waiting = waitingWorkers
-        waitingWorkers.removeAll(keepingCapacity: true)
-        for worker in waiting {
-            worker.resume(returning: nil)
+        for endpoint in Array(endpointQueues.keys) {
+            var queue = endpointQueues[endpoint] ?? EndpointUploadQueue()
+            let waiting = queue.waitingWorkers
+            queue.waitingWorkers.removeAll(keepingCapacity: true)
+            endpointQueues[endpoint] = queue
+            for worker in waiting {
+                worker.resume(returning: nil)
+            }
         }
     }
 
