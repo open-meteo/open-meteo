@@ -3,7 +3,7 @@ import Vapor
 import AsyncHTTPClient
 
 /// Queues best-effort S3 sync operations per endpoint so slow endpoints do not block faster ones.
-actor S3UploadManager {
+actor S3SyncManager {
     typealias DirectorySync = @Sendable (S3UploadSyncTarget) async throws -> Void
 
     private let logger: Logger
@@ -70,10 +70,10 @@ actor S3UploadManager {
     }
 }
 
-private final class S3UploadManagerLifecycle: LifecycleHandler {
-    private let manager: S3UploadManager
+private final class S3SyncManagerLifecycle: LifecycleHandler {
+    private let manager: S3SyncManager
 
-    init(manager: S3UploadManager) {
+    init(manager: S3SyncManager) {
         self.manager = manager
     }
 
@@ -88,21 +88,21 @@ private final class S3UploadManagerLifecycle: LifecycleHandler {
 }
 
 extension Application {
-    fileprivate struct S3UploadManagerKey: StorageKey, LockKey {
-        typealias Value = S3UploadManager
+    fileprivate struct S3SyncManagerKey: StorageKey, LockKey {
+        typealias Value = S3SyncManager
     }
 
-    var s3UploadManager: S3UploadManager {
-        let lock = self.locks.lock(for: S3UploadManagerKey.self)
+    var s3SyncManager: S3SyncManager {
+        let lock = self.locks.lock(for: S3SyncManagerKey.self)
         lock.lock()
         defer { lock.unlock() }
-        if let existing = self.storage[S3UploadManagerKey.self] {
+        if let existing = self.storage[S3SyncManagerKey.self] {
             return existing
         }
 
-        let manager = S3UploadManager(client: http1Client, logger: logger)
-        self.lifecycle.use(S3UploadManagerLifecycle(manager: manager))
-        self.storage[S3UploadManagerKey.self] = manager
+        let manager = S3SyncManager(client: http1Client, logger: logger)
+        self.lifecycle.use(S3SyncManagerLifecycle(manager: manager))
+        self.storage[S3SyncManagerKey.self] = manager
         return manager
     }
 }

@@ -534,10 +534,10 @@ import Darwin
         ])
     }
 
-    @Test func s3UploadManagerSerializesSyncsPerEndpointAndRunsEndpointsIndependently() async throws {
-        let probe = S3UploadManagerProbe()
-        let manager = S3UploadManager(
-            logger: Logger(label: "DownloaderTests.S3UploadManager"),
+    @Test func s3SyncManagerSerializesSyncsPerEndpointAndRunsEndpointsIndependently() async throws {
+        let probe = S3SyncManagerProbe()
+        let manager = S3SyncManager(
+            logger: Logger(label: "DownloaderTests.S3SyncManager"),
             syncDirectory: { target in
                 try await probe.sync(target: target)
             }
@@ -711,7 +711,7 @@ private actor S3UploadSessionOrderProbe {
     }
 }
 
-private actor S3UploadManagerProbe {
+private actor S3SyncManagerProbe {
     private var recordedEvents: [String] = []
     private var activeByEndpoint: [String: Int] = [:]
     private var maxActive: [String: Int] = [:]
