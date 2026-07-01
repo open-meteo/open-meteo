@@ -137,6 +137,58 @@ import Logging
         #expect(targets.first?.url == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
     }
 
+    @Test func s3UploadPlanFormatsSpatialRealmSuffixes() throws {
+        let run = Timestamp(2026, 1, 1, 0)
+        let time = Timestamp(2026, 1, 1, 3)
+        let data = ByteBuffer(string: "{}").readableBytesView
+
+        let defaultFile = S3UploadPlan.targets(
+            buckets: "openmeteo",
+            artifact: .spatialFile(
+                domain: .ncep_gfs025,
+                localFile: "/tmp/2026-01-01T0300.om",
+                run: run,
+                time: time,
+                realm: nil
+            )
+        )
+        #expect(defaultFile.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300.om")
+
+        let realmFile = S3UploadPlan.targets(
+            buckets: "openmeteo",
+            artifact: .spatialFile(
+                domain: .ncep_gfs025,
+                localFile: "/tmp/2026-01-01T0300_model-level.om",
+                run: run,
+                time: time,
+                realm: "model-level"
+            )
+        )
+        #expect(realmFile.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300_model-level.om")
+
+        let defaultMeta = S3UploadPlan.targets(
+            buckets: "openmeteo",
+            artifact: .spatialMeta(
+                domain: .ncep_gfs025,
+                localFile: "/tmp/meta.json",
+                remote: .run(run: run, realm: nil),
+                data: data
+            )
+        )
+        #expect(defaultMeta.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/meta.json")
+
+        let realmMeta = S3UploadPlan.targets(
+            buckets: "openmeteo",
+            artifact: .spatialMeta(
+                domain: .ncep_gfs025,
+                localFile: "/tmp/meta_model-level.json",
+                remote: .latest(realm: "model-level"),
+                data: data
+            )
+        )
+        #expect(realmMeta.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/latest_model-level.json")
+    }
+
     @Test func s3UploadSessionLimitsFileUploadsPerEndpoint() async throws {
         let slowEndpoint = "s3://slow-bucket/"
         let fastEndpoint = "s3://fast-bucket/"

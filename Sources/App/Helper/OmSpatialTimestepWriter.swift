@@ -160,11 +160,11 @@ actor OmSpatialTimestepWriter {
             variables: self.variableString,
             crs_wkt: domain.grid.crsWkt2
         )
-        let realm = realm.map { "_\($0)" } ?? ""
+        let realmSuffix = realm.map { "_\($0)" } ?? ""
         let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
-        let metaRunMeta = "\(path)meta\(realm).json"
-        let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
-        let metaLatest = "\(directorySpatial)latest\(realm).json"
+        let metaRunMeta = "\(path)meta\(realmSuffix).json"
+        let metaInProgress = "\(directorySpatial)in-progress\(realmSuffix).json"
+        let metaLatest = "\(directorySpatial)latest\(realmSuffix).json"
         
         /// Note: ByteBuffer+readableBytesView fixes a release build issue
         let metaData = ByteBuffer(data: try meta.jsonEncodedData()).readableBytesView
@@ -212,7 +212,7 @@ actor OmSpatialTimestepWriter {
                 localFile: filename,
                 run: run,
                 time: time,
-                realm: realm
+                realm: self.realm
             )
         )
 
@@ -221,7 +221,7 @@ actor OmSpatialTimestepWriter {
                 .spatialMeta(
                     domain: domainRegistry,
                     localFile: metaRunMeta,
-                    remote: .run(run: run, realm: realm),
+                    remote: .run(run: run, realm: self.realm),
                     data: metaData
                 )
             ]
@@ -229,7 +229,7 @@ actor OmSpatialTimestepWriter {
                 metaArtifacts.append(.spatialMeta(
                     domain: domainRegistry,
                     localFile: metaInProgress,
-                    remote: .inProgress(realm: realm),
+                    remote: .inProgress(realm: self.realm),
                     data: metaData
                 ))
             }
@@ -237,7 +237,7 @@ actor OmSpatialTimestepWriter {
                 metaArtifacts.append(.spatialMeta(
                     domain: domainRegistry,
                     localFile: metaLatest,
-                    remote: .latest(realm: realm),
+                    remote: .latest(realm: self.realm),
                     data: metaData
                 ))
             }
