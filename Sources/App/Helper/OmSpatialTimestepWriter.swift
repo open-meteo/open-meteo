@@ -191,15 +191,8 @@ actor OmSpatialTimestepWriter {
                 localDirectory: directorySpatial
             )
             for target in targets {
-                let start = DispatchTime.now()
-                await application.s3UploadManager.sync(
-                    client: application.http1Client,
-                    bucketEndpoint: target.bucketEndpoint,
-                    localDirectory: target.localDirectory,
-                    server: target.server,
-                    basePath: target.basePath
-                )
-                logger.info("AWS Upload to \(target.bucketEndpoint.stripHttpPassword()) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                await application.s3UploadManager.sync(target)
+                logger.info("Queued AWS spatial sync to \(target.bucketEndpoint.stripHttpPassword()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
             return
         }

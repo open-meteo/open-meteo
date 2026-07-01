@@ -624,22 +624,6 @@ extension DomainRegistry {
     }
     
     func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
-        return buckets.split(separator: ",").map { bucket in
-            let bucketSplit = bucket.split(separator: "@")
-            if bucketSplit.count == 3 {
-                // http://user:pw@something.com/@profile
-                return (bucketSplit[0]+"@"+bucketSplit[1], String(bucketSplit[2]))
-            }
-            let bucket = String(bucketSplit[0].replacing("MODEL", with: bucketName))
-            let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
-            let profileUpper = profile.map {"_\($0.uppercased())"} ?? ""
-            
-            // An environment variable may overwrite the S3 credentials
-            if let credentials = Environment.get("S3_CREDENTIALS_\(bucket.uppercased())\(profileUpper)") {
-                return (credentials, profile)
-            }
-            
-            return (bucket, profile)
-        }
+        return S3BucketEndpoint.parseList(buckets, domain: self).map { ($0.bucket, $0.profile) }
     }
 }

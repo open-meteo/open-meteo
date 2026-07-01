@@ -4,6 +4,11 @@ import Testing
 import AsyncHTTPClient
 import NIOCore
 import Logging
+#if os(Linux)
+import Glibc
+#else
+import Darwin
+#endif
 
 @Suite struct DownloaderTests {
     @Test func testAwsSign() async throws {
@@ -211,6 +216,26 @@ import Logging
             )
         )
         #expect(realmMeta.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/latest_model-level.json")
+    }
+
+    @Test func s3BucketEndpointParsesModelProfilesAndCredentialOverrides() throws {
+        let endpoints = S3BucketEndpoint.parseList(
+            "openmeteo,s3://MODEL/@ceph,https://user:pw@example.com/bucket/@aws",
+            domain: .ncep_gfs025
+        )
+
+        #expect(endpoints == [
+            S3BucketEndpoint(bucket: "openmeteo", profile: nil),
+            S3BucketEndpoint(bucket: "s3://ncep-gfs025/", profile: "ceph"),
+            S3BucketEndpoint(bucket: "https://user:pw@example.com/bucket/", profile: "aws")
+        ])
+
+        setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://credential-bucket/", 1)
+        defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
+
+        #expect(S3BucketEndpoint.parseList("openmeteo@aws", domain: .ncep_gfs025) == [
+            S3BucketEndpoint(bucket: "s3://credential-bucket/", profile: "aws")
+        ])
     }
 
     @Test func s3UploadSessionLimitsFileUploadsPerEndpoint() async throws {
@@ -509,6 +534,31 @@ import Logging
         ])
     }
 
+    @Test func s3UploadManagerSerializesSyncsPerEndpointAndRunsEndpointsIndependently() async throws {
+        let probe = S3UploadManagerProbe()
+        let manager = S3UploadManager(
+            logger: Logger(label: "DownloaderTests.S3UploadManager"),
+            syncDirectory: { target in
+                try await probe.sync(target: target)
+            }
+        )
+
+        await manager.sync(s3UploadSyncTarget(endpoint: "s3://slow-bucket/", name: "slow-0"))
+        await manager.sync(s3UploadSyncTarget(endpoint: "s3://slow-bucket/", name: "slow-1"))
+        await manager.sync(s3UploadSyncTarget(endpoint: "s3://fast-bucket/", name: "fast-0"))
+        await manager.shutdown()
+
+        let events = await probe.events
+        let slowSecondStart = try #require(events.firstIndex(of: "start:s3://slow-bucket/:data/slow-1"))
+        let slowFirstEnd = try #require(events.firstIndex(of: "end:s3://slow-bucket/:data/slow-0"))
+        #expect(slowSecondStart > slowFirstEnd)
+        #expect(await probe.maxActiveByEndpoint == [
+            "s3://slow-bucket/": 1,
+            "s3://fast-bucket/": 1
+        ])
+        #expect(await probe.maxTotalActive > 1)
+    }
+
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
@@ -520,35 +570,6 @@ import Logging
 
         let data = randomData(byteCount: 1 * 1024 * 1024)
         try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin")
-    }
-
-    /// Upload three files using single-part PUT uploads.
-    /// Set S3_TEST_SERVER to a URL of the form
-    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
-    func testS3UploadThreeFiles() async throws {
-        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
-        let client = HTTPClient(eventLoopGroupProvider: .singleton)
-        defer { let _ = client.shutdown() }
-        let manager = S3UploadManager(logger: Logger(label: "DownloaderTests.S3UploadManager"))
-
-        let uploads: [(suffix: String, data: Data)] = [
-            ("a", randomData(byteCount: 128 * 1024)),
-            ("b", randomData(byteCount: 256 * 1024)),
-            ("c", randomData(byteCount: 512 * 1024))
-        ]
-
-        for upload in uploads {
-            await manager.upload(
-                client: client,
-                bucketEndpoint: server,
-                data: upload.data,
-                url: "\(server)test/s3uploader-three-\(upload.suffix).bin"
-            )
-        }
-
-        // Ensure all queued uploads complete before ending the test.
-        await manager.shutdown()
     }
 
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
@@ -599,6 +620,15 @@ private func s3UploadTarget(endpoint: String, name: String) -> S3UploadTarget {
         localFile: "/tmp/\(name).om",
         url: "\(endpoint)data/\(name).om",
         contentType: "application/octet-stream"
+    )
+}
+
+private func s3UploadSyncTarget(endpoint: String, name: String) -> S3UploadSyncTarget {
+    S3UploadSyncTarget(
+        bucketEndpoint: endpoint,
+        localDirectory: "/tmp/\(name)",
+        server: endpoint,
+        basePath: "data/\(name)"
     )
 }
 
@@ -678,5 +708,35 @@ private actor S3UploadSessionOrderProbe {
 
     func record(_ event: String) {
         recordedEvents.append(event)
+    }
+}
+
+private actor S3UploadManagerProbe {
+    private var recordedEvents: [String] = []
+    private var activeByEndpoint: [String: Int] = [:]
+    private var maxActive: [String: Int] = [:]
+    private var maxTotal = 0
+
+    var events: [String] {
+        recordedEvents
+    }
+
+    var maxActiveByEndpoint: [String: Int] {
+        maxActive
+    }
+
+    var maxTotalActive: Int {
+        maxTotal
+    }
+
+    func sync(target: S3UploadSyncTarget) async throws {
+        let endpoint = target.bucketEndpoint
+        activeByEndpoint[endpoint, default: 0] += 1
+        maxActive[endpoint] = max(maxActive[endpoint, default: 0], activeByEndpoint[endpoint, default: 0])
+        maxTotal = max(maxTotal, activeByEndpoint.values.reduce(0, +))
+        recordedEvents.append("start:\(endpoint):\(target.basePath)")
+        try await Task.sleep(nanoseconds: 50_000_000)
+        recordedEvents.append("end:\(endpoint):\(target.basePath)")
+        activeByEndpoint[endpoint, default: 0] -= 1
     }
 }
