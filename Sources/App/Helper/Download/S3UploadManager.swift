@@ -283,7 +283,22 @@ struct S3UploadSessionError: Error, CustomStringConvertible {
     }
 }
 
+/// Transaction-like uploader for publishing converted files to their final S3 keys.
+///
+/// Multipart parts are uploaded while conversion is still running, but final S3
+/// objects are not changed until `finish()` completes the multipart uploads. If
+/// conversion fails, `cancel()` aborts prepared uploads and drops metadata work,
+/// preserving the "no remote object changes before full conversion success"
+/// contract.
 actor S3UploadSession {
+    private enum State {
+        case open
+        case finishing
+        case finished
+        case cancelling
+        case cancelled
+    }
+
     private struct PreparedUpload: Sendable {
         let target: S3UploadTarget
         let prepared: S3MultiPartUploadPrepared
@@ -313,6 +328,7 @@ actor S3UploadSession {
 
     typealias MultipartUploadPrepare = @Sendable (S3UploadTarget) async throws -> S3MultiPartUploadPrepared
     typealias MultipartUploadCommit = @Sendable (S3MultiPartUploadPrepared) async throws -> Void
+    typealias MultipartUploadAbort = @Sendable (S3MultiPartUploadPrepared) async throws -> Void
     typealias DirectorySync = @Sendable (S3UploadSyncTarget) async throws -> Void
     typealias MetadataUploader = @Sendable (S3UploadTarget, ByteBufferView) async throws -> Void
 
@@ -320,10 +336,11 @@ actor S3UploadSession {
     private let maxConcurrentFileUploads: Int
     private let prepareMultipartUpload: MultipartUploadPrepare
     private let commitMultipartUpload: MultipartUploadCommit
+    private let abortMultipartUpload: MultipartUploadAbort
     private let syncDirectory: DirectorySync
     private let uploadMetadata: MetadataUploader
     private var endpointQueues: [String: EndpointUploadQueue] = [:]
-    private var isClosed = false
+    private var state: State = .open
     private var preparedUploads: [PreparedUpload] = []
     private var failures: [UploadFailure] = []
     private var syncsBeforeMetadata: [S3UploadSyncTarget] = []
@@ -335,6 +352,7 @@ actor S3UploadSession {
             maxConcurrentFileUploads: maxConcurrentFileUploads,
             prepareMultipartUpload: Self.prepareMultipartUpload(client: client),
             commitMultipartUpload: Self.commitMultipartUpload(client: client),
+            abortMultipartUpload: Self.abortMultipartUpload(client: client),
             syncDirectory: Self.syncDirectory(client: client),
             uploadMetadata: Self.uploadMetadata(client: client)
         )
@@ -345,6 +363,7 @@ actor S3UploadSession {
         maxConcurrentFileUploads: Int = 4,
         prepareMultipartUpload: @escaping MultipartUploadPrepare,
         commitMultipartUpload: @escaping MultipartUploadCommit,
+        abortMultipartUpload: @escaping MultipartUploadAbort = { _ in },
         syncDirectory: @escaping DirectorySync,
         uploadMetadata: @escaping MetadataUploader
     ) {
@@ -352,6 +371,7 @@ actor S3UploadSession {
         self.maxConcurrentFileUploads = max(1, maxConcurrentFileUploads)
         self.prepareMultipartUpload = prepareMultipartUpload
         self.commitMultipartUpload = commitMultipartUpload
+        self.abortMultipartUpload = abortMultipartUpload
         self.syncDirectory = syncDirectory
         self.uploadMetadata = uploadMetadata
     }
@@ -371,6 +391,12 @@ actor S3UploadSession {
     private static func commitMultipartUpload(client: HTTPClient) -> MultipartUploadCommit {
         return { prepared in
             try await prepared.commit(client: client)
+        }
+    }
+
+    private static func abortMultipartUpload(client: HTTPClient) -> MultipartUploadAbort {
+        return { prepared in
+            try await prepared.abort(client: client)
         }
     }
 
@@ -396,7 +422,7 @@ actor S3UploadSession {
     }
 
     func uploadMultipart(_ target: S3UploadTarget) {
-        guard !isClosed else {
+        guard state == .open else {
             logger.warning("S3 upload session is closed. Rejecting multipart upload for: \(target.url.asUrlGetQueryForLogging)")
             return
         }
@@ -405,7 +431,7 @@ actor S3UploadSession {
     }
 
     func uploadMetadataAfterCommits(_ target: S3UploadTarget, data: ByteBufferView) {
-        guard !isClosed else {
+        guard state == .open else {
             logger.warning("S3 upload session is closed. Rejecting metadata upload for: \(target.url.asUrlGetQueryForLogging)")
             return
         }
@@ -413,7 +439,7 @@ actor S3UploadSession {
     }
 
     func syncBeforeMetadata(_ target: S3UploadSyncTarget) {
-        guard !isClosed else {
+        guard state == .open else {
             logger.warning("S3 upload session is closed. Rejecting directory sync for: \(target.bucketEndpoint.stripHttpPassword())")
             return
         }
@@ -437,12 +463,20 @@ actor S3UploadSession {
         }
     }
 
+    /// Close the intake queue, wait for all prepared multipart uploads, then
+    /// publish in dependency order: data files first, directory syncs second,
+    /// metadata last. Once this starts, rollback is no longer attempted because
+    /// some final objects may already have been committed.
     func finish() async throws {
-        closeUploadQueue()
-        let workers = endpointQueues.values.flatMap { $0.workers }
-        for worker in workers {
-            await worker.value
+        switch state {
+        case .open:
+            state = .finishing
+        case .finishing, .finished, .cancelling, .cancelled:
+            return
         }
+
+        closeUploadQueue(droppingPending: false)
+        await waitForWorkers()
 
         let prepared = preparedUploads
         let syncs = syncsBeforeMetadata
@@ -450,6 +484,7 @@ actor S3UploadSession {
         var failedEndpoints = Set(failures.map { $0.bucketEndpoint })
 
         guard prepared.isEmpty == false || syncs.isEmpty == false || metadataUploads.isEmpty == false || failures.isEmpty == false else {
+            state = .finished
             return
         }
 
@@ -512,7 +547,57 @@ actor S3UploadSession {
             failures.append(contentsOf: metadataResults.compactMap { $0 })
         }
 
+        state = .finished
         try throwIfNeeded(failures)
+    }
+
+    /// Abort unpublished work after a conversion failure.
+    ///
+    /// This intentionally does not throw: the conversion error that triggered
+    /// cancellation should remain the caller-visible failure. Abort failures are
+    /// logged because they may leave S3 multipart uploads for lifecycle cleanup.
+    func cancel() async {
+        switch state {
+        case .open:
+            state = .cancelling
+        case .finishing, .cancelling, .cancelled, .finished:
+            return
+        }
+
+        closeUploadQueue(droppingPending: true)
+        syncsBeforeMetadata.removeAll(keepingCapacity: true)
+        metadataUploads.removeAll(keepingCapacity: true)
+
+        for worker in endpointQueues.values.flatMap({ $0.workers }) {
+            worker.cancel()
+        }
+        await waitForWorkers()
+
+        let prepared = preparedUploads
+        preparedUploads.removeAll(keepingCapacity: true)
+        failures.removeAll(keepingCapacity: true)
+
+        if !prepared.isEmpty {
+            let abortResults = await prepared.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
+                do {
+                    try await self.abortMultipartUpload(upload.prepared)
+                    return nil
+                } catch {
+                    return UploadFailure(
+                        bucketEndpoint: upload.target.bucketEndpoint,
+                        phase: "abort",
+                        location: String(upload.target.url.asUrlGetQueryForLogging),
+                        message: error.localizedDescription
+                    )
+                }
+            }
+            let abortFailures = abortResults.compactMap { $0 }
+            if !abortFailures.isEmpty {
+                logger.error("S3 upload session abort failed: \(abortFailures.map(\.description).joined(separator: "; "))")
+            }
+        }
+
+        state = .cancelled
     }
 
     private func enqueueUpload(_ target: S3UploadTarget) {
@@ -542,24 +627,31 @@ actor S3UploadSession {
                 let prepared = try await prepareMultipartUpload(target)
                 preparedUploads.append(PreparedUpload(target: target, prepared: prepared))
             } catch {
-                failures.append(UploadFailure(
-                    bucketEndpoint: target.bucketEndpoint,
-                    phase: "prepare",
-                    location: String(target.url.asUrlGetQueryForLogging),
-                    message: error.localizedDescription
-                ))
+                if state != .cancelling && state != .cancelled {
+                    failures.append(UploadFailure(
+                        bucketEndpoint: target.bucketEndpoint,
+                        phase: "prepare",
+                        location: String(target.url.asUrlGetQueryForLogging),
+                        message: error.localizedDescription
+                    ))
+                }
             }
         }
     }
 
     private func nextUploadTarget(endpoint: String) async -> S3UploadTarget? {
         var queue = endpointQueues[endpoint] ?? EndpointUploadQueue()
+        if state == .cancelling || state == .cancelled {
+            queue.pendingUploads.removeAll(keepingCapacity: true)
+            endpointQueues[endpoint] = queue
+            return nil
+        }
         if !queue.pendingUploads.isEmpty {
             let target = queue.pendingUploads.removeFirst()
             endpointQueues[endpoint] = queue
             return target
         }
-        if isClosed {
+        if state != .open {
             return nil
         }
         return await withCheckedContinuation { continuation in
@@ -568,19 +660,25 @@ actor S3UploadSession {
         }
     }
 
-    private func closeUploadQueue() {
-        guard !isClosed else {
-            return
-        }
-        isClosed = true
+    private func closeUploadQueue(droppingPending: Bool) {
         for endpoint in Array(endpointQueues.keys) {
             var queue = endpointQueues[endpoint] ?? EndpointUploadQueue()
+            if droppingPending {
+                queue.pendingUploads.removeAll(keepingCapacity: true)
+            }
             let waiting = queue.waitingWorkers
             queue.waitingWorkers.removeAll(keepingCapacity: true)
             endpointQueues[endpoint] = queue
             for worker in waiting {
                 worker.resume(returning: nil)
             }
+        }
+    }
+
+    private func waitForWorkers() async {
+        let workers = endpointQueues.values.flatMap { $0.workers }
+        for worker in workers {
+            await worker.value
         }
     }
 
