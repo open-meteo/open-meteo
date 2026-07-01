@@ -137,6 +137,30 @@ import Logging
         #expect(targets.first?.url == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
     }
 
+    @Test func s3UploadPlanBuildsStaticSyncTargetsWithoutMetaJson() throws {
+        let targets = S3UploadPlan.staticSyncTargets(
+            buckets: "openmeteo,s3://ceph-bucket/@ceph",
+            domain: .ncep_gfs025
+        )
+
+        #expect(targets == [
+            S3UploadSyncTarget(
+                bucketEndpoint: "openmeteo",
+                localDirectory: "\(DomainRegistry.ncep_gfs025.directory)static",
+                server: "openmeteo",
+                basePath: "data/ncep_gfs025/static",
+                exclude: [".*", "*~", "meta.json"]
+            ),
+            S3UploadSyncTarget(
+                bucketEndpoint: "s3://ceph-bucket/",
+                localDirectory: "\(DomainRegistry.ncep_gfs025.directory)static",
+                server: "s3://ceph-bucket/",
+                basePath: "data/ncep_gfs025/static",
+                exclude: [".*", "*~", "meta.json"]
+            )
+        ])
+    }
+
     @Test func s3UploadPlanFormatsSpatialRealmSuffixes() throws {
         let run = Timestamp(2026, 1, 1, 0)
         let time = Timestamp(2026, 1, 1, 3)
@@ -200,6 +224,7 @@ import Logging
                 await probe.prepare(target: target)
             },
             commitMultipartUpload: { _ in },
+            syncDirectory: { _ in },
             uploadMetadata: { _, _ in }
         )
 
@@ -226,6 +251,53 @@ import Logging
             try? await session.finish()
             throw error
         }
+    }
+
+    @Test func s3UploadSessionSyncsStaticBeforeMetadata() async throws {
+        let probe = S3UploadSessionOrderProbe()
+        let session = S3UploadSession(
+            logger: Logger(label: "DownloaderTests.S3UploadSession"),
+            prepareMultipartUpload: { target in
+                await probe.record("prepare:\(target.url)")
+                return S3MultiPartUploadPrepared(etags: ["etag"], url: target.url, encodedUploadId: "upload-id")
+            },
+            commitMultipartUpload: { prepared in
+                await probe.record("commit:\(prepared.url)")
+            },
+            syncDirectory: { target in
+                await probe.record("sync:\(target.basePath)")
+            },
+            uploadMetadata: { target, _ in
+                await probe.record("metadata:\(target.url)")
+            }
+        )
+
+        await session.uploadMultipart(s3UploadTarget(endpoint: "s3://bucket/", name: "chunk"))
+        await session.upload(.syncBeforeMetadata(S3UploadSyncTarget(
+            bucketEndpoint: "s3://bucket/",
+            localDirectory: "/tmp/static",
+            server: "s3://bucket/",
+            basePath: "data/ncep_gfs025/static",
+            exclude: [".*", "*~", "meta.json"]
+        )))
+        await session.uploadMetadataAfterCommits(
+            S3UploadTarget(
+                bucketEndpoint: "s3://bucket/",
+                localFile: "/tmp/meta.json",
+                url: "s3://bucket/data/ncep_gfs025/static/meta.json",
+                contentType: "application/json"
+            ),
+            data: ByteBuffer(string: "{}").readableBytesView
+        )
+
+        try await session.finish()
+
+        #expect(await probe.events == [
+            "prepare:s3://bucket/data/chunk.om",
+            "commit:s3://bucket/data/chunk.om",
+            "sync:data/ncep_gfs025/static",
+            "metadata:s3://bucket/data/ncep_gfs025/static/meta.json"
+        ])
     }
 
     /// Single-part PUT upload.
@@ -381,5 +453,17 @@ private actor S3UploadSessionSchedulerProbe {
 
     func getStarted(endpoint: String) -> Int {
         startedByEndpoint[endpoint, default: 0]
+    }
+}
+
+private actor S3UploadSessionOrderProbe {
+    private var recordedEvents: [String] = []
+
+    var events: [String] {
+        recordedEvents
+    }
+
+    func record(_ event: String) {
+        recordedEvents.append(event)
     }
 }

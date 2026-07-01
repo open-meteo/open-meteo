@@ -19,6 +19,7 @@ enum S3UploadFileKind: Sendable {
 
 enum S3UploadOperation: Sendable {
     case multipart(S3UploadTarget)
+    case syncBeforeMetadata(S3UploadSyncTarget)
     case metadataAfterCommits(S3UploadTarget, ByteBufferView)
 }
 
@@ -122,6 +123,21 @@ enum S3UploadPlan {
         }
     }
 
+    static func staticSyncTargets(
+        buckets: String,
+        domain: DomainRegistry
+    ) -> [S3UploadSyncTarget] {
+        return domain.parseBucket(buckets).map { bucket, _ in
+            S3UploadSyncTarget(
+                bucketEndpoint: bucket,
+                localDirectory: "\(domain.directory)static",
+                server: bucket,
+                basePath: "data/\(domain.rawValue)/static",
+                exclude: [".*", "*~", "meta.json"]
+            )
+        }
+    }
+
     private static func isDefaultOpenMeteoOrAws(bucket: String, profile: String?) -> Bool {
         return (bucket == "openmeteo" && profile == nil) || profile == "aws"
     }
@@ -136,11 +152,26 @@ enum S3UploadPlan {
     }
 }
 
-struct S3UploadSyncTarget: Sendable {
+struct S3UploadSyncTarget: Sendable, Equatable {
     let bucketEndpoint: String
     let localDirectory: String
     let server: String
     let basePath: String
+    let exclude: [String]
+
+    init(
+        bucketEndpoint: String,
+        localDirectory: String,
+        server: String,
+        basePath: String,
+        exclude: [String] = [".*", "*~"]
+    ) {
+        self.bucketEndpoint = bucketEndpoint
+        self.localDirectory = localDirectory
+        self.server = server
+        self.basePath = basePath
+        self.exclude = exclude
+    }
 }
 
 private extension S3UploadArtifact {
@@ -271,17 +302,20 @@ actor S3UploadSession {
 
     typealias MultipartUploadPrepare = @Sendable (S3UploadTarget) async throws -> S3MultiPartUploadPrepared
     typealias MultipartUploadCommit = @Sendable (S3MultiPartUploadPrepared) async throws -> Void
+    typealias DirectorySync = @Sendable (S3UploadSyncTarget) async throws -> Void
     typealias MetadataUploader = @Sendable (S3UploadTarget, ByteBufferView) async throws -> Void
 
     private let logger: Logger
     private let maxConcurrentFileUploads: Int
     private let prepareMultipartUpload: MultipartUploadPrepare
     private let commitMultipartUpload: MultipartUploadCommit
+    private let syncDirectory: DirectorySync
     private let uploadMetadata: MetadataUploader
     private var endpointQueues: [String: EndpointUploadQueue] = [:]
     private var isClosed = false
     private var preparedUploads: [PreparedUpload] = []
     private var failures: [String] = []
+    private var syncsBeforeMetadata: [S3UploadSyncTarget] = []
     private var metadataUploads: [MetadataUpload] = []
 
     init(client: HTTPClient, logger: Logger, maxConcurrentFileUploads: Int = 4) {
@@ -290,6 +324,7 @@ actor S3UploadSession {
             maxConcurrentFileUploads: maxConcurrentFileUploads,
             prepareMultipartUpload: Self.prepareMultipartUpload(client: client),
             commitMultipartUpload: Self.commitMultipartUpload(client: client),
+            syncDirectory: Self.syncDirectory(client: client),
             uploadMetadata: Self.uploadMetadata(client: client)
         )
     }
@@ -299,12 +334,14 @@ actor S3UploadSession {
         maxConcurrentFileUploads: Int = 4,
         prepareMultipartUpload: @escaping MultipartUploadPrepare,
         commitMultipartUpload: @escaping MultipartUploadCommit,
+        syncDirectory: @escaping DirectorySync,
         uploadMetadata: @escaping MetadataUploader
     ) {
         self.logger = logger
         self.maxConcurrentFileUploads = max(1, maxConcurrentFileUploads)
         self.prepareMultipartUpload = prepareMultipartUpload
         self.commitMultipartUpload = commitMultipartUpload
+        self.syncDirectory = syncDirectory
         self.uploadMetadata = uploadMetadata
     }
 
@@ -323,6 +360,21 @@ actor S3UploadSession {
     private static func commitMultipartUpload(client: HTTPClient) -> MultipartUploadCommit {
         return { prepared in
             try await prepared.commit(client: client)
+        }
+    }
+
+    private static func syncDirectory(client: HTTPClient) -> DirectorySync {
+        return { target in
+            guard FileManager.default.fileExists(atPath: target.localDirectory) else {
+                return
+            }
+            try await S3Uploader.uploadSync(
+                client: client,
+                localDirectory: target.localDirectory,
+                server: target.server,
+                basePath: target.basePath,
+                exclude: target.exclude
+            )
         }
     }
 
@@ -349,10 +401,20 @@ actor S3UploadSession {
         metadataUploads.append(MetadataUpload(target: target, data: data))
     }
 
+    func syncBeforeMetadata(_ target: S3UploadSyncTarget) {
+        guard !isClosed else {
+            logger.warning("S3 upload session is closed. Rejecting directory sync for: \(target.bucketEndpoint.stripHttpPassword())")
+            return
+        }
+        syncsBeforeMetadata.append(target)
+    }
+
     func upload(_ operation: S3UploadOperation) {
         switch operation {
         case .multipart(let target):
             uploadMultipart(target)
+        case .syncBeforeMetadata(let target):
+            syncBeforeMetadata(target)
         case .metadataAfterCommits(let target, let data):
             uploadMetadataAfterCommits(target, data: data)
         }
@@ -373,15 +435,22 @@ actor S3UploadSession {
         try throwIfNeeded()
 
         let prepared = preparedUploads
-        guard prepared.isEmpty == false || metadataUploads.isEmpty == false else {
+        let syncs = syncsBeforeMetadata
+        guard prepared.isEmpty == false || syncs.isEmpty == false || metadataUploads.isEmpty == false else {
             return
         }
 
-        let commitStart = DispatchTime.now()
-        try await prepared.foreachConcurrent(nConcurrent: 8) { upload in
-            try await self.commitMultipartUpload(upload.prepared)
+        if !prepared.isEmpty {
+            let commitStart = DispatchTime.now()
+            try await prepared.foreachConcurrent(nConcurrent: 8) { upload in
+                try await self.commitMultipartUpload(upload.prepared)
+            }
+            logger.info("S3 multipart commits completed in \(commitStart.timeElapsedPretty())")
         }
-        logger.info("S3 multipart commits completed in \(commitStart.timeElapsedPretty())")
+
+        try await syncs.foreachConcurrent(nConcurrent: 4) { target in
+            try await self.syncDirectory(target)
+        }
 
         try await metadataUploads.foreachConcurrent(nConcurrent: 8) { upload in
             try await self.uploadMetadata(upload.target, upload.data)
