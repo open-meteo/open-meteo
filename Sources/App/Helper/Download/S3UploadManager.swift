@@ -488,9 +488,17 @@ actor S3UploadSession {
             return
         }
 
-        if !prepared.isEmpty {
+        let preparedUploadsToAbort = prepared.filter { failedEndpoints.contains($0.target.bucketEndpoint) }
+        if !preparedUploadsToAbort.isEmpty {
+            let abortFailures = await abortPreparedUploads(preparedUploadsToAbort)
+            failures.append(contentsOf: abortFailures)
+            failedEndpoints.formUnion(abortFailures.map { $0.bucketEndpoint })
+        }
+
+        let preparedUploadsToCommit = prepared.filter { !failedEndpoints.contains($0.target.bucketEndpoint) }
+        if !preparedUploadsToCommit.isEmpty {
             let commitStart = DispatchTime.now()
-            let commitResults = await prepared.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
+            let commitResults = await preparedUploadsToCommit.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
                 do {
                     try await self.commitMultipartUpload(upload.prepared)
                     return nil
@@ -577,27 +585,32 @@ actor S3UploadSession {
         preparedUploads.removeAll(keepingCapacity: true)
         failures.removeAll(keepingCapacity: true)
 
-        if !prepared.isEmpty {
-            let abortResults = await prepared.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
-                do {
-                    try await self.abortMultipartUpload(upload.prepared)
-                    return nil
-                } catch {
-                    return UploadFailure(
-                        bucketEndpoint: upload.target.bucketEndpoint,
-                        phase: "abort",
-                        location: String(upload.target.url.asUrlGetQueryForLogging),
-                        message: error.localizedDescription
-                    )
-                }
-            }
-            let abortFailures = abortResults.compactMap { $0 }
-            if !abortFailures.isEmpty {
-                logger.error("S3 upload session abort failed: \(abortFailures.map(\.description).joined(separator: "; "))")
-            }
+        let abortFailures = await abortPreparedUploads(prepared)
+        if !abortFailures.isEmpty {
+            logger.error("S3 upload session abort failed: \(abortFailures.map(\.description).joined(separator: "; "))")
         }
 
         state = .cancelled
+    }
+
+    private func abortPreparedUploads(_ prepared: [PreparedUpload]) async -> [UploadFailure] {
+        guard !prepared.isEmpty else {
+            return []
+        }
+        let abortResults = await prepared.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
+            do {
+                try await self.abortMultipartUpload(upload.prepared)
+                return nil
+            } catch {
+                return UploadFailure(
+                    bucketEndpoint: upload.target.bucketEndpoint,
+                    phase: "abort",
+                    location: String(upload.target.url.asUrlGetQueryForLogging),
+                    message: error.localizedDescription
+                )
+            }
+        }
+        return abortResults.compactMap { $0 }
     }
 
     private func enqueueUpload(_ target: S3UploadTarget) {
