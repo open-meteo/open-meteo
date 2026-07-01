@@ -300,6 +300,17 @@ actor S3UploadSession {
         let data: ByteBufferView
     }
 
+    private struct UploadFailure: Sendable, CustomStringConvertible {
+        let bucketEndpoint: String
+        let phase: String
+        let location: String
+        let message: String
+
+        var description: String {
+            "\(phase) \(location): \(message)"
+        }
+    }
+
     typealias MultipartUploadPrepare = @Sendable (S3UploadTarget) async throws -> S3MultiPartUploadPrepared
     typealias MultipartUploadCommit = @Sendable (S3MultiPartUploadPrepared) async throws -> Void
     typealias DirectorySync = @Sendable (S3UploadSyncTarget) async throws -> Void
@@ -314,7 +325,7 @@ actor S3UploadSession {
     private var endpointQueues: [String: EndpointUploadQueue] = [:]
     private var isClosed = false
     private var preparedUploads: [PreparedUpload] = []
-    private var failures: [String] = []
+    private var failures: [UploadFailure] = []
     private var syncsBeforeMetadata: [S3UploadSyncTarget] = []
     private var metadataUploads: [MetadataUpload] = []
 
@@ -432,29 +443,76 @@ actor S3UploadSession {
         for worker in workers {
             await worker.value
         }
-        try throwIfNeeded()
 
         let prepared = preparedUploads
         let syncs = syncsBeforeMetadata
-        guard prepared.isEmpty == false || syncs.isEmpty == false || metadataUploads.isEmpty == false else {
+        var failures = failures
+        var failedEndpoints = Set(failures.map { $0.bucketEndpoint })
+
+        guard prepared.isEmpty == false || syncs.isEmpty == false || metadataUploads.isEmpty == false || failures.isEmpty == false else {
             return
         }
 
         if !prepared.isEmpty {
             let commitStart = DispatchTime.now()
-            try await prepared.foreachConcurrent(nConcurrent: 8) { upload in
-                try await self.commitMultipartUpload(upload.prepared)
+            let commitResults = await prepared.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
+                do {
+                    try await self.commitMultipartUpload(upload.prepared)
+                    return nil
+                } catch {
+                    return UploadFailure(
+                        bucketEndpoint: upload.target.bucketEndpoint,
+                        phase: "commit",
+                        location: String(upload.target.url.asUrlGetQueryForLogging),
+                        message: error.localizedDescription
+                    )
+                }
             }
+            let commitFailures = commitResults.compactMap { $0 }
+            failures.append(contentsOf: commitFailures)
+            failedEndpoints.formUnion(commitFailures.map { $0.bucketEndpoint })
             logger.info("S3 multipart commits completed in \(commitStart.timeElapsedPretty())")
         }
 
-        try await syncs.foreachConcurrent(nConcurrent: 4) { target in
-            try await self.syncDirectory(target)
+        let syncTargets = syncs.filter { !failedEndpoints.contains($0.bucketEndpoint) }
+        if !syncTargets.isEmpty {
+            let syncResults = await syncTargets.mapConcurrent(nConcurrent: 4) { target -> UploadFailure? in
+                do {
+                    try await self.syncDirectory(target)
+                    return nil
+                } catch {
+                    return UploadFailure(
+                        bucketEndpoint: target.bucketEndpoint,
+                        phase: "sync",
+                        location: target.basePath,
+                        message: error.localizedDescription
+                    )
+                }
+            }
+            let syncFailures = syncResults.compactMap { $0 }
+            failures.append(contentsOf: syncFailures)
+            failedEndpoints.formUnion(syncFailures.map { $0.bucketEndpoint })
         }
 
-        try await metadataUploads.foreachConcurrent(nConcurrent: 8) { upload in
-            try await self.uploadMetadata(upload.target, upload.data)
+        let metadataTargets = metadataUploads.filter { !failedEndpoints.contains($0.target.bucketEndpoint) }
+        if !metadataTargets.isEmpty {
+            let metadataResults = await metadataTargets.mapConcurrent(nConcurrent: 8) { upload -> UploadFailure? in
+                do {
+                    try await self.uploadMetadata(upload.target, upload.data)
+                    return nil
+                } catch {
+                    return UploadFailure(
+                        bucketEndpoint: upload.target.bucketEndpoint,
+                        phase: "metadata",
+                        location: String(upload.target.url.asUrlGetQueryForLogging),
+                        message: error.localizedDescription
+                    )
+                }
+            }
+            failures.append(contentsOf: metadataResults.compactMap { $0 })
         }
+
+        try throwIfNeeded(failures)
     }
 
     private func enqueueUpload(_ target: S3UploadTarget) {
@@ -484,7 +542,12 @@ actor S3UploadSession {
                 let prepared = try await prepareMultipartUpload(target)
                 preparedUploads.append(PreparedUpload(target: target, prepared: prepared))
             } catch {
-                failures.append("\(target.url.asUrlGetQueryForLogging): \(error.localizedDescription)")
+                failures.append(UploadFailure(
+                    bucketEndpoint: target.bucketEndpoint,
+                    phase: "prepare",
+                    location: String(target.url.asUrlGetQueryForLogging),
+                    message: error.localizedDescription
+                ))
             }
         }
     }
@@ -521,12 +584,13 @@ actor S3UploadSession {
         }
     }
 
-    private func throwIfNeeded() throws {
+    private func throwIfNeeded(_ failures: [UploadFailure]) throws {
         guard !failures.isEmpty else {
             return
         }
-        logger.error("S3 multipart upload preparation failed: \(failures.joined(separator: "; "))")
-        throw S3UploadSessionError(failures: failures)
+        let descriptions = failures.map { $0.description }
+        logger.error("S3 upload session failed: \(descriptions.joined(separator: "; "))")
+        throw S3UploadSessionError(failures: descriptions)
     }
 }
 

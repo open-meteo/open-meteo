@@ -300,6 +300,105 @@ import Logging
         ])
     }
 
+    @Test func s3UploadSessionCommitsHealthyEndpointAfterPrepareFailure() async throws {
+        let goodEndpoint = "s3://good-bucket/"
+        let badEndpoint = "s3://bad-bucket/"
+        let probe = S3UploadSessionOrderProbe()
+        let session = S3UploadSession(
+            logger: Logger(label: "DownloaderTests.S3UploadSession"),
+            prepareMultipartUpload: { target in
+                await probe.record("prepare:\(target.url)")
+                if target.bucketEndpoint == badEndpoint {
+                    throw TestS3UploadError.failed
+                }
+                return S3MultiPartUploadPrepared(etags: ["etag"], url: target.url, encodedUploadId: "upload-id")
+            },
+            commitMultipartUpload: { prepared in
+                await probe.record("commit:\(prepared.url)")
+            },
+            syncDirectory: { target in
+                await probe.record("sync:\(target.basePath)")
+            },
+            uploadMetadata: { target, _ in
+                await probe.record("metadata:\(target.url)")
+            }
+        )
+
+        await session.uploadMultipart(s3UploadTarget(endpoint: badEndpoint, name: "bad"))
+        await session.uploadMultipart(s3UploadTarget(endpoint: goodEndpoint, name: "good"))
+        await session.uploadMetadataAfterCommits(
+            s3UploadTarget(endpoint: badEndpoint, name: "meta"),
+            data: ByteBuffer(string: "{}").readableBytesView
+        )
+        await session.uploadMetadataAfterCommits(
+            s3UploadTarget(endpoint: goodEndpoint, name: "meta"),
+            data: ByteBuffer(string: "{}").readableBytesView
+        )
+
+        do {
+            try await session.finish()
+            Issue.record("Expected S3UploadSessionError")
+        } catch let error as S3UploadSessionError {
+            #expect(error.failures.count == 1)
+            #expect(error.failures.first?.contains("prepare") == true)
+        }
+
+        let events = await probe.events
+        #expect(events.contains("commit:s3://good-bucket/data/good.om"))
+        #expect(events.contains("metadata:s3://good-bucket/data/meta.om"))
+        #expect(!events.contains("metadata:s3://bad-bucket/data/meta.om"))
+    }
+
+    @Test func s3UploadSessionContinuesCommitsAfterCommitFailure() async throws {
+        let goodEndpoint = "s3://good-bucket/"
+        let badEndpoint = "s3://bad-bucket/"
+        let probe = S3UploadSessionOrderProbe()
+        let session = S3UploadSession(
+            logger: Logger(label: "DownloaderTests.S3UploadSession"),
+            prepareMultipartUpload: { target in
+                await probe.record("prepare:\(target.url)")
+                return S3MultiPartUploadPrepared(etags: ["etag"], url: target.url, encodedUploadId: "upload-id")
+            },
+            commitMultipartUpload: { prepared in
+                await probe.record("commit:\(prepared.url)")
+                if prepared.url.hasPrefix(badEndpoint) {
+                    throw TestS3UploadError.failed
+                }
+            },
+            syncDirectory: { target in
+                await probe.record("sync:\(target.basePath)")
+            },
+            uploadMetadata: { target, _ in
+                await probe.record("metadata:\(target.url)")
+            }
+        )
+
+        await session.uploadMultipart(s3UploadTarget(endpoint: badEndpoint, name: "bad"))
+        await session.uploadMultipart(s3UploadTarget(endpoint: goodEndpoint, name: "good"))
+        await session.uploadMetadataAfterCommits(
+            s3UploadTarget(endpoint: badEndpoint, name: "meta"),
+            data: ByteBuffer(string: "{}").readableBytesView
+        )
+        await session.uploadMetadataAfterCommits(
+            s3UploadTarget(endpoint: goodEndpoint, name: "meta"),
+            data: ByteBuffer(string: "{}").readableBytesView
+        )
+
+        do {
+            try await session.finish()
+            Issue.record("Expected S3UploadSessionError")
+        } catch let error as S3UploadSessionError {
+            #expect(error.failures.count == 1)
+            #expect(error.failures.first?.contains("commit") == true)
+        }
+
+        let events = await probe.events
+        #expect(events.contains("commit:s3://bad-bucket/data/bad.om"))
+        #expect(events.contains("commit:s3://good-bucket/data/good.om"))
+        #expect(events.contains("metadata:s3://good-bucket/data/meta.om"))
+        #expect(!events.contains("metadata:s3://bad-bucket/data/meta.om"))
+    }
+
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
@@ -395,6 +494,10 @@ private func s3UploadTarget(endpoint: String, name: String) -> S3UploadTarget {
 
 private enum TestTimeoutError: Error {
     case timedOut
+}
+
+private enum TestS3UploadError: Error {
+    case failed
 }
 
 private func waitForStarted(probe: S3UploadSessionSchedulerProbe, endpoint: String, count: Int, timeoutSeconds: Double) async throws {
