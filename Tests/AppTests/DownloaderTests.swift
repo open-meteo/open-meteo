@@ -399,6 +399,60 @@ import Logging
         #expect(!events.contains("metadata:s3://bad-bucket/data/meta.om"))
     }
 
+    @Test func s3UploadSessionCancelAbortsPreparedUploadsAndSkipsPublishSteps() async throws {
+        let endpoint = "s3://bucket/"
+        let scheduler = S3UploadSessionSchedulerProbe()
+        let order = S3UploadSessionOrderProbe()
+        let session = S3UploadSession(
+            logger: Logger(label: "DownloaderTests.S3UploadSession"),
+            maxConcurrentFileUploads: 1,
+            prepareMultipartUpload: { target in
+                await order.record("prepare:\(target.url)")
+                return await scheduler.prepare(target: target)
+            },
+            commitMultipartUpload: { prepared in
+                await order.record("commit:\(prepared.url)")
+            },
+            abortMultipartUpload: { prepared in
+                await order.record("abort:\(prepared.url)")
+            },
+            syncDirectory: { target in
+                await order.record("sync:\(target.basePath)")
+            },
+            uploadMetadata: { target, _ in
+                await order.record("metadata:\(target.url)")
+            }
+        )
+
+        await session.uploadMultipart(s3UploadTarget(endpoint: endpoint, name: "started"))
+        await session.uploadMultipart(s3UploadTarget(endpoint: endpoint, name: "queued"))
+        await session.upload(.syncBeforeMetadata(S3UploadSyncTarget(
+            bucketEndpoint: endpoint,
+            localDirectory: "/tmp/static",
+            server: endpoint,
+            basePath: "data/ncep_gfs025/static"
+        )))
+        await session.uploadMetadataAfterCommits(
+            s3UploadTarget(endpoint: endpoint, name: "meta"),
+            data: ByteBuffer(string: "{}").readableBytesView
+        )
+        try await waitForStarted(probe: scheduler, endpoint: endpoint, count: 1, timeoutSeconds: 2)
+
+        let cancelTask = Task {
+            await session.cancel()
+        }
+        await scheduler.release()
+        await cancelTask.value
+
+        await session.cancel()
+        try await session.finish()
+
+        #expect(await order.events == [
+            "prepare:s3://bucket/data/started.om",
+            "abort:s3://bucket/data/started.om"
+        ])
+    }
+
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.

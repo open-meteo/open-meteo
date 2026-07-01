@@ -285,6 +285,13 @@ struct S3MultiPartUploadPrepared: Sendable {
     let url: String
     let encodedUploadId: String
 
+    func abort(client: HTTPClient) async throws {
+        let logger = Logger(label: "S3Uploader")
+        var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
+        abortRequest.method = .DELETE
+        let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+    }
+
     /// complete multipart upload. This may take longer than expected
     func commit(client: HTTPClient) async throws {
         // Step 3: Complete multipart upload
