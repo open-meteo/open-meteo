@@ -1201,12 +1201,25 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
-            // For Netherlands and Belgium use KNMI seamless
-            if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let _ = try await KnmiDomain.harmonie_arome_netherlands.makeHourlyReader(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                guard let mapping = Self.knmi_seamless.getDomainAndVariable() else {
-                    throw ModelError.domainInitFailed(domain: Self.knmi_seamless.rawValue)
-                }
-                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
+            // For Netherlands and Belgium use KNMI, IFS and ICON
+            if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
+                    iconEu?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?,
+                    iconD2?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?
+                ].compactMap { $0 }
+                let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
+                    ifsProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    icon.asOptionalReader
+                ] + iconReaders + [
+                    ifs025.asOptionalReader,
+                    ifsHres.asOptionalReader,
+                    knmiNetherlands
+                ]
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             }
             // Scandinavian region, combine MetNo Nordic with IFS HRES
             if lat >= 54.9, let _ = try await MetNoDomain.nordic_pp.makeHourlyReader(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
