@@ -80,12 +80,10 @@ enum S3Uploader {
             let size = uploaded.map(\.size).reduce(0, +)
             let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
             let rate = Double(size) / timeChunkedRequest
-            logger.info("Upload \(url.asUrlGetQuery) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
+            logger.info("Upload \(url.asUrlGetQueryForLogging) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
         } catch {
-            var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
-            abortRequest.method = .DELETE
-            let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+            try await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId).abort(client: client)
             throw error
         }
     }
@@ -309,7 +307,7 @@ struct S3MultiPartUploadPrepared: Sendable {
         let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
         let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000
-        logger.info("Upload \(url.asUrlGetQuery) committed in \(timeCommitRequest.asSecondsPrettyPrint)")
+        logger.info("Upload \(url.asUrlGetQueryForLogging) committed in \(timeCommitRequest.asSecondsPrettyPrint)")
     }
 }
 
@@ -324,14 +322,5 @@ fileprivate extension String {
         guard let start = range(of: "<\(tag)>"),
               let end = range(of: "</\(tag)>") else { return nil }
         return String(self[start.upperBound..<end.lowerBound])
-    }
-    
-    /// Assume self is a URL, return the query part
-    var asUrlGetQuery: Substring {
-        guard let schemaIndex = self.firstRange(of: "://"),
-                let queryStart = self[schemaIndex.upperBound...].firstIndex(of: "/") else {
-            return Substring(self)
-        }
-        return self[queryStart...]
     }
 }
