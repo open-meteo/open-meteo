@@ -31,7 +31,7 @@ actor S3UploadManager {
     /// Enqueue a directory sync and return immediately.
     func sync(_ target: S3UploadSyncTarget) {
         let syncDirectory = self.syncDirectory
-        enqueue(endpoint: target.bucketEndpoint, description: "sync \(target.basePath)") {
+        enqueue(target) {
             try await syncDirectory(target)
         }
     }
@@ -45,7 +45,9 @@ actor S3UploadManager {
         }
     }
 
-    private func enqueue(endpoint: String, description: String, operation: @escaping @Sendable () async throws -> Void) {
+    private func enqueue(_ target: S3UploadSyncTarget, operation: @escaping @Sendable () async throws -> Void) {
+        let endpoint = target.bucketEndpoint
+        let description = "sync \(target.basePath)"
         guard !isShuttingDown else {
             logger.warning("S3 upload manager is shutting down. Rejecting \(description) for endpoint: \(endpoint.stripHttpPassword())")
             return
