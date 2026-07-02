@@ -1046,6 +1046,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .knmi_seamless:
             return .multipleWithPrecipitationProbability([
+                (GfsDomain.gfs013, GfsUvIndexVariable.self),
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
                 (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 (KnmiDomain.harmonie_arome_europe, KnmiVariable.self),
@@ -1208,6 +1209,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard
                 let gfs: any GenericReaderProtocol = try await GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifs025 = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             else {
@@ -1223,7 +1225,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 ].compactMap { $0 }
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfsUvIndex,
                     icon.asOptionalReader
                 ] + iconReaders + [
                     ifs025.asOptionalReader,
