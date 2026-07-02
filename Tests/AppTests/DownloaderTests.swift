@@ -97,25 +97,26 @@ import Darwin
     @Test func s3UploadPlanKeepsRegularDataForAwsProfile() throws {
         let targets = S3UploadPlan.targets(
             domain: .ncep_gfs025,
-            buckets: "s3://aws-bucket/@aws",
+            endpoints: s3Endpoints("s3://aws-bucket/@aws"),
             localFile: "/tmp/chunk_1.om",
             remotePath: "data/ncep_gfs025/temperature_2m/chunk_1.om"
         )
 
         #expect(targets == [
             S3UploadTarget(
-                bucketEndpoint: "s3://aws-bucket/",
+                bucketEndpoint: S3BucketEndpoint(rawEndpoint: "s3://aws-bucket/", profile: "aws"),
                 localFile: "/tmp/chunk_1.om",
-                url: "s3://aws-bucket/data/ncep_gfs025/temperature_2m/chunk_1.om",
+                remotePath: "data/ncep_gfs025/temperature_2m/chunk_1.om",
                 contentType: "application/octet-stream"
             )
         ])
+        #expect(targets.first?.uploadURL() == "s3://aws-bucket/data/ncep_gfs025/temperature_2m/chunk_1.om")
     }
 
     @Test func s3UploadPlanSkipsPreviousDayForAwsProfileAndDefaultOpenmeteo() throws {
         let targets = S3UploadPlan.targets(
             domain: .ncep_gfs025,
-            buckets: "openmeteo,s3://aws-bucket/@aws,s3://ceph-bucket/@ceph",
+            endpoints: s3Endpoints("openmeteo,s3://aws-bucket/@aws,s3://ceph-bucket/@ceph"),
             localFile: "/tmp/chunk_1.om",
             remotePath: "data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
             kind: .previousDay
@@ -123,9 +124,9 @@ import Darwin
 
         #expect(targets == [
             S3UploadTarget(
-                bucketEndpoint: "s3://ceph-bucket/",
+                bucketEndpoint: S3BucketEndpoint(rawEndpoint: "s3://ceph-bucket/", profile: "ceph"),
                 localFile: "/tmp/chunk_1.om",
-                url: "s3://ceph-bucket/data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
+                remotePath: "data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
                 contentType: "application/octet-stream"
             )
         ])
@@ -134,12 +135,12 @@ import Darwin
     @Test func s3UploadPlanUsesDataRunPrefix() throws {
         let targets = S3UploadPlan.targets(
             domain: .ncep_gfs025,
-            buckets: "openmeteo",
+            endpoints: s3Endpoints("openmeteo"),
             localFile: "/tmp/temperature_2m.om",
             remotePath: "data_run/ncep_gfs025/20260101/00/temperature_2m.om"
         )
 
-        #expect(targets.first?.url == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
+        #expect(targets.first?.uploadURL() == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
     }
 
     @Test func s3UploadPlanFormatsSpatialRealmSuffixes() throws {
@@ -148,7 +149,7 @@ import Darwin
         let data = ByteBuffer(string: "{}").readableBytesView
 
         let defaultFile = S3UploadPlan.targets(
-            buckets: "openmeteo",
+            endpoints: s3Endpoints("openmeteo"),
             artifact: .spatialFile(
                 domain: .ncep_gfs025,
                 localFile: "/tmp/2026-01-01T0300.om",
@@ -157,10 +158,10 @@ import Darwin
                 realm: nil
             )
         )
-        #expect(defaultFile.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300.om")
+        #expect(defaultFile.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300.om")
 
         let realmFile = S3UploadPlan.targets(
-            buckets: "openmeteo",
+            endpoints: s3Endpoints("openmeteo"),
             artifact: .spatialFile(
                 domain: .ncep_gfs025,
                 localFile: "/tmp/2026-01-01T0300_model-level.om",
@@ -169,10 +170,10 @@ import Darwin
                 realm: "model-level"
             )
         )
-        #expect(realmFile.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300_model-level.om")
+        #expect(realmFile.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300_model-level.om")
 
         let defaultMeta = S3UploadPlan.targets(
-            buckets: "openmeteo",
+            endpoints: s3Endpoints("openmeteo"),
             artifact: .spatialMeta(
                 domain: .ncep_gfs025,
                 localFile: "/tmp/meta.json",
@@ -180,10 +181,10 @@ import Darwin
                 data: data
             )
         )
-        #expect(defaultMeta.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/meta.json")
+        #expect(defaultMeta.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/meta.json")
 
         let realmMeta = S3UploadPlan.targets(
-            buckets: "openmeteo",
+            endpoints: s3Endpoints("openmeteo"),
             artifact: .spatialMeta(
                 domain: .ncep_gfs025,
                 localFile: "/tmp/meta_model-level.json",
@@ -191,7 +192,7 @@ import Darwin
                 data: data
             )
         )
-        #expect(realmMeta.first?.url == "s3://openmeteo/data_spatial/ncep_gfs025/latest_model-level.json")
+        #expect(realmMeta.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/latest_model-level.json")
     }
 
     @Test func s3BucketEndpointParsesModelProfilesAndCredentialOverrides() throws {
@@ -201,17 +202,41 @@ import Darwin
         )
 
         #expect(endpoints == [
-            S3BucketEndpoint(bucket: "openmeteo", profile: nil),
-            S3BucketEndpoint(bucket: "s3://ncep-gfs025/", profile: "ceph"),
-            S3BucketEndpoint(bucket: "https://user:pw@example.com/bucket/", profile: "aws")
+            S3BucketEndpoint(rawEndpoint: "openmeteo", profile: nil),
+            S3BucketEndpoint(rawEndpoint: "s3://ncep-gfs025/", profile: "ceph"),
+            S3BucketEndpoint(rawEndpoint: "https://user:pw@example.com/bucket/", profile: "aws")
         ])
 
         setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://credential-bucket/", 1)
         defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
 
         #expect(S3BucketEndpoint.parseList("openmeteo@aws", domain: .ncep_gfs025) == [
-            S3BucketEndpoint(bucket: "s3://credential-bucket/", profile: "aws")
+            S3BucketEndpoint(rawEndpoint: "s3://credential-bucket/", profile: "aws")
         ])
+    }
+
+    @Test func s3BucketEndpointListRedactsMultipleCredentialedEndpoints() throws {
+        let endpoints = S3BucketEndpointList(
+            "s3://user1:pw1@bucket-a/@aws,https://user2:pw2@example.com/bucket/@ceph",
+            domain: .ncep_gfs025
+        )
+
+        #expect(String(describing: endpoints) == "s3://bucket-a/,https://example.com/bucket/")
+        #expect(!String(describing: endpoints).contains("user1"))
+        #expect(!String(describing: endpoints).contains("pw1"))
+        #expect(!String(describing: endpoints).contains("user2"))
+        #expect(!String(describing: endpoints).contains("pw2"))
+    }
+
+    @Test func s3BucketEndpointListRedactsCredentialOverrides() throws {
+        setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://override-user:override-pw@credential-bucket/", 1)
+        defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
+
+        let endpoints = S3BucketEndpointList("openmeteo@aws", domain: .ncep_gfs025)
+
+        #expect(String(describing: endpoints) == "s3://credential-bucket/")
+        #expect(!String(describing: endpoints).contains("override-user"))
+        #expect(!String(describing: endpoints).contains("override-pw"))
     }
 
     @Test func s3SyncManagerSerializesSyncsPerEndpointAndRunsEndpointsIndependently() async throws {
@@ -296,11 +321,14 @@ private func randomData(byteCount: Int) -> Data {
 
 private func s3UploadSyncTarget(endpoint: String, name: String) -> S3UploadSyncTarget {
     S3UploadSyncTarget(
-        bucketEndpoint: endpoint,
+        bucketEndpoint: S3BucketEndpoint(rawEndpoint: endpoint, profile: nil),
         localDirectory: "/tmp/\(name)",
-        server: endpoint,
         basePath: "data/\(name)"
     )
+}
+
+private func s3Endpoints(_ buckets: String, domain: DomainRegistry = .ncep_gfs025) -> S3BucketEndpointList {
+    return S3BucketEndpointList(buckets, domain: domain)
 }
 
 private actor S3SyncManagerProbe {
@@ -322,7 +350,7 @@ private actor S3SyncManagerProbe {
     }
 
     func sync(target: S3UploadSyncTarget) async throws {
-        let endpoint = target.bucketEndpoint
+        let endpoint = target.bucketEndpoint.description
         activeByEndpoint[endpoint, default: 0] += 1
         maxActive[endpoint] = max(maxActive[endpoint, default: 0], activeByEndpoint[endpoint, default: 0])
         maxTotal = max(maxTotal, activeByEndpoint.values.reduce(0, +))

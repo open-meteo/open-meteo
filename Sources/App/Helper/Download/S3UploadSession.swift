@@ -41,7 +41,7 @@ actor S3UploadSession {
     private let logger: Logger
     private let maxConcurrentFileUploads: Int
     private var state: State = .open
-    private var endpoints: [String: S3EndpointUploadSession] = [:]
+    private var endpoints: [S3BucketEndpoint: S3EndpointUploadSession] = [:]
 
     init(client: HTTPClient, logger: Logger, maxConcurrentFileUploads: Int = 4) {
         self.client = client
@@ -51,7 +51,7 @@ actor S3UploadSession {
 
     func uploadMultipart(_ target: S3UploadTarget) async {
         guard state == .open else {
-            logger.warning("S3 upload session is closed. Rejecting multipart upload for: \(target.url.asUrlGetQueryForLogging)")
+            logger.warning("S3 upload session is closed. Rejecting multipart upload for: \(target.logLocation)")
             return
         }
         await endpoint(for: target.bucketEndpoint).uploadMultipart(target)
@@ -59,7 +59,7 @@ actor S3UploadSession {
 
     func uploadMetadataAfterCommits(_ target: S3UploadTarget, data: ByteBufferView) async {
         guard state == .open else {
-            logger.warning("S3 upload session is closed. Rejecting metadata upload for: \(target.url.asUrlGetQueryForLogging)")
+            logger.warning("S3 upload session is closed. Rejecting metadata upload for: \(target.logLocation)")
             return
         }
         await endpoint(for: target.bucketEndpoint).uploadMetadataAfterCommits(target, data: data)
@@ -74,8 +74,8 @@ actor S3UploadSession {
         }
     }
 
-    func upload(buckets: String, artifact: S3UploadArtifact) async {
-        for operation in S3UploadPlan.operations(buckets: buckets, artifact: artifact) {
+    func upload(endpoints: S3BucketEndpointList, artifact: S3UploadArtifact) async {
+        for operation in S3UploadPlan.operations(endpoints: endpoints, artifact: artifact) {
             await upload(operation)
         }
     }
@@ -138,7 +138,7 @@ actor S3UploadSession {
         state = .cancelled
     }
 
-    private func endpoint(for bucketEndpoint: String) -> S3EndpointUploadSession {
+    private func endpoint(for bucketEndpoint: S3BucketEndpoint) -> S3EndpointUploadSession {
         if let endpoint = endpoints[bucketEndpoint] {
             return endpoint
         }
@@ -156,7 +156,7 @@ actor S3UploadSession {
         guard !failures.isEmpty else {
             return
         }
-        let descriptions = failures.map(\.description)
+        let descriptions = failures.map { $0.description }
         logger.error("S3 upload session failed: \(descriptions.joined(separator: "; "))")
         throw S3UploadSessionError(failures: descriptions)
     }
@@ -175,7 +175,7 @@ private actor S3EndpointUploadSession {
 
     private let client: HTTPClient
     private let logger: Logger
-    private let bucketEndpoint: String
+    private let bucketEndpoint: S3BucketEndpoint
     private let maxConcurrentFileUploads: Int
     private let uploads = AsyncChannel<S3UploadTarget>()
     private var isClosed = false
@@ -184,7 +184,7 @@ private actor S3EndpointUploadSession {
     private var failures: [S3UploadFailure] = []
     private var metadataUploads: [MetadataUpload] = []
 
-    init(client: HTTPClient, logger: Logger, bucketEndpoint: String, maxConcurrentFileUploads: Int) {
+    init(client: HTTPClient, logger: Logger, bucketEndpoint: S3BucketEndpoint, maxConcurrentFileUploads: Int) {
         self.client = client
         self.logger = logger
         self.bucketEndpoint = bucketEndpoint
@@ -226,7 +226,7 @@ private actor S3EndpointUploadSession {
             let commitStart = DispatchTime.now()
             let commitFailures = await commitPreparedUploads(preparedUploads)
             failures.append(contentsOf: commitFailures)
-            logger.info("S3 multipart commits for \(bucketEndpoint.stripHttpPassword()) completed in \(commitStart.timeElapsedPretty())")
+            logger.info("S3 multipart commits for \(bucketEndpoint) completed in \(commitStart.timeElapsedPretty())")
         }
 
         if failures.isEmpty {
@@ -254,7 +254,7 @@ private actor S3EndpointUploadSession {
 
         let abortFailures = await abortPreparedUploads(preparedUploads)
         if !abortFailures.isEmpty {
-            logger.error("S3 upload session abort failed for \(bucketEndpoint.stripHttpPassword()): \(abortFailures.map(\.description).joined(separator: "; "))")
+            logger.error("S3 upload session abort failed for \(bucketEndpoint): \(abortFailures.map { $0.description }.joined(separator: "; "))")
         }
 
         preparedUploads.removeAll(keepingCapacity: true)
@@ -276,7 +276,7 @@ private actor S3EndpointUploadSession {
                 let prepared = try await S3Uploader.uploadMultipart(
                     client: client,
                     file: target.localFile,
-                    url: target.url,
+                    url: target.uploadURL(),
                     contentType: target.contentType,
                     nConcurrent: 4
                 )
@@ -285,7 +285,7 @@ private actor S3EndpointUploadSession {
                 if !Task.isCancelled {
                     failures.append(S3UploadFailure(
                         phase: "prepare",
-                        location: String(target.url.asUrlGetQueryForLogging),
+                        location: String(target.logLocation),
                         message: error.localizedDescription
                     ))
                 }
@@ -307,7 +307,7 @@ private actor S3EndpointUploadSession {
             } catch {
                 return S3UploadFailure(
                     phase: "commit",
-                    location: String(upload.target.url.asUrlGetQueryForLogging),
+                    location: String(upload.target.logLocation),
                     message: error.localizedDescription
                 )
             }
@@ -326,7 +326,7 @@ private actor S3EndpointUploadSession {
             } catch {
                 return S3UploadFailure(
                     phase: "abort",
-                    location: String(upload.target.url.asUrlGetQueryForLogging),
+                    location: String(upload.target.logLocation),
                     message: error.localizedDescription
                 )
             }
@@ -337,12 +337,12 @@ private actor S3EndpointUploadSession {
     private func uploadMetadata() async -> [S3UploadFailure] {
         let metadataResults = await metadataUploads.mapConcurrent(nConcurrent: 8) { upload -> S3UploadFailure? in
             do {
-                try await S3Uploader.upload(client: self.client, data: upload.data, url: upload.target.url, contentType: upload.target.contentType)
+                try await S3Uploader.upload(client: self.client, data: upload.data, url: upload.target.uploadURL(), contentType: upload.target.contentType)
                 return nil
             } catch {
                 return S3UploadFailure(
                     phase: "metadata",
-                    location: String(upload.target.url.asUrlGetQueryForLogging),
+                    location: String(upload.target.logLocation),
                     message: error.localizedDescription
                 )
             }

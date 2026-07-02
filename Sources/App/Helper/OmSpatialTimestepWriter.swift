@@ -64,7 +64,7 @@ actor OmSpatialTimestepWriter {
     }
     
     var variableString: [String] {
-        variables.map(\.omFileNameWithMember).sorted()
+        variables.map { $0.omFileNameWithMember }.sorted()
     }
     
     
@@ -156,7 +156,7 @@ actor OmSpatialTimestepWriter {
             reference_time: run.toDate(),
             last_modified_time: Date(),
             completed: completed,
-            valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
+            valid_times: validTimes.map { $0.iso8601_YYYY_MM_dd_HH_mmZ },
             variables: self.variableString,
             crs_wkt: domain.grid.crsWkt2
         )
@@ -184,22 +184,23 @@ actor OmSpatialTimestepWriter {
             return
         }
         let domainRegistry = domain.domainRegistry
+        let uploadS3Endpoints = S3BucketEndpointList(uploadS3Bucket, domain: domainRegistry)
         if forceAllTimestampUpload {
             let targets = S3UploadPlan.spatialSyncTargets(
-                buckets: uploadS3Bucket,
+                endpoints: uploadS3Endpoints,
                 domain: domainRegistry,
                 localDirectory: directorySpatial
             )
             for target in targets {
                 await application.s3SyncManager.sync(target)
-                logger.info("Queued AWS spatial sync to \(target.bucketEndpoint.stripHttpPassword()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                logger.info("Queued AWS spatial sync to \(target.bucketEndpoint) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
             return
         }
 
         let uploadSession = S3UploadSession(client: application.http1Client, logger: logger)
         await uploadSession.upload(
-            buckets: uploadS3Bucket,
+            endpoints: uploadS3Endpoints,
             artifact: .spatialFile(
                 domain: domainRegistry,
                 localFile: filename,
@@ -236,13 +237,13 @@ actor OmSpatialTimestepWriter {
             }
 
             for artifact in metaArtifacts {
-                await uploadSession.upload(buckets: uploadS3Bucket, artifact: artifact)
+                await uploadSession.upload(endpoints: uploadS3Endpoints, artifact: artifact)
             }
         }
 
         let start = DispatchTime.now()
         try await uploadSession.finish()
-        logger.info("AWS Upload to \(uploadS3Bucket.stripHttpPassword()) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+        logger.info("AWS Upload to \(uploadS3Endpoints) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
     }
     
     /// Finalize the time step
@@ -343,7 +344,7 @@ actor OmSpatialMultistepWriter {
     /// Finalise the time step and return all handles
     /// If not validTimes are given, use all timestamps from the underlaying writer
     func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
-        let validTimes = validTimes ?? writer.map(\.time)
+        let validTimes = validTimes ?? writer.map { $0.time }
         // Only upload META JSON for the last timestamp
         let lastTimestamp = writer.last?.time
         let handles = try await writer.asyncFlatMap({

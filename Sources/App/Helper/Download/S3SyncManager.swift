@@ -8,7 +8,7 @@ actor S3SyncManager {
 
     private let logger: Logger
     private let syncDirectory: DirectorySync
-    private var endpointQueues: [String: Task<Void, Never>] = [:]
+    private var endpointQueues: [S3BucketEndpoint: Task<Void, Never>] = [:]
     private var isShuttingDown = false
 
     init(client: HTTPClient, logger: Logger) {
@@ -16,7 +16,7 @@ actor S3SyncManager {
             try await S3Uploader.uploadSync(
                 client: client,
                 localDirectory: target.localDirectory,
-                server: target.server,
+                server: target.bucketEndpoint.uploadServer,
                 basePath: target.basePath,
                 exclude: target.exclude
             )
@@ -49,7 +49,7 @@ actor S3SyncManager {
         let endpoint = target.bucketEndpoint
         let description = "sync \(target.basePath)"
         guard !isShuttingDown else {
-            logger.warning("S3 upload manager is shutting down. Rejecting \(description) for endpoint: \(endpoint.stripHttpPassword())")
+            logger.warning("S3 upload manager is shutting down. Rejecting \(description) for endpoint: \(endpoint)")
             return
         }
 
@@ -58,12 +58,12 @@ actor S3SyncManager {
         let task = Task {
             await previous?.value
             let start = DispatchTime.now()
-            logger.info("S3 background \(description) for \(endpoint.stripHttpPassword()) started")
+            logger.info("S3 background \(description) for \(endpoint) started")
             do {
                 try await operation()
-                logger.info("S3 background \(description) for \(endpoint.stripHttpPassword()) completed in \(start.timeElapsedPretty())")
+                logger.info("S3 background \(description) for \(endpoint) completed in \(start.timeElapsedPretty())")
             } catch {
-                logger.error("S3 background \(description) for \(endpoint.stripHttpPassword()) failed: \(error.localizedDescription)")
+                logger.error("S3 background \(description) for \(endpoint) failed: \(error.localizedDescription)")
             }
         }
         endpointQueues[endpoint] = task

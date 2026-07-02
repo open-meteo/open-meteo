@@ -622,8 +622,4 @@ extension DomainRegistry {
             return rawValue.replacing("_", with: "-").lowercased()
         }
     }
-    
-    func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
-        return S3BucketEndpoint.parseList(buckets, domain: self).map { ($0.bucket, $0.profile) }
-    }
 }

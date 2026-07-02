@@ -2,10 +2,18 @@ import Foundation
 import NIOCore
 
 struct S3UploadTarget: Sendable, Equatable {
-    let bucketEndpoint: String
+    let bucketEndpoint: S3BucketEndpoint
     let localFile: String
-    let url: String
+    let remotePath: String
     let contentType: String
+
+    func uploadURL() -> String {
+        return bucketEndpoint.uploadURL(remotePath: remotePath)
+    }
+
+    var logLocation: Substring {
+        return uploadURL().asUrlGetQueryForLogging
+    }
 }
 
 enum S3UploadFileKind: Sendable {
@@ -48,10 +56,10 @@ enum S3SpatialMetaFile {
 
 enum S3UploadPlan {
     static func operations(
-        buckets: String,
+        endpoints: S3BucketEndpointList,
         artifact: S3UploadArtifact
     ) -> [S3UploadOperation] {
-        return targets(buckets: buckets, artifact: artifact).map { target in
+        return targets(endpoints: endpoints, artifact: artifact).map { target in
             switch artifact {
             case .timeSeries, .fullRun, .spatialFile:
                 return .multipart(target)
@@ -61,11 +69,11 @@ enum S3UploadPlan {
         }
     }
 
-    static func targets(buckets: String, artifact: S3UploadArtifact) -> [S3UploadTarget] {
+    static func targets(endpoints: S3BucketEndpointList, artifact: S3UploadArtifact) -> [S3UploadTarget] {
         let plan = artifact.plan
         return targets(
             domain: plan.domain,
-            buckets: buckets,
+            endpoints: endpoints,
             localFile: plan.localFile,
             remotePath: plan.remotePath,
             kind: plan.kind,
@@ -75,82 +83,74 @@ enum S3UploadPlan {
 
     static func targets(
         domain: DomainRegistry,
-        buckets: String,
+        endpoints: S3BucketEndpointList,
         localFile: String,
         remotePath: String,
         kind: S3UploadFileKind = .regular,
         contentType: String = "application/octet-stream"
     ) -> [S3UploadTarget] {
-        return S3BucketEndpoint.parseList(buckets, domain: domain).compactMap { endpoint in
-            guard shouldUpload(domain: domain, bucket: endpoint.bucket, profile: endpoint.profile, kind: kind) else {
+        return endpoints.compactMap { endpoint in
+            guard shouldUpload(domain: domain, endpoint: endpoint, kind: kind) else {
                 return nil
             }
-            return target(bucket: endpoint.bucket, localFile: localFile, remotePath: remotePath, contentType: contentType)
+            return target(endpoint: endpoint, localFile: localFile, remotePath: remotePath, contentType: contentType)
         }
     }
 
-    static func shouldUpload(domain: DomainRegistry, bucket: String, profile: String?, kind: S3UploadFileKind) -> Bool {
+    static func shouldUpload(domain: DomainRegistry, endpoint: S3BucketEndpoint, kind: S3UploadFileKind) -> Bool {
         switch kind {
         case .regular:
             return true
         case .previousDay:
-            return !isDefaultOpenMeteoOrAws(bucket: bucket, profile: profile)
+            return !endpoint.isDefaultOpenMeteoOrAws
         case .rolling:
-            return domain == .google_weathernext2_ensemble && !isDefaultOpenMeteoOrAws(bucket: bucket, profile: profile)
+            return domain == .google_weathernext2_ensemble && !endpoint.isDefaultOpenMeteoOrAws
         case .spatial:
-            return profile != "ceph"
+            return endpoint.profile != "ceph"
         }
     }
 
     static func spatialSyncTargets(
-        buckets: String,
+        endpoints: S3BucketEndpointList,
         domain: DomainRegistry,
         localDirectory: String
     ) -> [S3UploadSyncTarget] {
-        return S3BucketEndpoint.parseList(buckets, domain: domain).compactMap { endpoint in
-            guard shouldUpload(domain: domain, bucket: endpoint.bucket, profile: endpoint.profile, kind: .spatial) else {
+        return endpoints.compactMap { endpoint in
+            guard shouldUpload(domain: domain, endpoint: endpoint, kind: .spatial) else {
                 return nil
             }
             return S3UploadSyncTarget(
-                bucketEndpoint: endpoint.bucket,
+                bucketEndpoint: endpoint,
                 localDirectory: localDirectory,
-                server: endpoint.bucket,
                 basePath: "data_spatial/\(domain.rawValue)/"
             )
         }
     }
 
-    private static func isDefaultOpenMeteoOrAws(bucket: String, profile: String?) -> Bool {
-        return (bucket == "openmeteo" && profile == nil) || profile == "aws"
-    }
-
-    private static func target(bucket: String, localFile: String, remotePath: String, contentType: String) -> S3UploadTarget {
+    private static func target(endpoint: S3BucketEndpoint, localFile: String, remotePath: String, contentType: String) -> S3UploadTarget {
         return S3UploadTarget(
-            bucketEndpoint: bucket,
+            bucketEndpoint: endpoint,
             localFile: localFile,
-            url: bucket.s3UploadUrlPrefix + remotePath,
+            remotePath: remotePath,
             contentType: contentType
         )
     }
 }
 
 struct S3UploadSyncTarget: Sendable, Equatable {
-    let bucketEndpoint: String
+    let bucketEndpoint: S3BucketEndpoint
     let localDirectory: String
-    let server: String
     let basePath: String
     let exclude: [String]
 
     init(
-        bucketEndpoint: String,
+        bucketEndpoint: S3BucketEndpoint,
         localDirectory: String,
-        server: String,
         basePath: String,
         exclude: [String] = [".*", "*~"]
     ) {
         self.bucketEndpoint = bucketEndpoint
         self.localDirectory = localDirectory
-        self.server = server
         self.basePath = basePath
         self.exclude = exclude
     }
