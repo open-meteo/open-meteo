@@ -178,6 +178,7 @@ public func configure(_ app: Application) throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
+    app.commands.use(VersionCommand(), as: "version")
     app.asyncCommands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
     app.asyncCommands.use(DownloadCmaCommand(), as: "download-cma")
