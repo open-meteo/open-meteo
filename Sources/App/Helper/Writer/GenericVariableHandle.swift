@@ -40,102 +40,99 @@ struct GenericVariableHandle: Sendable {
     /// If `fullRunSkipMeta` do not generate meta.json for each run
     static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         let logger = application.logger
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
-            
-            let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
-            
-            if generateTimeSeries {
-                let startTime = DispatchTime.now()
-                logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
-                logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-            }
-            
-            /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
-            if generateTimeSeries, writeUpdateJson, let run, handles.contains(where: { ["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane", "shortwave_radiation"].contains($0.variable.omFileName.file) }) {
-                let end = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.add(domain.dtSeconds) ?? Timestamp(0)
-                
-                // let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
-                
-                // generate model update timeseries
-                // let range = TimerangeDt(start: run, to: end, dtSeconds: domain.dtSeconds)
-                let current = Timestamp.now()
-                /*let initTimes = try range.flatMap {
-                 // TODO timestamps need 64 bit integration
-                 return [
-                 GenericVariableHandle(
-                 variable: ModelTimeVariable.initialisation_time,
-                 time: $0,
-                 member: 0,
-                 fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: [Float($0.timeIntervalSince1970)])
-                 ),
-                 GenericVariableHandle(
-                 variable: ModelTimeVariable.modification_time,
-                 time: $0,
-                 member: 0,
-                 fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: [Float(current.timeIntervalSince1970)])
-                 )
-                 ]
-                 }
-                 let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
-                 try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
-                try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
-            }
-            
-            if generateTimeSeries, let uploadS3Bucket = uploadS3Bucket {
-                try await domain.domainRegistry.syncToS3(
-                    application: application,
-                    bucket: uploadS3Bucket,
-                    variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : nil
-                )
-            }
-        }
-        
-        if OpenMeteo.generatePreviousDay, generateTimeSeries, let run {
+        let uploadSession = uploadS3Bucket.map { _ in S3UploadSession(client: application.http1Client, logger: logger) }
+        do {
             for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
                 let domain = handles[0].domain
-            
-                // if run is nil, do not attempt to generate previous days files
-                logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                let startTimePreviousDays = DispatchTime.now()
-                try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression)
-                logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                
-                /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
-                if !uploadS3OnlyProbabilities, let uploadS3Bucket {
-                    try await domain.domainRegistry.syncToS3(
-                        application: application,
-                        bucket: uploadS3Bucket,
-                        variables: nil
-                    )
+
+                let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
+
+                if generateTimeSeries {
+                    let startTime = DispatchTime.now()
+                    logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, uploadSession: uploadSession)
+                    logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                }
+
+                if generateTimeSeries, let uploadS3Bucket, let uploadSession {
+                    let staticDomain = domain.domainRegistryStatic ?? domain.domainRegistry
+                    for target in S3UploadPlan.staticSyncTargets(buckets: uploadS3Bucket, domain: staticDomain) {
+                        await uploadSession.upload(.syncBeforeMetadata(target))
+                    }
+                }
+
+                /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
+                if generateTimeSeries, writeUpdateJson, let run, handles.contains(where: { ["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane", "shortwave_radiation"].contains($0.variable.omFileName.file) }) {
+                    let end = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.add(domain.dtSeconds) ?? Timestamp(0)
+
+                    // let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
+
+                    // generate model update timeseries
+                    // let range = TimerangeDt(start: run, to: end, dtSeconds: domain.dtSeconds)
+                    let current = Timestamp.now()
+                    /*let initTimes = try range.flatMap {
+                     // TODO timestamps need 64 bit integration
+                     return [
+                     GenericVariableHandle(
+                     variable: ModelTimeVariable.initialisation_time,
+                     time: $0,
+                     member: 0,
+                     fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: [Float($0.timeIntervalSince1970)])
+                     ),
+                     GenericVariableHandle(
+                     variable: ModelTimeVariable.modification_time,
+                     time: $0,
+                     member: 0,
+                     fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: [Float(current.timeIntervalSince1970)])
+                     )
+                     ]
+                     }
+                     let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
+                    try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
+                    let metaData = try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
+                    if let uploadS3Bucket, let uploadSession {
+                        let file = ModelUpdateMetaFile(domain: domain.domainRegistry)
+                        let metaBytes = ByteBuffer(data: metaData).readableBytesView
+                        await uploadSession.upload(
+                            buckets: uploadS3Bucket,
+                            artifact: .modelMeta(file, data: metaBytes)
+                        )
+                    }
                 }
             }
-        }
-        
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
-            let generateFullRun = generateFullRun && domain.generateFullRun
-            if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
-                logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                let startTimeFullRun = DispatchTime.now()
-                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta)
-                logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                
-                if let uploadS3Bucket {
-                    try await domain.domainRegistry.syncToS3PerRun(
-                        application: application,
-                        bucket: uploadS3Bucket,
-                        run: run,
-                        skipMeta: fullRunSkipMeta
-                    )
+
+            for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
+                let domain = handles[0].domain
+                let generateFullRun = generateFullRun && domain.generateFullRun
+                if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
+                    logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    let startTimeFullRun = DispatchTime.now()
+                    try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta, uploadS3Bucket: uploadS3Bucket, uploadSession: uploadSession)
+                    logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 }
             }
+
+            if OpenMeteo.generatePreviousDay, generateTimeSeries, let run {
+                for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
+                    let domain = handles[0].domain
+
+                    // if run is nil, do not attempt to generate previous days files
+                    logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    let startTimePreviousDays = DispatchTime.now()
+                    try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, uploadS3Bucket: uploadS3OnlyProbabilities ? nil : uploadS3Bucket, uploadS3OnlyProbabilities: false, uploadSession: uploadS3OnlyProbabilities ? nil : uploadSession)
+                    logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                }
+            }
+        } catch {
+            await uploadSession?.cancel()
+            throw error
         }
+
+        try await uploadSession?.finish()
     }
     
     /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
-    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool) async throws {
+    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, uploadS3Bucket: String? = nil, uploadSession: S3UploadSession? = nil) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -225,29 +222,44 @@ struct GenericVariableHandle: Sendable {
             let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
             try fn.linkTemporary(file: filePath)
+            if let uploadS3Bucket, let uploadSession {
+                await uploadSession.upload(
+                    buckets: uploadS3Bucket,
+                    artifact: .fullRun(file)
+                )
+            }
             await progress.finish()
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()
         if !skipMeta {
-            try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
+            let metaFiles = try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
+            if let uploadS3Bucket, let uploadSession {
+                for meta in metaFiles {
+                    let data = ByteBuffer(data: meta.data).readableBytesView
+                    await uploadSession.upload(
+                        buckets: uploadS3Bucket,
+                        artifact: .fullRunMeta(meta.file, data: data)
+                    )
+                }
+            }
         }
     }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, uploadSession: S3UploadSession?) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
                 .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, uploadSession: uploadSession)
             })
         } else {
-            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, uploadSession: uploadSession)
         }
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType) async throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, uploadSession: S3UploadSession?) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -337,7 +349,19 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
+            let uploadWrittenFile: ((OmFileType) async -> Void)?
+            if let uploadS3Bucket, let uploadSession, !uploadS3OnlyProbabilities || variable.omFileName.file == ProbabilityVariable.precipitation_probability.omFileName.file {
+                uploadWrittenFile = { file in
+                    await uploadSession.upload(
+                        buckets: uploadS3Bucket,
+                        artifact: .timeSeries(file)
+                    )
+                }
+            } else {
+                uploadWrittenFile = nil
+            }
+
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, onFileWritten: uploadWrittenFile) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
@@ -480,4 +504,3 @@ actor GribDeaverager {
         return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &grib2d.array)
     }
 }
-
