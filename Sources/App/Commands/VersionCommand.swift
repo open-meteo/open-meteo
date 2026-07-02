@@ -8,6 +8,8 @@ struct VersionCommand: Command {
     }
 
     func run(using context: CommandContext, signature: Signature) throws {
-        print("openmeteo-api \(BuildInfo.gitSHA)")
+        let branch = BuildInfo.gitBranch ?? "unknown"
+        let tag = BuildInfo.gitTag ?? "none"
+        print("openmeteo-api sha=\(BuildInfo.gitSHA) branch=\(branch) tag=\(tag)")
     }
 }
