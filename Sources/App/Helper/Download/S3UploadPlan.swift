@@ -17,7 +17,6 @@ enum S3UploadFileKind: Sendable {
 
 enum S3UploadOperation: Sendable {
     case multipart(S3UploadTarget)
-    case syncBeforeMetadata(S3UploadSyncTarget)
     case metadataAfterCommits(S3UploadTarget, ByteBufferView)
 }
 
@@ -117,21 +116,6 @@ enum S3UploadPlan {
                 localDirectory: localDirectory,
                 server: endpoint.bucket,
                 basePath: "data_spatial/\(domain.rawValue)/"
-            )
-        }
-    }
-
-    static func staticSyncTargets(
-        buckets: String,
-        domain: DomainRegistry
-    ) -> [S3UploadSyncTarget] {
-        return S3BucketEndpoint.parseList(buckets, domain: domain).map { endpoint in
-            S3UploadSyncTarget(
-                bucketEndpoint: endpoint.bucket,
-                localDirectory: "\(domain.directory)static",
-                server: endpoint.bucket,
-                basePath: "data/\(domain.rawValue)/static",
-                exclude: [".*", "*~", "meta.json"]
             )
         }
     }
