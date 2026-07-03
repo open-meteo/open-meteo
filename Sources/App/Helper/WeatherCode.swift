@@ -47,10 +47,10 @@ enum WeatherCode: Int {
             if thunderstroms > 90 {
                 return .thunderstormHeavy
             }
-            if thunderstroms > 70 {
+            if thunderstroms > 80 {
                 return .thunderstormStrong
             }
-            if thunderstroms > 50 {
+            if thunderstroms > 60 {
                 return .thunderstormSlightOrModerate
             }
         }
@@ -247,7 +247,7 @@ enum WeatherCode: Int {
 
         // Reduce confidence when no convective shower signal is present.
         if (convectivePrecipitation ?? precipitation) <= 0.0 {
-            baseProbability *= 0.75
+            baseProbability *= 0.7
         }
 
         // If the cap is highly restrictive (CIN > 100 J/kg), heavily suppress the final index

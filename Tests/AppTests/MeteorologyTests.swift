@@ -16,6 +16,9 @@ import Testing
         #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: nil, precipitation: 3, cloudcover: 100, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 46.572186)
         #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: nil, precipitation: 1, cloudcover: 100, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 35.520382)
         #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: nil, precipitation: 1, cloudcover: 100, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 24.41227)
+        
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 0, precipitation: 0, cloudcover: 54, gusts: 2, cape: 2810, liftedIndex: -8.6, convectiveInhibition: 5, pblHeight: 1760, modelDtSeconds: 3600, latitude: 39) == 47.352947)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 0, precipitation: 0, cloudcover: 75, gusts: 2, cape: 2280, liftedIndex: -8.1, convectiveInhibition: 7, pblHeight: 2050, modelDtSeconds: 3600, latitude: 39) == 49.411762)
     }
     
     @Test func wetbulbTemperature() {
