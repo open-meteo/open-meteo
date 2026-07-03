@@ -15,6 +15,10 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
     var countEnsembleMember: Int {
         return 1
     }
+    
+    var generateFullRun: Bool {
+         return false
+    }
 
     var hasYearlyFiles: Bool {
         return true

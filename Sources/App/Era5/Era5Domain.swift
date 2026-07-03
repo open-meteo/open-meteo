@@ -27,6 +27,10 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var generateFullRun: Bool {
+         return false
+    }
+    
     var countEnsembleMember: Int {
         return 1
     }

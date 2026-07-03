@@ -375,6 +375,10 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
             return 0
         }
     }
+    
+    var generateFullRun: Bool {
+         return false
+    }
 }
 
 enum GloFasVariable: String, GenericVariable {
