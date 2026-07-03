@@ -15,7 +15,11 @@ struct GitVersionPlugin: BuildToolPlugin {
                 executable: generator.url,
                 arguments: [
                     packageDirectory.path(percentEncoded: false),
-                    outputFile.path(percentEncoded: false)
+                    outputFile.path(percentEncoded: false),
+                    environment("GITHUB_SHA"),
+                    environment("GITHUB_REF_TYPE"),
+                    environment("GITHUB_REF_NAME"),
+                    environment("GITHUB_HEAD_REF")
                 ],
                 inputFiles: inputFiles,
                 outputFiles: [
@@ -60,5 +64,9 @@ struct GitVersionPlugin: BuildToolPlugin {
                 inputFiles.append(url)
             }
         }
+    }
+
+    private func environment(_ key: String) -> String {
+        ProcessInfo.processInfo.environment[key] ?? ""
     }
 }
