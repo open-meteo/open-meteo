@@ -44,10 +44,7 @@ enum WeatherCode: Int {
         
         if let cape {
             let thunderstroms = calculateThunderstormProbability(convectivePrecipitation: convectivePrecipitation, precipitation: precipitation, cloudcover: cloudcover, gusts: gusts, cape: cape, liftedIndex: liftedIndex, convectiveInhibition: convectiveInhibition, pblHeight: pblHeight, modelDtSeconds: modelDtSeconds, latitude: latitude)
-            if thunderstroms > 90 {
-                return .thunderstormHeavy
-            }
-            if thunderstroms > 80 {
+            if thunderstroms > 85 {
                 return .thunderstormStrong
             }
             if thunderstroms > 60 {
