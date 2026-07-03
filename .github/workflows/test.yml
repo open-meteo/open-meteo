@@ -40,5 +40,7 @@ jobs:
       run: ${{ env.swift_package_resolve }}
     - name: Build
       run: ${{ env.swift_build }}
+    - name: Print version
+      run: .build/debug/openmeteo-api version
     - name: Test
       run: ${{ env.swift_test }}
