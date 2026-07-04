@@ -16,6 +16,8 @@ final actor RateLimiter {
     static let concurrencyLimit = Environment.get("CONCURRENCY_LIMIT").flatMap(Int.init) ?? 1
     
     static let concurrencyLimitHard = Environment.get("CONCURRENCY_LIMIT_HARD").flatMap(Int.init) ?? 5
+    
+    static let concurrencyLimitTotal = Environment.get("CONCURRENCY_LIMIT_TOTAL").flatMap(Int.init) ?? 4096
 
     private var dailyPerIPv4 = [UInt32: Float]()
 
@@ -185,9 +187,15 @@ enum RateLimitError: Error, AbortError {
     case hourlyExceeded
     case minutelyExceeded
     case tooManyConcurrentRequests
+    case serviceOverloaded
 
     var status: NIOHTTP1.HTTPResponseStatus {
-        return .tooManyRequests
+        switch self {
+        case .serviceOverloaded:
+            return .serviceUnavailable
+        default:
+            return .tooManyRequests
+        }
     }
 
     var reason: String {
@@ -200,6 +208,8 @@ enum RateLimitError: Error, AbortError {
             return "Minutely API request limit exceeded. Please try again in one minute."
         case .tooManyConcurrentRequests:
             return "Too many concurrent requests"
+        case .serviceOverloaded:
+            return "The service is overloaded"
         }
     }
 }
