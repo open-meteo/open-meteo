@@ -11,6 +11,10 @@ actor ConcurrencyGroupLimiter {
     func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
         (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.reduce(0, { $0 + $1.value.count }))
     }
+    
+    func numberOfTrackedSlots() -> Int {
+        counts.count
+    }
 
     func wait(slot: Int, maxConcurrent: Int, maxConcurrentHard: Int) async throws {
         guard let count = counts[slot] else {
