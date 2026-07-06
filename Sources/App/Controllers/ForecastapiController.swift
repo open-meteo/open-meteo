@@ -38,10 +38,6 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             defaultModel: .metno_nordic).query
         )
-        categoriesRoute.getAndPost("meteoswiss", use: WeatherApiController(
-            has15minutely: false,
-            defaultModel: .meteoswiss_icon_seamless).query
-        )
         categoriesRoute.getAndPost("gem", use: WeatherApiController(
             has15minutely: false,
             defaultModel: .gem_seamless).query
