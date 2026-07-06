@@ -310,6 +310,8 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
 }
 
 struct AtomicBlockCacheStatistics {
+    static let zero = AtomicBlockCacheStatistics(used: 0, free: 0, accessed_15min: 0, accessed_30min: 0, accessed_60min: 0, accessed_3hours: 0, accessed_24hours: 0)
+
     let used, free, accessed_15min, accessed_30min, accessed_60min, accessed_3hours, accessed_24hours: Int
     
     var prettyPrint: String {

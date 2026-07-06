@@ -135,7 +135,6 @@ final class RemoteFileManager: Sendable {
      Does not block the cache manager actor. Gets list of entries to check and validates them outside actor isolation.
      */
     func revalidate(client: HTTPClient, logger: Logger) async throws {
-        let startRevalidation = DispatchTime.now()
         let now = Timestamp.now()
         
         // Remove unused entries
@@ -223,14 +222,6 @@ final class RemoteFileManager: Sendable {
                 await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
             }
         }
-        let total = await cache.count()
-        if total > 0, OmStatistics.lastPrintUnitTimestampSeconds.load(ordering: .relaxed) < Timestamp.now().subtract(minutes: 1).timeIntervalSince1970 {
-            logger.error("OmFileManager: \(total) open files. Revalidation took \(startRevalidation.timeElapsedPretty()). \(OmStatistics.toString())")
-            if OpenMeteo.remoteDataDirectory != nil {
-                logger.error("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
-            }
-            OmStatistics.reset()
-        }
     }
     
     /// Called every second from a life cycle handler on an available thread
@@ -251,21 +242,6 @@ enum OmStatistics {
     static let remoteCheckedExist = Atomic(0)
     static let currentlyOpeningFiles = Atomic(0)
     static let currentlyWaitingOnOpeningFiles = Atomic(0)
-    static let lastPrintUnitTimestampSeconds = Atomic(0)
-    
-    static func reset() {
-        inactivity.store(0, ordering: .relaxed)
-        localModified.store(0, ordering: .relaxed)
-        remoteModified.store(0, ordering: .relaxed)
-        remoteDeleted.store(0, ordering: .relaxed)
-        remoteRevalidated.store(0, ordering: .relaxed)
-        remoteCheckedExist.store(0, ordering: .relaxed)
-        lastPrintUnitTimestampSeconds.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
-    }
-    
-    static func toString() -> String {
-        return "inactivity=\(inactivity.load(ordering: .relaxed)) localModified=\(localModified.load(ordering: .relaxed)) remoteModified=\(remoteModified.load(ordering: .relaxed)) remoteDeleted=\(remoteDeleted.load(ordering: .relaxed)) remoteRevalidated=\(remoteRevalidated.load(ordering: .relaxed)) remoteCheckedExist=\(remoteCheckedExist.load(ordering: .relaxed)) currentlyOpeningFiles=\(currentlyOpeningFiles.load(ordering: .relaxed)) currentlyWaitingOnOpeningFiles=\(currentlyWaitingOnOpeningFiles.load(ordering: .relaxed))"
-    }
 }
 
 fileprivate enum LocalOrRemote: Sendable {
