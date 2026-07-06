@@ -981,7 +981,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                let precip = Reader.variableFromString("precipitation") {
                 return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
                     let snowfall = zip(snowline.data, precip.data).map {
-                        $0 < reader.targetElevation ? $1 * 0.7 : 0
+                        guard $0.isFinite, $1.isFinite else {
+                            return Float.nan
+                        }
+                        return $0 < reader.targetElevation ? $1 * 0.7 : 0
                     }
                     return DataAndUnit(snowfall, .centimetre)
                 }
@@ -1018,7 +1021,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                let precip = Reader.variableFromString("precipitation") {
                 return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
                     let rain = zip(snowline.data, precip.data).map {
-                        $0 < reader.targetElevation ? 0 : $1
+                        guard $0.isFinite, $1.isFinite else {
+                            return Float.nan
+                        }
+                        return $0 < reader.targetElevation ? 0 : $1
                     }
                     return DataAndUnit(rain, precip.unit)
                 }
