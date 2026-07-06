@@ -41,6 +41,7 @@ struct GenericVariableHandle: Sendable {
     static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         let logger = application.logger
         let uploadSession = uploadS3Bucket.map { _ in S3UploadSession(client: application.http1Client, logger: logger) }
+        let uploadSessions2 = await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket)
         do {
             for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
                 let domain = handles[0].domain
@@ -51,7 +52,16 @@ struct GenericVariableHandle: Sendable {
                 if generateTimeSeries {
                     let startTime = DispatchTime.now()
                     logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                    
+                    let sessions = (uploadSessions2 ?? []).map({$0.startMultiPartUploads()})
+                    // TODO pass sessions to converter
+                    
                     try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, uploadS3Endpoints: uploadS3Endpoints, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, uploadSession: uploadSession)
+                    
+                    for (queue,session) in zip(uploadSessions2 ?? [], sessions) {
+                        await queue.finishMultiPartUploads(session)
+                    }
+                    
                     logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 }
 
@@ -91,6 +101,10 @@ struct GenericVariableHandle: Sendable {
                             endpoints: uploadS3Endpoints,
                             artifact: .modelMeta(file, data: metaBytes)
                         )
+                    }
+                    
+                    for upload in uploadSessions2 ?? [] {
+                        await upload.upload(data: metaData, objectName: "data/\(domain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json")
                     }
                 }
             }

@@ -2,7 +2,10 @@ import Foundation
 import Vapor
 
 struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
+    /// URL with credentials `https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket`
     private let rawEndpoint: String
+    
+    /// Profile string like `aws` or `ceph`
     let profile: String?
 
     init(rawEndpoint: String, profile: String?) {
@@ -26,14 +29,14 @@ struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
         return rawEndpoint.s3UploadUrlPrefix + remotePath
     }
 
-    static func parseList(_ buckets: String, domain: DomainRegistry) -> [S3BucketEndpoint] {
+    static func parseList(_ buckets: String) -> [S3BucketEndpoint] {
         return buckets.split(separator: ",").map { bucket in
             let bucketSplit = bucket.split(separator: "@")
             if bucketSplit.count == 3 {
                 // http://user:pw@something.com/@profile
                 return S3BucketEndpoint(rawEndpoint: bucketSplit[0] + "@" + bucketSplit[1], profile: String(bucketSplit[2]))
             }
-            let bucket = String(bucketSplit[0].replacing("MODEL", with: domain.bucketName))
+            let bucket = bucketSplit[0]
             let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
             let profileUpper = profile.map { "_\($0.uppercased())" } ?? ""
 
@@ -42,7 +45,7 @@ struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
                 return S3BucketEndpoint(rawEndpoint: credentials, profile: profile)
             }
 
-            return S3BucketEndpoint(rawEndpoint: bucket, profile: profile)
+            return S3BucketEndpoint(rawEndpoint: String(bucket), profile: profile)
         }
     }
 }
@@ -51,7 +54,7 @@ struct S3BucketEndpointList: Sendable, Sequence, CustomStringConvertible {
     private let endpoints: [S3BucketEndpoint]
 
     init(_ buckets: String, domain: DomainRegistry) {
-        self.endpoints = S3BucketEndpoint.parseList(buckets, domain: domain)
+        self.endpoints = S3BucketEndpoint.parseList(buckets)
     }
 
     var description: String {

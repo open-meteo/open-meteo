@@ -278,7 +278,7 @@ private actor S3EndpointUploadSession {
                     file: target.localFile,
                     url: target.uploadURL(),
                     contentType: target.contentType,
-                    nConcurrent: 4
+                    executor: LimitedConcurrencyExecutor(maxConcurrency: 4)
                 )
                 preparedUploads.append(PreparedUpload(target: target, prepared: prepared))
             } catch {
