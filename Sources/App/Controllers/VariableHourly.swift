@@ -976,6 +976,16 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .cloudcover_high:
             return getDeriverMap(variable: .cloud_cover_high)
         case .snowfall, .snowfall_spread:
+            if variable == .snowfall,
+               let snowline = Reader.variableFromString("snowfall_height"),
+               let precip = Reader.variableFromString("precipitation") {
+                return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
+                    let snowfall = zip(snowline.data, precip.data).map {
+                        $0 < reader.targetElevation ? $1 * 0.7 : 0
+                    }
+                    return DataAndUnit(snowfall, .centimetre)
+                }
+            }
             guard let snowWater = getDeriverMap(variable: variable == .snowfall_spread ? .snowfall_water_equivalent_spread : .snowfall_water_equivalent) else {
                 return nil
             }
@@ -1004,6 +1014,15 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(rain, precip.unit)
             }
         case .rain:
+            if let snowline = Reader.variableFromString("snowfall_height"),
+               let precip = Reader.variableFromString("precipitation") {
+                return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
+                    let rain = zip(snowline.data, precip.data).map {
+                        $0 < reader.targetElevation ? 0 : $1
+                    }
+                    return DataAndUnit(rain, precip.unit)
+                }
+            }
             guard
                 let snowwater = getDeriverMap(variable: .snowfall_water_equivalent),
                 let precip = Reader.variableFromString("precipitation")
@@ -1026,6 +1045,12 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(rain, precip.unit)
             }
         case .showers:
+            if Reader.variableFromString("snowfall_height") != nil,
+               let precip = Reader.variableFromString("precipitation") {
+                return .one(.raw(precip)) { precip, _ in
+                    return DataAndUnit(precip.data.map { min($0, 0) }, precip.unit)
+                }
+            }
             guard
                 let precip = Reader.variableFromString("precipitation"),
                 let rain = getDeriverMap(variable: .rain),
