@@ -192,51 +192,36 @@ actor OmSpatialTimestepWriter {
             return
         }
 
-        let uploadSession = S3UploadSession(client: application.http1Client, logger: logger)
-        await uploadSession.upload(
-            endpoints: uploadS3Endpoints,
-            artifact: .spatialFile(
-                domain: domainRegistry,
-                localFile: filename,
-                run: run,
-                time: time,
-                realm: self.realm
-            )
-        )
-
+        let start = DispatchTime.now()
+        let remoteFile = "data_spatial/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYY_MM_dd_HHmm)\(realmSuffix).om"
+        var metaUploads: [(remotePath: String, data: ByteBufferView)] = []
         if uploadMeta {
-            var metaArtifacts: [S3UploadArtifact] = [
-                .spatialMeta(
-                    domain: domainRegistry,
-                    localFile: metaRunMeta,
-                    remote: .run(run: run, realm: self.realm),
-                    data: metaData
-                )
-            ]
+            metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta\(realmSuffix).json", metaData))
             if canUpdateInProgress {
-                metaArtifacts.append(.spatialMeta(
-                    domain: domainRegistry,
-                    localFile: metaInProgress,
-                    remote: .inProgress(realm: self.realm),
-                    data: metaData
-                ))
+                metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/in-progress\(realmSuffix).json", metaData))
             }
             if completed {
-                metaArtifacts.append(.spatialMeta(
-                    domain: domainRegistry,
-                    localFile: metaLatest,
-                    remote: .latest(realm: self.realm),
-                    data: metaData
-                ))
-            }
-
-            for artifact in metaArtifacts {
-                await uploadSession.upload(endpoints: uploadS3Endpoints, artifact: artifact)
+                metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/latest\(realmSuffix).json", metaData))
             }
         }
-
-        let start = DispatchTime.now()
-        try await uploadSession.finish()
+        for endpoint in uploadS3Endpoints where endpoint.profile != "ceph" {
+            let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
+            let prepared = try await S3Uploader.uploadMultipart(
+                client: application.http1Client,
+                file: filename,
+                url: endpoint.uploadURL(remotePath: remoteFile),
+                executor: executor
+            )
+            try await prepared.commit(client: application.http1Client)
+            for metaUpload in metaUploads {
+                try await S3Uploader.upload(
+                    client: application.http1Client,
+                    data: metaUpload.data,
+                    url: endpoint.uploadURL(remotePath: metaUpload.remotePath),
+                    contentType: "application/json"
+                )
+            }
+        }
         logger.info("AWS Upload to \(uploadS3Endpoints) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
     }
     

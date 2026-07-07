@@ -30,6 +30,16 @@ struct S3UploadQueue {
             })
         }
     }
+
+    /// Abort multipart uploads that were prepared before a conversion failure.
+    func abortMultiPartUploads(_ session: S3MultiFileUploadQueue) async {
+        await queue.enqueueIgnoreError(logger: logger) {
+            let prepared = try await session.queue.collect()
+            try await prepared.foreachConcurrent(nConcurrent: 4, body: { prepared in
+                try await prepared.abort(client: client)
+            })
+        }
+    }
     
     func upload<D: DataProtocol & Sendable>(data: D, objectName: String, contentType: String = "application/octet-stream") async {
         await queue.enqueueIgnoreError(logger: logger) {
@@ -69,13 +79,13 @@ struct S3MultiFileUploadQueue {
         self.endpoint = endpoint
     }
     
-    func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream") async throws {
+    func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream") async {
         await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
             try await S3Uploader.uploadMultipart(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, executor: partUploadExecutor)
         }
     }
     
-    func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream") async throws {
+    func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream") async {
         await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
             try await S3Uploader.uploadMultipart(client: client, file: file, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, executor: partUploadExecutor)
         }

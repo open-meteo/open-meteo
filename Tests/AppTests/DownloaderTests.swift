@@ -94,107 +94,6 @@ import Darwin
         #expect("s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".stripHttpPassword() == "s3://openmeteo.s3.amazonaws.com:8080/text.txt")
     }
 
-    @Test func s3UploadPlanKeepsRegularDataForAwsProfile() throws {
-        let targets = S3UploadPlan.targets(
-            domain: .ncep_gfs025,
-            endpoints: s3Endpoints("s3://aws-bucket/@aws"),
-            localFile: "/tmp/chunk_1.om",
-            remotePath: "data/ncep_gfs025/temperature_2m/chunk_1.om"
-        )
-
-        #expect(targets == [
-            S3UploadTarget(
-                bucketEndpoint: S3BucketEndpoint(rawEndpoint: "s3://aws-bucket/", profile: "aws"),
-                localFile: "/tmp/chunk_1.om",
-                remotePath: "data/ncep_gfs025/temperature_2m/chunk_1.om",
-                contentType: "application/octet-stream"
-            )
-        ])
-        #expect(targets.first?.uploadURL() == "s3://aws-bucket/data/ncep_gfs025/temperature_2m/chunk_1.om")
-    }
-
-    @Test func s3UploadPlanSkipsPreviousDayForAwsProfileAndDefaultOpenmeteo() throws {
-        let targets = S3UploadPlan.targets(
-            domain: .ncep_gfs025,
-            endpoints: s3Endpoints("openmeteo,s3://aws-bucket/@aws,s3://ceph-bucket/@ceph"),
-            localFile: "/tmp/chunk_1.om",
-            remotePath: "data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
-            kind: .previousDay
-        )
-
-        #expect(targets == [
-            S3UploadTarget(
-                bucketEndpoint: S3BucketEndpoint(rawEndpoint: "s3://ceph-bucket/", profile: "ceph"),
-                localFile: "/tmp/chunk_1.om",
-                remotePath: "data/ncep_gfs025/temperature_2m_previous_day1/chunk_1.om",
-                contentType: "application/octet-stream"
-            )
-        ])
-    }
-
-    @Test func s3UploadPlanUsesDataRunPrefix() throws {
-        let targets = S3UploadPlan.targets(
-            domain: .ncep_gfs025,
-            endpoints: s3Endpoints("openmeteo"),
-            localFile: "/tmp/temperature_2m.om",
-            remotePath: "data_run/ncep_gfs025/20260101/00/temperature_2m.om"
-        )
-
-        #expect(targets.first?.uploadURL() == "s3://openmeteo/data_run/ncep_gfs025/20260101/00/temperature_2m.om")
-    }
-
-    @Test func s3UploadPlanFormatsSpatialRealmSuffixes() throws {
-        let run = Timestamp(2026, 1, 1, 0)
-        let time = Timestamp(2026, 1, 1, 3)
-        let data = ByteBuffer(string: "{}").readableBytesView
-
-        let defaultFile = S3UploadPlan.targets(
-            endpoints: s3Endpoints("openmeteo"),
-            artifact: .spatialFile(
-                domain: .ncep_gfs025,
-                localFile: "/tmp/2026-01-01T0300.om",
-                run: run,
-                time: time,
-                realm: nil
-            )
-        )
-        #expect(defaultFile.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300.om")
-
-        let realmFile = S3UploadPlan.targets(
-            endpoints: s3Endpoints("openmeteo"),
-            artifact: .spatialFile(
-                domain: .ncep_gfs025,
-                localFile: "/tmp/2026-01-01T0300_model-level.om",
-                run: run,
-                time: time,
-                realm: "model-level"
-            )
-        )
-        #expect(realmFile.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/2026-01-01T0300_model-level.om")
-
-        let defaultMeta = S3UploadPlan.targets(
-            endpoints: s3Endpoints("openmeteo"),
-            artifact: .spatialMeta(
-                domain: .ncep_gfs025,
-                localFile: "/tmp/meta.json",
-                remote: .run(run: run, realm: nil),
-                data: data
-            )
-        )
-        #expect(defaultMeta.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/2026/01/01/0000Z/meta.json")
-
-        let realmMeta = S3UploadPlan.targets(
-            endpoints: s3Endpoints("openmeteo"),
-            artifact: .spatialMeta(
-                domain: .ncep_gfs025,
-                localFile: "/tmp/meta_model-level.json",
-                remote: .latest(realm: "model-level"),
-                data: data
-            )
-        )
-        #expect(realmMeta.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/latest_model-level.json")
-    }
-
     @Test func s3BucketEndpointParsesProfilesAndCredentialOverrides() throws {
         let endpoints = S3BucketEndpoint.parseList(
             "openmeteo,https://user:pw@example.com/bucket/@aws"
@@ -290,8 +189,4 @@ private func randomData(byteCount: Int) -> Data {
         }
     }
     return data
-}
-
-private func s3Endpoints(_ buckets: String) -> S3BucketEndpointList {
-    return S3BucketEndpointList(buckets)
 }
