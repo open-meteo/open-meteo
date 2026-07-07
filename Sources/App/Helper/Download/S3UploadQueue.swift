@@ -47,6 +47,16 @@ struct S3UploadQueue {
         }
     }
 
+    func enqueueUpload(_ description: String, _ work: @escaping @Sendable (HTTPClient, S3BucketEndpoint) async throws -> ()) async {
+        await queue.enqueue {
+            do {
+                try await work(client, endpoint)
+            } catch {
+                logger.error("Error during queued upload \(description) to \(endpoint): \(error)")
+            }
+        }
+    }
+
     func uploadSync(localDirectory: String, basePath: String, exclude: [String] = [".*", "*~"]) async {
         await queue.enqueueIgnoreError(logger: logger) {
             try await S3Uploader.uploadSync(client: client, localDirectory: localDirectory, server: endpoint.uploadServer.s3UploadUrlPrefix, basePath: basePath, exclude: exclude)

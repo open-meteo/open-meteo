@@ -192,9 +192,8 @@ actor OmSpatialTimestepWriter {
             return
         }
 
-        let start = DispatchTime.now()
         let remoteFile = "data_spatial/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYY_MM_dd_HHmm)\(realmSuffix).om"
-        var metaUploads: [(remotePath: String, data: ByteBufferView)] = []
+        var metaUploads: [(objectName: String, data: ByteBufferView)] = []
         if uploadMeta {
             metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta\(realmSuffix).json", metaData))
             if canUpdateInProgress {
@@ -204,25 +203,31 @@ actor OmSpatialTimestepWriter {
                 metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/latest\(realmSuffix).json", metaData))
             }
         }
+        let metadataUploads = metaUploads
+        let logger = logger
         for endpoint in uploadS3Endpoints where endpoint.profile != "ceph" {
-            let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
-            let prepared = try await S3Uploader.uploadMultipart(
-                client: application.http1Client,
-                file: filename,
-                url: endpoint.uploadURL(remotePath: remoteFile),
-                executor: executor
-            )
-            try await prepared.commit(client: application.http1Client)
-            for metaUpload in metaUploads {
-                try await S3Uploader.upload(
-                    client: application.http1Client,
-                    data: metaUpload.data,
-                    url: endpoint.uploadURL(remotePath: metaUpload.remotePath),
-                    contentType: "application/json"
+            let uploadQueue = await application.s3SyncManager.getQueue(endpoint: endpoint)
+            await uploadQueue.enqueueUpload("spatial \(remoteFile)") { client, endpoint in
+                let uploadStart = DispatchTime.now()
+                let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
+                let prepared = try await S3Uploader.uploadMultipart(
+                    client: client,
+                    file: filename,
+                    url: endpoint.uploadURL(remotePath: remoteFile),
+                    executor: executor
                 )
+                try await prepared.commit(client: client)
+                for metaUpload in metadataUploads {
+                    try await S3Uploader.upload(
+                        client: client,
+                        data: metaUpload.data,
+                        url: endpoint.uploadURL(remotePath: metaUpload.objectName),
+                        contentType: "application/json"
+                    )
+                }
+                logger.info("AWS spatial upload to \(endpoint) took \(uploadStart.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
         }
-        logger.info("AWS Upload to \(uploadS3Endpoints) took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
     }
     
     /// Finalize the time step
