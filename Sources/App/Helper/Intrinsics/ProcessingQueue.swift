@@ -79,23 +79,42 @@ actor ProcessingSerialQueue {
 /// Executes jobs in parallel in the background and return the result in `collect()`. Order is NOT preserved!
 actor ProcessingParallelQueue<T: Sendable> {
     private var continuation: AsyncStream<@Sendable () async -> T?>.Continuation
-    private var processingTask: Task<[T], Error>
+    private var processingTask: Task<[T], Never>
     
     init(executor: LimitedConcurrencyExecutor) {
         let (stream, continuation) = AsyncStream<@Sendable () async -> T?>.makeStream()
         self.continuation = continuation
         self.processingTask = Task {
-            let results = BoxedArray<T>()
-            await withThrowingTaskGroup { group in
+            var results = [T]()
+            await withTaskGroup(of: T?.self) { group in
+                var running = 0
                 for await taskBlock in stream {
-                    group.addTask {
-                        if let result = await executor.execute(taskBlock) {
-                            await results.append(result)
+                    // If all worker slots are occupied, wait for one child task to finish
+                    // before scheduling more work. This prevents unbounded child tasks from
+                    // piling up inside the executor while preserving the stream backlog behavior.
+                    if running >= executor.maxConcurrency, let result = await group.next() {
+                        running -= 1
+                        if let result {
+                            results.append(result)
                         }
+                    }
+                    // Claim a task-group slot. The executor still enforces shared concurrency,
+                    // but the queue no longer creates more children than it can actively run.
+                    group.addTask {
+                        await executor.execute {
+                            await taskBlock()
+                        }
+                    }
+                    running += 1
+                }
+                // On stream termination, drain all remaining child tasks and collect results.
+                while let result = await group.next() {
+                    if let result {
+                        results.append(result)
                     }
                 }
             }
-            return await results.array
+            return results
         }
     }
     
@@ -117,24 +136,12 @@ actor ProcessingParallelQueue<T: Sendable> {
     }
     
     /// Closes the queue, drains all remaining tasks in parallel, and collects results. Order is NOT preserved!
-    func collect() async throws -> [T] {
+    func collect() async -> [T] {
         continuation.finish()
-        return try await processingTask.value
+        return await processingTask.value
     }
     
     deinit {
         continuation.finish()
-    }
-}
-
-actor BoxedArray<T>: Sendable {
-    var array: Array<T>
-    
-    init(array: [T] = .init()) {
-        self.array = array
-    }
-    
-    func append(_ element: T) {
-        array.append(element)
     }
 }

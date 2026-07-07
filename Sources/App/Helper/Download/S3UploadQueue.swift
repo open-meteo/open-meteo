@@ -24,7 +24,7 @@ struct S3UploadQueue {
     /// Enqueue completion of multi files
     func finishMultiPartUploads(_ session: S3MultiFileUploadQueue) async {
         await queue.enqueueIgnoreError(logger: logger) {
-            let prepared = try await session.queue.collect()
+            let prepared = await session.queue.collect()
             try await prepared.foreachConcurrent(nConcurrent: 4, body: { prepared in
                 try await prepared.commit(client: client)
             })
@@ -34,7 +34,7 @@ struct S3UploadQueue {
     /// Abort multipart uploads that were prepared before a conversion failure.
     func abortMultiPartUploads(_ session: S3MultiFileUploadQueue) async {
         await queue.enqueueIgnoreError(logger: logger) {
-            let prepared = try await session.queue.collect()
+            let prepared = await session.queue.collect()
             try await prepared.foreachConcurrent(nConcurrent: 4, body: { prepared in
                 try await prepared.abort(client: client)
             })
