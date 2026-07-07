@@ -976,19 +976,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .cloudcover_high:
             return getDeriverMap(variable: .cloud_cover_high)
         case .snowfall, .snowfall_spread:
-            if variable == .snowfall,
-               let snowline = Reader.variableFromString("snowfall_height"),
-               let precip = Reader.variableFromString("precipitation") {
-                return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
-                    let snowfall = zip(snowline.data, precip.data).map {
-                        guard $0.isFinite, $1.isFinite else {
-                            return Float.nan
-                        }
-                        return $0 < reader.targetElevation ? $1 * 0.7 : 0
-                    }
-                    return DataAndUnit(snowfall, .centimetre)
-                }
-            }
             guard let snowWater = getDeriverMap(variable: variable == .snowfall_spread ? .snowfall_water_equivalent_spread : .snowfall_water_equivalent) else {
                 return nil
             }
@@ -1005,17 +992,27 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(dni, .wattPerSquareMetre)
             }
         case .snowfall_water_equivalent:
-            // If now snowfall water is not available, use precipitation and temperature below 0°C
-            guard
-                let t2m = Reader.variableFromString("temperature_2m"),
-                let precip = Reader.variableFromString("precipitation")
-            else {
-                return nil
+            if let snowline = Reader.variableFromString("snowfall_height"),
+               let precip = Reader.variableFromString("precipitation") {
+                return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
+                    let snowWater = zip(snowline.data, precip.data).map {
+                        guard $0.isFinite, $1.isFinite else {
+                            return Float.nan
+                        }
+                        return $0 < reader.targetElevation ? $1 : 0
+                    }
+                    return DataAndUnit(snowWater, precip.unit)
+                }
             }
-            return .two(.raw(precip), .raw(t2m)) { precip, t2m, _ in
-                let rain = zip(t2m.data, precip.data).map({ $1 * ($0 >= 0 ? 0 : 1) })
-                return DataAndUnit(rain, precip.unit)
+            // If no snowfall water is available, use precipitation and temperature below 0°C
+            if let t2m = Reader.variableFromString("temperature_2m"),
+               let precip = Reader.variableFromString("precipitation") {
+                return .two(.raw(precip), .raw(t2m)) { precip, t2m, _ in
+                    let snowWater = zip(t2m.data, precip.data).map({ $1 * ($0 >= 0 ? 0 : 1) })
+                    return DataAndUnit(snowWater, precip.unit)
+                }
             }
+            return nil
         case .rain:
             if let snowline = Reader.variableFromString("snowfall_height"),
                let precip = Reader.variableFromString("precipitation") {
