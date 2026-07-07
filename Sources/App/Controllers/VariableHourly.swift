@@ -1036,12 +1036,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(rain, precip.unit)
             }
         case .showers:
-            if Reader.variableFromString("snowfall_height") != nil,
-               let precip = Reader.variableFromString("precipitation") {
-                return .one(.raw(precip)) { precip, _ in
-                    return DataAndUnit(precip.data.map { min($0, 0) }, precip.unit)
-                }
-            }
             guard
                 let precip = Reader.variableFromString("precipitation"),
                 let rain = getDeriverMap(variable: .rain),
