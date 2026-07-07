@@ -55,26 +55,13 @@ om_block_cache_used_bytes \(cacheStats.used)
 # UNIT om_block_cache_free_bytes bytes
 # HELP om_block_cache_free_bytes Free cache bytes
 om_block_cache_free_bytes \(cacheStats.free)
-# TYPE om_block_cache_accessed_15min_bytes gauge
-# UNIT om_block_cache_accessed_15min_bytes bytes
-# HELP om_block_cache_accessed_15min_bytes Bytes accessed in last 15 minutes
-om_block_cache_accessed_15min_bytes \(cacheStats.accessed_15min)
-# TYPE om_block_cache_accessed_30min_bytes gauge
-# UNIT om_block_cache_accessed_30min_bytes bytes
-# HELP om_block_cache_accessed_30min_bytes Bytes accessed in last 30 minutes
-om_block_cache_accessed_30min_bytes \(cacheStats.accessed_30min)
-# TYPE om_block_cache_accessed_60min_bytes gauge
-# UNIT om_block_cache_accessed_60min_bytes bytes
-# HELP om_block_cache_accessed_60min_bytes Bytes accessed in last 60 minutes
-om_block_cache_accessed_60min_bytes \(cacheStats.accessed_60min)
-# TYPE om_block_cache_accessed_3h_bytes gauge
-# UNIT om_block_cache_accessed_3h_bytes bytes
-# HELP om_block_cache_accessed_3h_bytes Bytes accessed in last 3 hours
-om_block_cache_accessed_3h_bytes \(cacheStats.accessed_3hours)
-# TYPE om_block_cache_accessed_24h_bytes gauge
-# UNIT om_block_cache_accessed_24h_bytes bytes
-# HELP om_block_cache_accessed_24h_bytes Bytes accessed in last 24 hours
-om_block_cache_accessed_24h_bytes \(cacheStats.accessed_24hours)
+# HELP om_block_cache_accessed_bytes Block cache accessed data volume over a given window.
+# TYPE om_block_cache_accessed_bytes gauge
+om_block_cache_accessed_bytes{window="15m"} \(cacheStats.accessed_15min)
+om_block_cache_accessed_bytes{window="30m"} \(cacheStats.accessed_30min)
+om_block_cache_accessed_bytes{window="60m"} \(cacheStats.accessed_60min)
+om_block_cache_accessed_bytes{window="3h"} \(cacheStats.accessed_3hours)
+om_block_cache_accessed_bytes{window="24h"} \(cacheStats.accessed_24hours)
 # TYPE om_concurrency_monitored_ips gauge
 # HELP om_concurrency_monitored_ips Distinct IPs currently rate-limited
 om_concurrency_monitored_ips \(concurrencyStats.monitored_ips)
