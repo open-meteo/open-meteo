@@ -32,7 +32,7 @@ enum S3Uploader {
         }
     }
     
-    /// Uploads files to S3 in 8 MB chunks
+    /// Uploads files to S3 in 8 MB chunks, with part concurrency controlled by `executor`.
     /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
     static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {

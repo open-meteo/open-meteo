@@ -18,8 +18,6 @@ import Vapor
  data_spatial/<domain>/<run>/<timestamp>_model-levels.om (only late icon runs)
  */
 
-
-
 /// Write multiple spatial oriented variables into one file per time-step
 actor OmSpatialTimestepWriter {
     var variables: [VariableWithOffset] = .init()
@@ -183,8 +181,8 @@ actor OmSpatialTimestepWriter {
         guard let uploadS3Bucket else {
             return
         }
+        let uploadS3Endpoints = S3BucketEndpointList(uploadS3Bucket)
         let domainRegistry = domain.domainRegistry
-        let uploadS3Endpoints = S3BucketEndpointList(uploadS3Bucket, domain: domainRegistry)
         if forceAllTimestampUpload {
             let basePath = "data_spatial/\(domainRegistry.rawValue)/"
             for endpoint in uploadS3Endpoints where endpoint.profile != "ceph" {

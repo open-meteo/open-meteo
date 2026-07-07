@@ -195,30 +195,27 @@ import Darwin
         #expect(realmMeta.first?.uploadURL() == "s3://openmeteo/data_spatial/ncep_gfs025/latest_model-level.json")
     }
 
-    @Test func s3BucketEndpointParsesModelProfilesAndCredentialOverrides() throws {
+    @Test func s3BucketEndpointParsesProfilesAndCredentialOverrides() throws {
         let endpoints = S3BucketEndpoint.parseList(
-            "openmeteo,s3://MODEL/@ceph,https://user:pw@example.com/bucket/@aws",
-            domain: .ncep_gfs025
+            "openmeteo,https://user:pw@example.com/bucket/@aws"
         )
 
         #expect(endpoints == [
             S3BucketEndpoint(rawEndpoint: "openmeteo", profile: nil),
-            S3BucketEndpoint(rawEndpoint: "s3://ncep-gfs025/", profile: "ceph"),
             S3BucketEndpoint(rawEndpoint: "https://user:pw@example.com/bucket/", profile: "aws")
         ])
 
         setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://credential-bucket/", 1)
         defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
 
-        #expect(S3BucketEndpoint.parseList("openmeteo@aws", domain: .ncep_gfs025) == [
+        #expect(S3BucketEndpoint.parseList("openmeteo@aws") == [
             S3BucketEndpoint(rawEndpoint: "s3://credential-bucket/", profile: "aws")
         ])
     }
 
     @Test func s3BucketEndpointListRedactsMultipleCredentialedEndpoints() throws {
         let endpoints = S3BucketEndpointList(
-            "s3://user1:pw1@bucket-a/@aws,https://user2:pw2@example.com/bucket/@ceph",
-            domain: .ncep_gfs025
+            "s3://user1:pw1@bucket-a/@aws,https://user2:pw2@example.com/bucket/@ceph"
         )
 
         #expect(String(describing: endpoints) == "s3://bucket-a/,https://example.com/bucket/")
@@ -232,7 +229,7 @@ import Darwin
         setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://override-user:override-pw@credential-bucket/", 1)
         defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
 
-        let endpoints = S3BucketEndpointList("openmeteo@aws", domain: .ncep_gfs025)
+        let endpoints = S3BucketEndpointList("openmeteo@aws")
 
         #expect(String(describing: endpoints) == "s3://credential-bucket/")
         #expect(!String(describing: endpoints).contains("override-user"))
@@ -262,7 +259,8 @@ import Darwin
         defer { let _ = client.shutdown() }
 
         let data = ByteBuffer(data: randomData(byteCount: 10 * 1024 * 1024))
-        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin").commit(client: client)
+        let executor = LimitedConcurrencyExecutor(maxConcurrency: 8)
+        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin", executor: executor).commit(client: client)
     }
     
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
@@ -294,6 +292,6 @@ private func randomData(byteCount: Int) -> Data {
     return data
 }
 
-private func s3Endpoints(_ buckets: String, domain: DomainRegistry = .ncep_gfs025) -> S3BucketEndpointList {
-    return S3BucketEndpointList(buckets, domain: domain)
+private func s3Endpoints(_ buckets: String) -> S3BucketEndpointList {
+    return S3BucketEndpointList(buckets)
 }

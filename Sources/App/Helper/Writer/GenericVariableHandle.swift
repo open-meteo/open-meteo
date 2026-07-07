@@ -45,7 +45,7 @@ struct GenericVariableHandle: Sendable {
         do {
             for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
                 let domain = handles[0].domain
-                let uploadS3Endpoints = uploadS3Bucket.map { S3BucketEndpointList($0, domain: domain.domainRegistry) }
+                let uploadS3Endpoints = uploadS3Bucket.map { S3BucketEndpointList($0) }
 
                 let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
 
@@ -111,7 +111,7 @@ struct GenericVariableHandle: Sendable {
 
             for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
                 let domain = handles[0].domain
-                let uploadS3Endpoints = uploadS3Bucket.map { S3BucketEndpointList($0, domain: domain.domainRegistry) }
+                let uploadS3Endpoints = uploadS3Bucket.map { S3BucketEndpointList($0) }
                 let generateFullRun = generateFullRun && domain.generateFullRun
                 if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                     logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
@@ -124,7 +124,7 @@ struct GenericVariableHandle: Sendable {
             if OpenMeteo.generatePreviousDay, generateTimeSeries, let run {
                 for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
                     let domain = handles[0].domain
-                    let uploadS3Endpoints = uploadS3Bucket.map { S3BucketEndpointList($0, domain: domain.domainRegistry) }
+                    let uploadS3Endpoints = uploadS3Bucket.map { S3BucketEndpointList($0) }
 
                     // if run is nil, do not attempt to generate previous days files
                     logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")

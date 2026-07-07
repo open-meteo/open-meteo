@@ -53,7 +53,7 @@ struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
 struct S3BucketEndpointList: Sendable, Sequence, CustomStringConvertible {
     private let endpoints: [S3BucketEndpoint]
 
-    init(_ buckets: String, domain: DomainRegistry) {
+    init(_ buckets: String) {
         self.endpoints = S3BucketEndpoint.parseList(buckets)
     }
 
