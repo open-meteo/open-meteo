@@ -13,7 +13,9 @@ enum S3Uploader {
     static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .PUT
-        request.body = .bytes(ByteBuffer(bytes: data))
+        var body = ByteBufferAllocator().buffer(capacity: data.count)
+        body.writeData(data)
+        request.body = .bytes(body)
         request.headers.add(name: "Content-Type", value: contentType)
         request.headers.add(name: "x-amz-content-sha256", value: data.sha256Hex)
         // executeRetry extracts credentials from the URL, signs the request with
