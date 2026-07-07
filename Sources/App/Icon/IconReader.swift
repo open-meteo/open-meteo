@@ -709,15 +709,12 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
         if let cached = hhlColumnCache.column {
             return cached
         }
-        guard let iconDomain = reader.domain as? IconDomains else {
-            throw IconHhlError.notIconDomain(domain: "\(reader.domain)")
-        }
         guard let file = await reader.domain.getStaticFile(type: .hhl, httpClient: options.httpClient, logger: options.logger) else {
-            throw IconHhlError.staticFileMissing(domain: iconDomain.rawValue)
+            throw IconHhlError.staticFileMissing(domain: reader.domain.rawValue)
         }
         // 3D column read (one I/O), memoised so subsequent levels/variables do not re-read.
         let col = try await reader.domain.grid.readColumnFromStaticFile(gridpoint: reader.reader.position, file: file)
-        let nlev = iconDomain.numberOfModelHalfLevels
+        let nlev = reader.domain.numberOfModelHalfLevels
         let column = col.count == nlev ? col : Array(col.prefix(nlev)) + Array(repeating: .nan, count: max(0, nlev - col.count))
         hhlColumnCache.column = column
         return column
@@ -784,14 +781,11 @@ enum IconModelLevelError: Error, CustomStringConvertible {
 
 enum IconHhlError: Error, CustomStringConvertible {
     case staticFileMissing(domain: String)
-    case notIconDomain(domain: String)
 
     var description: String {
         switch self {
         case .staticFileMissing(let d):
             return "ICON HHL static file (hhl.om) is missing for domain '\(d)' — cannot derive model-level heights. Generate it via the model-level download (convertHhlHeights)."
-        case .notIconDomain(let d):
-            return "HHL column requested for non-ICON domain '\(d)'."
         }
     }
 }
