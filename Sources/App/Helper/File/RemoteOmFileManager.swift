@@ -225,9 +225,9 @@ final class RemoteFileManager: Sendable {
         }
         let total = await cache.count()
         if total > 0, OmStatistics.lastPrintUnitTimestampSeconds.load(ordering: .relaxed) < Timestamp.now().subtract(minutes: 1).timeIntervalSince1970 {
-            logger.error("OmFileManager: \(total) open files. Revalidation took \(startRevalidation.timeElapsedPretty()). \(OmStatistics.toString())")
+            logger.notice("OmFileManager: \(total) open files. Revalidation took \(startRevalidation.timeElapsedPretty()). \(OmStatistics.toString())")
             if OpenMeteo.remoteDataDirectory != nil {
-                logger.error("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
+                logger.notice("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
             }
             OmStatistics.reset()
         }
