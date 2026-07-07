@@ -37,7 +37,7 @@ struct S3UploadQueue {
         }
     }
 
-    func uploadSync(localDirectory: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws{
+    func uploadSync(localDirectory: String, basePath: String, exclude: [String] = [".*", "*~"]) async {
         await queue.enqueueIgnoreError(logger: logger) {
             try await S3Uploader.uploadSync(client: client, localDirectory: localDirectory, server: endpoint.uploadServer.s3UploadUrlPrefix, basePath: basePath, exclude: exclude)
         }

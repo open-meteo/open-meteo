@@ -186,14 +186,10 @@ actor OmSpatialTimestepWriter {
         let domainRegistry = domain.domainRegistry
         let uploadS3Endpoints = S3BucketEndpointList(uploadS3Bucket, domain: domainRegistry)
         if forceAllTimestampUpload {
-            let targets = S3UploadPlan.spatialSyncTargets(
-                endpoints: uploadS3Endpoints,
-                domain: domainRegistry,
-                localDirectory: directorySpatial
-            )
-            for target in targets {
-                await application.s3SyncManager.sync(target)
-                logger.info("Queued AWS spatial sync to \(target.bucketEndpoint) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+            let basePath = "data_spatial/\(domainRegistry.rawValue)/"
+            for endpoint in uploadS3Endpoints where endpoint.profile != "ceph" {
+                await application.s3SyncManager.sync(endpoint: endpoint, localDirectory: directorySpatial, basePath: basePath)
+                logger.info("Queued AWS spatial sync to \(endpoint) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
             return
         }

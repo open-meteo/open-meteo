@@ -110,23 +110,6 @@ enum S3UploadPlan {
         }
     }
 
-    static func spatialSyncTargets(
-        endpoints: S3BucketEndpointList,
-        domain: DomainRegistry,
-        localDirectory: String
-    ) -> [S3UploadSyncTarget] {
-        return endpoints.compactMap { endpoint in
-            guard shouldUpload(domain: domain, endpoint: endpoint, kind: .spatial) else {
-                return nil
-            }
-            return S3UploadSyncTarget(
-                bucketEndpoint: endpoint,
-                localDirectory: localDirectory,
-                basePath: "data_spatial/\(domain.rawValue)/"
-            )
-        }
-    }
-
     private static func target(endpoint: S3BucketEndpoint, localFile: String, remotePath: String, contentType: String) -> S3UploadTarget {
         return S3UploadTarget(
             bucketEndpoint: endpoint,
@@ -134,25 +117,6 @@ enum S3UploadPlan {
             remotePath: remotePath,
             contentType: contentType
         )
-    }
-}
-
-struct S3UploadSyncTarget: Sendable, Equatable {
-    let bucketEndpoint: S3BucketEndpoint
-    let localDirectory: String
-    let basePath: String
-    let exclude: [String]
-
-    init(
-        bucketEndpoint: S3BucketEndpoint,
-        localDirectory: String,
-        basePath: String,
-        exclude: [String] = [".*", "*~"]
-    ) {
-        self.bucketEndpoint = bucketEndpoint
-        self.localDirectory = localDirectory
-        self.basePath = basePath
-        self.exclude = exclude
     }
 }
 

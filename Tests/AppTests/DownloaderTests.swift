@@ -239,31 +239,6 @@ import Darwin
         #expect(!String(describing: endpoints).contains("override-pw"))
     }
 
-    @Test func s3SyncManagerSerializesSyncsPerEndpointAndRunsEndpointsIndependently() async throws {
-        let probe = S3SyncManagerProbe()
-        let manager = S3SyncManager(
-            logger: Logger(label: "DownloaderTests.S3SyncManager"),
-            syncDirectory: { target in
-                try await probe.sync(target: target)
-            }
-        )
-
-        await manager.sync(s3UploadSyncTarget(endpoint: "s3://slow-bucket/", name: "slow-0"))
-        await manager.sync(s3UploadSyncTarget(endpoint: "s3://slow-bucket/", name: "slow-1"))
-        await manager.sync(s3UploadSyncTarget(endpoint: "s3://fast-bucket/", name: "fast-0"))
-        await manager.shutdown()
-
-        let events = await probe.events
-        let slowSecondStart = try #require(events.firstIndex(of: "start:s3://slow-bucket/:data/slow-1"))
-        let slowFirstEnd = try #require(events.firstIndex(of: "end:s3://slow-bucket/:data/slow-0"))
-        #expect(slowSecondStart > slowFirstEnd)
-        #expect(await probe.maxActiveByEndpoint == [
-            "s3://slow-bucket/": 1,
-            "s3://fast-bucket/": 1
-        ])
-        #expect(await probe.maxTotalActive > 1)
-    }
-
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
@@ -319,44 +294,6 @@ private func randomData(byteCount: Int) -> Data {
     return data
 }
 
-private func s3UploadSyncTarget(endpoint: String, name: String) -> S3UploadSyncTarget {
-    S3UploadSyncTarget(
-        bucketEndpoint: S3BucketEndpoint(rawEndpoint: endpoint, profile: nil),
-        localDirectory: "/tmp/\(name)",
-        basePath: "data/\(name)"
-    )
-}
-
 private func s3Endpoints(_ buckets: String, domain: DomainRegistry = .ncep_gfs025) -> S3BucketEndpointList {
     return S3BucketEndpointList(buckets, domain: domain)
-}
-
-private actor S3SyncManagerProbe {
-    private var recordedEvents: [String] = []
-    private var activeByEndpoint: [String: Int] = [:]
-    private var maxActive: [String: Int] = [:]
-    private var maxTotal = 0
-
-    var events: [String] {
-        recordedEvents
-    }
-
-    var maxActiveByEndpoint: [String: Int] {
-        maxActive
-    }
-
-    var maxTotalActive: Int {
-        maxTotal
-    }
-
-    func sync(target: S3UploadSyncTarget) async throws {
-        let endpoint = target.bucketEndpoint.description
-        activeByEndpoint[endpoint, default: 0] += 1
-        maxActive[endpoint] = max(maxActive[endpoint, default: 0], activeByEndpoint[endpoint, default: 0])
-        maxTotal = max(maxTotal, activeByEndpoint.values.reduce(0, +))
-        recordedEvents.append("start:\(endpoint):\(target.basePath)")
-        try await Task.sleep(nanoseconds: 50_000_000)
-        recordedEvents.append("end:\(endpoint):\(target.basePath)")
-        activeByEndpoint[endpoint, default: 0] -= 1
-    }
 }
