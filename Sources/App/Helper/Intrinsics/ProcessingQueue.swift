@@ -127,3 +127,14 @@ actor ProcessingParallelQueue<T: Sendable> {
     }
 }
 
+actor BoxedArray<T>: Sendable {
+    var array: Array<T>
+    
+    init(array: [T] = .init()) {
+        self.array = array
+    }
+    
+    func append(_ element: T) {
+        array.append(element)
+    }
+}
