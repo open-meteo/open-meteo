@@ -1014,18 +1014,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             return nil
         case .rain:
-            if let snowline = Reader.variableFromString("snowfall_height"),
-               let precip = Reader.variableFromString("precipitation") {
-                return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
-                    let rain = zip(snowline.data, precip.data).map {
-                        guard $0.isFinite, $1.isFinite else {
-                            return Float.nan
-                        }
-                        return $0 < reader.targetElevation ? 0 : $1
-                    }
-                    return DataAndUnit(rain, precip.unit)
-                }
-            }
             guard
                 let snowwater = getDeriverMap(variable: .snowfall_water_equivalent),
                 let precip = Reader.variableFromString("precipitation")
