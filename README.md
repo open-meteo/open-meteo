@@ -43,6 +43,7 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 Apps:
 
 - [AirIndex Today](https://airindex.today/) Air quality forecasts across the globe.
+- [AllergyTJ](https://allergy.tj) Pollen risk and air quality tracker for Tajikistan, combining seasonal pollen calendars with live weather and AQI data.
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [BusyRunner](https://busyrunner.com/) Allows users to plan their weekly runs based on the weather.
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
