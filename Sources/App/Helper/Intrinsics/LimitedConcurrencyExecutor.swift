@@ -3,9 +3,9 @@ import Collections
 /// Limits the number of concurrently executed tasks. More incoming tasks are queued
 actor LimitedConcurrencyExecutor {
     public nonisolated let maxConcurrency: Int
-    
+
     private var activeCount = 0
-    
+
     /// Hold suspended tasks waiting for an opening
     private var suspensionQueue = Deque<CheckedContinuation<Void, Never>>()
     
@@ -13,30 +13,39 @@ actor LimitedConcurrencyExecutor {
         precondition(maxConcurrency > 0)
         self.maxConcurrency = maxConcurrency
     }
-    
-    /// Executes a single job, suspending inside the internal queue if the ceiling is reached
-    func execute<T>(_ job: () async throws -> T) async rethrows -> T {
-        // If we are at capacity, wait for a slot to clear up
+
+    /// Claim one execution slot, suspending if the executor is already full.
+    func acquire() async {
         if activeCount >= maxConcurrency {
             await withCheckedContinuation { continuation in
                 suspensionQueue.append(continuation)
             }
         } else {
-            // Claim the execution slot. Resumed waiters inherit the slot from the releasing task.
+            // Resumed waiters inherit the slot from the releasing task.
             activeCount += 1
         }
-        
-        defer {
-            // On exit (success or failure), relinquish slot and wake up next in line
-            if !suspensionQueue.isEmpty {
-                suspensionQueue.removeFirst().resume()
-            } else {
-                activeCount -= 1
-            }
+    }
+
+    /// Release one execution slot and wake the next waiter if present.
+    func release() {
+        if !suspensionQueue.isEmpty {
+            suspensionQueue.removeFirst().resume()
+        } else {
+            activeCount -= 1
         }
-        
-        // 3. Execute the payload
-        return try await job()
+    }
+
+    /// Executes a single job, suspending inside the internal queue if the ceiling is reached
+    func execute<T>(_ job: () async throws -> T) async rethrows -> T {
+        await acquire()
+        do {
+            let result = try await job()
+            release()
+            return result
+        } catch {
+            release()
+            throw error
+        }
     }
     
 //    nonisolated func execute<T: Sendable>(stream: AsyncStream<@Sendable () async throws -> T>) async throws -> [T] {
@@ -61,20 +70,46 @@ extension AsyncSequence where Element: Sendable {
         return try await withThrowingTaskGroup(of: (Int, T).self) { group in
             var results = [(Int, T)]()
             var index = 0
-            for try await element in self {
-                // `for try await` has already read `element` before this check runs.
-                // Retaining at most one element over `maxConcurrency` is acceptable here
-                // but we need to prevent unbounded scheduling.
-                if index >= executor.maxConcurrency, let result = try await group.next() {
+            var running = 0
+            var iterator = self.makeAsyncIterator()
+
+            while true {
+                // `acquire()` below already bounds element reads and active work.
+                // This drain bounds unconsumed task-group children/results, so completed
+                // results and part-upload errors do not pile up until the sequence ends.
+                if running >= executor.maxConcurrency, let result = try await group.next() {
+                    running -= 1
                     results.append(result)
                 }
+
+                await executor.acquire()
+
+                let element: Element?
+                do {
+                    element = try await iterator.next()
+                } catch {
+                    await executor.release()
+                    throw error
+                }
+
+                guard let element else {
+                    await executor.release()
+                    break
+                }
+
                 let i = index
                 group.addTask {
-                    return try await executor.execute {
-                        return (i, try await body(i, element))
+                    do {
+                        let result = try await body(i, element)
+                        await executor.release()
+                        return (i, result)
+                    } catch {
+                        await executor.release()
+                        throw error
                     }
                 }
                 index += 1
+                running += 1
             }
             while let result = try await group.next() {
                 results.append(result)

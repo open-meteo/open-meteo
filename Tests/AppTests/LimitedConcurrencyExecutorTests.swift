@@ -20,9 +20,8 @@ import Testing
         await startCounter.wait(untilAtLeast: executor.maxConcurrency)
         try await Task.sleep(nanoseconds: 50_000_000)
         let nextCalls = await nextCounter.value
-        // `for try await` reads the current element before the capacity check runs,
-        // so one element over `maxConcurrency` is the documented bound.
-        #expect(nextCalls <= executor.maxConcurrency + 1)
+        // The executor slot is acquired before reading the next async element.
+        #expect(nextCalls == executor.maxConcurrency)
 
         await gate.open()
         let result = await task.value
@@ -45,6 +44,22 @@ import Testing
                 return element
             }
         }
+    }
+
+    @Test func mapEnumeratedConcurrentReleasesPermitWhenIteratorThrows() async {
+        let executor = LimitedConcurrencyExecutor(maxConcurrency: 1)
+        let sequence = ThrowingAsyncSequence()
+
+        await #expect(throws: IteratorTestError.failed) {
+            try await sequence.mapEnumeratedConcurrent(executor: executor) { _, element in
+                element
+            }
+        }
+
+        let result = await executor.execute {
+            42
+        }
+        #expect(result == 42)
     }
 
     @Test func processingParallelQueueLimitsStartedWorkAndCompletes() async throws {
@@ -72,6 +87,30 @@ import Testing
 
         let results = await collectTask.value
         #expect(results.sorted() == Array(0..<20))
+    }
+}
+
+private enum IteratorTestError: Error {
+    case failed
+}
+
+private struct ThrowingAsyncSequence: AsyncSequence, Sendable {
+    typealias Element = Int
+
+    func makeAsyncIterator() -> Iterator {
+        Iterator()
+    }
+
+    struct Iterator: AsyncIteratorProtocol {
+        var current = 0
+
+        mutating func next() async throws -> Int? {
+            defer { current += 1 }
+            if current == 0 {
+                return 0
+            }
+            throw IteratorTestError.failed
+        }
     }
 }
 
