@@ -10,7 +10,7 @@ import Glibc
 import Darwin
 #endif
 
-@Suite struct DownloaderTests {
+@Suite(.serialized) struct DownloaderTests {
     @Test func testAwsSign() async throws {
         let url = "https://examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)
