@@ -3,19 +3,12 @@ import Vapor
 
 extension AsyncBodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(concurrencySlot: Int?, logger: Logger, _ task: @escaping () async throws -> Void) async throws {
-        if let concurrencySlot {
-            try await ConcurrencyGroupLimiter.instance.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
-        }
+    func submit(concurrencyPermit: ConcurrencyPermit?, logger: Logger, _ task: @escaping () async throws -> Void) async throws {
         do {
             try await task()
-            if let concurrencySlot {
-                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
-            }
+            await concurrencyPermit?.release()
         } catch {
-            if let concurrencySlot {
-                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
-            }
+            await concurrencyPermit?.release()
             logger.info("Error during streaming. Error \(error)")
             do {
                 try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
@@ -34,11 +27,11 @@ extension ForecastapiResult {
      Memory footprint is therefore much smaller and fits better into L2/L3 caches.
      Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
      */
-    func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, logger: Logger) throws -> Response {
+    func toJsonResponse(fixedGenerationTime: Double?, concurrencyPermit: ConcurrencyPermit?, logger: Logger) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in
-            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
+            try await writer.submit(concurrencyPermit: concurrencyPermit, logger: logger) {
                 var b = BufferAndAsyncWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1

@@ -160,7 +160,7 @@ extension Request {
             let params = try parseApiParams()
             let responder = try await fn(nil, params)
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
+            return try await responder.response(format: params.formatWithOptions, concurrencyPermit: nil, prefetch: weight < 10, logger: logger)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: { host.starts(with: $0) }) == true || isDevNode
@@ -190,7 +190,8 @@ extension Request {
             } else {
                 try await RateLimiter.instance.check(address: address)
             }
-            try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
+            let concurrencyLimit = ConcurrencyLimit(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
+            let concurrencyPermit = try await ConcurrencyGroupLimiter.instance.acquire(concurrencyLimit)
             let response: Response
             do {
                 let params = try parseApiParams()
@@ -202,7 +203,7 @@ extension Request {
                     guard url.count < 3500 else {
                         throw ForecastApiError.generic(message: "Your API URL is too long for automatic redirection from the open-access API to the commercial endpoints. Instead, use the 'customer-' prefixed URLs directly. Refer to the API documentation and select 'Usage -> Commercial' to obtain the correct customer URLs.")
                     }
-                    await ConcurrencyGroupLimiter.instance.release(slot: slot)
+                    await concurrencyPermit.release()
                     return self.redirect(to: url)
                 }
                 let responder = try await fn(host, params)
@@ -213,17 +214,16 @@ extension Request {
                 guard weight <= RateLimiter.limitHourly else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
                 }
-                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
+                response = try await responder.response(format: params.formatWithOptions, concurrencyPermit: concurrencyPermit, prefetch: weight < 10, logger: logger)
                 if isCFWorker {
                     await RateLimiter.instance.increment(int64: slot, count: weight)
                 } else {
                     await RateLimiter.instance.increment(address: address, count: weight)
                 }
             } catch {
-                await ConcurrencyGroupLimiter.instance.release(slot: slot)
+                await concurrencyPermit.release()
                 throw error
             }
-            await ConcurrencyGroupLimiter.instance.release(slot: slot)
             return response
         }
 
@@ -245,7 +245,8 @@ extension Request {
         let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
         let maxConcurrent = max(2, limit / 5_000_000)
         let slot = apikey.hash
-        try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
+        let concurrencyLimit = ConcurrencyLimit(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
+        let concurrencyPermit = try await ConcurrencyGroupLimiter.instance.acquire(concurrencyLimit)
         let response: Response
         do {
             let responder = try await fn(host, params)
@@ -253,14 +254,13 @@ extension Request {
                 throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
+            response = try await responder.response(format: params.formatWithOptions, concurrencyPermit: concurrencyPermit, prefetch: weight < 10, logger: logger)
             await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         }
         catch {
-            await ConcurrencyGroupLimiter.instance.release(slot: slot)
+            await concurrencyPermit.release()
             throw error
         }
-        await ConcurrencyGroupLimiter.instance.release(slot: slot)
         return response
     }
 }

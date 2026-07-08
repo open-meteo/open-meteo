@@ -41,14 +41,20 @@ fileprivate struct DemResponder: ForecastapiResponder {
         return Float(nVariablesModels ?? latitude.count)
     }
 
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response {
-        let elevation = try await zip(latitude, longitude).asyncMap { latitude, longitude in
-            try await Dem90.read(lat: latitude, lon: longitude, logger: logger, httpClient: httpClient)
+    func response(format: ForecastResultFormatWithOptions?, concurrencyPermit: ConcurrencyPermit?, prefetch: Bool, logger: Logger) async throws -> Response {
+        do {
+            let elevation = try await zip(latitude, longitude).asyncMap { latitude, longitude in
+                try await Dem90.read(lat: latitude, lon: longitude, logger: logger, httpClient: httpClient)
+            }
+            await concurrencyPermit?.release()
+            var headers = HTTPHeaders()
+            headers.add(name: .contentType, value: "application/json")
+            return Response(status: .ok, headers: headers, body: .init(string: """
+               {"elevation":\(elevation)}
+               """))
+        } catch {
+            await concurrencyPermit?.release()
+            throw error
         }
-        var headers = HTTPHeaders()
-        headers.add(name: .contentType, value: "application/json")
-        return Response(status: .ok, headers: headers, body: .init(string: """
-           {"elevation":\(elevation)}
-           """))
     }
 }
