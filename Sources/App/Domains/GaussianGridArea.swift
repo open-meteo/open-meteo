@@ -140,6 +140,11 @@ struct GaussianGridArea: Gridable {
     func findBox(boundingBox bb: BoundingBoxWGS84) -> GaussianGridAreaSlice? {
         return GaussianGridAreaSlice(area: self, bb: bb)
     }
+    
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? {
+        return GaussianGridAreaSlice(area: self, bb: bb).count
+    }
+    
 
     /// Get a 3×3 list of local indices surrounding a coordinate.
     /// Grid points are in strictly rising order, allowing optimised range reads.
@@ -296,6 +301,37 @@ struct GaussianGridArea: Gridable {
 struct GaussianGridAreaSlice: Sequence {
     let area: GaussianGridArea
     let bb: BoundingBoxWGS84
+    
+    var count: Int? {
+        let latitudeLines = area.type.latitudeLines
+        let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
+
+        let y1 = Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy / 2) / dy)))
+        let y2 = Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy / 2) / dy)))
+
+        let yStart = Swift.max(area.yStart, y1)
+        let yEnd = Swift.min(area.yEnd - 1, y2)
+        guard yStart <= yEnd else {
+            return 0
+        }
+
+        var total = 0
+        for y in yStart...yEnd {
+            let nxLine = area.type.nxOf(y: y)
+            let dx = 360 / Float(nxLine)
+            let x1Sub = (Int(round(bb.longitude.lowerBound / dx)) + nxLine) % nxLine
+            let x2Sub = (Int(round(bb.longitude.upperBound / dx)) + nxLine) % nxLine
+            let x1 = (Int(area.bounds.longitude.lowerBound / dx) + nxLine) % nxLine
+            let x2 = (Int(area.bounds.longitude.upperBound / dx) + nxLine) % nxLine
+            let n = x2 >= x1 ? (x2 - x1 + 1) : (nxLine - x1 + x2 + 1)
+            let rel1 = (x1Sub - x1 + nxLine) % nxLine
+            let rel2 = (x2Sub - x1 + nxLine) % nxLine
+            let xOffset = Swift.min(rel1, n)
+            let xOffsetEnd = Swift.min(rel2 + 1, n)
+            total += Swift.max(0, xOffsetEnd - xOffset)
+        }
+        return total
+    }
 
     func makeIterator() -> GaussianGridAreaSliceIterator {
         let latitudeLines = area.type.latitudeLines

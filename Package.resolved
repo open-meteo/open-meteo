@@ -302,8 +302,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/swift-zarr.git",
       "state" : {
-        "revision" : "a4feb316cb8a47f7df48ef6c54ce76e67e0027b0",
-        "version" : "0.1.4"
+        "revision" : "fa3861c69cf6f03871c83fc0a543ff63292433ce",
+        "version" : "0.1.5"
       }
     },
     {

@@ -204,6 +204,10 @@ struct GaussianGrid: Gridable {
         return Slice(type: type, bb: bb)
     }
     
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? {
+        return Slice(type: type, bb: bb).count
+    }
+    
     /// Get a 3x3 list of grid points surrounding a coordinate.
     /// Grid points are strictly rising, allowing optimised range reads
     /// minDistanceIndex [0,9] index of the closest grid point
@@ -383,6 +387,21 @@ extension GaussianGrid.Slice: Sequence {
             type: type,
             longitude: bb.longitude
         )
+    }
+    
+    var count: Int {
+        let latitudeLines = type.latitudeLines
+        let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
+        let y1 = Swift.max(0, Swift.min(2*latitudeLines-1, Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy / 2) / dy)))))
+        let y2 = Swift.max(0, Swift.min(2*latitudeLines-1, Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy / 2) / dy)))))
+        
+        return (y1..<y2).reduce(into: 0, { partial, y in
+            let nx = type.nxOf(y: y)
+            let dx = 360 / Float(nx)
+            let x1 = (Int(round(bb.longitude.lowerBound / dx)) + nx) % nx
+            let x2 = (Int(round(bb.longitude.upperBound / dx)) + nx) % nx
+            return partial += x2 - x1
+        })
     }
 
     /// Iterate over a subset of a grib following x and y ranges. The element returns the global grid coordinate (grid point index as integer)

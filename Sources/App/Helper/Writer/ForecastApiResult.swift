@@ -10,8 +10,6 @@ protocol FlatBuffersVariable: RawRepresentableString {
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response
-
-    var numberOfLocations: Int { get }
 }
 
 protocol ModelFlatbufferSerialisable {
@@ -76,10 +74,6 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
-
-    var numberOfLocations: Int {
-        results.count
-    }
 
     /// Number of variables times number of somains. Used to rate limiting
     let nVariablesTimesDomains: Int
