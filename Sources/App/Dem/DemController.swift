@@ -3,7 +3,8 @@ import Vapor
 
 struct DemController {
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter("api") { _, params in
+        OmStatistics.requestsElevationApiTotal.add(1, ordering: .relaxed)
+        return try await req.withApiParameter("api") { _, params in
             let latitude = params.latitude
             let longitude = params.longitude
 

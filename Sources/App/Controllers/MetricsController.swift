@@ -13,6 +13,19 @@ enum OmStatistics {
     static let fileCacheRemoteCheckedExist = Atomic(0)
     static let fileCacheCurrentlyOpeningFiles = Atomic(0)
     static let fileCacheCurrentlyWaitingOnOpeningFiles = Atomic(0)
+    
+    static let requestsQueued = Atomic(0)
+    static let requestsRunning = Atomic(0)
+    static let requestsTooManyLocationsTotal = Atomic(0)
+    static let requestsErrorThrownTotal = Atomic(0)
+    static let requestsForecastApiTotal = Atomic(0)
+    static let requestsElevationApiTotal = Atomic(0)
+    static let requestsCloudFlareWorkersTotal = Atomic(0)
+    static let requestsServiceOverloadedTotal = Atomic(0)
+    
+    static let limiterMinutelyExceededTotal = Atomic(0)
+    static let limiterHourlyExceededTotal = Atomic(0)
+    static let limiterDailyExceededTotal = Atomic(0)
 }
 
 
@@ -30,7 +43,7 @@ struct MetricsController: RouteCollection {
             ? OpenMeteo.dataBlockCache.cache.statistics()
             : .zero
 
-        let concurrencyStats = await ConcurrencyGroupLimiter.instance.stats()
+        let monitored_ips = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
 
         let body = """
 # TYPE om_file_cache_inactive_evictions counter
@@ -72,15 +85,38 @@ om_block_cache_accessed_bytes{window="30m"} \(cacheStats.accessed_30min)
 om_block_cache_accessed_bytes{window="60m"} \(cacheStats.accessed_60min)
 om_block_cache_accessed_bytes{window="3h"} \(cacheStats.accessed_3hours)
 om_block_cache_accessed_bytes{window="24h"} \(cacheStats.accessed_24hours)
-# TYPE om_concurrency_monitored_ips gauge
-# HELP om_concurrency_monitored_ips Distinct IPs currently rate-limited
-om_concurrency_monitored_ips \(concurrencyStats.monitored_ips)
-# TYPE om_concurrency_total_running gauge
-# HELP om_concurrency_total_running Currently running requests
-om_concurrency_total_running \(concurrencyStats.total_running)
-# TYPE om_concurrency_queued_requests gauge
-# HELP om_concurrency_queued_requests Queued requests waiting for slot
-om_concurrency_queued_requests \(concurrencyStats.queued_requests)
+# TYPE om_requests_monitored_ips gauge
+# HELP om_requests_monitored_ips Distinct IPs currently rate-limited
+om_requests_monitored_ips \(monitored_ips)
+# TYPE om_requests_total_running gauge
+# HELP om_requests_total_running Currently running requests
+om_requests_total_running \(OmStatistics.requestsRunning.load(ordering: .relaxed))
+# TYPE om_requests_queued_requests gauge
+# HELP om_requests_queued_requests Queued requests waiting for slot
+om_requests_queued_requests \(OmStatistics.requestsQueued.load(ordering: .relaxed))
+# TYPE om_requests_error_thrown_total counter
+# HELP om_requests_error_thrown_total Number of API with any error thrown
+om_requests_error_thrown_total \(OmStatistics.requestsErrorThrownTotal.load(ordering: .relaxed))
+# TYPE om_requests_too_many_locations_total counter
+# HELP om_requests_too_many_locations_total Number of API calls with too many locations
+om_requests_too_many_locations_total \(OmStatistics.requestsTooManyLocationsTotal.load(ordering: .relaxed))
+# TYPE om_requests_service_overloaded_total counter
+# HELP om_requests_service_overloaded_total Number of API calls rejected with service overloaded error
+om_requests_service_overloaded_total \(OmStatistics.requestsServiceOverloadedTotal.load(ordering: .relaxed))
+# TYPE om_requests_cloudflare_workers_total counter
+# HELP om_requests_cloudflare_workers_total Number of API calls from CF Workers
+om_requests_cloudflare_workers_total \(OmStatistics.requestsCloudFlareWorkersTotal.load(ordering: .relaxed))
+# TYPE om_requests_forecast_api_total counter
+# HELP om_requests_forecast_api_total Number of Forecast API calls
+om_requests_forecast_api_total \(OmStatistics.requestsForecastApiTotal.load(ordering: .relaxed))
+# TYPE om_requests_elevation_api_total counter
+# HELP om_requests_elevation_api_total Number of Elevation API calls
+om_requests_elevation_api_total \(OmStatistics.requestsElevationApiTotal.load(ordering: .relaxed))
+# HELP om_requests_rate_limited_total Block cache accessed data volume over a given window.
+# TYPE om_requests_rate_limited_total gauge
+om_requests_rate_limited_total{window="1m"} \(OmStatistics.limiterMinutelyExceededTotal.load(ordering: .relaxed))
+om_requests_rate_limited_total{window="1h"} \(OmStatistics.limiterHourlyExceededTotal.load(ordering: .relaxed))
+om_requests_rate_limited_total{window="2h"} \(OmStatistics.limiterDailyExceededTotal.load(ordering: .relaxed))
 # EOF
 
 """

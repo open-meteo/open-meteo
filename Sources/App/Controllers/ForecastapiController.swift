@@ -172,7 +172,8 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
+        OmStatistics.requestsForecastApiTotal.add(1, ordering: .relaxed)
+        return try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
             let type = type ?? ApiType.detect(host: info.host)
             let currentTime = Timestamp.now()
             let currentTimeHour0 = currentTime.with(hour: 0)
@@ -313,6 +314,7 @@ struct WeatherApiController {
             switch prepared {
             case .coordinates(let coordinates):
                 if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, coordinates.count > numberOfLocationsMaximum {
+                    OmStatistics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
                     throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                 }
                 locations = try await coordinates.asyncMap { prepared in
@@ -345,6 +347,7 @@ struct WeatherApiController {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                     }
                     if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, numberOfGridCells > numberOfLocationsMaximum {
+                        OmStatistics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
                         throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                     }
                     guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
