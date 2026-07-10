@@ -175,7 +175,7 @@ extension Request {
 
         if isFreeApi {
             guard await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots() <= RateLimiter.concurrencyLimitTotal else {
-                OmStatistics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+                OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
                 throw RateLimitError.serviceOverloaded
             }
             guard let address = peerAddress ?? remoteAddress else {
@@ -190,7 +190,7 @@ extension Request {
                 slot = address.rateLimitSlot
             }
             if isCFWorker {
-                OmStatistics.requestsCloudFlareWorkersTotal.add(1, ordering: .relaxed)
+                OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
                 try await RateLimiter.instance.check(int64: slot)
             } else {
                 try await RateLimiter.instance.check(address: address)
@@ -222,7 +222,7 @@ extension Request {
                     await RateLimiter.instance.increment(address: address, count: weight)
                 }
             } catch {
-                OmStatistics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
+                OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
                 await ConcurrencyGroupLimiter.instance.release(slot: slot)
                 throw error
             }

@@ -58,12 +58,12 @@ import Vapor
         do {
             OpenMeteo.dataBlockCacheInitialized.store(false, ordering: .relaxed)
 
-            OmStatistics.fileCacheInactivityEvictions.store(7, ordering: .relaxed)
-            OmStatistics.fileCacheLocalModified.store(11, ordering: .relaxed)
-            OmStatistics.fileCacheRemoteModified.store(13, ordering: .relaxed)
-            OmStatistics.fileCacheRemoteDeleted.store(17, ordering: .relaxed)
-            OmStatistics.fileCacheRemoteRevalidated.store(19, ordering: .relaxed)
-            OmStatistics.fileCacheRemoteCheckedExist.store(23, ordering: .relaxed)
+            OmMetrics.fileCacheInactivityEvictions.store(7, ordering: .relaxed)
+            OmMetrics.fileCacheLocalModified.store(11, ordering: .relaxed)
+            OmMetrics.fileCacheRemoteModified.store(13, ordering: .relaxed)
+            OmMetrics.fileCacheRemoteDeleted.store(17, ordering: .relaxed)
+            OmMetrics.fileCacheRemoteRevalidated.store(19, ordering: .relaxed)
+            OmMetrics.fileCacheRemoteCheckedExist.store(23, ordering: .relaxed)
 
             let response = try await metricsResponse(app: app)
             let body = try await response.string(on: app.eventLoopGroup.next())

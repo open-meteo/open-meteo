@@ -14,7 +14,7 @@ actor ConcurrencyGroupLimiter {
 
     func wait(slot: Int, maxConcurrent: Int, maxConcurrentHard: Int) async throws {
         guard let count = counts[slot] else {
-            OmStatistics.requestsRunning.add(1, ordering: .relaxed)
+            OmMetrics.requestsRunning.add(1, ordering: .relaxed)
             counts[slot] = 1
             // print("Single request slot \(slot)")
             return
@@ -25,15 +25,15 @@ actor ConcurrencyGroupLimiter {
         counts[slot] = count + 1
         if count >= maxConcurrent {
             // print("Queuing request slot \(slot)")
-            OmStatistics.requestsQueued.add(1, ordering: .relaxed)
+            OmMetrics.requestsQueued.add(1, ordering: .relaxed)
             await withCheckedContinuation { waiters[slot, default: []].append($0) }
-            OmStatistics.requestsQueued.subtract(1, ordering: .relaxed)
+            OmMetrics.requestsQueued.subtract(1, ordering: .relaxed)
         }
-        OmStatistics.requestsRunning.add(1, ordering: .relaxed)
+        OmMetrics.requestsRunning.add(1, ordering: .relaxed)
     }
 
     func release(slot: Int) {
-        OmStatistics.requestsRunning.subtract(1, ordering: .relaxed)
+        OmMetrics.requestsRunning.subtract(1, ordering: .relaxed)
         guard let count = counts[slot] else {
             fatalError("Released slot \(slot) but it was not in use")
         }

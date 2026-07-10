@@ -2,9 +2,8 @@ import Vapor
 import NIO
 import Synchronization
 
-/// Runtime statistics print to the console regularly
-/// Could be further improved
-enum OmStatistics {
+/// Counters to hold metrics
+enum OmMetrics {
     static let fileCacheInactivityEvictions = Atomic(0)
     static let fileCacheLocalModified = Atomic(0)
     static let fileCacheRemoteModified = Atomic(0)
@@ -20,7 +19,7 @@ enum OmStatistics {
     static let requestsErrorThrownTotal = Atomic(0)
     static let requestsForecastApiTotal = Atomic(0)
     static let requestsElevationApiTotal = Atomic(0)
-    static let requestsCloudFlareWorkersTotal = Atomic(0)
+    static let requestsCloudflareWorkersTotal = Atomic(0)
     static let requestsServiceOverloadedTotal = Atomic(0)
     
     static let limiterMinutelyExceededTotal = Atomic(0)
@@ -48,28 +47,28 @@ struct MetricsController: RouteCollection {
         let body = """
 # TYPE om_file_cache_inactive_evictions counter
 # HELP om_file_cache_inactive_evictions File cache entries evicted after inactivity
-om_file_cache_inactive_evictions_total \(OmStatistics.fileCacheInactivityEvictions.load(ordering: .relaxed))
+om_file_cache_inactive_evictions_total \(OmMetrics.fileCacheInactivityEvictions.load(ordering: .relaxed))
 # TYPE om_file_cache_local_modified counter
 # HELP om_file_cache_local_modified Local files modified
-om_file_cache_local_modified_total \(OmStatistics.fileCacheLocalModified.load(ordering: .relaxed))
+om_file_cache_local_modified_total \(OmMetrics.fileCacheLocalModified.load(ordering: .relaxed))
 # TYPE om_file_cache_remote_modified counter
 # HELP om_file_cache_remote_modified Remote files modified
-om_file_cache_remote_modified_total \(OmStatistics.fileCacheRemoteModified.load(ordering: .relaxed))
+om_file_cache_remote_modified_total \(OmMetrics.fileCacheRemoteModified.load(ordering: .relaxed))
 # TYPE om_file_cache_remote_deleted counter
 # HELP om_file_cache_remote_deleted Remote files deleted
-om_file_cache_remote_deleted_total \(OmStatistics.fileCacheRemoteDeleted.load(ordering: .relaxed))
+om_file_cache_remote_deleted_total \(OmMetrics.fileCacheRemoteDeleted.load(ordering: .relaxed))
 # TYPE om_file_cache_remote_revalidated counter
 # HELP om_file_cache_remote_revalidated Remote file revalidations
-om_file_cache_remote_revalidated_total \(OmStatistics.fileCacheRemoteRevalidated.load(ordering: .relaxed))
+om_file_cache_remote_revalidated_total \(OmMetrics.fileCacheRemoteRevalidated.load(ordering: .relaxed))
 # TYPE om_file_cache_remote_checked_exist counter
 # HELP om_file_cache_remote_checked_exist Remote existence checks
-om_file_cache_remote_checked_exist_total \(OmStatistics.fileCacheRemoteCheckedExist.load(ordering: .relaxed))
+om_file_cache_remote_checked_exist_total \(OmMetrics.fileCacheRemoteCheckedExist.load(ordering: .relaxed))
 # TYPE om_file_cache_opening_files gauge
 # HELP om_file_cache_opening_files Currently opening files
-om_file_cache_opening_files \(OmStatistics.fileCacheCurrentlyOpeningFiles.load(ordering: .relaxed))
+om_file_cache_opening_files \(OmMetrics.fileCacheCurrentlyOpeningFiles.load(ordering: .relaxed))
 # TYPE om_file_cache_waiting_on_opening gauge
 # HELP om_file_cache_waiting_on_opening Files queued waiting to open
-om_file_cache_waiting_on_opening \(OmStatistics.fileCacheCurrentlyWaitingOnOpeningFiles.load(ordering: .relaxed))
+om_file_cache_waiting_on_opening \(OmMetrics.fileCacheCurrentlyWaitingOnOpeningFiles.load(ordering: .relaxed))
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes
@@ -90,33 +89,33 @@ om_block_cache_accessed_bytes{window="24h"} \(cacheStats.accessed_24hours)
 om_requests_monitored_ips \(monitored_ips)
 # TYPE om_requests_total_running gauge
 # HELP om_requests_total_running Currently running requests
-om_requests_total_running \(OmStatistics.requestsRunning.load(ordering: .relaxed))
+om_requests_total_running \(OmMetrics.requestsRunning.load(ordering: .relaxed))
 # TYPE om_requests_queued_requests gauge
 # HELP om_requests_queued_requests Queued requests waiting for slot
-om_requests_queued_requests \(OmStatistics.requestsQueued.load(ordering: .relaxed))
+om_requests_queued_requests \(OmMetrics.requestsQueued.load(ordering: .relaxed))
 # TYPE om_requests_error_thrown_total counter
 # HELP om_requests_error_thrown_total Number of API with any error thrown
-om_requests_error_thrown_total \(OmStatistics.requestsErrorThrownTotal.load(ordering: .relaxed))
+om_requests_error_thrown_total \(OmMetrics.requestsErrorThrownTotal.load(ordering: .relaxed))
 # TYPE om_requests_too_many_locations_total counter
 # HELP om_requests_too_many_locations_total Number of API calls with too many locations
-om_requests_too_many_locations_total \(OmStatistics.requestsTooManyLocationsTotal.load(ordering: .relaxed))
+om_requests_too_many_locations_total \(OmMetrics.requestsTooManyLocationsTotal.load(ordering: .relaxed))
 # TYPE om_requests_service_overloaded_total counter
 # HELP om_requests_service_overloaded_total Number of API calls rejected with service overloaded error
-om_requests_service_overloaded_total \(OmStatistics.requestsServiceOverloadedTotal.load(ordering: .relaxed))
+om_requests_service_overloaded_total \(OmMetrics.requestsServiceOverloadedTotal.load(ordering: .relaxed))
 # TYPE om_requests_cloudflare_workers_total counter
 # HELP om_requests_cloudflare_workers_total Number of API calls from CF Workers
-om_requests_cloudflare_workers_total \(OmStatistics.requestsCloudFlareWorkersTotal.load(ordering: .relaxed))
+om_requests_cloudflare_workers_total \(OmMetrics.requestsCloudflareWorkersTotal.load(ordering: .relaxed))
 # TYPE om_requests_forecast_api_total counter
 # HELP om_requests_forecast_api_total Number of Forecast API calls
-om_requests_forecast_api_total \(OmStatistics.requestsForecastApiTotal.load(ordering: .relaxed))
+om_requests_forecast_api_total \(OmMetrics.requestsForecastApiTotal.load(ordering: .relaxed))
 # TYPE om_requests_elevation_api_total counter
 # HELP om_requests_elevation_api_total Number of Elevation API calls
-om_requests_elevation_api_total \(OmStatistics.requestsElevationApiTotal.load(ordering: .relaxed))
+om_requests_elevation_api_total \(OmMetrics.requestsElevationApiTotal.load(ordering: .relaxed))
 # HELP om_requests_rate_limited_total Block cache accessed data volume over a given window.
 # TYPE om_requests_rate_limited_total gauge
-om_requests_rate_limited_total{window="1m"} \(OmStatistics.limiterMinutelyExceededTotal.load(ordering: .relaxed))
-om_requests_rate_limited_total{window="1h"} \(OmStatistics.limiterHourlyExceededTotal.load(ordering: .relaxed))
-om_requests_rate_limited_total{window="2h"} \(OmStatistics.limiterDailyExceededTotal.load(ordering: .relaxed))
+om_requests_rate_limited_total{window="1m"} \(OmMetrics.limiterMinutelyExceededTotal.load(ordering: .relaxed))
+om_requests_rate_limited_total{window="1h"} \(OmMetrics.limiterHourlyExceededTotal.load(ordering: .relaxed))
+om_requests_rate_limited_total{window="24h"} \(OmMetrics.limiterDailyExceededTotal.load(ordering: .relaxed))
 # EOF
 
 """
