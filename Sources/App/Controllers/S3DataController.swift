@@ -44,6 +44,11 @@ struct S3DataController: RouteCollection {
 
     /// List all files in a specified directory
     func list(_ req: Request) async throws -> Response {
+        OmMetrics.requestsS3ApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
         let params = try req.query.decode(S3List.ListV2Query.self)
         guard let apikey = params.apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) else {
             throw SyncError.invalidApiKey

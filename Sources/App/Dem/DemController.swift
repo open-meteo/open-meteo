@@ -4,6 +4,10 @@ import Vapor
 struct DemController {
     func query(_ req: Request) async throws -> Response {
         OmMetrics.requestsElevationApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
         return try await req.withApiParameter("api") { _, params in
             let latitude = params.latitude
             let longitude = params.longitude

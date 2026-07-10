@@ -18,6 +18,7 @@ enum OmMetrics {
     static let requestsTooManyLocationsTotal = Atomic(0)
     static let requestsErrorThrownTotal = Atomic(0)
     static let requestsForecastApiTotal = Atomic(0)
+    static let requestsS3ApiTotal = Atomic(0)
     static let requestsElevationApiTotal = Atomic(0)
     static let requestsCloudflareWorkersTotal = Atomic(0)
     static let requestsServiceOverloadedTotal = Atomic(0)
@@ -108,11 +109,14 @@ om_requests_cloudflare_workers_total \(OmMetrics.requestsCloudflareWorkersTotal.
 # TYPE om_requests_forecast_api_total counter
 # HELP om_requests_forecast_api_total Number of Forecast API calls
 om_requests_forecast_api_total \(OmMetrics.requestsForecastApiTotal.load(ordering: .relaxed))
+# TYPE om_requests_s3_api_total counter
+# HELP om_requests_s3_api_total Number of S3 API calls
+om_requests_s3_api_total \(OmMetrics.requestsS3ApiTotal.load(ordering: .relaxed))
 # TYPE om_requests_elevation_api_total counter
 # HELP om_requests_elevation_api_total Number of Elevation API calls
 om_requests_elevation_api_total \(OmMetrics.requestsElevationApiTotal.load(ordering: .relaxed))
 # HELP om_requests_rate_limited_total Block cache accessed data volume over a given window.
-# TYPE om_requests_rate_limited_total gauge
+# TYPE om_requests_rate_limited_total counter
 om_requests_rate_limited_total{window="1m"} \(OmMetrics.limiterMinutelyExceededTotal.load(ordering: .relaxed))
 om_requests_rate_limited_total{window="1h"} \(OmMetrics.limiterHourlyExceededTotal.load(ordering: .relaxed))
 om_requests_rate_limited_total{window="24h"} \(OmMetrics.limiterDailyExceededTotal.load(ordering: .relaxed))

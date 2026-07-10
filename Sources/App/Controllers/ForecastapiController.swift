@@ -173,6 +173,10 @@ struct WeatherApiController {
     
     func query(_ req: Request) async throws -> Response {
         OmMetrics.requestsForecastApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
         return try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
             let type = type ?? ApiType.detect(host: info.host)
             let currentTime = Timestamp.now()

@@ -174,10 +174,6 @@ extension Request {
         }
 
         if isFreeApi {
-            guard await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots() <= RateLimiter.concurrencyLimitTotal else {
-                OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
-                throw RateLimitError.serviceOverloaded
-            }
             guard let address = peerAddress ?? remoteAddress else {
                 throw ForecastApiError.generic(message: "Could not get remote address")
             }
