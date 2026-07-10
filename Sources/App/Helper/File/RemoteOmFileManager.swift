@@ -146,7 +146,7 @@ final class RemoteFileManager: Sendable {
             if case .local(let local) = entry.value {
                 // Local file open. Check if it was deleted
                 if local.fn.file.wasDeleted() {
-                    OmStatistics.localModified.add(1, ordering: .relaxed)
+                    OmStatistics.fileCacheLocalModified.add(1, ordering: .relaxed)
                     await cache.removeEntry(forKey: key)
                     continue
                 }
@@ -154,7 +154,7 @@ final class RemoteFileManager: Sendable {
                 // Local file is missing, or a remote file is open
                 // Check if a file is now available locally
                 if FileManager.default.fileExists(atPath: key.key.getFilePath()) {
-                    OmStatistics.localModified.add(1, ordering: .relaxed)
+                    OmStatistics.fileCacheLocalModified.add(1, ordering: .relaxed)
                     await cache.removeEntry(forKey: key)
                     continue
                 }
@@ -175,14 +175,14 @@ final class RemoteFileManager: Sendable {
             guard let remoteFile = key.key.getRemoteUrl(), case .remote(let old) = entry.value  else {
                 continue
             }
-            OmStatistics.remoteRevalidated.add(1, ordering: .relaxed)
+            OmStatistics.fileCacheRemoteRevalidated.add(1, ordering: .relaxed)
             if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) {
                 guard old.fn.cacheKey != new.cacheKey else {
                     await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
                     old.fn.backend.lastValidated = now
                     continue // do not update if the existing entry is the same
                 }
-                OmStatistics.remoteModified.add(1, ordering: .relaxed)
+                OmStatistics.fileCacheRemoteModified.add(1, ordering: .relaxed)
                 guard let reader = try await key.key.makeRemoteCaptureNotOmFile(file: new) else {
                     await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
                     continue
@@ -199,7 +199,7 @@ final class RemoteFileManager: Sendable {
             } else {
                 // File was deleted on remote server
                 logger.error("OmFileManager: Remote file deleted \(key).")
-                OmStatistics.remoteDeleted.add(1, ordering: .relaxed)
+                OmStatistics.fileCacheRemoteDeleted.add(1, ordering: .relaxed)
                 await cache.setEntry(forKey: key, value: entry.with(value: nil, lastValidated: now))
             }
             // Remove data from local cache
@@ -213,10 +213,10 @@ final class RemoteFileManager: Sendable {
         
         /// Validate missing remote files
         for (key, entry, remoteFile) in await cache.missingRemoteFilesToValidate() {
-            OmStatistics.remoteCheckedExist.add(1, ordering: .relaxed)
+            OmStatistics.fileCacheRemoteCheckedExist.add(1, ordering: .relaxed)
             if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile),
                 let reader = try await key.key.makeRemoteCaptureNotOmFile(file: new)  {
-                OmStatistics.remoteModified.add(1, ordering: .relaxed)
+                OmStatistics.fileCacheRemoteModified.add(1, ordering: .relaxed)
                 await cache.setEntry(forKey: key, value: entry.with(value: .remote(reader), lastValidated: now))
             } else {
                 await cache.setEntry(forKey: key, value: entry.with(lastValidated: now))
@@ -230,19 +230,6 @@ final class RemoteFileManager: Sendable {
     }
 }
 
-
-/// Runtime statistics print to the console regularly
-/// Could be further improved
-enum OmStatistics {
-    static let inactivity = Atomic(0)
-    static let localModified = Atomic(0)
-    static let remoteModified = Atomic(0)
-    static let remoteDeleted = Atomic(0)
-    static let remoteRevalidated = Atomic(0)
-    static let remoteCheckedExist = Atomic(0)
-    static let currentlyOpeningFiles = Atomic(0)
-    static let currentlyWaitingOnOpeningFiles = Atomic(0)
-}
 
 fileprivate enum LocalOrRemote: Sendable {
     case local(any LocalFileRepresentable)
@@ -323,7 +310,7 @@ fileprivate final actor RemoteFileManagerCache {
             // Value not cached or needs to be refreshed
             cache[key] = .running([])
             do {
-                OmStatistics.currentlyOpeningFiles.add(1, ordering: .relaxed)
+                OmStatistics.fileCacheCurrentlyOpeningFiles.add(1, ordering: .relaxed)
                 let (data, lastValidated) = try await RemoteFileManager.open(key: key.key, client: client, logger: logger, forceNew: forceNew)
                 guard case .running(let queued) = cache.updateValue(.cached(.init(value: data, lastValidated: lastValidated)), forKey: key) else {
                     fatalError("State was not .running()")
@@ -331,7 +318,7 @@ fileprivate final actor RemoteFileManagerCache {
                 queued.forEach {
                     $0.resume(with: .success(data))
                 }
-                OmStatistics.currentlyOpeningFiles.subtract(1, ordering: .relaxed)
+                OmStatistics.fileCacheCurrentlyOpeningFiles.subtract(1, ordering: .relaxed)
                 return data
             } catch {
                 guard case .running(let queued) = cache.removeValue(forKey: key) else {
@@ -340,7 +327,7 @@ fileprivate final actor RemoteFileManagerCache {
                 queued.forEach({
                     $0.resume(with: .failure(error))
                 })
-                OmStatistics.currentlyOpeningFiles.subtract(1, ordering: .relaxed)
+                OmStatistics.fileCacheCurrentlyOpeningFiles.subtract(1, ordering: .relaxed)
                 throw error
             }
         }
@@ -349,9 +336,9 @@ fileprivate final actor RemoteFileManagerCache {
             cache[key] = .cached(Entry(value: entry.value, lastValidated: entry.lastValidated, lastValidatedLocal: entry.lastValidatedLocal, lastAccessed: .now()))
             return entry.value
         case .running(let running):
-            OmStatistics.currentlyWaitingOnOpeningFiles.add(1, ordering: .relaxed)
+            OmStatistics.fileCacheCurrentlyWaitingOnOpeningFiles.add(1, ordering: .relaxed)
             defer {
-                OmStatistics.currentlyWaitingOnOpeningFiles.subtract(1, ordering: .relaxed)
+                OmStatistics.fileCacheCurrentlyWaitingOnOpeningFiles.subtract(1, ordering: .relaxed)
             }
             let value = try await withCheckedThrowingContinuation { continuation in
                 cache[key] = .running(running + [continuation])
@@ -368,7 +355,7 @@ fileprivate final actor RemoteFileManagerCache {
             }
             // Evict unused entries after 15 minutes
             if entry.lastAccessed < olderThan {
-                OmStatistics.inactivity.add(1, ordering: .relaxed)
+                OmStatistics.fileCacheInactivityEvictions.add(1, ordering: .relaxed)
                 cache.removeValue(forKey: key)
             }
         }
