@@ -172,8 +172,8 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter(subdomain, alias: alias) { host, params -> ForecastapiResult<MultiDomainsReader> in
-            let type = type ?? ApiType.detect(host: host)
+        try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
+            let type = type ?? ApiType.detect(host: info.host)
             let currentTime = Timestamp.now()
             let currentTimeHour0 = currentTime.with(hour: 0)
             
@@ -337,6 +337,12 @@ struct WeatherApiController {
                 locations = try await domains.asyncFlatMap({ domain in
                     guard let grid = domain.genericDomain?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
+                    }
+                    guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
+                        throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
+                    }
+                    if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, numberOfGridCells > numberOfLocationsMaximum {
+                        throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                     }
                     guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
