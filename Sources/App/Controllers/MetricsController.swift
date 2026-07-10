@@ -140,8 +140,10 @@ extension SocketAddress {
             // IPv6 loopback is ::1 (15 bytes of 0, 1 byte of 1)
             var loopbackAddr6 = in6_addr()
             #if os(Windows)
-            loopbackAddr6.u.Byte[15] = 1
-            #else
+            loopbackaddr6.u.byte[15] = 1
+            #elseif os(Linux)
+            loopbackAddr6.__in6_u.__u6_addr8.15 = 1
+            #else // macOS / iOS / Darwin
             loopbackAddr6.__u6_addr.__u6_addr8.15 = 1
             #endif
             
