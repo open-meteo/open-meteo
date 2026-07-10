@@ -312,6 +312,9 @@ struct WeatherApiController {
             let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation]
             switch prepared {
             case .coordinates(let coordinates):
+                if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, coordinates.count > numberOfLocationsMaximum {
+                    throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+                }
                 locations = try await coordinates.asyncMap { prepared in
                     let coordinates = prepared.coordinate
                     let timezone = prepared.timezone
