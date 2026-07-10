@@ -30,8 +30,6 @@ struct DemController {
 }
 
 fileprivate struct DemResponder: ForecastapiResponder {
-    var numberOfLocations: Int { 1 }
-
     let latitude: [Float]
     let longitude: [Float]
     let logger: Logger
