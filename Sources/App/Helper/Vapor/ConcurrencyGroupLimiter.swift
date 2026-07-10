@@ -8,6 +8,10 @@ actor ConcurrencyGroupLimiter {
     private var counts: [Int: Int] = [:]
     private var waiters: [Int: [CheckedContinuation<Void, Never>]] = [:]
     
+    func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
+        (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.reduce(0, { $0 + $1.value.count }))
+    }
+    
     func numberOfTrackedSlots() -> Int {
         counts.count
     }

@@ -222,6 +222,13 @@ extension Request {
                     await RateLimiter.instance.increment(address: address, count: weight)
                 }
             } catch {
+                // In an error case, also increment to API rate limiter by 1
+                // Some users do infinite retries on errors!
+                if isCFWorker {
+                    await RateLimiter.instance.increment(int64: slot, count: 1)
+                } else {
+                    await RateLimiter.instance.increment(address: address, count: 1)
+                }
                 OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
                 await ConcurrencyGroupLimiter.instance.release(slot: slot)
                 throw error
