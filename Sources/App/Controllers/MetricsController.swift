@@ -36,7 +36,7 @@ struct MetricsController: RouteCollection {
 
     @Sendable
     func metricsHandler(_ req: Request) async throws -> Response {
-        guard (req.peerAddress ?? req.remoteAddress)?.isLocalhost == true else {
+        guard req.remoteAddress?.isLocalhost == true else {
             throw Abort(.forbidden)
         }
         let cacheStats = OpenMeteo.dataBlockCacheInitialized.load(ordering: .relaxed)
