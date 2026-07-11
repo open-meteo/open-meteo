@@ -172,7 +172,12 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
+        OmMetrics.requestsForecastApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
+        return try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
             let type = type ?? ApiType.detect(host: info.host)
             let currentTime = Timestamp.now()
             let currentTimeHour0 = currentTime.with(hour: 0)
@@ -313,6 +318,7 @@ struct WeatherApiController {
             switch prepared {
             case .coordinates(let coordinates):
                 if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, coordinates.count > numberOfLocationsMaximum {
+                    OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
                     throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                 }
                 locations = try await coordinates.asyncMap { prepared in
@@ -345,6 +351,7 @@ struct WeatherApiController {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                     }
                     if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, numberOfGridCells > numberOfLocationsMaximum {
+                        OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
                         throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                     }
                     guard let gridpoionts = grid.findBox(boundingBox: bbox) else {

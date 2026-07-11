@@ -102,24 +102,30 @@ final actor RateLimiter {
     
     func check(uint32 ip: UInt32) throws {
         if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
+            OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.minutelyExceeded
         }
         if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
+            OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.hourlyExceeded
         }
         if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
+            OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.dailyExceeded
         }
     }
     
     func check(int64 ip: Int) throws {
         if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
+            OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.minutelyExceeded
         }
         if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
+            OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.hourlyExceeded
         }
         if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
+            OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.dailyExceeded
         }
     }

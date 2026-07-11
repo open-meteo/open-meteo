@@ -87,9 +87,7 @@ public final actor ApiKeyManager {
         let logger = application.logger
         if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
-            let timeStats = DispatchTime.now()
-            let concurrencyLimit = await ConcurrencyGroupLimiter.instance.stats()
-            logger.error("API key usage: \(usage). Concurrency \(concurrencyLimit) (collection time \(timeStats.timeElapsedPretty()))")
+            logger.error("API key usage: \(usage)")
         }
         let keys = KeyAndLimit.readApiKeys(path: apiKeysPath)
         guard keys.count > 0 else {
@@ -176,9 +174,6 @@ extension Request {
         }
 
         if isFreeApi {
-            guard await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots() <= RateLimiter.concurrencyLimitTotal else {
-                throw RateLimitError.serviceOverloaded
-            }
             guard let address = peerAddress ?? remoteAddress else {
                 throw ForecastApiError.generic(message: "Could not get remote address")
             }
@@ -191,6 +186,7 @@ extension Request {
                 slot = address.rateLimitSlot
             }
             if isCFWorker {
+                OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
                 try await RateLimiter.instance.check(int64: slot)
             } else {
                 try await RateLimiter.instance.check(address: address)
@@ -222,6 +218,14 @@ extension Request {
                     await RateLimiter.instance.increment(address: address, count: weight)
                 }
             } catch {
+                // In an error case, also increment to API rate limiter by 1
+                // Some users do infinite retries on errors!
+                if isCFWorker {
+                    await RateLimiter.instance.increment(int64: slot, count: 1)
+                } else {
+                    await RateLimiter.instance.increment(address: address, count: 1)
+                }
+                OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
                 await ConcurrencyGroupLimiter.instance.release(slot: slot)
                 throw error
             }
