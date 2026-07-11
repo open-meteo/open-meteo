@@ -34,19 +34,14 @@ enum S3List {
         var continuation: String? = nil
         let logger = Logger(label: "S3List")
         while true {
-            guard var urlComponents = URLComponents(string: server) else {
-                fatalError("Could not parse URL \(server) to URLComponents")
+            var url = "\(server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
+            if let continuation {
+                url += "&continuation-token=\(continuation.awsPercentEncoded)"
             }
-            // Encode all reserved chars incl. `+` and `/`. `queryItems` leaves `+` literal and S3 decodes it as a space -> "continuation token provided is incorrect".
-            func enc(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? value }
-            urlComponents.percentEncodedQueryItems = [
-                URLQueryItem(name: "list-type", value: "2"),
-                URLQueryItem(name: "delimiter", value: enc("/")),
-                URLQueryItem(name: "prefix", value: enc(prefix)),
-                continuation.map { URLQueryItem(name: "continuation-token", value: enc($0)) },
-                apikey.map { URLQueryItem(name: "apikey", value: enc($0)) }
-            ].compactMap { $0 }
-            let request = HTTPClientRequest(url: urlComponents.url!.absoluteString)
+            if let apikey {
+                url += "&apikey=\(apikey.awsPercentEncoded)"
+            }
+            let request = HTTPClientRequest(url: url)
 
             var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
             guard let body = response.readString(length: response.readableBytes) else {
