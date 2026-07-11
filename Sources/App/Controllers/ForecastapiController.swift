@@ -1138,6 +1138,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
         case .ukmo_global_deterministic_10km:
             return .single(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self)
+        case .meteoswiss_icon_ch1:
+            return .singleWithPrecipitationProbability(MeteoSwissDomain.icon_ch1, MeteoSwissVariable.self, precipitationProb: MeteoSwissDomain.icon_ch1_ensemble)
+        case .meteoswiss_icon_ch2:
+            return .singleWithPrecipitationProbability(MeteoSwissDomain.icon_ch2, MeteoSwissVariable.self, precipitationProb: MeteoSwissDomain.icon_ch2_ensemble)
+        case .meteoswiss_icon_seamless:
+            return .multiple([
+                (MeteoSwissDomain.icon_ch2_ensemble, ProbabilityVariable.self),
+                (MeteoSwissDomain.icon_ch1_ensemble, ProbabilityVariable.self),
+                (MeteoSwissDomain.icon_ch2, MeteoSwissVariable.self),
+                (MeteoSwissDomain.icon_ch1, MeteoSwissVariable.self)
+            ])
+        case .meteoswiss_icon_ch1_ensemble:
+            return .single(MeteoSwissDomain.icon_ch1_ensemble, MeteoSwissVariable.self)
+        case .meteoswiss_icon_ch2_ensemble:
+            return .single(MeteoSwissDomain.icon_ch2_ensemble, MeteoSwissVariable.self)
         case .meteoswiss_icon_ch1_ensemble_mean:
             return .single(MeteoSwissDomain.icon_ch1_ensemble_mean, VariableOrSpread<MeteoSwissVariable>.self)
         case .meteoswiss_icon_ch2_ensemble_mean:
@@ -1701,19 +1716,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .italia_meteo_arpae_icon_2i:
             return [] // migrated
         case .meteoswiss_icon_ch1:
-            let probabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let reader: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, reader].compactMap({ $0 })
+            return [] // migrated
         case .meteoswiss_icon_ch2:
-            let probabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let reader: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, reader].compactMap({ $0 })
+            return [] // migrated
         case .meteoswiss_icon_seamless:
-            let probabilitiesCh1: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let probabilitiesCh2: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ch1: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ch2: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilitiesCh2, probabilitiesCh1, ch2, ch1].compactMap({ $0 })
+            return [] // migrated
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             /// Note: ICON D2 EPS has been excluded, because it only provides 20 members and noticable different results compared to ICON EU EPS
             /// See: https://github.com/open-meteo/open-meteo/issues/876
@@ -1745,9 +1752,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ukmo_uk_ensemble_2km:
             return [] // migrated
         case .meteoswiss_icon_ch1_ensemble:
-            return try await MeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .meteoswiss_icon_ch2_ensemble:
-            return try await MeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .ecmwf_seasonal_seamless:
             return []
         case .ecmwf_seas5:
@@ -2312,11 +2319,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .italia_meteo_arpae_icon_2i:
             return nil // migrated
         case .meteoswiss_icon_ch1:
-            return try await MeteoSwissReader(domain: .icon_ch1, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .meteoswiss_icon_ch2:
-            return try await MeteoSwissReader(domain: .icon_ch2, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .meteoswiss_icon_seamless:
-            return nil
+            return nil // migrated
         case .gfs05:
             return nil
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
