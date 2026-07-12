@@ -4,6 +4,12 @@ import Vapor
 
 /// Read any time from multiple files
 struct OmFileSplitter {
+    final class MemoryCounter {
+        var count: Int = 0
+    }
+    
+    let memoryCounter = MemoryCounter()
+    
     let domain: DomainRegistry
 
     let masterTimeRange: Range<Timestamp>?
@@ -183,6 +189,13 @@ struct OmFileSplitter {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
+        
+        memoryCounter.count += nTime * location.count * MemoryLayout<Float>.stride
+        if memoryCounter.count > 512*1024*1024 {
+            logger.error("Allocated too much memory \(domain) \(variable) \(location) \(level) \(time.time.prettyString())")
+            throw ForecastApiError.generic(message: "Query allocated too much memory. Try to reduce the time range or number of variables")
+        }
+        
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var out = [Float](repeating: .nan, count: nTime * location.count)
         
