@@ -974,6 +974,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             default: return nil
             }
         }
+
+        func getRawReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
+            switch self {
+            case .single(let domain, let variable), .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: _):
+                return try await domain.makeRawReader(variableType: variable, position: gridpoint, options: options)
+            case .multiple, .multipleWithPrecipitationProbability:
+                return nil
+            }
+        }
         
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
             switch self {
@@ -2142,6 +2151,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
+        if let mapping = getDomainAndVariable(), let reader = try await mapping.getRawReader(gridpoint: gridpoint, options: options) {
+            return reader
+        }
+
         switch self {
         case .gfs025, .ncep_gfs025:
             return try await GfsReader(domain: .gfs025, gridpoint: gridpoint, options: options)

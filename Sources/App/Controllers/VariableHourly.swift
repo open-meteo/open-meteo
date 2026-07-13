@@ -510,6 +510,12 @@ extension GenericDomain {
     func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
+
+    /// Make a cached raw reader for a single gridpoint.
+    func makeRawReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, options: GenericReaderOptions) async throws -> any GenericReaderProtocol {
+        let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
+        return GenericReaderCached(reader: reader)
+    }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
