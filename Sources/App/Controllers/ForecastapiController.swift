@@ -974,7 +974,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             default: return nil
             }
         }
-
+        
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
             switch self {
             case .single(let domain, let variable):
