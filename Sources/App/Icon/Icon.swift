@@ -39,6 +39,21 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         return 3600
     }
 
+    var pressureLevelInterpolations: [Int: PressureLevelInterpolation] {
+        switch self {
+        case .icon, .iconEu:
+            return [975: PressureLevelInterpolation(lowerLevel: 950, upperLevel: 1000)]
+        case .iconD2:
+            return [
+                800: PressureLevelInterpolation(lowerLevel: 700, upperLevel: 850),
+                900: PressureLevelInterpolation(lowerLevel: 850, upperLevel: 950),
+                925: PressureLevelInterpolation(lowerLevel: 850, upperLevel: 950)
+            ]
+        default:
+            return [:]
+        }
+    }
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .icon:

@@ -2,6 +2,11 @@ import Foundation
 import OmFileFormat
 import Vapor
 
+struct PressureLevelInterpolation: Sendable {
+    let lowerLevel: Int
+    let upperLevel: Int
+}
+
 /**
  Generic domain that is required for the reader
  */
@@ -38,9 +43,16 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
+
+    /// Pressure levels that are synthesized from two neighboring model levels.
+    var pressureLevelInterpolations: [Int: PressureLevelInterpolation] { get }
 }
 
 extension GenericDomain {
+    var pressureLevelInterpolations: [Int: PressureLevelInterpolation] {
+        return [:]
+    }
+
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }
