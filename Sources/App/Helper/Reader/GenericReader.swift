@@ -161,8 +161,11 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+        let fileNames = [variable.omFileName.file] + variable.omFileNameFallbacks
         if time.dtSeconds == domain.dtSeconds {
-            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+            for fileName in fileNames {
+                try await omFileSplitter.willNeed(variable: fileName, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+            }
             return
         }
 
@@ -171,12 +174,19 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
             time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
 
-        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), logger: logger, httpClient: httpClient)
+        for fileName in fileNames {
+            try await omFileSplitter.willNeed(variable: fileName, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), logger: logger, httpClient: httpClient)
+        }
     }
 
     /// Read
     private func readRaw(variable: Variable, time: TimerangeDtAndSettings) async throws -> [Float] {
-        return try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+        var data = try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+        for fileName in variable.omFileNameFallbacks where data.containsNaN() {
+            let fallback = try await omFileSplitter.read(variable: variable, fileName: fileName, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+            data.integrateIfNaN(fallback)
+        }
+        return data
     }
     
     /// Scale and apply elevation correction. Must be done after temporal interpolation to preserve scaling

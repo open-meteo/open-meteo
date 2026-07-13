@@ -473,6 +473,15 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
         return (rawValue, 0)
     }
 
+    var omFileNameFallbacks: [String] {
+        switch self {
+        case .shortwave_radiation:
+            return ["diffuse_radiation"]
+        default:
+            return []
+        }
+    }
+
     var unit: SiUnit {
         switch self {
         case .precipitation: return .millimetre
