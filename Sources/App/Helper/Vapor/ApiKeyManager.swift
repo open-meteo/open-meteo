@@ -87,7 +87,9 @@ public final actor ApiKeyManager {
         let logger = application.logger
         if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
-            logger.error("API key usage: \(usage)")
+            if !usage.isEmpty {
+                logger.error("API key usage: \(usage)")
+            }
         }
         let keys = KeyAndLimit.readApiKeys(path: apiKeysPath)
         guard keys.count > 0 else {

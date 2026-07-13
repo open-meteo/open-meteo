@@ -183,6 +183,8 @@ struct OmFileSplitter {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
+        OmMetrics.memoryReadAllocated.wrappingAdd(nTime * location.count * MemoryLayout<Float>.stride, ordering: .relaxed)
+        
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var out = [Float](repeating: .nan, count: nTime * location.count)
         
