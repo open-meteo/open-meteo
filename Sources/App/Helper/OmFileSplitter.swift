@@ -190,6 +190,7 @@ struct OmFileSplitter {
         let nTime = indexTime.count
         var start = indexTime.lowerBound
         
+        OmMetrics.memoryReadAllocated.wrappingAdd(nTime * location.count * MemoryLayout<Float>.stride, ordering: .relaxed)
         memoryCounter.count += nTime * location.count * MemoryLayout<Float>.stride
         if memoryCounter.count > 512*1024*1024 {
             logger.error("Allocated too much memory \(domain) \(variable) \(location) \(level) \(time.time.prettyString())")
