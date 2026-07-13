@@ -3,7 +3,34 @@ import Foundation
 import Testing
 import VaporTesting
 
+private struct ReaderConstructionResult {
+    let source: String
+    let targetElevation: Float
+}
+
 @Suite struct ApiTests {
+    @Test func multiDomainReadersShareElevationAndPreserveMixerOrder() async {
+        var initializations = [(source: String, elevation: Float)]()
+        let result = await MultiDomains.DomainReaderMapping.makeReadersInMixerOrder(
+            sources: ["fallback", "authoritative"],
+            elevation: .nan,
+            makeReader: { source, elevation in
+                initializations.append((source, elevation))
+                return ReaderConstructionResult(
+                    source: source,
+                    targetElevation: elevation.isNaN ? 321 : elevation
+                )
+            },
+            resolvedElevation: { $0.targetElevation }
+        )
+
+        #expect(initializations.map(\.source) == ["authoritative", "fallback"])
+        #expect(initializations[0].elevation.isNaN)
+        #expect(initializations[1].elevation == 321)
+        #expect(result.readers.map(\.source) == ["fallback", "authoritative"])
+        #expect(result.elevation == 321)
+    }
+
     @Test func dwdIconGenericMappings() throws {
         let seamlessAliases: [MultiDomains] = [.icon_seamless, .icon_mix, .dwd_icon_seamless]
         let expectedSeamlessDomains: [DomainRegistry] = [
