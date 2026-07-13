@@ -315,7 +315,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .sunshine_duration:
                 try await prefetchData(derived: .surface(.direct_radiation), time: time)
             case .mass_density_8m:
-                try await prefetchData(derived: .surface(.mass_density_8m), time: time)
+                try await prefetchData(raw: .surface(.mass_density_8m), time: time)
             }
         case .pressure(let v):
             switch v.variable {
