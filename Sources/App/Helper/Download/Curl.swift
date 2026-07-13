@@ -22,43 +22,6 @@ enum CurlError: Error {
     case invalidURL(String)
 }
 
-struct CurlRedirectError: Error, CustomStringConvertible, Sendable {
-    let status: HTTPStatus
-    let request: String
-    let location: String?
-    let history: [String]
-    let server: String?
-    let retryAfter: String?
-
-    init(response: HTTPClientResponse, request: String) {
-        self.status = response.status
-        self.request = Self.sanitize(url: response.history.last?.request.url ?? request)
-        self.location = response.headers.first(name: "location").map(Self.sanitize)
-        self.history = response.history.map { entry in
-            let request = Self.sanitize(url: entry.request.url)
-            let location = entry.responseHead.headers.first(name: "location").map(Self.sanitize) ?? "<missing>"
-            return "\(entry.responseHead.status) \(request) -> \(location)"
-        }
-        self.server = response.headers.first(name: "server")
-        self.retryAfter = response.headers.first(name: "retry-after")
-    }
-
-    var description: String {
-        let history = history.isEmpty ? "<empty>" : history.joined(separator: ", ")
-        return "Unexpected redirect: status=\(status), request=\(request), location=\(location ?? "<missing>"), history=[\(history)], server=\(server ?? "<missing>"), retry-after=\(retryAfter ?? "<missing>")"
-    }
-
-    private static func sanitize(url: String) -> String {
-        guard var components = URLComponents(string: url) else {
-            return "<invalid-url>"
-        }
-        components.user = nil
-        components.password = nil
-        components.query = nil
-        components.fragment = nil
-        return components.string ?? "<invalid-url>"
-    }
-}
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
 final class Curl: Sendable {
@@ -183,9 +146,6 @@ final class Curl: Sendable {
                     // await print(try response.body.collect(upTo: 10000000).readStringImmutable())
                     if !retryUnauthorized && response.status == .unauthorized {
                         throw CurlErrorNonRetry.unauthorized
-                    }
-                    if (300..<400).contains(response.status.code) {
-                        throw CurlRedirectError(response: response, request: url)
                     }
                     throw CurlError.downloadFailed(code: response.status)
                 }
