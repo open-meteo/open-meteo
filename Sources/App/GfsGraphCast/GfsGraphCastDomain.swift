@@ -128,9 +128,9 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
             return ["\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_13_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"]
         case .aigefs025:
-            let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
+            let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/EAGLE_ensemble/"
             let mmm = member.zeroPadded(len: 3)
-            let base = "\(server)aigefs/prod/aigefs.\(yyyymmdd)/\(hh)/mem\(mmm)/model/atmos/grib2/"
+            let base = "\(server)aigefs.\(yyyymmdd)/\(hh)/mem\(mmm)/model/atmos/grib2/"
             return ["\(base)aigefs.t\(hh)z.sfc.f\(fHHH).grib2", "\(base)aigefs.t\(hh)z.pres.f\(fHHH).grib2"]
         case .aigfs025:
             let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
