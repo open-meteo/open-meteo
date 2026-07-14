@@ -1,6 +1,8 @@
 import Foundation
 import OmFileFormat
 
+typealias LatLon = (latitude: Float, longitude: Float)
+
 /// An exact native ICON triangular grid backed by a memory-mappable mesh artifact.
 ///
 /// Coordinate lookup maps to one regular latitude/longitude bin and tests only the native
@@ -14,16 +16,12 @@ struct IconNativeGrid: Gridable {
 
     let storage: IconNativeGridStorage
 
-    init(file: URL) throws {
-        storage = try IconNativeGridStorage(file: file)
+    init(storage: IconNativeGridStorage) {
+        self.storage = storage
     }
 
-    static func loadMapped(data: Data) throws -> Self {
-        let file = FileManager.default.temporaryDirectory
-            .appendingPathComponent("icon-native-grid-\(UUID().uuidString).bin")
-        try data.write(to: file, options: .atomic)
-        defer { try? FileManager.default.removeItem(at: file) }
-        return try Self(file: file)
+    static func load(file: URL) throws -> Self {
+        Self(storage: try IconNativeGridStorage(file: file))
     }
 
     var nx: Int { storage.cellCount }
@@ -31,8 +29,6 @@ struct IconNativeGrid: Gridable {
     var searchRadius: Int { 2 }
     var gridNumber: UInt32 { storage.gridNumber }
     var gridUUID: [UInt8] { storage.gridUUID }
-    var gridSourceChecksum: [UInt8] { storage.sourceChecksum }
-    var gridBounds: GridBounds { storage.bounds }
 
     var crsWkt2: String {
         """
@@ -69,7 +65,7 @@ struct IconNativeGrid: Gridable {
 
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
 
-    func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
+    func getCoordinates(gridpoint: Int) -> LatLon {
         precondition(gridpoint >= 0 && gridpoint < storage.cellCount, "ICON grid point out of range")
         return storage.center(at: gridpoint)
     }
@@ -158,7 +154,7 @@ struct IconNativeGrid: Gridable {
         return elevationResult(gridpoint: candidates.points[bestPosition], value: elevations[bestPosition])
     }
 
-    private func lookupInput(lat: Float, lon: Float) -> (point: IconNativeGridPoint, bin: Int)? {
+    private func lookupInput(lat: Float, lon: Float) -> (point: SphericalPoint, bin: Int)? {
         guard lat.isFinite, lon.isFinite, lat >= -90, lat <= 90 else {
             return nil
         }
@@ -166,7 +162,7 @@ struct IconNativeGrid: Gridable {
         guard let bin = storage.bin(latitude: lat, longitude: longitude) else {
             return nil
         }
-        return (IconNativeGridPoint(latitude: lat, longitude: longitude), bin)
+        return (SphericalPoint(latitude: lat, longitude: longitude), bin)
     }
 
     private func surroundingGridpoints(seed: Int) -> (points: InlineArray<16, Int>, count: Int) {
@@ -250,13 +246,8 @@ enum IconNativeGridError: Error, Equatable, CustomStringConvertible {
     case unsupportedVersion(UInt32)
     case invalidHeader
     case invalidChecksum
-    case invalidCenter(Int)
-    case invalidVertex(Int)
     case invalidTriangle(Int)
-    case invalidNeighbour(cell: Int, neighbour: UInt32)
-    case asymmetricNeighbour(cell: Int, neighbour: Int)
     case invalidBinOffset(Int)
-    case invalidBinCell(bin: Int, cell: UInt32)
     case candidateLimit(bin: Int, count: Int)
     case artifactTooLarge(actual: Int, maximum: Int)
 
@@ -266,20 +257,15 @@ enum IconNativeGridError: Error, Equatable, CustomStringConvertible {
         case .unsupportedVersion(let version): "Unsupported ICON native grid version \(version)"
         case .invalidHeader: "Invalid ICON native grid header or section layout"
         case .invalidChecksum: "ICON native grid checksum mismatch"
-        case .invalidCenter(let cell): "Invalid ICON cell centre at index \(cell)"
-        case .invalidVertex(let vertex): "Invalid ICON vertex at index \(vertex)"
         case .invalidTriangle(let cell): "Invalid ICON triangle at cell \(cell)"
-        case .invalidNeighbour(let cell, let neighbour): "Invalid ICON neighbour \(neighbour) for cell \(cell)"
-        case .asymmetricNeighbour(let cell, let neighbour): "ICON neighbour relation \(cell)-\(neighbour) is not symmetric"
         case .invalidBinOffset(let bin): "Invalid ICON spatial-bin offset at bin \(bin)"
-        case .invalidBinCell(let bin, let cell): "Invalid ICON cell \(cell) in spatial bin \(bin)"
         case .candidateLimit(let bin, let count): "ICON spatial bin \(bin) requires \(count) candidates"
         case .artifactTooLarge(let actual, let maximum): "ICON grid artifact requires \(actual) bytes; limit is \(maximum) bytes"
         }
     }
 }
 
-struct IconNativeGridPoint: Sendable, Equatable {
+struct SphericalPoint: Sendable, Equatable {
     let x: Float
     let y: Float
     let z: Float
@@ -325,12 +311,12 @@ struct IconNativeGridPoint: Sendable, Equatable {
     }
 }
 
-struct IconNativeGridTriangle: Sendable, Equatable {
-    let a: IconNativeGridPoint
-    let b: IconNativeGridPoint
-    let c: IconNativeGridPoint
+struct SphericalTriangle: Sendable, Equatable {
+    let a: SphericalPoint
+    let b: SphericalPoint
+    let c: SphericalPoint
 
-    func contains(_ point: IconNativeGridPoint) -> Bool {
+    func contains(_ point: SphericalPoint) -> Bool {
         let tolerance: Float = 1e-6
         return isInsideEdge(a: a, b: b, opposite: c, point: point, tolerance: tolerance)
             && isInsideEdge(a: b, b: c, opposite: a, point: point, tolerance: tolerance)
@@ -341,15 +327,15 @@ struct IconNativeGridTriangle: Sendable, Equatable {
         edgeIsValid(a, b) && edgeIsValid(b, c) && edgeIsValid(c, a)
     }
 
-    private func edgeIsValid(_ lhs: IconNativeGridPoint, _ rhs: IconNativeGridPoint) -> Bool {
+    private func edgeIsValid(_ lhs: SphericalPoint, _ rhs: SphericalPoint) -> Bool {
         lhs.cross(rhs).dot(lhs.cross(rhs)) > 1e-12
     }
 
     private func isInsideEdge(
-        a: IconNativeGridPoint,
-        b: IconNativeGridPoint,
-        opposite: IconNativeGridPoint,
-        point: IconNativeGridPoint,
+        a: SphericalPoint,
+        b: SphericalPoint,
+        opposite: SphericalPoint,
+        point: SphericalPoint,
         tolerance: Float
     ) -> Bool {
         let normal = a.cross(b)
@@ -362,14 +348,13 @@ struct IconNativeGridTriangle: Sendable, Equatable {
 
 enum IconNativeGridArtifact {
     static let magic = Array("ICONMSH1".utf8)
-    static let version: UInt32 = 3
-    static let headerSize = 192
+    static let version: UInt32 = 4
+    static let headerSize = 160
     static let globalFlag: UInt32 = 1
 
     struct Metadata: Sendable {
         let gridNumber: UInt32
         let gridUUID: [UInt8]
-        let sourceChecksum: [UInt8]
         let isGlobal: Bool
         let bounds: GridBounds
         let binNx: Int
@@ -380,20 +365,20 @@ enum IconNativeGridArtifact {
         let binDy: Float
     }
 
-    static func make(
+    static func write(
+        to file: String,
         metadata: Metadata,
-        centers: [IconNativeGridPoint],
-        vertices: [IconNativeGridPoint],
+        centers: [LatLon],
+        vertices: [SphericalPoint],
         vertexIndices: [UInt32],
         neighbourIndices: [UInt32],
         binOffsets: [UInt32],
         binCells: [UInt32],
         maximumFileSize: Int = .max
-    ) throws -> Data {
+    ) throws {
         let binCount = metadata.binNx.multipliedReportingOverflow(by: metadata.binNy)
         guard !binCount.overflow,
               metadata.gridUUID.count == 16,
-              metadata.sourceChecksum.count == 32,
               !centers.isEmpty,
               !vertices.isEmpty,
               centers.count <= Int(UInt32.max),
@@ -410,81 +395,99 @@ enum IconNativeGridArtifact {
             throw IconNativeGridError.invalidHeader
         }
 
-        var data = Data(repeating: 0, count: headerSize)
-        let centersOffset = data.count
-        for center in centers {
-            data.appendFloat(center.latitude)
-            data.appendFloat(center.longitude)
+        guard let verticesOffset = alignedEnd(offset: headerSize, length: centers.count * 8),
+              let vertexIndicesOffset = alignedEnd(offset: verticesOffset, length: vertices.count * 12),
+              let neighboursOffset = alignedEnd(offset: vertexIndicesOffset, length: vertexIndices.count * 4),
+              let binOffsetsOffset = alignedEnd(offset: neighboursOffset, length: neighbourIndices.count * 4),
+              let binCellsOffset = alignedEnd(offset: binOffsetsOffset, length: binOffsets.count * 4),
+              let fileSize = alignedEnd(offset: binCellsOffset, length: binCells.count * 4) else {
+            throw IconNativeGridError.invalidHeader
         }
-        data.padToEightBytes()
-        let verticesOffset = data.count
-        for vertex in vertices {
-            data.appendFloat(vertex.x)
-            data.appendFloat(vertex.y)
-            data.appendFloat(vertex.z)
-        }
-        data.padToEightBytes()
-        let vertexIndicesOffset = data.count
-        for value in vertexIndices { data.appendInteger(value) }
-        data.padToEightBytes()
-        let neighboursOffset = data.count
-        for value in neighbourIndices { data.appendInteger(value) }
-        data.padToEightBytes()
-        let binOffsetsOffset = data.count
-        for value in binOffsets { data.appendInteger(value) }
-        data.padToEightBytes()
-        let binCellsOffset = data.count
-        for value in binCells { data.appendInteger(value) }
-        data.padToEightBytes()
-
-        guard data.count <= maximumFileSize else {
-            throw IconNativeGridError.artifactTooLarge(actual: data.count, maximum: maximumFileSize)
+        guard fileSize <= maximumFileSize else {
+            throw IconNativeGridError.artifactTooLarge(actual: fileSize, maximum: maximumFileSize)
         }
 
-        data.replaceSubrange(0..<magic.count, with: magic)
-        data.writeInteger(version, at: 8)
-        data.writeInteger(UInt32(headerSize), at: 12)
-        data.writeInteger(metadata.isGlobal ? globalFlag : 0, at: 16)
-        data.writeInteger(metadata.gridNumber, at: 20)
-        data.writeInteger(UInt32(centers.count), at: 24)
-        data.writeInteger(UInt32(vertices.count), at: 28)
-        data.writeInteger(UInt32(metadata.binNx), at: 32)
-        data.writeInteger(UInt32(metadata.binNy), at: 36)
-        data.writeFloat(metadata.binLatMin, at: 40)
-        data.writeFloat(metadata.binLonMin, at: 44)
-        data.writeFloat(metadata.binDx, at: 48)
-        data.writeFloat(metadata.binDy, at: 52)
-        data.writeFloat(metadata.bounds.lat_bounds.lowerBound, at: 56)
-        data.writeFloat(metadata.bounds.lat_bounds.upperBound, at: 60)
-        data.writeFloat(metadata.bounds.lon_bounds.lowerBound, at: 64)
-        data.writeFloat(metadata.bounds.lon_bounds.upperBound, at: 68)
-        data.writeInteger(UInt32(IconNativeGrid.maximumCandidateCount), at: 72)
-        data.writeInteger(UInt64(centersOffset), at: 80)
-        data.writeInteger(UInt64(verticesOffset), at: 88)
-        data.writeInteger(UInt64(vertexIndicesOffset), at: 96)
-        data.writeInteger(UInt64(neighboursOffset), at: 104)
-        data.writeInteger(UInt64(binOffsetsOffset), at: 112)
-        data.writeInteger(UInt64(binCellsOffset), at: 120)
-        data.replaceSubrange(136..<152, with: metadata.gridUUID)
-        data.writeInteger(UInt64(data.count), at: 152)
-        data.replaceSubrange(160..<192, with: metadata.sourceChecksum)
-        let checksum = data.withUnsafeBytes { iconNativeGridChecksum(bytes: RawSpan(_unsafeBytes: $0)) }
-        data.writeInteger(checksum, at: 128)
+        var header = Data(repeating: 0, count: headerSize)
+        header.replaceSubrange(0..<magic.count, with: magic)
+        header.writeInteger(version, at: 8)
+        header.writeInteger(UInt32(headerSize), at: 12)
+        header.writeInteger(metadata.isGlobal ? globalFlag : 0, at: 16)
+        header.writeInteger(metadata.gridNumber, at: 20)
+        header.writeInteger(UInt32(centers.count), at: 24)
+        header.writeInteger(UInt32(vertices.count), at: 28)
+        header.writeInteger(UInt32(metadata.binNx), at: 32)
+        header.writeInteger(UInt32(metadata.binNy), at: 36)
+        header.writeFloat(metadata.binLatMin, at: 40)
+        header.writeFloat(metadata.binLonMin, at: 44)
+        header.writeFloat(metadata.binDx, at: 48)
+        header.writeFloat(metadata.binDy, at: 52)
+        header.writeFloat(metadata.bounds.lat_bounds.lowerBound, at: 56)
+        header.writeFloat(metadata.bounds.lat_bounds.upperBound, at: 60)
+        header.writeFloat(metadata.bounds.lon_bounds.lowerBound, at: 64)
+        header.writeFloat(metadata.bounds.lon_bounds.upperBound, at: 68)
+        header.writeInteger(UInt32(IconNativeGrid.maximumCandidateCount), at: 72)
+        header.writeInteger(UInt64(headerSize), at: 80)
+        header.writeInteger(UInt64(verticesOffset), at: 88)
+        header.writeInteger(UInt64(vertexIndicesOffset), at: 96)
+        header.writeInteger(UInt64(neighboursOffset), at: 104)
+        header.writeInteger(UInt64(binOffsetsOffset), at: 112)
+        header.writeInteger(UInt64(binCellsOffset), at: 120)
+        header.replaceSubrange(136..<152, with: metadata.gridUUID)
+        header.writeInteger(UInt64(fileSize), at: 152)
 
-        _ = try IconNativeGrid.loadMapped(data: data)
-        return data
+        let handle = try FileHandle.createNewFile(file: file, size: fileSize, overwrite: true)
+        var writer = IconNativeGridArtifactWriter(handle: handle)
+        do {
+            try writer.write(header)
+            for center in centers {
+                try writer.writeFloat(center.latitude)
+                try writer.writeFloat(center.longitude)
+            }
+            try writer.pad(to: verticesOffset)
+            for vertex in vertices {
+                try writer.writeFloat(vertex.x)
+                try writer.writeFloat(vertex.y)
+                try writer.writeFloat(vertex.z)
+            }
+            try writer.pad(to: vertexIndicesOffset)
+            for value in vertexIndices { try writer.writeInteger(value) }
+            try writer.pad(to: neighboursOffset)
+            for value in neighbourIndices { try writer.writeInteger(value) }
+            try writer.pad(to: binOffsetsOffset)
+            for value in binOffsets { try writer.writeInteger(value) }
+            try writer.pad(to: binCellsOffset)
+            for value in binCells { try writer.writeInteger(value) }
+            try writer.pad(to: fileSize)
+            let checksum = try writer.finish()
+            try handle.seek(toOffset: 128)
+            var littleEndianChecksum = checksum.littleEndian
+            try Swift.withUnsafeBytes(of: &littleEndianChecksum) { bytes in
+                try handle.write(contentsOf: bytes)
+            }
+            try handle.synchronize()
+            try handle.close()
+        } catch {
+            try? handle.close()
+            throw error
+        }
+    }
+
+    private static func alignedEnd(offset: Int, length: Int) -> Int? {
+        let end = offset.addingReportingOverflow(length)
+        guard !end.overflow else { return nil }
+        let padded = end.partialValue.addingReportingOverflow(7)
+        guard !padded.overflow else { return nil }
+        return padded.partialValue / 8 * 8
     }
 }
 
-final class IconNativeGridStorage: @unchecked Sendable {
+final class IconNativeGridStorage: Sendable {
     private let mapped: MmapFile
 
     let isGlobal: Bool
     let gridNumber: UInt32
     let gridUUID: [UInt8]
-    let sourceChecksum: [UInt8]
     let cellCount: Int
-    let vertexCount: Int
     let binNx: Int
     let binNy: Int
     let binLatMin: Float
@@ -499,7 +502,6 @@ final class IconNativeGridStorage: @unchecked Sendable {
     private let neighboursOffset: Int
     private let binOffsetsOffset: Int
     private let binCellsOffset: Int
-    private let binCellCount: Int
 
     init(file: URL) throws {
         let fileHandle = try FileHandle.openFileReading(file: file.path)
@@ -530,7 +532,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
         isGlobal = flags & IconNativeGridArtifact.globalFlag != 0
         gridNumber = Self.readUInt32(bytes, at: 20)
         cellCount = Int(Self.readUInt32(bytes, at: 24))
-        vertexCount = Int(Self.readUInt32(bytes, at: 28))
+        let vertexCount = Int(Self.readUInt32(bytes, at: 28))
         binNx = Int(Self.readUInt32(bytes, at: 32))
         binNy = Int(Self.readUInt32(bytes, at: 36))
         binLatMin = Self.readFloat(bytes, at: 40)
@@ -565,9 +567,6 @@ final class IconNativeGridStorage: @unchecked Sendable {
         var uuid = [UInt8](); uuid.reserveCapacity(16)
         for offset in 136..<152 { uuid.append(Self.readUInt8(bytes, at: offset)) }
         gridUUID = uuid
-        var source = [UInt8](); source.reserveCapacity(32)
-        for offset in 160..<192 { source.append(Self.readUInt8(bytes, at: offset)) }
-        sourceChecksum = source
 
         guard cellCount > 0,
               vertexCount > 0,
@@ -607,8 +606,6 @@ final class IconNativeGridStorage: @unchecked Sendable {
               Self.alignedEnd(offset: binCellsOffset, length: binCellBytes) == length else {
             throw IconNativeGridError.invalidHeader
         }
-        binCellCount = finalBinOffset
-
         if isGlobal {
             guard abs(binLatMin + 90) < 1e-4,
                   abs(Float(binNy) * binDy - 180) < 1e-3,
@@ -616,19 +613,18 @@ final class IconNativeGridStorage: @unchecked Sendable {
                 throw IconNativeGridError.invalidHeader
             }
         }
-        try validate(bytes: bytes, binCount: binCount)
     }
 
-    @inline(__always) func center(at cell: Int) -> (latitude: Float, longitude: Float) {
+    @inline(__always) func center(at cell: Int) -> LatLon {
         withBytes { bytes in
             let offset = centersOffset + cell * 8
             return (Self.readFloat(bytes, at: offset), Self.readFloat(bytes, at: offset + 4))
         }
     }
 
-    @inline(__always) func centerPoint(at cell: Int) -> IconNativeGridPoint {
+    @inline(__always) func centerPoint(at cell: Int) -> SphericalPoint {
         let coordinate = center(at: cell)
-        return IconNativeGridPoint(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        return SphericalPoint(latitude: coordinate.latitude, longitude: coordinate.longitude)
     }
 
     @inline(__always) func neighbour(cell: Int, position: Int) -> UInt32 {
@@ -656,7 +652,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
         return y * binNx + x
     }
 
-    func containingCell(point: IconNativeGridPoint, bin: Int) -> (cell: Int?, candidateCount: Int) {
+    func containingCell(point: SphericalPoint, bin: Int) -> (cell: Int?, candidateCount: Int) {
         withBytes { bytes in
             let lower = Int(Self.readUInt32(bytes, at: binOffsetsOffset + bin * 4))
             let upper = Int(Self.readUInt32(bytes, at: binOffsetsOffset + (bin + 1) * 4))
@@ -671,96 +667,22 @@ final class IconNativeGridStorage: @unchecked Sendable {
         }
     }
 
-    private func triangle(cell: Int, bytes: borrowing RawSpan) -> IconNativeGridTriangle {
+    private func triangle(cell: Int, bytes: borrowing RawSpan) -> SphericalTriangle {
         let offset = vertexIndicesOffset + cell * 12
-        return IconNativeGridTriangle(
+        return SphericalTriangle(
             a: vertex(at: Int(Self.readUInt32(bytes, at: offset)), bytes: bytes),
             b: vertex(at: Int(Self.readUInt32(bytes, at: offset + 4)), bytes: bytes),
             c: vertex(at: Int(Self.readUInt32(bytes, at: offset + 8)), bytes: bytes)
         )
     }
 
-    private func vertex(at index: Int, bytes: borrowing RawSpan) -> IconNativeGridPoint {
+    private func vertex(at index: Int, bytes: borrowing RawSpan) -> SphericalPoint {
         let offset = verticesOffset + index * 12
-        return IconNativeGridPoint(
+        return SphericalPoint(
             x: Self.readFloat(bytes, at: offset),
             y: Self.readFloat(bytes, at: offset + 4),
             z: Self.readFloat(bytes, at: offset + 8)
         )
-    }
-
-    private func validate(bytes: borrowing RawSpan, binCount: Int) throws {
-        for cell in 0..<cellCount {
-            let coordinateOffset = centersOffset + cell * 8
-            let latitude = Self.readFloat(bytes, at: coordinateOffset)
-            let longitude = Self.readFloat(bytes, at: coordinateOffset + 4)
-            guard latitude.isFinite, longitude.isFinite, latitude >= -90, latitude <= 90,
-                  longitude >= -180.0001, longitude <= 180.0001 else {
-                throw IconNativeGridError.invalidCenter(cell)
-            }
-        }
-        for vertex in 0..<vertexCount {
-            let point = self.vertex(at: vertex, bytes: bytes)
-            guard point.x.isFinite, point.y.isFinite, point.z.isFinite,
-                  abs(point.dot(point) - 1) < 1e-5 else {
-                throw IconNativeGridError.invalidVertex(vertex)
-            }
-        }
-        for cell in 0..<cellCount {
-            let topologyOffset = vertexIndicesOffset + cell * 12
-            let a = Self.readUInt32(bytes, at: topologyOffset)
-            let b = Self.readUInt32(bytes, at: topologyOffset + 4)
-            let c = Self.readUInt32(bytes, at: topologyOffset + 8)
-            guard a < UInt32(vertexCount), b < UInt32(vertexCount), c < UInt32(vertexCount),
-                  a != b, b != c, c != a,
-                  triangle(cell: cell, bytes: bytes).isValid else {
-                throw IconNativeGridError.invalidTriangle(cell)
-            }
-            var unique = InlineArray<3, UInt32>(repeating: IconNativeGrid.missingIndex)
-            var uniqueCount = 0
-            for position in 0..<3 {
-                let neighbour = Self.readUInt32(bytes, at: neighboursOffset + (cell * 3 + position) * 4)
-                if neighbour == IconNativeGrid.missingIndex { continue }
-                guard neighbour < UInt32(cellCount), neighbour != UInt32(cell) else {
-                    throw IconNativeGridError.invalidNeighbour(cell: cell, neighbour: neighbour)
-                }
-                for previous in 0..<uniqueCount where unique[previous] == neighbour {
-                    throw IconNativeGridError.invalidNeighbour(cell: cell, neighbour: neighbour)
-                }
-                unique[uniqueCount] = neighbour
-                uniqueCount += 1
-                var reciprocal = false
-                for otherPosition in 0..<3 where Self.readUInt32(bytes, at: neighboursOffset + (Int(neighbour) * 3 + otherPosition) * 4) == UInt32(cell) {
-                    reciprocal = true
-                }
-                guard reciprocal else {
-                    throw IconNativeGridError.asymmetricNeighbour(cell: cell, neighbour: Int(neighbour))
-                }
-            }
-        }
-
-        var previous = 0
-        for bin in 0..<binCount {
-            let lower = Int(Self.readUInt32(bytes, at: binOffsetsOffset + bin * 4))
-            let upper = Int(Self.readUInt32(bytes, at: binOffsetsOffset + (bin + 1) * 4))
-            guard lower == previous, lower <= upper, upper <= binCellCount else {
-                throw IconNativeGridError.invalidBinOffset(bin)
-            }
-            let count = upper - lower
-            guard count <= IconNativeGrid.maximumCandidateCount else {
-                throw IconNativeGridError.candidateLimit(bin: bin, count: count)
-            }
-            var priorCell: UInt32?
-            for index in lower..<upper {
-                let cell = Self.readUInt32(bytes, at: binCellsOffset + index * 4)
-                guard cell < UInt32(cellCount), priorCell == nil || cell > priorCell! else {
-                    throw IconNativeGridError.invalidBinCell(bin: bin, cell: cell)
-                }
-                priorCell = cell
-            }
-            previous = upper
-        }
-        guard previous == binCellCount else { throw IconNativeGridError.invalidBinOffset(binCount) }
     }
 
     @inline(__always) private func withBytes<R>(_ body: (borrowing RawSpan) throws -> R) rethrows -> R {
@@ -804,13 +726,6 @@ final class IconNativeGridStorage: @unchecked Sendable {
 }
 
 private extension Data {
-    mutating func appendInteger<T: FixedWidthInteger>(_ value: T) {
-        var littleEndian = value.littleEndian
-        Swift.withUnsafeBytes(of: &littleEndian) { append(contentsOf: $0) }
-    }
-
-    mutating func appendFloat(_ value: Float) { appendInteger(value.bitPattern) }
-
     mutating func writeInteger<T: FixedWidthInteger>(_ value: T, at offset: Int) {
         var littleEndian = value.littleEndian
         Swift.withUnsafeBytes(of: &littleEndian) {
@@ -819,10 +734,69 @@ private extension Data {
     }
 
     mutating func writeFloat(_ value: Float, at offset: Int) { writeInteger(value.bitPattern, at: offset) }
+}
 
-    mutating func padToEightBytes() {
-        let padding = (8 - count % 8) % 8
-        if padding > 0 { append(contentsOf: repeatElement(0, count: padding)) }
+/// Sequential, bounded-memory artifact writer. Hashing flushed chunks avoids rereading the staged
+/// file merely to calculate its checksum; the loader still independently verifies it afterwards.
+private struct IconNativeGridArtifactWriter {
+    private static let bufferSize = 1 * 1_024 * 1_024
+
+    private let handle: FileHandle
+    private var buffer = Data()
+    private(set) var position = 0
+    private var hash: UInt64 = 0xcbf29ce484222325
+
+    init(handle: FileHandle) {
+        self.handle = handle
+        buffer.reserveCapacity(Self.bufferSize)
+    }
+
+    mutating func write(_ data: Data) throws {
+        try data.withUnsafeBytes { try write($0) }
+    }
+
+    mutating func writeInteger<T: FixedWidthInteger>(_ value: T) throws {
+        var littleEndian = value.littleEndian
+        try Swift.withUnsafeBytes(of: &littleEndian) { try write($0) }
+    }
+
+    mutating func writeFloat(_ value: Float) throws {
+        try writeInteger(value.bitPattern)
+    }
+
+    mutating func pad(to offset: Int) throws {
+        guard offset >= position else { throw IconNativeGridError.invalidHeader }
+        if offset > position {
+            try write(Data(repeating: 0, count: offset - position))
+        }
+    }
+
+    mutating func finish() throws -> UInt64 {
+        try flush()
+        return hash
+    }
+
+    private mutating func write(_ bytes: UnsafeRawBufferPointer) throws {
+        var source = bytes
+        while !source.isEmpty {
+            let count = min(Self.bufferSize - buffer.count, source.count)
+            buffer.append(contentsOf: source.prefix(count))
+            position += count
+            source = UnsafeRawBufferPointer(rebasing: source[count...])
+            if buffer.count == Self.bufferSize {
+                try flush()
+            }
+        }
+    }
+
+    private mutating func flush() throws {
+        guard !buffer.isEmpty else { return }
+        for byte in buffer {
+            hash ^= UInt64(byte)
+            hash &*= 0x100000001b3
+        }
+        try handle.write(contentsOf: buffer)
+        buffer.removeAll(keepingCapacity: true)
     }
 }
 
