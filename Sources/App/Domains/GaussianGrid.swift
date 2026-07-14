@@ -3,6 +3,15 @@ import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
 struct GaussianGrid: Gridable {
+    var gridBounds: GridBounds {
+        let firstLatitude = getCoordinates(gridpoint: 0).latitude
+        let lastLatitude = getCoordinates(gridpoint: count - 1).latitude
+        return GridBounds(
+            lat_bounds: min(firstLatitude, lastLatitude)...max(firstLatitude, lastLatitude),
+            lon_bounds: -180...180
+        )
+    }
+
     var crsWkt2: String {
         // Gaussian grids do not have a OGC WTK2 string. Encode the Gaussian grid type as id "gaussian_grid"
         return """
@@ -444,4 +453,3 @@ extension GaussianGrid.Slice: Sequence {
         }
     }
 }
-
