@@ -26,6 +26,9 @@ struct CdoHelper: Sendable {
     func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
         guard let cdo else {
             return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
+                if let identity = domain.nativeGridIdentity {
+                    return (message, try IconNativeGribDecoder.decode(message: message, identity: identity))
+                }
                 return (message, Array2D(data: try message.getDouble().map(Float.init), nx: grid.nx, ny: grid.ny))
             }
         }
@@ -55,6 +58,8 @@ extension IconDomains {
         case .iconD2:
             return nil
         case .iconD2_15min:
+            return nil
+        case .iconNative, .iconD2Native, .iconD2Native15min:
             return nil
         case .iconEps:
             return "0036_R03B06_G"
