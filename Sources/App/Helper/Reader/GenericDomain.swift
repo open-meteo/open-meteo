@@ -9,6 +9,11 @@ protocol GenericDomain: Sendable {
     /// The grid definition. Could later be replaced with a more generic implementation
     var grid: any Gridable { get }
 
+    /// Whether the domain has the local metadata required to construct a reader.
+    /// Most grids are defined in code and are always available. File-backed grids can override
+    /// this to let seamless or multi-model requests skip them without failing the request.
+    var isAvailable: Bool { get }
+
     /// Domain name used as data directory
     var domainRegistry: DomainRegistry { get }
 
@@ -41,6 +46,8 @@ protocol GenericDomain: Sendable {
 }
 
 extension GenericDomain {
+    var isAvailable: Bool { true }
+
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }
