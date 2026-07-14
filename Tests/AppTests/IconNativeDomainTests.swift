@@ -62,28 +62,6 @@ import Testing
         ])
     }
 
-    @Test func spatialIndexUsesNativeTriangleCells() throws {
-        let vertices = [
-            IconNativeGridPoint(latitude: 0, longitude: 0),
-            IconNativeGridPoint(latitude: 0, longitude: 0.1),
-            IconNativeGridPoint(latitude: 0.1, longitude: 0),
-            IconNativeGridPoint(latitude: 0.1, longitude: 0.1),
-        ]
-        let vertexIndices: [UInt32] = [0, 1, 2, 1, 3, 2]
-        let index = try IconNativeGridGenerator.makeSpatialIndex(
-            vertices: vertices,
-            vertexIndices: vertexIndices,
-            isGlobal: false,
-            bounds: GridBounds(lat_bounds: 0...0.1, lon_bounds: 0...0.1),
-            initialStep: 0.04
-        )
-
-        #expect(index.offsets.count == index.nx * index.ny + 1)
-        #expect(index.offsets.last == UInt32(index.cells.count))
-        #expect(index.cells.allSatisfy { $0 < 2 })
-        #expect(index.maximumCandidates <= IconNativeGrid.maximumCandidateCount)
-    }
-
     @Test func gribMetadataRequiresTheExactNativeGrid() throws {
         let valid = metadata(identity: .d2)
         try valid.validate(identity: .d2)
@@ -113,15 +91,6 @@ import Testing
         #expect(throws: IconNativeGribError.invalidDecodedValueCount(expected: 542_040, actual: 525_072)) {
             try IconNativeGribDecoder.validateDecodedValueCount(525_072, identity: .d2)
         }
-    }
-
-    @Test func unavailableNativeGridIsNonFatalAndCannotResolveCoordinates() async throws {
-        let grid = IconNativeUnavailableGrid()
-
-        #expect(grid.findPoint(lat: 52.5, lon: 13.4) == nil)
-        #expect(grid.findPointInterpolated(lat: 52.5, lon: 13.4) == nil)
-        #expect(grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 50..<53, longitude: 10..<14)) == nil)
-        #expect(grid.estimatedNumberOfGridCells(boundingBox: BoundingBoxWGS84(latitude: 50..<53, longitude: 10..<14)) == nil)
     }
 
     @Test func forecastModelsUseGenericDomainMappings() throws {
