@@ -257,6 +257,21 @@ import Testing
     }
 
     @Test func gridBoundsForKnownDomains() {
+        let camsEuropeBounds = CamsDomain.cams_europe.grid.gridBounds
+        #expect(abs(camsEuropeBounds.lat_bounds.lowerBound - 30.05) < 0.0001)
+        #expect(camsEuropeBounds.lat_bounds.upperBound == 71.95)
+        #expect(camsEuropeBounds.lon_bounds == -24.95...44.95)
+
+        let gaussianBounds = GaussianGrid(type: .o320).gridBounds
+        #expect(gaussianBounds.lat_bounds.lowerBound < gaussianBounds.lat_bounds.upperBound)
+        #expect(gaussianBounds.lon_bounds == -180...180)
+
+        let gaussianAreaBounds = GaussianGridArea(
+            type: .o320,
+            bounds: BoundingBoxWGS84(latitude: 30..<70, longitude: -20..<40)
+        ).gridBounds
+        #expect(gaussianAreaBounds == GridBounds(lat_bounds: 30...70, lon_bounds: -20...40))
+
         let iconGridBounds = IconDomains.icon.grid.gridBounds
         #expect(iconGridBounds == GridBounds(lat_bounds: -90.0...90.0, lon_bounds: -180.0...179.75))
 
