@@ -19,8 +19,14 @@ struct IconNativeGrid: Gridable {
         storage = try IconNativeGridStorage(file: file)
     }
 
-    init(data: Data) throws {
-        storage = try IconNativeGridStorage(data: data)
+    /// Map generated artifact data through a temporary file. The file can be unlinked immediately
+    /// after `mmap`; the mapping and its file handle remain owned by `MmapFile`.
+    static func loadMapped(data: Data) throws -> Self {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("icon-native-grid-\(UUID().uuidString).bin")
+        try data.write(to: file, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: file) }
+        return try Self(file: file)
     }
 
     var nx: Int { storage.cellCount }
@@ -532,11 +538,13 @@ enum IconNativeGridArtifact {
         data.replaceSubrange(136..<152, with: metadata.gridUUID)
         data.writeInteger(UInt64(data.count), at: 152)
         data.replaceSubrange(160..<192, with: metadata.sourceChecksum)
-        let checksum = data.withUnsafeBytes { iconNativeGridChecksum(bytes: $0) }
+        let checksum = data.withUnsafeBytes {
+            iconNativeGridChecksum(bytes: RawSpan(_unsafeBytes: $0))
+        }
         data.writeInteger(checksum, at: 128)
 
         // Run the same validation as the runtime loader before emitting an artifact.
-        _ = try IconNativeGrid(data: data)
+        _ = try IconNativeGrid.loadMapped(data: data)
         try IconNativeGridSeedProof.validate(
             metadata: metadata,
             centers: centers,
@@ -549,8 +557,7 @@ enum IconNativeGridArtifact {
 }
 
 final class IconNativeGridStorage: @unchecked Sendable {
-    private let data: NSData
-    private let bytes: UnsafeRawPointer
+    private let mapped: MmapFile
 
     let isGlobal: Bool
     let hasCoverage: Bool
@@ -574,22 +581,23 @@ final class IconNativeGridStorage: @unchecked Sendable {
     private let boundaryTrianglesOffset: Int
     private let boundaryTriangleCount: Int
 
-    convenience init(file: URL) throws {
-        let data = try NSData(contentsOf: file, options: .mappedIfSafe)
-        try self.init(nsData: data)
-    }
-
-    convenience init(data: Data) throws {
-        try self.init(nsData: NSData(data: data))
-    }
-
-    private init(nsData: NSData) throws {
-        data = nsData
-        bytes = nsData.bytes
-        guard nsData.length >= IconNativeGridArtifact.headerSize else {
+    init(file: URL) throws {
+        let fileHandle = try FileHandle.openFileReading(file: file.path)
+        let mapped = try MmapFile(fn: fileHandle)
+        guard !mapped.data.isEmpty else {
             throw IconNativeGridError.invalidHeader
         }
-        guard Array(UnsafeRawBufferPointer(start: bytes, count: 8)) == IconNativeGridArtifact.magic else {
+        self.mapped = mapped
+        let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
+        let length = mapped.data.count
+        guard length >= IconNativeGridArtifact.headerSize else {
+            throw IconNativeGridError.invalidHeader
+        }
+        var magicMatches = true
+        for offset in IconNativeGridArtifact.magic.indices where Self.readUInt8(bytes, at: offset) != IconNativeGridArtifact.magic[offset] {
+            magicMatches = false
+        }
+        guard magicMatches else {
             throw IconNativeGridError.invalidMagic
         }
         let version = Self.readUInt32(bytes, at: 8)
@@ -597,10 +605,10 @@ final class IconNativeGridStorage: @unchecked Sendable {
             throw IconNativeGridError.unsupportedVersion(version)
         }
         guard Self.readUInt32(bytes, at: 12) == IconNativeGridArtifact.headerSize,
-              Self.readUInt64(bytes, at: 152) == nsData.length else {
+              Self.readUInt64(bytes, at: 152) == length else {
             throw IconNativeGridError.invalidHeader
         }
-        let checksum = iconNativeGridChecksum(bytes: UnsafeRawBufferPointer(start: bytes, count: nsData.length))
+        let checksum = iconNativeGridChecksum(bytes: bytes)
         guard checksum == Self.readUInt64(bytes, at: 128) else {
             throw IconNativeGridError.invalidChecksum
         }
@@ -650,8 +658,18 @@ final class IconNativeGridStorage: @unchecked Sendable {
         boundaryOffsetsOffset = parsedBoundaryOffsetsOffset
         boundaryTrianglesOffset = parsedBoundaryTrianglesOffset
         boundaryTriangleCount = Int(Self.readUInt32(bytes, at: 120))
-        gridUUID = Array(UnsafeRawBufferPointer(start: bytes.advanced(by: 136), count: 16))
-        sourceChecksum = Array(UnsafeRawBufferPointer(start: bytes.advanced(by: 160), count: 32))
+        var gridUUID = [UInt8]()
+        gridUUID.reserveCapacity(16)
+        for offset in 136..<152 {
+            gridUUID.append(Self.readUInt8(bytes, at: offset))
+        }
+        self.gridUUID = gridUUID
+        var sourceChecksum = [UInt8]()
+        sourceChecksum.reserveCapacity(32)
+        for offset in 160..<192 {
+            sourceChecksum.append(Self.readUInt8(bytes, at: offset))
+        }
+        self.sourceChecksum = sourceChecksum
 
         guard cellCount > 0,
               seedNx > 0,
@@ -671,9 +689,9 @@ final class IconNativeGridStorage: @unchecked Sendable {
               let neighbourBytes = Self.multiplied(cellCount, 12),
               let binCount = Self.multiplied(seedNx, seedNy),
               let seedBytes = Self.multiplied(binCount, 4),
-              Self.validSection(offset: centersOffset, length: centerBytes, dataLength: nsData.length),
-              Self.validSection(offset: neighboursOffset, length: neighbourBytes, dataLength: nsData.length),
-              Self.validSection(offset: seedsOffset, length: seedBytes, dataLength: nsData.length),
+              Self.validSection(offset: centersOffset, length: centerBytes, dataLength: length),
+              Self.validSection(offset: neighboursOffset, length: neighbourBytes, dataLength: length),
+              Self.validSection(offset: seedsOffset, length: seedBytes, dataLength: length),
               centersOffset == IconNativeGridArtifact.headerSize,
               let expectedNeighboursOffset = Self.alignedEnd(offset: centersOffset, length: centerBytes),
               neighboursOffset == expectedNeighboursOffset,
@@ -699,16 +717,16 @@ final class IconNativeGridStorage: @unchecked Sendable {
                   boundaryTrianglesOffset > 0,
                   let boundaryIndexBytes = Self.multiplied(binCount + 1, 4),
                   let triangleBytes = Self.multiplied(boundaryTriangleCount, 36),
-                  Self.validSection(offset: coverageOffset, length: binCount, dataLength: nsData.length),
-                  Self.validSection(offset: boundaryOffsetsOffset, length: boundaryIndexBytes, dataLength: nsData.length),
-                  Self.validSection(offset: boundaryTrianglesOffset, length: triangleBytes, dataLength: nsData.length),
+                  Self.validSection(offset: coverageOffset, length: binCount, dataLength: length),
+                  Self.validSection(offset: boundaryOffsetsOffset, length: boundaryIndexBytes, dataLength: length),
+                  Self.validSection(offset: boundaryTrianglesOffset, length: triangleBytes, dataLength: length),
                   coverageOffset == expectedAfterSeeds,
                   let expectedBoundaryOffsetsOffset = Self.alignedEnd(offset: coverageOffset, length: binCount),
                   boundaryOffsetsOffset == expectedBoundaryOffsetsOffset,
                   let expectedBoundaryTrianglesOffset = Self.alignedEnd(offset: boundaryOffsetsOffset, length: boundaryIndexBytes),
                   boundaryTrianglesOffset == expectedBoundaryTrianglesOffset,
                   let expectedFileSize = Self.alignedEnd(offset: boundaryTrianglesOffset, length: triangleBytes),
-                  expectedFileSize == nsData.length else {
+                  expectedFileSize == length else {
                 throw IconNativeGridError.invalidHeader
             }
         } else {
@@ -716,15 +734,19 @@ final class IconNativeGridStorage: @unchecked Sendable {
                   boundaryOffsetsOffset == 0,
                   boundaryTrianglesOffset == 0,
                   boundaryTriangleCount == 0,
-                  expectedAfterSeeds == nsData.length else {
+                  expectedAfterSeeds == length else {
                 throw IconNativeGridError.invalidHeader
             }
         }
 
-        try validate(binCount: binCount)
+        try validate(bytes: bytes, binCount: binCount)
     }
 
     @inline(__always) func center(at cell: Int) -> IconNativeGridPoint {
+        withBytes { center(at: cell, bytes: $0) }
+    }
+
+    @inline(__always) private func center(at cell: Int, bytes: borrowing RawSpan) -> IconNativeGridPoint {
         let offset = centersOffset + cell * 12
         return IconNativeGridPoint(
             x: Self.readFloat(bytes, at: offset),
@@ -734,15 +756,25 @@ final class IconNativeGridStorage: @unchecked Sendable {
     }
 
     @inline(__always) func neighbour(cell: Int, position: Int) -> UInt32 {
+        withBytes {
+            Self.readUInt32($0, at: neighboursOffset + (cell * 3 + position) * 4)
+        }
+    }
+
+    @inline(__always) private func neighbour(cell: Int, position: Int, bytes: borrowing RawSpan) -> UInt32 {
         Self.readUInt32(bytes, at: neighboursOffset + (cell * 3 + position) * 4)
     }
 
     @inline(__always) func seed(at bin: Int) -> UInt32 {
+        withBytes { Self.readUInt32($0, at: seedsOffset + bin * 4) }
+    }
+
+    @inline(__always) private func seed(at bin: Int, bytes: borrowing RawSpan) -> UInt32 {
         Self.readUInt32(bytes, at: seedsOffset + bin * 4)
     }
 
     @inline(__always) func coverage(at bin: Int) -> UInt8 {
-        bytes.load(fromByteOffset: coverageOffset + bin, as: UInt8.self)
+        withBytes { Self.readUInt8($0, at: coverageOffset + bin) }
     }
 
     func seedBin(lat: Float, lon: Float) -> Int? {
@@ -774,20 +806,26 @@ final class IconNativeGridStorage: @unchecked Sendable {
     }
 
     func contains(point: IconNativeGridPoint, boundaryBin: Int) -> Bool {
+        withBytes { bytes in
+            contains(point: point, boundaryBin: boundaryBin, bytes: bytes)
+        }
+    }
+
+    private func contains(point: IconNativeGridPoint, boundaryBin: Int, bytes: borrowing RawSpan) -> Bool {
         let lower = Int(Self.readUInt32(bytes, at: boundaryOffsetsOffset + boundaryBin * 4))
         let upper = Int(Self.readUInt32(bytes, at: boundaryOffsetsOffset + (boundaryBin + 1) * 4))
         guard lower <= upper, upper <= boundaryTriangleCount else {
             return false
         }
         for triangleIndex in lower..<upper {
-            if boundaryTriangle(at: triangleIndex).contains(point) {
+            if boundaryTriangle(at: triangleIndex, bytes: bytes).contains(point) {
                 return true
             }
         }
         return false
     }
 
-    private func boundaryTriangle(at index: Int) -> IconNativeGridBoundaryTriangle {
+    private func boundaryTriangle(at index: Int, bytes: borrowing RawSpan) -> IconNativeGridBoundaryTriangle {
         let offset = boundaryTrianglesOffset + index * 36
         func point(_ position: Int) -> IconNativeGridPoint {
             let pointOffset = offset + position * 12
@@ -800,9 +838,9 @@ final class IconNativeGridStorage: @unchecked Sendable {
         return IconNativeGridBoundaryTriangle(a: point(0), b: point(1), c: point(2))
     }
 
-    private func validate(binCount: Int) throws {
+    private func validate(bytes: borrowing RawSpan, binCount: Int) throws {
         for cell in 0..<cellCount {
-            let point = center(at: cell)
+            let point = center(at: cell, bytes: bytes)
             let normSquared = point.dot(point)
             guard point.x.isFinite, point.y.isFinite, point.z.isFinite, abs(normSquared - 1) < 1e-5 else {
                 throw IconNativeGridError.invalidCenter(cell)
@@ -810,7 +848,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
             var uniqueNeighbours = InlineArray<3, UInt32>(repeating: IconNativeGrid.missingIndex)
             var uniqueCount = 0
             for position in 0..<3 {
-                let value = neighbour(cell: cell, position: position)
+                let value = neighbour(cell: cell, position: position, bytes: bytes)
                 if value == IconNativeGrid.missingIndex {
                     continue
                 }
@@ -823,7 +861,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
                 uniqueNeighbours[uniqueCount] = value
                 uniqueCount += 1
                 var reciprocal = false
-                for reciprocalPosition in 0..<3 where neighbour(cell: Int(value), position: reciprocalPosition) == cell {
+                for reciprocalPosition in 0..<3 where neighbour(cell: Int(value), position: reciprocalPosition, bytes: bytes) == cell {
                     reciprocal = true
                 }
                 guard reciprocal else {
@@ -833,7 +871,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
         }
 
         for bin in 0..<binCount {
-            let seed = seed(at: bin)
+            let seed = seed(at: bin, bytes: bytes)
             if seed != IconNativeGrid.missingIndex, seed >= cellCount {
                 throw IconNativeGridError.invalidSeed(bin: bin, seed: seed)
             }
@@ -843,7 +881,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
             guard hasCoverage else {
                 continue
             }
-            let coverage = coverage(at: bin)
+            let coverage = Self.readUInt8(bytes, at: coverageOffset + bin)
             guard coverage <= 2 else {
                 throw IconNativeGridError.invalidCoverage(bin: bin, value: coverage)
             }
@@ -865,7 +903,7 @@ final class IconNativeGridStorage: @unchecked Sendable {
         }
         if hasCoverage {
             for triangleIndex in 0..<boundaryTriangleCount {
-                let triangle = boundaryTriangle(at: triangleIndex)
+                let triangle = boundaryTriangle(at: triangleIndex, bytes: bytes)
                 for point in [triangle.a, triangle.b, triangle.c] {
                     guard point.x.isFinite,
                           point.y.isFinite,
@@ -876,6 +914,10 @@ final class IconNativeGridStorage: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    @inline(__always) private func withBytes<R>(_ body: (borrowing RawSpan) throws -> R) rethrows -> R {
+        try body(RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data)))
     }
 
     private static func multiplied(_ lhs: Int, _ rhs: Int) -> Int? {
@@ -903,15 +945,19 @@ final class IconNativeGridStorage: @unchecked Sendable {
         return withPadding.partialValue / 8 * 8
     }
 
-    @inline(__always) private static func readUInt32(_ bytes: UnsafeRawPointer, at offset: Int) -> UInt32 {
-        UInt32(littleEndian: bytes.loadUnaligned(fromByteOffset: offset, as: UInt32.self))
+    @inline(__always) private static func readUInt8(_ bytes: borrowing RawSpan, at offset: Int) -> UInt8 {
+        bytes.unsafeLoad(fromByteOffset: offset, as: UInt8.self)
     }
 
-    @inline(__always) private static func readUInt64(_ bytes: UnsafeRawPointer, at offset: Int) -> UInt64 {
-        UInt64(littleEndian: bytes.loadUnaligned(fromByteOffset: offset, as: UInt64.self))
+    @inline(__always) private static func readUInt32(_ bytes: borrowing RawSpan, at offset: Int) -> UInt32 {
+        UInt32(littleEndian: bytes.unsafeLoadUnaligned(fromByteOffset: offset, as: UInt32.self))
     }
 
-    @inline(__always) private static func readFloat(_ bytes: UnsafeRawPointer, at offset: Int) -> Float {
+    @inline(__always) private static func readUInt64(_ bytes: borrowing RawSpan, at offset: Int) -> UInt64 {
+        UInt64(littleEndian: bytes.unsafeLoadUnaligned(fromByteOffset: offset, as: UInt64.self))
+    }
+
+    @inline(__always) private static func readFloat(_ bytes: borrowing RawSpan, at offset: Int) -> Float {
         Float(bitPattern: readUInt32(bytes, at: offset))
     }
 }
@@ -945,11 +991,13 @@ private extension Data {
     }
 }
 
-private func iconNativeGridChecksum(bytes: UnsafeRawBufferPointer) -> UInt64 {
+private func iconNativeGridChecksum(bytes: borrowing RawSpan) -> UInt64 {
     var hash: UInt64 = 0xcbf29ce484222325
-    for index in bytes.indices {
+    for index in bytes.byteOffsets {
         // The checksum field is treated as zero by both writer and reader.
-        let byte: UInt8 = (128..<136).contains(index) ? 0 : bytes[index]
+        let byte: UInt8 = (128..<136).contains(index)
+            ? 0
+            : bytes.unsafeLoad(fromByteOffset: index, as: UInt8.self)
         hash ^= UInt64(byte)
         hash &*= 0x100000001b3
     }

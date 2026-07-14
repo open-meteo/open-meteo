@@ -6,7 +6,7 @@ import Testing
 @Suite struct IconNativeGridTests {
     @Test func coordinateRoundTripsUseNativeOrdering() throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid(data: fixture.data)
+        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
 
         #expect(grid.nx == 8)
         #expect(grid.ny == 1)
@@ -23,7 +23,7 @@ import Testing
 
     @Test func lookupMatchesBruteForceAndHasFixedCandidateBound() throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid(data: fixture.data)
+        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
 
         for latitude in stride(from: Float(-90), through: 90, by: 2.5) {
             for longitude in stride(from: Float(-180), to: 180, by: 2.5) {
@@ -37,7 +37,7 @@ import Testing
 
     @Test func polesDatelineAndInvalidCoordinatesAreDeterministic() throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid(data: fixture.data)
+        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
 
         #expect(grid.findPoint(lat: 0, lon: -180) == grid.findPoint(lat: 0, lon: 180))
         #expect(grid.findPoint(lat: 12, lon: -179.999) == grid.findPoint(lat: 12, lon: 180.001))
@@ -78,7 +78,7 @@ import Testing
             boundaryOffsets: [0, 1],
             boundaryTriangles: [triangle]
         )
-        let grid = try IconNativeGrid(data: data)
+        let grid = try IconNativeGrid.loadMapped(data: data)
 
         #expect(grid.findPoint(lat: 2, lon: 2) == 0)
         #expect(grid.findPoint(lat: 8, lon: 8) == nil)
@@ -100,7 +100,7 @@ import Testing
     }
 
     @Test func unsupportedRectangularOperationsReturnNil() throws {
-        let grid = try IconNativeGrid(data: makeGlobalFixture().data)
+        let grid = try IconNativeGrid.loadMapped(data: makeGlobalFixture().data)
         let boundingBox = BoundingBoxWGS84(latitude: 40..<50, longitude: 0..<10)
 
         #expect(grid.findPointInterpolated(lat: 45, lon: 5) == nil)
@@ -152,7 +152,7 @@ import Testing
             neighbours: neighbours,
             seeds: [0]
         )
-        let grid = try IconNativeGrid(data: data)
+        let grid = try IconNativeGrid.loadMapped(data: data)
         let terrainFile = try await makeElevationFile([0, 100, 100, 100, 500])
         let seaFile = try await makeElevationFile([100, 100, 100, 100, -999])
         defer {
@@ -188,25 +188,25 @@ import Testing
         var invalidMagic = fixture.data
         invalidMagic[0] ^= 0xff
         #expect(throws: IconNativeGridError.invalidMagic) {
-            _ = try IconNativeGrid(data: invalidMagic)
+            _ = try IconNativeGrid.loadMapped(data: invalidMagic)
         }
 
         var invalidPayload = fixture.data
         invalidPayload[IconNativeGridArtifact.headerSize] ^= 0x01
         #expect(throws: IconNativeGridError.invalidChecksum) {
-            _ = try IconNativeGrid(data: invalidPayload)
+            _ = try IconNativeGrid.loadMapped(data: invalidPayload)
         }
 
         var invalidIdentity = fixture.data
         invalidIdentity[136] ^= 0x01
         #expect(throws: IconNativeGridError.invalidChecksum) {
-            _ = try IconNativeGrid(data: invalidIdentity)
+            _ = try IconNativeGrid.loadMapped(data: invalidIdentity)
         }
 
         var truncated = fixture.data
         truncated.removeLast()
         #expect(throws: IconNativeGridError.invalidHeader) {
-            _ = try IconNativeGrid(data: truncated)
+            _ = try IconNativeGrid.loadMapped(data: truncated)
         }
     }
 
@@ -268,7 +268,7 @@ import Testing
 
     @Test func concurrentLookupsAreStable() async throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid(data: fixture.data)
+        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
         let expected = (0..<360).map { offset in
             let longitude = Float(offset) - 179.75
             return bruteForce(latitude: 37.5, longitude: longitude, centers: fixture.centers)
