@@ -470,13 +470,15 @@ private struct IconNativeGridElevationFile {
 private func makeElevationFile(_ elevations: [Float]) async throws -> IconNativeGridElevationFile {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("icon-native-elevation-\(UUID().uuidString).om").path
+    let handle = try FileHandle.createNewFile(file: path)
     try elevations.writeOmFile(
-        file: path,
+        fn: handle,
         dimensions: [1, elevations.count],
         chunks: [1, elevations.count],
         compression: .pfor_delta2d_int16,
         scalefactor: 1
     )
+    try handle.close()
     let reader = try await OmFileReader(file: path).expectArray(of: Float.self)
     return IconNativeGridElevationFile(path: path, reader: reader)
 }
