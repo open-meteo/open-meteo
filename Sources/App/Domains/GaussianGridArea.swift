@@ -24,13 +24,6 @@ struct GaussianGridArea: Gridable {
     var ny: Int { 1 }
     var searchRadius: Int { 1 }
 
-    var gridBounds: GridBounds {
-        GridBounds(
-            lat_bounds: bounds.latitude.lowerBound...bounds.latitude.upperBound,
-            lon_bounds: bounds.longitude.lowerBound...bounds.longitude.upperBound
-        )
-    }
-
     var crsWkt2: String {
         return """
             GEOGCRS["Reduced Gaussian Grid",

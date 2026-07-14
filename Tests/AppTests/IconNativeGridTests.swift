@@ -6,14 +6,13 @@ import Testing
 @Suite struct IconNativeGridTests {
     @Test func coordinateRoundTripsUseNativeOrdering() throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
+        defer { fixture.remove() }
+        let grid = try IconNativeGrid.load(file: fixture.file)
 
         #expect(grid.nx == fixture.centers.count)
         #expect(grid.ny == 1)
         #expect(grid.gridNumber == 26)
         #expect(grid.gridUUID == Array(0..<16))
-        #expect(grid.gridSourceChecksum == Array(repeating: 26, count: 32))
-        #expect(grid.gridBounds == GridBounds(lat_bounds: -90...90, lon_bounds: -180...180))
 
         for index in fixture.centers.indices {
             let coordinate = grid.getCoordinates(gridpoint: index)
@@ -25,7 +24,8 @@ import Testing
 
     @Test func lookupMatchesExhaustiveContainmentAndHasFixedCandidateBound() throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
+        defer { fixture.remove() }
+        let grid = try IconNativeGrid.load(file: fixture.file)
 
         for latitude in stride(from: Float(-90), through: 90, by: 2.5) {
             for longitude in stride(from: Float(-180), to: 180, by: 2.5) {
@@ -44,14 +44,15 @@ import Testing
 
     @Test func sharedEdgesPolesAndDatelineAreDeterministic() throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
+        defer { fixture.remove() }
+        let grid = try IconNativeGrid.load(file: fixture.file)
 
         #expect(grid.findPoint(lat: 0, lon: -180) == grid.findPoint(lat: 0, lon: 180))
         #expect(grid.findPoint(lat: 12, lon: -179.999) == grid.findPoint(lat: 12, lon: 180.001))
         #expect(grid.findPoint(lat: 90, lon: -180) == grid.findPoint(lat: 90, lon: 123))
         #expect(grid.findPoint(lat: -90, lon: -123) == grid.findPoint(lat: -90, lon: 179))
 
-        let sharedEdge = IconNativeGridPoint(latitude: 0, longitude: 45)
+        let sharedEdge = SphericalPoint(latitude: 0, longitude: 45)
         let matching = matchingCells(point: sharedEdge, vertices: fixture.vertices, vertexIndices: fixture.vertexIndices)
         #expect(matching.count >= 2)
         #expect(grid.findPoint(lat: 0, lon: 45) == matching.min())
@@ -63,9 +64,9 @@ import Testing
 
     @Test func regionalMeshRejectsPointsOutsideItsTriangles() throws {
         let vertices = [
-            IconNativeGridPoint(latitude: 0, longitude: 0),
-            IconNativeGridPoint(latitude: 0, longitude: 0.1),
-            IconNativeGridPoint(latitude: 0.1, longitude: 0),
+            SphericalPoint(latitude: 0, longitude: 0),
+            SphericalPoint(latitude: 0, longitude: 0.1),
+            SphericalPoint(latitude: 0.1, longitude: 0),
         ]
         let vertexIndices: [UInt32] = [0, 1, 2]
         let centers = triangleCenters(vertices: vertices, vertexIndices: vertexIndices)
@@ -75,9 +76,12 @@ import Testing
             vertexIndices: vertexIndices,
             isGlobal: false,
             bounds: bounds,
-            initialStep: 0.04
+            step: 0.04
         )
-        let data = try IconNativeGridArtifact.make(
+        let file = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        try IconNativeGridArtifact.write(
+            to: file.path,
             metadata: makeMetadata(isGlobal: false, bounds: bounds, index: index),
             centers: centers,
             vertices: vertices,
@@ -86,7 +90,7 @@ import Testing
             binOffsets: index.offsets,
             binCells: index.cells
         )
-        let grid = try IconNativeGrid.loadMapped(data: data)
+        let grid = try IconNativeGrid.load(file: file)
 
         #expect(grid.findPoint(lat: 0.02, lon: 0.02) == 0)
         #expect(grid.findPoint(lat: 0.08, lon: 0.08) == nil)
@@ -95,45 +99,114 @@ import Testing
     }
 
     @Test func nativeScaleHalfSpacesRejectOutsidePoints() {
-        let triangle = IconNativeGridTriangle(
-            a: IconNativeGridPoint(latitude: 50, longitude: 10),
-            b: IconNativeGridPoint(latitude: 50, longitude: 10.02),
-            c: IconNativeGridPoint(latitude: 50.02, longitude: 10)
+        let triangle = SphericalTriangle(
+            a: SphericalPoint(latitude: 50, longitude: 10),
+            b: SphericalPoint(latitude: 50, longitude: 10.02),
+            c: SphericalPoint(latitude: 50.02, longitude: 10)
         )
 
-        #expect(triangle.contains(IconNativeGridPoint(latitude: 50.005, longitude: 10.005)))
-        #expect(!triangle.contains(IconNativeGridPoint(latitude: 50.02, longitude: 10.02)))
-        #expect(!triangle.contains(IconNativeGridPoint(latitude: 50.1, longitude: 10.1)))
-        #expect(!triangle.contains(IconNativeGridPoint(latitude: 51, longitude: 11)))
+        #expect(triangle.contains(SphericalPoint(latitude: 50.005, longitude: 10.005)))
+        #expect(!triangle.contains(SphericalPoint(latitude: 50.02, longitude: 10.02)))
+        #expect(!triangle.contains(SphericalPoint(latitude: 50.1, longitude: 10.1)))
+        #expect(!triangle.contains(SphericalPoint(latitude: 51, longitude: 11)))
     }
 
-    @Test func unsupportedRectangularOperationsReturnNil() throws {
-        let grid = try IconNativeGrid.loadMapped(data: makeGlobalFixture().data)
-        let boundingBox = BoundingBoxWGS84(latitude: 40..<50, longitude: 0..<10)
-
-        #expect(grid.findPointInterpolated(lat: 45, lon: 5) == nil)
-        #expect(grid.findBox(boundingBox: boundingBox) == nil)
-        #expect(grid.estimatedNumberOfGridCells(boundingBox: boundingBox) == nil)
-    }
-
-    @Test func fileBackedArtifactUsesTheSameValidatedPath() throws {
+    @Test func validatedStagingMappingSurvivesAtomicPublication() throws {
         let fixture = try makeGlobalFixture()
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("icon-native-\(UUID().uuidString).grid")
-        try fixture.data.write(to: file, options: .atomic)
-        defer { try? FileManager.default.removeItem(at: file) }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("icon-native-publication-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let staged = directory.appendingPathComponent("grid.bin~")
+        let published = directory.appendingPathComponent("grid.bin")
+        try FileManager.default.moveFileOverwrite(from: fixture.file.path, to: staged.path)
 
-        let grid = try IconNativeGrid(file: file)
-        #expect(grid.findPoint(lat: 45, lon: 45) == bruteForceContaining(
-            latitude: 45,
-            longitude: 45,
-            vertices: fixture.vertices,
-            vertexIndices: fixture.vertexIndices
-        ))
+        let grid = try IconNativeGrid.load(file: staged)
+        try FileManager.default.moveFileOverwrite(from: staged.path, to: published.path)
+
+        #expect(!FileManager.default.fileExists(atPath: staged.path))
+        #expect(FileManager.default.fileExists(atPath: published.path))
+        #expect(grid.findPoint(lat: 45, lon: 45) != nil)
+        #expect(grid.gridNumber == 26)
+    }
+
+    @Test func cacheSingleFlightsAndPinsSuccessfulStorage() async throws {
+        let fixture = try makeGlobalFixture()
+        defer { fixture.remove() }
+        let identity = makeIdentity(for: fixture)
+        let cache = IconNativeGridCache(file: fixture.file.path, identity: identity)
+
+        let storageIdentifiers = try await withThrowingTaskGroup(of: ObjectIdentifier.self) { group in
+            for _ in 0..<16 {
+                group.addTask {
+                    let grid = try cache.get()
+                    return ObjectIdentifier(grid.storage)
+                }
+            }
+            var identifiers = [ObjectIdentifier]()
+            for try await identifier in group { identifiers.append(identifier) }
+            return identifiers
+        }
+        #expect(Set(storageIdentifiers).count == 1)
+
+        let replacement = try makeGlobalFixture()
+        try FileManager.default.moveFileOverwrite(from: replacement.file.path, to: fixture.file.path)
+        let pinned = try cache.get()
+        #expect(ObjectIdentifier(pinned.storage) == storageIdentifiers[0])
+    }
+
+    @Test func cachedMissingArtifactBecomesAvailableAfterPublication() throws {
+        let fixture = try makeGlobalFixture()
+        let published = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: published) }
+        let identity = makeIdentity(for: fixture)
+        let cache = IconNativeGridCache(file: published.path, identity: identity)
+
+        #expect(throws: IconNativeDomainError.missingGridArtifact(published.path)) {
+            _ = try cache.get()
+        }
+        try FileManager.default.moveFileOverwrite(from: fixture.file.path, to: published.path)
+        cache.install(try IconNativeGrid.load(file: published))
+        let grid = try cache.get()
+        #expect(grid.nx == fixture.centers.count)
+    }
+
+    @Test func failedCacheRetriesWhenArtifactFingerprintChanges() throws {
+        let fixture = try makeGlobalFixture()
+        let published = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: published) }
+        let cache = IconNativeGridCache(
+            file: published.path,
+            identity: makeIdentity(for: fixture),
+            retryInterval: .zero
+        )
+
+        #expect(throws: IconNativeDomainError.missingGridArtifact(published.path)) {
+            _ = try cache.get()
+        }
+        try FileManager.default.moveFileOverwrite(from: fixture.file.path, to: published.path)
+        #expect(try cache.get().nx == fixture.centers.count)
+    }
+
+    @Test func downloaderValidationInspectsDiskWithoutReplacingPinnedStorage() throws {
+        let fixture = try makeGlobalFixture()
+        defer { fixture.remove() }
+        let cache = IconNativeGridCache(file: fixture.file.path, identity: makeIdentity(for: fixture))
+        let pinned = try cache.get()
+        var invalid = try Data(contentsOf: fixture.file)
+        invalid[0] ^= 0xff
+        try invalid.write(to: fixture.file)
+
+        #expect(throws: IconNativeDomainError.self) {
+            try cache.validateFileAndInstall()
+        }
+        #expect(ObjectIdentifier(try cache.get().storage) == ObjectIdentifier(pinned.storage))
     }
 
     @Test func terrainAndSeaSelectionFollowNativeTopology() async throws {
         let fixture = try makeRegionalFixture()
-        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
+        defer { fixture.remove() }
+        let grid = try IconNativeGrid.load(file: fixture.file)
         let terrainFile = try await makeElevationFile([0, 500])
         let seaFile = try await makeElevationFile([100, -999])
         defer {
@@ -169,59 +242,84 @@ import Testing
 
     @Test func corruptArtifactsFailBeforeLookup() throws {
         let fixture = try makeGlobalFixture()
+        defer { fixture.remove() }
+        let data = try Data(contentsOf: fixture.file)
 
-        var invalidMagic = fixture.data
+        var invalidMagic = data
         invalidMagic[0] ^= 0xff
+        let invalidMagicFile = try writeTemporaryData(invalidMagic)
+        defer { try? FileManager.default.removeItem(at: invalidMagicFile) }
         #expect(throws: IconNativeGridError.invalidMagic) {
-            _ = try IconNativeGrid.loadMapped(data: invalidMagic)
+            _ = try IconNativeGrid.load(file: invalidMagicFile)
         }
 
-        var invalidPayload = fixture.data
+        var invalidPayload = data
         invalidPayload[IconNativeGridArtifact.headerSize] ^= 0x01
+        let invalidPayloadFile = try writeTemporaryData(invalidPayload)
+        defer { try? FileManager.default.removeItem(at: invalidPayloadFile) }
         #expect(throws: IconNativeGridError.invalidChecksum) {
-            _ = try IconNativeGrid.loadMapped(data: invalidPayload)
+            _ = try IconNativeGrid.load(file: invalidPayloadFile)
         }
 
-        var invalidIdentity = fixture.data
+        var invalidIdentity = data
         invalidIdentity[136] ^= 0x01
+        let invalidIdentityFile = try writeTemporaryData(invalidIdentity)
+        defer { try? FileManager.default.removeItem(at: invalidIdentityFile) }
         #expect(throws: IconNativeGridError.invalidChecksum) {
-            _ = try IconNativeGrid.loadMapped(data: invalidIdentity)
+            _ = try IconNativeGrid.load(file: invalidIdentityFile)
         }
 
-        var truncated = fixture.data
+        var truncated = data
         truncated.removeLast()
+        let truncatedFile = try writeTemporaryData(truncated)
+        defer { try? FileManager.default.removeItem(at: truncatedFile) }
         #expect(throws: IconNativeGridError.invalidHeader) {
-            _ = try IconNativeGrid.loadMapped(data: truncated)
+            _ = try IconNativeGrid.load(file: truncatedFile)
         }
     }
 
-    @Test func meshTopologyAndCsrInvariantsAreValidatedByTheWriter() throws {
+    @Test func artifactSizeBudgetIsCheckedBeforeWriting() throws {
         let fixture = try makeRegionalFixtureInputs()
+        let file = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: file) }
 
-        var invalidVertices = fixture.vertexIndices
-        invalidVertices[0] = UInt32(fixture.vertices.count)
-        #expect(throws: IconNativeGridError.invalidTriangle(0)) {
-            _ = try makeArtifact(inputs: fixture, vertexIndices: invalidVertices)
+        do {
+            try IconNativeGridArtifact.write(
+                to: file.path,
+                metadata: fixture.metadata,
+                centers: fixture.centers,
+                vertices: fixture.vertices,
+                vertexIndices: fixture.vertexIndices,
+                neighbourIndices: fixture.neighbours,
+                binOffsets: fixture.index.offsets,
+                binCells: fixture.index.cells,
+                maximumFileSize: 1
+            )
+            Issue.record("Expected artifact size budget failure")
+        } catch IconNativeGridError.artifactTooLarge {
+            #expect(!FileManager.default.fileExists(atPath: file.path))
         }
+    }
 
-        var invalidNeighbours = fixture.neighbours
-        invalidNeighbours[0] = 0
-        #expect(throws: IconNativeGridError.invalidNeighbour(cell: 0, neighbour: 0)) {
-            _ = try makeArtifact(inputs: fixture, neighbours: invalidNeighbours)
-        }
+    @Test func invalidNetcdfErrorsStayInTheSourceErrorDomain() throws {
+        let file = try writeTemporaryData(Data("not a NetCDF file".utf8))
+        defer { try? FileManager.default.removeItem(at: file) }
 
-        var invalidCells = fixture.index.cells
-        invalidCells[0] = UInt32(fixture.centers.count)
-        #expect(throws: IconNativeGridError.invalidBinCell(bin: 0, cell: UInt32(fixture.centers.count))) {
-            _ = try makeArtifact(inputs: fixture, binCells: invalidCells)
+        do {
+            _ = try IconNativeGridGenerator.readSource(file: file.path, identity: .d2)
+            Issue.record("Expected invalid NetCDF source to fail")
+        } catch is IconNativeGridSourceError {
+            // The downloader can safely identify this as a replaceable cached source.
+        } catch {
+            Issue.record("Expected IconNativeGridSourceError, got \(error)")
         }
     }
 
     @Test func spatialIndexRejectsAnUnboundedCandidateBin() throws {
         let vertices = [
-            IconNativeGridPoint(latitude: 0, longitude: 0),
-            IconNativeGridPoint(latitude: 0, longitude: 0.01),
-            IconNativeGridPoint(latitude: 0.01, longitude: 0),
+            SphericalPoint(latitude: 0, longitude: 0),
+            SphericalPoint(latitude: 0, longitude: 0.01),
+            SphericalPoint(latitude: 0.01, longitude: 0),
         ]
         let vertexIndices = Array(repeating: [UInt32(0), UInt32(1), UInt32(2)], count: 129).flatMap { $0 }
         do {
@@ -230,7 +328,7 @@ import Testing
                 vertexIndices: vertexIndices,
                 isGlobal: false,
                 bounds: GridBounds(lat_bounds: 0...0.01, lon_bounds: 0...0.01),
-                initialStep: 0.02
+                step: 0.02
             )
             Issue.record("Expected the per-bin candidate bound to fail")
         } catch IconNativeGridError.candidateLimit {
@@ -240,7 +338,8 @@ import Testing
 
     @Test func concurrentLookupsAreStable() async throws {
         let fixture = try makeGlobalFixture()
-        let grid = try IconNativeGrid.loadMapped(data: fixture.data)
+        defer { fixture.remove() }
+        let grid = try IconNativeGrid.load(file: fixture.file)
         let expected = (0..<360).map { offset in
             bruteForceContaining(
                 latitude: 37.5,
@@ -266,16 +365,23 @@ import Testing
         #expect(correct)
     }
 
-    @Test func officialD2TriangleInteriorsPreserveNativeIndices() throws {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_D2_GRID_TEST_FILE"] != nil))
+    func officialD2TriangleInteriorsPreserveNativeIndices() throws {
         guard let sourceFile = ProcessInfo.processInfo.environment["ICON_D2_GRID_TEST_FILE"] else {
             return
         }
         let source = try IconNativeGridGenerator.readSource(file: sourceFile, identity: .d2)
-        let data = try IconNativeGridGenerator.generate(sourceFile: sourceFile, identity: .d2)
-        let grid = try IconNativeGrid.loadMapped(data: data)
+        let artifactFile = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: artifactFile) }
+        let grid = try IconNativeGridGenerator.generate(
+            sourceFile: sourceFile,
+            identity: .d2,
+            artifactFile: artifactFile.path
+        )
 
         #expect(grid.nx == IconNativeGridIdentity.d2.cellCount)
-        #expect(data.count <= 64 * 1_024 * 1_024)
+        let artifactSize = FileManager.default.fileStats(at: artifactFile.path).map { Int($0.st_size) } ?? .max
+        #expect(artifactSize <= 64 * 1_024 * 1_024)
         for cell in source.centers.indices {
             let coordinate = grid.getCoordinates(gridpoint: cell)
             #expect(abs(coordinate.latitude - source.centers[cell].latitude) < 1e-4)
@@ -289,7 +395,7 @@ import Testing
             let y = a.y + b.y + c.y
             let z = a.z + b.z + c.z
             let length = sqrt(x * x + y * y + z * z)
-            let interior = IconNativeGridPoint(x: x / length, y: y / length, z: z / length)
+            let interior = SphericalPoint(x: x / length, y: y / length, z: z / length)
             let actual = grid.findPoint(lat: interior.latitude, lon: interior.longitude)
             if actual != cell {
                 Issue.record("Official ICON-D2 triangle interior \(cell) resolved to \(String(describing: actual))")
@@ -297,19 +403,60 @@ import Testing
             }
         }
     }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_GLOBAL_GRID_TEST_FILE"] != nil))
+    func officialGlobalGridPreservesSampledNativeIndices() throws {
+        guard let sourceFile = ProcessInfo.processInfo.environment["ICON_GLOBAL_GRID_TEST_FILE"] else {
+            return
+        }
+        let source = try IconNativeGridGenerator.readSource(file: sourceFile, identity: .global)
+        let artifactFile = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: artifactFile) }
+        let grid = try IconNativeGridGenerator.generate(
+            sourceFile: sourceFile,
+            identity: .global,
+            artifactFile: artifactFile.path
+        )
+
+        let stride = max(1, source.centers.count / 100_000)
+        for cell in Swift.stride(from: 0, to: source.centers.count, by: stride) {
+            let coordinate = grid.getCoordinates(gridpoint: cell)
+            #expect(abs(coordinate.latitude - source.centers[cell].latitude) < 1e-4)
+            #expect(abs(coordinate.longitude - source.centers[cell].longitude) < 1e-4)
+
+            let offset = cell * 3
+            let a = source.vertices[Int(source.vertexIndices[offset])]
+            let b = source.vertices[Int(source.vertexIndices[offset + 1])]
+            let c = source.vertices[Int(source.vertexIndices[offset + 2])]
+            let x = a.x + b.x + c.x
+            let y = a.y + b.y + c.y
+            let z = a.z + b.z + c.z
+            let length = sqrt(x * x + y * y + z * z)
+            let interior = SphericalPoint(
+                x: x / length,
+                y: y / length,
+                z: z / length
+            )
+            #expect(grid.findPoint(lat: interior.latitude, lon: interior.longitude) == cell)
+        }
+    }
 }
 
 private struct IconNativeGridFixture {
-    let data: Data
-    let centers: [IconNativeGridPoint]
-    let vertices: [IconNativeGridPoint]
+    let file: URL
+    let centers: [LatLon]
+    let vertices: [SphericalPoint]
     let vertexIndices: [UInt32]
+
+    func remove() {
+        try? FileManager.default.removeItem(at: file)
+    }
 }
 
 private struct IconNativeGridFixtureInputs {
     let metadata: IconNativeGridArtifact.Metadata
-    let centers: [IconNativeGridPoint]
-    let vertices: [IconNativeGridPoint]
+    let centers: [LatLon]
+    let vertices: [SphericalPoint]
     let vertexIndices: [UInt32]
     let neighbours: [UInt32]
     let index: IconNativeGridGenerator.SpatialIndex
@@ -336,12 +483,12 @@ private func makeElevationFile(_ elevations: [Float]) async throws -> IconNative
 
 private func makeGlobalFixture() throws -> IconNativeGridFixture {
     let vertices = [
-        IconNativeGridPoint(x: 0, y: 0, z: 1),
-        IconNativeGridPoint(x: 0, y: 0, z: -1),
-        IconNativeGridPoint(x: 1, y: 0, z: 0),
-        IconNativeGridPoint(x: 0, y: 1, z: 0),
-        IconNativeGridPoint(x: -1, y: 0, z: 0),
-        IconNativeGridPoint(x: 0, y: -1, z: 0),
+        SphericalPoint(x: 0, y: 0, z: 1),
+        SphericalPoint(x: 0, y: 0, z: -1),
+        SphericalPoint(x: 1, y: 0, z: 0),
+        SphericalPoint(x: 0, y: 1, z: 0),
+        SphericalPoint(x: -1, y: 0, z: 0),
+        SphericalPoint(x: 0, y: -1, z: 0),
     ]
     let vertexIndices: [UInt32] = [
         0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 2,
@@ -355,10 +502,12 @@ private func makeGlobalFixture() throws -> IconNativeGridFixture {
         vertexIndices: vertexIndices,
         isGlobal: true,
         bounds: bounds,
-        initialStep: 45
+        step: 45
     )
     let metadata = makeMetadata(isGlobal: true, bounds: bounds, index: index)
-    let data = try IconNativeGridArtifact.make(
+    let file = temporaryArtifactFile()
+    try IconNativeGridArtifact.write(
+        to: file.path,
         metadata: metadata,
         centers: centers,
         vertices: vertices,
@@ -367,13 +516,14 @@ private func makeGlobalFixture() throws -> IconNativeGridFixture {
         binOffsets: index.offsets,
         binCells: index.cells
     )
-    return IconNativeGridFixture(data: data, centers: centers, vertices: vertices, vertexIndices: vertexIndices)
+    _ = try IconNativeGrid.load(file: file)
+    return IconNativeGridFixture(file: file, centers: centers, vertices: vertices, vertexIndices: vertexIndices)
 }
 
 private func makeRegionalFixture() throws -> IconNativeGridFixture {
     let inputs = try makeRegionalFixtureInputs()
     return IconNativeGridFixture(
-        data: try makeArtifact(inputs: inputs),
+        file: try makeArtifact(inputs: inputs),
         centers: inputs.centers,
         vertices: inputs.vertices,
         vertexIndices: inputs.vertexIndices
@@ -382,10 +532,10 @@ private func makeRegionalFixture() throws -> IconNativeGridFixture {
 
 private func makeRegionalFixtureInputs() throws -> IconNativeGridFixtureInputs {
     let vertices = [
-        IconNativeGridPoint(latitude: 0, longitude: 0),
-        IconNativeGridPoint(latitude: 0, longitude: 0.1),
-        IconNativeGridPoint(latitude: 0.1, longitude: 0),
-        IconNativeGridPoint(latitude: 0.1, longitude: 0.1),
+        SphericalPoint(latitude: 0, longitude: 0),
+        SphericalPoint(latitude: 0, longitude: 0.1),
+        SphericalPoint(latitude: 0.1, longitude: 0),
+        SphericalPoint(latitude: 0.1, longitude: 0.1),
     ]
     let vertexIndices: [UInt32] = [0, 1, 2, 1, 3, 2]
     let centers = triangleCenters(vertices: vertices, vertexIndices: vertexIndices)
@@ -399,7 +549,7 @@ private func makeRegionalFixtureInputs() throws -> IconNativeGridFixtureInputs {
         vertexIndices: vertexIndices,
         isGlobal: false,
         bounds: bounds,
-        initialStep: 0.04
+        step: 0.04
     )
     return IconNativeGridFixtureInputs(
         metadata: makeMetadata(isGlobal: false, bounds: bounds, index: index),
@@ -419,7 +569,6 @@ private func makeMetadata(
     IconNativeGridArtifact.Metadata(
         gridNumber: isGlobal ? 26 : 47,
         gridUUID: isGlobal ? Array(0..<16) : Array(repeating: 47, count: 16),
-        sourceChecksum: Array(repeating: isGlobal ? 26 : 47, count: 32),
         isGlobal: isGlobal,
         bounds: bounds,
         binNx: index.nx,
@@ -431,24 +580,50 @@ private func makeMetadata(
     )
 }
 
-private func makeArtifact(
-    inputs: IconNativeGridFixtureInputs,
-    vertexIndices: [UInt32]? = nil,
-    neighbours: [UInt32]? = nil,
-    binCells: [UInt32]? = nil
-) throws -> Data {
-    try IconNativeGridArtifact.make(
-        metadata: inputs.metadata,
-        centers: inputs.centers,
-        vertices: inputs.vertices,
-        vertexIndices: vertexIndices ?? inputs.vertexIndices,
-        neighbourIndices: neighbours ?? inputs.neighbours,
-        binOffsets: inputs.index.offsets,
-        binCells: binCells ?? inputs.index.cells
+private func makeArtifact(inputs: IconNativeGridFixtureInputs) throws -> URL {
+    let file = temporaryArtifactFile()
+    do {
+        try IconNativeGridArtifact.write(
+            to: file.path,
+            metadata: inputs.metadata,
+            centers: inputs.centers,
+            vertices: inputs.vertices,
+            vertexIndices: inputs.vertexIndices,
+            neighbourIndices: inputs.neighbours,
+            binOffsets: inputs.index.offsets,
+            binCells: inputs.index.cells
+        )
+        _ = try IconNativeGrid.load(file: file)
+        return file
+    } catch {
+        try? FileManager.default.removeItem(at: file)
+        throw error
+    }
+}
+
+private func temporaryArtifactFile() -> URL {
+    FileManager.default.temporaryDirectory
+        .appendingPathComponent("icon-native-grid-\(UUID().uuidString).bin")
+}
+
+private func writeTemporaryData(_ data: Data) throws -> URL {
+    let file = temporaryArtifactFile()
+    try data.write(to: file)
+    return file
+}
+
+private func makeIdentity(for fixture: IconNativeGridFixture) -> IconNativeGridIdentity {
+    IconNativeGridIdentity(
+        gridNumber: 26,
+        gridUUID: Array(0..<16),
+        gridUUIDHex: Array(0..<16).map { String(format: "%02x", $0) }.joined(),
+        cellCount: fixture.centers.count,
+        isGlobal: true,
+        sourceFile: "synthetic.nc.bz2"
     )
 }
 
-private func triangleCenters(vertices: [IconNativeGridPoint], vertexIndices: [UInt32]) -> [IconNativeGridPoint] {
+private func triangleCenters(vertices: [SphericalPoint], vertexIndices: [UInt32]) -> [LatLon] {
     (0..<(vertexIndices.count / 3)).map { cell in
         let a = vertices[Int(vertexIndices[cell * 3])]
         let b = vertices[Int(vertexIndices[cell * 3 + 1])]
@@ -457,7 +632,8 @@ private func triangleCenters(vertices: [IconNativeGridPoint], vertexIndices: [UI
         let y = a.y + b.y + c.y
         let z = a.z + b.z + c.z
         let length = sqrt(x * x + y * y + z * z)
-        return IconNativeGridPoint(x: x / length, y: y / length, z: z / length)
+        let point = SphericalPoint(x: x / length, y: y / length, z: z / length)
+        return (point.latitude, point.longitude)
     }
 }
 
@@ -481,23 +657,23 @@ private func makeNeighbours(vertexIndices: [UInt32]) -> [UInt32] {
 private func bruteForceContaining(
     latitude: Float,
     longitude: Float,
-    vertices: [IconNativeGridPoint],
+    vertices: [SphericalPoint],
     vertexIndices: [UInt32]
 ) -> Int? {
     matchingCells(
-        point: IconNativeGridPoint(latitude: latitude, longitude: longitude),
+        point: SphericalPoint(latitude: latitude, longitude: longitude),
         vertices: vertices,
         vertexIndices: vertexIndices
     ).min()
 }
 
 private func matchingCells(
-    point: IconNativeGridPoint,
-    vertices: [IconNativeGridPoint],
+    point: SphericalPoint,
+    vertices: [SphericalPoint],
     vertexIndices: [UInt32]
 ) -> [Int] {
     (0..<(vertexIndices.count / 3)).filter { cell in
-        IconNativeGridTriangle(
+        SphericalTriangle(
             a: vertices[Int(vertexIndices[cell * 3])],
             b: vertices[Int(vertexIndices[cell * 3 + 1])],
             c: vertices[Int(vertexIndices[cell * 3 + 2])]

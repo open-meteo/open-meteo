@@ -1,9 +1,9 @@
-import Crypto
 import Foundation
 import SwiftNetCDF
 
 enum IconNativeGridSourceError: Error, CustomStringConvertible {
     case couldNotOpen(String)
+    case io(path: String, reason: String)
     case missingAttribute(String)
     case invalidAttribute(name: String, actual: String)
     case missingVariable(String)
@@ -14,6 +14,7 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .couldNotOpen(let path): "Could not open ICON grid NetCDF at \(path)"
+        case .io(let path, let reason): "Could not read ICON grid NetCDF at \(path): \(reason)"
         case .missingAttribute(let name): "Missing ICON grid NetCDF attribute '\(name)'"
         case .invalidAttribute(let name, let actual): "Invalid ICON grid NetCDF attribute '\(name)': \(actual)"
         case .missingVariable(let name): "Missing ICON grid NetCDF variable '\(name)'"
@@ -30,12 +31,11 @@ enum IconNativeGridGenerator {
     struct SourceData {
         /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
         /// location offset in native forecast files.
-        let centers: [IconNativeGridPoint]
+        let centers: [LatLon]
         let neighbourIndices: [UInt32]
         let vertexIndices: [UInt32]
-        let vertices: [IconNativeGridPoint]
-        let vertexLatitudes: [Float]
-        let vertexLongitudes: [Float]
+        let vertices: [SphericalPoint]
+        let bounds: GridBounds
     }
 
     struct SpatialIndex: Sendable {
@@ -47,13 +47,11 @@ enum IconNativeGridGenerator {
         let dy: Float
         let offsets: [UInt32]
         let cells: [UInt32]
-        let maximumCandidates: Int
     }
 
-    static func generate(sourceFile: String, identity: IconNativeGridIdentity) throws -> Data {
+    static func generate(sourceFile: String, identity: IconNativeGridIdentity, artifactFile: String) throws -> IconNativeGrid {
         let source = try readSource(file: sourceFile, identity: identity)
-        let checksum = try sha256(file: sourceFile)
-        let bounds = makeBounds(source: source, identity: identity)
+        let bounds = source.bounds
         // Budgets catch accidental index explosions caused by malformed geometry or an unsuitable
         // bin resolution before a very large artifact is installed.
         let maximumFileSize = identity.isGlobal ? 256 * 1_024 * 1_024 : 64 * 1_024 * 1_024
@@ -63,14 +61,13 @@ enum IconNativeGridGenerator {
             vertexIndices: source.vertexIndices,
             isGlobal: identity.isGlobal,
             bounds: bounds,
-            initialStep: identity.isGlobal ? 0.25 : 0.04,
+            step: identity.isGlobal ? 0.25 : 0.04,
             fixedArtifactBytes: fixedBytes,
             maximumFileSize: maximumFileSize
         )
         let metadata = IconNativeGridArtifact.Metadata(
             gridNumber: identity.gridNumber,
             gridUUID: identity.gridUUID,
-            sourceChecksum: checksum,
             isGlobal: identity.isGlobal,
             bounds: bounds,
             binNx: index.nx,
@@ -80,7 +77,8 @@ enum IconNativeGridGenerator {
             binDx: index.dx,
             binDy: index.dy
         )
-        return try IconNativeGridArtifact.make(
+        try IconNativeGridArtifact.write(
+            to: artifactFile,
             metadata: metadata,
             centers: source.centers,
             vertices: source.vertices,
@@ -90,9 +88,20 @@ enum IconNativeGridGenerator {
             binCells: index.cells,
             maximumFileSize: maximumFileSize
         )
+        return try IconNativeGrid.load(file: URL(fileURLWithPath: artifactFile))
     }
 
     static func readSource(file: String, identity: IconNativeGridIdentity) throws -> SourceData {
+        do {
+            return try readSourceUnchecked(file: file, identity: identity)
+        } catch let error as IconNativeGridSourceError {
+            throw error
+        } catch {
+            throw IconNativeGridSourceError.io(path: file, reason: String(describing: error))
+        }
+    }
+
+    private static func readSourceUnchecked(file: String, identity: IconNativeGridIdentity) throws -> SourceData {
         guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
             throw IconNativeGridSourceError.couldNotOpen(file)
         }
@@ -116,10 +125,8 @@ enum IconNativeGridGenerator {
             throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
         }
 
-        let centers = try makePoints(longitudes: clon, latitudes: clat, variable: "clon/clat")
-        let vertices = try makePoints(longitudes: vlon, latitudes: vlat, variable: "vlon/vlat")
-        let vertexLongitudes = vlon.map { Float($0 * 180 / .pi) }
-        let vertexLatitudes = vlat.map { Float($0 * 180 / .pi) }
+        let centers = try makeCoordinates(longitudes: clon, latitudes: clat, variable: "clon/clat")
+        let (vertices, vertexBounds) = try makeVertices(longitudes: vlon, latitudes: vlat)
 
         // ICON stores connectivity as three complete `(nv, cell)` planes with one-based indices.
         // The artifact uses cell-major, zero-based triples for direct random access at runtime.
@@ -146,27 +153,28 @@ enum IconNativeGridGenerator {
             neighbourIndices: neighbourIndices,
             vertexIndices: vertexIndices,
             vertices: vertices,
-            vertexLatitudes: vertexLatitudes,
-            vertexLongitudes: vertexLongitudes
+            bounds: identity.isGlobal
+                ? GridBounds(lat_bounds: -90...90, lon_bounds: -180...180)
+                : vertexBounds
         )
     }
 
     /// Build a conservative triangle-to-bin CSR index. The operation is deliberately offline;
     /// production lookup reads one already-bounded candidate range directly from the mmap.
     static func makeSpatialIndex(
-        vertices: [IconNativeGridPoint],
+        vertices: [SphericalPoint],
         vertexIndices: [UInt32],
         isGlobal: Bool,
         bounds: GridBounds,
-        initialStep: Float,
+        step: Float,
         fixedArtifactBytes: Int = 0,
         maximumFileSize: Int = .max
     ) throws -> SpatialIndex {
         guard !vertices.isEmpty,
               !vertexIndices.isEmpty,
               vertexIndices.count.isMultiple(of: 3),
-              initialStep.isFinite,
-              initialStep > 0 else {
+              step.isFinite,
+              step > 0 else {
             throw IconNativeGridError.invalidHeader
         }
         let cellCount = vertexIndices.count / 3
@@ -174,126 +182,126 @@ enum IconNativeGridGenerator {
             for position in 0..<3 where vertexIndices[cell * 3 + position] >= UInt32(vertices.count) {
                 throw IconNativeGridError.invalidTriangle(cell)
             }
+            let offset = cell * 3
+            let triangle = SphericalTriangle(
+                a: vertices[Int(vertexIndices[offset])],
+                b: vertices[Int(vertexIndices[offset + 1])],
+                c: vertices[Int(vertexIndices[offset + 2])]
+            )
+            guard triangle.isValid else {
+                throw IconNativeGridError.invalidTriangle(cell)
+            }
         }
 
-        // Start coarse to minimize the offset table. If any bin has too many triangles, halve the
-        // step until the runtime work bound is met or the artifact budget prevents refinement.
-        var step = initialStep
-        for _ in 0..<8 {
-            let latitudeMinimum: Float
-            let longitudeMinimum: Float
-            let nx: Int
-            let ny: Int
-            if isGlobal {
-                latitudeMinimum = -90
-                longitudeMinimum = -180
-                nx = Int((360 / step).rounded())
-                ny = Int((180 / step).rounded())
-            } else {
-                latitudeMinimum = floor(bounds.lat_bounds.lowerBound / step) * step
-                longitudeMinimum = floor(bounds.lon_bounds.lowerBound / step) * step
-                nx = Int(ceil((bounds.lon_bounds.upperBound - longitudeMinimum) / step))
-                ny = Int(ceil((bounds.lat_bounds.upperBound - latitudeMinimum) / step))
-            }
-            let binCountResult = nx.multipliedReportingOverflow(by: ny)
-            guard nx > 0, ny > 0, !binCountResult.overflow else { throw IconNativeGridError.invalidHeader }
-            let binCount = binCountResult.partialValue
-            let offsetBytes = (binCount + 1).multipliedReportingOverflow(by: 4)
-            guard !offsetBytes.overflow else { throw IconNativeGridError.invalidHeader }
-            let minimumSize = fixedArtifactBytes.addingReportingOverflow(offsetBytes.partialValue)
-            guard !minimumSize.overflow, minimumSize.partialValue <= maximumFileSize else {
-                throw IconNativeGridError.artifactTooLarge(actual: minimumSize.partialValue, maximum: maximumFileSize)
-            }
+        let latitudeMinimum: Float
+        let longitudeMinimum: Float
+        let nx: Int
+        let ny: Int
+        if isGlobal {
+            latitudeMinimum = -90
+            longitudeMinimum = -180
+            nx = Int((360 / step).rounded())
+            ny = Int((180 / step).rounded())
+        } else {
+            latitudeMinimum = floor(bounds.lat_bounds.lowerBound / step) * step
+            longitudeMinimum = floor(bounds.lon_bounds.lowerBound / step) * step
+            nx = Int(ceil((bounds.lon_bounds.upperBound - longitudeMinimum) / step))
+            ny = Int(ceil((bounds.lat_bounds.upperBound - latitudeMinimum) / step))
+        }
+        let binCountResult = nx.multipliedReportingOverflow(by: ny)
+        guard nx > 0, ny > 0, !binCountResult.overflow else { throw IconNativeGridError.invalidHeader }
+        let binCount = binCountResult.partialValue
+        let offsetBytes = (binCount + 1).multipliedReportingOverflow(by: 4)
+        guard !offsetBytes.overflow else { throw IconNativeGridError.invalidHeader }
+        let minimumSize = fixedArtifactBytes.addingReportingOverflow(offsetBytes.partialValue)
+        guard !minimumSize.overflow, minimumSize.partialValue <= maximumFileSize else {
+            throw IconNativeGridError.artifactTooLarge(actual: minimumSize.partialValue, maximum: maximumFileSize)
+        }
 
-            // First pass counts triangle references per bin. It determines both the work bound and
-            // the exact CSR allocation without building millions of small Swift arrays.
-            var counts = [UInt32](repeating: 0, count: binCount)
-            for cell in 0..<cellCount {
-                try forEachOverlappingBin(
-                    cell: cell,
-                    vertices: vertices,
-                    vertexIndices: vertexIndices,
-                    nx: nx,
-                    ny: ny,
-                    latitudeMinimum: latitudeMinimum,
-                    longitudeMinimum: longitudeMinimum,
-                    step: step,
-                    isGlobal: isGlobal
-                ) { bin in
-                    let increment = counts[bin].addingReportingOverflow(1)
-                    guard !increment.overflow else { throw IconNativeGridError.invalidBinOffset(bin) }
-                    counts[bin] = increment.partialValue
-                }
-            }
-            var maximum = 0
-            var maximumBin = 0
-            for bin in counts.indices where Int(counts[bin]) > maximum {
-                maximum = Int(counts[bin])
-                maximumBin = bin
-            }
-            if isGlobal, let empty = counts.firstIndex(of: 0) {
-                throw IconNativeGridError.invalidBinOffset(empty)
-            }
-            if maximum > IconNativeGrid.maximumCandidateCount {
-                step /= 2
-                if step > 0 { continue }
-                throw IconNativeGridError.candidateLimit(bin: maximumBin, count: maximum)
-            }
-
-            // Prefix sums form the CSR offsets. Candidate cell identifiers are UInt32 because both
-            // operational grids are far below that limit and the native GRIB index is also linear.
-            var offsets = [UInt32](repeating: 0, count: binCount + 1)
-            var total: UInt64 = 0
-            for bin in counts.indices {
-                total += UInt64(counts[bin])
-                guard total <= UInt64(UInt32.max) else { throw IconNativeGridError.invalidBinOffset(bin) }
-                offsets[bin + 1] = UInt32(total)
-            }
-            let candidateBytes = Int(total).multipliedReportingOverflow(by: 4)
-            let actualSize = minimumSize.partialValue.addingReportingOverflow(candidateBytes.partialValue)
-            guard !candidateBytes.overflow, !actualSize.overflow, actualSize.partialValue <= maximumFileSize else {
-                throw IconNativeGridError.artifactTooLarge(actual: actualSize.partialValue, maximum: maximumFileSize)
-            }
-
-            // Reuse the count array as insertion cursors for the second pass. Cells are visited in
-            // ascending order, so every bin's candidate range is already sorted and deterministic.
-            for bin in counts.indices { counts[bin] = offsets[bin] }
-            var cells = [UInt32](repeating: 0, count: Int(total))
-            for cell in 0..<cellCount {
-                try forEachOverlappingBin(
-                    cell: cell,
-                    vertices: vertices,
-                    vertexIndices: vertexIndices,
-                    nx: nx,
-                    ny: ny,
-                    latitudeMinimum: latitudeMinimum,
-                    longitudeMinimum: longitudeMinimum,
-                    step: step,
-                    isGlobal: isGlobal
-                ) { bin in
-                    let destination = Int(counts[bin])
-                    cells[destination] = UInt32(cell)
-                    counts[bin] += 1
-                }
-            }
-            return SpatialIndex(
+        // First pass counts triangle references per bin. It determines both the work bound and
+        // the exact CSR allocation without building millions of small Swift arrays.
+        var counts = [UInt32](repeating: 0, count: binCount)
+        for cell in 0..<cellCount {
+            try forEachOverlappingBin(
+                cell: cell,
+                vertices: vertices,
+                vertexIndices: vertexIndices,
                 nx: nx,
                 ny: ny,
                 latitudeMinimum: latitudeMinimum,
                 longitudeMinimum: longitudeMinimum,
-                dx: step,
-                dy: step,
-                offsets: offsets,
-                cells: cells,
-                maximumCandidates: maximum
-            )
+                step: step,
+                isGlobal: isGlobal
+            ) { bin in
+                let increment = counts[bin].addingReportingOverflow(1)
+                guard !increment.overflow else { throw IconNativeGridError.invalidBinOffset(bin) }
+                counts[bin] = increment.partialValue
+            }
         }
-        throw IconNativeGridError.candidateLimit(bin: -1, count: IconNativeGrid.maximumCandidateCount + 1)
+        var maximum = 0
+        var maximumBin = 0
+        for bin in counts.indices where Int(counts[bin]) > maximum {
+            maximum = Int(counts[bin])
+            maximumBin = bin
+        }
+        if isGlobal, let empty = counts.firstIndex(of: 0) {
+            throw IconNativeGridError.invalidBinOffset(empty)
+        }
+        guard maximum <= IconNativeGrid.maximumCandidateCount else {
+            throw IconNativeGridError.candidateLimit(bin: maximumBin, count: maximum)
+        }
+
+        // Prefix sums form the CSR offsets. Candidate cell identifiers are UInt32 because both
+        // operational grids are far below that limit and the native GRIB index is also linear.
+        var offsets = [UInt32](repeating: 0, count: binCount + 1)
+        var total: UInt64 = 0
+        for bin in counts.indices {
+            total += UInt64(counts[bin])
+            guard total <= UInt64(UInt32.max) else { throw IconNativeGridError.invalidBinOffset(bin) }
+            offsets[bin + 1] = UInt32(total)
+        }
+        let candidateBytes = Int(total).multipliedReportingOverflow(by: 4)
+        let actualSize = minimumSize.partialValue.addingReportingOverflow(candidateBytes.partialValue)
+        guard !candidateBytes.overflow, !actualSize.overflow, actualSize.partialValue <= maximumFileSize else {
+            throw IconNativeGridError.artifactTooLarge(actual: actualSize.partialValue, maximum: maximumFileSize)
+        }
+
+        // Reuse the count array as insertion cursors for the second pass. Cells are visited in
+        // ascending order, so every bin's candidate range is already sorted and deterministic.
+        for bin in counts.indices { counts[bin] = offsets[bin] }
+        var cells = [UInt32](repeating: 0, count: Int(total))
+        for cell in 0..<cellCount {
+            try forEachOverlappingBin(
+                cell: cell,
+                vertices: vertices,
+                vertexIndices: vertexIndices,
+                nx: nx,
+                ny: ny,
+                latitudeMinimum: latitudeMinimum,
+                longitudeMinimum: longitudeMinimum,
+                step: step,
+                isGlobal: isGlobal
+            ) { bin in
+                let destination = Int(counts[bin])
+                cells[destination] = UInt32(cell)
+                counts[bin] += 1
+            }
+        }
+        return SpatialIndex(
+            nx: nx,
+            ny: ny,
+            latitudeMinimum: latitudeMinimum,
+            longitudeMinimum: longitudeMinimum,
+            dx: step,
+            dy: step,
+            offsets: offsets,
+            cells: cells
+        )
     }
 
     private static func forEachOverlappingBin(
         cell: Int,
-        vertices: [IconNativeGridPoint],
+        vertices: [SphericalPoint],
         vertexIndices: [UInt32],
         nx: Int,
         ny: Int,
@@ -376,22 +384,11 @@ enum IconNativeGridGenerator {
         return first <= last ? first...last : nil
     }
 
-    private static func angularDistance(_ lhs: IconNativeGridPoint, _ rhs: IconNativeGridPoint) -> Float {
+    private static func angularDistance(_ lhs: SphericalPoint, _ rhs: SphericalPoint) -> Float {
         // `acos(dot)` loses all precision for native D2 edges because their Float dot product can
         // round to exactly one. atan2(sin, cos) remains accurate for very small angular distances.
         let cross = lhs.cross(rhs)
         return atan2(sqrt(max(0, cross.dot(cross))), max(-1, min(1, lhs.dot(rhs))))
-    }
-
-    private static func makeBounds(source: SourceData, identity: IconNativeGridIdentity) -> GridBounds {
-        if identity.isGlobal {
-            return GridBounds(lat_bounds: -90...90, lon_bounds: -180...180)
-        }
-        // Regional coverage follows the primal triangle vertices, not the displaced circumcentres.
-        return GridBounds(
-            lat_bounds: (source.vertexLatitudes.min() ?? -90)...(source.vertexLatitudes.max() ?? 90),
-            lon_bounds: (source.vertexLongitudes.min() ?? -180)...(source.vertexLongitudes.max() ?? 180)
-        )
     }
 
     private static func estimatedFixedArtifactBytes(cellCount: Int, vertexCount: Int) -> Int {
@@ -443,25 +440,83 @@ enum IconNativeGridGenerator {
         return try typed.read()
     }
 
-    private static func makePoints(longitudes: [Double], latitudes: [Double], variable: String) throws -> [IconNativeGridPoint] {
+    private static func makeCoordinates(
+        longitudes: [Double],
+        latitudes: [Double],
+        variable: String
+    ) throws -> [LatLon] {
         guard longitudes.count == latitudes.count else {
             throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch for \(variable)")
         }
-        var points = [IconNativeGridPoint](); points.reserveCapacity(longitudes.count)
+        var coordinates = [LatLon]()
+        coordinates.reserveCapacity(longitudes.count)
+
         for index in longitudes.indices {
-            let longitude = longitudes[index]
-            let latitude = latitudes[index]
-            guard longitude.isFinite, latitude.isFinite,
-                  longitude >= -.pi - 1e-8, longitude <= .pi + 1e-8,
-                  latitude >= -.pi / 2 - 1e-8, latitude <= .pi / 2 + 1e-8 else {
-                throw IconNativeGridSourceError.invalidValue(variable: variable, index: index)
-            }
-            points.append(IconNativeGridPoint(
-                latitude: Float(latitude * 180 / .pi),
-                longitude: Float(longitude * 180 / .pi)
+            coordinates.append(try makeCoordinate(
+                longitude: longitudes[index],
+                latitude: latitudes[index],
+                variable: variable,
+                index: index
             ))
         }
-        return points
+        return coordinates
+    }
+
+    private static func makeVertices(
+        longitudes: [Double],
+        latitudes: [Double]
+    ) throws -> ([SphericalPoint], GridBounds) {
+        guard longitudes.count == latitudes.count, !longitudes.isEmpty else {
+            throw IconNativeGridSourceError.invalidTopology("empty vertex coordinate arrays")
+        }
+        let first = try makeCoordinate(
+            longitude: longitudes[0],
+            latitude: latitudes[0],
+            variable: "vlon/vlat",
+            index: 0
+        )
+        var latitudeMinimum = first.latitude
+        var latitudeMaximum = first.latitude
+        var longitudeMinimum = first.longitude
+        var longitudeMaximum = first.longitude
+        var vertices = [SphericalPoint](); vertices.reserveCapacity(longitudes.count)
+        for index in longitudes.indices {
+            let coordinate = index == 0 ? first : try makeCoordinate(
+                longitude: longitudes[index],
+                latitude: latitudes[index],
+                variable: "vlon/vlat",
+                index: index
+            )
+            latitudeMinimum = min(latitudeMinimum, coordinate.latitude)
+            latitudeMaximum = max(latitudeMaximum, coordinate.latitude)
+            longitudeMinimum = min(longitudeMinimum, coordinate.longitude)
+            longitudeMaximum = max(longitudeMaximum, coordinate.longitude)
+            vertices.append(SphericalPoint(latitude: coordinate.latitude, longitude: coordinate.longitude))
+        }
+        return (
+            vertices,
+            GridBounds(
+                lat_bounds: latitudeMinimum...latitudeMaximum,
+                lon_bounds: longitudeMinimum...longitudeMaximum
+            )
+        )
+    }
+
+    private static func makeCoordinate(
+        longitude: Double,
+        latitude: Double,
+        variable: String,
+        index: Int
+    ) throws -> LatLon {
+        guard longitude.isFinite, latitude.isFinite,
+              longitude >= -.pi - 1e-8, longitude <= .pi + 1e-8,
+              latitude >= -.pi / 2 - 1e-8, latitude <= .pi / 2 + 1e-8 else {
+            throw IconNativeGridSourceError.invalidValue(variable: variable, index: index)
+        }
+        return (
+            latitude: Float(latitude * 180 / .pi),
+            longitude: Float(longitude * 180 / .pi)
+        )
     }
 
     static func transposeConnectivity(
@@ -509,15 +564,4 @@ enum IconNativeGridGenerator {
         }
     }
 
-    private static func sha256(file: String) throws -> [UInt8] {
-        // Persisting the source checksum makes artifacts reproducible and distinguishes two source
-        // files even if their operational UUID metadata was accidentally reused.
-        let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: file))
-        defer { try? handle.close() }
-        var hash = SHA256()
-        while let data = try handle.read(upToCount: 8 * 1_024 * 1_024), !data.isEmpty {
-            hash.update(data: data)
-        }
-        return Array(hash.finalize())
-    }
 }

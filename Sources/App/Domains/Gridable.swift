@@ -15,10 +15,6 @@ public protocol Gridable: Sendable {
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
-
-    /// Geographic bounds of the grid. Unstructured grids must override the default implementation,
-    /// because their first and last storage indices do not necessarily describe opposite corners.
-    var gridBounds: GridBounds { get }
     
     func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
     func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
@@ -29,12 +25,9 @@ public protocol Gridable: Sendable {
 
 extension Gridable {
     var gridBounds: GridBounds {
-        let first = getCoordinates(gridpoint: 0)
-        let last = getCoordinates(gridpoint: nx * ny - 1)
-        return GridBounds(
-            lat_bounds: min(first.latitude, last.latitude)...max(first.latitude, last.latitude),
-            lon_bounds: min(first.longitude, last.longitude)...max(first.longitude, last.longitude)
-        )
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return GridBounds(lat_bounds: sw.latitude...ne.latitude, lon_bounds: sw.longitude...ne.longitude)
     }
 }
 

@@ -37,7 +37,7 @@ struct IconNativeGridIdentity: Sendable, Equatable {
     }
 }
 
-enum IconNativeDomainError: Error, Equatable, CustomStringConvertible {
+enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable {
     case missingGridArtifact(String)
     case invalidGridArtifact(path: String, reason: String)
 
@@ -51,47 +51,143 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-private enum IconNativeGridCache {
-    /// Keep one mmap alive per physical grid. ICON-D2 hourly and 15-minute domains deliberately
-    /// share grid 47 and therefore the same cache entry and `grid.bin`.
-    private static let grids = Mutex<[UInt32: IconNativeGrid]>([:])
+private struct IconNativeGridFileFingerprint: Sendable, Equatable {
+    let inode: UInt64
+    let size: Int64
+    let modificationSeconds: Int64
+    let modificationNanoseconds: Int64
 
-    static func get(registry: DomainRegistry, identity: IconNativeGridIdentity) throws -> IconNativeGrid {
-        if let cached = grids.withLock({ $0[identity.gridNumber] }) {
-            return cached
+    static func read(file: String) -> Self? {
+        guard let stats = FileManager.default.fileStats(at: file) else { return nil }
+        #if os(Linux)
+        let modification = stats.st_mtim
+        #else
+        let modification = stats.st_mtimespec
+        #endif
+        return Self(
+            inode: UInt64(stats.st_ino),
+            size: Int64(stats.st_size),
+            modificationSeconds: Int64(modification.tv_sec),
+            modificationNanoseconds: Int64(modification.tv_nsec)
+        )
+    }
+}
+
+private struct IconNativeGridFailureState: Sendable {
+    let fingerprint: IconNativeGridFileFingerprint?
+    let error: IconNativeDomainError
+    let retryAfter: ContinuousClock.Instant
+}
+
+/// One cache per physical grid. Once storage is available the hot path is a single atomic load;
+/// the mutex is used only to single-flight initial loading and throttled recovery from failures.
+final class IconNativeGridCache: Sendable {
+    private let file: String
+    private let identity: IconNativeGridIdentity
+    private let retryInterval: Duration
+    private let storage = AtomicLazyReference<IconNativeGridStorage>()
+    private let failure = Mutex<IconNativeGridFailureState?>(nil)
+
+    init(file: String, identity: IconNativeGridIdentity, retryInterval: Duration = .seconds(30)) {
+        self.file = file
+        self.identity = identity
+        self.retryInterval = retryInterval
+    }
+
+    func get() throws -> IconNativeGrid {
+        if let storage = storage.load() {
+            return IconNativeGrid(storage: storage)
         }
-        let grid = try load(registry: registry, identity: identity)
-        grids.withLock { $0[identity.gridNumber] = grid }
-        return grid
+        return try failure.withLock { failure in
+            // Another cold caller may have completed loading while this caller waited for the lock.
+            if let storage = storage.load() {
+                return IconNativeGrid(storage: storage)
+            }
+            let now = ContinuousClock.now
+            if let failure, now < failure.retryAfter {
+                throw failure.error
+            }
+            let fingerprint = IconNativeGridFileFingerprint.read(file: file)
+            if let storage = storage.load() {
+                failure = nil
+                return IconNativeGrid(storage: storage)
+            }
+            if let previous = failure, previous.fingerprint == fingerprint {
+                failure = IconNativeGridFailureState(
+                    fingerprint: fingerprint,
+                    error: previous.error,
+                    retryAfter: now.advanced(by: retryInterval)
+                )
+                throw previous.error
+            }
+            do {
+                let loaded = try loadStorage(fingerprint: fingerprint)
+                let installed = storage.storeIfNil(loaded)
+                failure = nil
+                return IconNativeGrid(storage: installed)
+            } catch {
+                if let storage = storage.load() {
+                    failure = nil
+                    return IconNativeGrid(storage: storage)
+                }
+                let wrapped = error as? IconNativeDomainError
+                    ?? IconNativeDomainError.invalidGridArtifact(path: file, reason: String(describing: error))
+                failure = IconNativeGridFailureState(
+                    fingerprint: fingerprint,
+                    error: wrapped,
+                    retryAfter: now.advanced(by: retryInterval)
+                )
+                throw wrapped
+            }
+        }
     }
 
-    static func store(_ grid: IconNativeGrid, identity: IconNativeGridIdentity) {
-        grids.withLock { $0[identity.gridNumber] = grid }
+    /// Publish a storage mapping produced by the downloader. A previously loaded mapping remains
+    /// pinned by design; unavailable caches transition immediately without waiting for retry.
+    func install(_ grid: IconNativeGrid) {
+        _ = storage.storeIfNil(grid.storage)
     }
 
-    static func load(registry: DomainRegistry, identity: IconNativeGridIdentity) throws -> IconNativeGrid {
-        let path = "\(registry.directory)static/grid.bin"
-        guard FileManager.default.fileExists(atPath: path) else {
-            throw IconNativeDomainError.missingGridArtifact(path)
+    /// Downloader-only disk validation. Unlike `get()`, this always inspects the final artifact.
+    func validateFileAndInstall() throws {
+        let fingerprint = IconNativeGridFileFingerprint.read(file: file)
+        let loaded = try loadStorage(fingerprint: fingerprint)
+        _ = storage.storeIfNil(loaded)
+    }
+
+    private func loadStorage(fingerprint: IconNativeGridFileFingerprint?) throws -> IconNativeGridStorage {
+        guard fingerprint != nil else {
+            throw IconNativeDomainError.missingGridArtifact(file)
         }
         do {
-            let grid = try IconNativeGrid(file: URL(fileURLWithPath: path))
-            guard grid.gridNumber == identity.gridNumber else {
-                throw IconNativeDomainError.invalidGridArtifact(path: path, reason: "expected grid number \(identity.gridNumber), got \(grid.gridNumber)")
+            let storage = try IconNativeGridStorage(file: URL(fileURLWithPath: file))
+            guard storage.gridNumber == identity.gridNumber else {
+                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected grid number \(identity.gridNumber), got \(storage.gridNumber)")
             }
-            guard grid.gridUUID == identity.gridUUID else {
-                throw IconNativeDomainError.invalidGridArtifact(path: path, reason: "grid UUID does not match \(identity.gridUUIDHex)")
+            guard storage.gridUUID == identity.gridUUID else {
+                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "grid UUID does not match \(identity.gridUUIDHex)")
             }
-            guard grid.nx == identity.cellCount, grid.ny == 1 else {
-                throw IconNativeDomainError.invalidGridArtifact(path: path, reason: "expected \(identity.cellCount) cells, got \(grid.nx * grid.ny)")
+            guard storage.cellCount == identity.cellCount else {
+                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected \(identity.cellCount) cells, got \(storage.cellCount)")
             }
-            return grid
+            return storage
         } catch let error as IconNativeDomainError {
             throw error
         } catch {
-            throw IconNativeDomainError.invalidGridArtifact(path: path, reason: String(describing: error))
+            throw IconNativeDomainError.invalidGridArtifact(path: file, reason: String(describing: error))
         }
     }
+}
+
+private enum IconNativeGridCaches {
+    static let global = IconNativeGridCache(
+        file: "\(DomainRegistry.dwd_icon_global_native.directory)static/grid.bin",
+        identity: .global
+    )
+    static let d2 = IconNativeGridCache(
+        file: "\(DomainRegistry.dwd_icon_d2_native.directory)static/grid.bin",
+        identity: .d2
+    )
 }
 
 extension IconDomains {
@@ -156,15 +252,19 @@ extension IconDomains {
         }
     }
 
-    func requireNativeGrid() throws -> IconNativeGrid {
+    private var nativeGridCache: IconNativeGridCache {
         switch self {
         case .iconNative:
-            return try IconNativeGridCache.get(registry: .dwd_icon_global_native, identity: .global)
+            return IconNativeGridCaches.global
         case .iconD2Native, .iconD2Native15min:
-            return try IconNativeGridCache.get(registry: .dwd_icon_d2_native, identity: .d2)
+            return IconNativeGridCaches.d2
         default:
             preconditionFailure("\(self) is not a native ICON domain")
         }
+    }
+
+    func requireNativeGrid() throws -> IconNativeGrid {
+        try nativeGridCache.get()
     }
 
     func prepareNativeGrid(application: Application) async throws {
@@ -175,9 +275,9 @@ extension IconDomains {
             preconditionFailure("Native ICON domain has no static registry")
         }
         do {
-            // The common case performs only mmap validation and populates the process cache.
-            let grid = try IconNativeGridCache.load(registry: registry, identity: identity)
-            IconNativeGridCache.store(grid, identity: identity)
+            // Downloader preparation deliberately validates the on-disk artifact. API lookups use
+            // the atomically pinned mapping and never enter this disk-maintenance path.
+            try nativeGridCache.validateFileAndInstall()
             return
         } catch IconNativeDomainError.missingGridArtifact {
             application.logger.info("Generating missing native ICON grid artifact for '\(rawValue)'")
@@ -212,22 +312,42 @@ extension IconDomains {
             try await downloadSource()
         }
 
-        let artifact: Data
+        let artifactPath = "\(staticDirectory)grid.bin"
+        let stagedArtifactPath = "\(artifactPath)~"
+        try FileManager.default.removeItemIfExists(at: stagedArtifactPath)
+        var published = false
+        defer {
+            if !published {
+                try? FileManager.default.removeItem(atPath: stagedArtifactPath)
+            }
+        }
+
+        let grid: IconNativeGrid
         do {
-            artifact = try IconNativeGridGenerator.generate(sourceFile: sourceFile, identity: identity)
+            grid = try IconNativeGridGenerator.generate(
+                sourceFile: sourceFile,
+                identity: identity,
+                artifactFile: stagedArtifactPath
+            )
         } catch let error as IconNativeGridSourceError where sourceExisted {
             // A cached source may be truncated or may belong to an older operational grid. Retry
             // source errors once with a fresh download; generation errors are retained for diagnosis.
             application.logger.warning("Discarding unusable cached ICON grid definition and downloading it again: \(error)")
             try FileManager.default.removeItem(atPath: sourceFile)
+            try FileManager.default.removeItemIfExists(at: stagedArtifactPath)
             try await downloadSource()
-            artifact = try IconNativeGridGenerator.generate(sourceFile: sourceFile, identity: identity)
+            grid = try IconNativeGridGenerator.generate(
+                sourceFile: sourceFile,
+                identity: identity,
+                artifactFile: stagedArtifactPath
+            )
         }
 
-        let artifactPath = "\(staticDirectory)grid.bin"
-        try artifact.write(to: URL(fileURLWithPath: artifactPath), options: .atomic)
-        let grid = try IconNativeGridCache.load(registry: registry, identity: identity)
-        IconNativeGridCache.store(grid, identity: identity)
+        // The mmap remains valid across rename because it owns the staged file descriptor. Publish
+        // only after complete validation, then cache that same mapping without reopening the file.
+        try FileManager.default.moveFileOverwrite(from: stagedArtifactPath, to: artifactPath)
+        nativeGridCache.install(grid)
+        published = true
         try? FileManager.default.removeItem(atPath: sourceFile)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
     }
@@ -241,13 +361,11 @@ struct IconNativeUnavailableGrid: Gridable {
     let nx = 1
     let ny = 1
     let searchRadius = 0
-    let gridBounds = GridBounds(lat_bounds: -90...90, lon_bounds: -180...180)
-
     func findPoint(lat: Float, lon: Float) -> Int? { nil }
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Range<Int>? { nil }
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
-    func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) { (.nan, .nan) }
+    func getCoordinates(gridpoint: Int) -> LatLon { (.nan, .nan) }
     func findPointTerrainOptimised(
         lat: Float,
         lon: Float,
