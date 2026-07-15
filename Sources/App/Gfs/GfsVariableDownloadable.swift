@@ -2,7 +2,7 @@
 protocol GfsVariableDownloadable: GenericVariable, Hashable {
     func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String?
     func skipHour0(for domain: GfsDomain) -> Bool
-    func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)?
+    func multiplyAdd(domain: GfsDomain, dtSeconds: Int) -> (multiply: Float, add: Float)?
 }
 
 extension GfsSurfaceVariable: GfsVariableDownloadable {
@@ -448,7 +448,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         }
     }
 
-    func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
+    func multiplyAdd(domain: GfsDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m, .temperature_80m, .temperature_100m:
             return (1, -273.15)
@@ -468,7 +468,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil
             case .gfs013, .gfs025, .hrrr_conus_15min, .hrrr_conus:
                 // precipitation rate per second to hourly precipitation
-                return (Float(domain.dtSeconds), 0)
+                return (Float(dtSeconds), 0)
             case .gfs025_ens, .gfs05_ens, .gefs05_ensemble_mean, .gefs025_ensemble_mean:
                 return nil
             }
@@ -532,7 +532,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
         return false
     }
 
-    func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
+    func multiplyAdd(domain: GfsDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:
             return (1, -273.15)
