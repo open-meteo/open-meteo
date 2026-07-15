@@ -173,6 +173,31 @@ import Darwin
 
         try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "test/ecmwf_ifs025_ensemble_mean/")
     }
+    
+    /// Upload three files using single-part PUT uploads.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3UploadThreeFiles() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+        let manager = S3UploadQueue(endpoint: S3BucketEndpoint(rawEndpoint: server, profile: nil), client: client)
+        let logger = Logger(label: "DownloaderTests.S3UploadManager")
+
+        let uploads: [(suffix: String, data: Data)] = [
+            ("a", randomData(byteCount: 128 * 1024)),
+            ("b", randomData(byteCount: 256 * 1024)),
+            ("c", randomData(byteCount: 512 * 1024))
+        ]
+
+        for upload in uploads {
+            await manager.upload(data: upload.data, objectName: "test/s3uploader-three-\(upload.suffix).bin", contentType: "application/octet-stream")
+        }
+
+        // Ensure all queued uploads complete before ending the test.
+        await manager.finish()
+    }
 }
 
 /// Fill a `Data` buffer with cryptographically random bytes.
