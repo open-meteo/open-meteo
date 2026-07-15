@@ -88,7 +88,8 @@ struct ModelUpdateMetaJson: Codable, Sendable {
     }
 
     /// Write a new meta data JSON
-    static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws {
+    @discardableResult
+    static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws -> Data {
         let meta = ModelUpdateMetaJson(
             last_run_initialisation_time: run.timeIntervalSince1970,
             last_run_modification_time: now.timeIntervalSince1970,
@@ -109,7 +110,9 @@ struct ModelUpdateMetaJson: Codable, Sendable {
         let path = ModelUpdateMetaFile(domain: domain.domainRegistry)
         try path.createDirectory()
         let pathString = path.getFilePath()
-        try meta.writeTo(path: pathString)
+        let data = try meta.jsonEncodedData()
+        try data.writeAtomic(path: pathString)
+        return data
     }
 
     /// Update the availability time and return a new object

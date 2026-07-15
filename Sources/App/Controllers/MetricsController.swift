@@ -23,6 +23,8 @@ enum OmMetrics {
     static let requestsCloudflareWorkersTotal = Atomic(0)
     static let requestsServiceOverloadedTotal = Atomic(0)
     
+    static let memoryReadAllocated = Atomic(0)
+    
     static let limiterMinutelyExceededTotal = Atomic(0)
     static let limiterHourlyExceededTotal = Atomic(0)
     static let limiterDailyExceededTotal = Atomic(0)
@@ -120,8 +122,10 @@ om_requests_elevation_api_total \(OmMetrics.requestsElevationApiTotal.load(order
 om_requests_rate_limited_total{window="1m"} \(OmMetrics.limiterMinutelyExceededTotal.load(ordering: .relaxed))
 om_requests_rate_limited_total{window="1h"} \(OmMetrics.limiterHourlyExceededTotal.load(ordering: .relaxed))
 om_requests_rate_limited_total{window="24h"} \(OmMetrics.limiterDailyExceededTotal.load(ordering: .relaxed))
+# TYPE om_memory_read_allocated_bytes counter
+# HELP om_memory_read_allocated_bytes Allocated read arrays
+om_memory_read_allocated_bytes \(OmMetrics.memoryReadAllocated.load(ordering: .relaxed))
 # EOF
-
 """
 
         var headers = HTTPHeaders()

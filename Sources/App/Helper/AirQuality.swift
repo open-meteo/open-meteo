@@ -39,7 +39,7 @@ enum UnitedStatesAirQuality {
     static let o3_HourlyThresholds: [Float] = [.nan, .nan, 125, 165, 205, 405, 505, 605]
     static let o3_8HourlyThresholds: [Float] = [0, 55, 70, 85, 105, 200, .nan, .nan]
 
-    static let pm2_5_24HourlyMeanThresholds: [Float] = [0, 12, 35.5, 55.5, 150.5, 250.5, 350.1, 500.5]
+    static let pm2_5_24HourlyMeanThresholds: [Float] = [0, 9, 35.5, 55.5, 125.5, 225.5, 325.5, 500]
     static let pm10_24HourlyMeanThresholds: [Float] = [0, 55, 155, 255, 355, 425, 505, 605]
 
     static let co_8HourlyThresholds: [Float] = [0, 4.5, 9.5, 12.5, 15.5, 30.5, 40.5, 50.5]

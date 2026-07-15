@@ -13,7 +13,9 @@ enum S3Uploader {
     static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .PUT
-        request.body = .bytes(ByteBuffer(bytes: data))
+        var body = ByteBufferAllocator().buffer(capacity: data.count)
+        body.writeData(data)
+        request.body = .bytes(body)
         request.headers.add(name: "Content-Type", value: contentType)
         request.headers.add(name: "x-amz-content-sha256", value: data.sha256Hex)
         // executeRetry extracts credentials from the URL, signs the request with
@@ -22,22 +24,22 @@ enum S3Uploader {
         let _ = try await client.executeRetry(request, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
     }
     
-    static func uploadMultipart(client: HTTPClient, file: String, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
-        try await uploadMultipart(client: client, file: FilePath(file), url: url, contentType: contentType, nConcurrent: nConcurrent)
+    static func uploadMultipart(client: HTTPClient, file: String, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
+        try await uploadMultipart(client: client, file: FilePath(file), url: url, contentType: contentType, executor: executor)
     }
     
-    static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
+    static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
         return try await FileSystem.shared.withFileHandle(forReadingAt: file) { fh in
-            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, nConcurrent: nConcurrent)
+            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, executor: executor)
         }
     }
     
-    /// Uploads files to S3 in 8 MB chunks
+    /// Uploads files to S3 in 8 MB chunks, with part concurrency controlled by `executor`.
     /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", nConcurrent: Int = 8) async throws -> S3MultiPartUploadPrepared {
+    static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
-
+        
         // Step 1: Initiate multipart upload
         let timeInitiateRequestStart = DispatchTime.now().uptimeNanoseconds
         var initiateRequest = HTTPClientRequest(url: url + "?uploads")
@@ -60,7 +62,7 @@ enum S3Uploader {
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
         let chunks = data.readChunks(chunkLength: .megabytes(8))
         do {
-            let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(nConcurrent: nConcurrent) { (partNumber, chunk) in
+            let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(executor: executor) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
                 req.method = .PUT
                 req.body = .bytes(chunk)
@@ -80,12 +82,10 @@ enum S3Uploader {
             let size = uploaded.map(\.size).reduce(0, +)
             let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
             let rate = Double(size) / timeChunkedRequest
-            logger.info("Upload \(url.asUrlGetQuery) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
+            logger.info("Upload \(url.asUrlGetQueryForLogging) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
         } catch {
-            var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
-            abortRequest.method = .DELETE
-            let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+            try await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId).abort(client: client)
             throw error
         }
     }
@@ -175,9 +175,10 @@ enum S3Uploader {
         logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
 
         // Step 4: Upload 2 files concurrently.
+        let executor = LimitedConcurrencyExecutor(maxConcurrency: 16)
         let prepared = try await toUpload.mapConcurrent(nConcurrent: 4) { file in
             let url = serverBase + "/" + file.remoteKey
-            return try await uploadMultipart(client: client, file: file.absolutePath, url: url, nConcurrent: 4)
+            return try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor)
         }
         let uploadTime = Double(DispatchTime.now().uptimeNanoseconds - uploadStart.uptimeNanoseconds) / 1_000_000_000
         let rate = Double(totalBytes) / uploadTime
@@ -280,10 +281,17 @@ extension String {
 }
 
 /// Intermediate representation
-struct S3MultiPartUploadPrepared {
+struct S3MultiPartUploadPrepared: Sendable {
     let etags: [String]
     let url: String
     let encodedUploadId: String
+
+    func abort(client: HTTPClient) async throws {
+        let logger = Logger(label: "S3Uploader")
+        var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
+        abortRequest.method = .DELETE
+        let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+    }
 
     /// complete multipart upload. This may take longer than expected
     func commit(client: HTTPClient) async throws {
@@ -302,7 +310,7 @@ struct S3MultiPartUploadPrepared {
         let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
         let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000
-        logger.info("Upload \(url.asUrlGetQuery) committed in \(timeCommitRequest.asSecondsPrettyPrint)")
+        logger.info("Upload \(url.asUrlGetQueryForLogging) committed in \(timeCommitRequest.asSecondsPrettyPrint)")
     }
 }
 
@@ -318,14 +326,4 @@ fileprivate extension String {
               let end = range(of: "</\(tag)>") else { return nil }
         return String(self[start.upperBound..<end.lowerBound])
     }
-    
-    /// Assume self is a URL, return the query part
-    var asUrlGetQuery: Substring {
-        guard let schemaIndex = self.firstRange(of: "://"),
-                let queryStart = self[schemaIndex.upperBound...].firstIndex(of: "/") else {
-            return Substring(self)
-        }
-        return self[queryStart...]
-    }
 }
-
