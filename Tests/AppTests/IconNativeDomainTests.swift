@@ -28,6 +28,27 @@ import Testing
         #expect(IconDomains.iconD2Native15min.levels.isEmpty)
     }
 
+    @Test func globalDownloadAliasesProduceNativeAndRemappedDomainsTogether() {
+        let regular = IconDomains.icon.downloadDomains
+        let native = IconDomains.iconNative.downloadDomains
+
+        #expect(regular == native)
+        #expect(regular == [.iconNative, .icon])
+
+        #expect(IconDomains.iconD2.downloadDomains == [.iconD2])
+        #expect(IconDomains.iconD2Native.downloadDomains == [.iconD2Native])
+    }
+
+    @Test func globalRemappingGathersNativeCellsAndPreservesMissingDestinations() {
+        let remapper = CdoIconGlobal(mapping: [2, -1, 0, 2])
+        let remapped = remapper.remap([10, 20, 30])
+
+        #expect(remapped[0] == 30)
+        #expect(remapped[1].isNaN)
+        #expect(remapped[2] == 10)
+        #expect(remapped[3] == 30)
+    }
+
     @Test func nativeGridIdentitiesMatchOperationalGrids() {
         #expect(IconNativeGridIdentity.global.gridNumber == 26)
         #expect(IconNativeGridIdentity.global.gridUUIDHex == "a27b8de618c411e4820ab5b098c6a5c0")
