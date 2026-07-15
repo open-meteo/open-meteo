@@ -330,11 +330,11 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, onFileWritten: ((OmFileType) async -> Void)? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, multipartUploadQueues: [S3MultiFileUploadQueue]? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         if nMembers > 1, let retainDays = domain.useRollingDays {
             // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
-            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, onFileWritten: onFileWritten, supplyChunk: supplyChunk)
+            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, multipartUploadQueues: multipartUploadQueues, supplyChunk: supplyChunk)
         }
         
         let indexTime = time.toIndexTime()
@@ -478,7 +478,9 @@ struct OmFileSplitter {
             // Overwrite existing file, with newly created
             try writer.writeFn.linkTemporary(file: writer.fileName)
             try writer.writeFn.close()
-            await onFileWritten?(writer.file)
+            for uploadQueue in multipartUploadQueues ?? [] {
+                await uploadQueue.uploadTimeSeriesFile(writer.file)
+            }
         }
     }
     
@@ -489,7 +491,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onFileWritten: ((OmFileType) async -> Void)? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, multipartUploadQueues: [S3MultiFileUploadQueue]? = nil, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: 0, previousDay: 0)
         try readFile.createDirectory()
@@ -610,7 +612,9 @@ struct OmFileSplitter {
         try writeFile.writeTrailer(rootVariable: root)
         try writeFn.linkTemporary(file: fileName)
         try writeFn.close()
-        await onFileWritten?(readFile)
+        for uploadQueue in multipartUploadQueues ?? [] {
+            await uploadQueue.uploadTimeSeriesFile(readFile)
+        }
     }
 }
 
