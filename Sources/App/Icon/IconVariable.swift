@@ -78,7 +78,7 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
 /**
  Combined surface and pressure level variables with all definitions for the API
  */
-typealias IconVariable = SurfaceAndPressureVariable<IconSurfaceVariable, IconPressureVariable>
+typealias IconVariable = SurfacePressureAndHeightVariable<IconSurfaceVariable, IconPressureVariable, IconModelLevelVariable>
 
 /**
  Available variables to download from the DWD open data server

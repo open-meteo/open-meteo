@@ -121,6 +121,56 @@ extension HeightVariableRespresentable {
     }
 }
 
+/// Represent a variable on a native model level, named `<variable>_level<N>` (1 = model top).
+protocol ModelLevelVariableRespresentable: RawRepresentable
+where RawValue == String, Variable.RawValue == String {
+    associatedtype Variable: RawRepresentable
+
+    var variable: Variable { get }
+    var level: Int { get }
+
+    init(variable: Variable, level: Int)
+}
+
+extension ModelLevelVariableRespresentable {
+    init?(rawValue: String) {
+        guard let range = rawValue.range(of: "_level", options: .backwards) else {
+            return nil
+        }
+        let variableString = rawValue[rawValue.startIndex..<range.lowerBound]
+        guard let variable = Variable(rawValue: String(variableString)) else {
+            return nil
+        }
+        guard let level = Int(rawValue[range.upperBound..<rawValue.endIndex]) else {
+            return nil
+        }
+        self.init(variable: variable, level: level)
+    }
+
+    var rawValue: String {
+        return "\(variable.rawValue)_level\(level)"
+    }
+
+    init(from decoder: Decoder) throws {
+        let s = try decoder.singleValueContainer().decode(String.self)
+        guard let initialised = Self(rawValue: s) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Cannot initialize \(Self.self) from invalid String value \(s)",
+                    underlyingError: nil
+                )
+            )
+        }
+        self = initialised
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var e = encoder.singleValueContainer()
+        try e.encode(rawValue)
+    }
+}
+
 protocol RawRepresentableString {
     init?(rawValue: String)
     var rawValue: String { get }

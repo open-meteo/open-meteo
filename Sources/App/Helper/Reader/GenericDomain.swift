@@ -82,6 +82,12 @@ extension GenericDomain {
                 client: httpClient,
                 logger: logger
             )?.reader
+        case .hhl:
+            return try? await RemoteFileManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "hhl", chunk: nil),
+                client: httpClient,
+                logger: logger
+            )?.reader
         }
     }
 
@@ -110,6 +116,12 @@ extension GenericDomain {
     var soilTypeFileOm: OmFileType {
         .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "soil_type", chunk: nil)
     }
+
+    /// HHL half-level heights (ASL) as single 3D static [ny, nx, nHalf] (level last).
+    /// Only populated for ICON domains.
+    var hhlFileOm: OmFileType {
+        .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "hhl", chunk: nil)
+    }
 }
 
 /**
@@ -123,6 +135,11 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// The scalefactor to compress data
     var scalefactor: Float { get }
 
+    /// OM-file compression for this variable. Defaults to lossy int16 (`pfor_delta2d_int16`). Override
+    /// for variables with a large dynamic range (e.g. specific humidity) where a logarithmic int16 gives
+    /// constant *relative* precision at the same size.
+    var omFileCompression: OmCompressionType { get }
+
     /// Kind of interpolation for this variable. Used to interpolate from 1 to 3 hours
     var interpolation: ReaderInterpolation { get }
 
@@ -134,6 +151,11 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
 
     /// If true, forecasts from the previous model runs will be preserved
     var storePreviousForecast: Bool { get }
+}
+
+extension GenericVariable {
+    /// Default: lossy int16 packing (existing behaviour for all variables).
+    var omFileCompression: OmCompressionType { .pfor_delta2d_int16 }
 }
 
 

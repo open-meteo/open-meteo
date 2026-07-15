@@ -81,7 +81,7 @@ extension ApiSectionSingle {
         b.buffer.writeString(time)
         for e in columns {
             if e.value.isFinite {
-                b.buffer.writeString(",\(e.value.formatted(decimals: e.unit.significantDigits))")
+                b.buffer.writeString(",\(e.value.formatted(decimals: e.unit.apiSignificantDigits))")
             } else {
                 b.buffer.writeString(",NaN")
             }
@@ -119,7 +119,7 @@ extension ApiSectionString {
                 switch e.data {
                 case .float(let a):
                     if a[i].isFinite {
-                        b.buffer.writeString(",\(a[i].formatted(decimals: e.unit.significantDigits))")
+                        b.buffer.writeString(",\(a[i].formatted(decimals: e.unit.apiSignificantDigits))")
                     } else {
                         b.buffer.writeString(",NaN")
                     }

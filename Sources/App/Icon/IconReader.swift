@@ -10,6 +10,10 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 
     let options: GenericReaderOptions
 
+    /// Memoises the HHL half-level column for this reader's grid point so it is read once, not per
+    /// height/RH/dew-point query. Reference type → shared across value copies of the same reader.
+    let hhlColumnCache = HhlColumnCache()
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
@@ -34,6 +38,58 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func get(raw: IconVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        // Domain-aware validity guard for native model levels. The `<var>_level<N>` parser is
+        // domain-agnostic (PressureVariableRespresentable), so an out-of-range level (e.g.
+        // temperature_level200 on a 65-level domain) would otherwise hit a missing .om file and
+        // silently return NaN. Reject it up front with a clear error.
+        if case let .height(modelLevel) = raw {
+            let nLevels = reader.domain.numberOfModelFullLevels
+            guard modelLevel.level >= 1, modelLevel.level <= nLevels else {
+                throw IconModelLevelError.levelOutOfRange(level: modelLevel.level, max: nLevels, domain: reader.domain.rawValue)
+            }
+        }
+        if case let .height(modelLevel) = raw {
+            switch modelLevel.variable {
+            case .height:
+                let height = try await fullLevelHeightASL(fullLevel: modelLevel.level)
+                return DataAndUnit([Float](repeating: height ?? .nan, count: time.time.count), .metre)
+            case .height_agl:
+                let height = try await fullLevelHeightAGL(fullLevel: modelLevel.level)
+                return DataAndUnit([Float](repeating: height ?? .nan, count: time.time.count), .metre)
+            default:
+                break
+            }
+        }
+        // Model-level relative humidity derived on read (no native relhum grib on model levels; use qv + t + p)
+        if case let .height(modelLevel) = raw, modelLevel.variable == .relative_humidity {
+            let level = modelLevel.level
+            let qv = try await reader.get(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
+            let t = try await reader.get(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            let p = try await reader.get(variable: .height(IconModelLevelVariable(variable: .pressure, level: level)), time: time)
+            let rh = Meteorology.specificToRelativeHumidity(specificHumidity: qv.data, temperature: t.data, pressure: p.data)
+            return DataAndUnit(rh, .percentage)
+        }
+        if case let .height(modelLevel) = raw, modelLevel.variable == .wind_speed {
+            let level = modelLevel.level
+            let u = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_u_component, level: level)), time: time).data
+            let v = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_v_component, level: level)), time: time).data
+            let speed = zip(u, v).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        }
+        if case let .height(modelLevel) = raw, modelLevel.variable == .wind_direction {
+            let level = modelLevel.level
+            let u = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_u_component, level: level)), time: time).data
+            let v = try await reader.get(variable: .height(IconModelLevelVariable(variable: .wind_v_component, level: level)), time: time).data
+            let direction = Meteorology.windirectionFast(u: u, v: v)
+            return DataAndUnit(direction, .degreeDirection)
+        }
+        if case let .height(modelLevel) = raw, modelLevel.variable == .dew_point {
+            let level = modelLevel.level
+            let t = try await reader.get(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            let rh = try await get(raw: .height(IconModelLevelVariable(variable: .relative_humidity, level: level)), time: time)
+            let dp = zip(t.data, rh.data).map(Meteorology.dewpoint)
+            return DataAndUnit(dp, .celsius)
+        }
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
@@ -146,6 +202,29 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func prefetchData(raw: IconVariable, time: TimerangeDtAndSettings) async throws {
+        if case let .height(ml) = raw, ml.variable == .height || ml.variable == .height_agl {
+            return
+        }
+        if case let .height(ml) = raw, ml.variable == .relative_humidity {
+            let level = ml.level
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .pressure, level: level)), time: time)
+            return
+        }
+        if case let .height(ml) = raw, ml.variable == .wind_speed || ml.variable == .wind_direction {
+            let level = ml.level
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .wind_u_component, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .wind_v_component, level: level)), time: time)
+            return
+        }
+        if case let .height(ml) = raw, ml.variable == .dew_point {
+            let level = ml.level
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .specific_humidity, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .temperature, level: level)), time: time)
+            try await reader.prefetchData(variable: .height(IconModelLevelVariable(variable: .pressure, level: level)), time: time)
+            return
+        }
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
@@ -621,6 +700,45 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
+
+    // MARK: - HHL (column from single 3D static hhl.om [ny, nx, nlev] level-last; called on demand for height queries)
+
+    /// Full half-level heights ASL at this grid point (from 3D file). Read once and memoised; throws a
+    /// descriptive error instead of silently returning `[]`/NaN when the static `hhl.om` is unavailable.
+    func hhlColumnASL() async throws -> [Float] {
+        if let cached = hhlColumnCache.column {
+            return cached
+        }
+        guard let file = await reader.domain.getStaticFile(type: .hhl, httpClient: options.httpClient, logger: options.logger) else {
+            throw IconHhlError.staticFileMissing(domain: reader.domain.rawValue)
+        }
+        // 3D column read (one I/O), memoised so subsequent levels/variables do not re-read.
+        let col = try await reader.domain.grid.readColumnFromStaticFile(gridpoint: reader.reader.position, file: file)
+        let nlev = reader.domain.numberOfModelHalfLevels
+        let column = col.count == nlev ? col : Array(col.prefix(nlev)) + Array(repeating: .nan, count: max(0, nlev - col.count))
+        hhlColumnCache.column = column
+        return column
+    }
+
+    /// Geometric height ASL of full level N (1-based, top=1) = avg of enclosing half levels.
+    func fullLevelHeightASL(fullLevel: Int) async throws -> Float? {
+        let hs = try await hhlColumnASL()
+        guard fullLevel >= 1, fullLevel < hs.count else { return nil }
+        let h1 = hs[fullLevel - 1]
+        let h2 = hs[fullLevel]
+        guard h1.isFinite, h2.isFinite else { return .nan }
+        return (h1 + h2) / 2
+    }
+
+    /// AGL version (subtract model surface elevation).
+    func fullLevelHeightAGL(fullLevel: Int) async throws -> Float? {
+        guard let asl = try await fullLevelHeightASL(fullLevel: fullLevel) else { return nil }
+        let surf = reader.modelElevation.numeric
+        if surf.isFinite && surf > -999 {
+            return asl - surf
+        }
+        return asl  // sea or no data: ASL is the reference
+    }
 }
 
 struct IconMixer: GenericReaderMixer {
@@ -628,5 +746,46 @@ struct IconMixer: GenericReaderMixer {
 
     static func makeReader(domain: IconReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> IconReader? {
         return try await IconReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    }
+
+    // Forward HHL (static, same across mix)
+    func hhlColumnASL() async throws -> [Float] {
+        return try await reader.first?.hhlColumnASL() ?? []
+    }
+
+    func fullLevelHeightASL(fullLevel: Int) async throws -> Float? {
+        return try await reader.first?.fullLevelHeightASL(fullLevel: fullLevel)
+    }
+
+    func fullLevelHeightAGL(fullLevel: Int) async throws -> Float? {
+        return try await reader.first?.fullLevelHeightAGL(fullLevel: fullLevel)
+    }
+}
+
+/// Reference-type cache holding the per-grid-point HHL half-level column, so it is read from the static
+/// `hhl.om` exactly once per `IconReader` instead of on every height/RH/dew-point derivation.
+final class HhlColumnCache {
+    var column: [Float]?
+}
+
+enum IconModelLevelError: Error, CustomStringConvertible {
+    case levelOutOfRange(level: Int, max: Int, domain: String)
+
+    var description: String {
+        switch self {
+        case .levelOutOfRange(let level, let max, let domain):
+            return "Model level \(level) is out of range for domain '\(domain)' (valid 1...\(max))."
+        }
+    }
+}
+
+enum IconHhlError: Error, CustomStringConvertible {
+    case staticFileMissing(domain: String)
+
+    var description: String {
+        switch self {
+        case .staticFileMissing(let d):
+            return "ICON HHL static file (hhl.om) is missing for domain '\(d)' — cannot derive model-level heights. Generate it via the model-level download (convertHhlHeights)."
+        }
     }
 }

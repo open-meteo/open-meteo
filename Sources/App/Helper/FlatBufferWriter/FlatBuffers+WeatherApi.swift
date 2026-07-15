@@ -694,6 +694,65 @@ extension ForecastPressureVariable: FlatBuffersVariable {
     }
 }
 
+extension ForecastHeightOrModelLevelVariable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .height(let v):
+            return v.getFlatBuffersMeta()
+        case .modelLevel(let ml):
+            switch ml.variable {
+            case .height, .height_agl:
+                return .init(variable: .geopotentialHeight)
+            case .wind_u_component:
+                return .init(variable: .windUComponent)
+            case .wind_v_component:
+                return .init(variable: .windVComponent)
+            case .temperature:
+                return .init(variable: .temperature)
+            case .specific_humidity:
+                return .init(variable: .relativeHumidity)
+            case .relative_humidity:
+                return .init(variable: .relativeHumidity)
+            case .pressure:
+                return .init(variable: .surfacePressure)
+            case .wind_speed:
+                return .init(variable: .windSpeed)
+            case .wind_direction:
+                return .init(variable: .windDirection)
+            case .dew_point:
+                return .init(variable: .dewPoint)
+            }
+        }
+    }
+}
+
+extension IconModelLevelVariable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch variable {
+        case .height, .height_agl:
+            return .init(variable: .geopotentialHeight)
+        case .wind_u_component:
+            return .init(variable: .windUComponent)
+        case .wind_v_component:
+            return .init(variable: .windVComponent)
+        case .temperature:
+            return .init(variable: .temperature)
+        case .specific_humidity:
+            return .init(variable: .relativeHumidity)
+        case .relative_humidity:
+            return .init(variable: .relativeHumidity)
+        case .pressure:
+            return .init(variable: .surfacePressure)
+        case .wind_speed:
+            return .init(variable: .windSpeed)
+        case .wind_direction:
+            return .init(variable: .windDirection)
+        case .dew_point:
+            return .init(variable: .dewPoint)
+        }
+    }
+}
+
 extension ForecastHeightVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch variable {

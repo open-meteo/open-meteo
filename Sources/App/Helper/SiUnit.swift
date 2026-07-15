@@ -3,6 +3,19 @@ import enum OpenMeteoSdk.openmeteo_sdk_Unit
 
 typealias SiUnit = openmeteo_sdk_Unit
 
+extension SiUnit {
+    /// Number of decimals used when formatting values for API/file output (JSON/CSV/XLSX/export).
+    /// Defaults to the SDK's `significantDigits`, but raises specific humidity (g/kg) to 5: it spans
+    /// ~4–5 orders of magnitude, so the default 2 decimals truncates dry-layer values to `0.00`
+    /// (and breaks any client-side dew-point computed from the rounded value).
+    var apiSignificantDigits: Int {
+        switch self {
+        case .gramPerKilogram: return 5
+        default: return significantDigits
+        }
+    }
+}
+
 enum TemperatureUnit: String, Codable {
     case celsius
     case fahrenheit

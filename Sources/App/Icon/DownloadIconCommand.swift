@@ -17,15 +17,75 @@ struct DownloadIconCommand: AsyncCommand {
         case pressureLevel
         case pressureLevelGt500
         case pressureLevelLtE500
-        
+        case hiresTemp
+
         var realm: String? {
             switch self {
-            case .modelLevel:
+            case .modelLevel, .hiresTemp:
                 return "model-level"
             case .pressureLevel:
                 return "pressure-level"
             default:
                 return nil
+            }
+        }
+
+        /// Variable set downloaded for this group. Extracted so the group semantics can be unit-tested.
+        /// `modelLevel` keeps upstream semantics (surface vars flagged model-level); `hiresTemp` is the
+        /// full model-level profile (u/v + t + p + qv) over all levels — rh/dew_point are derived on-read.
+        func variables(domain: IconDomains) -> [any IconVariableDownloadable] {
+            switch self {
+            case .all:
+                return IconSurfaceVariable.allCases + domain.levels.reversed().flatMap { level in
+                    IconPressureVariableType.allCases.map { variable in
+                        IconPressureVariable(variable: variable, level: level)
+                    }
+                }
+            case .surface:
+                return IconSurfaceVariable.allCases.filter {
+                    !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
+                }
+            case .surfaceAndPressure:
+                return IconSurfaceVariable.allCases.filter {
+                    !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
+                } + domain.levels.reversed().flatMap { level in
+                    IconPressureVariableType.allCases.map { variable in
+                        IconPressureVariable(variable: variable, level: level)
+                    }
+                }
+            case .modelLevel:
+                // upstream semantics: surface variables flagged as model-level (NOT the hires profile stack)
+                return IconSurfaceVariable.allCases.filter {
+                    $0.getVarAndLevel(domain: domain)?.cat == "model-level"
+                }
+            case .hiresTemp:
+                return (1...domain.numberOfModelFullLevels).reversed().flatMap { level in
+                    [
+                        IconModelLevelVariable(variable: .wind_u_component, level: level),
+                        IconModelLevelVariable(variable: .wind_v_component, level: level),
+                        IconModelLevelVariable(variable: .temperature, level: level),
+                        IconModelLevelVariable(variable: .specific_humidity, level: level),
+                        IconModelLevelVariable(variable: .pressure, level: level)
+                    ]
+                }
+            case .pressureLevel:
+                return domain.levels.reversed().flatMap { level in
+                    IconPressureVariableType.allCases.map { variable in
+                        IconPressureVariable(variable: variable, level: level)
+                    }
+                }
+            case .pressureLevelGt500:
+                return domain.levels.reversed().flatMap { level in
+                    level > 500 ? IconPressureVariableType.allCases.map { variable in
+                        IconPressureVariable(variable: variable, level: level)
+                    } : []
+                }
+            case .pressureLevelLtE500:
+                return domain.levels.reversed().flatMap { level in
+                    level <= 500 ? IconPressureVariableType.allCases.map { variable in
+                        IconPressureVariable(variable: variable, level: level)
+                    } : []
+                }
             }
         }
     }
@@ -49,6 +109,9 @@ struct DownloadIconCommand: AsyncCommand {
         @Option(name: "only-variables")
         var onlyVariables: String?
 
+        @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
+        var maxForecastHour: Int?
+
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
@@ -57,6 +120,9 @@ struct DownloadIconCommand: AsyncCommand {
         
         @Flag(name: "skip-timeseries")
         var skipTimeseries: Bool
+
+        @Flag(name: "update-meta", help: "Force writing static/meta.json even when the run contains no surface marker variable (e.g. hires model-level groups)")
+        var updateMeta: Bool
     }
 
     var help: String {
@@ -114,8 +180,85 @@ struct DownloadIconCommand: AsyncCommand {
         try hsurf.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
     }
 
+    /// Convert HHL (half-level heights ASL) to single 3D static OM file [ny, nx, nHalf] (level last).
+    /// One file per domain (no per-level chunks). Derived full-level heights are computed on read (lazy).
+    /// Follows exact convertSurfaceElevation patterns for URL/Cdo/idempotency.
+    func convertHhlHeights(application: Application, domain: IconDomains, run: Timestamp) async throws {
+        let logger = application.logger
+        let hhlFile = domain.hhlFileOm.getFilePath()
+        if FileManager.default.fileExists(atPath: hhlFile) {
+            return
+        }
+        logger.info("Converting HHL for \(domain) (will download \(domain.numberOfModelHalfLevels) small per-level files)")
+        try domain.hhlFileOm.createDirectory()
+
+        let downloadDirectory = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
+        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
+        // HHL is published on the same grid as hsurf: regular-lat-lon for nests (d2/eu), icosahedral
+        // (remapped via CDO) for global. d2 also offers an icosahedral native variant, but that grid
+        // has no remap weights here (cdo == nil) so it cannot be reshaped to the regular target grid.
+        let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
+
+        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let dateStr = run.format_YYYYMMddHH
+
+        // HHL: published as one small GRIB per half level (see Key Data Facts).
+        // https://opendata.dwd.de/weather/nwp/icon/grib/00/hhl/...
+        let hhlVar = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "hhl" : "HHL"
+        let nHalf = domain.numberOfModelHalfLevels
+
+        var hhl2D: [Array2D] = []
+        for lev in 1...nHalf {
+            let levelPart = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_\(lev)" : "_\(lev)"
+            let hhlUrl = "\(serverPrefix)hhl/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(levelPart)_\(hhlVar).grib2.bz2"
+            let msgs = try await cdo.downloadAndRemap(hhlUrl)
+            guard msgs.count == 1 else {
+                logger.warning("Expected 1 message for HHL lev \(lev), got \(msgs.count) for \(hhlUrl)")
+                continue
+            }
+            hhl2D.append(msgs[0].data)
+        }
+        logger.info("HHL downloaded \(hhl2D.count)/\(nHalf) levels for \(domain)")
+        guard hhl2D.count == nHalf else {
+            throw NSError(domain: "HHL", code: 1, userInfo: [NSLocalizedDescriptionKey: "Incomplete HHL levels for \(domain)"])
+        }
+
+        // Stack to [ny, nx, nlev] layout (level innermost/fastest varying) so that
+        // for a fixed (y,x) the nlev values are contiguous. Matches chunks [y, x, nlev].
+        let ny = domain.grid.ny
+        let nx = domain.grid.nx
+        let nlev = nHalf
+        var stacked = [Float](repeating: .nan, count: ny * nx * nlev)
+        for (levIdx, levData) in hhl2D.enumerated() {
+            precondition(levData.data.count == ny * nx)
+            for (spIdx, val) in levData.data.enumerated() {
+                // spatialIdx * nlev + lev  => levels contiguous per spatial point
+                stacked[spIdx * nlev + levIdx] = val
+            }
+        }
+
+        // Chunk spatial like makeSpatialWriter, full vertical in each chunk for column reads.
+        let chunkY = min(ny, 32)
+        let chunkX = min(nx, max(1, 1024 / chunkY))
+        // 32-bit pfor (not _int16): global half levels reach 75000 m ASL, which overflows the
+        // 16-bit signed range (±32767) and produces NaN above ~32 km. 1 m resolution is plenty.
+        try stacked.writeOmFile(
+            file: hhlFile,
+            dimensions: [ny, nx, nlev],
+            chunks: [chunkY, chunkX, nlev],
+            compression: .pfor_delta2d,
+            scalefactor: 1.0,
+            createNetCdf: false
+        )
+    }
+
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?, maxForecastHour: Int?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
         let downloadDirectory = domain.downloadDirectory
@@ -147,7 +290,11 @@ struct DownloadIconCommand: AsyncCommand {
             return elevation
         }()
         
-        let timestamps = domain.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
+        var forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        if let maxForecastHour {
+            forecastSteps = forecastSteps.filter { $0 <= maxForecastHour }
+        }
+        let timestamps = forecastSteps.map { run.add(hours: $0) }
         let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
@@ -453,72 +600,28 @@ struct DownloadIconCommand: AsyncCommand {
                 if let variable = IconPressureVariable(rawValue: String($0)) {
                     return variable
                 }
+                if let variable = IconModelLevelVariable(rawValue: String($0)), variable.variable != .height, variable.variable != .height_agl {
+                    return variable
+                }
                 return try IconSurfaceVariable.load(rawValue: String($0))
             }
         }
 
-        /// 3 different variables sets to optimise download time:
-        /// - surface variables with soil
-        /// - model-level e.g. for 180m wind, they have a much larger dalay and sometimes are aborted
-        /// - pressure level which take forever to download because it is too much data
-        var groupVariables: [any IconVariableDownloadable]
-        switch group {
-        case .all:
-            groupVariables = IconSurfaceVariable.allCases + domain.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .surface:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
-            }
-        case .surfaceAndPressure:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
-            } + domain.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .modelLevel:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                $0.getVarAndLevel(domain: domain)?.cat == "model-level"
-            }
-        case .pressureLevel:
-            groupVariables = domain.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .pressureLevelGt500:
-            groupVariables = domain.levels.reversed().flatMap { level in
-                return level > 500 ? IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                } : []
-            }
-        case .pressureLevelLtE500:
-            groupVariables = domain.levels.reversed().flatMap { level in
-                return level <= 500 ? IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                } : []
-            }
-        }
-
-        let variables = onlyVariables ?? groupVariables
+        let variables = onlyVariables ?? group.variables(domain: domain)
 
         let logger = context.application.logger
         let generateFullRun = domain.countEnsembleMember == 1
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
+        try await convertHhlHeights(application: context.application, domain: domain, run: run)
 
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm, maxForecastHour: signature.maxForecastHour)
 
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(application: context.application, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries, forceUpdateMeta: signature.updateMeta)
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries, forceUpdateMeta: signature.updateMeta)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
