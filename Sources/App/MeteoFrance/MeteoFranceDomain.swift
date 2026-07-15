@@ -410,6 +410,13 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .cape: return true
+        case .wind_gusts_10m: return true
+        case .wind_u_component_10m, .wind_v_component_10m: return true
+        case .wind_u_component_20m, .wind_v_component_20m: return true
+        case .wind_u_component_50m, .wind_v_component_50m: return true
+        case .wind_u_component_100m, .wind_v_component_100m: return true
+        case .wind_u_component_150m, .wind_v_component_150m: return true
+        case .wind_u_component_200m, .wind_v_component_200m: return true
         default: return false
         }
     }
