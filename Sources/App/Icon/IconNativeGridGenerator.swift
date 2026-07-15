@@ -414,12 +414,8 @@ enum IconNativeGridGenerator {
         guard normalisedUUID == identity.gridUUIDHex else {
             throw IconNativeGridSourceError.invalidAttribute(name: "uuidOfHGrid", actual: uuid)
         }
-        guard let globalGrid: Int32 = try group.getAttribute("global_grid")?.read() else {
-            throw IconNativeGridSourceError.missingAttribute("global_grid")
-        }
-        guard (globalGrid != 0) == identity.isGlobal else {
-            throw IconNativeGridSourceError.invalidAttribute(name: "global_grid", actual: String(globalGrid))
-        }
+        // DWD's published grid files do not consistently carry ICON's optional `global_grid`
+        // attribute. Grid number, UUID, and the validated cell count uniquely identify the mesh.
     }
 
     private static func readDouble(group: Group, name: String, dimensions: [String]) throws -> [Double] {

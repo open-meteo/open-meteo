@@ -36,12 +36,7 @@ struct CdoHelper: Sendable {
         let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
         return try messages.map { message in
             let source = try message.getDouble()
-            let destination = cdo.mapping.map { src in
-                guard src >= 0 else {
-                    return Float.nan
-                }
-                return Float(source[Int(src)])
-            }
+            let destination = cdo.remap(source)
             let grid2d = Array2D(data: destination, nx: grid.nx, ny: grid.ny)
             return (message, grid2d)
         }
@@ -73,8 +68,21 @@ extension IconDomains {
     }
 }
 
-struct CdoIconGlobal {
+struct CdoIconGlobal: Sendable {
     let mapping: [Int32]
+
+    init(mapping: [Int32]) {
+        self.mapping = mapping
+    }
+
+    func remap<T: BinaryFloatingPoint>(_ source: [T]) -> [Float] {
+        mapping.map { index in
+            guard index >= 0 else {
+                return .nan
+            }
+            return Float(source[Int(index)])
+        }
+    }
 
     /// Download and prepare weights for icon global remapping
     public init?(curl: Curl, domain: IconDomains) async throws {
