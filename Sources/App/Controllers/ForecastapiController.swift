@@ -397,6 +397,29 @@ struct WeatherApiController {
     }
 }
 
+private struct GenericReaderNoData<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
+    let modelLat: Float
+    let modelLon: Float
+    let targetElevation: Float
+    let modelDtSeconds: Int
+
+    var modelElevation: ElevationOrSea {
+        return .noData
+    }
+
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return nil
+    }
+
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
+        return false
+    }
+
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        return nil
+    }
+}
+
 struct MultiDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = ForecastVariable
     
@@ -966,6 +989,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case multiple([(any GenericDomain, any GenericVariable.Type)])
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
         case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
+        case seamlessLocal(
+            global: [(any GenericDomain, any GenericVariable.Type)],
+            local: [(any GenericDomain, any GenericVariable.Type)],
+            geographicExtent: any GenericDomain,
+            precipitationProb: (any GenericDomain)?
+        )
         
         var singleDomain: (any GenericDomain)? {
             switch self {
@@ -998,6 +1027,26 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     let domain: any GenericDomain = d.0
                     let variable: any GenericVariable.Type = d.1
                     return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+                return MultiDomains.hourlyToMultiSameType(readers)
+            case .seamlessLocal(let global, let local, let geographicExtent, let precipitationProb):
+                guard geographicExtent.grid.findPoint(lat: lat, lon: lon) != nil else {
+                    let hourly = GenericReaderNoData<ForecastVariable>(
+                        modelLat: lat,
+                        modelLon: lon,
+                        targetElevation: elevation,
+                        modelDtSeconds: 3600
+                    )
+                    return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+                }
+                var readers = try await (global + local).asyncCompactMap { d in
+                    let domain: any GenericDomain = d.0
+                    let variable: any GenericVariable.Type = d.1
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+                if let precipitationProb,
+                   let probabilityReader = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                    readers.append(probabilityReader.asOptionalReader)
                 }
                 return MultiDomains.hourlyToMultiSameType(readers)
             }
@@ -1168,10 +1217,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .chmi_aladin_central_europe_2km:
             return .single(ChmiDomain.aladin_central_europe_2km, ChmiVariable.self)
         case .chmi_aladin_seamless:
-            return .multiple([
+            return .seamlessLocal(global: [
+                (EcmwfDomain.ifs025, EcmwfVariable.self),
+                (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self)
+            ], local: [
                 (ChmiDomain.aladin_central_europe_2km, ChmiSurfaceVariable.self),
                 (ChmiDomain.aladin_cz_1km, ChmiVariable.self)
-            ])
+            ], geographicExtent: ChmiDomain.aladin_central_europe_2km, precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
@@ -1234,7 +1286,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        
         if let d = getDomainAndVariable() {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
         }
@@ -1491,7 +1542,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
             case .multipleWithPrecipitationProbability(_, precipitationProb: _):
                 return (nil, nil, nil, nil)
-            case .multiple(_):
+            case .multiple(_), .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
         }
@@ -1860,7 +1911,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return domain
             case .multipleWithPrecipitationProbability(_, precipitationProb: _):
                 return nil
-            case .multiple(_):
+            case .multiple(_), .seamlessLocal:
                 return nil
             }
         }
