@@ -30,14 +30,19 @@ struct FullRunMetaJson: Codable {
         self.valid_times = validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ)
     }
     
-    static func write(domain: GenericDomain, run: Timestamp, validTimes: [Timestamp]) throws {
+    static func write(domain: GenericDomain, run: Timestamp, validTimes: [Timestamp]) throws -> [(file: FullRunMetaFile, data: Data)] {
         guard let meta = try FullRunMetaJson(domain: domain, run: run, validTimes: validTimes) else {
-            return
+            return []
         }
+        let data = try meta.jsonEncodedData()
         let path = FullRunMetaFile.run(domain.domainRegistry, run)
-        try meta.writeTo(path: path.getFilePath())
+        try data.writeAtomic(path: path.getFilePath())
         let pathLatest = FullRunMetaFile.latest(domain.domainRegistry)
-        try meta.writeTo(path: pathLatest.getFilePath())
+        try data.writeAtomic(path: pathLatest.getFilePath())
+        return [
+            (path, data),
+            (pathLatest, data)
+        ]
     }
 }
 
