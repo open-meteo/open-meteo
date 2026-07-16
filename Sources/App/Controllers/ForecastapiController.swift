@@ -397,29 +397,6 @@ struct WeatherApiController {
     }
 }
 
-private struct GenericReaderNoData<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
-    let modelLat: Float
-    let modelLon: Float
-    let targetElevation: Float
-    let modelDtSeconds: Int
-
-    var modelElevation: ElevationOrSea {
-        return .noData
-    }
-
-    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        return nil
-    }
-
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
-        return false
-    }
-
-    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
-        return nil
-    }
-}
-
 struct MultiDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = ForecastVariable
     
@@ -1031,13 +1008,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType(readers)
             case .seamlessLocal(let global, let local, let geographicExtent, let precipitationProb):
                 guard geographicExtent.grid.findPoint(lat: lat, lon: lon) != nil else {
-                    let hourly = GenericReaderNoData<ForecastVariable>(
-                        modelLat: lat,
-                        modelLon: lon,
-                        targetElevation: elevation,
-                        modelDtSeconds: 3600
-                    )
-                    return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+                    return nil
                 }
                 var readers = try await (global + local).asyncCompactMap { d in
                     let domain: any GenericDomain = d.0
