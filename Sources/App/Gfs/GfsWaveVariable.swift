@@ -148,7 +148,7 @@ extension GfsWaveVariable: GfsVariableDownloadable {
         return false
     }
 
-    func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
+    func multiplyAdd(domain: GfsDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
         return nil
     }
 }
