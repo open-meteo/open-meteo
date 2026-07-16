@@ -790,6 +790,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_icon_global_native
+    case dwd_icon_d2_native
+    case dwd_icon_d2_native_15min
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
@@ -978,25 +981,45 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
             switch self {
             case .single(let domain, let variable):
+                guard domain.isAvailable else {
+                    options.logger.warning("Skipping unavailable domain '\(domain.domainRegistry.rawValue)'")
+                    return nil
+                }
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
+                guard domain.isAvailable else {
+                    options.logger.warning("Skipping unavailable domain '\(domain.domainRegistry.rawValue)'")
+                    return nil
+                }
                 guard let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     return nil
                 }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                let prob = precipitationProb.isAvailable
+                    ? try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                    : nil
                 return MultiDomains.hourlyToMultiSameType([reader, prob].compactMap({$0}))
             case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
-                let readers = try await domains.asyncCompactMap { d in
+                let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await domains.asyncCompactMap { d -> (any GenericReaderOptionalProtocol<ForecastVariable>)? in
                     let domain: any GenericDomain = d.0
                     let variable: any GenericVariable.Type = d.1
+                    guard domain.isAvailable else {
+                        options.logger.warning("Skipping unavailable domain '\(domain.domainRegistry.rawValue)'")
+                        return nil
+                    }
                     return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                let prob = precipitationProb.isAvailable
+                    ? try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                    : nil
                 return MultiDomains.hourlyToMultiSameType(readers + [prob].compactMap({$0}))
             case .multiple(let domains):
-                let readers = try await domains.asyncCompactMap { d in
+                let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await domains.asyncCompactMap { d -> (any GenericReaderOptionalProtocol<ForecastVariable>)? in
                     let domain: any GenericDomain = d.0
                     let variable: any GenericVariable.Type = d.1
+                    guard domain.isAvailable else {
+                        options.logger.warning("Skipping unavailable domain '\(domain.domainRegistry.rawValue)'")
+                        return nil
+                    }
                     return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 }
                 return MultiDomains.hourlyToMultiSameType(readers)
@@ -1018,6 +1041,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Generic domains with hourly data that can use the generic deriver controller
     func getDomainAndVariable() -> DomainReaderMapping? {
         switch self {
+        case .dwd_icon_global_native:
+            return .single(IconDomains.iconNative, IconVariable.self)
+        case .dwd_icon_d2_native:
+            return .multiple([
+                (IconDomains.iconD2Native, IconVariable.self),
+                (IconDomains.iconD2Native15min, IconVariable.self)
+            ])
+        case .dwd_icon_d2_native_15min:
+            return .single(IconDomains.iconD2Native15min, IconVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
@@ -1520,6 +1552,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, include15Min: Bool) async throws -> [any GenericReaderProtocol] {
         switch self {
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+            return [] // migrated to DomainReaderMapping and GenericReader
         case .best_match:
             return [] // migrated
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
@@ -1855,9 +1889,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         if let d = getDomainAndVariable() {
             switch d {
             case .single(let domain, _):
-                return domain
+                return domain.isAvailable ? domain : nil
             case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _):
-                return domain
+                return domain.isAvailable ? domain : nil
             case .multipleWithPrecipitationProbability(_, precipitationProb: _):
                 return nil
             case .multiple(_):
@@ -1902,6 +1936,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
+        case .dwd_icon_global_native:
+            return IconDomains.iconNative
+        case .dwd_icon_d2_native:
+            return nil // combines hourly and 15-minute native domains
+        case .dwd_icon_d2_native_15min:
+            return IconDomains.iconD2Native15min
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
         case .ecmwf_ifs025:
@@ -2195,6 +2235,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await IconReader(domain: .iconD2, gridpoint: gridpoint, options: options)
         case .dwd_icon_d2_15min:
             return try await IconReader(domain: .iconD2_15min, gridpoint: gridpoint, options: options)
+        case .dwd_icon_global_native:
+            return try await GenericReader<IconDomains, IconVariable>(domain: .iconNative, position: gridpoint, options: options)
+        case .dwd_icon_d2_native:
+            return try await GenericReader<IconDomains, IconVariable>(domain: .iconD2Native, position: gridpoint, options: options)
+        case .dwd_icon_d2_native_15min:
+            return try await GenericReader<IconDomains, IconVariable>(domain: .iconD2Native15min, position: gridpoint, options: options)
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs025:
