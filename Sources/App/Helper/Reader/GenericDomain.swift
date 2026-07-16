@@ -2,6 +2,11 @@ import Foundation
 import OmFileFormat
 import Vapor
 
+struct PressureLevelInterpolation: Sendable {
+    let lowerLevel: Int
+    let upperLevel: Int
+}
+
 /**
  Generic domain that is required for the reader
  */
@@ -38,9 +43,16 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
+
+    /// Pressure levels that are synthesized from two neighboring model levels.
+    var pressureLevelInterpolations: [Int: PressureLevelInterpolation] { get }
 }
 
 extension GenericDomain {
+    var pressureLevelInterpolations: [Int: PressureLevelInterpolation] {
+        return [:]
+    }
+
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }
@@ -120,6 +132,9 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// NOTE: `level` has been replaced with `ensembleMemberLevel` in settings
     var omFileName: (file: String, level: Int) { get }
 
+    /// Older filenames that contain the same logical variable. The primary file always takes precedence.
+    var omFileNameFallbacks: [String] { get }
+
     /// The scalefactor to compress data
     var scalefactor: Float { get }
 
@@ -134,6 +149,12 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
 
     /// If true, forecasts from the previous model runs will be preserved
     var storePreviousForecast: Bool { get }
+}
+
+extension GenericVariable {
+    var omFileNameFallbacks: [String] {
+        return []
+    }
 }
 
 

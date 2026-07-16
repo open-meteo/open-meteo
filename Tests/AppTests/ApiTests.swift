@@ -3,7 +3,112 @@ import Foundation
 import Testing
 import VaporTesting
 
+private struct ReaderConstructionResult {
+    let source: String
+    let targetElevation: Float
+}
+
 @Suite struct ApiTests {
+    @Test func multiDomainReadersShareElevationAndPreserveMixerOrder() async {
+        var initializations = [(source: String, elevation: Float)]()
+        let result = await MultiDomains.DomainReaderMapping.makeReadersInMixerOrder(
+            sources: ["fallback", "authoritative"],
+            elevation: .nan,
+            makeReader: { source, elevation in
+                initializations.append((source, elevation))
+                return ReaderConstructionResult(
+                    source: source,
+                    targetElevation: elevation.isNaN ? 321 : elevation
+                )
+            },
+            resolvedElevation: { $0.targetElevation }
+        )
+
+        #expect(initializations.map(\.source) == ["authoritative", "fallback"])
+        #expect(initializations[0].elevation.isNaN)
+        #expect(initializations[1].elevation == 321)
+        #expect(result.readers.map(\.source) == ["fallback", "authoritative"])
+        #expect(result.elevation == 321)
+    }
+
+    @Test func dwdIconGenericMappings() throws {
+        let seamlessAliases: [MultiDomains] = [.icon_seamless, .icon_mix, .dwd_icon_seamless]
+        let expectedSeamlessDomains: [DomainRegistry] = [
+            .dwd_icon_eps,
+            .dwd_icon_eu_eps,
+            .dwd_icon,
+            .dwd_icon_eu,
+            .dwd_icon_d2,
+            .dwd_icon_d2_15min
+        ]
+        for model in seamlessAliases {
+            let mapping = try #require(model.getDomainAndVariable())
+            guard case .multiple(let domains) = mapping else {
+                Issue.record("Expected multiple-domain mapping for \(model.rawValue)")
+                continue
+            }
+            #expect(domains.map { $0.0.domainRegistry } == expectedSeamlessDomains)
+            #expect(mapping.genericDomain == nil)
+        }
+
+        let globalAliases: [MultiDomains] = [.icon_global, .dwd_icon_global, .dwd_icon]
+        for model in globalAliases {
+            let mapping = try #require(model.getDomainAndVariable())
+            guard case .singleWithPrecipitationProbability(let domain, _, let probability) = mapping else {
+                Issue.record("Expected single-domain probability mapping for \(model.rawValue)")
+                continue
+            }
+            #expect(domain.domainRegistry == .dwd_icon)
+            #expect(probability.domainRegistry == .dwd_icon_eps)
+            #expect(mapping.genericDomain?.domainRegistry == .dwd_icon)
+            #expect(mapping.singleDomain?.domainRegistry == .dwd_icon)
+        }
+
+        let euAliases: [MultiDomains] = [.icon_eu, .dwd_icon_eu]
+        for model in euAliases {
+            let mapping = try #require(model.getDomainAndVariable())
+            guard case .singleWithPrecipitationProbability(let domain, _, let probability) = mapping else {
+                Issue.record("Expected single-domain probability mapping for \(model.rawValue)")
+                continue
+            }
+            #expect(domain.domainRegistry == .dwd_icon_eu)
+            #expect(probability.domainRegistry == .dwd_icon_eu_eps)
+            #expect(mapping.genericDomain?.domainRegistry == .dwd_icon_eu)
+        }
+
+        let d2Aliases: [MultiDomains] = [.icon_d2, .dwd_icon_d2]
+        for model in d2Aliases {
+            let mapping = try #require(model.getDomainAndVariable())
+            guard case .singleWithSupplementalDomains(let domain, _, let supplemental, let probability) = mapping else {
+                Issue.record("Expected supplemental-domain mapping for \(model.rawValue)")
+                continue
+            }
+            #expect(domain.domainRegistry == .dwd_icon_d2)
+            #expect(supplemental.map { $0.0.domainRegistry } == [.dwd_icon_d2_15min])
+            #expect(probability?.domainRegistry == .dwd_icon_d2_eps)
+            #expect(mapping.genericDomain?.domainRegistry == .dwd_icon_d2)
+            #expect(mapping.singleDomain == nil)
+        }
+
+        let d2QuarterHourly = try #require(MultiDomains.dwd_icon_d2_15min.getDomainAndVariable())
+        guard case .single(let domain, _) = d2QuarterHourly else {
+            Issue.record("Expected single-domain mapping for dwd_icon_d2_15min")
+            return
+        }
+        #expect(domain.domainRegistry == .dwd_icon_d2_15min)
+        #expect(d2QuarterHourly.genericDomain?.domainRegistry == .dwd_icon_d2_15min)
+
+        for model in [MultiDomains.icon_seamless_eps, .dwd_icon_seamless_eps] {
+            let mapping = try #require(model.getDomainAndVariable())
+            guard case .multiple(let domains) = mapping else {
+                Issue.record("Expected multiple-domain mapping for \(model.rawValue)")
+                continue
+            }
+            #expect(domains.map { $0.0.domainRegistry } == [.dwd_icon_eps, .dwd_icon_eu_eps])
+            #expect(domains.contains { $0.0.domainRegistry == .dwd_icon_d2_eps } == false)
+        }
+    }
+
     /*@Test func generateS3SyncCommands() throws {
         for domain in DomainRegistry.allCases {
             let d = domain.rawValue
