@@ -1190,8 +1190,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
                 (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self)
             ], local: [
-                (ChmiDomain.aladin_central_europe_2km, ChmiSurfaceVariable.self),
-                (ChmiDomain.aladin_cz_1km, ChmiVariable.self)
+                (ChmiDomain.aladin_central_europe_2km, ChmiVariable.self),
+                (ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
