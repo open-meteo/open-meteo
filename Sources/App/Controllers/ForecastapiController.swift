@@ -1169,8 +1169,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(ChmiDomain.aladin_central_europe_2km, ChmiVariable.self)
         case .chmi_aladin_seamless:
             return .multiple([
-                (ChmiDomain.aladin_central_europe_2km, ChmiSurfaceVariable.self),
-                (ChmiDomain.aladin_cz_1km, ChmiVariable.self)
+                (ChmiDomain.aladin_central_europe_2km, ChmiVariable.self),
+                (ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
             ])
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
