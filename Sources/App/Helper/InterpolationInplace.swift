@@ -284,7 +284,7 @@ extension Array where Element == Float {
                 break
             }
             for i in firstValid..<nTime {
-                guard self[l * nTime + i].isFinite else {
+                guard self[l * nTime + i].isNaN else {
                     continue
                 }
                 if i < firstMissing {
