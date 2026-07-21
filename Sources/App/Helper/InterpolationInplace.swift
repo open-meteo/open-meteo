@@ -284,7 +284,7 @@ extension Array where Element == Float {
                 break
             }
             for i in firstValid..<nTime {
-                guard self[l * nTime + i].isFinite else {
+                guard self[l * nTime + i].isNaN else {
                     continue
                 }
                 if i < firstMissing {
@@ -319,7 +319,13 @@ extension Array where Element == Float {
         let radMinium = 5 / Zensun.solarConstant
 
         /// solar factor, backwards averaged over dt
-        let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
+        let solar2d_raw = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
+        /// Atmospheric attenuation constant besed on Haurwitz. Standard would be -0.059. -0.09 is assuming more haze, but it matches better with reference data
+        let atmosphericAttenuationConstant: Float = -0.09
+        /// Estimate clear sky radiation
+        let solar2d = Array2DFastTime(data: solar2d_raw.data.map {
+            $0 * exp(atmosphericAttenuationConstant / $0)
+        }, nLocations: solar2d_raw.nLocations, nTime: solar2d_raw.nTime)
         /// Lower bound of solar hours
         let sLow = solarHours.lowerBound
 
@@ -365,83 +371,18 @@ extension Array where Element == Float {
                     // not possible to do any interpolation
                     break
                 }
-                let width = posC - posB
-                let posA = posB - width
-                let posD = posC + width
-                let posAValid = posA >= 0 && posA - sLow >= 0 && !self[l * nTime + posA].isNaN
-                let posDValid = posD < nTime && posD - sLow < solarTime.count && !self[l * nTime + posD].isNaN
-
-                let B = self[l * nTime + posB]
-                let solB = solar2d[sPos, posB - sLow]
                 let solC = solar2d[sPos, posC - sLow]
 
                 /// solAvgC is an average of the solar factor from posB until posC
                 let solAvgC = missingValuesAreBackwardsAveraged ? solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean() : solC
 
                 /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
-                var ktC = solAvgC <= radMinium ? .nan : Swift.min(C / solAvgC, radLimit)
-
-                /// Clearness index at point B, or use `ktC` for low radiation levels. B could be NaN if data is immediately missing in the beginning of a time-series
-                var ktB = solB <= radMinium || B.isNaN ? ktC : Swift.min(B / solB, radLimit)
-
-                var ktA, ktD: Float
-                if posDValid && posAValid {
-                    // 4 point Hermite kt interpolation
-                    let A = self[l * nTime + posA]
-                    let D = self[l * nTime + posD]
-
-                    let solA = solar2d[sPos, posA - sLow]
-                    ktA = solA <= radMinium ? ktB : Swift.min(A / solA, radLimit)
-
-                    /// solD is an average of the solar factor from posC until posD
-                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solar2d[sPos, posD - sLow]
-                    ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
-                } else {
-                    // 2 point linear kt interpolation
-                    ktA = ktB
-                    ktD = ktC
-                }
-
-                if ktC.isNaN && ktB > 0 {
-                    ktC = ktB
-                }
-
-                if ktC.isNaN && ktA > 0 {
-                    ktB = ktA
-                    ktC = ktA
-                }
-
-                // Especially for 6h values, aggressively try to find any KT index that works
-                // As a future improvement, the clear-sky radiation could be approximated by cloud cover total as an additional input
-                // This could improve morning/evening kt approximations
-                if ktC.isNaN && ktD > 0 {
-                    ktA = ktD
-                    ktB = ktD
-                    ktC = ktD
-                }
-
-                let a = -ktA / 2.0 + (3.0 * ktB) / 2.0 - (3.0 * ktC) / 2.0 + ktD / 2.0
-                let b = ktA - (5.0 * ktB) / 2.0 + 2.0 * ktC - ktD / 2.0
-                let c = -ktA / 2.0 + ktC / 2.0
-                let d = ktB
-
-                // Fill up all missing values until point C
+                let ktC = solAvgC <= radMinium || C <= 0 ? .nan : Swift.min(C / solAvgC, radLimit)
+                
                 for t in t..<posC {
-                    // fractional position of the missing value in relation to points B and C
-                    let f = Float(t - posB) / Float(posC - posB)
-                    // Interpolated clearness index at missing value position
-                    let kt = a * f * f * f + b * f * f + c * f + d
-                    if kt < 0 && B >= 0 && C >= 0 {
-                        /// Derivatives may trigger negative radiation, if values drop to fast. Fallback to linear interpolation
-                        self[l * nTime + t] = (ktB * (1 - f) + ktC * f) * solar2d[sPos, t - sLow]
-                    } else {
-                        // kt can still be NaN at night
-                        self[l * nTime + t] = Swift.max(0, kt) * solar2d[sPos, t - sLow]
-                    }
+                    self[l * nTime + t] = Swift.max(0, ktC) * solar2d[sPos, t - sLow]
                 }
-
                 if missingValuesAreBackwardsAveraged {
-                    // Deaverage point C, ktC could be NaN at night, therefore `max(0, ktC)` instead of `max(ktC, 0)`
                     self[l * nTime + posC] = Swift.max(0, ktC) * solC
                 }
             }

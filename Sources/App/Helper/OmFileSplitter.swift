@@ -198,7 +198,7 @@ struct OmFileSplitter {
                 guard let timestamps else {
                     return
                 }
-                let fullRunTime = TimerangeDt(start: timestamps[0], to: timestamps[timestamps.count - 1].add(time.dtSeconds), dtSeconds: time.dtSeconds)
+                let fullRunTime = TimerangeDt(start: run.toTimestamp(), to: timestamps[timestamps.count - 1].add(time.dtSeconds), dtSeconds: time.dtSeconds)
                 guard let offsets = indexTime.intersect(fileTime: fullRunTime.toIndexTime()) else {
                     return
                 }
