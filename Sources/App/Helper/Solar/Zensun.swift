@@ -60,27 +60,20 @@ public enum Zensun {
                 
                 let a = cos(t0) * cos(t1)
                 let b = sin(t0) * sin(t1)
+                assert(b > 0)
                 
+                let arg = -a / b
+                guard arg < 1 else {
+                    // polar night
+                    out[i, t] = 0
+                    continue
+                }
                 // limit integration to sunrise/set, μ > 0 within `p0 ± carg`
-                var lo = p1
-                var hi = p10
-                let width = hi - lo
-                
-                if b > 0 {
-                    let arg = -a / b
-                    if arg >= 1 {
-                        // polar night
-                        out[i, t] = 0
-                        continue
-                    }
-                    let carg = arg <= -1 ? Float.pi : acos(arg)
-                    lo = max(lo, p0 - carg)
-                    hi = min(hi, p0 + carg)
-                    if lo >= hi {
-                        out[i, t] = 0
-                        continue
-                    }
-                } else if a <= 0 {
+                let carg = arg <= -1 ? Float.pi : acos(arg)
+                assert(carg >= 0)
+                let lo = max(p1, p0 - carg)
+                let hi = min(p10, p0 + carg)
+                guard lo < hi else {
                     out[i, t] = 0
                     continue
                 }
@@ -98,6 +91,7 @@ public enum Zensun {
                 let c = (lo + hi) * 0.5
                 let h = (hi - lo) * 0.5
                 let x = h * 0.77459667
+                let width = p10 - p1
                 out[i, t] = h * ((5 / 9) * (integrand(c - x) + integrand(c + x)) + (8 / 9) * integrand(c)) / (rsun * rsun * width)
             }
         }
