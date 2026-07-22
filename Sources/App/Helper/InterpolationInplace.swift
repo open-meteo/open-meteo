@@ -318,15 +318,9 @@ extension Array where Element == Float {
         /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
         let radMinium = 5 / Zensun.solarConstant
 
-        /// solar factor, backwards averaged over dt
-        let solar2d_raw = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
-        /// Atmospheric attenuation constant besed on Haurwitz. Standard would be -0.059. -0.09 is assuming more haze, but it matches better with reference data
-        let atmosphericAttenuationConstant: Float = -0.09
-        /// Estimate clear sky radiation
-        let solar2d = Array2DFastTime(data: solar2d_raw.data.map {
-            $0 * exp(atmosphericAttenuationConstant / $0)
-        }, nLocations: solar2d_raw.nLocations, nTime: solar2d_raw.nTime)
-        /// Lower bound of solar hours
+        /// solar factor corrected by Haurwitz clear-sky attenuation, backwards averaged over dt
+        let solar2d = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
+
         let sLow = solarHours.lowerBound
 
         for l in 0..<nTimeSeries {

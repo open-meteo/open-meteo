@@ -3,6 +3,30 @@ import Foundation
 import Testing
 
 @Suite struct ZensunTests {
+    /// Clear sky radiation approximation
+    @Test func clearSkyRadiationTest() {
+        let time1h = TimerangeDt(start: Timestamp(2022, 8, 17, 1), nTime: 24, dtSeconds: 3600)
+        let time3h = TimerangeDt(start: Timestamp(2022, 8, 17, 3), nTime: 24/3, dtSeconds: 3*3600)
+        let time15m = TimerangeDt(start: Timestamp(2022, 8, 17, 0, 15), nTime: 24*4, dtSeconds: 3600/4)
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 47, lonMin: 4.5, dx: 1, dy: 1)
+        
+        let clearsky15min = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time15m).data.map{1098 * $0}
+        
+        #expect(arraysEqual(clearsky15min, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.8888949, 24.169424, 62.123974, 104.62052, 148.83984, 193.75536, 238.82538, 283.6846, 328.04675, 371.66437, 414.31506, 455.791, 495.89835, 534.45245, 571.27936, 606.21436, 639.1024, 669.7985, 698.16736, 724.08527, 747.43854, 768.1251, 786.05505, 801.1505, 813.3451, 822.5862, 828.8332, 832.05884, 832.24896, 829.40234, 823.53094, 814.66003, 802.82733, 788.0845, 770.495, 750.1344, 727.0912, 701.4656, 673.36865, 642.923, 610.2622, 575.52924, 538.87787, 500.47144, 460.48257, 419.094, 376.49927, 332.90344, 288.5278, 243.61626, 198.45102, 153.38725, 108.94294, 66.07627, 27.317997, 2.7596323, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        
+        let clearsky1h = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time1h).data.map{1098 * $0}
+        
+        #expect(arraysEqual(clearsky1h, [0.0, 0.0, 0.0, 0.0, 0.47222197, 84.87222, 261.0263, 434.3688, 587.71625, 709.8281, 792.1245, 828.8859, 817.5562, 758.89844, 656.9471, 518.77704, 354.18735, 176.0258, 24.053576, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        
+        let averaged = clearsky15min.mean(by: 4)
+        #expect(arraysEqual(averaged, clearsky1h, accuracy: 1))
+        
+        let clearsky3h = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time3h).data.map{1098 * $0}
+        #expect(arraysEqual(clearsky3h, [0.0, 28.426155, 427.56738, 776.82776, 744.33136, 349.47205, 7.9511237, 0.0]))
+        let averaged3h = clearsky15min.mean(by: 4*3)
+        #expect(arraysEqual(averaged3h, clearsky3h, accuracy: 1))
+    }
+    
     @Test func isDaylightTime() {
         let time = TimerangeDt(start: Timestamp(2023, 04, 06), nTime: 48, dtSeconds: 3600)
         let isDay = Zensun.calculateIsDay(timeRange: time, lat: 52.52, lon: 13.42)
