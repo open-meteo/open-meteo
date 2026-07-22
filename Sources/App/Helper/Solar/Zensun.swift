@@ -62,8 +62,8 @@ public enum Zensun {
                 let b = sin(t0) * sin(t1)
                 
                 // limit integration to sunrise/set, μ > 0 within `p0 ± carg`
-                var lo = min(p1, p10)
-                var hi = max(p1, p10)
+                var lo = p1
+                var hi = p10
                 let width = hi - lo
                 
                 if b > 0 {
