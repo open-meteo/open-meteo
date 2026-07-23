@@ -423,9 +423,13 @@ extension Sequence where Element == Timestamp {
 
             if onlyDate {
                 return AnyIterator<String> {
-                    guard let element = iterator.next()?.add(utc_offset_seconds) else {
+                    guard let raw = iterator.next() else {
                         return nil
                     }
+                    if raw.isNoData {
+                        return "null"
+                    }
+                    let element = raw.add(utc_offset_seconds)
                     if quotedString {
                         return "\"\(element.iso8601_YYYY_MM_dd)\""
                     }
@@ -434,9 +438,13 @@ extension Sequence where Element == Timestamp {
             }
 
             return AnyIterator<String> {
-                guard let element = iterator.next()?.add(utc_offset_seconds) else {
+                guard let raw = iterator.next() else {
                     return nil
                 }
+                if raw.isNoData {
+                    return "null"
+                }
+                let element = raw.add(utc_offset_seconds)
                 var time = element.timeIntervalSince1970
                 if dateCalculated != time - time.moduloPositive(86400) {
                     dateCalculated = time - time.moduloPositive(86400)
@@ -468,6 +476,9 @@ extension Sequence where Element == Timestamp {
                 return AnyIterator<String> {
                     guard let element = iterator.next() else {
                         return nil
+                    }
+                    if element.isNoData {
+                        return "null"
                     }
                     return "\(element.timeIntervalSince1970)"
                 }

@@ -41,6 +41,15 @@ public struct Timestamp: Hashable, Sendable {
         return Timestamp(Int(Date().timeIntervalSince1970))
     }
 
+    /// Sentinel value representing a missing timestamp, e.g. a day on which the moon does not rise or set.
+    /// Serialised as `null` (JSON) or an empty field (CSV/XLSX). Guard with `isNoData` before applying a UTC offset to avoid integer overflow.
+    public static let noData = Timestamp(Int.max)
+
+    /// `true` if this is the `noData` sentinel
+    @inlinable public var isNoData: Bool {
+        timeIntervalSince1970 == Int.max
+    }
+
     /// month 1-12, day 1-31
     public init(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0, _ second: Int = 0) {
         assert(month > 0)
