@@ -11,6 +11,18 @@ import Darwin
 #endif
 
 @Suite(.serialized) struct DownloaderTests {
+    
+    @Test func testS3Inventory() async throws {
+        let server = "https://openmeteo.s3.amazonaws.com/"
+        let inventory = S3Inventory(server: server)
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+        let logger = Logger(label: "DownloaderTests.testS3Inventory")
+        let file = try await inventory.getObject(path: "data/cams_europe/alder_pollen/chunk_2311.om", client: client, logger: logger)
+        print(await file?.meta())
+    }
+    
+    
     @Test func testAwsSign() async throws {
         let url = "https://examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)
