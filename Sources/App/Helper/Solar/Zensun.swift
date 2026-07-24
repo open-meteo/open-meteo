@@ -9,6 +9,94 @@ public enum Zensun {
 
     /// Lookup table for sun declination and equation of time
     public static let sunPosition = SolarPositonFastLookup()
+    
+    /// Backwards-averaged clear-sky solar factor: average of `μ * exp(-0.057 / μ)` over hour angle
+    /// , divided by `rsun²`. `μ = cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)` is the
+    /// cosine of the solar zenith angle, `exp(-0.057 / μ)` the Haurwitz clear-sky attenuation
+    /// (airmass ≈ 1/μ) and `rsun` the earth-sun distance in AU.
+    /// The integral is clamped to sunrise/sunset (μ > 0), but averaged over the full step width, so
+    /// the night fraction of a step counts as zero. No closed form exists, uses 3-point Gauss-Legendre
+    /// quadrature. Error of the average is below 0.0002 for hourly steps and 0.001 for up to 6 hours
+    /// (~0.06° in equivalent zenith angle). ~28ns per timestep / location.
+    public static func calculateClearSkyRadiationBackwardsAveraged(grid: any Gridable, locationRange: some RandomAccessCollection<Int>, timerange: TimerangeDt) -> Array2DFastTime {
+        var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
+
+        for (t, timestamp) in timerange.enumerated() {
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
+
+            /// earth-sun distance in AU
+            let rsun = timestamp.getSunRadius()
+
+            let latsun = decang
+            /// universal time
+            let ut = timestamp.hourWithFraction
+            let t1 = (90 - latsun).degreesToRadians
+
+            let lonsun = -15.0 * (ut - 12.0 + eqtime)
+
+            /// longitude of sun
+            let p1 = lonsun.degreesToRadians
+
+            let ut0 = ut - (Float(timerange.dtSeconds) / 3600)
+            let lonsun0 = -15.0 * (ut0 - 12.0 + eqtime)
+
+            let p10 = lonsun0.degreesToRadians
+            
+            assert(p10 > p1)
+
+            for (i, gridpoint) in locationRange.enumerated() {
+                let (lat, lon) = grid.getCoordinates(gridpoint: gridpoint)
+                let t0 = (90 - lat).degreesToRadians                     // colatitude of point
+
+                /// longitude of point
+                var p0 = lon.degreesToRadians
+                if p0 < p1 - .pi {
+                    p0 += 2 * .pi
+                }
+                if p0 > p1 + .pi {
+                    p0 -= 2 * .pi
+                }
+                
+                let a = cos(t0) * cos(t1)
+                let b = sin(t0) * sin(t1)
+                assert(b > 0)
+                
+                let arg = -a / b
+                guard arg < 1 else {
+                    // polar night
+                    out[i, t] = 0
+                    continue
+                }
+                // limit integration to sunrise/set, μ > 0 within `p0 ± carg`
+                let carg = arg <= -1 ? Float.pi : acos(arg)
+                assert(carg >= 0)
+                let lo = max(p1, p0 - carg)
+                let hi = min(p10, p0 + carg)
+                guard lo < hi else {
+                    out[i, t] = 0
+                    continue
+                }
+
+                // μ * exp(-0.057 / μ). Below μ=0.005 the integrand is < 5e-8
+                func integrand(_ p: Float) -> Float {
+                    let mu = a + b * cos(p - p0)
+                    if mu < 0.005 {
+                        return 0
+                    }
+                    return mu * exp(-0.057 / mu)
+                }
+
+                // 3-point Gauss-Legendre
+                let c = (lo + hi) * 0.5
+                let h = (hi - lo) * 0.5
+                let x = h * 0.77459667
+                let width = p10 - p1
+                out[i, t] = h * ((5 / 9) * (integrand(c - x) + integrand(c + x)) + (8 / 9) * integrand(c)) / (rsun * rsun * width)
+            }
+        }
+        return out
+    }
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// This function is performance critical for updates. This explains redundant code.

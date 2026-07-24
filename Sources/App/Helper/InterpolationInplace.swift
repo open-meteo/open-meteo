@@ -233,10 +233,11 @@ extension Array where Element == Float {
     }
 
     /// Interpolate missing values by seeking for the next valid value and perform a solar backwards interpolation
-    /// Calculates the solar position backwards averages over `dt` and estimates the clearness index `kt` which is then hermite interpolated
+    /// Calculates the solar position backwards averages over `dt` and estimates the clearness radiation and index `kt`
+    /// which is then spline interpolated, but preserves averages
     ///
     /// Assumes that the first value after a series of missing values is the average solar radiation for all missing steps (including self)
-    /// Values after missing values will afterwards deaveraged as well
+    /// Values after missing values will afterwards deaveraged as well (except if missingValuesAreBackwardsAveraged=false)
     /// If multiple perturbed runs are supplied, dimensions must be [location, member, time]
     ///
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
@@ -318,15 +319,9 @@ extension Array where Element == Float {
         /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
         let radMinium = 5 / Zensun.solarConstant
 
-        /// solar factor, backwards averaged over dt
-        let solar2d_raw = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
-        /// Atmospheric attenuation constant besed on Haurwitz. Standard would be -0.059. -0.09 is assuming more haze, but it matches better with reference data
-        let atmosphericAttenuationConstant: Float = -0.09
-        /// Estimate clear sky radiation
-        let solar2d = Array2DFastTime(data: solar2d_raw.data.map {
-            $0 * exp(atmosphericAttenuationConstant / $0)
-        }, nLocations: solar2d_raw.nLocations, nTime: solar2d_raw.nTime)
-        /// Lower bound of solar hours
+        /// solar factor corrected by Haurwitz clear-sky attenuation, backwards averaged over dt
+        let solar2d = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
+
         let sLow = solarHours.lowerBound
 
         for l in 0..<nTimeSeries {
@@ -371,21 +366,102 @@ extension Array where Element == Float {
                     // not possible to do any interpolation
                     break
                 }
+                // Interpolate between 3 points. Each point is actually an interval mean value.
+                // It is therefore important to preserve the mean value
+                let width = posC - posB
+                let posA = posB - width
+                let posD = posC + width
+                let posBValid = posA >= 0 && posA - sLow >= 0 && !self[l * nTime + posA].isNaN
+                let posDValid = posD < nTime && posD - sLow < solarTime.count && !self[l * nTime + posD].isNaN
                 let solC = solar2d[sPos, posC - sLow]
 
                 /// solAvgC is an average of the solar factor from posB until posC
                 let solAvgC = missingValuesAreBackwardsAveraged ? solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean() : solC
-
+                
                 /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
                 let ktC = solAvgC <= radMinium || C <= 0 ? .nan : Swift.min(C / solAvgC, radLimit)
                 
-                for t in t..<posC {
-                    self[l * nTime + t] = Swift.max(0, ktC) * solar2d[sPos, t - sLow]
+                var ktB: Float
+                if posBValid {
+                    let B = missingValuesAreBackwardsAveraged ? self[l * nTime + posA + 1 ..< l * nTime + posB + 1].mean() : self[l * nTime + posB]
+                    let solAvgB = missingValuesAreBackwardsAveraged ? solar2d[sPos, posA + 1 - sLow ..< posB + 1 - sLow].mean() : solar2d[sPos, posB - sLow]
+                    ktB = solAvgB <= radMinium ? ktC : Swift.min(B / solAvgB, radLimit)
+                } else {
+                    ktB = ktC
                 }
-                if missingValuesAreBackwardsAveraged {
-                    self[l * nTime + posC] = Swift.max(0, ktC) * solC
+                
+                var ktD: Float
+                if posDValid {
+                    let D = self[l * nTime + posD]
+                    /// solD is an average of the solar factor from posC until posD
+                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solar2d[sPos, posD - sLow]
+                    ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
+                } else {
+                    ktD = ktC
                 }
+                
+                if ktB.isNaN, ktC.isNaN, ktD.isNaN {
+                    // night time. Does not apply +1 to range, because current value should already be 0
+                    for t in t..<posC {
+                        self[l * nTime + t] = 0
+                    }
+                    continue
+                }
+                let meanPreservationFactor: Float
+                /// If value is below 5 watts, do not adjust means
+                if missingValuesAreBackwardsAveraged && C > 5 {
+                    var mean: Float = 0
+                    let meanWith = posC - t + 1
+                    for t in t..<posC + 1 {
+                        let ktC = ktC.isFinite ? ktC : ktB.isFinite ? ktB : ktD
+                        let ktB = ktB.isFinite ? ktB : ktC
+                        let ktD = ktD.isFinite ? ktD : ktC
+                        let f = Float(t - posB) / Float(posC - posB)
+                        let kt = splineInterpolateCentered(a: ktB, b: ktC, c: ktD, fraction: f)
+                        mean += Swift.max(kt, 0) * solar2d[sPos, t - sLow]
+                    }
+                    meanPreservationFactor = mean <= 5 ? 0 : C / mean * Float(meanWith)
+                } else {
+                    meanPreservationFactor = 1
+                }
+                
+                for t in t..<posC + (missingValuesAreBackwardsAveraged ? 1 : 0) {
+                    let ktC = ktC.isFinite ? ktC : ktB.isFinite ? ktB : ktD
+                    let ktB = ktB.isFinite ? ktB : ktC
+                    let ktD = ktD.isFinite ? ktD : ktC
+                    let f = Float(t - posB) / Float(posC - posB)
+                    let kt = splineInterpolateCentered(a: ktB, b: ktC, c: ktD, fraction: f)
+                    
+                    self[l * nTime + t] = Swift.max(kt, 0) * solar2d[sPos, t - sLow] * meanPreservationFactor
+                    //print(ktB, ktC, ktD, f, "=", kt, meanPreservationFactor, solar2d[sPos, t - sLow], self[l * nTime + t] )
+                }
+//                for t in t..<posC {
+//                    self[l * nTime + t] = Swift.max(0, ktC) * solar2d[sPos, t - sLow]
+//                }
+//                if missingValuesAreBackwardsAveraged {
+//                    self[l * nTime + posC] = Swift.max(0, ktC) * solC
+//                }
             }
         }
     }
+}
+
+/// Shifted spline interpolation
+/// fraction 0 = mean(a,b), fraction 1 = mean (b/c)
+fileprivate func splineInterpolateCentered(a: Float, b: Float, c: Float, fraction: Float) -> Float {
+    // 1. Clamp fraction to valid 0.0...1.0 range
+    let t = max(0.0, min(1.0, fraction))
+    let oneMinusT = 1.0 - t
+    
+    // 2. Define the start and end anchors based on your midpoints
+    let startPoint = (a + b) * 0.5 // mean(a,b)
+    let controlPoint = b           // point b pulls the curve
+    let endPoint = (b + c) * 0.5   // mean(b,c)
+    
+    // 3. Compute Quadratic Bezier formula
+    let term1 = oneMinusT * oneMinusT * startPoint
+    let term2 = 2.0 * oneMinusT * t * controlPoint
+    let term3 = t * t * endPoint
+    
+    return term1 + term2 + term3
 }
