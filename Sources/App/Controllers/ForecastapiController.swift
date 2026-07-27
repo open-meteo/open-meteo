@@ -1060,14 +1060,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard let reader = forecast.readers.first else {
                     return nil
                 }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([reader, prob].compactMap({$0}))
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([prob].compactMap { $0 } + [reader])
             case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
                 let readers = try await makeDerivedHourlyReaders(domains)
                 let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
                 return MultiDomains.hourlyToMultiSameType(readers + [prob].compactMap({$0}))
             case .multiple(let domains):
-                return MultiDomains.hourlyToMultiSameType(try await makeDerivedHourlyReaders(domains))
+                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return MultiDomains.hourlyToMultiSameType(forecast.readers)
             case .seamlessLocal(let global, let local, let precipitationProb):
                 let localReaders = try await makeDerivedHourlyReaders(local)
                 guard !localReaders.isEmpty else {
