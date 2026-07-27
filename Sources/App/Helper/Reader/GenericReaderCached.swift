@@ -31,7 +31,7 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         return reader.modelLon
     }
 
-    /// Longitude of the grid point
+    /// Domain used by the underlying reader
     var domain: Domain {
         return reader.domain
     }
