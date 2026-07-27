@@ -132,9 +132,6 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// NOTE: `level` has been replaced with `ensembleMemberLevel` in settings
     var omFileName: (file: String, level: Int) { get }
 
-    /// Older filenames that contain the same logical variable. The primary file always takes precedence.
-    var omFileNameFallbacks: [String] { get }
-
     /// The scalefactor to compress data
     var scalefactor: Float { get }
 
@@ -150,13 +147,6 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// If true, forecasts from the previous model runs will be preserved
     var storePreviousForecast: Bool { get }
 }
-
-extension GenericVariable {
-    var omFileNameFallbacks: [String] {
-        return []
-    }
-}
-
 
 enum ReaderInterpolation {
     /// Simple linear interpolation

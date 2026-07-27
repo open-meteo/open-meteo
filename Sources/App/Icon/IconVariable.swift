@@ -448,6 +448,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
 enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
     case precipitation
     case shortwave_radiation
+    case diffuse_radiation
     case direct_radiation
     case pressure_msl
     case wind_v_component_10m
@@ -473,15 +474,6 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
         return (rawValue, 0)
     }
 
-    var omFileNameFallbacks: [String] {
-        switch self {
-        case .shortwave_radiation:
-            return ["diffuse_radiation"]
-        default:
-            return []
-        }
-    }
-
     var unit: SiUnit {
         switch self {
         case .precipitation: return .millimetre
@@ -493,7 +485,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation, .diffuse_radiation, .direct_radiation:
             return .wattPerSquareMetre
         }
     }
@@ -507,7 +499,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return 1
         case .relative_humidity_2m:
             return 1
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation, .diffuse_radiation, .direct_radiation:
             return 1
         case .wind_v_component_10m:
             return 10
@@ -532,9 +524,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .shortwave_radiation:
-            return .solar_backwards_averaged
-        case .direct_radiation:
+        case .shortwave_radiation, .diffuse_radiation, .direct_radiation:
             return .solar_backwards_averaged
         }
     }

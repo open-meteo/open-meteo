@@ -476,11 +476,11 @@ extension ForecastVariable {
 }
 
 extension GenericDomain {
-    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<GenericReaderCached<Self, Variable>>? {
+    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<Self, Variable>? {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
+        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
     }
     
     func makeWeeklyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
@@ -503,7 +503,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
+        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
     }
     
     /// Make a default reader for a single domain with hourly data
@@ -517,7 +517,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
-        let hourly = VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
+        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
     
@@ -525,7 +525,7 @@ extension GenericDomain {
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
-        let hourly = VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
+        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, pressureLevelInterpolations: pressureLevelInterpolations)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
 }
@@ -580,8 +580,9 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
     }
 }
 
-struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
+struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & Hashable>: GenericDeriverProtocol {
     typealias VariableOpt = ForecastVariable
+    typealias Reader = GenericReaderCached<Domain, Variable>
     
     let reader: Reader
     let options: GenericReaderOptions
@@ -591,6 +592,16 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         self.reader = reader
         self.options = options
         self.pressureLevelInterpolations = pressureLevelInterpolations
+    }
+
+    static func mergeIconEpsShortwaveRadiation(current: DataAndUnit, legacy: DataAndUnit) -> DataAndUnit {
+        var data = current.data
+        data.integrateIfNaN(legacy.data)
+        return DataAndUnit(data, current.unit)
+    }
+
+    static func calculateIconEpsDiffuseRadiation(shortwave: DataAndUnit, direct: DataAndUnit) -> DataAndUnit {
+        return DataAndUnit(zip(shortwave.data, direct.data).map { max($0 - $1, 0) }, shortwave.unit)
     }
 
     var elevationForEt0: Float {
@@ -715,6 +726,34 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
     
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
+        // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
+        if reader.domain.domainRegistry == .dwd_icon_eps || reader.domain.domainRegistry == .dwd_icon_eps_ensemble_mean {
+            switch variable {
+            case .shortwave_radiation:
+                guard
+                    let shortwave = Reader.variableFromString("shortwave_radiation"),
+                    let legacyShortwave = Reader.variableFromString("diffuse_radiation")
+                else {
+                    return nil
+                }
+                return .two(.raw(shortwave), .raw(legacyShortwave)) { shortwave, legacyShortwave, _ in
+                    return Self.mergeIconEpsShortwaveRadiation(current: shortwave, legacy: legacyShortwave)
+                }
+            case .diffuse_radiation:
+                guard
+                    let shortwave = getDeriverMap(variable: .shortwave_radiation),
+                    let direct = getDeriverMap(variable: .direct_radiation)
+                else {
+                    return nil
+                }
+                return .two(.mapped(shortwave), .mapped(direct)) { shortwave, direct, _ in
+                    return Self.calculateIconEpsDiffuseRadiation(shortwave: shortwave, direct: direct)
+                }
+            default:
+                break
+            }
+        }
+
         switch variable {
         case .direct_radiation, .diffuse_radiation:
             if let radiation = Reader.variableFromString(variable.rawValue) {
