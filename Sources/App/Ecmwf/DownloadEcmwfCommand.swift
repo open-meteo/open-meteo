@@ -45,6 +45,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         @Flag(name: "download-full-grib-file", help: "Skip GRIB inventory and process entire file")
         var downloadFullGribFile: Bool
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -88,7 +91,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let generateFullRun = domain.countEnsembleMember == 1
         let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// Download elevation file

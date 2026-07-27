@@ -30,14 +30,25 @@ import Testing
 
     @Test func gaussianGridSlice() {
         let grid = GaussianGrid(type: .o1280)
-        let sub = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 8..<8.5))!
+        let bb1 = BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 8..<8.5)
+        let sub = grid.findBox(boundingBox: bb1)!
         #expect(sub.map { $0 } == [823061, 823062, 823063, 823064, 825629, 825630, 825631, 825632])
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: bb1) == 8)
 
-        let sub2 = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 8.5..<9))!
+        let bb2 = BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 8.5..<9)
+        let sub2 = grid.findBox(boundingBox: bb2)!
         #expect(sub2.map { $0 } == [823065, 823066, 823067, 825633, 825634, 825635])
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: bb2) == 6)
 
-        let sub3 = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 9..<9.5))!
+        let bb3 = BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 9..<9.5)
+        let sub3 = grid.findBox(boundingBox: bb3)!
         #expect(sub3.map { $0 } == [823068, 823069, 823070, 823071, 825636, 825637, 825638, 825639])
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: bb3) == 8)
+        
+        let bb4 = BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: -9.5..<(-8))
+        let sub4 = grid.findBox(boundingBox: bb4)!
+        #expect(sub4.map { $0 } == [825504, 825505, 825506, 825507, 825508, 825509, 825510, 825511, 825512, 825513, 825514, 828076, 828077, 828078, 828079, 828080, 828081, 828082, 828083, 828084, 828085, 828086])
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: bb4) == 22)
     }
     
     @Test func gaussianGridArea() {

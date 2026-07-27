@@ -108,11 +108,6 @@ enum ProbabilityReader {
         }
         return reader
     }
-    
-    /// Reader for probabilities based on MeteoSwiss CH1 or CH2
-    static func makeMeteoSwissReader(domain: MeteoSwissDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<MeteoSwissDomain, ProbabilityVariable>? {
-        return try await GenericReader<MeteoSwissDomain, ProbabilityVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-    }
 }
 
 extension VariablePerMemberStorage {

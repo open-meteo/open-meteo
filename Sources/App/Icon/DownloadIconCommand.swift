@@ -191,11 +191,7 @@ struct DownloadIconCommand: AsyncCommand {
                             continue
                         }
                         if let variable = variable as? IconSurfaceVariable {
-                            if [IconSurfaceVariable.diffuse_radiation, .direct_radiation].contains(variable) {
-                                for i in array2d.data.indices {
-                                    array2d.data[i] = max(array2d.data[i], 0)
-                                }
-                            }
+                            variable.correctDownloadedValues(data: &array2d.data)
                             if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
                                 await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: array2d)
                                 continue
@@ -237,11 +233,7 @@ struct DownloadIconCommand: AsyncCommand {
                     }
 
                     if let variable = variable as? IconSurfaceVariable {
-                        if [IconSurfaceVariable.diffuse_radiation, .direct_radiation].contains(variable) {
-                            for i in array2d.data.indices {
-                                array2d.data[i] = max(array2d.data[i], 0)
-                            }
-                        }
+                        variable.correctDownloadedValues(data: &array2d.data)
                         
                         if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)

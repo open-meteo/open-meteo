@@ -87,9 +87,9 @@ public final actor ApiKeyManager {
         let logger = application.logger
         if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
-            let timeStats = DispatchTime.now()
-            let concurrencyLimit = await ConcurrencyGroupLimiter.instance.stats()
-            logger.error("API key usage: \(usage). Concurrency \(concurrencyLimit) (collection time \(timeStats.timeElapsedPretty()))")
+            if !usage.isEmpty {
+                logger.error("API key usage: \(usage)")
+            }
         }
         let keys = KeyAndLimit.readApiKeys(path: apiKeysPath)
         guard keys.count > 0 else {
@@ -142,6 +142,11 @@ extension SocketAddress {
 }
 
 extension Request {
+    struct ApiRequestInfo {
+        let host: String?
+        let numberOfLocationsMaximum: Int?
+    }
+    
     func parseApiParams() throws -> ApiQueryParameter {
         self.method == .POST ? try self.content.decode(ApiQueryParameter.self) : try self.query.decode(ApiQueryParameter.self)
     }
@@ -153,12 +158,12 @@ extension Request {
 
     /// fn params: hostname, unlockSlot, numberOfLocationsMaximum, params
     @discardableResult
-    func withApiParameter<T: ForecastapiResponder>(_ subdomain: String, alias: [String] = [], fn: (String?, ApiQueryParameter) async throws -> T) async throws -> Response {
+    func withApiParameter<T: ForecastapiResponder>(_ subdomain: String, alias: [String] = [], fn: (ApiRequestInfo, ApiQueryParameter) async throws -> T) async throws -> Response {
         // let host = "api.open-meteo.com"
         guard let host = headers[.host].first(where: { $0.contains("open-meteo.com") }) else {
             // localhost or not an openmeteo host
             let params = try parseApiParams()
-            let responder = try await fn(nil, params)
+            let responder = try await fn(ApiRequestInfo(host: nil, numberOfLocationsMaximum: nil), params)
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
             return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
         }
@@ -183,6 +188,7 @@ extension Request {
                 slot = address.rateLimitSlot
             }
             if isCFWorker {
+                OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
                 try await RateLimiter.instance.check(int64: slot)
             } else {
                 try await RateLimiter.instance.check(address: address)
@@ -202,10 +208,7 @@ extension Request {
                     await ConcurrencyGroupLimiter.instance.release(slot: slot)
                     return self.redirect(to: url)
                 }
-                let responder = try await fn(host, params)
-                if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
-                    throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
-                }
+                let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: OpenMeteo.numberOfLocationsMaximum), params)
                 let weight = responder.calculateQueryWeight(nVariablesModels: nil)
                 guard weight <= RateLimiter.limitHourly else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
@@ -217,6 +220,14 @@ extension Request {
                     await RateLimiter.instance.increment(address: address, count: weight)
                 }
             } catch {
+                // In an error case, also increment to API rate limiter by 1
+                // Some users do infinite retries on errors!
+                if isCFWorker {
+                    await RateLimiter.instance.increment(int64: slot, count: 1)
+                } else {
+                    await RateLimiter.instance.increment(address: address, count: 1)
+                }
+                OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
                 await ConcurrencyGroupLimiter.instance.release(slot: slot)
                 throw error
             }
@@ -245,10 +256,7 @@ extension Request {
         try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
         let response: Response
         do {
-            let responder = try await fn(host, params)
-            if responder.numberOfLocations > numberOfLocationsMaximum {
-                throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
-            }
+            let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: numberOfLocationsMaximum), params)
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
             response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
             await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)

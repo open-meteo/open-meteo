@@ -43,14 +43,11 @@ enum WeatherCode: Int {
         // let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / modelDtHours) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / modelDtHours) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
         
         if let cape {
-            let thunderstroms = calculateThunderstormProbability(convectivePrecipitation: convectivePrecipitation, gusts: gusts, cape: cape, liftedIndex: liftedIndex, convectiveInhibition: convectiveInhibition, pblHeight: pblHeight, modelDtSeconds: modelDtSeconds, latitude: latitude)
-            if thunderstroms > 90 {
-                return .thunderstormHeavy
-            }
-            if thunderstroms > 70 {
+            let thunderstroms = calculateThunderstormProbability(convectivePrecipitation: convectivePrecipitation, precipitation: precipitation, cloudcover: cloudcover, gusts: gusts, cape: cape, liftedIndex: liftedIndex, convectiveInhibition: convectiveInhibition, pblHeight: pblHeight, modelDtSeconds: modelDtSeconds, latitude: latitude)
+            if thunderstroms > 85 {
                 return .thunderstormStrong
             }
-            if thunderstroms > 50 {
+            if thunderstroms > 60 {
                 return .thunderstormSlightOrModerate
             }
         }
@@ -136,6 +133,8 @@ enum WeatherCode: Int {
     
     public static func calculateThunderstormProbability(
         convectivePrecipitation: Float?,
+        precipitation: Float,
+        cloudcover: Float,
         gusts: Float?,
         cape: Float,
         liftedIndex: Float?,
@@ -147,6 +146,7 @@ enum WeatherCode: Int {
         
         // 1. HARD BLOCKERS
         if cape <= 10.0 { return 0.0 }
+        if cloudcover < 30.0 { return 0.0 }
         if let cin = convectiveInhibition, cin > 250.0 { return 0.0 }
         if let li = liftedIndex, li > 2.0 { return 0.0 }
         
@@ -193,18 +193,23 @@ enum WeatherCode: Int {
             totalWeight += liWeight
         }
         
-        // 6. Convective Precipitation Score (Base Weight: 25%)
-        if let precip = convectivePrecipitation {
-            let precipWeight: Float = 0.25
-            let dtHours = Float(modelDtSeconds) / 3600.0
-            
-            // Require higher precipitation rates near the equator (2.0mm/hr up to 5.0mm/hr)
-            let referencePrecipPerHour: Float = 2.0 + (3.0 * (1.0 - (Swift.min(absLat, 30.0) / 30.0)))
-            let referencePrecip = referencePrecipPerHour * dtHours
-            
-            let precipScore = Swift.max(0.0, Swift.min(precip / referencePrecip, 1.0))
+        // 6. Precipitation Trigger Score (Base Weight: 25%)
+        // Prefer convective showers. If unavailable, use regular precipitation with a penalty.
+        let dtHours = Float(modelDtSeconds) / 3600.0
+        let referencePrecipPerHour: Float = 2.0 + (3.0 * (1.0 - (Swift.min(absLat, 30.0) / 30.0)))
+        let referencePrecip = referencePrecipPerHour * dtHours
+
+        let precipWeight: Float = 0.25
+        if let showers = convectivePrecipitation, showers > 0.0 {
+            let precipScore = Swift.max(0.0, Swift.min(showers / referencePrecip, 1.0))
             accumulatedScore += (precipScore * precipWeight)
             totalWeight += precipWeight
+        } else {
+            // Without explicit showers, require stronger total rain and cap confidence lower.
+            let fallbackReferencePrecip = referencePrecip * 1.6
+            let fallbackPrecipScore = Swift.max(0.0, Swift.min(precipitation / fallbackReferencePrecip, 1.0))
+            accumulatedScore += (fallbackPrecipScore * precipWeight * 0.6)
+            totalWeight += (precipWeight * 0.6)
         }
 
         // 6. Boundary Layer Height Score (Base Weight: 7.5%)
@@ -231,11 +236,15 @@ enum WeatherCode: Int {
         // 8. TRIGGER DYNAMICS AMPLIFIER
         // If the model actively simulates convective rain in an unstable airmass, the cap has broken.
         if let precip = convectivePrecipitation, let cin = convectiveInhibition {
-            let hoursInDt = Float(modelDtSeconds) / 3600.0
-            let triggerRainThreshold = 0.1 * hoursInDt
+            let triggerRainThreshold = 0.1 * dtHours
             if precip > triggerRainThreshold && cape > 300.0 && cin < 50.0 {
                 baseProbability = Swift.min(baseProbability * 1.3, 100.0)
             }
+        }
+
+        // Reduce confidence when no convective shower signal is present.
+        if (convectivePrecipitation ?? precipitation) <= 0.0 {
+            baseProbability *= 0.7
         }
 
         // If the cap is highly restrictive (CIN > 100 J/kg), heavily suppress the final index
@@ -243,7 +252,15 @@ enum WeatherCode: Int {
             baseProbability *= 0.3
         }
         
-        // 9. APPLY FINAL LATITUDE DAMPENING
+        // 9. APPLY CLOUD COVER AND LATITUDE DAMPENING
+        // Additional suppression between 30-60% cloud cover, then no penalty above 60%.
+        let cloudCoverFactor: Float
+        if cloudcover >= 60.0 {
+            cloudCoverFactor = 1.0
+        } else {
+            cloudCoverFactor = 0.6 + (0.4 * ((cloudcover - 30.0) / 30.0))
+        }
+        baseProbability *= cloudCoverFactor
         baseProbability *= latitudeFactor
         
         return Swift.max(0.0, Swift.min(baseProbability, 100.0))

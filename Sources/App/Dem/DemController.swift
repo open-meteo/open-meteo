@@ -3,7 +3,12 @@ import Vapor
 
 struct DemController {
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter("api") { _, params in
+        OmMetrics.requestsElevationApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
+        return try await req.withApiParameter("api") { _, params in
             let latitude = params.latitude
             let longitude = params.longitude
 
@@ -30,8 +35,6 @@ struct DemController {
 }
 
 fileprivate struct DemResponder: ForecastapiResponder {
-    var numberOfLocations: Int { 1 }
-
     let latitude: [Float]
     let longitude: [Float]
     let logger: Logger

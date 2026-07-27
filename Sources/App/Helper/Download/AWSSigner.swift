@@ -16,6 +16,13 @@ extension CharacterSet {
     }()
 }
 
+extension String {
+    /// Add Percentage encoding, but keep alphanumerics and -_.~
+    var awsPercentEncoded: String {
+        addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? self
+    }
+}
+
 /// Sign AWS URLs with AWS4-HMAC-SHA256
 public struct AWSSigner {
     public let accessKey: String

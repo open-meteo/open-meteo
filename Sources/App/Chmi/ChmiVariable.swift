@@ -141,11 +141,10 @@ enum ChmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     }
 }
 
-/// Types of pressure level variables
+/// Types of pressure level variables.
+/// Wind speed and direction are not stored: they are derived from U/V components by the API.
 enum ChmiPressureVariableType: String, CaseIterable {
     case temperature
-    case wind_speed
-    case wind_direction
     case wind_u_component
     case wind_v_component
     case vertical_velocity
@@ -170,10 +169,6 @@ struct ChmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         switch variable {
         case .temperature:
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_speed:
-            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
-        case .wind_direction:
-            return (0.2..<0.5).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .wind_u_component, .wind_v_component:
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -189,10 +184,6 @@ struct ChmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         switch variable {
         case .temperature:
             return .hermite(bounds: nil)
-        case .wind_speed:
-            return .hermite(bounds: 0...10e9)
-        case .wind_direction:
-            return .linearDegrees
         case .wind_u_component:
             return .hermite(bounds: nil)
         case .wind_v_component:
@@ -210,10 +201,6 @@ struct ChmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         switch variable {
         case .temperature:
             return .celsius
-        case .wind_speed:
-            return .metrePerSecond
-        case .wind_direction:
-            return .degreeDirection
         case .wind_u_component:
             return .metrePerSecond
         case .wind_v_component:

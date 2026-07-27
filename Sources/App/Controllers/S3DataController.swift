@@ -44,6 +44,11 @@ struct S3DataController: RouteCollection {
 
     /// List all files in a specified directory
     func list(_ req: Request) async throws -> Response {
+        OmMetrics.requestsS3ApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
         let params = try req.query.decode(S3List.ListV2Query.self)
         guard let apikey = params.apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) else {
             throw SyncError.invalidApiKey
@@ -152,7 +157,7 @@ struct S3DataController: RouteCollection {
         }
         /// TODO consider caching
         if let remote = OpenMeteo.remoteDataDirectory, let modelStr = pathNoData.firstIndex(of: "/").map({ pathNoData[..<$0] }), let model = DomainRegistry(rawValue: String(modelStr)) {
-            var request = HTTPClientRequest(url: "\(remote.replacing("MODEL", with: model.bucketName))\(pathNoData)")
+            var request = HTTPClientRequest(url: "\(remote)\(pathNoData)")
             try request.applyS3Credentials()
             let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
             let r = Response(status: response.status, body: .init(asyncStream: { writer in

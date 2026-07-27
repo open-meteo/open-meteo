@@ -157,6 +157,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
 
     /// Convective available potential energy
     case cape
+
+    /// Convective inhibition
+    case convective_inhibition
     // case tke
 
     /// LPI Lightning Potential Index . Only available in icon-d2. Scales form 0 to ~120
@@ -252,6 +255,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return 10
         case .cape:
             return 0.1
+        case .convective_inhibition:
+            return 1
         case .lightning_potential:
             return 10
         case .snowfall_height:
@@ -311,6 +316,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .temperature_180m:
             return .celsius
         case .cape:
+            return .joulePerKilogram
+        case .convective_inhibition:
             return .joulePerKilogram
         case .lightning_potential:
             return .joulePerKilogram
@@ -405,6 +412,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .snowfall_water_equivalent:
             return .backwards_sum
         case .cape:
+            return .hermite(bounds: 0...10e9)
+        case .convective_inhibition:
             return .hermite(bounds: 0...10e9)
         case .lightning_potential:
             return .linear
@@ -637,6 +646,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
     case cloud_cover
     case relative_humidity_2m
     case cape
+    case convective_inhibition
     case snowfall_water_equivalent
     case geopotential_height_850hPa
     case geopotential_height_500hPa
@@ -688,6 +698,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .relative_humidity_2m: return .percentage
         case .direct_radiation, .diffuse_radiation: return .wattPerSquareMetre
         case .cape: return .joulePerKilogram
+        case .convective_inhibition: return .joulePerKilogram
         case .geopotential_height_850hPa: return .metre
         case .geopotential_height_500hPa: return .metre
         }
@@ -720,6 +731,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .wind_u_component_180m: return 10
         case .wind_gusts_10m: return 10
         case .cape: return 0.1
+        case .convective_inhibition: return 1
         case .geopotential_height_850hPa: return 0.1
         case .geopotential_height_500hPa: return 0.05
         }
@@ -752,6 +764,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .relative_humidity_2m: return .hermite(bounds: 0...100)
         case .direct_radiation, .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...10e9)
+        case .convective_inhibition: return .hermite(bounds: 0...10e9)
         case .geopotential_height_850hPa: return .hermite(bounds: nil)
         case .geopotential_height_500hPa: return .hermite(bounds: nil)
         }

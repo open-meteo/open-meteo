@@ -199,8 +199,8 @@ paths:
                 - best_match
                 - meteofrance_wave
                 - meteofrance_currents
-                - ewam
-                - gwam
+                - dwd_ewam
+                - dwd_gwam
                 - ecmwf_wam
                 - ecmwf_wam025
                 - ncep_gfswave025

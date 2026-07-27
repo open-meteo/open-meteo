@@ -43,12 +43,14 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 Apps:
 
 - [AirIndex Today](https://airindex.today/) Air quality forecasts across the globe.
+- [AllergyTJ](https://allergy.tj) Pollen risk and air quality tracker for Tajikistan, combining seasonal pollen calendars with live weather and AQI data.
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [BusyRunner](https://busyrunner.com/) Allows users to plan their weekly runs based on the weather.
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
 - [Calima Canarias](https://calimacanarias.com) Real-time Saharan dust (calima) forecast and air quality monitoring for the Canary Islands and the rest of Spain.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
+- [CycleWeather](https://cycleweather.app) CycleWeather is a free iOS weather app for cyclists, showing a color-coded 7-day hourly forecast — temperature (feels-like), precipitation, wind, air quality, and UV — with rain alerts and radar, all in one glanceable view.
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app

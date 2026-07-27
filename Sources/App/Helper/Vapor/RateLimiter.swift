@@ -16,6 +16,8 @@ final actor RateLimiter {
     static let concurrencyLimit = Environment.get("CONCURRENCY_LIMIT").flatMap(Int.init) ?? 1
     
     static let concurrencyLimitHard = Environment.get("CONCURRENCY_LIMIT_HARD").flatMap(Int.init) ?? 5
+    
+    static let concurrencyLimitTotal = Environment.get("CONCURRENCY_LIMIT_TOTAL").flatMap(Int.init) ?? 4096
 
     private var dailyPerIPv4 = [UInt32: Float]()
 
@@ -100,24 +102,30 @@ final actor RateLimiter {
     
     func check(uint32 ip: UInt32) throws {
         if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
+            OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.minutelyExceeded
         }
         if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
+            OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.hourlyExceeded
         }
         if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
+            OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.dailyExceeded
         }
     }
     
     func check(int64 ip: Int) throws {
         if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
+            OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.minutelyExceeded
         }
         if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
+            OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.hourlyExceeded
         }
         if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
+            OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
             throw RateLimitError.dailyExceeded
         }
     }
@@ -185,9 +193,15 @@ enum RateLimitError: Error, AbortError {
     case hourlyExceeded
     case minutelyExceeded
     case tooManyConcurrentRequests
+    case serviceOverloaded
 
     var status: NIOHTTP1.HTTPResponseStatus {
-        return .tooManyRequests
+        switch self {
+        case .serviceOverloaded:
+            return .serviceUnavailable
+        default:
+            return .tooManyRequests
+        }
     }
 
     var reason: String {
@@ -200,6 +214,8 @@ enum RateLimitError: Error, AbortError {
             return "Minutely API request limit exceeded. Please try again in one minute."
         case .tooManyConcurrentRequests:
             return "Too many concurrent requests"
+        case .serviceOverloaded:
+            return "The service is overloaded"
         }
     }
 }

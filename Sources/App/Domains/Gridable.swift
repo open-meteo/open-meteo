@@ -13,6 +13,7 @@ public protocol Gridable: Sendable {
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction?
     associatedtype SliceType: Sequence<Int>
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
     
     func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?

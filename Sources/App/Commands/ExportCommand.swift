@@ -388,12 +388,12 @@ struct ExportCommand: AsyncCommand {
                     return try await points.asyncMap { (gridpoint, elevation) in
                         let coords = grid.getCoordinates(gridpoint: gridpoint)
                         // Read data
-                        guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                        guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                             fatalError("Could not get reader for domain \(domain)")
                         }
                         let rows = try await variables.asyncMap { variable in
                             let (v, previousDay) = variable.variableAndPreviousDay
-                            guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
+                            guard let data = try await reader.get(variable: v, time: time.toSettings(previousDay: previousDay)) else {
                                 fatalError("Invalid variable \(variable)")
                             }
                             return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
@@ -467,12 +467,12 @@ struct ExportCommand: AsyncCommand {
                 return try await points.asyncMap { (gridpoint, elevation) in
                     let coords = grid.getCoordinates(gridpoint: gridpoint)
                     // Read data
-                    guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                    guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                         fatalError("Could not create reader for domain \(domain)")
                     }
                     let rows = try await variables.asyncMap { variable in
                         let (v, previousDay) = variable.variableAndPreviousDay
-                        guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
+                        guard let data = try await reader.get(variable: v, time: time.toSettings(previousDay: previousDay)) else {
                             fatalError("Invalid variable \(variable)")
                         }
                         return data
@@ -500,6 +500,12 @@ struct ExportCommand: AsyncCommand {
     }
 
     func generateNetCdf(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, compressionLevel: Int?, /*targetGridDomain: TargetGridDomain?,*/ outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
+        let variables = variables.map {
+            guard let variable = ForecastVariable(rawValue: $0) else {
+                fatalError("Could not parse variable name \($0)")
+            }
+            return variable
+        }
         guard let genericDomain = domain.genericDomain else {
             fatalError("Export not supported for domain \(domain)")
         }
@@ -510,7 +516,7 @@ struct ExportCommand: AsyncCommand {
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
-        try ncFile.setAttribute("TITLE", "\(domain) \(variables.joined(separator: ", "))")
+        try ncFile.setAttribute("TITLE", "\(domain) \(variables.map(\.rawValue).joined(separator: ", "))")
         let latDimension = try ncFile.createDimension(name: "LAT", length: grid.ny)
         let lonDimension = try ncFile.createDimension(name: "LON", length: grid.nx)
 
@@ -571,13 +577,13 @@ struct ExportCommand: AsyncCommand {
                 // Loop over locations, read and write
                 for gridpoint in 0..<grid.count {
                     // Read data
-                    guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                    guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                         fatalError("Could not create reader for domain \(domain)")
                     }
-                    guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
+                    guard let data = try await reader.get(variable: variable, time: time.toSettings())?.data else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
+                    let normals = normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                     try ncVariable.write(normals, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                     await progress.add(time.count * 4)
                 }
@@ -588,7 +594,7 @@ struct ExportCommand: AsyncCommand {
 
         let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
         for variable in variables {
-            var ncVariable = try ncFile.createVariable(name: variable, type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
+            var ncVariable = try ncFile.createVariable(name: variable.rawValue, type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
 
             if let compressionLevel, compressionLevel > 0 {
                 try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
@@ -624,10 +630,10 @@ struct ExportCommand: AsyncCommand {
             // Loop over locations, read and write
             for gridpoint in 0..<grid.count {
                 // Read data
-                guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                     fatalError("Could not create reader for domain \(domain)")
                 }
-                guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                guard let data = try await reader.get(variable: variable, time: time.toSettings()) else {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])

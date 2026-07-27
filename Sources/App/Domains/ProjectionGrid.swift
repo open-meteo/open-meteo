@@ -104,6 +104,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         }
         return trueNorthDirection
     }
+    
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? {
+        return findBox(boundingBox: bb)?.count
+    }
 
     func findBox(boundingBox bb: BoundingBoxWGS84) -> ProjectionGridSlice<Projection>? {
         guard let sw = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
@@ -130,6 +134,10 @@ struct ProjectionGridSlice<Projection: Projectable> {
     let grid: ProjectionGrid<Projection>
     let yRange: Range<Int>
     let xRange: Range<Int>
+    
+    var count: Int {
+        return xRange.count * yRange.count
+    }
 }
 
 extension ProjectionGridSlice: Sequence {

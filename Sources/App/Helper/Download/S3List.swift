@@ -26,7 +26,7 @@ enum S3List {
         let modificationTime: Date
         let fileSize: Int
     }
-    
+
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
     static func s3list(client: HTTPClient, server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
         var allFiles: [S3List.ListV2File] = []
@@ -34,28 +34,20 @@ enum S3List {
         var continuation: String? = nil
         let logger = Logger(label: "S3List")
         while true {
-            /*var vaporRequest = ClientRequest(method: .GET, url: URI("\(server)"))
-            let params = S3List.ListV2Query(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey, continuation_token: continuation)
-            try vaporRequest.query.encode(params)
-            let request = HTTPClientRequest(url: vaporRequest.url.string)*/
-            
-            guard var urlComponents = URLComponents(string: server) else {
-                fatalError("Could not parse URL \(server) to URLComponents")
+            var url = "\(server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
+            if let continuation {
+                url += "&continuation-token=\(continuation.awsPercentEncoded)"
             }
-            urlComponents.queryItems = [
-                URLQueryItem(name: "list-type", value: "2"),
-                URLQueryItem(name: "delimiter", value: "/"),
-                URLQueryItem(name: "prefix", value: prefix),
-                continuation.map { URLQueryItem(name: "continuation-token", value: $0) },
-                apikey.map { URLQueryItem(name: "apikey", value: $0) }
-            ].compactMap { $0 }
-            let request = HTTPClientRequest(url: urlComponents.url!.absoluteString)
-            
+            if let apikey {
+                url += "&apikey=\(apikey.awsPercentEncoded)"
+            }
+            let request = HTTPClientRequest(url: url)
+
             var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
             guard let body = response.readString(length: response.readableBytes) else {
                 return (allFiles, allDirectories)
             }
-            
+
             let files = body.xmlSection("Contents").map {
                 guard let name = $0.xmlFirst("Key"),
                       let modificationTimeString = $0.xmlFirst("LastModified"),

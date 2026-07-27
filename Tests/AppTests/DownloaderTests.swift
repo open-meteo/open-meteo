@@ -4,8 +4,13 @@ import Testing
 import AsyncHTTPClient
 import NIOCore
 import Logging
+#if os(Linux)
+import Glibc
+#else
+import Darwin
+#endif
 
-@Suite struct DownloaderTests {
+@Suite(.serialized) struct DownloaderTests {
     @Test func testAwsSign() async throws {
         let url = "https://examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)
@@ -89,6 +94,47 @@ import Logging
         #expect("s3://AKIAYawfawfawed5jdrh:FgseawfawfrVU8Dk1zTsesefsegsgW1I%2FWJ6@openmeteo.s3.amazonaws.com:8080/text.txt".stripHttpPassword() == "s3://openmeteo.s3.amazonaws.com:8080/text.txt")
     }
 
+    @Test func s3BucketEndpointParsesProfilesAndCredentialOverrides() throws {
+        let endpoints = S3BucketEndpoint.parseList(
+            "openmeteo,https://user:pw@example.com/bucket/@aws"
+        )
+
+        #expect(endpoints == [
+            S3BucketEndpoint(rawEndpoint: "openmeteo", profile: nil),
+            S3BucketEndpoint(rawEndpoint: "https://user:pw@example.com/bucket/", profile: "aws")
+        ])
+
+        setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://credential-bucket/", 1)
+        defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
+
+        #expect(S3BucketEndpoint.parseList("openmeteo@aws") == [
+            S3BucketEndpoint(rawEndpoint: "s3://credential-bucket/", profile: "aws")
+        ])
+    }
+
+    @Test func s3BucketEndpointListRedactsMultipleCredentialedEndpoints() throws {
+        let endpoints = S3BucketEndpointList(
+            "s3://user1:pw1@bucket-a/@aws,https://user2:pw2@example.com/bucket/@ceph"
+        )
+
+        #expect(String(describing: endpoints) == "s3://bucket-a/,https://example.com/bucket/")
+        #expect(!String(describing: endpoints).contains("user1"))
+        #expect(!String(describing: endpoints).contains("pw1"))
+        #expect(!String(describing: endpoints).contains("user2"))
+        #expect(!String(describing: endpoints).contains("pw2"))
+    }
+
+    @Test func s3BucketEndpointListRedactsCredentialOverrides() throws {
+        setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://override-user:override-pw@credential-bucket/", 1)
+        defer { unsetenv("S3_CREDENTIALS_OPENMETEO_AWS") }
+
+        let endpoints = S3BucketEndpointList("openmeteo@aws")
+
+        #expect(String(describing: endpoints) == "s3://credential-bucket/")
+        #expect(!String(describing: endpoints).contains("override-user"))
+        #expect(!String(describing: endpoints).contains("override-pw"))
+    }
+
     /// Single-part PUT upload.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
@@ -102,35 +148,6 @@ import Logging
         try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin")
     }
 
-    /// Upload three files using single-part PUT uploads.
-    /// Set S3_TEST_SERVER to a URL of the form
-    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
-    func testS3UploadThreeFiles() async throws {
-        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
-        let client = HTTPClient(eventLoopGroupProvider: .singleton)
-        defer { let _ = client.shutdown() }
-        let manager = S3UploadManager(logger: Logger(label: "DownloaderTests.S3UploadManager"))
-
-        let uploads: [(suffix: String, data: Data)] = [
-            ("a", randomData(byteCount: 128 * 1024)),
-            ("b", randomData(byteCount: 256 * 1024)),
-            ("c", randomData(byteCount: 512 * 1024))
-        ]
-
-        for upload in uploads {
-            await manager.upload(
-                client: client,
-                bucketEndpoint: server,
-                data: upload.data,
-                url: "\(server)test/s3uploader-three-\(upload.suffix).bin"
-            )
-        }
-
-        // Ensure all queued uploads complete before ending the test.
-        await manager.shutdown()
-    }
-
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
@@ -141,7 +158,8 @@ import Logging
         defer { let _ = client.shutdown() }
 
         let data = ByteBuffer(data: randomData(byteCount: 10 * 1024 * 1024))
-        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin").commit(client: client)
+        let executor = LimitedConcurrencyExecutor(maxConcurrency: 8)
+        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin", executor: executor).commit(client: client)
     }
     
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
@@ -154,6 +172,31 @@ import Logging
         defer { let _ = client.shutdown() }
 
         try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "test/ecmwf_ifs025_ensemble_mean/")
+    }
+    
+    /// Upload three files using single-part PUT uploads.
+    /// Set S3_TEST_SERVER to a URL of the form
+    /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    func testS3UploadThreeFiles() async throws {
+        let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+        let manager = S3UploadQueue(endpoint: S3BucketEndpoint(rawEndpoint: server, profile: nil), client: client)
+        let logger = Logger(label: "DownloaderTests.S3UploadManager")
+
+        let uploads: [(suffix: String, data: Data)] = [
+            ("a", randomData(byteCount: 128 * 1024)),
+            ("b", randomData(byteCount: 256 * 1024)),
+            ("c", randomData(byteCount: 512 * 1024))
+        ]
+
+        for upload in uploads {
+            await manager.upload(data: upload.data, objectName: "test/s3uploader-three-\(upload.suffix).bin", contentType: "application/octet-stream")
+        }
+
+        // Ensure all queued uploads complete before ending the test.
+        await manager.finish()
     }
 }
 

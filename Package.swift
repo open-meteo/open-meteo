@@ -71,7 +71,10 @@ let package = Package(
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
             cSettings: cFlags,
-            swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
+            swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : []),
+            plugins: [
+                .plugin(name: "GitVersionPlugin")
+            ]
             //plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
         .target(
@@ -86,6 +89,17 @@ let package = Package(
             name: "CHelper",
             cSettings: cFlags,
             swiftSettings: swiftFlags
+        ),
+        .executableTarget(
+            name: "GitVersionGenerator",
+            path: "Tools/GitVersionGenerator"
+        ),
+        .plugin(
+            name: "GitVersionPlugin",
+            capability: .buildTool(),
+            dependencies: [
+                "GitVersionGenerator"
+            ]
         ),
         .executableTarget(
             name: "openmeteo-api",

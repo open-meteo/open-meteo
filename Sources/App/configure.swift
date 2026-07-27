@@ -1,6 +1,6 @@
 import Vapor
 import OmFileFormat
-// import Leaf
+import Synchronization
 
 enum OpenMeteo {
     /// Data directory with trailing slash
@@ -29,12 +29,16 @@ enum OpenMeteo {
     }()
     
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
+    static let dataBlockCacheInitialized = Atomic(false)
+
     static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
         let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
-        return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        let cache = AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        dataBlockCacheInitialized.store(true, ordering: .relaxed)
+        return cache
     }()
     
     /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
@@ -178,6 +182,7 @@ public func configure(_ app: Application) throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
+    app.commands.use(VersionCommand(), as: "version")
     app.asyncCommands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
     app.asyncCommands.use(DownloadCmaCommand(), as: "download-cma")

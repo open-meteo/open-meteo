@@ -47,6 +47,10 @@ struct RegularGrid: Gridable {
         self.dy = (latitude.upperBound - latitude.lowerBound) / Float(ny - 1)
         self.searchRadius = searchRadius
     }
+    
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? {
+        return findBox(boundingBox: bb)?.count
+    }
 
     var isGlobal: Bool {
         return (Float(nx) * dx) >= 360 && (Float(ny) * dy) >= 180
