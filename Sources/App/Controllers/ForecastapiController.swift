@@ -960,12 +960,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?,
         monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     )
-    
+
     enum DomainReaderMapping {
         case single(any GenericDomain, any GenericVariable.Type)
         case multiple([(any GenericDomain, any GenericVariable.Type)])
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
         case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
+        case seamlessLocal(
+            global: [(any GenericDomain, any GenericVariable.Type)],
+            local: [(any GenericDomain, any GenericVariable.Type)],
+            precipitationProb: (any GenericDomain)?
+        )
         case singleWithSupplementalDomains(
             any GenericDomain,
             any GenericVariable.Type,
@@ -1017,7 +1022,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 }
             )
         }
-
+        
         var singleDomain: (any GenericDomain)? {
             switch self {
             case .single(let domain, _), .singleWithPrecipitationProbability(let domain, _, _):
@@ -1039,6 +1044,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
 
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
+            func makeDerivedHourlyReaders(_ domains: [(any GenericDomain, any GenericVariable.Type)]) async throws -> [any GenericReaderOptionalProtocol<ForecastVariable>] {
+                return try await domains.asyncCompactMap { domainAndVariable in
+                    let domain = domainAndVariable.0
+                    let variable = domainAndVariable.1
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+            }
+
             switch self {
             case .single(let domain, let variable):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1047,15 +1060,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard let reader = forecast.readers.first else {
                     return nil
                 }
-                let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([probability, reader].compactMap { $0 })
-            case .multipleWithPrecipitationProbability(let domains, let precipitationProb):
-                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + forecast.readers)
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([reader, prob].compactMap({$0}))
+            case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
+                let readers = try await makeDerivedHourlyReaders(domains)
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType(readers + [prob].compactMap({$0}))
             case .multiple(let domains):
-                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMultiSameType(forecast.readers)
+                return MultiDomains.hourlyToMultiSameType(try await makeDerivedHourlyReaders(domains))
+            case .seamlessLocal(let global, let local, let precipitationProb):
+                let localReaders = try await makeDerivedHourlyReaders(local)
+                guard !localReaders.isEmpty else {
+                    return nil
+                }
+                let globalReaders = try await makeDerivedHourlyReaders(global)
+                let probabilityReaders: [any GenericReaderOptionalProtocol<ForecastVariable>]
+                if let precipitationProb,
+                   let probabilityReader = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                    probabilityReaders = [probabilityReader.asOptionalReader]
+                } else {
+                    probabilityReaders = []
+                }
+                return MultiDomains.hourlyToMultiSameType(globalReaders + localReaders + probabilityReaders)
             case .singleWithSupplementalDomains(let domain, let variable, let supplemental, let precipitationProb):
                 let forecast = try await Self.makeDomainReaders(sources: [(domain, variable)] + supplemental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 guard !forecast.readers.isEmpty else {
@@ -1080,7 +1106,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 domain = primaryDomain
                 variable = primaryVariable
                 allowMinMaxTwoAggregations = false
-            case .multiple, .multipleWithPrecipitationProbability:
+            case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
             let result = try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
@@ -1283,10 +1309,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .chmi_aladin_central_europe_2km:
             return .single(ChmiDomain.aladin_central_europe_2km, ChmiVariable.self)
         case .chmi_aladin_seamless:
-            return .multiple([
-                (ChmiDomain.aladin_central_europe_2km, ChmiSurfaceVariable.self),
-                (ChmiDomain.aladin_cz_1km, ChmiVariable.self)
-            ])
+            return .seamlessLocal(global: [
+                (EcmwfDomain.ifs025, EcmwfVariable.self),
+                (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self)
+            ], local: [
+                (ChmiDomain.aladin_central_europe_2km, ChmiVariable.self),
+                (ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
+            ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
@@ -1349,7 +1378,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        
         if let d = getDomainAndVariable() {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
         }

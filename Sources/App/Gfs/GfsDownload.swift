@@ -245,7 +245,7 @@ struct GfsDownload: AsyncCommand {
                         continue
                     }
                     let timestamp = run.add(timestep * 60)
-                    if let fma = variable.variable.multiplyAdd(domain: domain) {
+                    if let fma = variable.variable.multiplyAdd(domain: domain, dtSeconds: domain.dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
 
@@ -305,6 +305,9 @@ struct GfsDownload: AsyncCommand {
         
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            /// Delta time seconds considering irregular timesteps
+            let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((forecastHour - previousHour) * 3600)
             logger.info("Downloading forecastHour \(forecastHour)")
 
             let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
@@ -399,7 +402,7 @@ struct GfsDownload: AsyncCommand {
                     }
                     
                     // Scaling before compression with scalefactor
-                    if let fma = variable.variable.multiplyAdd(domain: domain) {
+                    if let fma = variable.variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     

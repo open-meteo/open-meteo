@@ -82,10 +82,10 @@ struct DwdSisDownloader: AsyncCommand {
             return (-10*60 + 3*60 + lineFraction * sweepTimeOfLimitedLatitudeRangeSeconds) / 3600
         }
         
-        let sisFile = "https://opendata.dwd.de/weather/satellite/radiation/sis/SISin\(run.format_YYYYMMddHHmm)EAv4.nc"
-        let sidFile = "https://opendata.dwd.de/weather/satellite/radiation/sid/SIDin\(run.format_YYYYMMddHHmm)EAv4.nc"
+        let sisFile = "https://opendata.dwd.de/weather/satellite/radiation/sis/SISin\(run.format_YYYYMMddHHmm)EAv4.nc.bz2"
+        let sidFile = "https://opendata.dwd.de/weather/satellite/radiation/sid/SIDin\(run.format_YYYYMMddHHmm)EAv4.nc.bz2"
 
-        var (sis, sisc) = try await curl.downloadInMemoryAsync(url: sisFile, minSize: nil).withUnsafeBytes({
+        var (sis, sisc) = try await curl.downloadInMemoryAsync(url: sisFile, minSize: nil, bzip2Decode: true).withUnsafeBytes({
             guard let nc = try NetCDF.open(memory: $0) else {
                 fatalError("Failed to open \(sisFile)")
             }
@@ -95,7 +95,7 @@ struct DwdSisDownloader: AsyncCommand {
             }
             return (sis, sisc)
         })
-        var sid = try await curl.downloadInMemoryAsync(url: sidFile, minSize: nil).withUnsafeBytes({
+        var sid = try await curl.downloadInMemoryAsync(url: sidFile, minSize: nil, bzip2Decode: true).withUnsafeBytes({
             guard let nc = try NetCDF.open(memory: $0) else {
                 fatalError("Failed to open \(sidFile)")
             }

@@ -199,14 +199,14 @@ enum DomainRegistry: String, CaseIterable {
     }
     
     var remoteDataDirectory: String? {
-        guard let remote = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: bucketName) else {
+        guard let remote = OpenMeteo.remoteDataDirectory else {
             return nil
         }
         return "\(remote)\(rawValue)/"
     }
     
     var remoteDataRunDirectory: String? {
-        guard let remote = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: bucketName) else {
+        guard let remote = OpenMeteo.remoteDataDirectory else {
             return nil
         }
         return "\(remote)\(rawValue)/".replacingOccurrences(of: "data/", with: "data_run/")
@@ -584,42 +584,3 @@ enum DomainRegistry: String, CaseIterable {
 //        try spawnRetriedNoFail(cmd: "aws", args: args)
 //    }
 //}
-
-extension DomainRegistry {
-    var bucketName: String {
-        switch self {
-        case .cmc_gem_geps_ensemble_mean:
-            return "cmc-gem-geps"
-        case .ncep_gefswave025_ensemble_mean:
-            return "ncep-gefswave025"
-        case .ncep_gefs025_ensemble_mean:
-            return "ncep-gefs025"
-        case .ncep_gefs05_ensemble_mean:
-            return "ncep-gefs05"
-        case .dwd_icon_eps_ensemble_mean:
-            return "dwd-icon-eps"
-        case .dwd_icon_eu_eps_ensemble_mean:
-            return "dwd-icon-eu-eps"
-        case .dwd_icon_d2_eps_ensemble_mean:
-            return "dwd-icon-d2-eps"
-        case .ukmo_global_ensemble_mean_20km:
-            return "ukmo-global-ensemble-20km"
-        case .ukmo_uk_ensemble_mean_2km:
-            return "ukmo-uk-ensemble-2km"
-        case .ncep_aigefs025_ensemble_mean:
-            return "ncep-aigefs025"
-        case .ecmwf_ifs025_ensemble_mean:
-            return "ecmwf-ifs025-ensemble"
-        case .ecmwf_aifs025_ensemble_mean:
-            return "ecmwf-aifs025-ensemble"
-        case .ecmwf_wam025_ensemble_mean:
-            return "ecmwf-wam025-ensemble"
-        case .meteoswiss_icon_ch1_ensemble_mean:
-            return "meteoswiss-icon-ch1-ensemble"
-        case .meteoswiss_icon_ch2_ensemble_mean:
-            return "meteoswiss-icon-ch2-ensemble"
-        default:
-            return rawValue.replacing("_", with: "-").lowercased()
-        }
-    }
-}
