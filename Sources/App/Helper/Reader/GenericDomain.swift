@@ -38,7 +38,6 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
-
 }
 
 extension GenericDomain {
@@ -136,6 +135,7 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// If true, forecasts from the previous model runs will be preserved
     var storePreviousForecast: Bool { get }
 }
+
 
 enum ReaderInterpolation {
     /// Simple linear interpolation
