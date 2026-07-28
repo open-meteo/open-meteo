@@ -448,7 +448,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
 enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
     case precipitation
     case shortwave_radiation
-    case diffuse_radiation
+    // Historical total shortwave values used the `diffuse_radiation` filename.
+    // No corresponding legacy `diffuse_radiation_spread` archive exists.
+    case legacy_shortwave_radiation
     case direct_radiation
     case pressure_msl
     case wind_v_component_10m
@@ -471,7 +473,12 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
     }
 
     var omFileName: (file: String, level: Int) {
-        return (rawValue, 0)
+        switch self {
+        case .legacy_shortwave_radiation:
+            return ("diffuse_radiation", 0)
+        default:
+            return (rawValue, 0)
+        }
     }
 
     var unit: SiUnit {
@@ -485,7 +492,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .shortwave_radiation, .diffuse_radiation, .direct_radiation:
+        case .shortwave_radiation, .legacy_shortwave_radiation, .direct_radiation:
             return .wattPerSquareMetre
         }
     }
@@ -499,7 +506,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return 1
         case .relative_humidity_2m:
             return 1
-        case .shortwave_radiation, .diffuse_radiation, .direct_radiation:
+        case .shortwave_radiation, .legacy_shortwave_radiation, .direct_radiation:
             return 1
         case .wind_v_component_10m:
             return 10
@@ -524,7 +531,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .shortwave_radiation, .diffuse_radiation, .direct_radiation:
+        case .shortwave_radiation, .legacy_shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
         }
     }

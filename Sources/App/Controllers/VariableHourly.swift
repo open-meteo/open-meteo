@@ -751,7 +751,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             case .shortwave_radiation:
                 guard
                     let shortwave = Reader.variableFromString("shortwave_radiation"),
-                    let legacyShortwave = Reader.variableFromString("diffuse_radiation")
+                    let legacyShortwave = Reader.variableFromString("legacy_shortwave_radiation")
                 else {
                     return nil
                 }
@@ -768,6 +768,9 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return .two(.mapped(shortwave), .mapped(direct)) { shortwave, direct, _ in
                     return Self.calculateIconEpsDiffuseRadiation(shortwave: shortwave, direct: direct)
                 }
+            case .diffuse_radiation_spread:
+                // Cannot derive a difference spread without covariance or member-level data.
+                return nil
             default:
                 break
             }
