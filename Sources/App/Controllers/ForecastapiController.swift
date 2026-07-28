@@ -1025,15 +1025,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         
         var singleDomain: (any GenericDomain)? {
             switch self {
-            case .single(let domain, _), .singleWithPrecipitationProbability(let domain, _, _):
-                return domain
-            default:
-                return nil
-            }
-        }
-
-        var genericDomain: (any GenericDomain)? {
-            switch self {
             case .single(let domain, _),
                  .singleWithPrecipitationProbability(let domain, _, _),
                  .singleWithSupplementalDomains(let domain, _, _, _):
@@ -2031,7 +2022,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     var genericDomain: (any GenericDomain)? {
         if let d = getDomainAndVariable() {
-            return d.genericDomain
+            return d.singleDomain
         }
         
         switch self {

@@ -48,7 +48,7 @@ private struct ReaderConstructionResult {
                 continue
             }
             #expect(domains.map { $0.0.domainRegistry } == expectedSeamlessDomains)
-            #expect(mapping.genericDomain == nil)
+            #expect(mapping.singleDomain == nil)
         }
 
         let globalAliases: [MultiDomains] = [.icon_global, .dwd_icon_global, .dwd_icon]
@@ -60,7 +60,6 @@ private struct ReaderConstructionResult {
             }
             #expect(domain.domainRegistry == .dwd_icon)
             #expect(probability.domainRegistry == .dwd_icon_eps)
-            #expect(mapping.genericDomain?.domainRegistry == .dwd_icon)
             #expect(mapping.singleDomain?.domainRegistry == .dwd_icon)
         }
 
@@ -73,7 +72,7 @@ private struct ReaderConstructionResult {
             }
             #expect(domain.domainRegistry == .dwd_icon_eu)
             #expect(probability.domainRegistry == .dwd_icon_eu_eps)
-            #expect(mapping.genericDomain?.domainRegistry == .dwd_icon_eu)
+            #expect(mapping.singleDomain?.domainRegistry == .dwd_icon_eu)
         }
 
         let d2Aliases: [MultiDomains] = [.icon_d2, .dwd_icon_d2]
@@ -86,8 +85,7 @@ private struct ReaderConstructionResult {
             #expect(domain.domainRegistry == .dwd_icon_d2)
             #expect(supplemental.map { $0.0.domainRegistry } == [.dwd_icon_d2_15min])
             #expect(probability?.domainRegistry == .dwd_icon_d2_eps)
-            #expect(mapping.genericDomain?.domainRegistry == .dwd_icon_d2)
-            #expect(mapping.singleDomain == nil)
+            #expect(mapping.singleDomain?.domainRegistry == .dwd_icon_d2)
         }
 
         let d2QuarterHourly = try #require(MultiDomains.dwd_icon_d2_15min.getDomainAndVariable())
@@ -96,7 +94,7 @@ private struct ReaderConstructionResult {
             return
         }
         #expect(domain.domainRegistry == .dwd_icon_d2_15min)
-        #expect(d2QuarterHourly.genericDomain?.domainRegistry == .dwd_icon_d2_15min)
+        #expect(d2QuarterHourly.singleDomain?.domainRegistry == .dwd_icon_d2_15min)
 
         for model in [MultiDomains.icon_seamless_eps, .dwd_icon_seamless_eps] {
             let mapping = try #require(model.getDomainAndVariable())
