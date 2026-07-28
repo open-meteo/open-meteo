@@ -1071,28 +1071,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
 
         func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
-            let domain: any GenericDomain
-            let variable: any GenericVariable.Type
-            let allowMinMaxTwoAggregations: Bool
             switch self {
-            case .single(let primaryDomain, let primaryVariable):
-                domain = primaryDomain
-                variable = primaryVariable
-                allowMinMaxTwoAggregations = true
-            case .singleWithPrecipitationProbability(let primaryDomain, let primaryVariable, _),
-                 .singleWithSupplementalDomains(let primaryDomain, let primaryVariable, _, _):
-                domain = primaryDomain
-                variable = primaryVariable
-                allowMinMaxTwoAggregations = false
+            case .single(let primaryDomain, let primaryVariable),
+                 .singleWithPrecipitationProbability(let primaryDomain, let primaryVariable, _):
+                return try await primaryDomain.makeGenericHourlyDaily(variableType: primaryVariable, position: gridpoint, options: options)
+            case .singleWithSupplementalDomains(let primaryDomain, let primaryVariable, _, _):
+                let result = try await primaryDomain.makeGenericHourlyDaily(variableType: primaryVariable, position: gridpoint, options: options)
+                guard let hourly = result.hourly else {
+                    return (nil, nil, nil, nil)
+                }
+                let combined = GenericReaderMultiSameType<ForecastVariable>(reader: [hourly])
+                return (combined, combined.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
-            let result = try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-            guard let hourly = result.hourly else {
-                return (nil, nil, nil, nil)
-            }
-            let combined = GenericReaderMultiSameType<ForecastVariable>(reader: [hourly])
-            return (combined, combined.makeDailyAggregator(allowMinMaxTwoAggregations: allowMinMaxTwoAggregations), nil, nil)
         }
     }
     
