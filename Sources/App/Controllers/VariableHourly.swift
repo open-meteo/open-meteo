@@ -606,49 +606,31 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         reader.targetElevation.isFinite ? reader.targetElevation : reader.modelElevation.numeric
     }
 
-    static func pressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
-        switch domain {
-        case .dwd_icon, .dwd_icon_eu:
-            return level == 975 ? (950, 1000) : nil
-        case .dwd_icon_d2:
-            switch level {
-            case 800:
-                return (700, 850)
-            case 900, 925:
-                return (850, 950)
-            default:
-                return nil
-            }
-        case .meteofrance_arpege_europe, .meteofrance_arpege_world025, .meteofrance_arome_france0025:
-            return level == 975 ? (950, 1000) : nil
+    static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
+        switch (domain, level) {
+        case (.dwd_icon, 975), (.dwd_icon_eu, 975):
+            return (950, 1000)
+        case (.dwd_icon_d2, 800):
+            return (700, 850)
+        case (.dwd_icon_d2, 900), (.dwd_icon_d2, 925):
+            return (850, 950)
         default:
             return nil
         }
     }
 
-    private func getPressureBaseMap(variable: ForecastPressureVariableType, level: Int) -> DerivedMapping<Reader.MixingVar>? {
-        let canonical: ForecastPressureVariableType
-        switch variable {
-        case .relativehumidity:
-            canonical = .relative_humidity
-        default:
-            canonical = variable
-        }
-
-        guard let interpolation = Self.pressureLevelInterpolation(domain: reader.domain.domainRegistry, level: level) else {
-            return .direct(Reader.variableFromString("\(canonical.rawValue)_\(level)hPa"))
-        }
+    private func interpolateIconPressureLevel(variable: ForecastPressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int) -> DerivedMapping<Reader.MixingVar>? {
         guard
-            let lower = Reader.variableFromString("\(canonical.rawValue)_\(interpolation.lowerLevel)hPa"),
-            let upper = Reader.variableFromString("\(canonical.rawValue)_\(interpolation.upperLevel)hPa")
+            let lower = Reader.variableFromString("\(variable.rawValue)_\(lowerLevel)hPa"),
+            let upper = Reader.variableFromString("\(variable.rawValue)_\(upperLevel)hPa")
         else {
             return nil
         }
 
-        switch canonical {
+        switch variable {
         case .temperature, .wind_u_component, .wind_v_component:
             return .two(.raw(lower), .raw(upper)) { lower, upper, _ in
-                let fraction = Float(level - interpolation.lowerLevel) / Float(interpolation.upperLevel - interpolation.lowerLevel)
+                let fraction = Float(level - lowerLevel) / Float(upperLevel - lowerLevel)
                 return DataAndUnit(zip(lower.data, upper.data).map { $0 + fraction * ($1 - $0) }, lower.unit)
             }
         case .relative_humidity:
@@ -657,7 +639,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             }
         case .geopotential_height:
             return .two(.raw(lower), .raw(upper)) { lower, upper, _ in
-                let fraction = Float(level - interpolation.lowerLevel) / Float(interpolation.upperLevel - interpolation.lowerLevel)
+                let fraction = Float(level - lowerLevel) / Float(upperLevel - lowerLevel)
                 let height = zip(lower.data, upper.data).map { lower, upper -> Float in
                     let lowerPressure = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: lower)
                     let upperPressure = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: upper)
@@ -669,6 +651,13 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return nil
         }
     }
+
+    private func getDeriverMap(variable: ForecastPressureVariableType, level: Int) -> DerivedMapping<Reader.MixingVar>? {
+        return getDeriverMap(variable: VariableOrSpread(
+            variable: ForecastPressureVariable(variable: variable, level: level),
+            isSpread: false
+        ))
+    }
     
     func getDeriverMap(variable: VariableOrSpread<ForecastPressureVariable>) -> DerivedMapping<Reader.MixingVar>? {
         guard variable.isSpread == false else {
@@ -676,19 +665,32 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return .direct(Reader.variableFromString(variable.rawValue))
         }
         let v = variable.variable
-        if Self.pressureLevelInterpolation(domain: reader.domain.domainRegistry, level: v.level) == nil,
-           let variable = Reader.variableFromString(variable.rawValue) {
+
+        if let interpolation = Self.iconPressureLevelInterpolation(domain: reader.domain.domainRegistry, level: v.level) {
+            switch v.variable {
+            case .temperature, .geopotential_height, .relative_humidity, .wind_u_component, .wind_v_component:
+                return interpolateIconPressureLevel(
+                    variable: v.variable,
+                    level: v.level,
+                    lowerLevel: interpolation.lowerLevel,
+                    upperLevel: interpolation.upperLevel
+                )
+            default:
+                break
+            }
+        }
+
+        if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }
+
         switch v.variable {
-        case .temperature, .geopotential_height, .relative_humidity, .wind_u_component, .wind_v_component:
-            return getPressureBaseMap(variable: v.variable, level: v.level)
         case .windspeed:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .wind_speed, level: v.level), isSpread: false))
+            return getDeriverMap(variable: .wind_speed, level: v.level)
         case .wind_speed:
             guard
-                let u = getPressureBaseMap(variable: .wind_u_component, level: v.level),
-                let v = getPressureBaseMap(variable: .wind_v_component, level: v.level)
+                let u = getDeriverMap(variable: .wind_u_component, level: v.level),
+                let v = getDeriverMap(variable: .wind_v_component, level: v.level)
             else {
                 return nil
             }
@@ -696,11 +698,11 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return DataAndUnit(zip(u.data, v.data).map(Meteorology.windspeed), .metrePerSecond)
             }
         case .winddirection:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .wind_direction, level: v.level), isSpread: false))
+            return getDeriverMap(variable: .wind_direction, level: v.level)
         case .wind_direction:
             guard
-                let u = getPressureBaseMap(variable: .wind_u_component, level: v.level),
-                let v = getPressureBaseMap(variable: .wind_v_component, level: v.level)
+                let u = getDeriverMap(variable: .wind_u_component, level: v.level),
+                let v = getDeriverMap(variable: .wind_v_component, level: v.level)
             else {
                 return nil
             }
@@ -708,11 +710,11 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
             }
         case .dewpoint:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .dew_point, level: v.level), isSpread: false))
+            return getDeriverMap(variable: .dew_point, level: v.level)
         case .dew_point:
             guard
-                let temperature = getPressureBaseMap(variable: .temperature, level: v.level),
-                let rh = getPressureBaseMap(variable: .relative_humidity, level: v.level)
+                let temperature = getDeriverMap(variable: .temperature, level: v.level),
+                let rh = getDeriverMap(variable: .relative_humidity, level: v.level)
             else {
                 return nil
             }
@@ -721,9 +723,9 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return DataAndUnit(dewpoint, .celsius)
             }
         case .cloudcover:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .cloud_cover, level: v.level), isSpread: false))
+            return getDeriverMap(variable: .cloud_cover, level: v.level)
         case .cloud_cover:
-            guard let rh = getPressureBaseMap(variable: .relative_humidity, level: v.level) else {
+            guard let rh = getDeriverMap(variable: .relative_humidity, level: v.level) else {
                 return nil
             }
             return .one(.mapped(rh)) { rh, _ in
@@ -731,9 +733,9 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return DataAndUnit(c, .percentage)
             }
         case .relativehumidity:
-            return getPressureBaseMap(variable: .relative_humidity, level: v.level)
+            return getDeriverMap(variable: .relative_humidity, level: v.level)
         default:
-            return .direct(Reader.variableFromString(variable.rawValue))
+            return nil
         }
     }
     
