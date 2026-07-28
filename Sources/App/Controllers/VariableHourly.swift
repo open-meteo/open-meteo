@@ -1235,8 +1235,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 }
                 return DataAndUnit(showers, precip.unit)
             }
-        case .weathercode:
-            return getDeriverMap(variable: .weather_code)
         case .weather_code:
             guard
                 let cloudCover = getDeriverMap(variable: .cloud_cover),
