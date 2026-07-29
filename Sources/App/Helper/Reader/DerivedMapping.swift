@@ -34,6 +34,16 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         }
         return .direct(variable)
     }
+
+    /// Promote a resolved input to a complete mapping without wrapping an existing derived graph.
+    static func from(input: RawOrMapped) -> Self? {
+        switch input {
+        case .raw(let variable):
+            return .direct(variable)
+        case .mapped(let mapping):
+            return mapping
+        }
+    }
     
     static func windSpeed(speed: Variable?, levelFrom: Float, levelTo: Float) -> Self? {
         guard let speed else {
