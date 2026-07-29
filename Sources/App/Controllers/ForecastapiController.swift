@@ -1322,6 +1322,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
     }
 
+    static func hourlyToMultiSameType(_ readers: [(any GenericReaderOptionalProtocol<ForecastVariable>)?]) -> ForecastReaderResult? {
+        return hourlyToMultiSameType(readers.compactMap { $0 })
+    }
+
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
         if let d = getDomainAndVariable() {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1347,15 +1351,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let iconD2 = try await IconDomains.iconD2.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
-                    iconEu,
-                    iconD2
-                ].compactMap { $0 }
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
                     gfsUvIndex,
-                    icon
-                ] + iconReaders + [
+                    icon,
+                    iconEu,
+                    iconD2,
                     ifs025.asOptionalReader,
                     ifsHres.asOptionalReader,
                     knmiNetherlands
@@ -1386,16 +1387,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
-                let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
+                return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
                     iconProbabilities.asOptionalReader,
                     gfs.asOptionalReader,
                     ifsHres.asOptionalReader,
                     icon,
                     iconEu,
-                    iconD2
-                ] + (include15Min ? [iconD2_15min] : [])
-                return MultiDomains.hourlyToMultiSameType(readers)
+                    iconD2,
+                    include15Min ? iconD2_15min : nil
+                ])
             }
             // For western europe, use arome models
             if (42.10..<51.32).contains(lat), (-6.18..<8.35).contains(lon), let arome_france_hd = try await MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
@@ -1403,31 +1404,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let arome_france = try await MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arome_france_15min = try await MeteoFranceReader(domain: .arome_france_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arpege_europe = try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let optionalReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
-                    arpege_europe?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?,
-                    arome_france?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?,
-                    arome_france_hd.asOptionalReader,
-                    arome_france_15min?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?,
-                    arome_france_hd_15min?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?
-                ].compactMap { $0 }
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     iconProbabilities.asOptionalReader,
                     gfs.asOptionalReader,
                     icon,
-                    ifsHres.asOptionalReader
-                ] + optionalReaders)
+                    ifsHres.asOptionalReader,
+                    arpege_europe?.asOptionalReader,
+                    arome_france?.asOptionalReader,
+                    arome_france_hd.asOptionalReader,
+                    arome_france_15min?.asOptionalReader,
+                    arome_france_hd_15min?.asOptionalReader
+                ])
             }
             // For Northern Europe and Iceland use DMI Harmonie
             if (44..<66).contains(lat), let dmiEurope = try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let optionalReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = [iconEu].compactMap { $0 }
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     gfs.asOptionalReader,
-                    icon
-                ] + optionalReaders + [
+                    icon,
+                    iconEu,
                     ifs025.asOptionalReader,
                     ifsHres.asOptionalReader,
                     dmiEurope.asOptionalReader
@@ -1436,12 +1434,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // For North America, use HRRR
             if let hrrr = try await GfsReader(domains: include15Min ? [.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let optionalReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
-                    nbmProbabilities?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?
-                ].compactMap { $0 }
                 return MultiDomains.hourlyToMultiSameType([
-                    gfsProbabilites.asOptionalReader
-                ] + optionalReaders + [
+                    gfsProbabilites.asOptionalReader,
+                    nbmProbabilities?.asOptionalReader,
                     icon,
                     gfs.asOptionalReader,
                     hrrr.asOptionalReader

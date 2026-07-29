@@ -537,7 +537,7 @@ extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariab
 }
 
 extension GenericReaderProtocol {
-    var asOptionalReader: some GenericReaderOptionalProtocol<ForecastVariable> {
+    var asOptionalReader: any GenericReaderOptionalProtocol<ForecastVariable> {
         return GenericReaderProtocolOptionally(reader: self)
     }
 }
