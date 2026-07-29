@@ -407,6 +407,22 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
             return .wind_direction_10m
         case .surface_air_pressure:
             return .surface_pressure
+        case .snow_height:
+            return .snow_depth
+        case .sensible_heatflux:
+            return .sensible_heat_flux
+        case .latent_heatflux:
+            return .latent_heat_flux
+        case .soil_moisture_0_1cm:
+            return .soil_moisture_0_to_1cm
+        case .soil_moisture_1_3cm:
+            return .soil_moisture_1_to_3cm
+        case .soil_moisture_3_9cm:
+            return .soil_moisture_3_to_9cm
+        case .soil_moisture_9_27cm:
+            return .soil_moisture_9_to_27cm
+        case .soil_moisture_27_81cm:
+            return .soil_moisture_27_to_81cm
         default:
             return self
         }
@@ -1149,12 +1165,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return getDeriverMap(variable: .cloud_cover_mid)
         case .cloudcover_high:
             return getDeriverMap(variable: .cloud_cover_high)
-        case .snow_height:
-            return getDeriverMap(variable: .snow_depth)
-        case .sensible_heatflux:
-            return getDeriverMap(variable: .sensible_heat_flux)
-        case .latent_heatflux:
-            return getDeriverMap(variable: .latent_heat_flux)
         case .snowfall, .snowfall_spread:
             guard let snowWater = getDeriverMap(variable: variable == .snowfall_spread ? .snowfall_water_equivalent_spread : .snowfall_water_equivalent) else {
                 return nil
@@ -1349,24 +1359,14 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             
         case .soil_moisture_0_to_1cm:
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
-        case .soil_moisture_0_1cm:
-            return getDeriverMap(variable: .soil_moisture_0_to_1cm)
         case .soil_moisture_1_to_3cm:
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
-        case .soil_moisture_1_3cm:
-            return getDeriverMap(variable: .soil_moisture_1_to_3cm)
         case .soil_moisture_3_to_9cm:
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
-        case .soil_moisture_3_9cm:
-            return getDeriverMap(variable: .soil_moisture_3_to_9cm)
         case .soil_moisture_9_to_27cm:
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_10_to_40cm.rawValue))
-        case .soil_moisture_9_27cm:
-            return getDeriverMap(variable: .soil_moisture_9_to_27cm)
         case .soil_moisture_27_to_81cm:
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_40_to_100cm.rawValue))
-        case .soil_moisture_27_81cm:
-            return getDeriverMap(variable: .soil_moisture_27_to_81cm)
             
         case .soil_moisture_0_to_100cm:
             guard
@@ -1439,7 +1439,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     func getDeriverMap(variable: ForecastVariable) -> DerivedMapping<Reader.MixingVar>? {
         switch variable {
         case .surface(let variable):
-            return getDeriverMap(variable: variable.variable)
+            return getDeriverMap(variable: variable.variable.remapped)
         case .pressure(let variable):
             return getDeriverMap(variable: variable)
         case .height(let variable):
