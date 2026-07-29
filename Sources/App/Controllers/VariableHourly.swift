@@ -405,6 +405,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
             return .wind_speed_10m
         case .winddirection:
             return .wind_direction_10m
+        case .weathercode:
+            return .weather_code
         case .surface_air_pressure:
             return .surface_pressure
         case .snow_height:
@@ -716,25 +718,15 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
 
         switch remapped {
         case .wind_speed:
-            guard
-                let u = pressureLevelInput(.wind_u_component, at: pressure.level),
-                let v = pressureLevelInput(.wind_v_component, at: pressure.level)
-            else {
-                return nil
-            }
-            return .two(u, v) { u, v, _ in
-                return DataAndUnit(zip(u.data, v.data).map(Meteorology.windspeed), .metrePerSecond)
-            }
+            return .windSpeed(
+                u: pressureLevelInput(.wind_u_component, at: pressure.level),
+                v: pressureLevelInput(.wind_v_component, at: pressure.level)
+            )
         case .wind_direction:
-            guard
-                let u = pressureLevelInput(.wind_u_component, at: pressure.level),
-                let v = pressureLevelInput(.wind_v_component, at: pressure.level)
-            else {
-                return nil
-            }
-            return .two(u, v) { u, v, _ in
-                return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
-            }
+            return .windDirection(
+                u: pressureLevelInput(.wind_u_component, at: pressure.level),
+                v: pressureLevelInput(.wind_v_component, at: pressure.level)
+            )
         case .dew_point:
             guard
                 let temperature = pressureLevelInput(.temperature, at: pressure.level),
@@ -830,8 +822,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                     return DataAndUnit(corrected, rain.unit)
                 }
             }
-        case .weathercode:
-            return getDeriverMap(variable: .weather_code)
         case .weather_code:
             if abs(reader.modelElevation.numeric - reader.targetElevation) > 100,
                let weatherCode = Reader.variableFromString("weather_code"),

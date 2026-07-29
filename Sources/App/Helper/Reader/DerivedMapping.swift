@@ -59,7 +59,14 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         guard let u, let v else {
             return nil
         }
-        return .two(.raw(u), .raw(v), {u, v, _ in
+        return windSpeed(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v))
+    }
+
+    static func windSpeed(u: RawOrMapped?, v: RawOrMapped?) -> Self? {
+        guard let u, let v else {
+            return nil
+        }
+        return .two(u, v, {u, v, _ in
             return DataAndUnit(zip(u.data, v.data).map(Meteorology.windspeed), .metrePerSecond)
         })
     }
@@ -77,7 +84,14 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         guard let u, let v else {
             return nil
         }
-        return .two(.raw(u), .raw(v), {u, v, _ in
+        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v))
+    }
+
+    static func windDirection(u: RawOrMapped?, v: RawOrMapped?) -> Self? {
+        guard let u, let v else {
+            return nil
+        }
+        return .two(u, v, {u, v, _ in
             return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
         })
     }
