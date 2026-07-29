@@ -1616,15 +1616,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         if let mapping = getDomainAndVariable() {
             switch mapping {
             case .single(let domain, let variable),
-                 .singleWithPrecipitationProbability(let domain, let variable, _):
+                 .singleWithPrecipitationProbability(let domain, let variable, _),
+                 .singleWithSupplementalDomains(let domain, let variable, _, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-            case .singleWithSupplementalDomains(let domain, let variable, _, _):
-                let result = try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-                guard let hourly = result.hourly else {
-                    return (nil, nil, nil, nil)
-                }
-                let combined = GenericReaderMultiSameType<ForecastVariable>(reader: [hourly])
-                return (combined, combined.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
