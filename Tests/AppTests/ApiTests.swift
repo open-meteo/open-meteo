@@ -11,7 +11,7 @@ private struct ReaderConstructionResult {
 @Suite struct ApiTests {
     @Test func multiDomainReadersShareElevationAndPreserveMixerOrder() async {
         var initializations = [(source: String, elevation: Float)]()
-        let result = await MultiDomains.DomainReaderMapping.makeReadersInMixerOrder(
+        let result = await makeReadersInMixerOrder(
             sources: ["fallback", "authoritative"],
             elevation: .nan,
             makeReader: { source, elevation in

@@ -978,31 +978,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             precipitationProb: (any GenericDomain)?
         )
 
-        /// Readers are declared in mixer order, with the authoritative metadata source last.
-        /// Initialise in reverse so an omitted elevation is resolved by the first available
-        /// authoritative reader, then shared by all fallback readers.
-        static func makeReadersInMixerOrder<Source, Reader>(
-            sources: [Source],
-            elevation: Float,
-            makeReader: (Source, Float) async throws -> Reader?,
-            resolvedElevation: (Reader) -> Float
-        ) async rethrows -> (readers: [Reader], elevation: Float) {
-            var elevation = elevation
-            var readers = [Reader]()
-            readers.reserveCapacity(sources.count)
-
-            for source in sources.reversed() {
-                guard let reader = try await makeReader(source, elevation) else {
-                    continue
-                }
-                if elevation.isNaN {
-                    elevation = resolvedElevation(reader)
-                }
-                readers.append(reader)
-            }
-            return (Array(readers.reversed()), elevation)
-        }
-
         private static func makeDomainReaders(
             sources: [(any GenericDomain, any GenericVariable.Type)],
             lat: Float,
