@@ -623,10 +623,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     let reader: Reader
     let options: GenericReaderOptions
 
-    var elevationForEt0: Float {
-        reader.targetElevation.isFinite ? reader.targetElevation : reader.modelElevation.numeric
-    }
-
     /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
     static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
         switch (domain, level) {
@@ -1090,7 +1086,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return .four(.mapped(radiation), .raw(temp), .mapped(wind), .mapped(dew)) { swrad, temperature, windspeed, dewpoint, time in
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let et0 = swrad.data.indices.map { i in
-                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature.data[i], windspeed10mMeterPerSecond: windspeed.data[i], dewpointCelsius: dewpoint.data[i], shortwaveRadiationWatts: swrad.data[i], elevation: elevationForEt0, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
+                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature.data[i], windspeed10mMeterPerSecond: windspeed.data[i], dewpointCelsius: dewpoint.data[i], shortwaveRadiationWatts: swrad.data[i], elevation: reader.resolvedTargetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
                 }
                 return DataAndUnit(et0, .millimetre)
             }

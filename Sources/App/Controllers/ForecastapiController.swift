@@ -993,7 +993,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 },
                 resolvedElevation: { reader in
-                    reader.targetElevation.isFinite ? reader.targetElevation : reader.modelElevation.numeric
+                    reader.resolvedTargetElevation
                 }
             )
         }

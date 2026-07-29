@@ -11,6 +11,12 @@ protocol GenericReaderBaseProtocol {
     func getStatic(type: ReaderStaticVariable) async throws -> Float?
 }
 
+extension GenericReaderBaseProtocol {
+    var resolvedTargetElevation: Float {
+        targetElevation.isFinite ? targetElevation : modelElevation.numeric
+    }
+}
+
 /// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
 protocol GenericReaderProtocol: GenericReaderBaseProtocol {
     associatedtype MixingVar: GenericVariableMixable
