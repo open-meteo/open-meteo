@@ -1,6 +1,8 @@
 import Foundation
 import Vapor
 import AsyncHTTPClient
+import NIOCore
+import NIOFileSystem
 
 /**
  Expose database as S3 endpoint. This can be used to pull data from one server to another. It is used only internally to transfer data between Open-Meteo API nodes. Note: This is only a limited implementation and not fully compatible.
@@ -10,9 +12,6 @@ import AsyncHTTPClient
  
  Download exmaple
  `http://127.0.0.1:8080/data/cmc_gem_gdps/shortwave_radiation/chunk_1430.om?apikey=123`
- 
- TODO:
- - Actual S3 authentication with signatures instead of simple apikeys as URL query parameter. Not required at this stage.
  
  Nginx setting:
  ```
@@ -25,13 +24,29 @@ import AsyncHTTPClient
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
     static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
+    static let uploadCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment()
+    static let multipartChunkSize = 8 * 1024 * 1024
+    static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
 
     func boot(routes: RoutesBuilder) throws {
-        if Self.syncApiKeys.isEmpty {
+        if Self.syncApiKeys.isEmpty && Self.uploadCredentials.isEmpty {
             return
         }
-        routes.get("", use: self.list)
-        routes.get("data", "**", use: self.get)
+
+        if !Self.syncApiKeys.isEmpty {
+            routes.get("", use: self.list)
+            routes.get("data", "**", use: self.get)
+            routes.get("data_run", "**", use: self.get)
+            routes.get("data_spatial", "**", use: self.get)
+        }
+
+        if !Self.uploadCredentials.isEmpty {
+            for root in ["data", "data_run", "data_spatial"] {
+                routes.on(.PUT, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.putObject)
+                routes.on(.POST, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.postObject)
+                routes.on(.DELETE, [PathComponent(stringLiteral: root), .catchall], use: self.deleteObject)
+            }
+        }
     }
 
 
@@ -40,6 +55,82 @@ struct S3DataController: RouteCollection {
         let apikey: String?
         /// in megabytes per second
         let rate: Int?
+    }
+
+    struct UploadCredential: Sendable, Hashable {
+        let accessKey: String
+        let secretKey: String
+
+        static func loadFromEnvironment() -> [UploadCredential] {
+            var credentials = Set<UploadCredential>()
+            let env = ProcessInfo.processInfo.environment
+
+            if let raw = Environment.get("S3_UPLOAD_CREDENTIALS") {
+                for entry in raw.split(separator: ",") {
+                    if let parsed = parseCredential(String(entry)) {
+                        credentials.insert(parsed)
+                    }
+                }
+            }
+
+            for (key, value) in env where key.hasPrefix("S3_UPLOAD_CREDENTIALS_") {
+                if let parsed = parseCredential(value) {
+                    credentials.insert(parsed)
+                }
+            }
+
+            let keyPrefix = "S3_UPLOAD_KEY_"
+            for (keyName, keyValue) in env where keyName.hasPrefix(keyPrefix) {
+                let suffix = String(keyName.dropFirst(keyPrefix.count))
+                let secretName = "S3_UPLOAD_SECRET_\(suffix)"
+                if let secretValue = env[secretName], !keyValue.isEmpty, !secretValue.isEmpty {
+                    credentials.insert(.init(accessKey: keyValue, secretKey: secretValue))
+                }
+            }
+
+            return Array(credentials)
+        }
+
+        private static func parseCredential(_ raw: String) -> UploadCredential? {
+            if let split = raw.firstIndex(of: ":") {
+                let key = String(raw[..<split]).trimmingCharacters(in: .whitespaces)
+                let secret = String(raw[raw.index(after: split)...]).trimmingCharacters(in: .whitespaces)
+                guard !key.isEmpty, !secret.isEmpty else { return nil }
+                return UploadCredential(accessKey: key, secretKey: secret)
+            }
+            if let split = raw.firstIndex(of: "=") {
+                let key = String(raw[..<split]).trimmingCharacters(in: .whitespaces)
+                let secret = String(raw[raw.index(after: split)...]).trimmingCharacters(in: .whitespaces)
+                guard !key.isEmpty, !secret.isEmpty else { return nil }
+                return UploadCredential(accessKey: key, secretKey: secret)
+            }
+            return nil
+        }
+    }
+
+    enum S3Root: String, CaseIterable {
+        case data = "data"
+        case dataRun = "data_run"
+        case dataSpatial = "data_spatial"
+
+        var pathPrefix: String {
+            "/\(rawValue)/"
+        }
+
+        var listPrefix: String {
+            "\(rawValue)/"
+        }
+
+        var directory: String {
+            switch self {
+            case .data:
+                return OpenMeteo.dataDirectory
+            case .dataRun:
+                return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")
+            case .dataSpatial:
+                return OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")
+            }
+        }
     }
 
     /// List all files in a specified directory
@@ -55,13 +146,15 @@ struct S3DataController: RouteCollection {
         }
 
         let path = params.prefix.sanitisedPath
-        guard params.list_type == 2, params.delimiter == "/",
-              path.last == "/", path.starts(with: "data/") else {
+        guard params.list_type == 2, params.delimiter == "/", path.last == "/" else {
             throw Abort(.forbidden)
         }
 
-        let pathNoData = path[path.index(path.startIndex, offsetBy: 5)..<path.endIndex]
-        let pathUrl = URL(fileURLWithPath: "\(OpenMeteo.dataDirectory)\(pathNoData)", isDirectory: true)
+        guard let resolved = resolveListPath(path) else {
+            throw Abort(.forbidden)
+        }
+
+        let pathUrl = URL(fileURLWithPath: resolved.absoluteDirectoryPath, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
 
         guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
@@ -96,7 +189,7 @@ struct S3DataController: RouteCollection {
         let filesXml = files.map {
             """
             <Contents>
-                <Key>\(path)\($0.name)</Key>
+                <Key>\(resolved.prefix)\($0.name)</Key>
                 <LastModified>\(dateFormat.string(from: $0.modificationTime))</LastModified>
                 <Size>\($0.fileSize)</Size>
                 <StorageClass>STANDARD</StorageClass>
@@ -106,7 +199,7 @@ struct S3DataController: RouteCollection {
         let directoriesXml = directories.map {
             """
             <CommonPrefixes>
-            <Prefix>\(path)\($0)/</Prefix>
+            <Prefix>\(resolved.prefix)\($0)/</Prefix>
             </CommonPrefixes>
             """
         }.joined(separator: "\n")
@@ -117,7 +210,7 @@ struct S3DataController: RouteCollection {
         <?xml version="1.0" encoding="UTF-8"?>
         <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
             <Name>openmeteo</Name>
-            <Prefix>\(path)</Prefix>
+            <Prefix>\(resolved.prefix)</Prefix>
             <KeyCount>\(files.count + directories.count)</KeyCount>
             <MaxKeys>1000</MaxKeys>
             <Delimiter>/</Delimiter>
@@ -140,15 +233,18 @@ struct S3DataController: RouteCollection {
             }
         }
 
-        guard path.last != "/", path.starts(with: "/data/") else {
+        guard path.last != "/", let resolved = resolveObjectPath(path) else {
             throw Abort(.forbidden)
         }
-        let pathNoData = path[path.index(path.startIndex, offsetBy: 6)..<path.endIndex]
+
+        guard let pathNoRoot = resolved.relativePath.split(separator: "/").dropFirst().joined(separator: "/").nilIfEmpty else {
+            throw Abort(.forbidden)
+        }
 
         if let nginxSendfilePrefix = Self.nginxSendfilePrefix {
             let response = Response()
             // let response = req.fileio.streamFile(at: abspath)
-            response.headers.add(name: "X-Accel-Redirect", value: "/\(nginxSendfilePrefix)/\(pathNoData)")
+            response.headers.add(name: "X-Accel-Redirect", value: "/\(nginxSendfilePrefix)/\(pathNoRoot)")
             if let rate = params.rate {
                 // Bytes per second download speed limit
                 response.headers.add(name: "X-Accel-Limit-Rate", value: "\((rate) * 1024 * 1024)")
@@ -156,8 +252,11 @@ struct S3DataController: RouteCollection {
             return response
         }
         /// TODO consider caching
-        if let remote = OpenMeteo.remoteDataDirectory, let modelStr = pathNoData.firstIndex(of: "/").map({ pathNoData[..<$0] }), let model = DomainRegistry(rawValue: String(modelStr)) {
-            var request = HTTPClientRequest(url: "\(remote)\(pathNoData)")
+          if resolved.root == .data,
+              let remote = OpenMeteo.remoteDataDirectory,
+              let modelStr = pathNoRoot.firstIndex(of: "/").map({ pathNoRoot[..<$0] }),
+              let _ = DomainRegistry(rawValue: String(modelStr)) {
+            var request = HTTPClientRequest(url: "\(remote)\(pathNoRoot)")
             try request.applyS3Credentials()
             let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
             let r = Response(status: response.status, body: .init(asyncStream: { writer in
@@ -173,8 +272,247 @@ struct S3DataController: RouteCollection {
             r.headers.contentType = response.headers.contentType
             return r
         }
-        let response = try await req.fileio.asyncStreamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
+        let response = try await req.fileio.asyncStreamFile(at: resolved.absolutePath)
         return response
+    }
+
+    func putObject(_ req: Request) async throws -> Response {
+        try ensureUploadCredentialsAvailable()
+        let body = try requestBodyData(req)
+        try verifyUploadSignature(req: req, body: body)
+        let query = req.url.queryParameters
+
+        if let uploadId = query["uploadId"], let partNumber = query["partNumber"] ?? query["partnumber"] {
+            try await writeMultipartPart(req: req, uploadId: uploadId, partNumber: partNumber, body: body)
+            return makeUploadPartResponse(body: body)
+        }
+
+        try await uploadSinglePut(req: req, body: body)
+        return Response(status: .ok)
+    }
+
+    func postObject(_ req: Request) async throws -> Response {
+        try ensureUploadCredentialsAvailable()
+        let body = try requestBodyData(req)
+        try verifyUploadSignature(req: req, body: body)
+        let query = req.url.queryParameters
+
+        if query["uploads"] != nil {
+            return try await initiateMultipartUpload(req)
+        }
+
+        if let uploadId = query["uploadId"], let partNumber = query["partNumber"] ?? query["partnumber"] {
+            try await writeMultipartPart(req: req, uploadId: uploadId, partNumber: partNumber, body: body)
+            return makeUploadPartResponse(body: body)
+        }
+
+        if let uploadId = query["uploadId"] {
+            try await completeMultipartUpload(req: req, uploadId: uploadId)
+            return Response(status: .ok)
+        }
+
+        throw Abort(.badRequest, reason: "Unsupported POST operation")
+    }
+
+    func deleteObject(_ req: Request) async throws -> Response {
+        try ensureUploadCredentialsAvailable()
+        let body = try requestBodyData(req)
+        try verifyUploadSignature(req: req, body: body)
+        let query = req.url.queryParameters
+        guard let uploadId = query["uploadId"] else {
+            throw Abort(.badRequest, reason: "Missing uploadId")
+        }
+
+        let resolved = try resolveUploadTarget(forPath: req.url.path)
+        let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
+        _ = try await FileSystem.shared.removeItem(at: FilePath(tempPath))
+        return Response(status: .noContent)
+    }
+
+    private func uploadSinglePut(req: Request, body: Data) async throws {
+        let resolved = try resolveUploadTarget(forPath: req.url.path)
+        let uploadId = String(UInt64.random(in: 1_000_000_000...9_999_999_999_999_999_999))
+        let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
+
+        try await ensureParentDirectoryExists(forFileAt: resolved.absolutePath)
+        try await body.write(toFileAt: FilePath(tempPath), options: .newFile(replaceExisting: true))
+        try await FileSystem.shared.replaceItem(at: FilePath(resolved.absolutePath), withItemAt: FilePath(tempPath))
+        try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: resolved.absolutePath)
+    }
+
+    private func initiateMultipartUpload(_ req: Request) async throws -> Response {
+        let resolved = try resolveUploadTarget(forPath: req.url.path)
+        guard let fileSizeRaw = req.headers.first(name: "x-file-size"),
+              let fileSize = Int64(fileSizeRaw), fileSize >= 0 else {
+            throw Abort(.badRequest, reason: "Missing or invalid x-file-size header")
+        }
+
+        let uploadId = String(UInt64.random(in: 1_000_000_000...9_999_999_999_999_999_999))
+        let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
+        try await ensureParentDirectoryExists(forFileAt: resolved.absolutePath)
+        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
+            try await handle.resize(to: .bytes(fileSize))
+        }
+
+        let responseBody = """
+        <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+        <InitiateMultipartUploadResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">
+            <Bucket>openmeteo</Bucket>
+            <Key>\(resolved.relativePath)</Key>
+            <UploadId>\(uploadId)</UploadId>
+        </InitiateMultipartUploadResult>
+        """
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/xml")
+        return Response(status: .ok, headers: headers, body: .init(string: responseBody))
+    }
+
+    private func writeMultipartPart(req: Request, uploadId: String, partNumber: String, body: Data) async throws {
+        guard let part = Int(partNumber), part >= 1 else {
+            throw Abort(.badRequest, reason: "Invalid partNumber")
+        }
+        guard body.count <= Self.multipartChunkSize else {
+            throw Abort(.badRequest, reason: "Chunk size exceeds 8MB")
+        }
+
+        let resolved = try resolveUploadTarget(forPath: req.url.path)
+        let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
+        let tempInfo = try await FileSystem.shared.info(forFileAt: FilePath(tempPath))
+        guard let tempInfo else {
+            throw Abort(.notFound, reason: "Multipart upload not found")
+        }
+        let offset = Int64(part - 1) * Int64(Self.multipartChunkSize)
+        guard offset + Int64(body.count) <= tempInfo.size else {
+            throw Abort(.badRequest, reason: "Part exceeds allocated file size")
+        }
+
+        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
+            try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
+        }
+    }
+
+    private func completeMultipartUpload(req: Request, uploadId: String) async throws {
+        let resolved = try resolveUploadTarget(forPath: req.url.path)
+        let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
+        guard try await FileSystem.shared.info(forFileAt: FilePath(tempPath)) != nil else {
+            throw Abort(.notFound, reason: "Multipart upload not found")
+        }
+        try await ensureParentDirectoryExists(forFileAt: resolved.absolutePath)
+        try await FileSystem.shared.replaceItem(at: FilePath(resolved.absolutePath), withItemAt: FilePath(tempPath))
+        try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: resolved.absolutePath)
+    }
+
+    private func makeUploadPartResponse(body: Data) -> Response {
+        var headers = HTTPHeaders()
+        headers.add(name: "ETag", value: "\"\(body.sha256Hex)\"")
+        return Response(status: .ok, headers: headers)
+    }
+
+    private func ensureUploadCredentialsAvailable() throws {
+        guard !Self.uploadCredentials.isEmpty else {
+            throw Abort(.serviceUnavailable, reason: "No upload credentials configured")
+        }
+    }
+
+    private func verifyUploadSignature(req: Request, body: Data) throws {
+        let payloadHash = body.sha256Hex
+        let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
+        guard let host else {
+            throw Abort(.unauthorized, reason: "Missing Host header")
+        }
+        let canonicalURL = "https://\(host)\(req.url.string)"
+
+        var hasMatchingAccessKey = false
+        for credentials in Self.uploadCredentials {
+            let signer = AWSSigner(accessKey: credentials.accessKey, secretKey: credentials.secretKey, region: "us-west-2", service: "s3")
+            do {
+                try signer.verify(url: canonicalURL, method: req.method, headers: req.headers, payloadHashSha256: payloadHash)
+                return
+            } catch AWSSigner.SigningError.invalidAccessKey {
+                continue
+            } catch {
+                hasMatchingAccessKey = true
+            }
+        }
+
+        let reason = hasMatchingAccessKey ? "Invalid request signature" : "Unknown access key"
+        throw Abort(.unauthorized, reason: reason)
+    }
+
+    private func requestBodyData(_ req: Request) throws -> Data {
+        let body = req.body.data ?? ByteBuffer()
+        return Data(body.readableBytesView)
+    }
+
+    private func ensureParentDirectoryExists(forFileAt path: String) async throws {
+        let parent = FilePath(path).removingLastComponent()
+        try await FileSystem.shared.createDirectory(at: parent, withIntermediateDirectories: true)
+    }
+
+    private func tempUploadPath(finalPath: String, uploadId: String) -> String {
+        return "\(finalPath).\(uploadId)~"
+    }
+
+    private func resolveListPath(_ prefix: String) -> (prefix: String, absoluteDirectoryPath: String)? {
+        for root in Self.supportedRoots {
+            guard prefix.starts(with: root.listPrefix) else { continue }
+            let relative = String(prefix.dropFirst(root.listPrefix.count))
+            if relative.contains("..") || relative.contains("//") {
+                return nil
+            }
+            return (prefix, root.directory + relative)
+        }
+        return nil
+    }
+
+    private func resolveUploadTarget(forPath path: String) throws -> (root: S3Root, relativePath: String, absolutePath: String) {
+        guard let resolved = resolveObjectPath(path) else {
+            throw Abort(.forbidden)
+        }
+        return resolved
+    }
+
+    private func resolveObjectPath(_ path: String) -> (root: S3Root, relativePath: String, absolutePath: String)? {
+        let cleanPath = path.sanitisedPath
+        guard cleanPath.first == "/", cleanPath.last != "/", !cleanPath.contains(".."), !cleanPath.contains("//") else {
+            return nil
+        }
+        for root in Self.supportedRoots {
+            guard cleanPath.starts(with: root.pathPrefix) else { continue }
+            let relative = String(cleanPath.dropFirst(root.pathPrefix.count))
+            guard !relative.isEmpty else { return nil }
+            return (root, "\(root.rawValue)/\(relative)", root.directory + relative)
+        }
+        return nil
+    }
+
+    private func applyLastModifiedIfProvided(header: String?, filePath: String) async throws {
+        guard let header, let date = Self.parseLastModifiedDate(header) else {
+            return
+        }
+        let seconds = Int(date.timeIntervalSince1970)
+        let nanoseconds = Int((date.timeIntervalSince1970 - Double(seconds)) * 1_000_000_000)
+        let ts = FileInfo.Timespec(seconds: seconds, nanoseconds: max(0, nanoseconds))
+        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(filePath), options: .modifyFile(createIfNecessary: false)) { handle in
+            try await handle.setLastDataModificationTime(to: ts)
+        }
+    }
+
+    private static func parseLastModifiedDate(_ value: String) -> Date? {
+        if let unix = Double(value) {
+            return Date(timeIntervalSince1970: unix)
+        }
+
+        let iso = ISO8601DateFormatter()
+        if let date = iso.date(from: value) {
+            return date
+        }
+
+        let rfc1123 = DateFormatter()
+        rfc1123.locale = Locale(identifier: "en_US_POSIX")
+        rfc1123.timeZone = TimeZone(secondsFromGMT: 0)
+        rfc1123.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return rfc1123.date(from: value)
     }
 }
 
@@ -195,6 +533,31 @@ fileprivate extension String {
     /// Allow only alpha numerics, dash, underscore and slash
     var sanitisedPath: String {
         return trimmingCharacters(in: Self.sanitisedPathCharacterSet)
+    }
+
+    func replacingLastPathComponent(with component: String) -> String {
+        var url = URL(fileURLWithPath: self, isDirectory: true)
+        url.deleteLastPathComponent()
+        url.appendPathComponent(component, isDirectory: true)
+        let result = url.path
+        return result.hasSuffix("/") ? result : result + "/"
+    }
+
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
+
+fileprivate extension URI {
+    var queryParameters: [String: String] {
+        var queryMap: [String: String] = [:]
+        guard let components = URLComponents(string: self.string) else {
+            return queryMap
+        }
+        for item in components.queryItems ?? [] {
+            queryMap[item.name] = item.value ?? ""
+        }
+        return queryMap
     }
 }
 
