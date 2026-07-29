@@ -592,16 +592,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         self.options = options
     }
 
-    static func mergeIconEpsShortwaveRadiation(current: DataAndUnit, legacy: DataAndUnit) -> DataAndUnit {
-        var data = current.data
-        data.integrateIfNaN(legacy.data)
-        return DataAndUnit(data, current.unit)
-    }
-
-    static func calculateIconEpsDiffuseRadiation(shortwave: DataAndUnit, direct: DataAndUnit) -> DataAndUnit {
-        return DataAndUnit(zip(shortwave.data, direct.data).map { max($0 - $1, 0) }, shortwave.unit)
-    }
-
     var elevationForEt0: Float {
         reader.targetElevation.isFinite ? reader.targetElevation : reader.modelElevation.numeric
     }
@@ -758,7 +748,9 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                     return nil
                 }
                 return .two(.raw(shortwave), .raw(legacyShortwave)) { shortwave, legacyShortwave, _ in
-                    return Self.mergeIconEpsShortwaveRadiation(current: shortwave, legacy: legacyShortwave)
+                    var data = shortwave.data
+                    data.integrateIfNaN(legacyShortwave.data)
+                    return DataAndUnit(data, shortwave.unit)
                 }
             case .diffuse_radiation:
                 guard
@@ -768,7 +760,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                     return nil
                 }
                 return .two(.mapped(shortwave), .mapped(direct)) { shortwave, direct, _ in
-                    return Self.calculateIconEpsDiffuseRadiation(shortwave: shortwave, direct: direct)
+                    return DataAndUnit(zip(shortwave.data, direct.data).map { max($0 - $1, 0) }, shortwave.unit)
                 }
             case .diffuse_radiation_spread:
                 // Cannot derive a difference spread without covariance or member-level data.
