@@ -57,6 +57,9 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     case soil_temperature_7_to_28cm_mean
     case sunrise
     case sunset
+    case moonrise
+    case moonset
+    case moon_phase
     case daylight_duration
     case sunshine_duration
     case surface_pressure_max
@@ -177,6 +180,12 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
         case .sunrise:
             return .none
         case .sunset:
+            return .none
+        case .moonrise:
+            return .none
+        case .moonset:
+            return .none
+        case .moon_phase:
             return .none
         case .et0_fao_evapotranspiration:
             return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
