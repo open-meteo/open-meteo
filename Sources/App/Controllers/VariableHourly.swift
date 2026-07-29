@@ -623,6 +623,10 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     let reader: Reader
     let options: GenericReaderOptions
 
+    private var elevationDifferenceOver100m: Bool {
+        abs(reader.modelElevation.numeric - reader.targetElevation) > 100
+    }
+
     /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
     static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
         switch (domain, level) {
@@ -798,7 +802,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 }
             }
         case .snowfall_water_equivalent:
-            if abs(reader.modelElevation.numeric - reader.targetElevation) > 100,
+            if elevationDifferenceOver100m,
                let snowfall = Reader.variableFromString("snowfall_water_equivalent"),
                let temperature = Reader.variableFromString("temperature_2m") {
                 return .two(.raw(snowfall), .raw(temperature)) { snowfall, temperature, _ in
@@ -807,7 +811,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 }
             }
         case .rain:
-            if abs(reader.modelElevation.numeric - reader.targetElevation) > 100,
+            if elevationDifferenceOver100m,
                let rain = Reader.variableFromString("rain"),
                let snowfall = Reader.variableFromString("snowfall_water_equivalent"),
                let temperature = Reader.variableFromString("temperature_2m") {
@@ -819,7 +823,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 }
             }
         case .weather_code:
-            if abs(reader.modelElevation.numeric - reader.targetElevation) > 100,
+            if elevationDifferenceOver100m,
                let weatherCode = Reader.variableFromString("weather_code"),
                let temperature = Reader.variableFromString("temperature_2m") {
                 return .two(.raw(weatherCode), .raw(temperature)) { weatherCode, temperature, _ in
