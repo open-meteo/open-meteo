@@ -1045,22 +1045,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
-        func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
-            switch self {
-            case .single(let primaryDomain, let primaryVariable),
-                 .singleWithPrecipitationProbability(let primaryDomain, let primaryVariable, _):
-                return try await primaryDomain.makeGenericHourlyDaily(variableType: primaryVariable, position: gridpoint, options: options)
-            case .singleWithSupplementalDomains(let primaryDomain, let primaryVariable, _, _):
-                let result = try await primaryDomain.makeGenericHourlyDaily(variableType: primaryVariable, position: gridpoint, options: options)
-                guard let hourly = result.hourly else {
-                    return (nil, nil, nil, nil)
-                }
-                let combined = GenericReaderMultiSameType<ForecastVariable>(reader: [hourly])
-                return (combined, combined.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
-            case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
-                return (nil, nil, nil, nil)
-            }
-        }
     }
     
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
@@ -1629,8 +1613,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
-        if let d = getDomainAndVariable() {
-            return try await d.getReaders(gridpoint: gridpoint, options: options)
+        if let mapping = getDomainAndVariable() {
+            switch mapping {
+            case .single(let domain, let variable),
+                 .singleWithPrecipitationProbability(let domain, let variable, _):
+                return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
+            case .singleWithSupplementalDomains(let domain, let variable, _, _):
+                let result = try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
+                guard let hourly = result.hourly else {
+                    return (nil, nil, nil, nil)
+                }
+                let combined = GenericReaderMultiSameType<ForecastVariable>(reader: [hourly])
+                return (combined, combined.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
+                return (nil, nil, nil, nil)
+            }
         }
         
         switch self {
