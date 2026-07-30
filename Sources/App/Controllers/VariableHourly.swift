@@ -623,10 +623,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     let reader: Reader
     let options: GenericReaderOptions
 
-    private var elevationDifferenceOver100m: Bool {
-        abs(reader.modelElevation.numeric - reader.targetElevation) > 100
-    }
-
     /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
     static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
         switch (domain, level) {
@@ -794,56 +790,60 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             }
         }
 
-        switch variable {
-        case .direct_radiation, .diffuse_radiation:
-            if let radiation = Reader.variableFromString(variable.rawValue) {
-                return .one(.raw(radiation)) { radiation, _ in
-                    return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)
-                }
-            }
-        case .snowfall_water_equivalent:
-            if elevationDifferenceOver100m,
-               let snowfall = Reader.variableFromString("snowfall_water_equivalent"),
-               let temperature = Reader.variableFromString("temperature_2m") {
-                return .two(.raw(snowfall), .raw(temperature)) { snowfall, temperature, _ in
-                    let corrected = zip(snowfall.data, temperature.data).map { $0 * ($1 >= 0 ? 0 : 1) }
-                    return DataAndUnit(corrected, snowfall.unit)
-                }
-            }
-        case .rain:
-            if elevationDifferenceOver100m,
-               let rain = Reader.variableFromString("rain"),
-               let snowfall = Reader.variableFromString("snowfall_water_equivalent"),
-               let temperature = Reader.variableFromString("temperature_2m") {
-                return .three(.raw(rain), .raw(snowfall), .raw(temperature)) { rain, snowfall, temperature, _ in
-                    let corrected = zip(zip(rain.data, snowfall.data), temperature.data).map {
-                        $0.0 + max(0, $0.1 * ($1 >= 0 ? 1 : 0))
+        let rawVariable = Reader.variableFromString(variable.rawValue)
+
+        // corrections for ICON if elevation difference exceeds 100m
+        if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
+            switch variable {
+            case .snowfall_water_equivalent:
+                if let snowfall = rawVariable,
+                   let temperature = Reader.variableFromString("temperature_2m") {
+                    return .two(.raw(snowfall), .raw(temperature)) { snowfall, temperature, _ in
+                        let corrected = zip(snowfall.data, temperature.data).map { $0 * ($1 >= 0 ? 0 : 1) }
+                        return DataAndUnit(corrected, snowfall.unit)
                     }
-                    return DataAndUnit(corrected, rain.unit)
                 }
-            }
-        case .weather_code:
-            if elevationDifferenceOver100m,
-               let weatherCode = Reader.variableFromString("weather_code"),
-               let temperature = Reader.variableFromString("temperature_2m") {
-                return .two(.raw(weatherCode), .raw(temperature)) { weatherCode, temperature, _ in
-                    let corrected = zip(weatherCode.data, temperature.data).map { value, temperature -> Float in
-                        guard value.isFinite, let weatherCode = WeatherCode(rawValue: Int(value)) else {
-                            return value
+            case .rain:
+                if let rain = rawVariable,
+                   let snowfall = Reader.variableFromString("snowfall_water_equivalent"),
+                   let temperature = Reader.variableFromString("temperature_2m") {
+                    return .three(.raw(rain), .raw(snowfall), .raw(temperature)) { rain, snowfall, temperature, _ in
+                        let corrected = zip(zip(rain.data, snowfall.data), temperature.data).map {
+                            $0.0 + max(0, $0.1 * ($1 >= 0 ? 1 : 0))
                         }
-                        return Float(weatherCode.correctSnowRainHardCutOff(temperature_2m: temperature).rawValue)
+                        return DataAndUnit(corrected, rain.unit)
                     }
-                    return DataAndUnit(corrected, weatherCode.unit)
                 }
+            case .weather_code:
+                if let weatherCode = rawVariable,
+                   let temperature = Reader.variableFromString("temperature_2m") {
+                    return .two(.raw(weatherCode), .raw(temperature)) { weatherCode, temperature, _ in
+                        let corrected = zip(weatherCode.data, temperature.data).map { value, temperature -> Float in
+                            guard value.isFinite, let code = WeatherCode(rawValue: Int(value)) else {
+                                return value
+                            }
+                            return Float(code.correctSnowRainHardCutOff(temperature_2m: temperature).rawValue)
+                        }
+                        return DataAndUnit(corrected, weatherCode.unit)
+                    }
+                }
+            default:
+                break
             }
-        default:
-            break
         }
 
-        if let variable = Reader.variableFromString(variable.rawValue) {
-            return .direct(variable)
+        if let rawVariable {
+            // variable dependent corrections of raw data
+            switch variable {
+            case .direct_radiation, .diffuse_radiation:
+                return .one(.raw(rawVariable)) { radiation, _ in
+                    return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)
+                }
+            default:
+                return .direct(rawVariable)
+            }
         }
-        
+
         switch variable {
         case .windspeed_10m:
             return getDeriverMap(variable: .wind_speed_10m)
