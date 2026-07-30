@@ -34,6 +34,16 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         }
         return .direct(variable)
     }
+
+    /// Promote a resolved input to a complete mapping without wrapping an existing derived graph.
+    static func from(input: RawOrMapped) -> Self? {
+        switch input {
+        case .raw(let variable):
+            return .direct(variable)
+        case .mapped(let mapping):
+            return mapping
+        }
+    }
     
     static func windSpeed(speed: Variable?, levelFrom: Float, levelTo: Float) -> Self? {
         guard let speed else {
@@ -49,7 +59,14 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         guard let u, let v else {
             return nil
         }
-        return .two(.raw(u), .raw(v), {u, v, _ in
+        return windSpeed(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v))
+    }
+
+    static func windSpeed(u: RawOrMapped?, v: RawOrMapped?) -> Self? {
+        guard let u, let v else {
+            return nil
+        }
+        return .two(u, v, {u, v, _ in
             return DataAndUnit(zip(u.data, v.data).map(Meteorology.windspeed), .metrePerSecond)
         })
     }
@@ -67,7 +84,14 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         guard let u, let v else {
             return nil
         }
-        return .two(.raw(u), .raw(v), {u, v, _ in
+        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v))
+    }
+
+    static func windDirection(u: RawOrMapped?, v: RawOrMapped?) -> Self? {
+        guard let u, let v else {
+            return nil
+        }
+        return .two(u, v, {u, v, _ in
             return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
         })
     }
