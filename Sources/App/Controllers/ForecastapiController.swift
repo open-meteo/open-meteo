@@ -986,16 +986,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             mode: GridSelectionMode,
             options: GenericReaderOptions
         ) async throws -> (readers: [any GenericReaderOptionalProtocol<ForecastVariable>], elevation: Float) {
-            try await makeReadersInMixerOrder(
-                sources: sources,
-                elevation: elevation,
-                makeReader: { source, elevation in
-                    try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                },
-                resolvedElevation: { reader in
-                    reader.resolvedTargetElevation
+            var elevation = elevation
+            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.reversed().asyncCompactMap { source in
+                guard let reader = try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                    return nil
                 }
-            )
+                if elevation.isNaN {
+                    elevation = reader.resolvedTargetElevation
+                }
+                return reader
+            }.reversed()
+            return (readers, elevation)
         }
         
         var singleDomain: (any GenericDomain)? {

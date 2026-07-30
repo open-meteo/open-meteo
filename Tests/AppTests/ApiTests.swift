@@ -4,33 +4,6 @@ import Testing
 import VaporTesting
 
 @Suite struct ApiTests {
-    @Test func multiDomainReadersShareElevationAndPreserveMixerOrder() async {
-        struct ReaderConstructionResult {
-            let source: String
-            let targetElevation: Float
-        }
-
-        var initializations = [(source: String, elevation: Float)]()
-        let result = await makeReadersInMixerOrder(
-            sources: ["fallback", "authoritative"],
-            elevation: .nan,
-            makeReader: { source, elevation in
-                initializations.append((source, elevation))
-                return ReaderConstructionResult(
-                    source: source,
-                    targetElevation: elevation.isNaN ? 321 : elevation
-                )
-            },
-            resolvedElevation: { $0.targetElevation }
-        )
-
-        #expect(initializations.map(\.source) == ["authoritative", "fallback"])
-        #expect(initializations[0].elevation.isNaN)
-        #expect(initializations[1].elevation == 321)
-        #expect(result.readers.map(\.source) == ["fallback", "authoritative"])
-        #expect(result.elevation == 321)
-    }
-
     /*@Test func generateS3SyncCommands() throws {
         for domain in DomainRegistry.allCases {
             let d = domain.rawValue

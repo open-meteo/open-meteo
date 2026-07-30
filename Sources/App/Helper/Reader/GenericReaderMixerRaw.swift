@@ -17,31 +17,6 @@ protocol GenericReaderMixer: GenericReaderMixerRaw {
     static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Reader?
 }
 
-/// Readers are declared in mixer order, with the authoritative metadata source last.
-/// Initialise in reverse so an omitted elevation can be resolved by the first available
-/// authoritative reader, then shared by all fallback readers.
-func makeReadersInMixerOrder<Source, Reader>(
-    sources: [Source],
-    elevation: Float,
-    makeReader: (Source, Float) async throws -> Reader?,
-    resolvedElevation: (Reader) -> Float
-) async rethrows -> (readers: [Reader], elevation: Float) {
-    var elevation = elevation
-    var readers = [Reader]()
-    readers.reserveCapacity(sources.count)
-
-    for source in sources.reversed() {
-        guard let reader = try await makeReader(source, elevation) else {
-            continue
-        }
-        if elevation.isNaN {
-            elevation = resolvedElevation(reader)
-        }
-        readers.append(reader)
-    }
-    return (Array(readers.reversed()), elevation)
-}
-
 struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {
     typealias MixingVar = Reader.MixingVar
 
@@ -49,22 +24,24 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
 }
 
 extension GenericReaderMixer {
+    /// Initialises highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
     public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        let result = try await makeReadersInMixerOrder(
-            sources: domains,
-            elevation: elevation,
-            makeReader: { domain, elevation in
-                try await Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            },
-            resolvedElevation: { reader in
-                reader.modelElevation.numeric
-            }
-        )
+        var elevation = elevation
 
-        guard !result.readers.isEmpty else {
+        let reader: [Reader] = try await domains.reversed().asyncCompactMap { domain -> (Reader?) in
+            guard let domain = try await Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return nil
+            }
+            if elevation.isNaN {
+                elevation = domain.modelElevation.numeric
+            }
+            return domain
+        }.reversed()
+
+        guard !reader.isEmpty else {
             return nil
         }
-        self.init(reader: result.readers)
+        self.init(reader: reader)
     }
 }
 
