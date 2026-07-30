@@ -40,8 +40,8 @@ fileprivate struct DemResponder: ForecastapiResponder {
     let logger: Logger
     let httpClient: HTTPClient
 
-    func calculateQueryWeight(nVariablesModels: Int?) -> Float {
-        return Float(nVariablesModels ?? latitude.count)
+    func calculateQueryWeight() -> Float {
+        return Float(latitude.count)
     }
 
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response {

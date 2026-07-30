@@ -123,7 +123,6 @@ struct SyncCommand: AsyncCommand {
             let (models, variablesSig) = arg1
             
             return models.map { model in
-                let server = server.replacing("MODEL", with: model.bucketName)
                 return (server, model, variablesSig)
             }
         }.grouped(by: { $0.server }).flatMap( { $0.value })

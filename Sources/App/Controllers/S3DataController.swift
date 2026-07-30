@@ -157,7 +157,7 @@ struct S3DataController: RouteCollection {
         }
         /// TODO consider caching
         if let remote = OpenMeteo.remoteDataDirectory, let modelStr = pathNoData.firstIndex(of: "/").map({ pathNoData[..<$0] }), let model = DomainRegistry(rawValue: String(modelStr)) {
-            var request = HTTPClientRequest(url: "\(remote.replacing("MODEL", with: model.bucketName))\(pathNoData)")
+            var request = HTTPClientRequest(url: "\(remote)\(pathNoData)")
             try request.applyS3Credentials()
             let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
             let r = Response(status: response.status, body: .init(asyncStream: { writer in

@@ -94,7 +94,11 @@ extension ApiSectionString {
                 case .float(let a):
                     sheet.write(a[i], significantDigits: e.unit.significantDigits)
                 case .timestamp(let a):
-                    sheet.writeTimestamp(a[i].add(utc_offset_seconds))
+                    if a[i].isNoData {
+                        sheet.write("")
+                    } else {
+                        sheet.writeTimestamp(a[i].add(utc_offset_seconds))
+                    }
                 }
             }
             sheet.endRow()

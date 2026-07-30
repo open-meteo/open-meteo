@@ -164,7 +164,7 @@ extension Request {
             // localhost or not an openmeteo host
             let params = try parseApiParams()
             let responder = try await fn(ApiRequestInfo(host: nil, numberOfLocationsMaximum: nil), params)
-            let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+            let weight = responder.calculateQueryWeight()
             return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
@@ -209,7 +209,7 @@ extension Request {
                     return self.redirect(to: url)
                 }
                 let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: OpenMeteo.numberOfLocationsMaximum), params)
-                let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+                let weight = responder.calculateQueryWeight()
                 guard weight <= RateLimiter.limitHourly else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
                 }
@@ -257,7 +257,7 @@ extension Request {
         let response: Response
         do {
             let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: numberOfLocationsMaximum), params)
-            let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+            let weight = responder.calculateQueryWeight()
             response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
             await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         }

@@ -8,7 +8,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 }
 
 protocol ForecastapiResponder {
-    func calculateQueryWeight(nVariablesModels: Int?) -> Float
+    func calculateQueryWeight() -> Float
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response
 }
 
@@ -244,14 +244,14 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     /// `weight = max(variables / 10, variables / 10 * days / 14) * locations`
     ///
     /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
-    func calculateQueryWeight(nVariablesModels: Int? = nil) -> Float {
+    func calculateQueryWeight() -> Float {
         let referenceDays = 14
         let referenceVariables = 10
         // Sum up weights for each location. Technically each location can have a different time interval
         return results.reduce(0, {
             let nDays = $1.time.range.durationSeconds / 86400
             let timeFraction = Float(nDays) / Float(referenceDays)
-            let variablesFraction = Float(nVariablesModels ?? nVariablesTimesDomains) / Float(referenceVariables)
+            let variablesFraction = Float(nVariablesTimesDomains) / Float(referenceVariables)
             let weight = max(variablesFraction, timeFraction * variablesFraction)
             return $0 + max(1, weight)
         })
@@ -423,9 +423,13 @@ extension Sequence where Element == Timestamp {
 
             if onlyDate {
                 return AnyIterator<String> {
-                    guard let element = iterator.next()?.add(utc_offset_seconds) else {
+                    guard let raw = iterator.next() else {
                         return nil
                     }
+                    if raw.isNoData {
+                        return "null"
+                    }
+                    let element = raw.add(utc_offset_seconds)
                     if quotedString {
                         return "\"\(element.iso8601_YYYY_MM_dd)\""
                     }
@@ -434,9 +438,13 @@ extension Sequence where Element == Timestamp {
             }
 
             return AnyIterator<String> {
-                guard let element = iterator.next()?.add(utc_offset_seconds) else {
+                guard let raw = iterator.next() else {
                     return nil
                 }
+                if raw.isNoData {
+                    return "null"
+                }
+                let element = raw.add(utc_offset_seconds)
                 var time = element.timeIntervalSince1970
                 if dateCalculated != time - time.moduloPositive(86400) {
                     dateCalculated = time - time.moduloPositive(86400)
@@ -468,6 +476,9 @@ extension Sequence where Element == Timestamp {
                 return AnyIterator<String> {
                     guard let element = iterator.next() else {
                         return nil
+                    }
+                    if element.isNoData {
+                        return "null"
                     }
                     return "\(element.timeIntervalSince1970)"
                 }
