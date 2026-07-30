@@ -1136,6 +1136,39 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (KnmiDomain.harmonie_arome_europe, KnmiVariable.self),
                 (KnmiDomain.harmonie_arome_netherlands, KnmiVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .meteofrance_seamless, .meteofrance_mix:
+            return .multiple([
+                (MeteoFranceDomain.arpege_world, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arpege_europe, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france_hd, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france_15min, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
+            ])
+        case .meteofrance_arpege_seamless, .arpege_seamless:
+            return .multiple([
+                (MeteoFranceDomain.arpege_world, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arpege_europe, MeteoFranceVariable.self)
+            ])
+        case .meteofrance_arome_seamless, .arome_seamless:
+            return .multiple([
+                (MeteoFranceDomain.arome_france, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france_hd, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france_15min, MeteoFranceVariable.self),
+                (MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
+            ])
+        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
+            return .single(MeteoFranceDomain.arpege_world, MeteoFranceVariable.self)
+        case .meteofrance_arpege_europe, .arpege_europe:
+            return .single(MeteoFranceDomain.arpege_europe, MeteoFranceVariable.self)
+        case .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025:
+            return .single(MeteoFranceDomain.arome_france, MeteoFranceVariable.self)
+        case .meteofrance_arome_france_hd, .arome_france_hd:
+            return .single(MeteoFranceDomain.arome_france_hd, MeteoFranceVariable.self)
+        case .meteofrance_arome_france_15min:
+            return .single(MeteoFranceDomain.arome_france_15min, MeteoFranceVariable.self)
+        case .meteofrance_arome_france_hd_15min:
+            return .single(MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return .multiple([
                 (IconDomains.iconEps, ProbabilityVariable.self),
@@ -1399,23 +1432,35 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 ])
             }
             // For western europe, use arome models
-            if (42.10..<51.32).contains(lat), (-6.18..<8.35).contains(lon), let arome_france_hd = try await MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let arome_france_hd_15min = try await MeteoFranceReader(domain: .arome_france_hd_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let arome_france = try await MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let arome_france_15min = try await MeteoFranceReader(domain: .arome_france_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let arpege_europe = try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMultiSameType([
-                    gfsProbabilites.asOptionalReader,
-                    iconProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
-                    icon,
-                    ifsHres.asOptionalReader,
-                    arpege_europe?.asOptionalReader,
-                    arome_france?.asOptionalReader,
-                    arome_france_hd.asOptionalReader,
-                    arome_france_15min?.asOptionalReader,
-                    arome_france_hd_15min?.asOptionalReader
-                ])
+            if (42.10..<51.32).contains(lat), (-6.18..<8.35).contains(lon) {
+                var meteofranceElevation = elevation
+                let aromeFranceHd15Min = try await MeteoFranceDomain.arome_france_hd_15min.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
+                if meteofranceElevation.isNaN, let aromeFranceHd15Min {
+                    meteofranceElevation = aromeFranceHd15Min.resolvedTargetElevation
+                }
+                let aromeFrance15Min = try await MeteoFranceDomain.arome_france_15min.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
+                if meteofranceElevation.isNaN, let aromeFrance15Min {
+                    meteofranceElevation = aromeFrance15Min.resolvedTargetElevation
+                }
+                if let aromeFranceHd = try await MeteoFranceDomain.arome_france_hd.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options) {
+                    if meteofranceElevation.isNaN {
+                        meteofranceElevation = aromeFranceHd.resolvedTargetElevation
+                    }
+                    let aromeFrance = try await MeteoFranceDomain.arome_france.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
+                    let arpegeEurope = try await MeteoFranceDomain.arpege_europe.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
+                    return MultiDomains.hourlyToMultiSameType([
+                        gfsProbabilites.asOptionalReader,
+                        iconProbabilities.asOptionalReader,
+                        gfs.asOptionalReader,
+                        icon,
+                        ifsHres.asOptionalReader,
+                        arpegeEurope,
+                        aromeFrance,
+                        aromeFranceHd,
+                        aromeFrance15Min,
+                        aromeFranceHd15Min
+                    ])
+                }
             }
             // For Northern Europe and Iceland use DMI Harmonie
             if (44..<66).contains(lat), let dmiEurope = try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
@@ -1704,26 +1749,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_hgefs025_ensemble_mean:
             return []
 //            return try await GfsGraphCastReader(domain: .hgefs025_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .meteofrance_mix, .meteofrance_seamless:
-            return (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []).compactMap({ $0 })
-        case .meteofrance_arpege_seamless, .arpege_seamless:
-            return (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []).compactMap({ $0 })
-        case .meteofrance_arome_seamless, .arome_seamless:
-            return try await MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
-            return try await MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .meteofrance_arpege_europe, .arpege_europe:
-            return (try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []).compactMap({ $0 })
-        case .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025:
-            // Note: AROME PI 15min is not used for consistency here
-            return try await MeteoFranceMixer(domains: [.arome_france], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arome_france_hd, .arome_france_hd:
-            // Note: AROME PI 15min is not used for consistency here
-            return try await MeteoFranceMixer(domains: [.arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arome_france_15min:
-            return try await MeteoFranceMixer(domains: [.arome_france_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arome_france_hd_15min:
-            return try await MeteoFranceMixer(domains: [.arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+        case .meteofrance_mix, .meteofrance_seamless,
+             .meteofrance_arpege_seamless, .arpege_seamless,
+             .meteofrance_arome_seamless, .arome_seamless,
+             .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025,
+             .meteofrance_arpege_europe, .arpege_europe,
+             .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025,
+             .meteofrance_arome_france_hd, .arome_france_hd,
+             .meteofrance_arome_france_15min,
+             .meteofrance_arome_france_hd_15min:
+            return [] // migrated
         case .jma_mix, .jma_seamless:
             return try await JmaMixer(domains: [.gsm, .msm_upper_level, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .jma_msm:
@@ -2015,14 +2050,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GfsGraphCastDomain.aigefs025
         case .ncep_hgefs025_ensemble_mean:
             return GfsGraphCastDomain.hgefs025_ensemble_mean
-        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
-            return MeteoFranceDomain.arpege_world
-        case .meteofrance_arpege_europe, .arpege_europe:
-            return MeteoFranceDomain.arpege_europe
-        case .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025:
-            return MeteoFranceDomain.arome_france
-        case .meteofrance_arome_france_hd, .arome_france_hd:
-            return MeteoFranceDomain.arome_france_hd
+        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025,
+             .meteofrance_arpege_europe, .arpege_europe,
+             .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025,
+             .meteofrance_arome_france_hd, .arome_france_hd:
+            return nil // migrated
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return nil // migrated
         case .icon_eu, .dwd_icon_eu:
@@ -2081,22 +2113,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .ncep_nbm_conus:
             return NbmDomain.nbm_conus
-        case .meteofrance_seamless:
-            return nil
-        case .meteofrance_mix:
-            return nil
-        case .meteofrance_arpege_seamless:
-            return nil
-        case .meteofrance_arome_seamless:
-            return nil
-        case .meteofrance_arome_france_hd_15min:
-            return MeteoFranceDomain.arome_france_hd_15min
-        case .meteofrance_arome_france_15min:
-            return MeteoFranceDomain.arome_france_15min
-        case .arpege_seamless:
-            return nil
-        case .arome_seamless:
-            return nil
+        case .meteofrance_seamless, .meteofrance_mix,
+             .meteofrance_arpege_seamless, .arpege_seamless,
+             .meteofrance_arome_seamless, .arome_seamless,
+             .meteofrance_arome_france_hd_15min,
+             .meteofrance_arome_france_15min:
+            return nil // migrated
         case .jma_seamless:
             return nil
         case .jma_mix:
@@ -2292,30 +2314,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // defined in the upper function
         case .ncep_hgefs025_ensemble_mean:
             return nil // defined in the upper function
-        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
-            return try await MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
-        case .meteofrance_arpege_europe, .arpege_europe, .meteofrance_arome_france0025:
-            return try await MeteoFranceReader(domain: .arpege_europe, gridpoint: gridpoint, options: options)
-        case .meteofrance_arome_france, .arome_france:
-            return try await MeteoFranceReader(domain: .arome_france, gridpoint: gridpoint, options: options)
-        case .meteofrance_arome_france_hd, .arome_france_hd:
-            return try await MeteoFranceReader(domain: .arome_france_hd, gridpoint: gridpoint, options: options)
-        case .meteofrance_seamless:
-            return nil
-        case .meteofrance_mix:
-            return nil
-        case .meteofrance_arpege_seamless:
-            return nil
-        case .meteofrance_arome_seamless:
-            return nil
-        case .meteofrance_arome_france_hd_15min:
-            return try await MeteoFranceReader(domain: .arome_france_hd_15min, gridpoint: gridpoint, options: options)
-        case .meteofrance_arome_france_15min:
-            return try await MeteoFranceReader(domain: .arome_france_15min, gridpoint: gridpoint, options: options)
-        case .arpege_seamless:
-            return nil
-        case .arome_seamless:
-            return nil
+        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025,
+             .meteofrance_arpege_europe, .arpege_europe,
+             .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025,
+             .meteofrance_arome_france_hd, .arome_france_hd,
+             .meteofrance_seamless, .meteofrance_mix,
+             .meteofrance_arpege_seamless, .arpege_seamless,
+             .meteofrance_arome_seamless, .arome_seamless,
+             .meteofrance_arome_france_hd_15min,
+             .meteofrance_arome_france_15min:
+            return nil // migrated
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return nil // migrated
         case .icon_eu, .dwd_icon_eu:

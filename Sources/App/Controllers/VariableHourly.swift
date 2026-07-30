@@ -623,6 +623,30 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     let reader: Reader
     let options: GenericReaderOptions
 
+    private var isMeteoFranceForecastDomain: Bool {
+        switch reader.domain.domainRegistry {
+        case .meteofrance_arome_france0025,
+             .meteofrance_arome_france_hd,
+             .meteofrance_arome_france0025_15min,
+             .meteofrance_arome_france_hd_15min,
+             .meteofrance_arpege_europe,
+             .meteofrance_arpege_world025:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func meteoFranceShortwaveRadiation() -> DerivedMapping<Reader.MixingVar>? {
+        guard let shortwave = Reader.variableFromString("shortwave_radiation") else {
+            return nil
+        }
+        return .one(.raw(shortwave)) { shortwave, _ in
+            let correction = Float(10_000_000) / Float(3600 * 3600)
+            return DataAndUnit(shortwave.data.map { $0 * correction }, shortwave.unit)
+        }
+    }
+
     /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
     static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
         switch (domain, level) {
@@ -785,6 +809,62 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             case .diffuse_radiation_spread:
                 // Cannot derive a difference spread without covariance or member-level data.
                 return nil
+            default:
+                break
+            }
+        }
+
+        if isMeteoFranceForecastDomain {
+            switch variable {
+            case .shortwave_radiation:
+                return meteoFranceShortwaveRadiation()
+            case .diffuse_radiation:
+                guard let shortwave = meteoFranceShortwaveRadiation() else {
+                    return nil
+                }
+                return .one(.mapped(shortwave)) { shortwave, time in
+                    let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                    return DataAndUnit(diffuse, shortwave.unit)
+                }
+            case .direct_radiation:
+                guard let shortwave = meteoFranceShortwaveRadiation() else {
+                    return nil
+                }
+                return .one(.mapped(shortwave)) { shortwave, time in
+                    let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                    return DataAndUnit(zip(shortwave.data, diffuse).map(-), shortwave.unit)
+                }
+            case .wind_speed_120m:
+                return .windSpeed(
+                    u: Reader.variableFromString("wind_u_component_150m"),
+                    v: Reader.variableFromString("wind_v_component_150m"),
+                    levelFrom: 150,
+                    levelTo: 120
+                )
+            case .wind_direction_120m:
+                return .windDirection(
+                    u: Reader.variableFromString("wind_u_component_150m"),
+                    v: Reader.variableFromString("wind_v_component_150m")
+                )
+            case .temperature_120m:
+                return .direct(Reader.variableFromString("temperature_150m"))
+            case .rain:
+                guard
+                    let precipitation = Reader.variableFromString("precipitation"),
+                    let snowfallWaterEquivalent = getDeriverMap(variable: .snowfall_water_equivalent)
+                else {
+                    return nil
+                }
+                return .two(.raw(precipitation), .mapped(snowfallWaterEquivalent)) { precipitation, snowfallWaterEquivalent, _ in
+                    return DataAndUnit(zip(precipitation.data, snowfallWaterEquivalent.data).map(-), precipitation.unit)
+                }
+            case .showers:
+                guard let precipitation = Reader.variableFromString("precipitation") else {
+                    return nil
+                }
+                return .one(.raw(precipitation)) { precipitation, _ in
+                    return DataAndUnit(precipitation.data.map { min($0, 0) }, precipitation.unit)
+                }
             default:
                 break
             }
