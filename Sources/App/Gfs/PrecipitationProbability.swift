@@ -52,14 +52,6 @@ enum ProbabilityReader {
         ].compactMap({ $0 }))
     }
 
-    /// Reader for probabilities based on ICON EPS
-    static func makeIconGlobalReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable> {
-        guard let reader = try await GenericReader<IconDomains, ProbabilityVariable>(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-        }
-        return reader
-    }
-
     /// Reader for probabilities based on NCEP NBM
     static func makeNbmReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<NbmDomain, ProbabilityVariable>? {
         return try await GenericReader<NbmDomain, ProbabilityVariable>(domain: .nbm_conus, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -70,16 +62,6 @@ enum ProbabilityReader {
 //        return try await GenericReader<MeteoFranceDomain, ProbabilityVariable>(domain: .arpege_europe_probabilities, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
 //    }
 
-    /// Reader for probabilities based on ICON EU EPS
-    static func makeIconEuReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable>? {
-        return try await GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-    }
-
-    /// Reader for probabilities based on ICON D2 EPS
-    static func makeIconD2Reader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable>? {
-        return try await GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-    }
-    
     /// Reader for probabilities based on AIGEFS
     static func makeAigefsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<GfsGraphCastDomain, ProbabilityVariable>? {
         return try await GenericReader<GfsGraphCastDomain, ProbabilityVariable>(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)

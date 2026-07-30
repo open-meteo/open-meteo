@@ -986,55 +986,81 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             local: [(any GenericDomain, any GenericVariable.Type)],
             precipitationProb: (any GenericDomain)?
         )
+        case singleWithSupplementalDomains(
+            any GenericDomain,
+            any GenericVariable.Type,
+            supplemental: [(any GenericDomain, any GenericVariable.Type)],
+            precipitationProb: (any GenericDomain)?
+        )
+
+        private static func makeDomainReaders(
+            sources: [(any GenericDomain, any GenericVariable.Type)],
+            lat: Float,
+            lon: Float,
+            elevation: Float,
+            mode: GridSelectionMode,
+            options: GenericReaderOptions
+        ) async throws -> (readers: [any GenericReaderOptionalProtocol<ForecastVariable>], elevation: Float) {
+            var elevation = elevation
+            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.reversed().asyncCompactMap { source in
+                guard let reader = try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                    return nil
+                }
+                if elevation.isNaN {
+                    elevation = reader.resolvedTargetElevation
+                }
+                return reader
+            }.reversed()
+            return (readers, elevation)
+        }
         
         var singleDomain: (any GenericDomain)? {
             switch self {
-            case .single(let domain, _): return domain
-            case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _): return domain
-            default: return nil
+            case .single(let domain, _),
+                 .singleWithPrecipitationProbability(let domain, _, _),
+                 .singleWithSupplementalDomains(let domain, _, _, _):
+                return domain
+            default:
+                return nil
             }
         }
-        
-        func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-            func makeDerivedHourlyReaders(_ domains: [(any GenericDomain, any GenericVariable.Type)]) async throws -> [any GenericReaderOptionalProtocol<ForecastVariable>] {
-                return try await domains.asyncCompactMap { domainAndVariable in
-                    let domain = domainAndVariable.0
-                    let variable = domainAndVariable.1
-                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                }
-            }
 
+        func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
             switch self {
             case .single(let domain, let variable):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
-                guard let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            case .singleWithPrecipitationProbability(let domain, let variable, let precipitationProb):
+                let forecast = try await Self.makeDomainReaders(sources: [(domain, variable)], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                guard let reader = forecast.readers.first else {
                     return nil
                 }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([reader, prob].compactMap({$0}))
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([prob].compactMap { $0 } + [reader])
             case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
-                let readers = try await makeDerivedHourlyReaders(domains)
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType(readers + [prob].compactMap({$0}))
+                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + forecast.readers)
             case .multiple(let domains):
-                return MultiDomains.hourlyToMultiSameType(try await makeDerivedHourlyReaders(domains))
+                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return MultiDomains.hourlyToMultiSameType(forecast.readers)
             case .seamlessLocal(let global, let local, let precipitationProb):
-                let localReaders = try await makeDerivedHourlyReaders(local)
-                guard !localReaders.isEmpty else {
+                let localForecast = try await Self.makeDomainReaders(sources: local, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                guard !localForecast.readers.isEmpty else {
                     return nil
                 }
-                let globalReaders = try await makeDerivedHourlyReaders(global)
-                let probabilityReaders: [any GenericReaderOptionalProtocol<ForecastVariable>]
-                if let precipitationProb,
-                   let probabilityReader = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                    probabilityReaders = [probabilityReader.asOptionalReader]
-                } else {
-                    probabilityReaders = []
+                let globalForecast = try await Self.makeDomainReaders(sources: global, lat: lat, lon: lon, elevation: localForecast.elevation, mode: mode, options: options)
+                let probability = try await precipitationProb?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: globalForecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + globalForecast.readers + localForecast.readers)
+            case .singleWithSupplementalDomains(let domain, let variable, let supplemental, let precipitationProb):
+                let forecast = try await Self.makeDomainReaders(sources: [(domain, variable)] + supplemental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                guard !forecast.readers.isEmpty else {
+                    return nil
                 }
-                return MultiDomains.hourlyToMultiSameType(globalReaders + localReaders + probabilityReaders)
+                let probability = try await precipitationProb?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + forecast.readers)
             }
         }
+
     }
     
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
@@ -1110,6 +1136,33 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (KnmiDomain.harmonie_arome_europe, KnmiVariable.self),
                 (KnmiDomain.harmonie_arome_netherlands, KnmiVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .icon_seamless, .icon_mix, .dwd_icon_seamless:
+            return .multiple([
+                (IconDomains.iconEps, ProbabilityVariable.self),
+                (IconDomains.iconEuEps, ProbabilityVariable.self),
+                (IconDomains.icon, IconVariable.self),
+                (IconDomains.iconEu, IconVariable.self),
+                (IconDomains.iconD2, IconVariable.self),
+                (IconDomains.iconD2_15min, IconVariable.self)
+            ])
+        case .icon_global, .dwd_icon_global, .dwd_icon:
+            return .singleWithPrecipitationProbability(IconDomains.icon, IconVariable.self, precipitationProb: IconDomains.iconEps)
+        case .icon_eu, .dwd_icon_eu:
+            return .singleWithPrecipitationProbability(IconDomains.iconEu, IconVariable.self, precipitationProb: IconDomains.iconEuEps)
+        case .icon_d2, .dwd_icon_d2:
+            return .singleWithSupplementalDomains(
+                IconDomains.iconD2,
+                IconVariable.self,
+                supplemental: [(IconDomains.iconD2_15min, IconVariable.self)],
+                precipitationProb: IconDomains.iconD2Eps
+            )
+        case .dwd_icon_d2_15min:
+            return .single(IconDomains.iconD2_15min, IconVariable.self)
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
+            return .multiple([
+                (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
+                (IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self)
+            ])
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .multiple([
                 (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
@@ -1269,14 +1322,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
     }
 
+    static func hourlyToMultiSameType(_ readers: [(any GenericReaderOptionalProtocol<ForecastVariable>)?]) -> ForecastReaderResult? {
+        return hourlyToMultiSameType(readers.compactMap { $0 })
+    }
+
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
         if let d = getDomainAndVariable() {
-            return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
+            return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         
         switch self {
         case .best_match:
-            guard let icon: any GenericReaderProtocol = try await IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            guard let icon = try await IconDomains.icon.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1292,17 +1349,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For Netherlands and Belgium use KNMI, IFS and ICON
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = [
-                    iconEu?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?,
-                    iconD2?.asOptionalReader as (any GenericReaderOptionalProtocol<ForecastVariable>)?
-                ].compactMap { $0 }
+                let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconD2 = try await IconDomains.iconD2.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
                     gfsUvIndex,
-                    icon.asOptionalReader
-                ] + iconReaders + [
+                    icon,
+                    iconEu,
+                    iconD2,
                     ifs025.asOptionalReader,
                     ifsHres.asOptionalReader,
                     knmiNetherlands
@@ -1313,7 +1367,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard let mapping = Self.metno_seamless.getDomainAndVariable() else {
                     throw ModelError.domainInitFailed(domain: Self.metno_seamless.rawValue)
                 }
-                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
+                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
             if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
@@ -1324,16 +1378,25 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
                     (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
                 ], precipitationProb: EcmwfDomain.ifs025_ensemble)
-                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, biasCorrection: biasCorrection, include15Min: include15Min)
+                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             // If Icon-d2 is available, use icon domains
-            if let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-               let iconD2_15min = try await IconReader(domain: .iconD2_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if let iconD2 = try await IconDomains.iconD2.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+               let iconD2_15min = try await IconDomains.iconD2_15min.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 // TODO: check how out of projection areas are handled
-                guard let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                guard let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
-                return MultiDomains.hourlyToMulti(include15Min ? [ifsProbabilities, iconProbabilities, gfs, ifsHres, icon, iconEu, iconD2, iconD2_15min] : [ifsProbabilities, iconProbabilities, gfs, ifsHres, icon, iconEu, iconD2])
+                return MultiDomains.hourlyToMultiSameType([
+                    ifsProbabilities.asOptionalReader,
+                    iconProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    ifsHres.asOptionalReader,
+                    icon,
+                    iconEu,
+                    iconD2,
+                    include15Min ? iconD2_15min : nil
+                ])
             }
             // For western europe, use arome models
             if (42.10..<51.32).contains(lat), (-6.18..<8.35).contains(lon), let arome_france_hd = try await MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
@@ -1341,30 +1404,78 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let arome_france = try await MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arome_france_15min = try await MeteoFranceReader(domain: .arome_france_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arpege_europe = try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMulti(Array([gfsProbabilites, iconProbabilities, gfs, icon, ifsHres, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted()))
+                return MultiDomains.hourlyToMultiSameType([
+                    gfsProbabilites.asOptionalReader,
+                    iconProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    icon,
+                    ifsHres.asOptionalReader,
+                    arpege_europe?.asOptionalReader,
+                    arome_france?.asOptionalReader,
+                    arome_france_hd.asOptionalReader,
+                    arome_france_15min?.asOptionalReader,
+                    arome_france_hd_15min?.asOptionalReader
+                ])
             }
             // For Northern Europe and Iceland use DMI Harmonie
             if (44..<66).contains(lat), let dmiEurope = try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMulti(Array([gfsProbabilites, ifsProbabilities, gfs, icon, iconEu, ifs025, ifsHres, dmiEurope].compacted()))
+                let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return MultiDomains.hourlyToMultiSameType([
+                    gfsProbabilites.asOptionalReader,
+                    ifsProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    icon,
+                    iconEu,
+                    ifs025.asOptionalReader,
+                    ifsHres.asOptionalReader,
+                    dmiEurope.asOptionalReader
+                ])
             }
             // For North America, use HRRR
             if let hrrr = try await GfsReader(domains: include15Min ? [.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMulti(Array([gfsProbabilites, nbmProbabilities, icon, gfs, hrrr].compacted()))
+                return MultiDomains.hourlyToMultiSameType([
+                    gfsProbabilites.asOptionalReader,
+                    nbmProbabilities?.asOptionalReader,
+                    icon,
+                    gfs.asOptionalReader,
+                    hrrr.asOptionalReader
+                ])
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if (22.4 + 5..<47.65 - 5).contains(lat), (120 + 5..<150 - 5).contains(lon), let jma_msm = try await JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options), let jma_msm_upper = try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return MultiDomains.hourlyToMulti([gfsProbabilites, ifsProbabilities, gfs, icon, ifsHres, jma_msm_upper, jma_msm])
+                return MultiDomains.hourlyToMultiSameType([
+                    gfsProbabilites.asOptionalReader,
+                    ifsProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    icon,
+                    ifsHres.asOptionalReader,
+                    jma_msm_upper.asOptionalReader,
+                    jma_msm.asOptionalReader
+                ])
             }
 
             // Remaining eastern europe
-            if let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return MultiDomains.hourlyToMulti([gfsProbabilites, ifsProbabilities, iconProbabilities, gfs, ifsHres, icon, iconEu])
+            if let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                return MultiDomains.hourlyToMultiSameType([
+                    gfsProbabilites.asOptionalReader,
+                    ifsProbabilities.asOptionalReader,
+                    iconProbabilities.asOptionalReader,
+                    gfs.asOptionalReader,
+                    ifsHres.asOptionalReader,
+                    icon,
+                    iconEu
+                ])
             }
 
             // Remaining parts of the world
-            return MultiDomains.hourlyToMulti([gfsProbabilites, ifsProbabilities, gfs, icon, ifsHres])
+            return MultiDomains.hourlyToMultiSameType([
+                gfsProbabilites.asOptionalReader,
+                ifsProbabilities.asOptionalReader,
+                gfs.asOptionalReader,
+                icon,
+                ifsHres.asOptionalReader
+            ])
             
         case .ecmwf_seasonal_seamless, .ecmwf_seasonal_ensemble_mean_seamless:
             let isEnsembleMean = self == .ecmwf_seasonal_ensemble_mean_seamless
@@ -1376,7 +1487,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             
             let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
+            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
             let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: EcmwfEC46Variable6Hourly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
@@ -1518,15 +1629,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
-        if let d = getDomainAndVariable() {
-            switch d {
-            case .single(let domain, let variable):
+        if let mapping = getDomainAndVariable() {
+            switch mapping {
+            case .single(let domain, let variable),
+                 .singleWithPrecipitationProbability(let domain, let variable, _),
+                 .singleWithSupplementalDomains(let domain, let variable, _, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-            case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: _):
-                return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-            case .multipleWithPrecipitationProbability(_, precipitationProb: _):
-                return (nil, nil, nil, nil)
-            case .multiple(_), .seamlessLocal:
+            case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
         }
@@ -1629,19 +1738,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .jms_gsm, .jma_gsm:
             return try await JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
-            let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [iconProbabilities] + (try await IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+            return [] // migrated
         case .icon_global, .dwd_icon_global, .dwd_icon:
-            let iconProbabilities = try await ProbabilityReader.makeIconGlobalReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [iconProbabilities] + (try await IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
+            return [] // migrated
         case .icon_eu, .dwd_icon_eu:
-            let iconProbabilities = try await ProbabilityReader.makeIconEuReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (iconProbabilities.flatMap({ [$0] }) ?? []) + (try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
+            return [] // migrated
         case .icon_d2, .dwd_icon_d2:
-            let iconProbabilities = try await ProbabilityReader.makeIconD2Reader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (iconProbabilities.flatMap({ [$0] }) ?? []) + (try await IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+            return [] // migrated
         case .dwd_icon_d2_15min:
-            return (try await IconMixer(domains: [.iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+            return [] // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs025:
@@ -1757,9 +1862,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteoswiss_icon_seamless:
             return [] // migrated
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
-            /// Note: ICON D2 EPS has been excluded, because it only provides 20 members and noticable different results compared to ICON EU EPS
-            /// See: https://github.com/open-meteo/open-meteo/issues/876
-            return try await IconMixer(domains: [.iconEps, .iconEuEps], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            return [] // migrated
         case .icon_global_eps, .dwd_icon_global_eps:
             return [] // migrated
         case .icon_eu_eps, .dwd_icon_eu_eps:
@@ -1888,16 +1991,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     var genericDomain: (any GenericDomain)? {
         if let d = getDomainAndVariable() {
-            switch d {
-            case .single(let domain, _):
-                return domain
-            case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _):
-                return domain
-            case .multipleWithPrecipitationProbability(_, precipitationProb: _):
-                return nil
-            case .multiple(_), .seamlessLocal:
-                return nil
-            }
+            return d.singleDomain
         }
         
         switch self {
@@ -1930,13 +2024,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_arome_france_hd, .arome_france_hd:
             return MeteoFranceDomain.arome_france_hd
         case .icon_global, .dwd_icon_global, .dwd_icon:
-            return IconDomains.icon
+            return nil // migrated
         case .icon_eu, .dwd_icon_eu:
-            return IconDomains.iconEu
+            return nil // migrated
         case .icon_d2, .dwd_icon_d2:
-            return IconDomains.iconD2
+            return nil // migrated
         case .dwd_icon_d2_15min:
-            return IconDomains.iconD2_15min
+            return nil // migrated
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
         case .ecmwf_ifs025:
@@ -2223,13 +2317,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .arome_seamless:
             return nil
         case .icon_global, .dwd_icon_global, .dwd_icon:
-            return try await IconReader(domain: .icon, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .icon_eu, .dwd_icon_eu:
-            return try await IconReader(domain: .iconEu, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .icon_d2, .dwd_icon_d2:
-            return try await IconReader(domain: .iconD2, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .dwd_icon_d2_15min:
-            return try await IconReader(domain: .iconD2_15min, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs025:

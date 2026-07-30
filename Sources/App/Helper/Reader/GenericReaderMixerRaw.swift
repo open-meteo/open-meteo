@@ -24,8 +24,8 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
 }
 
 extension GenericReaderMixer {
+    /// Initialises highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
     public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
 
         let reader: [Reader] = try await domains.reversed().asyncCompactMap { domain -> (Reader?) in
