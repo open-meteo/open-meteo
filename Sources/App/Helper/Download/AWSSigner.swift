@@ -223,7 +223,7 @@ public struct AWSSigner {
         canonicalRequestHash.update(headerPayloadHash)
         let canonicalRequestHashHex = canonicalRequestHash.finalize().hex
 
-        let signingKey = getSignatureKey(date: String(dateStamp))
+        let signingKey = getSignatureKey(date: dateStamp)
         var stringToSignHmac = HMAC<SHA256>(key: SymmetricKey(data: signingKey))
         stringToSignHmac.update("AWS4-HMAC-SHA256\n")
         stringToSignHmac.update(amzDate)
@@ -458,7 +458,7 @@ public struct AWSSigner {
         case invalidSignature
     }
 
-    func getSignatureKey(date: String) -> HashedAuthenticationCode<SHA256> {
+    func getSignatureKey<T: StringProtocol>(date: T) -> HashedAuthenticationCode<SHA256> {
         let kDate = date.hmacSHA256(key: Data("AWS4\(secretKey)".utf8))
         let kRegion = region.hmacSHA256(key: kDate)
         let kService = service.hmacSHA256(key: kRegion)
@@ -501,7 +501,7 @@ extension DataProtocol {
     }
 }
 
-fileprivate extension String {
+fileprivate extension StringProtocol {
     func hmacSHA256<D: ContiguousBytes>(key: D) -> HashedAuthenticationCode<SHA256> {
         let key = SymmetricKey(data: key)
         return self.withContiguousStorageIfAvailable({
