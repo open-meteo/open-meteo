@@ -72,22 +72,6 @@ struct S3DataController: RouteCollection {
                     }
                 }
             }
-
-            for (key, value) in env where key.hasPrefix("S3_UPLOAD_CREDENTIALS_") {
-                if let parsed = parseCredential(value) {
-                    credentials.insert(parsed)
-                }
-            }
-
-            let keyPrefix = "S3_UPLOAD_KEY_"
-            for (keyName, keyValue) in env where keyName.hasPrefix(keyPrefix) {
-                let suffix = String(keyName.dropFirst(keyPrefix.count))
-                let secretName = "S3_UPLOAD_SECRET_\(suffix)"
-                if let secretValue = env[secretName], !keyValue.isEmpty, !secretValue.isEmpty {
-                    credentials.insert(.init(accessKey: keyValue, secretKey: secretValue))
-                }
-            }
-
             return Array(credentials)
         }
 
@@ -278,7 +262,9 @@ struct S3DataController: RouteCollection {
 
     func putObject(_ req: Request) async throws -> Response {
         try ensureUploadCredentialsAvailable()
-        let body = try requestBodyData(req)
+        guard let body = req.body.data else {
+            throw Abort(.badRequest, reason: "Expected body payload")
+        }
         try verifyUploadSignature(req: req, body: body)
         struct Params: Codable {
             let uploadId: String?
@@ -301,7 +287,7 @@ struct S3DataController: RouteCollection {
 
     func postObject(_ req: Request) async throws -> Response {
         try ensureUploadCredentialsAvailable()
-        let body = try requestBodyData(req)
+        let body = req.body.data ?? ByteBuffer()
         try verifyUploadSignature(req: req, body: body)
         struct Params: Codable {
             let uploadId: String?
@@ -337,8 +323,7 @@ struct S3DataController: RouteCollection {
 
     func deleteObject(_ req: Request) async throws -> Response {
         try ensureUploadCredentialsAvailable()
-        let body = try requestBodyData(req)
-        try verifyUploadSignature(req: req, body: body)
+        try verifyUploadSignature(req: req, body: ByteBuffer())
         struct Params: Codable {
             let uploadId: String?
         }
@@ -354,13 +339,15 @@ struct S3DataController: RouteCollection {
         return Response(status: .noContent)
     }
 
-    private func uploadSinglePut(req: Request, body: Data) async throws {
+    private func uploadSinglePut(req: Request, body: ByteBuffer) async throws {
         let resolved = try resolveUploadTarget(forPath: req.url.path)
         let uploadId = String(UInt64.random(in: 1_000_000_000...9_999_999_999_999_999_999))
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
 
         try await ensureParentDirectoryExists(forFileAt: resolved.absolutePath)
-        try await body.write(toFileAt: FilePath(tempPath), options: .newFile(replaceExisting: true))
+        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
+            try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
+        }
         try await FileSystem.shared.replaceItem(at: FilePath(resolved.absolutePath), withItemAt: FilePath(tempPath))
         try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: resolved.absolutePath)
         try await replicateSinglePut(req: req, resolved: resolved, body: body)
@@ -406,8 +393,8 @@ struct S3DataController: RouteCollection {
         )
     }
 
-    private func writeMultipartPart(resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: String, partNumber: Int, body: Data) async throws {
-        guard body.count <= Self.multipartChunkSize else {
+    private func writeMultipartPart(resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: String, partNumber: Int, body: ByteBuffer) async throws {
+        guard body.readableBytes <= Self.multipartChunkSize else {
             throw Abort(.badRequest, reason: "Chunk size exceeds 8MB")
         }
 
@@ -417,7 +404,7 @@ struct S3DataController: RouteCollection {
             throw Abort(.notFound, reason: "Multipart upload not found")
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        guard offset + Int64(body.count) <= tempInfo.size else {
+        guard offset + Int64(body.readableBytes) <= tempInfo.size else {
             throw Abort(.badRequest, reason: "Part exceeds allocated file size")
         }
 
@@ -436,9 +423,9 @@ struct S3DataController: RouteCollection {
         try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: resolved.absolutePath)
     }
 
-    private func makeUploadPartResponse(body: Data) -> Response {
+    private func makeUploadPartResponse(body: ByteBuffer) -> Response {
         var headers = HTTPHeaders()
-        headers.add(name: "ETag", value: "\"\(body.sha256Hex)\"")
+        headers.add(name: "ETag", value: "\"\(body.readableBytesView.sha256Hex)\"")
         return Response(status: .ok, headers: headers)
     }
 
@@ -448,8 +435,8 @@ struct S3DataController: RouteCollection {
         }
     }
 
-    private func verifyUploadSignature(req: Request, body: Data) throws {
-        let payloadHash = body.sha256Hex
+    private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
+        let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
         guard let host else {
             throw Abort(.unauthorized, reason: "Missing Host header")
@@ -473,14 +460,9 @@ struct S3DataController: RouteCollection {
         throw Abort(.unauthorized, reason: reason)
     }
 
-    private func requestBodyData(_ req: Request) throws -> Data {
-        let body = req.body.data ?? ByteBuffer()
-        return Data(body.readableBytesView)
-    }
-
     private func ensureParentDirectoryExists(forFileAt path: String) async throws {
-        let parent = FilePath(path).removingLastComponent()
-        try await FileSystem.shared.createDirectory(at: parent, withIntermediateDirectories: true)
+        let parent = path.removeLastPathComponent()
+        try await FileSystem.shared.createDirectory(at: FilePath(String(parent)), withIntermediateDirectories: true)
     }
 
     private func allocateMultipartTempFile(resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: String, fileSize: Int64) async throws {
@@ -504,16 +486,18 @@ struct S3DataController: RouteCollection {
         return await req.application.s3ServerHealth.activeServers()
     }
 
-    private func replicateSinglePut(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), body: Data) async throws {
+    private func replicateSinglePut(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), body: ByteBuffer) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         let lastModified = req.headers.first(name: "x-last-modified")
+        let bodyHash = body.readableBytesView.sha256Hex
+        let bodyLength = body.readableBytes
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath))
             request.method = .PUT
-            request.body = .bytes(ByteBuffer(data: body))
-            request.headers.add(name: "x-amz-content-sha256", value: body.sha256Hex)
-            request.headers.add(name: .contentLength, value: "\(body.count)")
+            request.body = .bytes(body)
+            request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
+            request.headers.add(name: .contentLength, value: "\(bodyLength)")
             if let contentType = req.headers.first(name: .contentType) {
                 request.headers.add(name: .contentType, value: contentType)
             }
@@ -537,15 +521,17 @@ struct S3DataController: RouteCollection {
         }
     }
 
-    private func replicateMultipartPart(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: String, partNumber: Int, body: Data) async throws {
+    private func replicateMultipartPart(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: String, partNumber: Int, body: ByteBuffer) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
+        let bodyHash = body.readableBytesView.sha256Hex
+        let bodyLength = body.readableBytes
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?partNumber=\(partNumber)&uploadId=\(uploadId)")
             request.method = .PUT
-            request.body = .bytes(ByteBuffer(data: body))
-            request.headers.add(name: "x-amz-content-sha256", value: body.sha256Hex)
-            request.headers.add(name: .contentLength, value: "\(body.count)")
+            request.body = .bytes(body)
+            request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
+            request.headers.add(name: .contentLength, value: "\(bodyLength)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
         }
     }
@@ -654,7 +640,7 @@ enum SyncError: AbortError {
     }
 }
 
-fileprivate extension String {
+extension String {
     static let sanitisedPathCharacterSet = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_/").inverted
 
     /// Allow only alpha numerics, dash, underscore and slash
@@ -662,12 +648,16 @@ fileprivate extension String {
         return trimmingCharacters(in: Self.sanitisedPathCharacterSet)
     }
 
+    func removeLastPathComponent() -> Substring {
+        let baseEnd = self.hasSuffix("/") ? self.index(before: self.endIndex) : self.endIndex
+        guard let slashPos = self[..<baseEnd].lastIndex(of: "/") else {
+            return Substring(self)
+        }
+        return self[..<slashPos]
+    }
+    
     func replacingLastPathComponent(with component: String) -> String {
-        var url = URL(fileURLWithPath: self, isDirectory: true)
-        url.deleteLastPathComponent()
-        url.appendPathComponent(component, isDirectory: true)
-        let result = url.path
-        return result.hasSuffix("/") ? result : result + "/"
+        return "\(self.removeLastPathComponent())/\(component)/"
     }
 
     var nilIfEmpty: String? {
