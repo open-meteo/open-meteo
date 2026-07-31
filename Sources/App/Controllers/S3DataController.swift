@@ -280,10 +280,15 @@ struct S3DataController: RouteCollection {
         try ensureUploadCredentialsAvailable()
         let body = try requestBodyData(req)
         try verifyUploadSignature(req: req, body: body)
-        let query = req.url.queryParameters
-
-        if let uploadId = query["uploadId"], let partNumber = query["partNumber"] ?? query["partnumber"] {
-            let part = try parsePartNumber(partNumber)
+        struct Params: Codable {
+            let uploadId: String?
+            let partNumber: Int?
+        }
+        let query = try req.query.decode(Params.self)
+        if let uploadId = query.uploadId, let part = query.partNumber {
+            guard part >= 1 else {
+                throw Abort(.badRequest, reason: "Invalid partNumber")
+            }
             let resolved = try resolveUploadTarget(forPath: req.url.path)
             try await writeMultipartPart(resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
             try await replicateMultipartPart(req: req, resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
@@ -298,23 +303,29 @@ struct S3DataController: RouteCollection {
         try ensureUploadCredentialsAvailable()
         let body = try requestBodyData(req)
         try verifyUploadSignature(req: req, body: body)
-        let query = req.url.queryParameters
-
-        if query["uploads"] != nil {
+        struct Params: Codable {
+            let uploadId: String?
+            let partNumber: Int?
+            let uploads: String?
+        }
+        let query = try req.query.decode(Params.self)
+        if query.uploads != nil {
             let prepared = try await initiateMultipartUpload(req)
             try await replicateMultipartInitiate(req: req, resolved: prepared.resolved, uploadId: prepared.uploadId, fileSize: prepared.fileSize)
             return prepared.response
         }
 
-        if let uploadId = query["uploadId"], let partNumber = query["partNumber"] ?? query["partnumber"] {
-            let part = try parsePartNumber(partNumber)
+        if let uploadId = query.uploadId, let part = query.partNumber {
+            guard part >= 1 else {
+                throw Abort(.badRequest, reason: "Invalid partNumber")
+            }
             let resolved = try resolveUploadTarget(forPath: req.url.path)
             try await writeMultipartPart(resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
             try await replicateMultipartPart(req: req, resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
             return makeUploadPartResponse(body: body)
         }
 
-        if let uploadId = query["uploadId"] {
+        if let uploadId = query.uploadId {
             let resolved = try resolveUploadTarget(forPath: req.url.path)
             try await completeMultipartUpload(req: req, resolved: resolved, uploadId: uploadId)
             try await replicateMultipartComplete(req: req, resolved: resolved, uploadId: uploadId)
@@ -328,8 +339,11 @@ struct S3DataController: RouteCollection {
         try ensureUploadCredentialsAvailable()
         let body = try requestBodyData(req)
         try verifyUploadSignature(req: req, body: body)
-        let query = req.url.queryParameters
-        guard let uploadId = query["uploadId"] else {
+        struct Params: Codable {
+            let uploadId: String?
+        }
+        let query = try req.query.decode(Params.self)
+        guard let uploadId = query.uploadId else {
             throw Abort(.badRequest, reason: "Missing uploadId")
         }
 
@@ -475,13 +489,6 @@ struct S3DataController: RouteCollection {
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
             try await handle.resize(to: .bytes(fileSize))
         }
-    }
-
-    private func parsePartNumber(_ raw: String) throws -> Int {
-        guard let part = Int(raw), part >= 1 else {
-            throw Abort(.badRequest, reason: "Invalid partNumber")
-        }
-        return part
     }
 
     private func validateUploadId(_ raw: String) throws -> String {
@@ -665,19 +672,6 @@ fileprivate extension String {
 
     var nilIfEmpty: String? {
         isEmpty ? nil : self
-    }
-}
-
-fileprivate extension URI {
-    var queryParameters: [String: String] {
-        var queryMap: [String: String] = [:]
-        guard let components = URLComponents(string: self.string) else {
-            return queryMap
-        }
-        for item in components.queryItems ?? [] {
-            queryMap[item.name] = item.value ?? ""
-        }
-        return queryMap
     }
 }
 
