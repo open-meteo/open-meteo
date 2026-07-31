@@ -30,7 +30,7 @@ import NIOFileSystem
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
     static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
-    static let readCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_READ_CREDENTIALS")
+    static let readCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_READ_CREDENTIALS") + Self.uploadCredentials
     static let uploadCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment()
     static let multipartChunkSize = 8 * 1024 * 1024
     static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
