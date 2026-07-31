@@ -21,7 +21,7 @@ import NIOFileSystem
  }
  ```
  
- If S3_UPLOAD_CREDENTIALS is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set
+ If S3_UPLOAD_CREDENTIALS is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set. E.g. AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
  
  If S3_UPLOAD_REPLICATION_SERVERS is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/," all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation
  */
@@ -32,7 +32,7 @@ struct S3DataController: RouteCollection {
     static let multipartChunkSize = 8 * 1024 * 1024
     static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
     static let uploadIdRange = 1_000_000_000...Int.max
-    static let uploadMaximumFileSize = 500 * 2^30 // 500GB
+    static let uploadMaximumFileSize = 500 << 30 // 500GB
 
     func boot(routes: RoutesBuilder) throws {
         if Self.syncApiKeys.isEmpty && Self.uploadCredentials.isEmpty {
@@ -133,7 +133,8 @@ struct S3DataController: RouteCollection {
               path.last == "/",
               !path.hasPrefix("/"),
               !path.contains("//"),
-              path.onlyContainsAlphanumericDashAndSlash else {
+              !path.contains(".."),
+              path.onlyContainsAlphanumericDashSlashDot else {
             throw Abort(.forbidden)
         }
 
@@ -298,15 +299,15 @@ struct S3DataController: RouteCollection {
         struct Params: Codable {
             let uploadId: Int?
             let partNumber: Int?
-            let uploads: String?
         }
-        let query = try req.query.decode(Params.self)
-        if query.uploads != nil {
+        
+        if req.url.query == "uploads" {
             let prepared = try await initiateMultipartUpload(req)
             try await replicateMultipartInitiate(req: req, resolved: prepared.resolved, uploadId: prepared.uploadId, fileSize: prepared.fileSize)
             return prepared.response
         }
 
+        let query = try req.query.decode(Params.self)
         if let uploadId = query.uploadId, let part = query.partNumber {
             guard Self.uploadIdRange.contains(uploadId) else {
                 throw Abort(.badRequest, reason: "Invalid uploadId")
@@ -361,6 +362,7 @@ struct S3DataController: RouteCollection {
 
     private func uploadSinglePut(req: Request, body: ByteBuffer) async throws {
         guard let resolved = resolveObjectPath(req.url.path) else {
+            print(req.url.path)
             throw Abort(.forbidden)
         }
         let uploadId = Int.random(in: Self.uploadIdRange)
@@ -600,7 +602,7 @@ struct S3DataController: RouteCollection {
               path.last != "/",
               !path.contains(".."),
               !path.contains("//"),
-              path.onlyContainsAlphanumericDashAndSlash else {
+              path.onlyContainsAlphanumericDashSlashDot else {
             return nil
         }
         for root in Self.supportedRoots {
@@ -668,13 +670,13 @@ extension String {
         return true
     }
     
-    /// Only contains A-Z, a-z, 0-9, _, - and /
-    var onlyContainsAlphanumericDashAndSlash: Bool {
+    /// Only contains A-Z, a-z, 0-9, _, -  / and .
+    var onlyContainsAlphanumericDashSlashDot: Bool {
         for byte in self.utf8 {
             let isUpperAZ = byte >= 65 && byte <= 90
             let isLowerAZ = byte >= 97 && byte <= 122
             let isDigit = byte >= 48 && byte <= 57
-            let isAllowedSymbol = byte == 95 || byte == 45 || byte == 47 // _ or - or /
+            let isAllowedSymbol = byte == 95 || byte == 45 || byte == 47 || byte == 46 // _ or - or / or .
             guard isUpperAZ || isLowerAZ || isDigit || isAllowedSymbol else {
                 return false
             }
