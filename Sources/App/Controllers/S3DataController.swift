@@ -261,7 +261,6 @@ struct S3DataController: RouteCollection {
     }
 
     func putObject(_ req: Request) async throws -> Response {
-        try ensureUploadCredentialsAvailable()
         guard let body = req.body.data else {
             throw Abort(.badRequest, reason: "Expected body payload")
         }
@@ -286,7 +285,6 @@ struct S3DataController: RouteCollection {
     }
 
     func postObject(_ req: Request) async throws -> Response {
-        try ensureUploadCredentialsAvailable()
         let body = req.body.data ?? ByteBuffer()
         try verifyUploadSignature(req: req, body: body)
         struct Params: Codable {
@@ -322,7 +320,6 @@ struct S3DataController: RouteCollection {
     }
 
     func deleteObject(_ req: Request) async throws -> Response {
-        try ensureUploadCredentialsAvailable()
         try verifyUploadSignature(req: req, body: ByteBuffer())
         struct Params: Codable {
             let uploadId: String?
@@ -429,13 +426,10 @@ struct S3DataController: RouteCollection {
         return Response(status: .ok, headers: headers)
     }
 
-    private func ensureUploadCredentialsAvailable() throws {
+    private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
         guard !Self.uploadCredentials.isEmpty else {
             throw Abort(.serviceUnavailable, reason: "No upload credentials configured")
         }
-    }
-
-    private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
         let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
         guard let host else {
@@ -504,7 +498,7 @@ struct S3DataController: RouteCollection {
             if let lastModified {
                 request.headers.add(name: "x-last-modified", value: lastModified)
             }
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(10), timeoutPerRequest: .seconds(60))
+            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
 
@@ -517,7 +511,7 @@ struct S3DataController: RouteCollection {
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             request.headers.add(name: "x-upload-id", value: uploadId)
             request.headers.add(name: "x-file-size", value: "\(fileSize)")
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(10), timeoutPerRequest: .seconds(30))
+            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
 
@@ -532,7 +526,7 @@ struct S3DataController: RouteCollection {
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: .contentLength, value: "\(bodyLength)")
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(10), timeoutPerRequest: .seconds(120))
+            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
 
@@ -547,7 +541,7 @@ struct S3DataController: RouteCollection {
             if let lastModified {
                 request.headers.add(name: "x-last-modified", value: lastModified)
             }
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(10), timeoutPerRequest: .seconds(60))
+            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
 
@@ -558,7 +552,7 @@ struct S3DataController: RouteCollection {
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?uploadId=\(uploadId)")
             request.method = .DELETE
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(10), timeoutPerRequest: .seconds(60))
+            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
 
