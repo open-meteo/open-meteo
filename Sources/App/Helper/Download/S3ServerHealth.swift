@@ -35,7 +35,7 @@ actor S3ServerHealth {
         self.states = servers.map { .init(server: $0, isOnline: true) }
     }
 
-    static func loadFromEnvironment(key: String = "S3_REPLICATION_SERVERS") -> [S3ReplicationServer] {
+    static func loadFromEnvironment(key: String = "S3_UPLOAD_REPLICATION_SERVERS") -> [S3ReplicationServer] {
         guard let configured = Environment.get(key) else {
             return []
         }
