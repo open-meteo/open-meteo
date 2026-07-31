@@ -23,6 +23,26 @@ extension String {
     }
 }
 
+extension HMAC {
+    mutating func update<T: StringProtocol>(_ string: T) {
+        string.withContiguousStorageIfAvailable({
+            $0.withMemoryRebound(to: UInt8.self) {
+                update(data: $0)
+            }
+        }) ?? update(data: string.data(using: .utf8) ?? Data())
+    }
+}
+
+extension SHA256 {
+    mutating func update<T: StringProtocol>(_ string: T) {
+        string.withContiguousStorageIfAvailable({
+            $0.withMemoryRebound(to: UInt8.self) {
+                update(data: $0)
+            }
+        }) ?? update(data: string.data(using: .utf8) ?? Data())
+    }
+}
+
 /// Sign AWS URLs with AWS4-HMAC-SHA256
 public struct AWSSigner {
     public let accessKey: String
@@ -84,23 +104,12 @@ public struct AWSSigner {
             (name,value) in "\(name.localizedLowercase):\(value.trimmingCharacters(in: .whitespaces))\n"
         }).joined()
         let signedHeaders = headersSorted.map(\.name.localizedLowercase).joined(separator: ";")
-
-        let canonicalRequest = [
-            method,
-            path,
-            canonicalQueryString,
-            canonicalHeaders,
-            signedHeaders,
-            payloadHash
-        ].joined(separator: "\n")
+        
+        let canonicalRequest = "\(method)\n\(path)\n\(canonicalQueryString)\n\(canonicalHeaders)\n\(signedHeaders)\n\(payloadHash)"
 
         let credentialScope = "\(dateStamp)/\(region)/\(service)/aws4_request"
-        let stringToSign = [
-            "AWS4-HMAC-SHA256",
-            amzDate,
-            credentialScope,
-            (canonicalRequest.data(using: .utf8) ?? Data()).sha256Hex
-        ].joined(separator: "\n")
+        
+        let stringToSign = "AWS4-HMAC-SHA256\n\(amzDate)\n\(credentialScope)\n\((canonicalRequest.data(using: .utf8) ?? Data()).sha256Hex)"
 
         let signingKey = getSignatureKey(date: dateStamp)
         let signature = stringToSign.hmacSHA256(key: signingKey).hex
@@ -113,8 +122,7 @@ public struct AWSSigner {
     }
     
     public func verify(url: String, method: HTTPMethod, headers: HTTPHeaders, payloadHashSha256: String, now: Date = Date()) throws {
-        guard let components = URLComponents(string: url),
-              let host = components.encodedHost else {
+        guard let parsedURL = ParsedVerificationURL(url: url) else {
             throw SigningError.invalidURL
         }
 
@@ -124,42 +132,61 @@ public struct AWSSigner {
         guard authorization.hasPrefix("AWS4-HMAC-SHA256 ") else {
             throw SigningError.unsupportedAuthorizationType
         }
+        
+        var canonicalRequestHash = SHA256()
+        canonicalRequestHash.update(method.rawValue)
+        canonicalRequestHash.update("\n")
 
-        let authPayload = String(authorization.dropFirst("AWS4-HMAC-SHA256 ".count))
-        var authFields: [String: String] = [:]
-        for pair in authPayload.split(separator: ",") {
-            let trimmed = pair.trimmingCharacters(in: .whitespaces)
-            let parts = trimmed.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
-            guard parts.count == 2 else {
-                throw SigningError.invalidAuthorizationHeader
-            }
-            authFields[String(parts[0])] = String(parts[1])
-        }
-
-        guard let credential = authFields["Credential"],
-              let signedHeadersString = authFields["SignedHeaders"],
-              let expectedSignature = authFields["Signature"] else {
+        let authPayload = authorization.dropFirst("AWS4-HMAC-SHA256 ".count)
+        guard let parsedAuth = Self.parseAuthorizationFields(authPayload) else {
             throw SigningError.invalidAuthorizationHeader
         }
+        let credential = parsedAuth.credential
+        let signedHeadersString = parsedAuth.signedHeadersString
+        let expectedSignature = parsedAuth.expectedSignature
 
-        let credentialParts = credential.split(separator: "/")
-        guard credentialParts.count == 5 else {
+        guard let accessKeyEnd = credential.firstIndex(of: "/") else {
             throw SigningError.invalidCredentialScope
         }
-        guard String(credentialParts[0]) == accessKey else {
+        guard credential[..<accessKeyEnd] == accessKey else {
             throw SigningError.invalidAccessKey
         }
-        let dateStamp = String(credentialParts[1])
-        guard String(credentialParts[2]) == region,
-              String(credentialParts[3]) == service,
-              String(credentialParts[4]) == "aws4_request" else {
+
+        let dateStart = credential.index(after: accessKeyEnd)
+        guard dateStart < credential.endIndex,
+              let dateEnd = credential[dateStart...].firstIndex(of: "/") else {
+            throw SigningError.invalidCredentialScope
+        }
+        let dateStamp = credential[dateStart..<dateEnd]
+
+        let regionStart = credential.index(after: dateEnd)
+        guard regionStart < credential.endIndex,
+              let regionEnd = credential[regionStart...].firstIndex(of: "/") else {
+            throw SigningError.invalidCredentialScope
+        }
+        guard credential[regionStart..<regionEnd] == region else {
+            throw SigningError.invalidCredentialScope
+        }
+
+        let serviceStart = credential.index(after: regionEnd)
+        guard serviceStart < credential.endIndex,
+              let serviceEnd = credential[serviceStart...].firstIndex(of: "/") else {
+            throw SigningError.invalidCredentialScope
+        }
+        guard credential[serviceStart..<serviceEnd] == service else {
+            throw SigningError.invalidCredentialScope
+        }
+
+        let terminalStart = credential.index(after: serviceEnd)
+        guard terminalStart < credential.endIndex,
+              credential[terminalStart...] == "aws4_request" else {
             throw SigningError.invalidCredentialScope
         }
 
         guard let amzDate = headers.first(name: "x-amz-date") else {
             throw SigningError.missingXAmzDate
         }
-        guard amzDate.count >= 8, String(amzDate.prefix(8)) == dateStamp else {
+        guard amzDate.count >= 8, amzDate.prefix(8) == dateStamp else {
             throw SigningError.invalidCredentialScope
         }
         guard let requestDate = Date.awsIso8601DateTime(amzDate) else {
@@ -172,59 +199,260 @@ public struct AWSSigner {
         guard let headerPayloadHash = headers.first(name: "x-amz-content-sha256") else {
             throw SigningError.missingPayloadHash
         }
-        guard headerPayloadHash.lowercased() == payloadHashSha256.lowercased() else {
+        guard headerPayloadHash.caseInsensitiveCompare(payloadHashSha256) == .orderedSame else {
             throw SigningError.payloadHashMismatch
         }
 
-        let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
-        let canonicalQueryString = components.queryItems?
-            .map({ "\($0.name)\($0.value.map{"=\($0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed)!)"} ?? "=")" })
-            .sorted()
-            .joined(separator: "&") ?? ""
+        let path = parsedURL.path
+        canonicalRequestHash.update(path)
+        canonicalRequestHash.update("\n")
+        
+        ParsedVerificationURL.updateCanonicalizeQueryHash(parsedURL.query, hash: &canonicalRequestHash)
 
-        let signedHeaderNames = signedHeadersString
-            .split(separator: ";")
-            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        canonicalRequestHash.update("\n")
+        
+        try Self.updateCanonicalHeadersHash(
+            signedHeadersString: signedHeadersString,
+            headers: headers,
+            host: parsedURL.host,
+            hash: &canonicalRequestHash
+        )
+        canonicalRequestHash.update("\n")
+        canonicalRequestHash.update(signedHeadersString)
+        canonicalRequestHash.update("\n")
+        canonicalRequestHash.update(headerPayloadHash)
+        let canonicalRequestHashHex = canonicalRequestHash.finalize().hex
 
-        var headerLookup: [String: String] = [:]
-        for header in headers {
-            let name = header.name.lowercased()
-            if headerLookup[name] == nil {
-                headerLookup[name] = header.value
-            }
-        }
-        if headerLookup["host"] == nil {
-            headerLookup["host"] = host
-        }
-
-        let canonicalHeaders = try signedHeaderNames.map { name in
-            guard let value = headerLookup[name] else {
-                throw SigningError.missingSignedHeader(name)
-            }
-            return "\(name):\(value.trimmingCharacters(in: .whitespaces))\n"
-        }.joined()
-
-        let canonicalRequest = [
-            method.rawValue,
-            path,
-            canonicalQueryString,
-            canonicalHeaders,
-            signedHeadersString,
-            headerPayloadHash
-        ].joined(separator: "\n")
-
-        let credentialScope = "\(dateStamp)/\(region)/\(service)/aws4_request"
-        let stringToSign = [
-            "AWS4-HMAC-SHA256",
-            amzDate,
-            credentialScope,
-            (canonicalRequest.data(using: .utf8) ?? Data()).sha256Hex
-        ].joined(separator: "\n")
-
-        let signingKey = getSignatureKey(date: dateStamp)
-        let computedSignature = stringToSign.hmacSHA256(key: signingKey).hex
+        let signingKey = getSignatureKey(date: String(dateStamp))
+        var stringToSignHmac = HMAC<SHA256>(key: SymmetricKey(data: signingKey))
+        stringToSignHmac.update("AWS4-HMAC-SHA256\n")
+        stringToSignHmac.update(amzDate)
+        stringToSignHmac.update("\n")
+        stringToSignHmac.update(dateStamp)
+        stringToSignHmac.update("/")
+        stringToSignHmac.update(region)
+        stringToSignHmac.update("/")
+        stringToSignHmac.update(service)
+        stringToSignHmac.update("/aws4_request\n")
+        stringToSignHmac.update(canonicalRequestHashHex)
+        let computedSignature = stringToSignHmac.finalize().hex
         guard computedSignature == expectedSignature else {
             throw SigningError.invalidSignature
+        }
+    }
+
+    private static func parseAuthorizationFields(_ authPayload: Substring) -> (credential: Substring, signedHeadersString: Substring, expectedSignature: Substring)? {
+        var credential: Substring?
+        var signedHeadersString: Substring?
+        var expectedSignature: Substring?
+
+        var start = authPayload.startIndex
+        while start < authPayload.endIndex {
+            let comma = authPayload[start...].firstIndex(of: ",")
+            let end = comma ?? authPayload.endIndex
+            let pair = authPayload[start..<end].trimmingWhitespaceSubstring
+            guard !pair.isEmpty, let equals = pair.firstIndex(of: "=") else {
+                return nil
+            }
+
+            let key = pair[..<equals].trimmingWhitespaceSubstring
+            let valueStart = pair.index(after: equals)
+            let value = pair[valueStart...].trimmingWhitespaceSubstring
+            guard !key.isEmpty else {
+                return nil
+            }
+
+            if key == "Credential" {
+                guard credential == nil else { return nil }
+                credential = value
+            } else if key == "SignedHeaders" {
+                guard signedHeadersString == nil else { return nil }
+                signedHeadersString = value
+            } else if key == "Signature" {
+                guard expectedSignature == nil else { return nil }
+                expectedSignature = value
+            } else {
+                return nil
+            }
+
+            if let comma {
+                start = authPayload.index(after: comma)
+            } else {
+                break
+            }
+        }
+
+        guard let credential,
+              let signedHeadersString,
+              let expectedSignature else {
+            return nil
+        }
+        return (credential, signedHeadersString, expectedSignature)
+    }
+
+    private static func updateCanonicalHeadersHash(signedHeadersString: Substring, headers: HTTPHeaders, host: Substring, hash: inout SHA256) throws {
+        var start = signedHeadersString.startIndex
+        while start < signedHeadersString.endIndex {
+            let separator = signedHeadersString[start...].firstIndex(of: ";")
+            let end = separator ?? signedHeadersString.endIndex
+            let name = signedHeadersString[start..<end].trimmingWhitespaceSubstring
+            let isHostHeader = name == "host"
+
+            guard let value: Substring = (headers.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })?.value).map({ Substring($0) })
+                ?? (isHostHeader ? host : nil) else {
+                throw SigningError.missingSignedHeader(String(name))
+            }
+
+            hash.update(name)
+            hash.update(":")
+            hash.update(value.trimmingWhitespaceSubstring)
+            hash.update("\n")
+
+            if let separator {
+                start = signedHeadersString.index(after: separator)
+            } else {
+                break
+            }
+        }
+    }
+
+    private struct ParsedVerificationURL {
+        let path: Substring
+        let query: Substring?
+        let host: Substring
+
+        private static let rootPath: Substring = "/"[...]
+
+        init?(url: String) {
+            guard let schemeSeparator = url.range(of: "://") else {
+                return nil
+            }
+
+            let authorityStart = schemeSeparator.upperBound
+            let authorityEnd = ParsedVerificationURL.findAuthorityEnd(in: url, from: authorityStart)
+            guard authorityStart < authorityEnd else {
+                return nil
+            }
+
+            let authority = url[authorityStart..<authorityEnd]
+            let host = ParsedVerificationURL.extractHost(from: authority)
+            guard !host.isEmpty else {
+                return nil
+            }
+
+            let pathAndQuery = url[authorityEnd..<url.endIndex]
+            let withoutFragment = ParsedVerificationURL.stripFragment(pathAndQuery)
+
+            if let queryStart = withoutFragment.firstIndex(of: "?") {
+                let rawPath = withoutFragment[withoutFragment.startIndex..<queryStart]
+                self.path = rawPath.isEmpty ? ParsedVerificationURL.rootPath : rawPath
+                let queryStartIndex = withoutFragment.index(after: queryStart)
+                self.query = queryStartIndex <= withoutFragment.endIndex ? withoutFragment[queryStartIndex..<withoutFragment.endIndex] : nil
+            } else {
+                self.path = withoutFragment.isEmpty ? ParsedVerificationURL.rootPath : withoutFragment
+                self.query = nil
+            }
+
+            self.host = host
+        }
+
+        private static func findAuthorityEnd(in url: String, from authorityStart: String.Index) -> String.Index {
+            return url[authorityStart...].firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) ?? url.endIndex
+        }
+
+        private static func extractHost(from authority: Substring) -> Substring {
+            return authority.lastIndex(of: "@").map { authority[authority.index(after: $0)..<authority.endIndex] } ?? authority
+        }
+
+        private static func stripFragment(_ pathAndQuery: Substring) -> Substring {
+            let fragmentStart = pathAndQuery.firstIndex(of: "#") ?? pathAndQuery.endIndex
+            return pathAndQuery[pathAndQuery.startIndex..<fragmentStart]
+        }
+
+        /// TODO can be further optimised
+        static func updateCanonicalizeQueryHash(_ query: Substring?, hash: inout SHA256) {
+            guard let query else {
+                return
+            }
+
+            var items: [String] = []
+            items.reserveCapacity(8)
+
+            for pair in query.split(separator: "&", omittingEmptySubsequences: false) {
+                var item = String()
+                item.reserveCapacity(pair.count + 2)
+
+                if let equals = pair.firstIndex(of: "=") {
+                    let rawName = pair[pair.startIndex..<equals]
+                    let rawValue = pair[pair.index(after: equals)..<pair.endIndex]
+                    appendCanonicalComponent(rawName, to: &item)
+                    item.append("=")
+                    appendCanonicalComponent(rawValue, to: &item)
+                } else {
+                    appendCanonicalComponent(pair, to: &item)
+                    item.append("=")
+                }
+
+                items.append(item)
+            }
+
+            items.sort()
+            let canonicalizeQuery = items.joined(separator: "&")
+            hash.update(canonicalizeQuery)
+        }
+
+        private static func appendCanonicalComponent(_ component: Substring, to output: inout String) {
+            let bytes = component.utf8
+            var index = bytes.startIndex
+            while index < bytes.endIndex {
+                let byte = bytes[index]
+
+                if byte == 37 { // %
+                    let b1Index = bytes.index(after: index)
+                    if b1Index < bytes.endIndex {
+                        let b2Index = bytes.index(after: b1Index)
+                        if b2Index < bytes.endIndex,
+                           let hi = hexNibble(bytes[b1Index]),
+                           let lo = hexNibble(bytes[b2Index]) {
+                            let decoded = (hi << 4) | lo
+                            appendCanonicalByte(decoded, to: &output)
+                            index = bytes.index(after: b2Index)
+                            continue
+                        }
+                    }
+                }
+
+                appendCanonicalByte(byte, to: &output)
+                index = bytes.index(after: index)
+            }
+        }
+
+        private static func appendCanonicalByte(_ byte: UInt8, to output: inout String) {
+            let isUpperAZ = byte >= 65 && byte <= 90
+            let isLowerAZ = byte >= 97 && byte <= 122
+            let isDigit = byte >= 48 && byte <= 57
+            let isAllowedSymbol = byte == 45 || byte == 95 || byte == 46 || byte == 126 // -_.~
+            if isUpperAZ || isLowerAZ || isDigit || isAllowedSymbol {
+                output.unicodeScalars.append(UnicodeScalar(Int(byte))!)
+                return
+            }
+
+            output.append("%")
+            output.unicodeScalars.append(UnicodeScalar(Int(upperHexDigit(byte >> 4)))!)
+            output.unicodeScalars.append(UnicodeScalar(Int(upperHexDigit(byte & 0x0F)))!)
+        }
+
+        private static func hexNibble(_ byte: UInt8) -> UInt8? {
+            switch byte {
+            case 48...57: return byte - 48       // 0-9
+            case 65...70: return byte - 55       // A-F
+            case 97...102: return byte - 87      // a-f
+            default: return nil
+            }
+        }
+
+        private static func upperHexDigit(_ nibble: UInt8) -> UInt8 {
+            return nibble < 10 ? (48 + nibble) : (55 + nibble)
         }
     }
 
@@ -295,6 +523,28 @@ fileprivate extension String {
                 HMAC<SHA256>.authenticationCode(for: $0, using: key)
             }
         }) ?? HMAC<SHA256>.authenticationCode(for: Data(self.utf8), using: key)
+    }
+}
+
+fileprivate extension StringProtocol {
+    var trimmingWhitespaceSubstring: SubSequence {
+        var start = startIndex
+        var end = endIndex
+
+        while start < end, self[start].isWhitespace {
+            formIndex(after: &start)
+        }
+
+        while start < end {
+            let beforeEnd = index(before: end)
+            if self[beforeEnd].isWhitespace {
+                end = beforeEnd
+            } else {
+                break
+            }
+        }
+
+        return self[start..<end]
     }
 }
 
