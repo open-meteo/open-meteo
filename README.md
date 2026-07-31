@@ -118,6 +118,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - .Net 8 / C#: https://github.com/colinnuk/open-meteo-dotnet-client-sdk
 - Android library for Geocoding API: https://github.com/woheller69/OmGeoDialog
 - Dart / Flutter: https://github.com/neursh/open-meteo-dart
+- Dart / Flutter (all APIs, typed): https://github.com/petyaas/weather_open_meteo_client
 - Go: https://github.com/HectorMalot/omgo
 - Kotlin: https://github.com/open-meteo/open-meteo-api-kotlin
 - PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
