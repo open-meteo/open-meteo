@@ -329,19 +329,20 @@ public struct AWSSigner {
             }
 
             let authorityStart = schemeSeparator.upperBound
-            let authorityEnd = ParsedVerificationURL.findAuthorityEnd(in: url, from: authorityStart)
+            let authorityEnd = url[authorityStart...].firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) ?? url.endIndex
             guard authorityStart < authorityEnd else {
                 return nil
             }
 
             let authority = url[authorityStart..<authorityEnd]
-            let host = ParsedVerificationURL.extractHost(from: authority)
+            host = authority.lastIndex(of: "@").map { authority[authority.index(after: $0)..<authority.endIndex] } ?? authority
             guard !host.isEmpty else {
                 return nil
             }
 
             let pathAndQuery = url[authorityEnd..<url.endIndex]
-            let withoutFragment = ParsedVerificationURL.stripFragment(pathAndQuery)
+            let fragmentStart = pathAndQuery.firstIndex(of: "#") ?? pathAndQuery.endIndex
+            let withoutFragment = pathAndQuery[pathAndQuery.startIndex..<fragmentStart]
 
             if let queryStart = withoutFragment.firstIndex(of: "?") {
                 let rawPath = withoutFragment[withoutFragment.startIndex..<queryStart]
@@ -352,21 +353,6 @@ public struct AWSSigner {
                 self.path = withoutFragment.isEmpty ? ParsedVerificationURL.rootPath : withoutFragment
                 self.query = nil
             }
-
-            self.host = host
-        }
-
-        private static func findAuthorityEnd(in url: String, from authorityStart: String.Index) -> String.Index {
-            return url[authorityStart...].firstIndex(where: { $0 == "/" || $0 == "?" || $0 == "#" }) ?? url.endIndex
-        }
-
-        private static func extractHost(from authority: Substring) -> Substring {
-            return authority.lastIndex(of: "@").map { authority[authority.index(after: $0)..<authority.endIndex] } ?? authority
-        }
-
-        private static func stripFragment(_ pathAndQuery: Substring) -> Substring {
-            let fragmentStart = pathAndQuery.firstIndex(of: "#") ?? pathAndQuery.endIndex
-            return pathAndQuery[pathAndQuery.startIndex..<fragmentStart]
         }
 
         /// TODO can be further optimised
