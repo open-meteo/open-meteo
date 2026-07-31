@@ -43,6 +43,7 @@ struct S3DataController: RouteCollection {
         }
         
         if !Self.syncApiKeys.isEmpty || !Self.readCredentials.isEmpty {
+            routes.on(.HEAD, [], use: self.headRoot)
             routes.get("", use: self.list)
             routes.get("data", "**", use: self.get)
             routes.get("data_run", "**", use: self.get)
@@ -62,6 +63,11 @@ struct S3DataController: RouteCollection {
         let apikey: String?
         /// in megabytes per second
         let rate: Int?
+    }
+
+    func headRoot(_ req: Request) throws -> HTTPStatus {
+        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: Self.readCredentials, missingCredentialsReason: "No read credentials configured")
+        return .ok
     }
     
     struct UploadCredential: Sendable, Hashable {
@@ -481,7 +487,7 @@ struct S3DataController: RouteCollection {
         guard let host else {
             throw Abort(.unauthorized, reason: "Missing Host header")
         }
-        let canonicalURL = "https://\(host)\(req.url.string)"
+        let canonicalURL = "\(req.scheme)://\(host)\(req.url.string)"
         
         var hasMatchingAccessKey = false
         for credentials in credentials {

@@ -151,9 +151,9 @@ extension Request {
         self.method == .POST ? try self.content.decode(ApiQueryParameter.self) : try self.query.decode(ApiQueryParameter.self)
     }
 
-    /// http or https
-    fileprivate var scheme: String {
-        return headers.first(name: "X-Forwarded-Proto") ?? url.scheme ?? "http"
+    /// http or https. Checks X-Forwarded-Proto
+    var scheme: String {
+        return (headers.first(name: "X-Forwarded-Proto") == "https" ? "https" : nil) ?? url.scheme ?? "http"
     }
 
     /// fn params: hostname, unlockSlot, numberOfLocationsMaximum, params

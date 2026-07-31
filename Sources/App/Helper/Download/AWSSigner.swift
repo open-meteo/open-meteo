@@ -44,6 +44,16 @@ public struct AWSSigner {
             throw SigningError.invalidURL
         }
 
+        let hostHeaderValue: String = {
+            guard let port = components.port,
+                  let scheme = components.scheme?.lowercased(),
+                  !((scheme == "http" && port == 80) || (scheme == "https" && port == 443))
+            else {
+                return host
+            }
+            return "\(host):\(port)"
+        }()
+
         let method = request.method.rawValue
         let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
         
@@ -55,7 +65,7 @@ public struct AWSSigner {
         let amzDate = now.iso8601DateTime
         let dateStamp = now.shortDate
         
-        request.headers.add(name: "Host", value: host)
+        request.headers.replaceOrAdd(name: "Host", value: hostHeaderValue)
         
         let payloadHash: String
         if let hash = request.headers.first(name: "x-amz-content-sha256") {
@@ -183,7 +193,9 @@ public struct AWSSigner {
                 headerLookup[name] = header.value
             }
         }
-        headerLookup["host"] = host
+        if headerLookup["host"] == nil {
+            headerLookup["host"] = host
+        }
 
         let canonicalHeaders = try signedHeaderNames.map { name in
             guard let value = headerLookup[name] else {
