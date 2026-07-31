@@ -21,6 +21,8 @@ import NIOFileSystem
  }
  ```
  
+ If S3_READ_CREDENTIALS is set to "key1:secret1,key2:secret2" the list and download endpoints accept AWS SigV4 signed GET requests in addition to API keys.
+
  If S3_UPLOAD_CREDENTIALS is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set. E.g. AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
  
  If S3_UPLOAD_REPLICATION_SERVERS is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/," all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation
@@ -28,6 +30,7 @@ import NIOFileSystem
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
     static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
+    static let readCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_READ_CREDENTIALS")
     static let uploadCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment()
     static let multipartChunkSize = 8 * 1024 * 1024
     static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
@@ -35,11 +38,11 @@ struct S3DataController: RouteCollection {
     static let uploadMaximumFileSize = 500 << 30 // 500GB
     
     func boot(routes: RoutesBuilder) throws {
-        if Self.syncApiKeys.isEmpty && Self.uploadCredentials.isEmpty {
+        if Self.syncApiKeys.isEmpty && Self.readCredentials.isEmpty && Self.uploadCredentials.isEmpty {
             return
         }
         
-        if !Self.syncApiKeys.isEmpty {
+        if !Self.syncApiKeys.isEmpty || !Self.readCredentials.isEmpty {
             routes.get("", use: self.list)
             routes.get("data", "**", use: self.get)
             routes.get("data_run", "**", use: self.get)
@@ -65,8 +68,8 @@ struct S3DataController: RouteCollection {
         let accessKey: String
         let secretKey: String
         
-        static func loadFromEnvironment() -> [UploadCredential] {
-            guard let raw = Environment.get("S3_UPLOAD_CREDENTIALS") else {
+        static func loadFromEnvironment(key: String = "S3_UPLOAD_CREDENTIALS") -> [UploadCredential] {
+            guard let raw = Environment.get(key) else {
                 return []
             }
             return raw.split(separator: ",").map { entry in
@@ -121,9 +124,7 @@ struct S3DataController: RouteCollection {
             throw RateLimitError.serviceOverloaded
         }
         let params = try req.query.decode(S3List.ListV2Query.self)
-        guard let apikey = params.apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) else {
-            throw SyncError.invalidApiKey
-        }
+        try authorizeReadRequest(req: req, apikey: params.apikey)
         
         let path = params.prefix
         guard params.list_type == 2, params.delimiter == "/" else {
@@ -219,10 +220,7 @@ struct S3DataController: RouteCollection {
         
         let isJson = resolved.relativePath.hasSuffix(".json")
         if !isJson {
-            /// Only require API keys for non-json calls
-            guard let apikey = params.apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) else {
-                throw SyncError.invalidApiKey
-            }
+            try authorizeReadRequest(req: req, apikey: params.apikey)
         }
         
         guard let pathNoRoot = resolved.relativePath.split(separator: "/").dropFirst().joined(separator: "/").nilIfEmpty else {
@@ -460,9 +458,23 @@ struct S3DataController: RouteCollection {
         return Response(status: .ok, headers: headers)
     }
     
+    private func authorizeReadRequest(req: Request, apikey: String?) throws {
+        if let apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) {
+            return
+        }
+        guard !Self.readCredentials.isEmpty else {
+            throw SyncError.invalidApiKey
+        }
+        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: Self.readCredentials, missingCredentialsReason: "No read credentials configured")
+    }
+
     private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
-        guard !Self.uploadCredentials.isEmpty else {
-            throw Abort(.serviceUnavailable, reason: "No upload credentials configured")
+        try verifyRequestSignature(req: req, body: body, credentials: Self.uploadCredentials, missingCredentialsReason: "No upload credentials configured")
+    }
+
+    private func verifyRequestSignature(req: Request, body: ByteBuffer, credentials: [UploadCredential], missingCredentialsReason: String) throws {
+        guard !credentials.isEmpty else {
+            throw Abort(.serviceUnavailable, reason: missingCredentialsReason)
         }
         let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
@@ -472,7 +484,7 @@ struct S3DataController: RouteCollection {
         let canonicalURL = "https://\(host)\(req.url.string)"
         
         var hasMatchingAccessKey = false
-        for credentials in Self.uploadCredentials {
+        for credentials in credentials {
             let signer = AWSSigner(accessKey: credentials.accessKey, secretKey: credentials.secretKey, region: "us-west-2", service: "s3")
             do {
                 try signer.verify(url: canonicalURL, method: req.method, headers: req.headers, payloadHashSha256: payloadHash)
