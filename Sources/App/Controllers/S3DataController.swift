@@ -581,15 +581,15 @@ struct S3DataController: RouteCollection {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         let lastModified = req.headers.first(name: "x-last-modified")
-        let bodyHash = body.readableBytesView.sha256Hex
-        let bodyLength = body.readableBytes
+        guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
+            throw S3ApiError.missingSha256HashHeader
+        }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath))
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
-            request.headers.add(name: .contentLength, value: "\(bodyLength)")
             if let contentType = req.headers.first(name: .contentType) {
                 request.headers.add(name: .contentType, value: contentType)
             }
@@ -617,15 +617,15 @@ struct S3DataController: RouteCollection {
     private func replicateMultipartPart(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int, partNumber: Int, body: ByteBuffer) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
-        let bodyHash = body.readableBytesView.sha256Hex
-        let bodyLength = body.readableBytes
+        guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
+            throw S3ApiError.missingSha256HashHeader
+        }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?partNumber=\(partNumber)&uploadId=\(uploadId)")
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
-            request.headers.add(name: .contentLength, value: "\(bodyLength)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
@@ -634,7 +634,9 @@ struct S3DataController: RouteCollection {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         let lastModified = req.headers.first(name: "x-last-modified")
-        let bodyHash = body.readableBytesView.sha256Hex
+        guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
+            throw S3ApiError.missingSha256HashHeader
+        }
         //let bodyLength = body.readableBytes
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?uploadId=\(uploadId)")
@@ -746,6 +748,7 @@ enum S3ApiError: AbortError, Equatable {
     case invalidCompletionXMLPart
     case missingCredentials(String)
     case missingHostHeader
+    case missingSha256HashHeader
     case invalidRequestSignature
     case unknownAccessKey
     
@@ -806,6 +809,8 @@ enum S3ApiError: AbortError, Equatable {
             return reason
         case .missingHostHeader:
             return "Missing Host header"
+        case .missingSha256HashHeader:
+            return "Missing SHA256 hash header"
         case .invalidRequestSignature:
             return "Invalid request signature"
         case .unknownAccessKey:
