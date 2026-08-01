@@ -88,8 +88,8 @@ struct S3DataController: RouteCollection {
         
         private static func parseCredential(_ raw: String) -> UploadCredential? {
             if let split = raw.firstIndex(of: ":") {
-                let key = String(raw[..<split]).trimmingCharacters(in: .whitespaces)
-                let secret = String(raw[raw.index(after: split)...]).trimmingCharacters(in: .whitespaces)
+                let key = String(raw[..<split])
+                let secret = String(raw[raw.index(after: split)...])
                 guard !key.isEmpty, !secret.isEmpty else { return nil }
                 return UploadCredential(accessKey: key, secretKey: secret)
             }
@@ -134,7 +134,7 @@ struct S3DataController: RouteCollection {
         
         let path = params.prefix
         guard params.list_type == 2, params.delimiter == "/" else {
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         guard !path.isEmpty,
               path.last == "/",
@@ -142,18 +142,18 @@ struct S3DataController: RouteCollection {
               !path.contains("//"),
               !path.contains(".."),
               path.onlyContainsAlphanumericDashSlashDot else {
-            throw Abort(.forbidden)
+                        throw S3ApiError.forbidden
         }
         
         guard let resolved = resolveListPath(path) else {
-            throw Abort(.forbidden)
+                        throw S3ApiError.forbidden
         }
         
         let pathUrl = URL(fileURLWithPath: resolved.absoluteDirectoryPath, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
         guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         
         var files = [S3List.ListV2File]()
@@ -221,7 +221,7 @@ struct S3DataController: RouteCollection {
         let params = try req.query.decode(DownloadParams.self)
         let path = req.url.path
         guard let resolved = resolveObjectPath(path) else {
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         
         let isJson = resolved.relativePath.hasSuffix(".json")
@@ -230,7 +230,7 @@ struct S3DataController: RouteCollection {
         }
         
         guard let pathNoRoot = resolved.relativePath.split(separator: "/").dropFirst().joined(separator: "/").nilIfEmpty else {
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         
         if let nginxSendfilePrefix = Self.nginxSendfilePrefix {
@@ -271,7 +271,7 @@ struct S3DataController: RouteCollection {
     
     func putObject(_ req: Request) async throws -> Response {
         guard let body = req.body.data else {
-            throw Abort(.badRequest, reason: "Expected body payload")
+            throw S3ApiError.expectedBodyPayload
         }
         try verifyUploadSignature(req: req, body: body)
         struct Params: Codable {
@@ -281,13 +281,13 @@ struct S3DataController: RouteCollection {
         let query = try req.query.decode(Params.self)
         if let uploadId = query.uploadId, let part = query.partNumber {
             guard Self.uploadIdRange.contains(uploadId) else {
-                throw Abort(.badRequest, reason: "Invalid uploadId")
+                throw S3ApiError.invalidUploadId
             }
             guard part >= 1, part <= Self.uploadMaximumFileSize / Self.multipartChunkSize else {
-                throw Abort(.badRequest, reason: "Invalid partNumber")
+                throw S3ApiError.invalidPartNumber
             }
             guard let resolved = resolveObjectPath(req.url.path) else {
-                throw Abort(.forbidden)
+                throw S3ApiError.forbidden
             }
             try await writeMultipartPart(resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
             try await replicateMultipartPart(req: req, resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
@@ -315,16 +315,16 @@ struct S3DataController: RouteCollection {
         let query = try req.query.decode(Params.self)
         if let uploadId = query.uploadId, let part = query.partNumber {
             guard Self.uploadIdRange.contains(uploadId) else {
-                throw Abort(.badRequest, reason: "Invalid uploadId")
+                throw S3ApiError.invalidUploadId
             }
             guard let body else {
-                throw Abort(.badRequest, reason: "Expected body payload")
+                throw S3ApiError.expectedBodyPayload
             }
             guard part >= 1, part <= Self.uploadMaximumFileSize / Self.multipartChunkSize else {
-                throw Abort(.badRequest, reason: "Invalid partNumber")
+                throw S3ApiError.invalidPartNumber
             }
             guard let resolved = resolveObjectPath(req.url.path) else {
-                throw Abort(.forbidden)
+                throw S3ApiError.forbidden
             }
             try await writeMultipartPart(resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
             try await replicateMultipartPart(req: req, resolved: resolved, uploadId: uploadId, partNumber: part, body: body)
@@ -333,17 +333,21 @@ struct S3DataController: RouteCollection {
         
         if let uploadId = query.uploadId {
             guard Self.uploadIdRange.contains(uploadId) else {
-                throw Abort(.badRequest, reason: "Invalid uploadId")
+                throw S3ApiError.invalidUploadId
             }
             guard let resolved = resolveObjectPath(req.url.path) else {
-                throw Abort(.forbidden)
+                throw S3ApiError.forbidden
             }
-            try await completeMultipartUpload(req: req, resolved: resolved, uploadId: uploadId)
-            try await replicateMultipartComplete(req: req, resolved: resolved, uploadId: uploadId)
+            guard let body else {
+                throw S3ApiError.expectedCompletionXMLBody
+            }
+            try await validateMultipartCompletionBody(resolved: resolved, uploadId: uploadId, body: body)
+            try await replicateMultipartComplete(req: req, resolved: resolved, uploadId: uploadId, body: body)
+            try await finalizeMultipartUpload(req: req, resolved: resolved, uploadId: uploadId)
             return Response(status: .ok)
         }
         
-        throw Abort(.badRequest, reason: "Unsupported POST operation")
+        throw S3ApiError.unsupportedPostOperation
     }
     
     func deleteObject(_ req: Request) async throws -> Response {
@@ -354,10 +358,10 @@ struct S3DataController: RouteCollection {
         let query = try req.query.decode(Params.self)
         let uploadId = query.uploadId
         guard Self.uploadIdRange.contains(uploadId) else {
-            throw Abort(.badRequest, reason: "Invalid uploadId")
+            throw S3ApiError.invalidUploadId
         }
         guard let resolved = resolveObjectPath(req.url.path) else {
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
         _ = try await FileSystem.shared.removeItem(at: FilePath(tempPath))
@@ -368,7 +372,7 @@ struct S3DataController: RouteCollection {
     private func uploadSinglePut(req: Request, body: ByteBuffer) async throws {
         guard let resolved = resolveObjectPath(req.url.path) else {
             print(req.url.path)
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         let uploadId = Int.random(in: Self.uploadIdRange)
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
@@ -392,17 +396,17 @@ struct S3DataController: RouteCollection {
     
     private func initiateMultipartUpload(_ req: Request) async throws -> MultipartInitPrepared {
         guard let resolved = resolveObjectPath(req.url.path) else {
-            throw Abort(.forbidden)
+            throw S3ApiError.forbidden
         }
         guard let fileSizeRaw = req.headers.first(name: "x-file-size"),
               let fileSize = Int64(fileSizeRaw), fileSize >= 0, fileSize <= Self.uploadMaximumFileSize else {
-            throw Abort(.badRequest, reason: "Missing or invalid x-file-size header")
+            throw S3ApiError.missingOrInvalidFileSizeHeader
         }
         
         let uploadId: Int
         if let customUploadId = req.headers.first(name: "x-upload-id") {
             guard let id = Int(customUploadId), Self.uploadIdRange.contains(id) else {
-                throw Abort(.badRequest, reason: "Invalid uploadId")
+                throw S3ApiError.invalidUploadId
             }
             uploadId = id
         } else {
@@ -430,32 +434,77 @@ struct S3DataController: RouteCollection {
     
     private func writeMultipartPart(resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int, partNumber: Int, body: ByteBuffer) async throws {
         guard body.readableBytes <= Self.multipartChunkSize else {
-            throw Abort(.badRequest, reason: "Chunk size exceeds 8MB")
+            throw S3ApiError.chunkSizeExceeds8MB
         }
         
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
         let tempInfo = try await FileSystem.shared.info(forFileAt: FilePath(tempPath))
         guard let tempInfo else {
-            throw Abort(.notFound, reason: "Multipart upload not found")
+            throw S3ApiError.multipartUploadNotFound
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
         guard offset + Int64(body.readableBytes) <= tempInfo.size else {
-            throw Abort(.badRequest, reason: "Part exceeds allocated file size")
+            throw S3ApiError.partExceedsAllocatedFileSize
         }
         
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
-    
-    private func completeMultipartUpload(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int) async throws {
+
+    private func validateMultipartCompletionBody(resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int, body: ByteBuffer) async throws {
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
-        guard try await FileSystem.shared.info(forFileAt: FilePath(tempPath)) != nil else {
-            throw Abort(.notFound, reason: "Multipart upload not found")
+        guard let completionXML = body.getString(at: body.readerIndex, length: body.readableBytes) else {
+            throw S3ApiError.couldNotDecodeCompletionXML
         }
-        try await ensureParentDirectoryExists(forFileAt: resolved.absolutePath)
+        let parts = try parseMultipartCompleteXML(completionXML)
+
+        _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(tempPath)) { handle in
+            let fileSize = try await handle.getFileSize()
+            guard fileSize > 0 else {
+                return
+            }
+            var partIndex = 0
+            for try await chunk in handle.readChunks(chunkLength: .bytes(Int64(Self.multipartChunkSize))) {
+                guard partIndex < parts.count else {
+                    throw S3ApiError.invalidNumberOfParts
+                }
+                let part = parts[partIndex]
+                guard part.partNumber == partIndex + 1 else {
+                    throw S3ApiError.nonContiguousPartNumbers
+                }
+                let actualHash = chunk.readableBytesView.sha256Hex
+                guard part.etagSha256.caseInsensitiveCompare(actualHash) == .orderedSame else {
+                    throw S3ApiError.multipartPartHashMismatch
+                }
+                partIndex += 1
+            }
+
+            guard partIndex == parts.count else {
+                throw S3ApiError.invalidNumberOfParts
+            }
+        }
+    }
+
+    private func finalizeMultipartUpload(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int) async throws {
+        let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
         try await FileSystem.shared.replaceItem(at: FilePath(resolved.absolutePath), withItemAt: FilePath(tempPath))
         try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: resolved.absolutePath)
+    }
+
+    private func parseMultipartCompleteXML(_ xml: String) throws -> [(partNumber: Int, etagSha256: Substring)] {
+        guard let root = xml.xmlFirst("CompleteMultipartUpload") else {
+            throw S3ApiError.invalidCompletionXML
+        }
+        return try root.xmlSection("Part").map { partSection in
+            guard let partNumberString = partSection.xmlFirst("PartNumber"),
+                  let etag = partSection.xmlFirst("ETag"),
+                  let partNumber = Int(partNumberString), partNumber >= 1,
+                  !etag.isEmpty else {
+                throw S3ApiError.invalidCompletionXMLPart
+            }
+            return (partNumber, etag.trimmingQuotes())
+        }
     }
     
     private func makeUploadPartResponse(body: ByteBuffer) -> Response {
@@ -469,7 +518,7 @@ struct S3DataController: RouteCollection {
             return
         }
         guard !Self.readCredentials.isEmpty else {
-            throw SyncError.invalidApiKey
+            throw S3ApiError.invalidApiKey
         }
         try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: Self.readCredentials, missingCredentialsReason: "No read credentials configured")
     }
@@ -480,12 +529,12 @@ struct S3DataController: RouteCollection {
 
     private func verifyRequestSignature(req: Request, body: ByteBuffer, credentials: [UploadCredential], missingCredentialsReason: String) throws {
         guard !credentials.isEmpty else {
-            throw Abort(.serviceUnavailable, reason: missingCredentialsReason)
+            throw S3ApiError.missingCredentials(missingCredentialsReason)
         }
         let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
         guard let host else {
-            throw Abort(.unauthorized, reason: "Missing Host header")
+            throw S3ApiError.missingHostHeader
         }
         let canonicalURL = "\(req.scheme)://\(host)\(req.url.string)"
         
@@ -502,8 +551,10 @@ struct S3DataController: RouteCollection {
             }
         }
         
-        let reason = hasMatchingAccessKey ? "Invalid request signature" : "Unknown access key"
-        throw Abort(.unauthorized, reason: reason)
+        if hasMatchingAccessKey {
+            throw S3ApiError.invalidRequestSignature
+        }
+        throw S3ApiError.unknownAccessKey
     }
     
     private func ensureParentDirectoryExists(forFileAt path: String) async throws {
@@ -520,6 +571,9 @@ struct S3DataController: RouteCollection {
     }
     
     private func activeReplicationServers(_ req: Request) async -> [S3ReplicationServer] {
+        if req.headers.first(name: "x-replication") == "false" {
+            return []
+        }
         return await req.application.s3ServerHealth.activeServers()
     }
     
@@ -534,6 +588,7 @@ struct S3DataController: RouteCollection {
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
+            request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentLength, value: "\(bodyLength)")
             if let contentType = req.headers.first(name: .contentType) {
                 request.headers.add(name: .contentType, value: contentType)
@@ -552,6 +607,7 @@ struct S3DataController: RouteCollection {
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?uploads")
             request.method = .POST
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
+            request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: "x-upload-id", value: "\(uploadId)")
             request.headers.add(name: "x-file-size", value: "\(fileSize)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
@@ -568,19 +624,25 @@ struct S3DataController: RouteCollection {
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
+            request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentLength, value: "\(bodyLength)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
     
-    private func replicateMultipartComplete(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int) async throws {
+    private func replicateMultipartComplete(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int, body: ByteBuffer) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         let lastModified = req.headers.first(name: "x-last-modified")
+        let bodyHash = body.readableBytesView.sha256Hex
+        //let bodyLength = body.readableBytes
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?uploadId=\(uploadId)")
             request.method = .POST
-            request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
+            request.body = .bytes(body)
+            request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
+            request.headers.add(name: "x-replication", value: "false")
+            request.headers.add(name: .contentType, value: "application/xml")
             if let lastModified {
                 request.headers.add(name: "x-last-modified", value: lastModified)
             }
@@ -595,6 +657,7 @@ struct S3DataController: RouteCollection {
             var request = HTTPClientRequest(url: server.objectURL(relativePath: resolved.relativePath) + "?uploadId=\(uploadId)")
             request.method = .DELETE
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
+            request.headers.add(name: "x-replication", value: "false")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
@@ -663,14 +726,125 @@ struct S3DataController: RouteCollection {
     }
 }
 
-enum SyncError: AbortError {
+enum S3ApiError: AbortError, Equatable {
     case invalidApiKey
+    case forbidden
+    case expectedBodyPayload
+    case invalidUploadId
+    case invalidPartNumber
+    case expectedCompletionXMLBody
+    case unsupportedPostOperation
+    case missingOrInvalidFileSizeHeader
+    case chunkSizeExceeds8MB
+    case multipartUploadNotFound
+    case partExceedsAllocatedFileSize
+    case couldNotDecodeCompletionXML
+    case invalidNumberOfParts
+    case nonContiguousPartNumbers
+    case multipartPartHashMismatch
+    case invalidCompletionXML
+    case invalidCompletionXMLPart
+    case missingCredentials(String)
+    case missingHostHeader
+    case invalidRequestSignature
+    case unknownAccessKey
     
     var status: NIOHTTP1.HTTPResponseStatus {
         switch self {
         case .invalidApiKey:
             return .unauthorized
+        case .forbidden:
+            return .forbidden
+        case .multipartUploadNotFound:
+            return .notFound
+        case .missingCredentials:
+            return .serviceUnavailable
+        case .missingHostHeader, .invalidRequestSignature, .unknownAccessKey:
+            return .unauthorized
+        default:
+            return .badRequest
         }
+    }
+    
+    var reason: String {
+        switch self {
+        case .invalidApiKey:
+            return "Invalid API key"
+        case .forbidden:
+            return "Forbidden"
+        case .expectedBodyPayload:
+            return "Expected body payload"
+        case .invalidUploadId:
+            return "Invalid uploadId"
+        case .invalidPartNumber:
+            return "Invalid partNumber"
+        case .expectedCompletionXMLBody:
+            return "Expected completion XML body"
+        case .unsupportedPostOperation:
+            return "Unsupported POST operation"
+        case .missingOrInvalidFileSizeHeader:
+            return "Missing or invalid x-file-size header"
+        case .chunkSizeExceeds8MB:
+            return "Chunk size exceeds 8MB"
+        case .multipartUploadNotFound:
+            return "Multipart upload not found"
+        case .partExceedsAllocatedFileSize:
+            return "Part exceeds allocated file size"
+        case .couldNotDecodeCompletionXML:
+            return "Could not decode completion XML"
+        case .invalidNumberOfParts:
+            return "Invalid number of parts"
+        case .nonContiguousPartNumbers:
+            return "Part numbers must be contiguous and start at 1"
+        case .multipartPartHashMismatch:
+            return "Multipart part hash mismatch"
+        case .invalidCompletionXML:
+            return "Invalid completion XML"
+        case .invalidCompletionXMLPart:
+            return "Invalid completion XML part"
+        case .missingCredentials(let reason):
+            return reason
+        case .missingHostHeader:
+            return "Missing Host header"
+        case .invalidRequestSignature:
+            return "Invalid request signature"
+        case .unknownAccessKey:
+            return "Unknown access key"
+        }
+    }
+}
+
+extension StringProtocol {
+    func trimmingWhitespace() -> Self.SubSequence {
+        var start = startIndex
+        while start < endIndex && self[start].isWhitespace {
+            formIndex(after: &start)
+        }
+        var end = endIndex
+        while end > start {
+            let before = index(before: end)
+            if !self[before].isWhitespace {
+                break
+            }
+            end = before
+        }
+        return self[start..<end]
+    }
+    
+    func trimmingQuotes() -> Self.SubSequence {
+        var start = startIndex
+        while start < endIndex && self[start] == "\"" {
+            formIndex(after: &start)
+        }
+        var end = endIndex
+        while end > start {
+            let before = index(before: end)
+            if self[before] != "\"" {
+                break
+            }
+            end = before
+        }
+        return self[start..<end]
     }
 }
 

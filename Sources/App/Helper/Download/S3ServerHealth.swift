@@ -42,9 +42,9 @@ actor S3ServerHealth {
 
         return configured
             .split(separator: ",")
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .map { url in
+                let url = String(url)
                 let withSlash = url.hasSuffix("/") ? url : url + "/"
                 return S3ReplicationServer(s3URL: withSlash)
             }

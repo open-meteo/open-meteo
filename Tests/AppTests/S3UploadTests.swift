@@ -93,11 +93,25 @@ struct S3UploadTests {
             #expect(partResponse.status == .ok)
 
             // Step 3: complete multipart upload
+            let completionXmlInvalidSHA = "<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>\"WRONG_SHA256\"</ETag></Part></CompleteMultipartUpload>"
+            let completeRequestInvalidSHA = try makeSignedRequest(
+                app: app,
+                method: .POST,
+                uri: "\(path)?uploadId=\(uploadId)",
+                body: ByteBuffer(string: completionXmlInvalidSHA),
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            await #expect(throws: S3ApiError.multipartPartHashMismatch) {
+                let _ = try await controller.postObject(completeRequestInvalidSHA)
+            }
+            
+            let completionXml = "<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>\"\(payload.sha256Hex)\"</ETag></Part></CompleteMultipartUpload>"
             let completeRequest = try makeSignedRequest(
                 app: app,
                 method: .POST,
                 uri: "\(path)?uploadId=\(uploadId)",
-                body: ByteBuffer(),
+                body: ByteBuffer(string: completionXml),
                 credential: credential,
                 additionalHeaders: [:]
             )
