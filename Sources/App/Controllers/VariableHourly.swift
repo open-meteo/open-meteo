@@ -834,18 +834,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                     let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                     return DataAndUnit(zip(shortwave.data, diffuse).map(-), shortwave.unit)
                 }
-            case .wind_speed_120m:
-                return .windSpeed(
-                    u: Reader.variableFromString("wind_u_component_150m"),
-                    v: Reader.variableFromString("wind_v_component_150m"),
-                    levelFrom: 150,
-                    levelTo: 120
-                )
-            case .wind_direction_120m:
-                return .windDirection(
-                    u: Reader.variableFromString("wind_u_component_150m"),
-                    v: Reader.variableFromString("wind_v_component_150m")
-                )
             case .temperature_120m:
                 return .direct(Reader.variableFromString("temperature_150m"))
             default:
@@ -986,18 +974,18 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return
                 .windSpeed(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_125m"), levelFrom: 125, levelTo: 120) ??
+                .windSpeed(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), levelFrom: 150, levelTo: 120) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_100m"), levelFrom: 100, levelTo: 120) ??
-                .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 120) ??
-                .windSpeed(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), levelFrom: 150, levelTo: 120)
+                .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 120)
         case .winddirection_120m:
             return getDeriverMap(variable: .wind_direction_120m)
         case .wind_direction_120m:
             return
                 .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ??
                 .direct(Reader.variableFromString("wind_direction_125m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m")) ??
                 .direct(Reader.variableFromString("wind_direction_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"))
         case .wind_speed_140m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"))
         case .wind_direction_140m:
