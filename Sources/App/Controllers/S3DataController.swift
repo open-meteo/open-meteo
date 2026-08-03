@@ -558,6 +558,10 @@ struct S3DataController: RouteCollection {
     }
     
     private func lazyReplicationQueues(_ req: Request) async -> [S3UploadQueue] {
+        /// Do not lazy replicate data_spatial to backend storage
+        guard req.url.path.hasPrefix("/data_spatial") == false else {
+            return []
+        }
         if req.headers.first(name: "x-replication") == "false" {
             return []
         }
