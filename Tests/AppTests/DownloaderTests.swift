@@ -114,12 +114,12 @@ import Darwin
 
     @Test func s3BucketEndpointParsesProfilesAndCredentialOverrides() throws {
         let endpoints = S3BucketEndpoint.parseList(
-            "openmeteo,https://user:pw@example.com/bucket/@aws"
+            "s3://openmeteo/,s3://user:pw@example.com/bucket/@aws"
         )
 
         #expect(endpoints == [
-            S3BucketEndpoint(rawEndpoint: "openmeteo", profile: nil),
-            S3BucketEndpoint(rawEndpoint: "https://user:pw@example.com/bucket/", profile: "aws")
+            S3BucketEndpoint(rawEndpoint: "s3://openmeteo/", profile: nil),
+            S3BucketEndpoint(rawEndpoint: "s3://user:pw@example.com/bucket/", profile: "aws")
         ])
 
         setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://credential-bucket/", 1)
@@ -132,10 +132,10 @@ import Darwin
 
     @Test func s3BucketEndpointListRedactsMultipleCredentialedEndpoints() throws {
         let endpoints = S3BucketEndpointList(
-            "s3://user1:pw1@bucket-a/@aws,https://user2:pw2@example.com/bucket/@ceph"
+            "s3://user1:pw1@bucket-a/@aws,s3://user2:pw2@example.com/bucket/@ceph"
         )
 
-        #expect(String(describing: endpoints) == "s3://bucket-a/,https://example.com/bucket/")
+        #expect(String(describing: endpoints) == "s3://bucket-a/,s3://example.com/bucket/")
         #expect(!String(describing: endpoints).contains("user1"))
         #expect(!String(describing: endpoints).contains("pw1"))
         #expect(!String(describing: endpoints).contains("user2"))
