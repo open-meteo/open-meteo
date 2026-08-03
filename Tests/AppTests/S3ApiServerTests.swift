@@ -94,6 +94,7 @@ struct S3ApiServerTests {
                 additionalHeaders: [:]
             )
             let partResponse = try await controller.putObject(partRequest)
+            #expect(partResponse.headers["ETag"].first == payload.sha256Hex)
             #expect(partResponse.status == .ok)
 
             // Step 3: complete multipart upload

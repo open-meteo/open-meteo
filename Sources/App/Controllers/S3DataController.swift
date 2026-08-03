@@ -500,7 +500,7 @@ struct S3DataController: RouteCollection {
     
     private func makeUploadPartResponse(body: ByteBuffer) -> Response {
         var headers = HTTPHeaders()
-        headers.add(name: "ETag", value: "\"\(body.readableBytesView.sha256Hex)\"")
+        headers.add(name: "ETag", value: "\(body.readableBytesView.sha256Hex)")
         return Response(status: .ok, headers: headers)
     }
     
