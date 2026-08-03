@@ -72,7 +72,7 @@ struct S3DataController: RouteCollection {
     }
     
     func headRoot(_ req: Request) throws -> HTTPStatus {
-        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: self.readCredentials, missingCredentialsReason: "No read credentials configured")
+        try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
         return .ok
     }
     
@@ -530,16 +530,17 @@ struct S3DataController: RouteCollection {
         guard !self.readCredentials.isEmpty else {
             throw S3ApiError.invalidApiKey
         }
-        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: self.readCredentials, missingCredentialsReason: "No read credentials configured")
+        try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
     }
     
     private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
-        try verifyRequestSignature(req: req, body: body, credentials: self.uploadCredentials, missingCredentialsReason: "No upload credentials configured")
+        try verifyRequestSignature(req: req, body: body, isRead: false)
     }
     
-    private func verifyRequestSignature(req: Request, body: ByteBuffer, credentials: [UploadCredential], missingCredentialsReason: String) throws {
+    private func verifyRequestSignature(req: Request, body: ByteBuffer, isRead: Bool) throws {
+        let credentials = isRead ? self.readCredentials : self.uploadCredentials
         guard !credentials.isEmpty else {
-            throw S3ApiError.missingCredentials(missingCredentialsReason)
+            throw isRead ? S3ApiError.missingReadCredentials : S3ApiError.missingUploadCredentials
         }
         let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
@@ -756,7 +757,8 @@ enum S3ApiError: AbortError, Equatable {
     case multipartPartHashMismatch
     case invalidCompletionXML
     case invalidCompletionXMLPart
-    case missingCredentials(String)
+    case missingReadCredentials
+    case missingUploadCredentials
     case missingHostHeader
     case missingSha256HashHeader
     case invalidRequestSignature
@@ -770,7 +772,7 @@ enum S3ApiError: AbortError, Equatable {
             return .forbidden
         case .multipartUploadNotFound:
             return .notFound
-        case .missingCredentials:
+        case .missingReadCredentials, .missingUploadCredentials:
             return .serviceUnavailable
         case .missingHostHeader, .invalidRequestSignature, .unknownAccessKey:
             return .unauthorized
@@ -815,8 +817,10 @@ enum S3ApiError: AbortError, Equatable {
             return "Invalid completion XML"
         case .invalidCompletionXMLPart:
             return "Invalid completion XML part"
-        case .missingCredentials(let reason):
-            return reason
+        case .missingReadCredentials:
+            return "No read credentials configured"
+        case .missingUploadCredentials:
+            return "No upload credentials configured"
         case .missingHostHeader:
             return "Missing Host header"
         case .missingSha256HashHeader:
