@@ -22,7 +22,7 @@ import NIOFileSystem
  ```
  
  If S3_READ_CREDENTIALS is set to "key1:secret1,key2:secret2" the list and download endpoints accept AWS SigV4 signed GET requests in addition to API keys.
-
+ 
  If S3_UPLOAD_CREDENTIALS is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set. E.g. AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
  
  If S3_UPLOAD_REPLICATION_SERVERS is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/," all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation
@@ -30,19 +30,25 @@ import NIOFileSystem
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
     static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
-    static let readCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_READ_CREDENTIALS") + Self.uploadCredentials
-    static let uploadCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_UPLOAD_CREDENTIALS")
     static let multipartChunkSize = 8 * 1024 * 1024
     static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
     static let uploadIdRange = 1_000_000_000...Int.max
     static let uploadMaximumFileSize = 500 << 30 // 500GB
     
+    let readCredentials: [UploadCredential]
+    let uploadCredentials: [UploadCredential]
+    
+    init(readCredentials: [UploadCredential]? = nil, uploadCredentials: [UploadCredential]? = nil) {
+        self.uploadCredentials = uploadCredentials ?? UploadCredential.loadFromEnvironment(key: "S3_UPLOAD_CREDENTIALS")
+        self.readCredentials = readCredentials ?? UploadCredential.loadFromEnvironment(key: "S3_READ_CREDENTIALS") + self.uploadCredentials
+    }
+    
     func boot(routes: RoutesBuilder) throws {
-        if Self.syncApiKeys.isEmpty && Self.readCredentials.isEmpty && Self.uploadCredentials.isEmpty {
+        if Self.syncApiKeys.isEmpty && readCredentials.isEmpty && uploadCredentials.isEmpty {
             return
         }
         
-        if !Self.syncApiKeys.isEmpty || !Self.readCredentials.isEmpty {
+        if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
             routes.on(.HEAD, [], use: self.headRoot)
             routes.get("", use: self.list)
             routes.get("data", "**", use: self.get)
@@ -50,7 +56,7 @@ struct S3DataController: RouteCollection {
             routes.get("data_spatial", "**", use: self.get)
         }
         
-        if !Self.uploadCredentials.isEmpty {
+        if !self.uploadCredentials.isEmpty {
             for root in ["data", "data_run", "data_spatial"] {
                 routes.on(.PUT, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.putObject)
                 routes.on(.POST, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.postObject)
@@ -64,15 +70,20 @@ struct S3DataController: RouteCollection {
         /// in megabytes per second
         let rate: Int?
     }
-
+    
     func headRoot(_ req: Request) throws -> HTTPStatus {
-        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: Self.readCredentials, missingCredentialsReason: "No read credentials configured")
+        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: self.readCredentials, missingCredentialsReason: "No read credentials configured")
         return .ok
     }
     
     struct UploadCredential: Sendable, Hashable {
         let accessKey: String
         let secretKey: String
+        
+        init(accessKey: String, secretKey: String) {
+            self.accessKey = accessKey
+            self.secretKey = secretKey
+        }
         
         static func loadFromEnvironment(key: String) -> [UploadCredential] {
             guard let raw = Environment.get(key) else {
@@ -142,11 +153,11 @@ struct S3DataController: RouteCollection {
               !path.contains("//"),
               !path.contains(".."),
               path.onlyContainsAlphanumericDashSlashDot else {
-                        throw S3ApiError.forbidden
+            throw S3ApiError.forbidden
         }
         
         guard let resolved = resolveListPath(path) else {
-                        throw S3ApiError.forbidden
+            throw S3ApiError.forbidden
         }
         
         let pathUrl = URL(fileURLWithPath: resolved.absoluteDirectoryPath, isDirectory: true)
@@ -371,7 +382,6 @@ struct S3DataController: RouteCollection {
     
     private func uploadSinglePut(req: Request, body: ByteBuffer) async throws {
         guard let resolved = resolveObjectPath(req.url.path) else {
-            print(req.url.path)
             throw S3ApiError.forbidden
         }
         let uploadId = Int.random(in: Self.uploadIdRange)
@@ -451,14 +461,14 @@ struct S3DataController: RouteCollection {
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
-
+    
     private func validateMultipartCompletionBody(resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int, body: ByteBuffer) async throws {
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
         guard let completionXML = body.getString(at: body.readerIndex, length: body.readableBytes) else {
             throw S3ApiError.couldNotDecodeCompletionXML
         }
         let parts = try parseMultipartCompleteXML(completionXML)
-
+        
         _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(tempPath)) { handle in
             let fileSize = try await handle.getFileSize()
             guard fileSize > 0 else {
@@ -479,19 +489,19 @@ struct S3DataController: RouteCollection {
                 }
                 partIndex += 1
             }
-
+            
             guard partIndex == parts.count else {
                 throw S3ApiError.invalidNumberOfParts
             }
         }
     }
-
+    
     private func finalizeMultipartUpload(req: Request, resolved: (root: S3Root, relativePath: String, absolutePath: String), uploadId: Int) async throws {
         let tempPath = tempUploadPath(finalPath: resolved.absolutePath, uploadId: uploadId)
         try await FileSystem.shared.replaceItem(at: FilePath(resolved.absolutePath), withItemAt: FilePath(tempPath))
         try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: resolved.absolutePath)
     }
-
+    
     private func parseMultipartCompleteXML(_ xml: String) throws -> [(partNumber: Int, etagSha256: Substring)] {
         guard let root = xml.xmlFirst("CompleteMultipartUpload") else {
             throw S3ApiError.invalidCompletionXML
@@ -517,16 +527,16 @@ struct S3DataController: RouteCollection {
         if let apikey, Self.syncApiKeys.contains(where: { $0 == apikey }) {
             return
         }
-        guard !Self.readCredentials.isEmpty else {
+        guard !self.readCredentials.isEmpty else {
             throw S3ApiError.invalidApiKey
         }
-        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: Self.readCredentials, missingCredentialsReason: "No read credentials configured")
+        try verifyRequestSignature(req: req, body: ByteBuffer(), credentials: self.readCredentials, missingCredentialsReason: "No read credentials configured")
     }
-
+    
     private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
-        try verifyRequestSignature(req: req, body: body, credentials: Self.uploadCredentials, missingCredentialsReason: "No upload credentials configured")
+        try verifyRequestSignature(req: req, body: body, credentials: self.uploadCredentials, missingCredentialsReason: "No upload credentials configured")
     }
-
+    
     private func verifyRequestSignature(req: Request, body: ByteBuffer, credentials: [UploadCredential], missingCredentialsReason: String) throws {
         guard !credentials.isEmpty else {
             throw S3ApiError.missingCredentials(missingCredentialsReason)

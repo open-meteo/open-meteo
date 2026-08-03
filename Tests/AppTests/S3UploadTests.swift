@@ -10,11 +10,10 @@ import NIOCore
 struct S3UploadTests {
     private let host = "localhost"
 
-    @Test(.enabled(if: !S3DataController.uploadCredentials.isEmpty))
     func singlePutUpload() async throws {
         try await withApp { app in
-            let controller = S3DataController()
-            let credential = try #require(S3DataController.uploadCredentials.first)
+            let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+            let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
 
             let objectName = "s3-upload-tests/single-\(UUID().uuidString).bin"
             let path = "/data/\(objectName)"
@@ -45,11 +44,10 @@ struct S3UploadTests {
         }
     }
 
-    @Test(.enabled(if: !S3DataController.uploadCredentials.isEmpty))
     func multipartUpload() async throws {
         try await withApp { app in
-            let controller = S3DataController()
-            let credential = try #require(S3DataController.uploadCredentials.first)
+            let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+            let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
 
             let objectName = "s3-upload-tests/multipart-\(UUID().uuidString).bin"
             let path = "/data/\(objectName)"
