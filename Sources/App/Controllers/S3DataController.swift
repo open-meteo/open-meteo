@@ -363,7 +363,7 @@ struct S3DataController: RouteCollection {
         try await replicateSinglePut(req: req, body: body)
         
         for queue in await lazyReplicationQueues(req) {
-            await queue.upload(data: body.readableBytesView, objectName: req.url.path, contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
+            await queue.upload(buffer: body, objectName: String(req.url.path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
         }
     }
     
@@ -478,7 +478,7 @@ struct S3DataController: RouteCollection {
         
         for queue in await lazyReplicationQueues(req) {
             let session = queue.startMultiPartUploads()
-            await session.uploadMultipart(file: absolutePath, objectName: req.url.path)
+            await session.uploadMultipart(file: absolutePath, objectName: String(req.url.path.dropFirst(1)))
             await queue.finishMultiPartUploads(session)
         }
     }
