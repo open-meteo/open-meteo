@@ -21,11 +21,13 @@ import NIOFileSystem
  }
  ```
  
- If S3_READ_CREDENTIALS is set to "key1:secret1,key2:secret2" the list and download endpoints accept AWS SigV4 signed GET requests in addition to API keys.
+ If `S3_READ_CREDENTIALS` is set to "key1:secret1,key2:secret2" the list and download endpoints accept AWS SigV4 signed GET requests in addition to API keys.
  
- If S3_UPLOAD_CREDENTIALS is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set. E.g. AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+ If `S3_UPLOAD_CREDENTIALS` is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set. E.g. AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
  
- If S3_UPLOAD_REPLICATION_SERVERS is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/," all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation
+ If `S3_UPLOAD_REPLICATION_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation. Used to replicate uploads to a fail-over server in realtime. If the server is available. This is a blocking operation.
+ 
+ If `S3_UPLOAD_LAZY_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are lazily replicated to those servers after the sync replication completed. Used to upload data to large S3 storage servers afterwards
  */
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
@@ -359,6 +361,10 @@ struct S3DataController: RouteCollection {
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: absolutePath)
         try await replicateSinglePut(req: req, body: body)
+        
+        for queue in await lazyReplicationQueues(req) {
+            await queue.upload(data: body.readableBytesView, objectName: req.url.path, contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
+        }
     }
     
     private struct MultipartInitPrepared {
@@ -469,6 +475,12 @@ struct S3DataController: RouteCollection {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: absolutePath)
+        
+        for queue in await lazyReplicationQueues(req) {
+            let session = queue.startMultiPartUploads()
+            await session.uploadMultipart(file: absolutePath, objectName: req.url.path)
+            await queue.finishMultiPartUploads(session)
+        }
     }
     
     private func parseMultipartCompleteXML(_ xml: String) throws -> [(partNumber: Int, etagSha256: Substring)] {
@@ -538,11 +550,21 @@ struct S3DataController: RouteCollection {
         try await FileSystem.shared.createDirectory(at: FilePath(String(parent)), withIntermediateDirectories: true)
     }
     
-    private func activeReplicationServers(_ req: Request) async -> [String] {
+    private func activeReplicationServers(_ req: Request) async -> [S3BucketEndpoint] {
         if req.headers.first(name: "x-replication") == "false" {
             return []
         }
         return await req.application.s3UploadReplicationServer.activeServers()
+    }
+    
+    private func lazyReplicationQueues(_ req: Request) async -> [S3UploadQueue] {
+        if req.headers.first(name: "x-replication") == "false" {
+            return []
+        }
+        guard let servers = Environment.get("S3_UPLOAD_LAZY_SERVERS") else {
+            return []
+        }
+        return await req.application.s3SyncManager.getQueues(buckets: servers)
     }
     
     private func replicateSinglePut(req: Request, body: ByteBuffer) async throws {
@@ -553,7 +575,7 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.missingSha256HashHeader
         }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: "\(server)\(req.url.path)")
+            var request = HTTPClientRequest(url: server.uploadURL(remotePath: "\(req.url.path)"))
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
@@ -572,7 +594,7 @@ struct S3DataController: RouteCollection {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?uploads")
+            var request = HTTPClientRequest(url: server.uploadURL(remotePath: "\(req.url.path)?uploads"))
             request.method = .POST
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             request.headers.add(name: "x-replication", value: "false")
@@ -589,7 +611,7 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.missingSha256HashHeader
         }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?partNumber=\(partNumber)&uploadId=\(uploadId)")
+            var request = HTTPClientRequest(url: server.uploadURL(remotePath: "\(req.url.path)?partNumber=\(partNumber)&uploadId=\(uploadId)"))
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
@@ -607,7 +629,7 @@ struct S3DataController: RouteCollection {
         }
         //let bodyLength = body.readableBytes
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?uploadId=\(uploadId)")
+            var request = HTTPClientRequest(url: server.uploadURL(remotePath: "\(req.url.path)?uploadId=\(uploadId)"))
             request.method = .POST
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
@@ -624,7 +646,7 @@ struct S3DataController: RouteCollection {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?uploadId=\(uploadId)")
+            var request = HTTPClientRequest(url: server.uploadURL(remotePath: "\(req.url.path)?uploadId=\(uploadId)"))
             request.method = .DELETE
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             request.headers.add(name: "x-replication", value: "false")

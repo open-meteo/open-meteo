@@ -44,9 +44,18 @@ struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
             if let credentials = Environment.get("S3_CREDENTIALS_\(bucket.uppercased())\(profileUpper)") {
                 return S3BucketEndpoint(rawEndpoint: credentials, profile: profile)
             }
-
+            guard bucket.starts(with: "s3://") else {
+                fatalError("replication server URL must start with 's3://'")
+            }
             return S3BucketEndpoint(rawEndpoint: String(bucket), profile: profile)
         }
+    }
+    
+    static func loadFromEnvironment(variable: String) -> [S3BucketEndpoint] {
+        guard let configured = Environment.get(variable) else {
+            return []
+        }
+        return self.parseList(configured)
     }
 }
 

@@ -5,8 +5,7 @@ import Logging
 
 actor S3ServerHealth: LifecycleHandler {
     private struct ServerState: Sendable {
-        /// Well formatted server string with trailing slash
-        let server: String
+        let server: S3BucketEndpoint
         var isOnline: Bool
     }
 
@@ -16,32 +15,13 @@ actor S3ServerHealth: LifecycleHandler {
     private var initialChecksCompleted = false
     private var monitorTask: Task<Void, Never>?
 
-    init(client: HTTPClient, logger: Logger, servers: [String]) {
+    init(client: HTTPClient, logger: Logger, servers: [S3BucketEndpoint]) {
         self.client = client
         self.logger = logger
         self.states = servers.map { .init(server: $0, isOnline: true) }
     }
 
-    static func loadFromEnvironment(key: String = "S3_UPLOAD_REPLICATION_SERVERS") -> [String] {
-        guard let configured = Environment.get(key) else {
-            return []
-        }
-
-        return configured
-            .split(separator: ",")
-            .map { url in
-                let url = String(url)
-                guard url.starts(with: "s3://") else {
-                    fatalError("replication server URL must start with 's3://'")
-                }
-                guard url.hasSuffix("/") else {
-                    fatalError("replication server URL must end with '/' trailing slash")
-                }
-                return url
-            }
-    }
-
-    func activeServers() async -> [String] {
+    func activeServers() async -> [S3BucketEndpoint] {
         if initialChecksCompleted == false {
             await performHealthChecks()
             initialChecksCompleted = true
@@ -81,7 +61,7 @@ actor S3ServerHealth: LifecycleHandler {
     private func checkServer(index: Int) async {
         let server = states[index].server
         do {
-            var request = HTTPClientRequest(url: server)
+            var request = HTTPClientRequest(url: server.uploadServer)
             request.method = .HEAD
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             _ = try await client.executeRetry(
@@ -92,11 +72,11 @@ actor S3ServerHealth: LifecycleHandler {
             )
 
             if states[index].isOnline == false {
-                logger.info("Replication server is online again: \(server.stripHttpPassword())")
+                logger.info("Replication server is online again: \(server.uploadServer.stripHttpPassword())")
             }
             states[index].isOnline = true
         } catch {
-            logger.error("Replication server HEAD failed: \(server.stripHttpPassword()). Error: \(error)")
+            logger.error("Replication server HEAD failed: \(server.uploadServer.stripHttpPassword()). Error: \(error)")
             states[index].isOnline = false
         }
     }
@@ -115,7 +95,8 @@ extension Application {
         if let existing = self.storage[S3ServerHealthKey.self] {
             return existing
         }
-        let manager = S3ServerHealth(client: dedicatedHttpClient, logger: logger, servers: S3ServerHealth.loadFromEnvironment())
+        let servers = S3BucketEndpoint.loadFromEnvironment(variable: "S3_UPLOAD_REPLICATION_SERVERS")
+        let manager = S3ServerHealth(client: dedicatedHttpClient, logger: logger, servers: servers)
         self.lifecycle.use(manager)
         self.storage[S3ServerHealthKey.self] = manager
         return manager
