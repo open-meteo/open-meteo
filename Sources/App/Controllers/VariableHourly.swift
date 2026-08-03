@@ -848,23 +848,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 )
             case .temperature_120m:
                 return .direct(Reader.variableFromString("temperature_150m"))
-            case .rain:
-                guard
-                    let precipitation = Reader.variableFromString("precipitation"),
-                    let snowfallWaterEquivalent = getDeriverMap(variable: .snowfall_water_equivalent)
-                else {
-                    return nil
-                }
-                return .two(.raw(precipitation), .mapped(snowfallWaterEquivalent)) { precipitation, snowfallWaterEquivalent, _ in
-                    return DataAndUnit(zip(precipitation.data, snowfallWaterEquivalent.data).map(-), precipitation.unit)
-                }
-            case .showers:
-                guard let precipitation = Reader.variableFromString("precipitation") else {
-                    return nil
-                }
-                return .one(.raw(precipitation)) { precipitation, _ in
-                    return DataAndUnit(precipitation.data.map { min($0, 0) }, precipitation.unit)
-                }
             default:
                 break
             }
