@@ -31,7 +31,6 @@ struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
     static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
     static let multipartChunkSize = 8 * 1024 * 1024
-    static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
     static let uploadIdRange = 1_000_000_000...Int.max
     static let uploadMaximumFileSize = 500 << 30 // 500GB
     
@@ -108,31 +107,6 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    enum S3Root: String, CaseIterable {
-        case data = "data"
-        case dataRun = "data_run"
-        case dataSpatial = "data_spatial"
-        
-        var pathPrefix: String {
-            "/\(rawValue)/"
-        }
-        
-        var listPrefix: String {
-            "\(rawValue)/"
-        }
-        
-        var directory: String {
-            switch self {
-            case .data:
-                return OpenMeteo.dataDirectory
-            case .dataRun:
-                return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")
-            case .dataSpatial:
-                return OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")
-            }
-        }
-    }
-    
     /// List all files in a specified directory
     func list(_ req: Request) async throws -> Response {
         OmMetrics.requestsS3ApiTotal.add(1, ordering: .relaxed)
@@ -147,20 +121,11 @@ struct S3DataController: RouteCollection {
         guard params.list_type == 2, params.delimiter == "/" else {
             throw S3ApiError.forbidden
         }
-        guard !path.isEmpty,
-              path.last == "/",
-              !path.hasPrefix("/"),
-              !path.contains("//"),
-              !path.contains(".."),
-              path.onlyContainsAlphanumericDashSlashDot else {
+        guard let absoluteDirectoryPath = resolveListPath(path) else {
             throw S3ApiError.forbidden
         }
         
-        guard let resolved = resolveListPath(path) else {
-            throw S3ApiError.forbidden
-        }
-        
-        let pathUrl = URL(fileURLWithPath: resolved.absoluteDirectoryPath, isDirectory: true)
+        let pathUrl = URL(fileURLWithPath: absoluteDirectoryPath, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
         guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
@@ -195,7 +160,7 @@ struct S3DataController: RouteCollection {
         let filesXml = files.map {
             """
             <Contents>
-                <Key>\(resolved.prefix)\($0.name)</Key>
+                <Key>\(path)\($0.name)</Key>
                 <LastModified>\(dateFormat.string(from: $0.modificationTime))</LastModified>
                 <Size>\($0.fileSize)</Size>
                 <StorageClass>STANDARD</StorageClass>
@@ -205,7 +170,7 @@ struct S3DataController: RouteCollection {
         let directoriesXml = directories.map {
             """
             <CommonPrefixes>
-            <Prefix>\(resolved.prefix)\($0)/</Prefix>
+            <Prefix>\(path)\($0)/</Prefix>
             </CommonPrefixes>
             """
         }.joined(separator: "\n")
@@ -216,7 +181,7 @@ struct S3DataController: RouteCollection {
         <?xml version="1.0" encoding="UTF-8"?>
         <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
             <Name>openmeteo</Name>
-            <Prefix>\(resolved.prefix)</Prefix>
+            <Prefix>\(path)</Prefix>
             <KeyCount>\(files.count + directories.count)</KeyCount>
             <MaxKeys>1000</MaxKeys>
             <Delimiter>/</Delimiter>
@@ -671,16 +636,26 @@ struct S3DataController: RouteCollection {
         return "\(finalPath).\(uploadId)~"
     }
     
-    private func resolveListPath(_ prefix: String) -> (prefix: String, absoluteDirectoryPath: String)? {
-        for root in Self.supportedRoots {
-            guard prefix.starts(with: root.listPrefix) else { continue }
-            let relative = String(prefix.dropFirst(root.listPrefix.count))
-            if relative.contains("..") || relative.contains("//") {
-                return nil
-            }
-            return (prefix, root.directory + relative)
+    private func resolveListPath(_ path: String) -> String? {
+        guard !path.isEmpty,
+              path.last == "/",
+              !path.hasPrefix("/"),
+              !path.contains("//"),
+              !path.contains(".."),
+              path.onlyContainsAlphanumericDashSlashDot else {
+            return nil
         }
-        return nil
+        let directory: Substring
+        if path.starts(with: "data/") {
+            directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
+        } else if path.starts(with: "data_run/") {
+            directory = (OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")).dropLast("/data_run/".count)
+        } else if path.starts(with: "data_spatial/") {
+            directory = (OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")).dropLast("/data_spatial/".count)
+        } else {
+            return nil
+        }
+        return "\(directory)/\(path)"
     }
     
     /// Get absolute object path for local storage
@@ -693,13 +668,17 @@ struct S3DataController: RouteCollection {
               path.onlyContainsAlphanumericDashSlashDot else {
             return nil
         }
-        for root in Self.supportedRoots {
-            guard path.starts(with: root.pathPrefix) else { continue }
-            let relative = path.dropFirst(root.pathPrefix.count)
-            guard !relative.isEmpty else { return nil }
-            return (root.directory + relative)
+        let directory: Substring
+        if path.starts(with: "/data/") {
+            directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
+        } else if path.starts(with: "/data_run/") {
+            directory = (OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")).dropLast("/data_run/".count)
+        } else if path.starts(with: "/data_spatial/") {
+            directory = (OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")).dropLast("/data_spatial/".count)
+        } else {
+            return nil
         }
-        return nil
+        return "\(directory)\(path)"
     }
     
     private func applyLastModifiedIfProvided(header: String?, filePath: String) async throws {

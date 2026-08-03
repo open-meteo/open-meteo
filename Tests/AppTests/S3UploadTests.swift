@@ -73,6 +73,14 @@ struct S3UploadTests {
             )
             let initiateResponse = try await controller.postObject(initiateRequest)
             #expect(initiateResponse.status == .ok)
+            #expect(initiateResponse.body.buffer!.string == """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                    <Bucket>openmeteo</Bucket>
+                    <Key>\(path)</Key>
+                    <UploadId>\(uploadId)</UploadId>
+                </InitiateMultipartUploadResult>
+                """)
 
             // Step 2: upload first part
             var partBody = ByteBufferAllocator().buffer(capacity: payload.count)
@@ -116,6 +124,31 @@ struct S3UploadTests {
 
             let stored = try Data(contentsOf: URL(fileURLWithPath: absolutePath))
             #expect(stored == payload)
+            
+            let listRequest = try makeSignedRequest(
+                app: app,
+                method: .GET,
+                uri: "/?list-type=2&delimiter=/&prefix=data/s3-upload-tests/",
+                body: ByteBuffer(),
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            let listResponse = try await controller.list(listRequest)
+            #expect(listResponse.status == .ok)
+            #expect(listResponse.body.buffer!.string.contains("<Key>data/\(objectName)</Key>"))
+            
+            let getRequest = try makeSignedRequest(
+                app: app,
+                method: .GET,
+                uri: path,
+                body: ByteBuffer(),
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            let getResponse = try await controller.get(getRequest)
+            #expect(getResponse.status == .ok)
+            #expect(try await getResponse.body.collect(on: app.eventLoopGroup.next()).get()?.string == "multipart-upload-body")
+
         }
     }
 
