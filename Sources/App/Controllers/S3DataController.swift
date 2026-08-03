@@ -283,7 +283,7 @@ struct S3DataController: RouteCollection {
         guard let body = req.body.data else {
             throw S3ApiError.expectedBodyPayload
         }
-        try verifyUploadSignature(req: req, body: body)
+        try verifyRequestSignature(req: req, body: body, isRead: false)
         struct Params: Codable {
             let uploadId: Int?
             let partNumber: Int?
@@ -310,7 +310,7 @@ struct S3DataController: RouteCollection {
     
     func postObject(_ req: Request) async throws -> Response {
         let body = req.body.data
-        try verifyUploadSignature(req: req, body: body ?? ByteBuffer())
+        try verifyRequestSignature(req: req, body: body ?? ByteBuffer(), isRead: false)
         struct Params: Codable {
             let uploadId: Int?
             let partNumber: Int?
@@ -361,7 +361,7 @@ struct S3DataController: RouteCollection {
     }
     
     func deleteObject(_ req: Request) async throws -> Response {
-        try verifyUploadSignature(req: req, body: ByteBuffer())
+        try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: false)
         struct Params: Codable {
             let uploadId: Int
         }
@@ -421,7 +421,12 @@ struct S3DataController: RouteCollection {
         } else {
             uploadId = Int.random(in: Self.uploadIdRange)
         }
-        try await allocateMultipartTempFile(absolutePath: absolutePath, uploadId: uploadId, fileSize: fileSize)
+        
+        let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
+        try await ensureParentDirectoryExists(forFileAt: absolutePath)
+        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
+            try await handle.resize(to: .bytes(fileSize))
+        }
         
         let responseBody = """
         <?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -532,10 +537,6 @@ struct S3DataController: RouteCollection {
         try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
     }
     
-    private func verifyUploadSignature(req: Request, body: ByteBuffer) throws {
-        try verifyRequestSignature(req: req, body: body, isRead: false)
-    }
-    
     private func verifyRequestSignature(req: Request, body: ByteBuffer, isRead: Bool) throws {
         let credentials = isRead ? self.readCredentials : self.uploadCredentials
         guard !credentials.isEmpty else {
@@ -571,15 +572,6 @@ struct S3DataController: RouteCollection {
         let parent = path.removeLastPathComponent()
         try await FileSystem.shared.createDirectory(at: FilePath(String(parent)), withIntermediateDirectories: true)
     }
-    
-    private func allocateMultipartTempFile(absolutePath: String, uploadId: Int, fileSize: Int64) async throws {
-        let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        try await ensureParentDirectoryExists(forFileAt: absolutePath)
-        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
-            try await handle.resize(to: .bytes(fileSize))
-        }
-    }
-    
     
     private func activeReplicationServers(_ req: Request) async -> [S3ReplicationServer] {
         if req.headers.first(name: "x-replication") == "false" {
