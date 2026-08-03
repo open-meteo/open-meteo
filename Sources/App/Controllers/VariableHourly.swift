@@ -637,14 +637,19 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         }
     }
 
-    private func meteoFranceShortwaveRadiation() -> DerivedMapping<Reader.MixingVar>? {
+    private func shortwaveRadiationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
         guard let shortwave = Reader.variableFromString("shortwave_radiation") else {
             return nil
         }
-        return .one(.raw(shortwave)) { shortwave, _ in
-            let correction = Float(10_000_000) / Float(3600 * 3600)
-            return DataAndUnit(shortwave.data.map { $0 * correction }, shortwave.unit)
+
+        if isMeteoFranceForecastDomain {
+            return .mapped(.one(.raw(shortwave)) { shortwave, _ in
+                let correctionFactor = MeteoFranceSurfaceVariable.shortwaveRadiationArchiveCorrectionFactor
+                return DataAndUnit(shortwave.data.map { $0 * correctionFactor }, shortwave.unit)
+            })
         }
+
+        return .raw(shortwave)
     }
 
     /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
@@ -814,31 +819,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             }
         }
 
-        if isMeteoFranceForecastDomain {
-            switch variable {
-            case .shortwave_radiation:
-                return meteoFranceShortwaveRadiation()
-            case .diffuse_radiation:
-                guard let shortwave = meteoFranceShortwaveRadiation() else {
-                    return nil
-                }
-                return .one(.mapped(shortwave)) { shortwave, time in
-                    let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                    return DataAndUnit(diffuse, shortwave.unit)
-                }
-            case .direct_radiation:
-                guard let shortwave = meteoFranceShortwaveRadiation() else {
-                    return nil
-                }
-                return .one(.mapped(shortwave)) { shortwave, time in
-                    let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                    return DataAndUnit(zip(shortwave.data, diffuse).map(-), shortwave.unit)
-                }
-            default:
-                break
-            }
-        }
-
         let rawVariable = Reader.variableFromString(variable.rawValue)
 
         // corrections for ICON if elevation difference exceeds 100m
@@ -884,6 +864,11 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         if let rawVariable {
             // variable dependent corrections of raw data
             switch variable {
+            case .shortwave_radiation:
+                guard let shortwave = shortwaveRadiationInput() else {
+                    return nil
+                }
+                return .from(input: shortwave)
             case .direct_radiation, .diffuse_radiation:
                 return .one(.raw(rawVariable)) { radiation, _ in
                     return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)
@@ -1168,31 +1153,31 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return DataAndUnit(ghi, direct.unit)
             }
         case .diffuse_radiation:
-            guard let swrad = Reader.variableFromString("shortwave_radiation") else {
+            guard let swrad = shortwaveRadiationInput() else {
                 return nil
             }
             if let direct = Reader.variableFromString("direct_radiation") {
-                return .two(.raw(swrad), .raw(direct)) { swrad, direct, _ in
+                return .two(swrad, .raw(direct)) { swrad, direct, _ in
                     return DataAndUnit(zip(swrad.data, direct.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
-            return .one(.raw(swrad)) { swrad, time in
+            return .one(swrad) { swrad, time in
                 let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(diffuse, .wattPerSquareMetre)
+                return DataAndUnit(diffuse, swrad.unit)
             }
         case .direct_radiation:
-            guard let swrad = Reader.variableFromString("shortwave_radiation") else {
+            guard let swrad = shortwaveRadiationInput() else {
                 return nil
             }
             if let diffuse = Reader.variableFromString("diffuse_radiation") {
-                return .two(.raw(swrad), .raw(diffuse)) { swrad, diffuse, _ in
+                return .two(swrad, .raw(diffuse)) { swrad, diffuse, _ in
                     return DataAndUnit(zip(swrad.data, diffuse.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
-            return .one(.raw(swrad)) { swrad, time in
+            return .one(swrad) { swrad, time in
                 let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let direct = zip(swrad.data, diffuse).map { max($0 - $1, 0) }
-                return DataAndUnit(direct, .wattPerSquareMetre)
+                return DataAndUnit(direct, swrad.unit)
             }
         case .sunshine_duration:
             guard let directRadiation = getDeriverMap(variable: .direct_radiation) else {
