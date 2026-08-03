@@ -834,8 +834,6 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                     let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                     return DataAndUnit(zip(shortwave.data, diffuse).map(-), shortwave.unit)
                 }
-            case .temperature_120m:
-                return .direct(Reader.variableFromString("temperature_150m"))
             default:
                 break
             }
@@ -1368,8 +1366,12 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
 
             }
-        case .temperature_80m, .temperature_120m:
+        case .temperature_80m:
             return .direct(Reader.variableFromString("temperature_100m"))
+        case .temperature_120m:
+            return
+                .direct(Reader.variableFromString("temperature_150m")) ??
+                .direct(Reader.variableFromString("temperature_100m"))
         case .temperature_180m:
             return .direct(Reader.variableFromString("temperature_200m"))
         case .global_tilted_irradiance:
