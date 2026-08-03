@@ -3,7 +3,7 @@ import Vapor
 import AsyncHTTPClient
 
 /// Queues best-effort S3 sync operations per endpoint so slow endpoints do not block faster ones.
-actor S3SyncManager {
+actor S3SyncManager: LifecycleHandler {
     private let logger: Logger
     private var queues: [S3UploadQueue] = []
     private var isShuttingDown = false
@@ -58,25 +58,14 @@ actor S3SyncManager {
         }
         return getQueues(buckets: bucketsOpt)
     }
-
+    
+    /// Called from lifecycle manager to shutdown application
     /// Stop accepting new work and wait for all queued syncs to finish.
-    func shutdown() async {
+    func shutdownAsync(_ application: Application) async {
         isShuttingDown = true
         for queue in queues {
             await queue.finish()
         }
-    }
-}
-
-private final class S3SyncManagerLifecycle: LifecycleHandler {
-    private let manager: S3SyncManager
-
-    init(manager: S3SyncManager) {
-        self.manager = manager
-    }
-
-    func shutdownAsync(_ application: Application) async {
-        await manager.shutdown()
     }
 }
 
@@ -94,7 +83,7 @@ extension Application {
         }
 
         let manager = S3SyncManager(client: http1Client, logger: logger)
-        self.lifecycle.use(S3SyncManagerLifecycle(manager: manager))
+        self.lifecycle.use(manager)
         self.storage[S3SyncManagerKey.self] = manager
         return manager
     }

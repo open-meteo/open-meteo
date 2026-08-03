@@ -577,7 +577,7 @@ struct S3DataController: RouteCollection {
         if req.headers.first(name: "x-replication") == "false" {
             return []
         }
-        return await req.application.s3ServerHealth.activeServers()
+        return await req.application.s3UploadReplicationServer.activeServers()
     }
     
     private func replicateSinglePut(req: Request, body: ByteBuffer) async throws {

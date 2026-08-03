@@ -3,7 +3,7 @@ import Vapor
 import AsyncHTTPClient
 import Logging
 
-actor S3ServerHealth {
+actor S3ServerHealth: LifecycleHandler {
     private struct ServerState: Sendable {
         /// Well formatted server string with trailing slash
         let server: String
@@ -62,8 +62,9 @@ actor S3ServerHealth {
         }
         return states.filter(\.isOnline).map(\.server)
     }
-
-    func shutdown() {
+    
+    /// Called from lifecycle manager to shutdown application
+    func shutdownAsync(_ application: Application) async {
         monitorTask?.cancel()
         monitorTask = nil
     }
@@ -101,33 +102,21 @@ actor S3ServerHealth {
     }
 }
 
-private final class S3ServerHealthLifecycle: LifecycleHandler {
-    private let manager: S3ServerHealth
-
-    init(manager: S3ServerHealth) {
-        self.manager = manager
-    }
-
-    func shutdownAsync(_ application: Application) async {
-        await manager.shutdown()
-    }
-}
-
 extension Application {
     fileprivate struct S3ServerHealthKey: StorageKey, LockKey {
         typealias Value = S3ServerHealth
     }
 
-    var s3ServerHealth: S3ServerHealth {
+    /// Monitored S3 hosts to replicate upload S3 files
+    var s3UploadReplicationServer: S3ServerHealth {
         let lock = self.locks.lock(for: S3ServerHealthKey.self)
         lock.lock()
         defer { lock.unlock() }
         if let existing = self.storage[S3ServerHealthKey.self] {
             return existing
         }
-
         let manager = S3ServerHealth(client: dedicatedHttpClient, logger: logger, servers: S3ServerHealth.loadFromEnvironment())
-        self.lifecycle.use(S3ServerHealthLifecycle(manager: manager))
+        self.lifecycle.use(manager)
         self.storage[S3ServerHealthKey.self] = manager
         return manager
     }
