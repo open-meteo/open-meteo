@@ -429,6 +429,7 @@ struct S3DataController: RouteCollection {
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
         guard offset + Int64(body.readableBytes) <= tempInfo.size else {
+            print("S3ApiError.partExceedsAllocatedFileSize offset: \(offset), size: \(tempInfo.size), body: \(body.readableBytes)")
             throw S3ApiError.partExceedsAllocatedFileSize
         }
         
