@@ -7,7 +7,7 @@ import AsyncHTTPClient
 import NIOCore
 
 @Suite(.serialized)
-struct S3UploadTests {
+struct S3ApiServerTests {
     @Test func singlePutUpload() async throws {
         try await withApp { app in
             let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
