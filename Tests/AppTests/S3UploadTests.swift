@@ -8,9 +8,7 @@ import NIOCore
 
 @Suite(.serialized)
 struct S3UploadTests {
-    private let host = "localhost"
-
-    func singlePutUpload() async throws {
+    @Test func singlePutUpload() async throws {
         try await withApp { app in
             let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
             let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
@@ -44,7 +42,7 @@ struct S3UploadTests {
         }
     }
 
-    func multipartUpload() async throws {
+    @Test func multipartUpload() async throws {
         try await withApp { app in
             let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
             let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
@@ -129,7 +127,7 @@ struct S3UploadTests {
         credential: S3DataController.UploadCredential,
         additionalHeaders: [String: String]
     ) throws -> Request {
-        var clientRequest = HTTPClientRequest(url: "https://\(host)\(uri)")
+        var clientRequest = HTTPClientRequest(url: "https://localhost\(uri)")
         clientRequest.method = method
 
         for (name, value) in additionalHeaders {
