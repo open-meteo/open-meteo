@@ -31,7 +31,7 @@ struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
     static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
     static let readCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_READ_CREDENTIALS") + Self.uploadCredentials
-    static let uploadCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment()
+    static let uploadCredentials: [UploadCredential] = UploadCredential.loadFromEnvironment(key: "S3_UPLOAD_CREDENTIALS")
     static let multipartChunkSize = 8 * 1024 * 1024
     static let supportedRoots: [S3Root] = [.data, .dataRun, .dataSpatial]
     static let uploadIdRange = 1_000_000_000...Int.max
@@ -74,7 +74,7 @@ struct S3DataController: RouteCollection {
         let accessKey: String
         let secretKey: String
         
-        static func loadFromEnvironment(key: String = "S3_UPLOAD_CREDENTIALS") -> [UploadCredential] {
+        static func loadFromEnvironment(key: String) -> [UploadCredential] {
             guard let raw = Environment.get(key) else {
                 return []
             }
