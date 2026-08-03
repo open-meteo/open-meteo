@@ -3,23 +3,10 @@ import Vapor
 import AsyncHTTPClient
 import Logging
 
-struct S3ReplicationServer: Sendable, Hashable {
-    /// URL including credentials, expected in form `s3://key:secret@server.tld/`
-    let s3URL: String
-
-    var redacted: String {
-        s3URL.stripHttpPassword()
-    }
-
-    func objectURL(relativePath: String) -> String {
-        let base = s3URL.hasSuffix("/") ? String(s3URL.dropLast()) : s3URL
-        return "\(base)/\(relativePath)"
-    }
-}
-
 actor S3ServerHealth {
     private struct ServerState: Sendable {
-        let server: S3ReplicationServer
+        /// Well formatted server string with trailing slash
+        let server: String
         var isOnline: Bool
     }
 
@@ -29,28 +16,32 @@ actor S3ServerHealth {
     private var initialChecksCompleted = false
     private var monitorTask: Task<Void, Never>?
 
-    init(client: HTTPClient, logger: Logger, servers: [S3ReplicationServer]) {
+    init(client: HTTPClient, logger: Logger, servers: [String]) {
         self.client = client
         self.logger = logger
         self.states = servers.map { .init(server: $0, isOnline: true) }
     }
 
-    static func loadFromEnvironment(key: String = "S3_UPLOAD_REPLICATION_SERVERS") -> [S3ReplicationServer] {
+    static func loadFromEnvironment(key: String = "S3_UPLOAD_REPLICATION_SERVERS") -> [String] {
         guard let configured = Environment.get(key) else {
             return []
         }
 
         return configured
             .split(separator: ",")
-            .filter { !$0.isEmpty }
             .map { url in
                 let url = String(url)
-                let withSlash = url.hasSuffix("/") ? url : url + "/"
-                return S3ReplicationServer(s3URL: withSlash)
+                guard url.starts(with: "s3://") else {
+                    fatalError("replication server URL must start with 's3://'")
+                }
+                guard url.hasSuffix("/") else {
+                    fatalError("replication server URL must end with '/' trailing slash")
+                }
+                return url
             }
     }
 
-    func activeServers() async -> [S3ReplicationServer] {
+    func activeServers() async -> [String] {
         if initialChecksCompleted == false {
             await performHealthChecks()
             initialChecksCompleted = true
@@ -89,7 +80,7 @@ actor S3ServerHealth {
     private func checkServer(index: Int) async {
         let server = states[index].server
         do {
-            var request = HTTPClientRequest(url: server.objectURL(relativePath: ""))
+            var request = HTTPClientRequest(url: server)
             request.method = .HEAD
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             _ = try await client.executeRetry(
@@ -100,11 +91,11 @@ actor S3ServerHealth {
             )
 
             if states[index].isOnline == false {
-                logger.info("Replication server is online again: \(server.redacted)")
+                logger.info("Replication server is online again: \(server.stripHttpPassword())")
             }
             states[index].isOnline = true
         } catch {
-            logger.error("Replication server HEAD failed: \(server.redacted). Error: \(error)")
+            logger.error("Replication server HEAD failed: \(server.stripHttpPassword()). Error: \(error)")
             states[index].isOnline = false
         }
     }
@@ -117,13 +108,8 @@ private final class S3ServerHealthLifecycle: LifecycleHandler {
         self.manager = manager
     }
 
-    func shutdown(_ application: Application) {
-        let semaphore = DispatchSemaphore(value: 0)
-        Task {
-            await manager.shutdown()
-            semaphore.signal()
-        }
-        semaphore.wait()
+    func shutdownAsync(_ application: Application) async {
+        await manager.shutdown()
     }
 }
 

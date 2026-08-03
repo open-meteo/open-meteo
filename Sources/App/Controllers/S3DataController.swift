@@ -573,7 +573,7 @@ struct S3DataController: RouteCollection {
         try await FileSystem.shared.createDirectory(at: FilePath(String(parent)), withIntermediateDirectories: true)
     }
     
-    private func activeReplicationServers(_ req: Request) async -> [S3ReplicationServer] {
+    private func activeReplicationServers(_ req: Request) async -> [String] {
         if req.headers.first(name: "x-replication") == "false" {
             return []
         }
@@ -588,7 +588,7 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.missingSha256HashHeader
         }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: server.objectURL(relativePath: req.url.path))
+            var request = HTTPClientRequest(url: "\(server)\(req.url.path)")
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
@@ -607,7 +607,7 @@ struct S3DataController: RouteCollection {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: server.objectURL(relativePath: req.url.path) + "?uploads")
+            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?uploads")
             request.method = .POST
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             request.headers.add(name: "x-replication", value: "false")
@@ -624,7 +624,7 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.missingSha256HashHeader
         }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: server.objectURL(relativePath: req.url.path) + "?partNumber=\(partNumber)&uploadId=\(uploadId)")
+            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?partNumber=\(partNumber)&uploadId=\(uploadId)")
             request.method = .PUT
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
@@ -642,7 +642,7 @@ struct S3DataController: RouteCollection {
         }
         //let bodyLength = body.readableBytes
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: server.objectURL(relativePath: req.url.path) + "?uploadId=\(uploadId)")
+            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?uploadId=\(uploadId)")
             request.method = .POST
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
@@ -659,7 +659,7 @@ struct S3DataController: RouteCollection {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
-            var request = HTTPClientRequest(url: server.objectURL(relativePath: req.url.path) + "?uploadId=\(uploadId)")
+            var request = HTTPClientRequest(url: "\(server)\(req.url.path)?uploadId=\(uploadId)")
             request.method = .DELETE
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
             request.headers.add(name: "x-replication", value: "false")

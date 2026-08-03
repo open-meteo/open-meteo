@@ -75,13 +75,8 @@ private final class S3SyncManagerLifecycle: LifecycleHandler {
         self.manager = manager
     }
 
-    func shutdown(_ application: Application) {
-        let semaphore = DispatchSemaphore(value: 0)
-        Task {
-            await manager.shutdown()
-            semaphore.signal()
-        }
-        semaphore.wait()
+    func shutdownAsync(_ application: Application) async {
+        await manager.shutdown()
     }
 }
 
