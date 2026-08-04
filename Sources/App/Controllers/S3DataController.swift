@@ -345,9 +345,10 @@ struct S3DataController: RouteCollection {
             guard let body else {
                 throw S3ApiError.expectedCompletionXMLBody
             }
+            let modifiedDate = req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? Date.now
             try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
-            try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body)
-            try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId)
+            try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
+            try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
             return Response(status: .ok)
         }
         
@@ -381,14 +382,17 @@ struct S3DataController: RouteCollection {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         
         try await ensureParentDirectoryExists(forFileAt: absolutePath)
-        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
+        let modifiedDate = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
             try await handle.resize(to: .bytes(Int64(body.readableBytes)))
             try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
+            
+            let modifiedDate = req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? Date.now
+            let ts = FileInfo.Timespec(seconds: Int(modifiedDate.timeIntervalSince1970), nanoseconds: 0)
+            try await handle.setLastDataModificationTime(to: ts)
+            return modifiedDate
         }
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
-        try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: absolutePath)
-        try await replicateSinglePut(req: req, body: body)
-        
+        try await replicateSinglePut(req: req, body: body, lastModified: modifiedDate)
         for queue in await lazyReplicationQueues(req) {
             await queue.upload(buffer: body, objectName: String(req.url.path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
         }
@@ -503,11 +507,14 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int) async throws {
+    private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Date) async throws {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
-        try await applyLastModifiedIfProvided(header: req.headers.first(name: "x-last-modified"), filePath: absolutePath)
-        
+        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(absolutePath), options: .modifyFile(createIfNecessary: false)) { handle in
+            let ts = FileInfo.Timespec(seconds: Int(lastModified.timeIntervalSince1970), nanoseconds: 0)
+            try await handle.setLastDataModificationTime(to: ts)
+        }
+                
         for queue in await lazyReplicationQueues(req) {
             let session = queue.startMultiPartUploads()
             await session.uploadMultipart(file: absolutePath, objectName: String(req.url.path.dropFirst(1)))
@@ -603,10 +610,9 @@ struct S3DataController: RouteCollection {
         return await req.application.s3SyncManager.getQueues(buckets: servers)
     }
     
-    private func replicateSinglePut(req: Request, body: ByteBuffer) async throws {
+    private func replicateSinglePut(req: Request, body: ByteBuffer, lastModified: Date) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
-        let lastModified = req.headers.first(name: "x-last-modified")
         guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
             throw S3ApiError.missingSha256HashHeader
         }
@@ -619,9 +625,7 @@ struct S3DataController: RouteCollection {
             if let contentType = req.headers.first(name: .contentType) {
                 request.headers.add(name: .contentType, value: contentType)
             }
-            if let lastModified {
-                request.headers.add(name: "x-last-modified", value: lastModified)
-            }
+            request.headers.add(name: "x-last-modified", value: lastModified.lastModifiedHttpDateFormat)
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
@@ -656,10 +660,9 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func replicateMultipartComplete(req: Request, uploadId: Int, body: ByteBuffer) async throws {
+    private func replicateMultipartComplete(req: Request, uploadId: Int, body: ByteBuffer, lastModified: Date) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
-        let lastModified = req.headers.first(name: "x-last-modified")
         guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
             throw S3ApiError.missingSha256HashHeader
         }
@@ -671,9 +674,7 @@ struct S3DataController: RouteCollection {
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentType, value: "application/xml")
-            if let lastModified {
-                request.headers.add(name: "x-last-modified", value: lastModified)
-            }
+            request.headers.add(name: "x-last-modified", value: lastModified.lastModifiedHttpDateFormat)
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
@@ -738,26 +739,16 @@ struct S3DataController: RouteCollection {
         }
         return "\(directory)\(path)"
     }
-    
-    private func applyLastModifiedIfProvided(header: String?, filePath: String) async throws {
-        guard let header, let date = Self.parseLastModifiedDate(header) else {
-            return
-        }
-        let seconds = Int(date.timeIntervalSince1970)
-        let nanoseconds = Int((date.timeIntervalSince1970 - Double(seconds)) * 1_000_000_000)
-        let ts = FileInfo.Timespec(seconds: seconds, nanoseconds: max(0, nanoseconds))
-        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(filePath), options: .modifyFile(createIfNecessary: false)) { handle in
-            try await handle.setLastDataModificationTime(to: ts)
-        }
-    }
-    
-    private static func parseLastModifiedDate(_ value: String) -> Date? {
-        if let unix = Double(value) {
+}
+
+fileprivate extension String {
+    func parseLastModifiedDate() -> Date? {
+        if let unix = Double(self) {
             return Date(timeIntervalSince1970: unix)
         }
         
         let iso = ISO8601DateFormatter()
-        if let date = iso.date(from: value) {
+        if let date = iso.date(from: self) {
             return date
         }
         
@@ -765,7 +756,17 @@ struct S3DataController: RouteCollection {
         rfc1123.locale = Locale(identifier: "en_US_POSIX")
         rfc1123.timeZone = TimeZone(secondsFromGMT: 0)
         rfc1123.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        return rfc1123.date(from: value)
+        return rfc1123.date(from: self)
+    }
+}
+
+fileprivate extension Date {
+    var lastModifiedHttpDateFormat: String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return fmt.string(from: self)
     }
 }
 
