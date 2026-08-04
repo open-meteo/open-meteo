@@ -50,11 +50,15 @@ struct S3DataController: RouteCollection {
         }
         
         if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
-            routes.on(.HEAD, [], use: self.headRoot)
             routes.get("", use: self.list)
-            routes.get("data", "**", use: self.get)
-            routes.get("data_run", "**", use: self.get)
-            routes.get("data_spatial", "**", use: self.get)
+            routes.get("openmeteo", use: self.list)
+            routes.on(.HEAD, [], use: self.headRoot)
+            for root in ["data", "data_run", "data_spatial"] {
+                routes.on(.HEAD, [PathComponent(stringLiteral: root), .catchall], use: self.get)
+                routes.on(.HEAD, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.get)
+                routes.get(PathComponent(stringLiteral: root), "**", use: self.get)
+                routes.get("openmeteo", PathComponent(stringLiteral: root), "**", use: self.get)
+            }
         }
         
         if !self.uploadCredentials.isEmpty {
@@ -123,6 +127,29 @@ struct S3DataController: RouteCollection {
         guard params.list_type == 2, params.delimiter == "/" else {
             throw S3ApiError.forbidden
         }
+        if params.prefix == "" {
+            return Response(body: .init(stringLiteral: """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                    <Name>openmeteo</Name>
+                    <Prefix>/</Prefix>
+                    <KeyCount>3</KeyCount>
+                    <MaxKeys>1000</MaxKeys>
+                    <Delimiter>/</Delimiter>
+                    <IsTruncated>false</IsTruncated>
+                    <CommonPrefixes>
+                    <Prefix>data/</Prefix>
+                    </CommonPrefixes>
+                    <CommonPrefixes>
+                    <Prefix>data_spatial/</Prefix>
+                    </CommonPrefixes>
+                    <CommonPrefixes>
+                    <Prefix>data_run/</Prefix>
+                    </CommonPrefixes>
+                </ListBucketResult>
+                """))
+        }
+        
         guard let absoluteDirectoryPath = resolveListPath(path) else {
             throw S3ApiError.forbidden
         }
@@ -197,7 +224,7 @@ struct S3DataController: RouteCollection {
     /// Serve file through nginx send file
     func get(_ req: Request) async throws -> Response {
         let params = try req.query.decode(DownloadParams.self)
-        let path = req.url.path
+        let path = req.url.path.dropPrefix("/openmeteo")
         guard let absolutePath = resolveObjectPath(path) else {
             throw S3ApiError.forbidden
         }
@@ -916,6 +943,13 @@ extension String {
     
     var nilIfEmpty: String? {
         isEmpty ? nil : self
+    }
+    
+    func dropPrefix(_ prefix: String) -> String {
+        if self.starts(with: prefix) {
+            return String(self.dropFirst(prefix.count))
+        }
+        return self
     }
 }
 
