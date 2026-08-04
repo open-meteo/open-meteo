@@ -357,6 +357,15 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
  List of all surface MeteoFrance variables
  */
 enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    /// Compensates for the historically incorrect archive conversion factor.
+    /// Archives use `3600 / 10_000_000`, while converting J/m² to W/m²
+    /// requires `1 / 3600`.
+    static let shortwaveRadiationArchiveCorrectionFactor = Float(10_000_000) / Float(3600 * 3600)
+
+    /// The historically incorrect conversion retained for archive compatibility.
+    static let shortwaveRadiationArchiveStorageFactor =
+        (1 / Float(3600)) / shortwaveRadiationArchiveCorrectionFactor
+
     case temperature_2m
     case cloud_cover
     case cloud_cover_low
