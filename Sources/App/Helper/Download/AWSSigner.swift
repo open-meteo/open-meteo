@@ -164,9 +164,10 @@ public struct AWSSigner {
               let regionEnd = credential[regionStart...].firstIndex(of: "/") else {
             throw SigningError.invalidCredentialScope
         }
-        guard credential[regionStart..<regionEnd] == region else {
-            throw SigningError.invalidCredentialScope
-        }
+        let requestedRegion = String(credential[regionStart..<regionEnd])
+//        guard credential[regionStart..<regionEnd] == region else {
+//            throw SigningError.invalidCredentialScope
+//        }
 
         let serviceStart = credential.index(after: regionEnd)
         guard serviceStart < credential.endIndex,
@@ -223,14 +224,15 @@ public struct AWSSigner {
         canonicalRequestHash.update(headerPayloadHash)
         let canonicalRequestHashHex = canonicalRequestHash.finalize().hex
 
-        let signingKey = getSignatureKey(date: dateStamp)
+        let signingKey = getSignatureKey(date: dateStamp, region: requestedRegion)
         var stringToSignHmac = HMAC<SHA256>(key: SymmetricKey(data: signingKey))
         stringToSignHmac.update("AWS4-HMAC-SHA256\n")
         stringToSignHmac.update(amzDate)
         stringToSignHmac.update("\n")
         stringToSignHmac.update(dateStamp)
         stringToSignHmac.update("/")
-        stringToSignHmac.update(region)
+        // Accept any region from the original string to sign
+        stringToSignHmac.update(requestedRegion)
         stringToSignHmac.update("/")
         stringToSignHmac.update(service)
         stringToSignHmac.update("/aws4_request\n")
@@ -458,9 +460,9 @@ public struct AWSSigner {
         case invalidSignature
     }
 
-    func getSignatureKey<T: StringProtocol>(date: T) -> HashedAuthenticationCode<SHA256> {
+    func getSignatureKey<T: StringProtocol>(date: T, region: String? = nil) -> HashedAuthenticationCode<SHA256> {
         let kDate = date.hmacSHA256(key: Data("AWS4\(secretKey)".utf8))
-        let kRegion = region.hmacSHA256(key: kDate)
+        let kRegion = (region ?? self.region).hmacSHA256(key: kDate)
         let kService = service.hmacSHA256(key: kRegion)
         let kSigning = "aws4_request".hmacSHA256(key: kService)
         return kSigning
