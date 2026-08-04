@@ -64,7 +64,7 @@ enum S3Uploader {
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let chunks = data.readChunks(chunkLength: .megabytes(8))
+        let chunks = data.readChunks(chunkLength: .mebibytes(8))
         do {
             let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(executor: executor) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")

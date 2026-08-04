@@ -428,7 +428,11 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.multipartUploadNotFound
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        print("S3ApiError.partExceedsAllocatedFileSize partNumber: \(partNumber), offset: \(offset), size: \(tempInfo.size), body: \(body.readableBytes), uploadId: \(uploadId) absolutePath: \(absolutePath)")
+        let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
+        let isLastPart = partNumber == numParts
+        guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
+            throw S3ApiError.partSizeNotChunkSize
+        }
         guard offset + Int64(body.readableBytes) <= tempInfo.size else {
             throw S3ApiError.partExceedsAllocatedFileSize
         }
@@ -750,6 +754,7 @@ enum S3ApiError: AbortError, Equatable {
     case chunkSizeExceeds8MB
     case multipartUploadNotFound
     case partExceedsAllocatedFileSize
+    case partSizeNotChunkSize
     case couldNotDecodeCompletionXML
     case invalidNumberOfParts
     case nonContiguousPartNumbers
@@ -804,6 +809,8 @@ enum S3ApiError: AbortError, Equatable {
             return "Multipart upload not found"
         case .partExceedsAllocatedFileSize:
             return "Part exceeds allocated file size"
+        case .partSizeNotChunkSize:
+            return "Part size must be equal to chunk size"
         case .couldNotDecodeCompletionXML:
             return "Could not decode completion XML"
         case .invalidNumberOfParts:
