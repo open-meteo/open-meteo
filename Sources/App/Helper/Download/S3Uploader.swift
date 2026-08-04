@@ -73,9 +73,12 @@ enum S3Uploader {
                 req.headers.add(name: "x-amz-content-sha256", value: chunk.readableBytesView.sha256Hex)
                 req.headers.add(name: .contentLength, value: "\(chunk.readableBytes)")
                 let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(120))
+                print(encodedUploadId, partNumber, chunk.readableBytes)
+                //print(try await response.body.collect(upTo: 100000).readStringImmutable())
                 guard let etag = response.headers.first(name: "ETag") else {
                     throw S3UploaderError.missingETag(partNumber: partNumber)
                 }
+                
                 return (etag, chunk.readableBytes)
             }
             let prepared = S3MultiPartUploadPrepared(
@@ -179,8 +182,8 @@ enum S3Uploader {
         logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
 
         // Step 4: Upload 2 files concurrently.
-        let executor = LimitedConcurrencyExecutor(maxConcurrency: 16)
-        let prepared = try await toUpload.mapConcurrent(nConcurrent: 4) { file in
+        let executor = LimitedConcurrencyExecutor(maxConcurrency: 1)
+        let prepared = try await toUpload.mapConcurrent(nConcurrent: 1) { file in
             let url = serverBase + "/" + file.remoteKey
             return try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor)
         }
@@ -190,14 +193,14 @@ enum S3Uploader {
         let commitStart = DispatchTime.now()
         
         // Commit all OM file changes
-        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
+        try await prepared.foreachConcurrent(nConcurrent: 1) { prepared in
             if prepared.url.hasSuffix(".json") {
                 return
             }
             try await prepared.commit(client: client)
         }
         // Commit all json files. E.g. meta.json which should be committed last
-        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
+        try await prepared.foreachConcurrent(nConcurrent: 1) { prepared in
             if prepared.url.hasSuffix(".json") == false {
                 return
             }
