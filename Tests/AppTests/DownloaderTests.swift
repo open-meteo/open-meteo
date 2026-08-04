@@ -162,7 +162,7 @@ import Darwin
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }
 
-        let data = randomData(byteCount: 1 * 1024)
+        let data = randomData(byteCount: 1 * 1024 * 1024)
         try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin")
     }
 
@@ -175,7 +175,7 @@ import Darwin
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }
 
-        let data = ByteBuffer(data: randomData(byteCount:  1024))
+        let data = ByteBuffer(data: randomData(byteCount: 10 * 1024 * 1024))
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 8)
         try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin", executor: executor).commit(client: client)
     }
@@ -189,7 +189,7 @@ import Darwin
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }
 
-        try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "data/test/ecmwf_ifs025_ensemble_mean/")
+        try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "test/ecmwf_ifs025_ensemble_mean/")
     }
     
     /// Upload three files using single-part PUT uploads.
