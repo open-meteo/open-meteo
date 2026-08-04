@@ -13,14 +13,6 @@ import NIOFileSystem
  Download exmaple
  `http://127.0.0.1:8080/data/cmc_gem_gdps/shortwave_radiation/chunk_1430.om?apikey=123`
  
- Nginx setting:
- ```
- location /data-internal {
- internal;
- alias /var/lib/openmeteo-api/data;
- }
- ```
- 
  If `S3_READ_CREDENTIALS` is set to "key1:secret1,key2:secret2" the list and download endpoints accept AWS SigV4 signed GET requests in addition to API keys.
  
  If `S3_UPLOAD_CREDENTIALS` is set to "key1:secret1,key2:secret2" the endpoints accepts file uploads using S3 multi part uploads. The upload is non standard, meaning that additional headers for the final file size must be set. E.g. AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
@@ -31,7 +23,6 @@ import NIOFileSystem
  */
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
-    static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
     static let multipartChunkSize = 8 * 1024 * 1024
     static let uploadIdRange = 1_000_000_000...Int.max
     static let uploadMaximumFileSize = 500 << 30 // 500GB
@@ -72,8 +63,6 @@ struct S3DataController: RouteCollection {
     
     struct DownloadParams: Codable {
         let apikey: String?
-        /// in megabytes per second
-        let rate: Int?
     }
     
     func headRoot(_ req: Request) throws -> HTTPStatus {
@@ -238,16 +227,6 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.forbidden
         }
         
-        if let nginxSendfilePrefix = Self.nginxSendfilePrefix {
-            let response = Response()
-            // let response = req.fileio.streamFile(at: abspath)
-            response.headers.add(name: "X-Accel-Redirect", value: "/\(nginxSendfilePrefix)/\(pathNoRoot)")
-            if let rate = params.rate {
-                // Bytes per second download speed limit
-                response.headers.add(name: "X-Accel-Limit-Rate", value: "\((rate) * 1024 * 1024)")
-            }
-            return response
-        }
         /// TODO consider caching
         if let remote = OpenMeteo.remoteDataDirectory,
            let modelStr = pathNoRoot.firstIndex(of: "/").map({ pathNoRoot[..<$0] }),
