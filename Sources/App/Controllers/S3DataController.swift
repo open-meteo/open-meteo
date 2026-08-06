@@ -937,7 +937,7 @@ extension DateFormatter {
     /// Format dates like `2023-11-14T04:32:17.000Z`
     static let awsS3DateTime = {
         let dateFormat = DateFormatter()
-        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.SSS'Z'"
+        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.000'Z'"
         return dateFormat
     }()
 }
