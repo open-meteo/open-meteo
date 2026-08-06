@@ -74,7 +74,8 @@ extension ForecastapiResult.PerLocation {
             throw ForecastApiError.noDataAvailableForThisLocation
         }
         let sections = try await runAllSections(variables: variables)
-        let current = try await first.current(variables: variables.currentVariables)
+        let currentModel = results.first(where: { $0.isModelAvailable }) ?? first
+        let current = try await currentModel.current(variables: variables.currentVariables)
         
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 

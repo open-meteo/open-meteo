@@ -567,6 +567,7 @@ enum ForecastApiError: Error {
     case invalidTimezone
     case timezoneNotSupported
     case noDataAvailableForThisLocation
+    case noDataAvailableForRequestedLocations
     case parameterNotAllowedWithStartEndRange(parameter: String)
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
@@ -622,6 +623,8 @@ extension ForecastApiError: AbortError {
             return "Parameter 'location_id' and coordinates must have the same number of elements"
         case .noDataAvailableForThisLocation:
             return "No data is available for this location"
+        case .noDataAvailableForRequestedLocations:
+            return "No data is available for the requested locations"
         case .startAndEndDateCountMustBeTheSame:
             return "Parameter 'start_date' and 'end_date' must have the same number of elements"
         case .coordinatesAndStartEndDatesCountMustBeTheSame:
