@@ -328,16 +328,50 @@ struct WeatherApiController {
                         try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
                     }
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                    let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
+                    let readers: [MultiDomainsReader] = try await domains.asyncMap { domain in
                         guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
-                            return nil
+                            let unavailableModelLocation =  MultiDomainsReader.UnavailableModelLocation(
+                                    latitude: coordinates.latitude,
+                                    longitude: coordinates.longitude,
+                                    elevation: coordinates.elevation,
+                                    modelDtSeconds: temporalResolution.dtSeconds
+                                        ?? domain.placeholderModelDtSeconds(longitude: coordinates.longitude)
+                                        ?? time.hourlyRead.dtSeconds
+                                )
+                            return MultiDomainsReader(
+                                domain: domain,
+                                readerHourly: nil,
+                                readerDaily: nil,
+                                readerWeekly: nil,
+                                readerMonthly: nil,
+                                params: params,
+                                run: run,
+                                has15minutely: has15minutely,
+                                time: time,
+                                timezone: timezone,
+                                currentTime: currentTime,
+                                temporalResolution: temporalResolution,
+                                unavailableModelLocation: unavailableModelLocation
+                            )
                         }
-                        /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
+
+                        // Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
                         let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
-                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
-                    }
-                    guard !readers.isEmpty else {
-                        throw ForecastApiError.noDataAvailableForThisLocation
+                        return MultiDomainsReader(
+                            domain: domain,
+                            readerHourly: r.hourly,
+                            readerDaily: r.daily,
+                            readerWeekly: r.weekly,
+                            readerMonthly: r.monthly,
+                            params: params,
+                            run: run,
+                            has15minutely: has15minutely,
+                            time: time,
+                            timezone: timezone,
+                            currentTime: currentTime,
+                            temporalResolution: temporalResolution,
+                            unavailableModelLocation: nil
+                        )
                     }
                     let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                     return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
@@ -370,7 +404,21 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            let readers = MultiDomainsReader(
+                                domain: domain,
+                                readerHourly: r.hourly,
+                                readerDaily: r.daily,
+                                readerWeekly: r.weekly,
+                                readerMonthly: r.monthly,
+                                params: params,
+                                run: run,
+                                has15minutely: has15minutely,
+                                time: time,
+                                timezone: timezone,
+                                currentTime: currentTime,
+                                temporalResolution: temporalResolution,
+                                unavailableModelLocation: nil
+                            )
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     }
@@ -385,19 +433,44 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            let readers = MultiDomainsReader(
+                                domain: domain,
+                                readerHourly: r.hourly,
+                                readerDaily: r.daily,
+                                readerWeekly: r.weekly,
+                                readerMonthly: r.monthly,
+                                params: params,
+                                run: run,
+                                has15minutely: has15minutely,
+                                time: time,
+                                timezone: timezone,
+                                currentTime: currentTime,
+                                temporalResolution: temporalResolution,
+                                unavailableModelLocation: nil
+                            )
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     })
                 })
             }
             
+            guard locations.contains(where: { location in location.results.contains(where: { $0.isModelAvailable }) }) else {
+                throw ForecastApiError.noDataAvailableForRequestedLocations
+            }
+
             return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariablesAdjusted)
         }
     }
 }
 
 struct MultiDomainsReader: ModelFlatbufferSerialisable {
+    struct UnavailableModelLocation {
+        let latitude: Float
+        let longitude: Float
+        let elevation: Float
+        let modelDtSeconds: Int
+    }
+
     typealias HourlyVariable = ForecastVariable
     
     typealias DailyVariable = ForecastVariableDaily
@@ -422,15 +495,15 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let readerMonthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     
     var latitude: Float {
-        readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
+        readerHourly?.modelLat ?? readerDaily?.modelLat ?? unavailableModelLocation?.latitude ?? .nan
     }
     
     var longitude: Float {
-        readerHourly?.modelLon ?? readerDaily?.modelLon ?? .nan
+        readerHourly?.modelLon ?? readerDaily?.modelLon ?? unavailableModelLocation?.longitude ?? .nan
     }
     
     var elevation: Float? {
-        readerHourly?.targetElevation ?? readerDaily?.targetElevation
+        readerHourly?.targetElevation ?? readerDaily?.targetElevation ?? unavailableModelLocation?.elevation
     }
     
     let params: ApiQueryParameter
@@ -441,8 +514,23 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let timezone: TimezoneWithOffset
     let currentTime: Timestamp
     let temporalResolution: ApiTemporalResolution
+    let unavailableModelLocation: UnavailableModelLocation?
+
+    var isModelAvailable: Bool {
+        unavailableModelLocation == nil
+    }
+
+    private func missingFloatColumns<Variable>(for variables: [Variable], count: Int, members: (Variable) -> Int) -> [ApiColumn<Variable>] {
+        let missing = ApiArray.float([Float](repeating: .nan, count: count))
+        return variables.map { variable in
+            .init(variable: variable, unit: .undefined, variables: .init(repeating: missing, count: members(variable)))
+        }
+    }
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+        guard isModelAvailable else {
+            return
+        }
         if let currentVariables, let readerHourly {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: has15minutely ? 900 : 3600), nTime: 1, dtSeconds: has15minutely ? 900 : 3600)
             for variable in currentVariables {
@@ -505,10 +593,23 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     }
 
     func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
-        guard let variables, let readerHourly else {
+        guard let variables else {
             return nil
         }
         let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: has15minutely ? 900 : 3600), nTime: 1, dtSeconds: has15minutely ? 900 : 3600)
+        if !isModelAvailable {
+            return .init(
+                name: params.current_weather == true ? "current_weather" : "current",
+                time: currentTimeRange.range.lowerBound,
+                dtSeconds: currentTimeRange.dtSeconds,
+                columns: variables.map { variable in
+                    .init(variable: variable, unit: .undefined, value: .nan)
+                }
+            )
+        }
+        guard let readerHourly else {
+            return nil
+        }
         return .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let timeRead = currentTimeRange.toSettings(previousDay: previousDay, run: run)
@@ -537,12 +638,20 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        guard let variables, let readerHourly else {
+        guard let variables else {
             return nil
         }
-        let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly.modelDtSeconds
+        let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly?.modelDtSeconds ?? unavailableModelLocation?.modelDtSeconds ?? 3600
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
         let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+        if !isModelAvailable {
+            return .init(name: "hourly", time: timeHourlyDisplay, columns: missingFloatColumns(for: variables, count: timeHourlyRead.count) {
+                $0.onlySingleMember ? 1 : domain.countEnsembleMember
+            })
+        }
+        guard let readerHourly else {
+            return nil
+        }
         return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
@@ -574,14 +683,34 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
-                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: domain.countEnsembleMember))
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: variable.onlySingleMember ? 1 : domain.countEnsembleMember))
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
     }
     
     func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
-        guard let variables, let readerDaily else {
+        guard let variables else {
+            return nil
+        }
+        if !isModelAvailable {
+            let missing = ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count))
+            let missingTimestamps = ApiArray.timestamp([Timestamp](repeating: .noData, count: time.dailyRead.count))
+            return .init(name: "daily", time: time.dailyDisplay, columns: variables.map { variable in
+                switch variable {
+                case .sunrise, .sunset, .moonrise, .moonset:
+                    return .init(variable: variable, unit: params.timeformatOrDefault.unit, variables: [missingTimestamps])
+                case .moon_phase:
+                    return .init(variable: variable, unit: .fraction, variables: [missing])
+                case .daylight_duration:
+                    return .init(variable: variable, unit: .seconds, variables: [missing])
+                default:
+                    let members = variable == .river_discharge && params.ensemble ? 51 : domain.countEnsembleMember
+                    return .init(variable: variable, unit: .undefined, variables: .init(repeating: missing, count: members))
+                }
+            })
+        }
+        guard let readerDaily else {
             return nil
         }
         let members = 0..<domain.countEnsembleMember
@@ -643,7 +772,15 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        guard let variables, let readerHourly else {
+        guard let variables else {
+            return nil
+        }
+        if !isModelAvailable {
+            return .init(name: "minutely_15", time: time.minutely15, columns: missingFloatColumns(for: variables, count: time.minutely15.count) {
+                $0.onlySingleMember ? 1 : domain.countEnsembleMember
+            })
+        }
+        guard let readerHourly else {
             return nil
         }
         
@@ -678,7 +815,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
-                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: domain.countEnsembleMember))
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: variable.onlySingleMember ? 1 : domain.countEnsembleMember))
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
@@ -1025,6 +1162,23 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
+        /// Matches the last (highest-priority) forecast reader used by
+        /// `GenericReaderMultiSameType` when native time resolution is requested.
+        var modelDtSeconds: Int {
+            switch self {
+            case .single(let domain, _),
+                 .singleWithPrecipitationProbability(let domain, _, _):
+                return domain.dtSeconds
+            case .multiple(let domains),
+                 .multipleWithPrecipitationProbability(let domains, _):
+                return domains.last?.0.dtSeconds ?? 3600
+            case .seamlessLocal(let global, let local, _):
+                return local.last?.0.dtSeconds ?? global.last?.0.dtSeconds ?? 3600
+            case .singleWithSupplementalDomains(let domain, _, let supplemental, _):
+                return supplemental.last?.0.dtSeconds ?? domain.dtSeconds
+            }
+        }
+
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
             switch self {
             case .single(let domain, let variable):
@@ -1063,6 +1217,34 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     }
     
+    /// Native timestep for a no-data placeholder. Generic mappings expose this
+    /// through their reader order; legacy composites select an underlying domain
+    /// from the requested coordinate.
+    func placeholderModelDtSeconds(longitude: Float) -> Int? {
+        if let mapping = getDomainAndVariable() {
+            return mapping.modelDtSeconds
+        }
+
+        switch self {
+        case .satellite_radiation_seamless:
+            if (-20..<60).contains(longitude) {
+                return DwdSisDomain.europe_africa_v4.dtSeconds
+            }
+            if (-60..<50).contains(longitude) {
+                return EumetsatLsaSafDomain.msg.dtSeconds
+            }
+            if (50..<90).contains(longitude) {
+                return EumetsatLsaSafDomain.iodc.dtSeconds
+            }
+            if longitude >= 90 {
+                return JaxaHimawariDomain.himawari_10min.dtSeconds
+            }
+            return nil
+        default:
+            return genericDomain?.dtSeconds
+        }
+    }
+
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
     /// This only works with one domain. Needs larger rewrite if this should work with seamless domains like ec46+seas5.
     var useLatestRun: Bool {
@@ -1305,7 +1487,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
     var remappedToEnsembleApi: Self {
         switch self {

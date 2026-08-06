@@ -1499,7 +1499,7 @@ extension ForecastVariable {
         switch self {
         case .surface(let surface):
             switch surface.variable {
-            case .terrestrial_radiation, .terrestrial_radiation_instant:
+            case .is_day, .terrestrial_radiation, .terrestrial_radiation_instant:
                 return true
             default:
                 return false
