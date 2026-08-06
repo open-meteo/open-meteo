@@ -20,6 +20,11 @@ import NIO
         }.collect()
         #expect(res2 == a2)
     }
+    
+    @Test func replacingLastPathComponent() {
+        #expect("/test/test".replacingLastPathComponent(with: "aaa") == "/test/aaa/")
+        #expect("/test/test/".replacingLastPathComponent(with: "aaa") == "/test/aaa/")
+    }
 
     @Test func indexedCurl() {
         let index = """

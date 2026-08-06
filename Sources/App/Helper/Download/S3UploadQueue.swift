@@ -2,6 +2,7 @@
 import AsyncHTTPClient
 import Logging
 import Foundation
+import NIOCore
 
 struct S3UploadQueue {
     let endpoint: S3BucketEndpoint
@@ -44,6 +45,12 @@ struct S3UploadQueue {
     func upload<D: DataProtocol & Sendable>(data: D, objectName: String, contentType: String = "application/octet-stream") async {
         await queue.enqueueIgnoreError(logger: logger) {
             try await S3Uploader.upload(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType)
+        }
+    }
+    
+    func upload(buffer: ByteBuffer, objectName: String, contentType: String = "application/octet-stream") async {
+        await queue.enqueueIgnoreError(logger: logger) {
+            try await S3Uploader.upload(client: client, buffer: buffer, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType)
         }
     }
 

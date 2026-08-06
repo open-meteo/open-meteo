@@ -36,14 +36,32 @@ import Darwin
     @Test func testAwsSignClientVerify() async throws {
         let url = "https://@examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)
-        try request.applyS3Credentials()
-        let signer = AWSSigner(accessKey: String("AKIAIOSFODNN7EXAMPLE"), secretKey: String("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"), region: "us-west-2", service: "s3")
+        //try request.applyS3Credentials()
+        let signer = AWSSigner(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", region: "us-west-2", service: "s3")
         try signer.sign(request: &request, now: Date(timeIntervalSince1970: 12345))
         #expect(request.headers["Authorization"].first == "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=d88b4ffeba0ad306663853a7280ffeda745d25ead6c775ab59af84a272dc853a")
         
         try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
         
         request.headers.replaceOrAdd(name: "Authorization", value: "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=d88b4ffeba0ad306663853a7280ffeda745d25ead6c775ab59af84a272dc853b")
+        #expect(throws: AWSSigner.SigningError.invalidSignature) {
+            try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+        }
+    }
+    
+    @Test func testAwsSignClientVerifyWithMoreParams() async throws {
+        let url = "https://@examplebucket.s3.amazonaws.com/?uploads&list-type=2&delimiter=%2F&prefix=data%2Ftest%2F"
+        var request = HTTPClientRequest(url: url)
+        request.headers = .init([("ADDITIONAL-headers", "Value%2F%2F"), ("zzzz_header", "")])
+        //try request.applyS3Credentials()
+        let signer = AWSSigner(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", region: "us-west-2", service: "s3")
+        try signer.sign(request: &request, now: Date(timeIntervalSince1970: 12345))
+        #expect(request.headers["Authorization"].first == "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=additional-headers;host;x-amz-content-sha256;x-amz-date;zzzz_header, Signature=20719d0a85515709f170eb36677d2115a6608bffb133c9bf3c1be76c8bdfe1da")
+        
+        try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+        
+        // skip zzzz_header
+        request.headers.replaceOrAdd(name: "Authorization", value: "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=additional-headers;host;x-amz-content-sha256;x-amz-date, Signature=20719d0a85515709f170eb36677d2115a6608bffb133c9bf3c1be76c8bdfe1da")
         #expect(throws: AWSSigner.SigningError.invalidSignature) {
             try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
         }
@@ -96,12 +114,12 @@ import Darwin
 
     @Test func s3BucketEndpointParsesProfilesAndCredentialOverrides() throws {
         let endpoints = S3BucketEndpoint.parseList(
-            "openmeteo,https://user:pw@example.com/bucket/@aws"
+            "s3://openmeteo/,s3://user:pw@example.com/bucket/@aws"
         )
 
         #expect(endpoints == [
-            S3BucketEndpoint(rawEndpoint: "openmeteo", profile: nil),
-            S3BucketEndpoint(rawEndpoint: "https://user:pw@example.com/bucket/", profile: "aws")
+            S3BucketEndpoint(rawEndpoint: "s3://openmeteo/", profile: nil),
+            S3BucketEndpoint(rawEndpoint: "s3://user:pw@example.com/bucket/", profile: "aws")
         ])
 
         setenv("S3_CREDENTIALS_OPENMETEO_AWS", "s3://credential-bucket/", 1)
@@ -114,10 +132,10 @@ import Darwin
 
     @Test func s3BucketEndpointListRedactsMultipleCredentialedEndpoints() throws {
         let endpoints = S3BucketEndpointList(
-            "s3://user1:pw1@bucket-a/@aws,https://user2:pw2@example.com/bucket/@ceph"
+            "s3://user1:pw1@bucket-a/@aws,s3://user2:pw2@example.com/bucket/@ceph"
         )
 
-        #expect(String(describing: endpoints) == "s3://bucket-a/,https://example.com/bucket/")
+        #expect(String(describing: endpoints) == "s3://bucket-a/,s3://example.com/bucket/")
         #expect(!String(describing: endpoints).contains("user1"))
         #expect(!String(describing: endpoints).contains("pw1"))
         #expect(!String(describing: endpoints).contains("user2"))

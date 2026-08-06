@@ -2,7 +2,7 @@ import Foundation
 import Vapor
 
 struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
-    /// URL with credentials `https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket`
+    /// URL with credentials `https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/`
     private let rawEndpoint: String
     
     /// Profile string like `aws` or `ceph`
@@ -34,19 +34,45 @@ struct S3BucketEndpoint: Sendable, Hashable, CustomStringConvertible {
             let bucketSplit = bucket.split(separator: "@")
             if bucketSplit.count == 3 {
                 // http://user:pw@something.com/@profile
+                let url = bucketSplit[0] + "@" + bucketSplit[1]
+                guard url.starts(with: "s3://") else {
+                    fatalError("S3 bucket URL must start with 's3://'")
+                }
+                guard url.hasSuffix("/") else {
+                    fatalError("S3 bucket URL must end with '/")
+                }
                 return S3BucketEndpoint(rawEndpoint: bucketSplit[0] + "@" + bucketSplit[1], profile: String(bucketSplit[2]))
             }
-            let bucket = bucketSplit[0]
+            let bucketName = bucketSplit[0]
             let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
             let profileUpper = profile.map { "_\($0.uppercased())" } ?? ""
 
             // An environment variable may overwrite the S3 credentials
-            if let credentials = Environment.get("S3_CREDENTIALS_\(bucket.uppercased())\(profileUpper)") {
+            if let credentials = Environment.get("S3_CREDENTIALS_\(bucketName.uppercased())\(profileUpper)") {
+                // URL stored in Env variable S3_CREDENTIALS_BUCKETNAME_PROFILE
+                guard credentials.starts(with: "s3://") else {
+                    fatalError("S3 bucket URL must start with 's3://'")
+                }
+                guard credentials.hasSuffix("/") else {
+                    fatalError("S3 bucket URL must end with '/")
+                }
                 return S3BucketEndpoint(rawEndpoint: credentials, profile: profile)
             }
-
-            return S3BucketEndpoint(rawEndpoint: String(bucket), profile: profile)
+            guard bucket.starts(with: "s3://") else {
+                fatalError("S3 bucket URL must start with 's3://'")
+            }
+            guard bucket.hasSuffix("/") else {
+                fatalError("S3 bucket URL must end with '/")
+            }
+            return S3BucketEndpoint(rawEndpoint: String(bucket), profile: nil)
         }
+    }
+    
+    static func loadFromEnvironment(variable: String) -> [S3BucketEndpoint] {
+        guard let configured = Environment.get(variable) else {
+            return []
+        }
+        return self.parseList(configured)
     }
 }
 

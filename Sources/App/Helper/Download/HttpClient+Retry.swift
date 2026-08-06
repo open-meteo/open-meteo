@@ -14,6 +14,7 @@ enum CurlErrorNonRetry: NonRetryError {
     case timeoutReached
     case chunkSizeMismatch
     case rangeQueriesNotSupportedForFiles
+    case payloadTooLarge
 }
 
 enum CurlErrorRetry: Error {
@@ -57,6 +58,8 @@ extension HTTPClientResponse {
             throw CurlErrorNonRetry.forbidden(body: try await self.readStringImmutable())
         case .badRequest:
             throw CurlErrorNonRetry.badRequest(body: try await self.readStringImmutable())
+        case .payloadTooLarge:
+            throw CurlErrorNonRetry.payloadTooLarge
         case .paymentRequired, .methodNotAllowed, .notAcceptable, .proxyAuthenticationRequired, .gone, .lengthRequired, .uriTooLong, .unsupportedMediaType, .rangeNotSatisfiable, .expectationFailed, .imATeapot, .misdirectedRequest, .unprocessableEntity, .locked, .failedDependency, .upgradeRequired, .preconditionRequired, .unavailableForLegalReasons:
             throw CurlErrorNonRetry.other(status)
         default:

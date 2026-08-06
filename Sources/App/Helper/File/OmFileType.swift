@@ -108,11 +108,11 @@ enum OmFileType: Hashable, RemoteFileManageable {
         }
         let file = getRelativeFilePath()
         switch self {
-        case .run(let domain, _, _):
-            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run"))\(file)"
-        case .domainChunk(let domain, _, _, _, _, _):
+        case .run(_, _, _):
+            return "\(remoteDirectory.replacingLastPathComponent(with: "data_run"))\(file)"
+        case .domainChunk(_, _, _, _, _, _):
             return "\(remoteDirectory)\(file)"
-        case .staticFile(domain: let domain, _, _):
+        case .staticFile(domain: _, _, _):
             return "\(remoteDirectory)\(file)"
         }
     }
