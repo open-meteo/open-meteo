@@ -174,7 +174,7 @@ struct S3DataController: RouteCollection {
             }
         }
         
-        let dateFormat = DateFormatter.awsS3DateTime
+        let dateFormat = DateFormatter.awsS3DateTimeFloored
         let filesXml = files.map {
             """
             <Contents>
@@ -934,8 +934,15 @@ extension String {
 }
 
 extension DateFormatter {
-    /// Format dates like `2023-11-14T04:32:17.000Z`
+    /// Format dates like `2023-11-14T04:32:17.123Z`
     static let awsS3DateTime = {
+        let dateFormat = DateFormatter()
+        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.SSS'Z'"
+        return dateFormat
+    }()
+    
+    /// Format dates like `2023-11-14T04:32:17.000Z`
+    static let awsS3DateTimeFloored = {
         let dateFormat = DateFormatter()
         dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.000'Z'"
         return dateFormat
