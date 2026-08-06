@@ -207,8 +207,10 @@ struct WeatherNextPressureVariable: PressureVariableRespresentable, Hashable, Ge
             return .gramPerKilogram
         case .geopotential_height:
             return .metre
-        case .wind_u_component, .wind_v_component, .vertical_velocity:
+        case .wind_u_component, .wind_v_component:
             return .metrePerSecond
+        case .vertical_velocity:
+            return .metrePerSecondNotUnitConverted
         }
     }
 
