@@ -56,6 +56,7 @@ Apps:
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
 - [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
+- [Heat Rules](https://heatrules.com/) A free browser-based calculator for occupational heat exposure limits. Inputs: location, work intensity, acclimatization status. Outputs: work/rest schedule, water intake, and the standard each number comes from.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
