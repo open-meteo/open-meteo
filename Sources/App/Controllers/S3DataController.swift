@@ -20,6 +20,11 @@ import NIOFileSystem
  If `S3_UPLOAD_REPLICATION_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation. Used to replicate uploads to a fail-over server in realtime. If the server is available. This is a blocking operation.
  
  If `S3_UPLOAD_LAZY_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are lazily replicated to those servers after the sync replication completed. Used to upload data to large S3 storage servers afterwards
+ 
+ TODO:
+ - Proxy to backend S3 server, cache backend S3 listings
+ - FileHandle open cache + maybe also cache local listing
+ - API key integration with accounting (1 call = 1KB traffic)
  */
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
@@ -42,6 +47,7 @@ struct S3DataController: RouteCollection {
         
         if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
             routes.get("", use: self.list)
+            routes.get("index.html", use: self.index)
             routes.get("openmeteo", use: self.list)
             routes.on(.HEAD, [], use: self.headRoot)
             for root in ["data", "data_run", "data_spatial"] {
@@ -110,108 +116,38 @@ struct S3DataController: RouteCollection {
             throw RateLimitError.serviceOverloaded
         }
         let params = try req.query.decode(S3List.ListV2Query.self)
-        try authorizeReadRequest(req: req, apikey: params.apikey)
-        
-        let path = params.prefix
-        guard params.list_type == 2, params.delimiter == "/" else {
-            throw S3ApiError.forbidden
-        }
-        if params.prefix == "" {
-            return Response(body: .init(stringLiteral: """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                    <Name>openmeteo</Name>
-                    <Prefix>/</Prefix>
-                    <KeyCount>3</KeyCount>
-                    <MaxKeys>1000</MaxKeys>
-                    <Delimiter>/</Delimiter>
-                    <IsTruncated>false</IsTruncated>
-                    <CommonPrefixes>
-                    <Prefix>data/</Prefix>
-                    </CommonPrefixes>
-                    <CommonPrefixes>
-                    <Prefix>data_spatial/</Prefix>
-                    </CommonPrefixes>
-                    <CommonPrefixes>
-                    <Prefix>data_run/</Prefix>
-                    </CommonPrefixes>
-                </ListBucketResult>
-                """))
-        }
-        
-        guard let absoluteDirectoryPath = resolveListPath(path) else {
-            throw S3ApiError.forbidden
-        }
-        
-        let pathUrl = URL(fileURLWithPath: absoluteDirectoryPath, isDirectory: true)
-        let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
-        
-        guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
-            throw S3ApiError.forbidden
-        }
-        
-        var files = [S3List.ListV2File]()
-        var directories = [String]()
-        /// Note: Maybe at some point a async version of the directory enumerator should be used.
-        /// https://forums.swift.org/t/xcode-16-3-cant-use-makeiterator-via-filemanagers-enumerator-at-in-async-function/78976
-        for case let fileURL as URL in AnySequence(directoryEnumerator) {
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
-                  let isDirectory = resourceValues.isDirectory,
-                  let name = resourceValues.name,
-                  !name.contains("~")
-            else {
-                continue
-            }
-            if isDirectory {
-                directories.append(name)
-            } else {
-                guard let modificationTime = resourceValues.contentModificationDate,
-                      let fileSize = resourceValues.fileSize
-                else {
-                    continue
-                }
-                files.append(S3List.ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
+        if params.apikey != nil || req.headers.first(name: .authorization) != nil {
+            try authorizeReadRequest(req: req, apikey: params.apikey)
+            return try params.makeResponse()
+        } else {
+            return try await req.withFreeApiRateLimiter() { _ in
+                try validateAllowedReferer(req)
+                return (1, try params.makeResponse())
             }
         }
-        
-        let dateFormat = DateFormatter.awsS3DateTimeFloored
-        let filesXml = files.map {
-            """
-            <Contents>
-                <Key>\(path)\($0.name)</Key>
-                <LastModified>\(dateFormat.string(from: $0.modificationTime))</LastModified>
-                <Size>\($0.fileSize)</Size>
-                <StorageClass>STANDARD</StorageClass>
-            </Contents>
-            """
-        }.joined(separator: "\n")
-        let directoriesXml = directories.map {
-            """
-            <CommonPrefixes>
-            <Prefix>\(path)\($0)/</Prefix>
-            </CommonPrefixes>
-            """
-        }.joined(separator: "\n")
-        
-        var headers = HTTPHeaders()
-        headers.add(name: .contentType, value: "application/xml")
-        return Response(status: .ok, headers: headers, body: .init(string: """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-            <Name>openmeteo</Name>
-            <Prefix>\(path)</Prefix>
-            <KeyCount>\(files.count + directories.count)</KeyCount>
-            <MaxKeys>1000</MaxKeys>
-            <Delimiter>/</Delimiter>
-            <IsTruncated>false</IsTruncated>
-            \(directoriesXml)
-            \(filesXml)
-        </ListBucketResult>
-        """))
     }
     
-    /// Serve file through nginx send file
+    /// Serve static files
     func get(_ req: Request) async throws -> Response {
+        OmMetrics.requestsS3ApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
+        if req.url.host == "data-spatial.open-meteo.com" {
+            return try await req.withFreeApiRateLimiter(fn: { _ in
+                try validateAllowedReferer(req)
+                let path = req.url.path
+                guard path.hasPrefix("/data_spatial") else {
+                    throw S3ApiError.forbidden
+                }
+                guard let absolutePath = resolveObjectPath(path) else {
+                    throw S3ApiError.forbidden
+                }
+                return (1, try await req.fileio.asyncStreamFile(at: absolutePath))
+            })
+        }
+        
         let params = try req.query.decode(DownloadParams.self)
         let path = req.url.path.dropPrefix("/openmeteo")
         guard let absolutePath = resolveObjectPath(path) else {
@@ -531,6 +467,15 @@ struct S3DataController: RouteCollection {
         }
         try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
     }
+
+    private func validateAllowedReferer(_ req: Request) throws {
+        guard let host = req.getRefererHost() else {
+            throw S3ApiError.forbidden
+        }
+        guard host == "localhost" || host == "open-meteo.com" || host.hasSuffix(".open-meteo.com") else {
+            throw S3ApiError.forbidden
+        }
+    }
     
     private func verifyRequestSignature(req: Request, body: ByteBuffer, isRead: Bool) throws {
         let credentials = isRead ? self.readCredentials : self.uploadCredentials
@@ -674,28 +619,6 @@ struct S3DataController: RouteCollection {
         return "\(finalPath).\(uploadId)~"
     }
     
-    private func resolveListPath(_ path: String) -> String? {
-        guard !path.isEmpty,
-              path.last == "/",
-              !path.hasPrefix("/"),
-              !path.contains("//"),
-              !path.contains(".."),
-              path.onlyContainsAlphanumericDashSlashDot else {
-            return nil
-        }
-        let directory: Substring
-        if path.starts(with: "data/") {
-            directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
-        } else if path.starts(with: "data_run/") {
-            directory = (OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")).dropLast("/data_run/".count)
-        } else if path.starts(with: "data_spatial/") {
-            directory = (OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")).dropLast("/data_spatial/".count)
-        } else {
-            return nil
-        }
-        return "\(directory)/\(path)"
-    }
-    
     /// Get absolute object path for local storage
     private func resolveObjectPath(_ path: String) -> String? {
         guard !path.isEmpty,
@@ -717,6 +640,150 @@ struct S3DataController: RouteCollection {
             return nil
         }
         return "\(directory)\(path)"
+    }
+}
+
+extension Request {
+    /// Get the `Referer` header and extract the hostname if available
+    func getRefererHost() -> Substring? {
+        guard let referer = headers.first(name: .referer) else {
+            return nil
+        }
+        guard let schemeRange = referer.range(of: "http://") ?? referer.range(of: "https://") else {
+            return nil
+        }
+        let hostStart = schemeRange.upperBound
+        guard hostStart < referer.endIndex else {
+            return nil
+        }
+        let hostEnd = referer[hostStart...].firstIndex(where: { $0 == "/" || $0 == ":" }) ?? referer.endIndex
+        guard hostStart < hostEnd else {
+            return nil
+        }
+        return referer[hostStart..<hostEnd]
+    }
+}
+
+extension S3List.ListV2Query {
+    func makeResponse() throws -> Response {
+        let path = self.prefix
+        guard self.list_type == 2, self.delimiter == "/" else {
+            throw S3ApiError.forbidden
+        }
+        if self.prefix == "" {
+            return Response(body: .init(stringLiteral: """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                    <Name>openmeteo</Name>
+                    <Prefix>/</Prefix>
+                    <KeyCount>3</KeyCount>
+                    <MaxKeys>1000</MaxKeys>
+                    <Delimiter>/</Delimiter>
+                    <IsTruncated>false</IsTruncated>
+                    <CommonPrefixes>
+                    <Prefix>data/</Prefix>
+                    </CommonPrefixes>
+                    <CommonPrefixes>
+                    <Prefix>data_spatial/</Prefix>
+                    </CommonPrefixes>
+                    <CommonPrefixes>
+                    <Prefix>data_run/</Prefix>
+                    </CommonPrefixes>
+                </ListBucketResult>
+                """))
+        }
+        
+        guard let absoluteDirectoryPath = resolveListPath(path) else {
+            throw S3ApiError.forbidden
+        }
+        
+        let pathUrl = URL(fileURLWithPath: absoluteDirectoryPath, isDirectory: true)
+        let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
+        
+        guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
+            throw S3ApiError.forbidden
+        }
+        
+        var files = [S3List.ListV2File]()
+        var directories = [String]()
+        /// Note: Maybe at some point a async version of the directory enumerator should be used.
+        /// https://forums.swift.org/t/xcode-16-3-cant-use-makeiterator-via-filemanagers-enumerator-at-in-async-function/78976
+        for case let fileURL as URL in AnySequence(directoryEnumerator) {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
+                  let isDirectory = resourceValues.isDirectory,
+                  let name = resourceValues.name,
+                  !name.contains("~")
+            else {
+                continue
+            }
+            if isDirectory {
+                directories.append(name)
+            } else {
+                guard let modificationTime = resourceValues.contentModificationDate,
+                      let fileSize = resourceValues.fileSize
+                else {
+                    continue
+                }
+                files.append(S3List.ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
+            }
+        }
+        
+        let dateFormat = DateFormatter.awsS3DateTimeFloored
+        let filesXml = files.map {
+            """
+            <Contents>
+                <Key>\(path)\($0.name)</Key>
+                <LastModified>\(dateFormat.string(from: $0.modificationTime))</LastModified>
+                <Size>\($0.fileSize)</Size>
+                <StorageClass>STANDARD</StorageClass>
+            </Contents>
+            """
+        }.joined(separator: "\n")
+        let directoriesXml = directories.map {
+            """
+            <CommonPrefixes>
+            <Prefix>\(path)\($0)/</Prefix>
+            </CommonPrefixes>
+            """
+        }.joined(separator: "\n")
+        
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/xml")
+        return Response(status: .ok, headers: headers, body: .init(string: """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <Name>openmeteo</Name>
+            <Prefix>\(path)</Prefix>
+            <KeyCount>\(files.count + directories.count)</KeyCount>
+            <MaxKeys>1000</MaxKeys>
+            <Delimiter>/</Delimiter>
+            <IsTruncated>false</IsTruncated>
+            \(directoriesXml)
+            \(filesXml)
+        </ListBucketResult>
+        """))
+    }
+    
+    private func resolveListPath(_ path: String) -> String? {
+        guard !path.isEmpty,
+              path.last == "/",
+              !path.hasPrefix("/"),
+              !path.contains("//"),
+              !path.contains(".."),
+              path.onlyContainsAlphanumericDashSlashDot else {
+            return nil
+        }
+        let directory: Substring
+        if path.starts(with: "data/") {
+            directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
+        } else if path.starts(with: "data_run/") {
+            directory = (OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")).dropLast("/data_run/".count)
+        } else if path.starts(with: "data_spatial/") {
+            directory = (OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")).dropLast("/data_spatial/".count)
+        } else {
+            return nil
+        }
+        return "\(directory)/\(path)"
     }
 }
 
