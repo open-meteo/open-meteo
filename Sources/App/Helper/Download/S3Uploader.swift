@@ -99,7 +99,7 @@ enum S3Uploader {
     /// `server` in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
     /// `basePath` offsets the object names relative to the local directory .e.g. `some-path/` in this example
     /// `exclude` can be used to exclude file names. Supports "*" and "?" wildcards
-    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
+    /*static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
         let logger = Logger(label: "S3Uploader")
         let remoteRoot = basePath.hasSuffix("/") ? basePath : basePath + "/"
         let serverBase = server.hasSuffix("/") ? String(server.dropLast()) : server
@@ -205,7 +205,7 @@ enum S3Uploader {
         }
         
         logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
-    }
+    }*/
 }
 
 /// Protocol of how a file can be chunked into 8 MB parts and upload as individual ByteBuffers. Unfortunately, `AsyncHTTPClient` only accepts ByteBuffers so a memory copy can not be avoided.

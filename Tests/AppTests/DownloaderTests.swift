@@ -183,14 +183,14 @@ import Darwin
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
     /// Set S3_TEST_SERVER to a URL of the form
     /// `https://ACCESS_KEY:SECRET_KEY@s3-host.tld/bucket/` to enable.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
+    /*@Test(.enabled(if: ProcessInfo.processInfo.environment["S3_TEST_SERVER"] != nil))
     func testS3SyncUpload() async throws {
         let server = try #require(ProcessInfo.processInfo.environment["S3_TEST_SERVER"])
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }
 
         try await S3Uploader.uploadSync(client: client, localDirectory: "/Users/patrick/Documents/open-meteo-data/data/ecmwf_ifs025_ensemble_mean/", server: server, basePath: "test/ecmwf_ifs025_ensemble_mean/")
-    }
+    }*/
     
     /// Upload three files using single-part PUT uploads.
     /// Set S3_TEST_SERVER to a URL of the form
