@@ -20,6 +20,11 @@ import NIOFileSystem
  If `S3_UPLOAD_REPLICATION_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation. Used to replicate uploads to a fail-over server in realtime. If the server is available. This is a blocking operation.
  
  If `S3_UPLOAD_LAZY_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are lazily replicated to those servers after the sync replication completed. Used to upload data to large S3 storage servers afterwards
+ 
+ TODO:
+ - Proxy to backend S3 server, cache backend S3 listings
+ - FileHandle open cache + maybe also cache local listing
+ - API key integration with accounting (1 call = 1KB traffic)
  */
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
