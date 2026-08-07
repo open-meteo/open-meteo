@@ -116,13 +116,28 @@ struct S3DataController: RouteCollection {
             return try params.makeResponse()
         } else {
             return try await req.withFreeApiRateLimiter() { _ in
+                try validateAllowedReferer(req)
                 return (1, try params.makeResponse())
             }
         }
     }
     
-    /// Serve file through nginx send file
+    /// Serve static files
     func get(_ req: Request) async throws -> Response {
+        if req.url.host == "data-spatial.open-meteo.com" {
+            return try await req.withFreeApiRateLimiter(fn: { _ in
+                try validateAllowedReferer(req)
+                let path = req.url.path
+                guard path.hasPrefix("/data_spatial") else {
+                    throw S3ApiError.forbidden
+                }
+                guard let absolutePath = resolveObjectPath(path) else {
+                    throw S3ApiError.forbidden
+                }
+                return (1, try await req.fileio.asyncStreamFile(at: absolutePath))
+            })
+        }
+        
         let params = try req.query.decode(DownloadParams.self)
         let path = req.url.path.dropPrefix("/openmeteo")
         guard let absolutePath = resolveObjectPath(path) else {
@@ -442,6 +457,15 @@ struct S3DataController: RouteCollection {
         }
         try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
     }
+
+    private func validateAllowedReferer(_ req: Request) throws {
+        guard let host = req.getRefererHost() else {
+            throw S3ApiError.forbidden
+        }
+        guard host == "localhost" || host == "open-meteo.com" || host.hasSuffix(".open-meteo.com") else {
+            throw S3ApiError.forbidden
+        }
+    }
     
     private func verifyRequestSignature(req: Request, body: ByteBuffer, isRead: Bool) throws {
         let credentials = isRead ? self.readCredentials : self.uploadCredentials
@@ -606,6 +630,27 @@ struct S3DataController: RouteCollection {
             return nil
         }
         return "\(directory)\(path)"
+    }
+}
+
+extension Request {
+    /// Get the `Referer` header and extract the hostname if available
+    func getRefererHost() -> Substring? {
+        guard let referer = headers.first(name: .referer) else {
+            return nil
+        }
+        guard let schemeRange = referer.range(of: "http://") ?? referer.range(of: "https://") else {
+            return nil
+        }
+        let hostStart = schemeRange.upperBound
+        guard hostStart < referer.endIndex else {
+            return nil
+        }
+        let hostEnd = referer[hostStart...].firstIndex(where: { $0 == "/" || $0 == ":" }) ?? referer.endIndex
+        guard hostStart < hostEnd else {
+            return nil
+        }
+        return referer[hostStart..<hostEnd]
     }
 }
 

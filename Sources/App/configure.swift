@@ -179,7 +179,7 @@ public func configure(_ app: Application) throws {
     )
     app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
     app.middleware.use(ErrorMiddleware.custom(environment: app.environment))
-    app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    //app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
     app.commands.use(VersionCommand(), as: "version")
