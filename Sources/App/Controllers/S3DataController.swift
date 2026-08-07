@@ -124,6 +124,11 @@ struct S3DataController: RouteCollection {
     
     /// Serve static files
     func get(_ req: Request) async throws -> Response {
+        OmMetrics.requestsS3ApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
         if req.url.host == "data-spatial.open-meteo.com" {
             return try await req.withFreeApiRateLimiter(fn: { _ in
                 try validateAllowedReferer(req)
