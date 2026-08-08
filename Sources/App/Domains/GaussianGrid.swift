@@ -444,4 +444,3 @@ extension GaussianGrid.Slice: Sequence {
         }
     }
 }
-
