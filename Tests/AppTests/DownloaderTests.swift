@@ -9,8 +9,18 @@ import Glibc
 #else
 import Darwin
 #endif
+import SystemPackage
 
 @Suite(.serialized) struct DownloaderTests {
+    @Test func fileSystemCache() async throws {
+        try FileManager.default.createDirectory(atPath: "cachetest/dir1/dir2", withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: "cachetest/dir1/dir2/file", contents: Data("Hello".utf8))
+        let a = try FileSystemCache.DirectoryEntry(path: "cachetest")
+        
+        #expect(await a.getDirectories().keys.first == "dir1")
+        #expect(await a.getFileTraversing(name: "dir1/dir2/file")?.size == 5)
+    }
+    
     @Test func testAwsSign() async throws {
         let url = "https://examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)
