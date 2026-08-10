@@ -693,27 +693,11 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         guard let variables else {
             return nil
         }
-        if !isModelAvailable {
-            let missing = ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count))
-            let missingTimestamps = ApiArray.timestamp([Timestamp](repeating: .noData, count: time.dailyRead.count))
-            return .init(name: "daily", time: time.dailyDisplay, columns: variables.map { variable in
-                switch variable {
-                case .sunrise, .sunset, .moonrise, .moonset:
-                    return .init(variable: variable, unit: params.timeformatOrDefault.unit, variables: [missingTimestamps])
-                case .moon_phase:
-                    return .init(variable: variable, unit: .fraction, variables: [missing])
-                case .daylight_duration:
-                    return .init(variable: variable, unit: .seconds, variables: [missing])
-                default:
-                    let members = variable == .river_discharge && params.ensemble ? 51 : domain.countEnsembleMember
-                    return .init(variable: variable, unit: .undefined, variables: .init(repeating: missing, count: members))
-                }
-            })
-        }
-        guard let readerDaily else {
+        if isModelAvailable && readerDaily == nil {
             return nil
         }
         let members = 0..<domain.countEnsembleMember
+        let missing = ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count))
         
         var riseSet: (rise: [Timestamp], set: [Timestamp])?
         var moonRiseSet: (rise: [Timestamp], set: [Timestamp])?
@@ -724,7 +708,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             let members = allMembersForRiverDischarge ? 0..<51 : members
             if variable == .sunrise || variable == .sunset {
                 // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
-                let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: self.latitude, lon: self.longitude, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 riseSet = times
                 if variable == .sunset {
                     return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -734,7 +718,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             }
             if variable == .moonrise || variable == .moonset {
                 // only calculate moonrise/set once. Uses `dailyDisplay` (local midnight in UTC) like sunrise/set
-                let times = moonRiseSet ?? Moon.calculateMoonRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon)
+                let times = moonRiseSet ?? Moon.calculateMoonRiseSet(timeRange: time.dailyDisplay.range, lat: self.latitude, lon: self.longitude)
                 moonRiseSet = times
                 if variable == .moonset {
                     return ApiColumn(variable: .moonset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -747,8 +731,11 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiColumn(variable: .moon_phase, unit: .fraction, variables: [.float(phase)])
             }
             if variable == .daylight_duration {
-                let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerDaily.modelLat)
+                let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: self.latitude)
                 return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
+            }
+            guard let readerDaily else {
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: missing, count: members.count))
             }
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in

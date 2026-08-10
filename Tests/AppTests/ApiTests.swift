@@ -29,6 +29,10 @@ import VaporTesting
         "\"\(variable)\":[\(Array(repeating: "null", count: count).joined(separator: ","))]"
     }
 
+    private func occurrences(of substring: String, in string: String) -> Int {
+        string.components(separatedBy: substring).count - 1
+    }
+
     /*@Test func generateS3SyncCommands() throws {
         for domain in DomainRegistry.allCases {
             let d = domain.rawValue
@@ -91,7 +95,7 @@ import VaporTesting
             1
         ])
         if case .timestamp(let values) = dailySection.columns[1].variables[0] {
-            #expect(values.allSatisfy { $0.isNoData })
+            #expect(values.allSatisfy { !$0.isNoData })
         } else {
             Issue.record("Expected timestamp sunrise values")
         }
@@ -180,7 +184,7 @@ import VaporTesting
     @Test func mixedAvailabilityPreservesLocations() async throws {
         try await withApp { app in
             let controller = WeatherApiController(defaultModel: .meteofrance_arome_france)
-            let query = "/v1/forecast?latitude=-33.8,48.8&longitude=151.2,2.3&elevation=0,35&models=meteofrance_arome_france&hourly=temperature_2m&daily=sunrise&forecast_days=1"
+            let query = "/v1/forecast?latitude=-33.8,48.8&longitude=151.2,2.3&elevation=0,35&models=meteofrance_arome_france&hourly=temperature_2m&daily=sunrise,moon_phase,daylight_duration&forecast_days=1"
             let request = makeRequest(
                 application: app,
                 url: query
@@ -193,7 +197,10 @@ import VaporTesting
             #expect(json.contains(#""longitude":151.2"#))
             #expect(json.contains(#""location_id":1"#))
             #expect(json.contains(nullArray(variable: "temperature_2m", count: 24)))
-            #expect(json.contains(nullArray(variable: "sunrise", count: 1)))
+            for variable in ["sunrise", "moon_phase", "daylight_duration"] {
+                #expect(occurrences(of: "\"\(variable)\":[", in: json) == 2)
+                #expect(!json.contains(nullArray(variable: variable, count: 1)))
+            }
         }
     }
 
