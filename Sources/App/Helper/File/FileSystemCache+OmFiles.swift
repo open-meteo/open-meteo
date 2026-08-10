@@ -30,6 +30,10 @@ extension OmFileRemoteOmReader: RemoteFilePayload {
     }
     
     func remoteUpdated(new: Self) async throws {
+        // Mark the old file as deleted/modified.
+        // Cached queries still work, but new queries will immediately throw an error without unnecessarily doing HTTP requests.
+        self.fn.backend.markAsDeleted()
+        
         let logger = reader.fn.backend.logger
         let activeBlocks = fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
         try await new.fn.preloadBlocks(blocks: activeBlocks)

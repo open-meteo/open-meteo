@@ -28,6 +28,7 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     let logger: Logger
     
     /// Timestamp in seconds when the last data was successfully fetched from the backend.
+    /// If set to `0`, the file has been deleted or modified. In both cases, it is not valid anymore
     private let lastValidatedAtomic: Atomic<Int>
     
     /// Timestamp when the last data was successfully fetched from the backend.
@@ -93,11 +94,19 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         self.lastValidatedAtomic = .init(lastValidated.timeIntervalSince1970)
     }
     
+    /// The file has been deleted or modified on the remote server. This instance is not valid anymore
+    func markAsDeleted() {
+        self.lastValidatedAtomic.store(0, ordering: .relaxed)
+    }
+    
     func prefetchData(offset: Int, count: Int) async throws {
         // nothing do do here
     }
     
     func getData(offset: Int, count: Int) async throws -> ByteBuffer {
+        guard lastValidatedAtomic.load(ordering: .relaxed) > 0 else {
+            throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        }
         var request = HTTPClientRequest(url: url)
         if let lastModified {
             request.headers.add(name: "If-Unmodified-Since", value: lastModified)
