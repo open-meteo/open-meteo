@@ -1151,16 +1151,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
         /// Matches the last (highest-priority) forecast reader used by
         /// `GenericReaderMultiSameType` when native time resolution is requested.
-        var modelDtSeconds: Int {
+        var nativeDtSeconds: Int? {
             switch self {
             case .single(let domain, _),
                  .singleWithPrecipitationProbability(let domain, _, _):
                 return domain.dtSeconds
             case .multiple(let domains),
                  .multipleWithPrecipitationProbability(let domains, _):
-                return domains.last?.0.dtSeconds ?? 3600
+                return domains.last?.0.dtSeconds
             case .seamlessLocal(let global, let local, _):
-                return local.last?.0.dtSeconds ?? global.last?.0.dtSeconds ?? 3600
+                return local.last?.0.dtSeconds ?? global.last?.0.dtSeconds
             case .singleWithSupplementalDomains(let domain, _, let supplemental, _):
                 return supplemental.last?.0.dtSeconds ?? domain.dtSeconds
             }
@@ -1228,7 +1228,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func placeholderModelDtSeconds(longitude: Float) -> Int? {
-        return getDomainAndVariable(longitude: longitude)?.modelDtSeconds ?? genericDomain?.dtSeconds
+        return getDomainAndVariable(longitude: longitude)?.nativeDtSeconds ?? genericDomain?.dtSeconds
     }
 
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
