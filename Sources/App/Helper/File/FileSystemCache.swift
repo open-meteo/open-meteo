@@ -15,7 +15,7 @@ import Darwin
  Provides functions to traverse the file tree to get individual files.
  
  Directories and its files are revalidated every couple of seconds to check for modifications.
- Directories are opened on-demand recusively. Only the parts that are used at least once, are loaded into memory.
+ Directories are opened on-demand recursively. Only the parts that are used at least once, are loaded into memory.
  
  Files may have an associated payload that is initialised lazily but then kept in memory.
  E.g. om or JSON files are decoded only once.
@@ -26,6 +26,8 @@ import Darwin
  
  Consider:
  - Currently OM files can be hash-mapped to open. String traversing is expensive. Any options?
+ - Store last accessed attribute and release file handles if not used for a whiles
+ - Background checks to revalidate eagerly -> make sure to release deleted files even if not read recently
  
  TODO:
  - Should use `getdents64` to speed up directory listing
@@ -127,7 +129,7 @@ enum FileSystemCache {
                     files[name] = FileEntry(
                         fd: fd,
                         inode: inode,
-                        size: stat.st_size,
+                        size: Int64(stat.st_size),
                         modificationTimestamp: stat.modificationTime
                     )
                 }
@@ -247,6 +249,11 @@ enum FileSystemCache {
         }
     }
 }
+
+#if os(Linux)
+// Linux-specific O_PATH definition
+let O_PATH: Int32 = 0x00200000
+#endif
 
 fileprivate extension FileHandle {
     enum OFlags {

@@ -29,6 +29,27 @@ final class RemoteFileManager: Sendable {
     
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
     func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
+        
+        /*let local = try! FileSystemCache.DirectoryEntry(path: "/some/path")
+        let remote = S3Inventory(server: "https://key:secret@bucket.s3.amazonaws.com/")
+        
+        /// should be `data/model/variable/file.om`
+        let path = file.getFilePath()
+        if let local = await local.getFileTraversing(name: path[...]) {
+            let payload = local.getPayload(ofType: Key.Local)
+            return try await fn(payload)
+        }
+        if let client, let remote = try await remote.getObject(path: path, client: client, logger: logger) {
+            let payload = remote.getPayload(ofType: Key.Remote, client: client, logger: logger, forceNew: false)
+            do {
+                return try await fn(payload)
+            } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+                let payload = remote.getPayload(ofType: Key.Remote, client: client, logger: logger, forceNew: true)
+                return try await fn(payload)
+           }
+        }
+        fatalError()*/
+        
         guard let value = try await get(file: file, client: client, logger: logger, forceNew: false) else {
             return nil
         }
