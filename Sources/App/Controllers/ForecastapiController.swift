@@ -1204,32 +1204,31 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     }
     
-    /// Native timestep for a no-data placeholder. Generic mappings expose this
-    /// through their reader order; legacy composites select an underlying domain
-    /// from the requested coordinate.
-    func placeholderModelDtSeconds(longitude: Float) -> Int? {
-        if let mapping = getDomainAndVariable() {
-            return mapping.modelDtSeconds
+    func getDomainAndVariable(longitude: Float) -> DomainReaderMapping? {
+        guard self == .satellite_radiation_seamless else {
+            return getDomainAndVariable()
         }
 
-        switch self {
-        case .satellite_radiation_seamless:
-            if (-20..<60).contains(longitude) {
-                return DwdSisDomain.europe_africa_v4.dtSeconds
-            }
-            if (-60..<50).contains(longitude) {
-                return EumetsatLsaSafDomain.msg.dtSeconds
-            }
-            if (50..<90).contains(longitude) {
-                return EumetsatLsaSafDomain.iodc.dtSeconds
-            }
-            if longitude >= 90 {
-                return JaxaHimawariDomain.himawari_10min.dtSeconds
-            }
-            return nil
-        default:
-            return genericDomain?.dtSeconds
+        if (-20..<60).contains(longitude) {
+            return .single(DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
         }
+        if (-60..<50).contains(longitude) {
+            return .single(EumetsatLsaSafDomain.msg, EumetsatLsaSafVariable.self)
+        }
+        if (50..<90).contains(longitude) {
+            return .single(EumetsatLsaSafDomain.iodc, EumetsatLsaSafVariable.self)
+        }
+        if longitude >= 90 {
+            return .multiple([
+                (JaxaHimawariDomain.himawari_10min, JaxaHimawariVariable.self),
+                (JaxaHimawariDomain.himawari_70e_10min, JaxaHimawariVariable.self)
+            ])
+        }
+        return nil
+    }
+
+    func placeholderModelDtSeconds(longitude: Float) -> Int? {
+        return getDomainAndVariable(longitude: longitude)?.modelDtSeconds ?? genericDomain?.dtSeconds
     }
 
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
@@ -1528,7 +1527,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        if let d = getDomainAndVariable() {
+        if let d = getDomainAndVariable(longitude: lon) {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         
@@ -1794,20 +1793,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
             
         case .satellite_radiation_seamless:
-            if (-20..<60).contains(lon) { // DWD MTG on 0°
-                return try await DwdSisDomain.europe_africa_v4.makeGenericHourlyDaily(variableType: DwdSisVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            }
-            if (-60..<50).contains(lon) { // MSG on 0°
-                return try await EumetsatLsaSafDomain.msg.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            }
-            if (50..<90).contains(lon) { // IODC on 41.5°
-                return try await EumetsatLsaSafDomain.iodc.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            }
-            if (90...).contains(lon) { // Himawari on 140°
-                let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let reader70e = try await JaxaHimawariDomain.himawari_70e_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMultiSameType([reader, reader70e])
-            }
             return nil
         case .jma_jaxa_himawari:
             let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)

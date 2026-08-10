@@ -153,7 +153,7 @@ import VaporTesting
             let controller = WeatherApiController(defaultModel: .satellite_radiation_seamless)
             let request = makeRequest(
                 application: app,
-                url: "/v1/forecast?latitude=-80,48.8&longitude=10,10&elevation=0,35&models=satellite_radiation_seamless&hourly=shortwave_radiation&forecast_days=1"
+                url: "/v1/forecast?latitude=-80,48.8&longitude=10,10&elevation=0,35&models=satellite_radiation_seamless&hourly=shortwave_radiation&temporal_resolution=native&forecast_days=1"
             )
 
             let response = try await controller.query(request)
@@ -161,7 +161,7 @@ import VaporTesting
             let json = try await bodyString(response, application: app)
             #expect(json.contains(#""latitude":-80"#))
             #expect(json.contains(#""location_id":1"#))
-            #expect(json.contains(nullArray(variable: "shortwave_radiation", count: 24)))
+            #expect(json.contains(nullArray(variable: "shortwave_radiation", count: 144)))
         }
     }
 
