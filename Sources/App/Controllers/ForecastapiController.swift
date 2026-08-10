@@ -802,7 +802,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
-                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: variable.onlySingleMember ? 1 : domain.countEnsembleMember))
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: domain.countEnsembleMember))
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
