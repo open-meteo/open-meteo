@@ -48,18 +48,6 @@ extension IconNativeGrid {
             let maximumDistanceMeters: Float
         }
 
-        enum BucketLayout: Sendable {
-            case rowMajor
-            case tiled8
-
-            var tileShift: Int? {
-                switch self {
-                case .rowMajor: nil
-                case .tiled8: 3
-                }
-            }
-        }
-
         struct FaceSection: Sendable {
             let minimumX: Int
             let minimumY: Int
@@ -68,12 +56,12 @@ extension IconNativeGrid {
             let firstBucket: Int
 
             @inline(__always)
-            func bucket(x: Int, y: Int, tileShift: Int?) -> Int? {
+            func bucket(x: Int, y: Int) -> Int? {
                 let localX = x - minimumX
                 let localY = y - minimumY
                 guard localX >= 0, localX < columns, localY >= 0, localY < rows else { return nil }
-                guard let tileShift else { return firstBucket + localY * columns + localX }
-                let tileSize = 1 << tileShift
+                let tileShift = CubeArtifact.tileShift
+                let tileSize = CubeArtifact.tileSize
                 let tileX = localX >> tileShift
                 let tileY = localY >> tileShift
                 let tileHeight = min(tileSize, rows - tileY * tileSize)
@@ -124,13 +112,15 @@ extension IconNativeGrid {
             }
         }
 
-        static let magic = Array("ICONCUB4".utf8)
-        static let version: UInt32 = 4
+        static let magic = Array("ICONCUB5".utf8)
+        static let version: UInt32 = 5
         static let headerBytes = 144
         static let faceSectionsOffset = 48
         static let faceSectionStride = 16
         static let centerStride = 16
         static let globalFlag: UInt32 = 1
+        static let tileShift = 3
+        static let tileSize = 1 << tileShift
 
         @inline(__always)
         private static func centerOffset(position: Int, centersOffset: Int) -> Int {
