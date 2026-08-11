@@ -188,26 +188,6 @@ extension IconNativeGrid.Generator {
             else {
                 throw IconNativeGrid.ArtifactError.invalidHeader
             }
-            var maximumQuantizationErrorMeters = 0.0
-            for center in centers {
-                let x = Double(Float(center.x))
-                let y = Double(Float(center.y))
-                let z = Double(Float(center.z))
-                let inverseNorm = 1 / sqrt(x * x + y * y + z * z)
-                let approximated = IconNativeCenter(
-                    x: x * inverseNorm,
-                    y: y * inverseNorm,
-                    z: z * inverseNorm
-                )
-                let chord = sqrt(max(0, center.squaredDistance(to: approximated)))
-                maximumQuantizationErrorMeters = max(
-                    maximumQuantizationErrorMeters,
-                    2 * asin(min(1, chord * 0.5)) * 6_371_229
-                )
-            }
-            guard maximumQuantizationErrorMeters <= 2 else {
-                throw IconNativeGrid.ArtifactError.invalidHeader
-            }
 
             @inline(__always)
             func storedDirection(_ center: IconNativeCenter) -> IconNativeCenter {
@@ -235,8 +215,13 @@ extension IconNativeGrid.Generator {
                 else {
                     throw IconNativeGrid.ArtifactError.invalidCenter(position)
                 }
+                let storedCenter = storedDirection(center)
+                let chord = sqrt(max(0, center.squaredDistance(to: storedCenter)))
+                guard 2 * asin(min(1, chord * 0.5)) * 6_371_229 <= 2 else {
+                    throw IconNativeGrid.ArtifactError.invalidHeader
+                }
                 let location = IconNativeGrid.CubeGeometry.location(
-                    for: storedDirection(center),
+                    for: storedCenter,
                     resolution: resolution
                 )
                 minimumX[location.face] = min(minimumX[location.face], location.x)

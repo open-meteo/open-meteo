@@ -115,8 +115,6 @@ struct IconNativeGrid: Gridable {
     var nx: Int { storage.cellCount }
     var ny: Int { 1 }
     var searchRadius: Int { 2 }
-    var gridNumber: UInt32 { storage.gridNumber }
-    var gridUUID: [UInt8] { storage.gridUUID }
 
     var crsWkt2: String {
         """
@@ -142,7 +140,7 @@ struct IconNativeGrid: Gridable {
 
     func getCoordinates(gridpoint: Int) -> LatLon {
         precondition(gridpoint >= 0 && gridpoint < storage.cellCount, "ICON grid point out of range")
-        return storage.coordinate(at: gridpoint)
+        return storage.centerVector(at: gridpoint).coordinate
     }
 
     func findPointInSea(
@@ -165,21 +163,10 @@ struct IconNativeGrid: Gridable {
             elevationFile: elevationFile
         )
 
-        var bestPosition = -1
-        var bestDistanceSquared = Float.infinity
-        for position in 0..<candidates.count where elevations[position] <= -999 {
-            let distanceSquared = candidates.distancesSquared[position]
-            if distanceSquared < bestDistanceSquared
-                || (distanceSquared == bestDistanceSquared
-                    && (bestPosition < 0 || candidates.points[position] < candidates.points[bestPosition])) {
-                bestDistanceSquared = distanceSquared
-                bestPosition = position
-            }
+        for position in 1..<candidates.count where elevations[position] <= -999 {
+            return (candidates.points[position], .sea)
         }
-        guard bestPosition >= 0 else {
-            return elevationResult(gridpoint: nearest, value: nearestElevation)
-        }
-        return (candidates.points[bestPosition], .sea)
+        return elevationResult(gridpoint: nearest, value: nearestElevation)
     }
 
     func findPointTerrainOptimised(
