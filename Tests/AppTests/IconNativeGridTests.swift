@@ -162,17 +162,16 @@ import Testing
     @Test func artifactUsesSinglePortableFloat32Format() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        let data = try Data(contentsOf: fixture.file)
-
-        #expect(Array(data[0..<8]) == Array("ICONCUB3".utf8))
-        #expect(data.uint32LE(at: 8) == 3)
-        #expect(data.uint32LE(at: 12) == IconNativeGrid.CubeArtifact.globalFlag)
-        #expect(data.uint32LE(at: 16) == globalMetadata.gridNumber)
-        #expect(data.uint32LE(at: 20) == UInt32(fixture.centers.count))
-        #expect(data.uint32LE(at: 24) == 4)
+        #expect(IconNativeGrid.CubeArtifact.magic == Array("ICONCUB3".utf8))
+        #expect(IconNativeGrid.CubeArtifact.version == 3)
+        #expect(IconNativeGrid.CubeArtifact.globalFlag == 1)
         #expect(IconNativeGrid.CubeArtifact.headerBytes == 184)
         #expect(IconNativeGrid.CubeArtifact.centerStride == 16)
         let artifact = try IconNativeGrid.CubeArtifact.open(file: fixture.file)
+        #expect(artifact.isGlobal)
+        #expect(artifact.gridNumber == globalMetadata.gridNumber)
+        #expect(artifact.cellCount == fixture.centers.count)
+        #expect(artifact.level == 4)
         #expect(artifact.centersOffset.isMultiple(of: 16))
         try validateGeneratedArtifact(fixture)
 
@@ -187,11 +186,10 @@ import Testing
     @Test func malformedLayoutAndSizeBudgetAreRejected() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        var corrupted = try Data(contentsOf: fixture.file)
-        corrupted.removeLast()
         let corruptedFile = temporaryArtifactFile()
         defer { try? FileManager.default.removeItem(at: corruptedFile) }
-        try corrupted.write(to: corruptedFile)
+        try FileManager.default.copyItem(at: fixture.file, to: corruptedFile)
+        try truncateLastByte(of: corruptedFile)
         #expect(throws: IconNativeGrid.ArtifactError.invalidHeader) {
             _ = try IconNativeGrid.load(file: corruptedFile)
         }
@@ -236,9 +234,7 @@ import Testing
         try FileManager.default.copyItem(at: fixture.file, to: published)
         #expect(try recovering.get().nx == fixture.centers.count)
 
-        var invalid = try Data(contentsOf: fixture.file)
-        invalid.removeLast()
-        try invalid.write(to: fixture.file, options: .atomic)
+        try truncateLastByte(of: fixture.file)
         #expect(throws: IconNativeDomainError.self) {
             try cache.validateFileAndInstall()
         }
@@ -275,7 +271,7 @@ import Testing
     @Test func invalidNetcdfUsesTheSourceErrorDomain() throws {
         let file = temporaryArtifactFile()
         defer { try? FileManager.default.removeItem(at: file) }
-        try Data("not a NetCDF file".utf8).write(to: file)
+        try "not a NetCDF file".write(to: file, atomically: true, encoding: .utf8)
 
         #expect(throws: IconNativeGridSourceError.self) {
             _ = try IconNativeGrid.Generator.readSource(file: file.path, identity: .d2)
@@ -554,6 +550,13 @@ private func temporaryArtifactFile() -> URL {
         .appendingPathComponent("icon-native-cube-\(UUID().uuidString).bin")
 }
 
+private func truncateLastByte(of file: URL) throws {
+    let handle = try FileHandle(forWritingTo: file)
+    defer { try? handle.close() }
+    let size = try handle.seekToEnd()
+    try handle.truncate(atOffset: size - 1)
+}
+
 private func makeElevationFile(_ elevations: [Float]) async throws -> IconNativeGridElevationFile {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("icon-native-elevation-\(UUID().uuidString).om").path
@@ -570,13 +573,4 @@ private func makeElevationFile(_ elevations: [Float]) async throws -> IconNative
         path: path,
         reader: try await OmFileReader(file: path).expectArray(of: Float.self)
     )
-}
-
-private extension Data {
-    func uint32LE(at offset: Int) -> UInt32 {
-        withUnsafeBytes {
-            UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self))
-        }
-    }
-
 }
