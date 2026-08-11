@@ -32,12 +32,6 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
 /// artifact. Spatial-index work belongs here, never in API coordinate lookup.
 extension IconNativeGrid {
     enum Generator {
-        struct SourceData {
-            /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
-            /// location offset in native forecast files.
-            let centers: [IconNativeCenter]
-        }
-
         static func generate(
             sourceFile: String,
             identity: IconNativeGridIdentity,
@@ -45,7 +39,7 @@ extension IconNativeGrid {
         )
             throws -> IconNativeGrid
         {
-            let source = try readSource(file: sourceFile, identity: identity)
+            let centers = try readSource(file: sourceFile, identity: identity)
             let maximumFileSize = identity.isGlobal ? 128 * 1_024 * 1_024 : 32 * 1_024 * 1_024
             let metadata = IconNativeGrid.CubeArtifact.Metadata(
                 gridNumber: identity.gridNumber,
@@ -56,14 +50,16 @@ extension IconNativeGrid {
             try IconNativeGrid.Generator.ArtifactWriter.write(
                 to: URL(fileURLWithPath: artifactFile),
                 metadata: metadata,
-                centers: source.centers,
+                centers: centers,
                 level: identity.isGlobal ? 9 : 11,
                 maximumFileSize: maximumFileSize
             )
             return try IconNativeGrid.load(file: URL(fileURLWithPath: artifactFile))
         }
 
-        static func readSource(file: String, identity: IconNativeGridIdentity) throws -> SourceData {
+        /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
+        /// location offset in native forecast files.
+        static func readSource(file: String, identity: IconNativeGridIdentity) throws -> [IconNativeCenter] {
             do {
                 return try readSourceUnchecked(file: file, identity: identity)
             } catch let error as IconNativeGridSourceError {
@@ -77,7 +73,7 @@ extension IconNativeGrid {
             file: String,
             identity: IconNativeGridIdentity
         ) throws
-            -> SourceData
+            -> [IconNativeCenter]
         {
             guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
                 throw IconNativeGridSourceError.couldNotOpen(file)
@@ -100,7 +96,7 @@ extension IconNativeGrid {
                 throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
             }
 
-            return SourceData(centers: try makeCenters(longitudes: clon, latitudes: clat))
+            return try makeCenters(longitudes: clon, latitudes: clat)
         }
 
         private static func validateAttributes(group: Group, identity: IconNativeGridIdentity) throws {
