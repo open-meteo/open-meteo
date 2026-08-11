@@ -9,20 +9,7 @@ extension IconNativeGrid {
     /// adjacency are derived from `(face, level, x, y)`.
     final class CubeIndex: Sendable {
         typealias Artifact = IconNativeGrid.CubeArtifact
-        typealias BucketLayout = Artifact.BucketLayout
         typealias FaceSection = Artifact.FaceSection
-
-        private protocol BucketLayoutDecoder {
-            static var tileShift: Int { get }
-        }
-
-        private struct RowMajorLayoutDecoder: BucketLayoutDecoder {
-            static let tileShift = 0
-        }
-
-        private struct Tiled8LayoutDecoder: BucketLayoutDecoder {
-            static let tileShift = 3
-        }
 
         struct Lookup: Sendable {
             let query: IconNativeLookupVector
@@ -54,7 +41,6 @@ extension IconNativeGrid {
         let artifactBytes: Int
         let gridNumber: UInt32
         let gridUUID: [UInt8]
-        let bucketLayout: BucketLayout
 
         init(file: URL) throws {
             let artifact = try Artifact.open(file: file)
@@ -75,7 +61,6 @@ extension IconNativeGrid {
             artifactBytes = artifact.artifactBytes
             gridNumber = artifact.gridNumber
             gridUUID = artifact.gridUUID
-            bucketLayout = artifact.isGlobal ? .tiled8 : .rowMajor
             let bucketWidth = 2 / Double(artifact.resolution)
             boundaryValues = (0...artifact.resolution).map { -1 + Double($0) * bucketWidth }
             boundaryInverseNormSquared = boundaryValues.map { 1 / (1 + $0 * $0) }
@@ -141,36 +126,11 @@ extension IconNativeGrid {
         /// Minimal production path. Ties and the uncommon implicit-tree traversal are deliberately
         /// delegated to `nearest`: fewer than two queries per thousand reach that cold path on the
         /// current R3B7 and ICON-D2 artifacts.
-        @inline(__always)
+        @inline(never)
         private func nearestHot(
             to query: IconNativeLookupVector,
-            location: IconNativeGrid.CubeGeometry.Location,
-            bytes: borrowing RawSpan
-        ) -> (cell: Int, position: Int, distanceSquared: Float)? {
-            switch bucketLayout {
-            case .rowMajor:
-                nearestHot(
-                    to: query,
-                    location: location,
-                    bytes: bytes,
-                    layout: RowMajorLayoutDecoder.self
-                )
-            case .tiled8:
-                nearestHot(
-                    to: query,
-                    location: location,
-                    bytes: bytes,
-                    layout: Tiled8LayoutDecoder.self
-                )
-            }
-        }
-
-        @inline(never)
-        private func nearestHot<Layout: BucketLayoutDecoder>(
-            to query: IconNativeLookupVector,
             location queryLocation: IconNativeGrid.CubeGeometry.Location,
-            bytes: borrowing RawSpan,
-            layout: Layout.Type
+            bytes: borrowing RawSpan
         ) -> (cell: Int, position: Int, distanceSquared: Float)? {
             let geometryQuery = query.center
             var bestDistanceSquared = Float.infinity
@@ -244,9 +204,9 @@ extension IconNativeGrid {
 
             @inline(__always)
             func bucket(x: Int, y: Int) -> Int? {
-                if isGlobal, Layout.tileShift > 0 {
-                    let tileShift = Layout.tileShift
-                    let tileSize = 1 << tileShift
+                if isGlobal {
+                    let tileShift = Artifact.tileShift
+                    let tileSize = Artifact.tileSize
                     let tileX = x >> tileShift
                     let tileY = y >> tileShift
                     let tileHeight = min(tileSize, resolution - tileY * tileSize)
@@ -257,13 +217,9 @@ extension IconNativeGrid {
                         + (y & (tileSize - 1)) * tileWidth
                         + (x & (tileSize - 1))
                 }
-                if isGlobal {
-                    return queryLocation.face * resolution * resolution + y * resolution + x
-                }
                 return faceSections[queryLocation.face].bucket(
                     x: x,
-                    y: y,
-                    tileShift: Layout.tileShift > 0 ? Layout.tileShift : nil
+                    y: y
                 )
             }
 
@@ -296,15 +252,7 @@ extension IconNativeGrid {
                     upperX = min(xRange.upperBound, section.minimumX + section.columns - 1)
                     guard lowerX <= upperX else { return }
                 }
-                guard Layout.tileShift > 0 else {
-                    let firstBucket = bucket(x: lowerX, y: y)!
-                    scanBucketInterval(
-                        firstBucket: firstBucket,
-                        lastBucket: firstBucket + upperX - lowerX
-                    )
-                    return
-                }
-                let tileShift = Layout.tileShift
+                let tileShift = Artifact.tileShift
                 var segmentLowerX = lowerX
                 while segmentLowerX <= upperX {
                     let localX = segmentLowerX - section.minimumX

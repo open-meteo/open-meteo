@@ -177,7 +177,6 @@ extension IconNativeGrid {
 extension IconNativeGrid.Generator {
     enum ArtifactWriter {
         private typealias Artifact = IconNativeGrid.CubeArtifact
-        private typealias BucketLayout = Artifact.BucketLayout
         private typealias FaceSection = Artifact.FaceSection
 
         static func write(
@@ -193,7 +192,6 @@ extension IconNativeGrid.Generator {
             else {
                 throw IconNativeGrid.ArtifactError.invalidHeader
             }
-            let bucketLayout: BucketLayout = metadata.isGlobal ? .tiled8 : .rowMajor
             var maximumQuantizationErrorMeters = 0.0
             for center in centers {
                 let x = Double(Float(center.x))
@@ -289,8 +287,7 @@ extension IconNativeGrid.Generator {
                 )
                 let bucket = faceSections[location.face].bucket(
                     x: location.x,
-                    y: location.y,
-                    tileShift: bucketLayout.tileShift
+                    y: location.y
                 )!
                 counts[bucket] += 1
             }
@@ -315,8 +312,7 @@ extension IconNativeGrid.Generator {
                 )
                 let bucket = faceSections[location.face].bucket(
                     x: location.x,
-                    y: location.y,
-                    tileShift: bucketLayout.tileShift
+                    y: location.y
                 )!
                 order[cursors[bucket]] = UInt32(cell)
                 canonicalPositions[cell] = UInt32(cursors[bucket])
