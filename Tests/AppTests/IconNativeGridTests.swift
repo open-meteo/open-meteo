@@ -131,29 +131,25 @@ import Testing
         #expect(abs(coordinate.longitude) < 1e-5)
     }
 
-    @Test func regionalCoverageAndLongitudeWrappingArePreserved() throws {
+    @Test func regionalDistanceLimitAndLongitudeWrappingArePreserved() throws {
         let centers = [
             IconNativeCenter(latitudeDegrees: 50, longitudeDegrees: 5),
             IconNativeCenter(latitudeDegrees: 50, longitudeDegrees: 10),
             IconNativeCenter(latitudeDegrees: 55, longitudeDegrees: 5),
             IconNativeCenter(latitudeDegrees: 55, longitudeDegrees: 10),
         ]
-        let coverage = IconNativeGrid.CubeArtifact.Coverage(
-            nx: 2,
-            ny: 2,
-            latitudeMinimum: 49,
-            longitudeMinimum: 4,
-            dx: 4,
-            dy: 4,
-            bits: [0b0000_0111]
+        let fixture = try makeFixture(
+            centers: centers,
+            isGlobal: false,
+            maximumDistanceMeters: 10_000
         )
-        let fixture = try makeFixture(centers: centers, isGlobal: false, coverage: coverage)
         defer { fixture.remove() }
         let grid = try IconNativeGrid.load(file: fixture.file)
 
         #expect(grid.findPoint(lat: 50, lon: 5) == 0)
         #expect(grid.findPoint(lat: 50, lon: 365) == 0)
-        #expect(grid.findPoint(lat: 56, lon: 10) == nil)
+        #expect(grid.findPoint(lat: 50.05, lon: 5) == 0)
+        #expect(grid.findPoint(lat: 50.2, lon: 5) == nil)
         #expect(grid.findPoint(lat: 48, lon: 5) == nil)
         #expect(grid.findPoint(lat: .nan, lon: 5) == nil)
         #expect(grid.findPoint(lat: 91, lon: 5) == nil)
@@ -162,10 +158,10 @@ import Testing
     @Test func artifactUsesSinglePortableFloat32Format() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        #expect(IconNativeGrid.CubeArtifact.magic == Array("ICONCUB3".utf8))
-        #expect(IconNativeGrid.CubeArtifact.version == 3)
+        #expect(IconNativeGrid.CubeArtifact.magic == Array("ICONCUB4".utf8))
+        #expect(IconNativeGrid.CubeArtifact.version == 4)
         #expect(IconNativeGrid.CubeArtifact.globalFlag == 1)
-        #expect(IconNativeGrid.CubeArtifact.headerBytes == 184)
+        #expect(IconNativeGrid.CubeArtifact.headerBytes == 144)
         #expect(IconNativeGrid.CubeArtifact.centerStride == 16)
         let artifact = try IconNativeGrid.CubeArtifact.open(file: fixture.file)
         #expect(artifact.isGlobal)
@@ -349,7 +345,7 @@ private let globalMetadata = IconNativeGrid.CubeArtifact.Metadata(
     gridNumber: 26,
     gridUUID: Array(0..<16),
     isGlobal: true,
-    coverage: .global
+    maximumDistanceMeters: 10_000_000
 )
 
 private func makeGlobalFixture() throws -> IconNativeGridFixture {
@@ -371,14 +367,14 @@ private func makeGlobalFixture() throws -> IconNativeGridFixture {
 private func makeFixture(
     centers: [IconNativeCenter],
     isGlobal: Bool = true,
-    coverage: IconNativeGrid.CubeArtifact.Coverage = .global
+    maximumDistanceMeters: Float = 10_000_000
 ) throws -> IconNativeGridFixture {
     let file = temporaryArtifactFile()
     let metadata = isGlobal ? globalMetadata : IconNativeGrid.CubeArtifact.Metadata(
         gridNumber: 47,
         gridUUID: Array(repeating: 47, count: 16),
         isGlobal: false,
-        coverage: coverage
+        maximumDistanceMeters: maximumDistanceMeters
     )
     do {
         try IconNativeGrid.Generator.ArtifactWriter.write(
@@ -506,6 +502,7 @@ private func makeIdentity(_ fixture: IconNativeGridFixture) -> IconNativeGridIde
         gridUUIDHex: Array(0..<16).map { String(format: "%02x", $0) }.joined(),
         cellCount: fixture.centers.count,
         isGlobal: true,
+        maximumDistanceMeters: 10_000_000,
         sourceFile: "synthetic.nc.bz2"
     )
 }

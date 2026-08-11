@@ -50,7 +50,7 @@ enum IconNativeGridBenchmark {
                 gridNumber: 26,
                 gridUUID: [UInt8](repeating: 0, count: 16),
                 isGlobal: true,
-                coverage: .global
+                maximumDistanceMeters: 20_000
             ),
             centers: makeCenters(),
             level: 9
@@ -527,10 +527,6 @@ enum IconNativeGridBenchmark {
                     ))
                 }
             }
-            var coverage = [UInt8](repeating: 0xff, count: (nx * ny + 7) / 8)
-            if !coverage.isEmpty, nx * ny & 7 != 0 {
-                coverage[coverage.count - 1] = UInt8((1 << (nx * ny & 7)) - 1)
-            }
             var uuid = [UInt8]()
             uuid.reserveCapacity(16)
             for offset in 136..<152 { uuid.append(data[offset]) }
@@ -542,15 +538,7 @@ enum IconNativeGridBenchmark {
                 gridNumber: data.readUInt32(at: 20),
                 gridUUID: uuid,
                 isGlobal: flags & 1 != 0,
-                coverage: .init(
-                    nx: nx,
-                    ny: ny,
-                    latitudeMinimum: Double(data.readFloat(at: 40)),
-                    longitudeMinimum: Double(data.readFloat(at: 44)),
-                    dx: Double(data.readFloat(at: 48)),
-                    dy: Double(data.readFloat(at: 52)),
-                    bits: coverage
-                )
+                maximumDistanceMeters: 4_000
             )
         }
     }

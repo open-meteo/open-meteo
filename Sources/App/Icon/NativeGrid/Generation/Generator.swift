@@ -28,62 +28,14 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
     }
 }
 
-/// Float precision is sufficient for the offline regional coverage mask and halves the temporary
-/// vertex footprint compared with the Double center vectors used by nearest-cell lookup.
-private struct IconNativeVertex: Sendable {
-    let x: Float
-    let y: Float
-    let z: Float
-
-    init(x: Float, y: Float, z: Float) {
-        self.x = x
-        self.y = y
-        self.z = z
-    }
-
-    init(latitude: Float, longitude: Float) {
-        if latitude >= 90 {
-            self.init(x: 0, y: 0, z: 1)
-            return
-        }
-        if latitude <= -90 {
-            self.init(x: 0, y: 0, z: -1)
-            return
-        }
-        let latitudeRadians = latitude * .pi / 180
-        let longitudeRadians = longitude * .pi / 180
-        let cosineLatitude = cos(latitudeRadians)
-        self.init(
-            x: cosineLatitude * cos(longitudeRadians),
-            y: cosineLatitude * sin(longitudeRadians),
-            z: sin(latitudeRadians)
-        )
-    }
-
-    @inline(__always)
-    func dot(_ other: Self) -> Float {
-        x * other.x + y * other.y + z * other.z
-    }
-
-    @inline(__always)
-    func cross(_ other: Self) -> Self {
-        Self(
-            x: y * other.z - z * other.y,
-            y: z * other.x - x * other.z,
-            z: x * other.y - y * other.x
-        )
-    }
-}
-
 /// Offline converter from DWD's official ICON grid NetCDF to the compact, mmap-oriented runtime
-/// artifact. Expensive topology and spatial-index work belongs here, never in API coordinate lookup.
+/// artifact. Spatial-index work belongs here, never in API coordinate lookup.
 extension IconNativeGrid {
     enum Generator {
         struct SourceData {
             /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
             /// location offset in native forecast files.
             let centers: [IconNativeCenter]
-            let coverage: IconNativeGrid.CubeArtifact.Coverage
         }
 
         static func generate(
@@ -99,7 +51,7 @@ extension IconNativeGrid {
                 gridNumber: identity.gridNumber,
                 gridUUID: identity.gridUUID,
                 isGlobal: identity.isGlobal,
-                coverage: source.coverage
+                maximumDistanceMeters: identity.maximumDistanceMeters
             )
             try IconNativeGrid.Generator.ArtifactWriter.write(
                 to: URL(fileURLWithPath: artifactFile),
@@ -142,209 +94,13 @@ extension IconNativeGrid {
                     actual: String(describing: dimensions["cell"])
                 )
             }
-            guard dimensions["nv"] == 3, let vertexCount = dimensions["vertex"], vertexCount > 0 else {
-                throw IconNativeGridSourceError.invalidAttribute(
-                    name: "nv/vertex dimensions",
-                    actual: String(describing: dimensions)
-                )
-            }
-
             let clon = try readDouble(group: group, name: "clon", dimensions: ["cell"])
             let clat = try readDouble(group: group, name: "clat", dimensions: ["cell"])
             guard clon.count == cellCount, clat.count == cellCount else {
                 throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
             }
 
-            let centers = try makeCenters(longitudes: clon, latitudes: clat)
-
-            let coverage: IconNativeGrid.CubeArtifact.Coverage
-            if identity.isGlobal {
-                // Global acceptance needs no raster, so vlat/vlon and vertex connectivity are not read.
-                coverage = .global
-            } else {
-                let vlon = try readDouble(group: group, name: "vlon", dimensions: ["vertex"])
-                let vlat = try readDouble(group: group, name: "vlat", dimensions: ["vertex"])
-                guard vlon.count == vertexCount, vlat.count == vertexCount else {
-                    throw IconNativeGridSourceError.invalidTopology("vertex coordinate array length mismatch")
-                }
-                let (vertices, bounds) = try makeVertices(longitudes: vlon, latitudes: vlat)
-                let verticesRaw = try readInt32(
-                    group: group,
-                    name: "vertex_of_cell",
-                    dimensions: ["nv", "cell"]
-                )
-                let vertexIndices = try transposeConnectivity(
-                    verticesRaw,
-                    cellCount: cellCount,
-                    upperBound: vertexCount,
-                    variable: "vertex_of_cell"
-                )
-                // Build the acceptance policy while temporary vertex geometry is in scope. SourceData
-                // retains only the compact mask, reducing peak memory during artifact serialization.
-                coverage = try makeCoverageRaster(
-                    vertices: vertices,
-                    vertexIndices: vertexIndices,
-                    bounds: bounds,
-                    step: 0.02
-                )
-            }
-
-            return SourceData(
-                centers: centers,
-                coverage: coverage
-            )
-        }
-
-        private static func makeCoverageRaster(
-            vertices: [IconNativeVertex],
-            vertexIndices: [UInt32],
-            bounds: GridBounds,
-            step: Float
-        ) throws -> IconNativeGrid.CubeArtifact.Coverage {
-            guard !vertices.isEmpty, !vertexIndices.isEmpty, vertexIndices.count.isMultiple(of: 3),
-                step.isFinite, step > 0
-            else {
-                throw IconNativeGridSourceError.invalidTopology("invalid regional coverage geometry")
-            }
-            let latitudeMinimum = floor(bounds.lat_bounds.lowerBound / step) * step
-            let longitudeMinimum = floor(bounds.lon_bounds.lowerBound / step) * step
-            let nx = Int(ceil((bounds.lon_bounds.upperBound - longitudeMinimum) / step))
-            let ny = Int(ceil((bounds.lat_bounds.upperBound - latitudeMinimum) / step))
-            let bitCountResult = nx.multipliedReportingOverflow(by: ny)
-            guard nx > 0, ny > 0, !bitCountResult.overflow,
-                let byteCount = IconNativeGrid.CubeArtifact.coverageByteCount(
-                    bitCount: bitCountResult.partialValue
-                )
-            else {
-                throw IconNativeGridSourceError.invalidTopology("regional coverage dimensions overflow")
-            }
-            var bits = [UInt8](repeating: 0, count: byteCount)
-            for cell in 0..<(vertexIndices.count / 3) {
-                try forEachOverlappingBin(
-                    cell: cell,
-                    vertices: vertices,
-                    vertexIndices: vertexIndices,
-                    nx: nx,
-                    ny: ny,
-                    latitudeMinimum: latitudeMinimum,
-                    longitudeMinimum: longitudeMinimum,
-                    step: step
-                ) { bin in
-                    bits[bin / 8] |= 1 << UInt8(bin % 8)
-                }
-            }
-            return IconNativeGrid.CubeArtifact.Coverage(
-                nx: nx,
-                ny: ny,
-                latitudeMinimum: Double(latitudeMinimum),
-                longitudeMinimum: Double(longitudeMinimum),
-                dx: Double(step),
-                dy: Double(step),
-                bits: bits
-            )
-        }
-
-        private static func forEachOverlappingBin(
-            cell: Int,
-            vertices: [IconNativeVertex],
-            vertexIndices: [UInt32],
-            nx: Int,
-            ny: Int,
-            latitudeMinimum: Float,
-            longitudeMinimum: Float,
-            step: Float,
-            body: (Int) -> Void
-        ) throws {
-            let offset = cell * 3
-            let a = vertices[Int(vertexIndices[offset])]
-            let b = vertices[Int(vertexIndices[offset + 1])]
-            let c = vertices[Int(vertexIndices[offset + 2])]
-            // A spherical cap centred on vertex `a` and reaching the other two vertices contains the
-            // complete small, geodesically convex ICON triangle. Its bounding box may over-select bins
-            // but cannot omit a bin that contains part of the triangle.
-            let radius = max(angularDistance(a, b), angularDistance(a, c)) + 2e-6
-            guard radius.isFinite, radius < .pi else {
-                throw IconNativeGridSourceError.invalidTopology("invalid triangle at cell \(cell)")
-            }
-
-            // This only matters for deliberately coarse synthetic meshes. Operational ICON cells are
-            // much smaller than a hemisphere, but assigning a large triangle to every bin is the safe
-            // conservative fallback.
-            if radius >= .pi / 2 {
-                for y in 0..<ny {
-                    for x in 0..<nx { body(y * nx + x) }
-                }
-                return
-            }
-
-            let latitudeRadians = asin(max(-1, min(1, a.z)))
-            let latitudeLower = max(-90, (latitudeRadians - radius) * 180 / .pi)
-            let latitudeUpper = min(90, (latitudeRadians + radius) * 180 / .pi)
-            guard
-                let yRange = binRange(
-                    lower: latitudeLower,
-                    upper: latitudeUpper,
-                    origin: latitudeMinimum,
-                    step: step,
-                    count: ny
-                )
-            else { return }
-
-            let reachesPole = latitudeRadians - radius <= -.pi / 2 || latitudeRadians + radius >= .pi / 2
-            let xRanges: [ClosedRange<Int>]
-            if reachesPole {
-                xRanges = [0...(nx - 1)]
-            } else {
-                let ratio = min(1, max(0, sin(radius) / max(1e-12, cos(latitudeRadians))))
-                let longitudeRadius = asin(ratio) * 180 / .pi
-                let longitude = atan2(a.y, a.x) * 180 / .pi
-                let lower = longitude - longitudeRadius
-                let upper = longitude + longitudeRadius
-                var longitudeRanges = [(Float, Float)]()
-                // Longitude intervals crossing the antimeridian are split into the two stored ranges.
-                if lower < -180 {
-                    longitudeRanges.append((lower + 360, 180))
-                    longitudeRanges.append((-180, upper))
-                } else if upper > 180 {
-                    longitudeRanges.append((lower, 180))
-                    longitudeRanges.append((-180, upper - 360))
-                } else {
-                    longitudeRanges.append((lower, upper))
-                }
-                xRanges = longitudeRanges.compactMap {
-                    binRange(lower: $0.0, upper: $0.1, origin: longitudeMinimum, step: step, count: nx)
-                }
-            }
-
-            for y in yRange {
-                for xRange in xRanges {
-                    for x in xRange { body(y * nx + x) }
-                }
-            }
-        }
-
-        private static func binRange(
-            lower: Float,
-            upper: Float,
-            origin: Float,
-            step: Float,
-            count: Int
-        )
-            -> ClosedRange<Int>?
-        {
-            var first = Int(floor((lower - origin) / step))
-            var last = Int(floor((upper - origin) / step))
-            if last < 0 || first >= count { return nil }
-            first = max(0, first)
-            last = min(count - 1, last)
-            return first <= last ? first...last : nil
-        }
-
-        private static func angularDistance(_ lhs: IconNativeVertex, _ rhs: IconNativeVertex) -> Float {
-            // `acos(dot)` loses all precision for native D2 edges because their Float dot product can
-            // round to exactly one. atan2(sin, cos) remains accurate for very small angular distances.
-            let cross = lhs.cross(rhs)
-            return atan2(sqrt(max(0, cross.dot(cross))), max(-1, min(1, lhs.dot(rhs))))
+            return SourceData(centers: try makeCenters(longitudes: clon, latitudes: clat))
         }
 
         private static func validateAttributes(group: Group, identity: IconNativeGridIdentity) throws {
@@ -386,24 +142,6 @@ extension IconNativeGrid {
             return try typed.read()
         }
 
-        private static func readInt32(
-            group: Group,
-            name: String,
-            dimensions: [String]
-        ) throws
-            -> [Int32]
-        {
-            guard let variable = group.getVariable(name: name), let typed = variable.asType(Int32.self)
-            else {
-                throw IconNativeGridSourceError.missingVariable(name)
-            }
-            let actual = variable.dimensions.map(\.name)
-            guard actual == dimensions else {
-                throw IconNativeGridSourceError.invalidDimensions(variable: name, actual: actual)
-            }
-            return try typed.read()
-        }
-
         private static func makeCenters(
             longitudes: [Double],
             latitudes: [Double]
@@ -429,94 +167,6 @@ extension IconNativeGrid {
             return centers
         }
 
-        private static func makeVertices(
-            longitudes: [Double],
-            latitudes: [Double]
-        ) throws -> ([IconNativeVertex], GridBounds) {
-            guard longitudes.count == latitudes.count, !longitudes.isEmpty else {
-                throw IconNativeGridSourceError.invalidTopology("empty vertex coordinate arrays")
-            }
-            let first = try makeCoordinate(
-                longitude: longitudes[0],
-                latitude: latitudes[0],
-                variable: "vlon/vlat",
-                index: 0
-            )
-            var latitudeMinimum = first.latitude
-            var latitudeMaximum = first.latitude
-            var longitudeMinimum = first.longitude
-            var longitudeMaximum = first.longitude
-            var vertices = [IconNativeVertex]()
-            vertices.reserveCapacity(longitudes.count)
-            for index in longitudes.indices {
-                let coordinate =
-                    index == 0
-                    ? first
-                    : try makeCoordinate(
-                        longitude: longitudes[index],
-                        latitude: latitudes[index],
-                        variable: "vlon/vlat",
-                        index: index
-                    )
-                latitudeMinimum = min(latitudeMinimum, coordinate.latitude)
-                latitudeMaximum = max(latitudeMaximum, coordinate.latitude)
-                longitudeMinimum = min(longitudeMinimum, coordinate.longitude)
-                longitudeMaximum = max(longitudeMaximum, coordinate.longitude)
-                vertices.append(
-                    IconNativeVertex(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                )
-            }
-            return (
-                vertices,
-                GridBounds(
-                    lat_bounds: latitudeMinimum...latitudeMaximum,
-                    lon_bounds: longitudeMinimum...longitudeMaximum
-                )
-            )
-        }
-
-        private static func makeCoordinate(
-            longitude: Double,
-            latitude: Double,
-            variable: String,
-            index: Int
-        ) throws -> LatLon {
-            guard longitude.isFinite, latitude.isFinite,
-                longitude >= -.pi - 1e-8, longitude <= .pi + 1e-8,
-                latitude >= -.pi / 2 - 1e-8, latitude <= .pi / 2 + 1e-8
-            else {
-                throw IconNativeGridSourceError.invalidValue(variable: variable, index: index)
-            }
-            return (
-                latitude: Float(latitude * 180 / .pi),
-                longitude: Float(longitude * 180 / .pi)
-            )
-        }
-
-        static func transposeConnectivity(
-            _ values: [Int32],
-            cellCount: Int,
-            upperBound: Int,
-            variable: String
-        ) throws -> [UInt32] {
-            guard values.count == cellCount * 3 else {
-                throw IconNativeGridSourceError.invalidTopology("\(variable) length mismatch")
-            }
-            // NetCDF layout: position * cellCount + cell. Artifact layout: cell * 3 + position.
-            var result = [UInt32](repeating: 0, count: values.count)
-            for cell in 0..<cellCount {
-                for position in 0..<3 {
-                    let sourceIndex = position * cellCount + cell
-                    let value = values[sourceIndex]
-                    guard value > 0, value <= upperBound else {
-                        throw IconNativeGridSourceError.invalidValue(variable: variable, index: sourceIndex)
-                    }
-                    result[cell * 3 + position] = UInt32(value - 1)
-                }
-            }
-            return result
-        }
-
     }
 }
 
@@ -539,7 +189,7 @@ extension IconNativeGrid.Generator {
         ) throws {
             guard !centers.isEmpty, centers.count <= Int(UInt32.max), level >= 0, level <= 15,
                 metadata.gridUUID.count == 16,
-                metadata.isGlobal == metadata.coverage.bits.isEmpty
+                metadata.maximumDistanceMeters.isFinite, metadata.maximumDistanceMeters > 0
             else {
                 throw IconNativeGrid.ArtifactError.invalidHeader
             }
@@ -673,11 +323,9 @@ extension IconNativeGrid.Generator {
                 cursors[bucket] += 1
             }
 
-            let coverageBytes = metadata.coverage.bits.count
             let layout = Artifact.SectionLayout(
                 cellCount: centers.count,
-                bucketCount: bucketCount,
-                coverageBytes: coverageBytes
+                bucketCount: bucketCount
             )
             guard layout.fileBytes <= maximumFileSize else {
                 throw IconNativeGrid.ArtifactError.artifactTooLarge(
@@ -693,13 +341,8 @@ extension IconNativeGrid.Generator {
             data.writeCubeInteger(metadata.gridNumber, at: 16)
             data.writeCubeInteger(UInt32(centers.count), at: 20)
             data.writeCubeInteger(UInt32(level), at: 24)
-            data.writeCubeInteger(UInt32(metadata.coverage.nx), at: 28)
-            data.writeCubeInteger(UInt32(metadata.coverage.ny), at: 32)
-            data.replaceSubrange(36..<52, with: metadata.gridUUID)
-            data.writeCubeDouble(metadata.coverage.latitudeMinimum, at: 56)
-            data.writeCubeDouble(metadata.coverage.longitudeMinimum, at: 64)
-            data.writeCubeDouble(metadata.coverage.dx, at: 72)
-            data.writeCubeDouble(metadata.coverage.dy, at: 80)
+            data.writeCubeFloat(metadata.maximumDistanceMeters, at: 28)
+            data.replaceSubrange(32..<48, with: metadata.gridUUID)
 
             for (face, section) in faceSections.enumerated() {
                 let offset = Artifact.faceSectionsOffset + face * Artifact.faceSectionStride
@@ -734,10 +377,6 @@ extension IconNativeGrid.Generator {
             for (cell, position) in canonicalPositions.enumerated() {
                 data.writeCubeInteger(position, at: layout.canonicalPositionsOffset + cell * 4)
             }
-            data.replaceSubrange(
-                layout.coverageOffset..<(layout.coverageOffset + coverageBytes),
-                with: metadata.coverage.bits
-            )
             try data.write(to: file, options: .atomic)
         }
     }
@@ -749,10 +388,6 @@ extension Data {
         Swift.withUnsafeBytes(of: &littleEndian) {
             replaceSubrange(offset..<(offset + $0.count), with: $0)
         }
-    }
-
-    fileprivate mutating func writeCubeDouble(_ value: Double, at offset: Int) {
-        writeCubeInteger(value.bitPattern, at: offset)
     }
 
     fileprivate mutating func writeCubeFloat(_ value: Float, at offset: Int) {

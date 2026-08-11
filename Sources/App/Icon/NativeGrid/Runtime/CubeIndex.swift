@@ -41,13 +41,7 @@ extension IconNativeGrid {
         private let offsetsOffset: Int
         let centersOffset: Int
         private let canonicalPositionsOffset: Int
-        private let coverageOffset: Int
-        private let coverageNx: Int
-        private let coverageNy: Int
-        private let coverageLatitudeMinimum: Double
-        private let coverageLongitudeMinimum: Double
-        private let coverageInverseDx: Double
-        private let coverageInverseDy: Double
+        private let maximumDistanceSquared: Float
         let resolutionScale: Double
         private let boundaryValues: [Double]
         private let boundaryInverseNormSquared: [Double]
@@ -69,13 +63,9 @@ extension IconNativeGrid {
             offsetsOffset = artifact.offsetsOffset
             centersOffset = artifact.centersOffset
             canonicalPositionsOffset = artifact.canonicalPositionsOffset
-            coverageOffset = artifact.coverageOffset
-            coverageNx = artifact.coverageNx
-            coverageNy = artifact.coverageNy
-            coverageLatitudeMinimum = artifact.coverageLatitudeMinimum
-            coverageLongitudeMinimum = artifact.coverageLongitudeMinimum
-            coverageInverseDx = artifact.coverageDx == 0 ? 0 : 1 / artifact.coverageDx
-            coverageInverseDy = artifact.coverageDy == 0 ? 0 : 1 / artifact.coverageDy
+            let maximumAngle = Double(artifact.maximumDistanceMeters) / 6_371_229
+            let maximumChord = 2 * sin(maximumAngle * 0.5)
+            maximumDistanceSquared = Float(maximumChord * maximumChord)
             isGlobal = artifact.isGlobal
             cellCount = artifact.cellCount
             level = artifact.level
@@ -102,15 +92,7 @@ extension IconNativeGrid {
                 return nil
             }
             let normalizedLongitude = IconNativeCenter.normalizedLongitude(longitude)
-            let latitudeDouble = Double(latitude)
             return withBytes { bytes in
-                guard
-                    covers(
-                        latitude: latitudeDouble,
-                        longitude: normalizedLongitude,
-                        bytes: bytes
-                    )
-                else { return nil }
                 let query = IconNativeCenter.fastCubeLookupVector(
                     latitudeDegrees: latitude,
                     longitudeDegrees: Float(normalizedLongitude)
@@ -120,7 +102,9 @@ extension IconNativeGrid {
                     resolution: resolution,
                     resolutionScale: resolutionScale
                 )
-                let nearest = nearestHot(to: query, location: location, bytes: bytes)
+                guard let nearest = nearestHot(to: query, location: location, bytes: bytes) else {
+                    return nil
+                }
                 return Lookup(
                     query: query,
                     location: location,
@@ -162,7 +146,7 @@ extension IconNativeGrid {
             to query: IconNativeLookupVector,
             location: IconNativeGrid.CubeGeometry.Location,
             bytes: borrowing RawSpan
-        ) -> (cell: Int, position: Int, distanceSquared: Float) {
+        ) -> (cell: Int, position: Int, distanceSquared: Float)? {
             switch bucketLayout {
             case .rowMajor:
                 nearestHot(
@@ -187,7 +171,7 @@ extension IconNativeGrid {
             location queryLocation: IconNativeGrid.CubeGeometry.Location,
             bytes: borrowing RawSpan,
             layout: Layout.Type
-        ) -> (cell: Int, position: Int, distanceSquared: Float) {
+        ) -> (cell: Int, position: Int, distanceSquared: Float)? {
             let geometryQuery = query.center
             var bestDistanceSquared = Float.infinity
             var secondBestDistanceSquared = Float.infinity
@@ -231,8 +215,17 @@ extension IconNativeGrid {
             }
 
             @inline(__always)
-            func exactFallback() -> (cell: Int, position: Int, distanceSquared: Float) {
-                let cell = nearest(to: geometryQuery, bytes: bytes)
+            func selectedWithinMaximumDistance() -> (cell: Int, position: Int, distanceSquared: Float)? {
+                bestDistanceSquared <= maximumDistanceSquared ? selected() : nil
+            }
+
+            @inline(__always)
+            func exactFallback() -> (cell: Int, position: Int, distanceSquared: Float)? {
+                guard let cell = nearest(
+                    to: geometryQuery,
+                    maximumDistanceSquared: Double(maximumDistanceSquared),
+                    bytes: bytes
+                ) else { return nil }
                 let position = Int(Artifact.readUInt32(
                     bytes,
                     at: canonicalPositionsOffset + cell * 4
@@ -357,7 +350,7 @@ extension IconNativeGrid {
             let leafXRange = queryLocation.x...queryLocation.x
             let leafYRange = queryLocation.y...queryLocation.y
             if certified(xRange: leafXRange, yRange: leafYRange) {
-                if selectionIsUnambiguous() { return selected() }
+                if selectionIsUnambiguous() { return selectedWithinMaximumDistance() }
                 return exactFallback()
             }
 
@@ -370,7 +363,7 @@ extension IconNativeGrid {
                 scanBucketRow(y: y, xRange: xRange)
             }
             if certified(xRange: xRange, yRange: yRange) {
-                if selectionIsUnambiguous() { return selected() }
+                if selectionIsUnambiguous() { return selectedWithinMaximumDistance() }
             }
             return exactFallback()
         }
@@ -422,24 +415,6 @@ extension IconNativeGrid {
                 maximumCandidateDistanceSquared
                 * max(0, 1 - maximumCandidateDistanceSquared * 0.25)
             return candidateSineSquared + 64 * Double.ulpOfOne < boundarySineSquared
-        }
-
-        @inline(__always)
-        private func covers(
-            latitude: Double,
-            longitude: Double,
-            bytes: borrowing RawSpan
-        ) -> Bool {
-            if isGlobal { return true }
-            let xValue = floor((longitude - coverageLongitudeMinimum) * coverageInverseDx)
-            let yValue = floor((latitude - coverageLatitudeMinimum) * coverageInverseDy)
-            guard xValue.isFinite, yValue.isFinite else { return false }
-            let x = Int(xValue)
-            let y = Int(yValue)
-            guard x >= 0, x < coverageNx, y >= 0, y < coverageNy else { return false }
-            let bit = y * coverageNx + x
-            return Artifact.readUInt8(bytes, at: coverageOffset + bit / 8)
-                & (1 << UInt8(bit % 8)) != 0
         }
 
         @inline(__always)
