@@ -35,15 +35,14 @@ enum IconNativeGridBenchmark {
                 .appendingPathComponent("icon-native-cube-benchmark-\(UUID().uuidString).bin")
             usesTemporaryArtifact = true
             print("Generating deterministic R3B7-scale cube artifact...")
-            try IconNativeGrid.Generator.ArtifactWriter.write(
+            try SphericalCubeArtifact.Writer.write(
                 to: file,
                 metadata: .init(
-                    gridNumber: 26,
-                    gridUUID: [UInt8](repeating: 0, count: 16),
-                    isGlobal: true,
-                    maximumDistanceMeters: 20_000
+                    identity: .init(number: 26, uuid: [UInt8](repeating: 0, count: 16)),
+                    coversWholeSphere: true,
+                    maximumChordDistanceSquared: maximumChordDistanceSquared(meters: 20_000)
                 ),
-                centers: makeCenters(),
+                points: makeCenters(),
                 level: 9
             )
         }
@@ -112,16 +111,16 @@ enum IconNativeGridBenchmark {
         return (samples, checksum)
     }
 
-    private static func makeCenters() -> [IconNativeCenter] {
+    private static func makeCenters() -> [SphericalPoint] {
         let goldenAngle = Double.pi * (3 - sqrt(5.0))
-        var centers = [IconNativeCenter]()
+        var centers = [SphericalPoint]()
         centers.reserveCapacity(syntheticCellCount)
         for index in 0..<syntheticCellCount {
             let z = 1 - 2 * (Double(index) + 0.5) / Double(syntheticCellCount)
             let radius = sqrt(max(0, 1 - z * z))
             let longitude = Double(index) * goldenAngle
             centers.append(
-                IconNativeCenter(
+                SphericalPoint(
                     x: radius * cos(longitude),
                     y: radius * sin(longitude),
                     z: z
@@ -172,7 +171,7 @@ enum IconNativeGridBenchmark {
     }
 
     private struct FallbackQuery {
-        let center: IconNativeCenter
+        let center: SphericalPoint
         let seedPosition: Int
     }
 
@@ -181,11 +180,11 @@ enum IconNativeGridBenchmark {
         queries: [(latitude: Float, longitude: Float)]
     ) -> [FallbackQuery] {
         queries.prefix(fallbackQueryCount).compactMap { query in
-            guard let lookup = grid.storage.findNearestLookup(
+            guard let lookup = grid.storage.nearestLookup(
                 latitude: query.latitude,
                 longitude: query.longitude
             ) else { return nil }
-            return FallbackQuery(center: lookup.query.center, seedPosition: lookup.position)
+            return FallbackQuery(center: lookup.query.point, seedPosition: lookup.position)
         }
     }
 
@@ -198,12 +197,12 @@ enum IconNativeGridBenchmark {
         var checksum = 0
         for _ in 0..<repeats {
             for query in queries {
-                let vector = IconNativeCenter.fastCubeLookupVector(
+                let vector = SphericalPoint.fastLookupVector(
                     latitudeDegrees: query.latitude,
-                    longitudeDegrees: IconNativeCenter.normalizedLongitude(query.longitude)
+                    longitudeDegrees: SphericalPoint.normalizedLongitude(query.longitude)
                 )
-                let location = IconNativeGrid.CubeGeometry.location(
-                    for: vector.center,
+                let location = SphericalCubeGeometry.location(
+                    for: vector.point,
                     resolution: grid.storage.resolution,
                     resolutionScale: grid.storage.resolutionScale
                 )
@@ -227,7 +226,7 @@ enum IconNativeGridBenchmark {
         var checksum = 0
         for _ in 0..<repeats {
             for query in queries {
-                checksum &+= grid.storage.findNearestCell(
+                checksum &+= grid.storage.nearestPointID(
                     latitude: query.latitude,
                     longitude: query.longitude
                 )!
@@ -245,11 +244,11 @@ enum IconNativeGridBenchmark {
         var checksum = 0
         for _ in 0..<repeats {
             for query in queries {
-                let candidates = grid.storage.findNearestCells(
+                let candidates = grid.storage.nearestCandidates(
                     latitude: query.latitude,
                     longitude: query.longitude
                 )!
-                checksum &+= candidates.points[0] &+ candidates.count
+                checksum &+= candidates.pointIDs[0] &+ candidates.count
             }
         }
         return checksum
@@ -276,5 +275,10 @@ enum IconNativeGridBenchmark {
             }
             return checksum
         }
+    }
+
+    private static func maximumChordDistanceSquared(meters: Double) -> Float {
+        let chord = 2 * sin(meters / 6_371_229 * 0.5)
+        return Float(chord * chord)
     }
 }

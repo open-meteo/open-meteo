@@ -1,117 +1,21 @@
 import Foundation
 import OmFileFormat
 
-typealias LatLon = (latitude: Float, longitude: Float)
-
-struct IconNativeLookupVector: Sendable {
-    let x: Float
-    let y: Float
-    let z: Float
-
-    var center: IconNativeCenter {
-        IconNativeCenter(x: Double(x), y: Double(y), z: Double(z))
-    }
-}
-
-/// Canonical Double-precision unit vector derived from the official ICON `clat`/`clon` values.
-/// The serialized XYZ values are the shared numerical contract for every artifact reader.
-struct IconNativeCenter: Sendable, Equatable {
-    private static let degreesToRadians = Double.pi / 180
-    private static let degreesToRadiansFloat = Float.pi / 180
-
-    let x: Double
-    let y: Double
-    let z: Double
-
-    init(x: Double, y: Double, z: Double) {
-        self.x = x
-        self.y = y
-        self.z = z
-    }
-
-    private init(normalizingX x: Double, y: Double, z: Double) {
-        let length = sqrt(x * x + y * y + z * z)
-        precondition(length.isFinite && length > 0, "Invalid ICON center vector")
-        self.x = x / length
-        self.y = y / length
-        self.z = z / length
-    }
-
-    init(latitudeRadians: Double, longitudeRadians: Double) {
-        let latitudeCosine = cos(latitudeRadians)
-        self.init(
-            normalizingX: latitudeCosine * cos(longitudeRadians),
-            y: latitudeCosine * sin(longitudeRadians),
-            z: sin(latitudeRadians)
-        )
-    }
-
-    init(latitudeDegrees: Double, longitudeDegrees: Double) {
-        self.init(
-            latitudeRadians: latitudeDegrees * Self.degreesToRadians,
-            longitudeRadians: longitudeDegrees * Self.degreesToRadians
-        )
-    }
-
-    /// The public grid inputs are already Float. Keeping trigonometry at that precision reduces
-    /// lookup latency while remaining within the cube artifact's accepted metre-scale error.
-    @inline(__always) static func fastCubeLookupVector(
-        latitudeDegrees: Float,
-        longitudeDegrees: Float
-    ) -> IconNativeLookupVector {
-        let latitude = latitudeDegrees * Self.degreesToRadiansFloat
-        let longitude = longitudeDegrees * Self.degreesToRadiansFloat
-        let latitudeCosine = cos(latitude)
-        return IconNativeLookupVector(
-            x: latitudeCosine * cos(longitude),
-            y: latitudeCosine * sin(longitude),
-            z: sin(latitude)
-        )
-    }
-
-    var coordinate: LatLon {
-        (
-            latitude: Float(asin(max(-1, min(1, z))) * 180 / .pi),
-            longitude: Float(atan2(y, x) * 180 / .pi)
-        )
-    }
-
-    @inline(__always) func dot(_ other: Self) -> Double {
-        x * other.x + y * other.y + z * other.z
-    }
-
-    @inline(__always) func squaredDistance(to other: Self) -> Double {
-        let dx = x - other.x
-        let dy = y - other.y
-        let dz = z - other.z
-        return dx * dx + dy * dy + dz * dz
-    }
-
-    @inline(__always) static func normalizedLongitude(_ longitude: Float) -> Float {
-        if longitude >= -180, longitude < 180 { return longitude }
-        var wrapped = longitude.truncatingRemainder(dividingBy: 360)
-        if wrapped < -180 { wrapped += 360 }
-        if wrapped >= 180 { wrapped -= 360 }
-        return wrapped
-    }
-
-}
-
 /// Metre-bounded nearest-official-mass-point lookup backed by the portable Float32 cube artifact.
 struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
-    let storage: IconNativeGrid.CubeIndex
+    let storage: SphericalCubeIndex
 
-    init(storage: IconNativeGrid.CubeIndex) {
+    init(storage: SphericalCubeIndex) {
         self.storage = storage
     }
 
     static func load(file: URL) throws -> Self {
-        Self(storage: try IconNativeGrid.CubeIndex(file: file))
+        Self(storage: try SphericalCubeIndex(file: file))
     }
 
-    var nx: Int { storage.cellCount }
+    var nx: Int { storage.pointCount }
     var ny: Int { 1 }
     var searchRadius: Int { 2 }
 
@@ -128,7 +32,7 @@ struct IconNativeGrid: Gridable {
     }
 
     func findPoint(lat: Float, lon: Float) -> Int? {
-        storage.findNearestCell(latitude: lat, longitude: lon)
+        storage.nearestPointID(latitude: lat, longitude: lon)
     }
 
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
@@ -138,8 +42,8 @@ struct IconNativeGrid: Gridable {
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
 
     func getCoordinates(gridpoint: Int) -> LatLon {
-        precondition(gridpoint >= 0 && gridpoint < storage.cellCount, "ICON grid point out of range")
-        return storage.centerVector(at: gridpoint).coordinate
+        precondition(gridpoint >= 0 && gridpoint < storage.pointCount, "ICON grid point out of range")
+        return storage.point(at: gridpoint).coordinate
     }
 
     func findPointInSea(
@@ -147,15 +51,15 @@ struct IconNativeGrid: Gridable {
         lon: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        guard let lookup = storage.findNearestLookup(latitude: lat, longitude: lon) else {
+        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon) else {
             return nil
         }
-        let nearest = lookup.cell
+        let nearest = lookup.pointID
         let nearestElevation = try await readFromStaticFile(gridpoint: nearest, file: elevationFile)
         if nearestElevation <= -999 {
             return (nearest, .sea)
         }
-        let candidates = storage.findNearestCells(from: lookup)
+        let candidates = storage.nearestCandidates(from: lookup)
         let elevations = try await readElevations(
             candidates: candidates,
             knownValue: nearestElevation,
@@ -163,7 +67,7 @@ struct IconNativeGrid: Gridable {
         )
 
         for position in 1..<candidates.count where elevations[position] <= -999 {
-            return (candidates.points[position], .sea)
+            return (candidates.pointIDs[position], .sea)
         }
         return elevationResult(gridpoint: nearest, value: nearestElevation)
     }
@@ -174,15 +78,15 @@ struct IconNativeGrid: Gridable {
         elevation: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        guard let lookup = storage.findNearestLookup(latitude: lat, longitude: lon) else {
+        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon) else {
             return nil
         }
-        let nearest = lookup.cell
+        let nearest = lookup.pointID
         let nearestElevation = try await readFromStaticFile(gridpoint: nearest, file: elevationFile)
         if nearestElevation.isFinite, nearestElevation > -999, abs(nearestElevation - elevation) <= 100 {
             return elevationResult(gridpoint: nearest, value: nearestElevation)
         }
-        let candidates = storage.findNearestCells(from: lookup)
+        let candidates = storage.nearestCandidates(from: lookup)
         let elevations = try await readElevations(
             candidates: candidates,
             knownValue: nearestElevation,
@@ -202,7 +106,7 @@ struct IconNativeGrid: Gridable {
             }
             let elevationDelta = candidateElevation >= 9999 ? 0 : abs(candidateElevation - elevation)
             let score = elevationDelta + distanceKilometres * 30
-            if score < bestScore || (score == bestScore && (bestPosition < 0 || candidates.points[position] < candidates.points[bestPosition])) {
+            if score < bestScore || (score == bestScore && (bestPosition < 0 || candidates.pointIDs[position] < candidates.pointIDs[bestPosition])) {
                 bestScore = score
                 bestPosition = position
             }
@@ -211,11 +115,11 @@ struct IconNativeGrid: Gridable {
         if bestPosition < 0 || bestScore > 1500 {
             return elevationResult(gridpoint: nearest, value: nearestElevation)
         }
-        return elevationResult(gridpoint: candidates.points[bestPosition], value: elevations[bestPosition])
+        return elevationResult(gridpoint: candidates.pointIDs[bestPosition], value: elevations[bestPosition])
     }
 
     private func readElevations(
-        candidates: IconNativeGrid.CubeIndex.NearbyCells,
+        candidates: SphericalCubeIndex.NearbyPoints,
         knownValue: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> InlineArray<10, Float> {
@@ -224,7 +128,7 @@ struct IconNativeGrid: Gridable {
         var sortedCount = 0
         if candidates.count > 1 {
             for originalPosition in 1..<candidates.count {
-                let cell = candidates.points[originalPosition]
+                let cell = candidates.pointIDs[originalPosition]
                 var insertion = sortedCount
                 while insertion > 0, cell < sortedCells[insertion - 1] {
                     sortedCells[insertion] = sortedCells[insertion - 1]

@@ -54,9 +54,9 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
 }
 
 private final class IconNativeGridCacheEntry: Sendable {
-    let result: Result<IconNativeGrid.CubeIndex, IconNativeDomainError>
+    let result: Result<SphericalCubeIndex, IconNativeDomainError>
 
-    init(_ result: Result<IconNativeGrid.CubeIndex, IconNativeDomainError>) {
+    init(_ result: Result<SphericalCubeIndex, IconNativeDomainError>) {
         self.result = result
     }
 }
@@ -97,22 +97,22 @@ final class IconNativeGridCache: Sendable {
         }
     }
 
-    private func loadStorage() throws(IconNativeDomainError) -> IconNativeGrid.CubeIndex {
+    private func loadStorage() throws(IconNativeDomainError) -> SphericalCubeIndex {
         guard FileManager.default.fileExists(atPath: file) else {
             throw IconNativeDomainError.missingGridArtifact(file)
         }
         do {
-            let storage = try IconNativeGrid.CubeIndex(file: URL(fileURLWithPath: file))
-            guard storage.gridNumber == identity.gridNumber else {
-                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected grid number \(identity.gridNumber), got \(storage.gridNumber)")
+            let storage = try SphericalCubeIndex(file: URL(fileURLWithPath: file))
+            guard storage.identity.number == identity.gridNumber else {
+                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected grid number \(identity.gridNumber), got \(storage.identity.number)")
             }
-            guard storage.gridUUID == identity.gridUUID else {
+            guard storage.identity.uuid == identity.gridUUID else {
                 throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "grid UUID does not match \(identity.gridUUIDHex)")
             }
-            guard storage.cellCount == identity.cellCount else {
-                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected \(identity.cellCount) cells, got \(storage.cellCount)")
+            guard storage.pointCount == identity.cellCount else {
+                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected \(identity.cellCount) cells, got \(storage.pointCount)")
             }
-            guard storage.isGlobal == identity.isGlobal else {
+            guard storage.coversWholeSphere == identity.isGlobal else {
                 throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "global/regional grid kind does not match")
             }
             return storage
