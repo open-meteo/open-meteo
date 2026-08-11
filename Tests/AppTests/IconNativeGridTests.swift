@@ -207,7 +207,7 @@ import Testing
         }
     }
 
-    @Test func cacheSingleFlightsAndReloadsReplacedFailures() async throws {
+    @Test func cacheMemoizesItsFirstLookupResult() async throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let cache = IconNativeGridCache(file: fixture.file.path, identity: makeIdentity(fixture))
@@ -223,16 +223,16 @@ import Testing
 
         let published = temporaryArtifactFile()
         defer { try? FileManager.default.removeItem(at: published) }
-        let recovering = IconNativeGridCache(
-            file: published.path,
-            identity: makeIdentity(fixture),
-            retryInterval: .seconds(3_600)
-        )
+        let unavailable = IconNativeGridCache(file: published.path, identity: makeIdentity(fixture))
         #expect(throws: IconNativeDomainError.missingGridArtifact(published.path)) {
-            _ = try recovering.get()
+            _ = try unavailable.get()
         }
         try FileManager.default.copyItem(at: fixture.file, to: published)
-        #expect(try recovering.get().nx == fixture.centers.count)
+        #expect(throws: IconNativeDomainError.missingGridArtifact(published.path)) {
+            _ = try unavailable.get()
+        }
+        let fresh = IconNativeGridCache(file: published.path, identity: makeIdentity(fixture))
+        #expect(try fresh.get().nx == fixture.centers.count)
 
         try truncateLastByte(of: fixture.file)
         #expect(throws: IconNativeDomainError.self) {
