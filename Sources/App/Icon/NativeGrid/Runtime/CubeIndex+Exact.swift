@@ -9,25 +9,6 @@ extension IconNativeGrid.CubeIndex {
         static let empty = Self(cell: -1, score: -.infinity)
     }
 
-    /// Used by artifact validation to avoid losing information by converting an official centre
-    /// through Float latitude/longitude before checking its canonical round trip.
-    @inline(__always)
-    func findNearestCell(to center: IconNativeCenter) -> Int {
-        withBytes { nearest(to: center, bytes: $0) }
-    }
-
-    @inline(never)
-    func nearest(
-        to unnormalizedQuery: IconNativeCenter,
-        bytes: borrowing RawSpan
-    ) -> Int {
-        nearest(
-            to: unnormalizedQuery,
-            maximumDistanceSquared: .infinity,
-            bytes: bytes
-        )!
-    }
-
     @inline(never)
     func nearest(
         to unnormalizedQuery: IconNativeCenter,

@@ -3,6 +3,19 @@ import Foundation
 import OmFileFormat
 import Testing
 
+private extension IconNativeGrid.CubeIndex {
+    /// Preserve the official Double-precision centre during artifact round-trip validation.
+    func findNearestCell(to center: IconNativeCenter) -> Int {
+        withBytes {
+            nearest(
+                to: center,
+                maximumDistanceSquared: .infinity,
+                bytes: $0
+            )!
+        }
+    }
+}
+
 @Suite struct IconNativeGridTests {
     @Test func nearestLookupStaysWithinMeterBudgetAcrossCubeFaces() throws {
         let fixture = try makeGlobalFixture()
@@ -523,17 +536,17 @@ private func validateOfficialGrid(
         IconNativeGridFixture(
             file: artifactFile,
             grid: grid,
-            centers: source.centers
+            centers: source
         )
     )
 
     #expect(grid.nx == identity.cellCount)
     #expect(grid.storage.artifactBytes <= maximumArtifactBytes)
-    let stride = max(1, source.centers.count / sampleLimit)
-    for cell in Swift.stride(from: 0, to: source.centers.count, by: stride) {
-        #expect(grid.storage.findNearestCell(to: source.centers[cell]) == cell)
+    let stride = max(1, source.count / sampleLimit)
+    for cell in Swift.stride(from: 0, to: source.count, by: stride) {
+        #expect(grid.storage.findNearestCell(to: source[cell]) == cell)
         #expect(centerDirectionDistance(
-            source.centers[cell],
+            source[cell],
             grid.storage.centerVector(at: cell)
         ) <= 2)
     }
