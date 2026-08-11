@@ -81,17 +81,8 @@ extension IconNativeGrid {
             try validateAttributes(group: group, identity: identity)
 
             let cellCount = identity.cellCount
-            let dimensions = Dictionary(
-                uniqueKeysWithValues: group.getDimensions().map { ($0.name, $0.length) }
-            )
-            guard dimensions["cell"] == cellCount else {
-                throw IconNativeGridSourceError.invalidAttribute(
-                    name: "cell dimension",
-                    actual: String(describing: dimensions["cell"])
-                )
-            }
-            let clon = try readDouble(group: group, name: "clon", dimensions: ["cell"])
-            let clat = try readDouble(group: group, name: "clat", dimensions: ["cell"])
+            let clon = try readDouble(group: group, name: "clon")
+            let clat = try readDouble(group: group, name: "clat")
             guard clon.count == cellCount, clat.count == cellCount else {
                 throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
             }
@@ -122,8 +113,7 @@ extension IconNativeGrid {
 
         private static func readDouble(
             group: Group,
-            name: String,
-            dimensions: [String]
+            name: String
         ) throws
             -> [Double]
         {
@@ -132,7 +122,7 @@ extension IconNativeGrid {
                 throw IconNativeGridSourceError.missingVariable(name)
             }
             let actual = variable.dimensions.map(\.name)
-            guard actual == dimensions else {
+            guard actual == ["cell"] else {
                 throw IconNativeGridSourceError.invalidDimensions(variable: name, actual: actual)
             }
             return try typed.read()
@@ -142,11 +132,6 @@ extension IconNativeGrid {
             longitudes: [Double],
             latitudes: [Double]
         ) throws -> [IconNativeCenter] {
-            guard longitudes.count == latitudes.count else {
-                throw IconNativeGridSourceError.invalidTopology(
-                    "coordinate array length mismatch for clon/clat"
-                )
-            }
             var centers = [IconNativeCenter]()
             centers.reserveCapacity(longitudes.count)
             for index in longitudes.indices {
@@ -190,17 +175,11 @@ extension IconNativeGrid.Generator {
                 throw IconNativeGrid.ArtifactError.invalidHeader
             }
 
-            @inline(__always)
             func storedDirection(_ center: IconNativeCenter) -> IconNativeCenter {
-                let x = Float(center.x)
-                let y = Float(center.y)
-                let z = Float(center.z)
-                let inverseNorm =
-                    1 / sqrt(Double(x) * Double(x) + Double(y) * Double(y) + Double(z) * Double(z))
                 return IconNativeCenter(
-                    x: Double(x) * inverseNorm,
-                    y: Double(y) * inverseNorm,
-                    z: Double(z) * inverseNorm
+                    x: Double(Float(center.x)),
+                    y: Double(Float(center.y)),
+                    z: Double(Float(center.z))
                 )
             }
 
@@ -217,10 +196,6 @@ extension IconNativeGrid.Generator {
                     throw IconNativeGrid.ArtifactError.invalidCenter(position)
                 }
                 let storedCenter = storedDirection(center)
-                let chord = sqrt(max(0, center.squaredDistance(to: storedCenter)))
-                guard 2 * asin(min(1, chord * 0.5)) * 6_371_229 <= 2 else {
-                    throw IconNativeGrid.ArtifactError.invalidHeader
-                }
                 let location = IconNativeGrid.CubeGeometry.location(
                     for: storedCenter,
                     resolution: resolution

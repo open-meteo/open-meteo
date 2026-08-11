@@ -19,6 +19,11 @@ extension IconNativeGrid {
             let distanceSquared: Float
         }
 
+        private struct Boundary: Sendable {
+            let value: Double
+            let inverseNormSquared: Double
+        }
+
         static let scoreTieTolerance = 1e-15
         private static let floatSelectionUlpMargin: Float = 32
         static let floatChordError = 8 * Double(Float.ulpOfOne)
@@ -31,8 +36,7 @@ extension IconNativeGrid {
         private let canonicalPositionsOffset: Int
         private let maximumDistanceSquared: Float
         let resolutionScale: Double
-        private let boundaryValues: [Double]
-        private let boundaryInverseNormSquared: [Double]
+        private let boundaries: [Boundary]
         let isGlobal: Bool
 
         let cellCount: Int
@@ -61,8 +65,10 @@ extension IconNativeGrid {
             gridNumber = artifact.gridNumber
             gridUUID = artifact.gridUUID
             let bucketWidth = 2 / Double(artifact.resolution)
-            boundaryValues = (0...artifact.resolution).map { -1 + Double($0) * bucketWidth }
-            boundaryInverseNormSquared = boundaryValues.map { 1 / (1 + $0 * $0) }
+            boundaries = (0...artifact.resolution).map {
+                let value = -1 + Double($0) * bucketWidth
+                return Boundary(value: value, inverseNormSquared: 1 / (1 + value * value))
+            }
         }
 
         @inline(__always)
@@ -79,7 +85,7 @@ extension IconNativeGrid {
             return withBytes { bytes in
                 let query = IconNativeCenter.fastCubeLookupVector(
                     latitudeDegrees: latitude,
-                    longitudeDegrees: Float(normalizedLongitude)
+                    longitudeDegrees: normalizedLongitude
                 )
                 let location = IconNativeGrid.CubeGeometry.location(
                     for: query.center,
@@ -174,11 +180,14 @@ extension IconNativeGrid {
             }
 
             @inline(__always)
-            func exactFallback() -> (cell: Int, position: Int, distanceSquared: Float)? {
+            func exactFallback(
+                certifiedRegion: ExactRegion? = nil
+            ) -> (cell: Int, position: Int, distanceSquared: Float)? {
                 guard let cell = nearest(
                     to: geometryQuery,
                     maximumDistanceSquared: Double(maximumDistanceSquared),
                     seedPosition: bestPosition >= 0 ? bestPosition : nil,
+                    certifiedRegion: certifiedRegion,
                     bytes: bytes
                 ) else { return nil }
                 let position = Int(Artifact.readUInt32(
@@ -219,12 +228,16 @@ extension IconNativeGrid {
             @inline(__always)
             func scanBucket(x: Int, y: Int) {
                 guard let bucket = bucket(x: x, y: y) else { return }
-                scanRange(directoryRange(bucket..<(bucket + 1), bytes: bytes))
+                let begin = directoryPosition(bucket, bytes: bytes)
+                let end = directoryPosition(bucket + 1, bytes: bytes)
+                scanRange(begin..<end)
             }
 
             @inline(__always)
             func scanBucketInterval(firstBucket: Int, lastBucket: Int) {
-                scanRange(directoryRange(firstBucket..<(lastBucket + 1), bytes: bytes))
+                let begin = directoryPosition(firstBucket, bytes: bytes)
+                let end = directoryPosition(lastBucket + 1, bytes: bytes)
+                scanRange(begin..<end)
             }
 
             @inline(__always)
@@ -288,7 +301,10 @@ extension IconNativeGrid {
             let leafYRange = queryLocation.y...queryLocation.y
             if certified(xRange: leafXRange, yRange: leafYRange) {
                 if selectionIsUnambiguous() { return selectedWithinMaximumDistance() }
-                return exactFallback()
+                return exactFallback(certifiedRegion: ExactRegion(
+                    xRange: leafXRange,
+                    yRange: leafYRange
+                ))
             }
 
             let xRange = max(0, queryLocation.x - 1)...min(resolution - 1, queryLocation.x + 1)
@@ -301,33 +317,25 @@ extension IconNativeGrid {
             }
             if certified(xRange: xRange, yRange: yRange) {
                 if selectionIsUnambiguous() { return selectedWithinMaximumDistance() }
+                return exactFallback(certifiedRegion: ExactRegion(
+                    xRange: xRange,
+                    yRange: yRange
+                ))
             }
             return exactFallback()
         }
 
         @inline(__always)
-        func directoryRange(
-            _ buckets: Range<Int>,
+        func directoryPosition(
+            _ bucket: Int,
             bytes: borrowing RawSpan
-        ) -> Range<Int> {
-            let firstBlock = buckets.lowerBound >> 8
-            let firstBase = Int(Artifact.readUInt32(
-                bytes,
-                at: directoryBasesOffset + firstBlock * 4
-            ))
-            let begin = firstBase + Int(Artifact.readUInt16(
-                bytes,
-                at: directoryLocalsOffset + buckets.lowerBound * 2
-            ))
-            let endBlock = buckets.upperBound >> 8
-            let endBase = endBlock == firstBlock
-                ? firstBase
-                : Int(Artifact.readUInt32(bytes, at: directoryBasesOffset + endBlock * 4))
-            let end = endBase + Int(Artifact.readUInt16(
-                bytes,
-                at: directoryLocalsOffset + buckets.upperBound * 2
-            ))
-            return begin..<end
+        ) -> Int {
+            Artifact.directoryPosition(
+                bucket,
+                bytes: bytes,
+                basesOffset: directoryBasesOffset,
+                localsOffset: directoryLocalsOffset
+            )
         }
 
         /// Certifies a direct bucket result without assuming anything about ICON adjacency. Leaving a
@@ -346,11 +354,12 @@ extension IconNativeGrid {
                 coordinate: Double,
                 boundaryIndex: Int
             ) -> Double {
-                let delta = coordinate - boundaryValues[boundaryIndex]
+                let boundary = boundaries[boundaryIndex]
+                let delta = coordinate - boundary.value
                 return min(
                     1,
                     location.normalizedNormalComponentSquared * delta * delta
-                        * boundaryInverseNormSquared[boundaryIndex]
+                        * boundary.inverseNormSquared
                 )
             }
 
