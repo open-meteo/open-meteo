@@ -27,7 +27,8 @@ extension IconNativeGrid {
         struct Mapping {
             let mapped: MmapFile
             let faceSections: [FaceSection]
-            let offsetsOffset: Int
+            let directoryBasesOffset: Int
+            let directoryLocalsOffset: Int
             let centersOffset: Int
             let canonicalPositionsOffset: Int
             let isGlobal: Bool
@@ -36,7 +37,6 @@ extension IconNativeGrid {
             let level: Int
             let resolution: Int
             let bucketCount: Int
-            let artifactBytes: Int
             let gridNumber: UInt32
             let gridUUID: [UInt8]
         }
@@ -89,15 +89,17 @@ extension IconNativeGrid {
         }
 
         struct SectionLayout {
-            let offsetsOffset: Int
+            let directoryBasesOffset: Int
+            let directoryLocalsOffset: Int
             let centersOffset: Int
             let canonicalPositionsOffset: Int
             let fileBytes: Int
 
             init(cellCount: Int, bucketCount: Int) {
-                offsetsOffset = CubeArtifact.headerBytes
+                directoryBasesOffset = CubeArtifact.headerBytes
+                directoryLocalsOffset = directoryBasesOffset + (bucketCount / 256 + 1) * 4
                 centersOffset = CubeArtifact.alignedEnd(
-                    offset: offsetsOffset,
+                    offset: directoryBasesOffset,
                     length: CubeArtifact.directoryBytes(bucketCount: bucketCount),
                     alignment: 16
                 )
@@ -186,14 +188,12 @@ extension IconNativeGrid {
         static func directoryPosition(
             _ index: Int,
             bytes: borrowing RawSpan,
-            offsetsOffset: Int,
-            bucketCount: Int
+            basesOffset: Int,
+            localsOffset: Int
         ) -> Int {
-            let baseCount = bucketCount / 256 + 1
             let block = index >> 8
-            let base = Int(readUInt32(bytes, at: offsetsOffset + block * 4))
-            let localOffset = offsetsOffset + baseCount * 4 + index * 2
-            return base + Int(readUInt16(bytes, at: localOffset))
+            let base = Int(readUInt32(bytes, at: basesOffset + block * 4))
+            return base + Int(readUInt16(bytes, at: localsOffset + index * 2))
         }
 
         static func directoryBytes(bucketCount: Int) -> Int {
@@ -254,7 +254,7 @@ extension IconNativeGrid.CubeArtifact {
         let maximumDistanceMeters = readFloat(bytes, at: 28)
         let gridUUID = readBytes(bytes, range: 32..<48)
 
-        guard cellCount > 0, level >= 0, level <= 15,
+        guard cellCount > 0, level >= tileShift, level <= 15,
             maximumDistanceMeters.isFinite, maximumDistanceMeters > 0
         else {
             throw IconNativeGrid.ArtifactError.invalidHeader
@@ -310,8 +310,8 @@ extension IconNativeGrid.CubeArtifact {
             let current = directoryPosition(
                 bucket,
                 bytes: bytes,
-                offsetsOffset: layout.offsetsOffset,
-                bucketCount: bucketCount
+                basesOffset: layout.directoryBasesOffset,
+                localsOffset: layout.directoryLocalsOffset
             )
             guard current >= previous, current <= cellCount else {
                 throw IconNativeGrid.ArtifactError.invalidHeader
@@ -323,7 +323,8 @@ extension IconNativeGrid.CubeArtifact {
         return Mapping(
             mapped: mapped,
             faceSections: faceSections,
-            offsetsOffset: layout.offsetsOffset,
+            directoryBasesOffset: layout.directoryBasesOffset,
+            directoryLocalsOffset: layout.directoryLocalsOffset,
             centersOffset: layout.centersOffset,
             canonicalPositionsOffset: layout.canonicalPositionsOffset,
             isGlobal: isGlobal,
@@ -332,7 +333,6 @@ extension IconNativeGrid.CubeArtifact {
             level: level,
             resolution: resolution,
             bucketCount: bucketCount,
-            artifactBytes: layout.fileBytes,
             gridNumber: gridNumber,
             gridUUID: gridUUID
         )

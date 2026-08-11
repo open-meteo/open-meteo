@@ -182,7 +182,8 @@ extension IconNativeGrid.Generator {
             level: Int,
             maximumFileSize: Int = .max
         ) throws {
-            guard !centers.isEmpty, centers.count <= Int(UInt32.max), level >= 0, level <= 15,
+            guard !centers.isEmpty, centers.count <= Int(UInt32.max),
+                level >= Artifact.tileShift, level <= 15,
                 metadata.gridUUID.count == 16,
                 metadata.maximumDistanceMeters.isFinite, metadata.maximumDistanceMeters > 0
             else {
@@ -332,13 +333,15 @@ extension IconNativeGrid.Generator {
             for block in 0..<baseCount {
                 data.writeCubeInteger(
                     offsets[min(bucketCount, block * 256)],
-                    at: layout.offsetsOffset + block * 4
+                    at: layout.directoryBasesOffset + block * 4
                 )
             }
-            let localsOffset = layout.offsetsOffset + baseCount * 4
             for index in offsets.indices {
                 let base = offsets[(index >> 8) * 256]
-                data.writeCubeInteger(UInt16(offsets[index] - base), at: localsOffset + index * 2)
+                data.writeCubeInteger(
+                    UInt16(offsets[index] - base),
+                    at: layout.directoryLocalsOffset + index * 2
+                )
             }
             for (position, cellValue) in order.enumerated() {
                 let center = centers[Int(cellValue)]

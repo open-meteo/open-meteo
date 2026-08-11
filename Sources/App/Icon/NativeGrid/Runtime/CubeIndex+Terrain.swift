@@ -10,8 +10,8 @@ extension IconNativeGrid.CubeIndex {
     }
 
     struct NearbyCells: Sendable {
-        var points = InlineArray<16, Int>(repeating: -1)
-        var distancesSquared = InlineArray<16, Float>(repeating: .infinity)
+        var points = InlineArray<10, Int>(repeating: -1)
+        var distancesSquared = InlineArray<10, Float>(repeating: .infinity)
         var count = 0
     }
 
@@ -21,7 +21,7 @@ extension IconNativeGrid.CubeIndex {
     func findNearestCells(
         latitude: Float,
         longitude: Float
-    ) -> (points: InlineArray<16, Int>, count: Int)? {
+    ) -> (points: InlineArray<10, Int>, count: Int)? {
         guard let lookup = findNearestLookup(latitude: latitude, longitude: longitude) else {
             return nil
         }
@@ -45,7 +45,7 @@ extension IconNativeGrid.CubeIndex {
     ) -> NearbyCells {
         let query = lookup.query
         let queryLocation = lookup.location
-        var candidates = InlineArray<16, DistanceCandidate>(repeating: .empty)
+        var candidates = InlineArray<10, DistanceCandidate>(repeating: .empty)
         var candidateCount = 0
         var scannedCenterCount = 0
 
@@ -99,10 +99,8 @@ extension IconNativeGrid.CubeIndex {
 
         @inline(__always)
         func scanBucket(_ bucket: Int) {
-            scanRange(
-                directoryPosition(bucket, bytes: bytes),
-                directoryPosition(bucket + 1, bytes: bytes)
-            )
+            let range = directoryRange(bucket..<(bucket + 1), bytes: bytes)
+            scanRange(range.lowerBound, range.upperBound)
         }
 
         @inline(__always)
@@ -123,10 +121,11 @@ extension IconNativeGrid.CubeIndex {
                     x: segmentLowerX,
                     y: y
                 )!
-                scanRange(
-                    directoryPosition(first, bytes: bytes),
-                    directoryPosition(first + segmentUpperX - segmentLowerX + 1, bytes: bytes)
+                let range = directoryRange(
+                    first..<(first + segmentUpperX - segmentLowerX + 1),
+                    bytes: bytes
                 )
+                scanRange(range.lowerBound, range.upperBound)
                 segmentLowerX = segmentUpperX + 1
             }
         }

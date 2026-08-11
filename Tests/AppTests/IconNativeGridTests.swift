@@ -10,6 +10,7 @@ private extension IconNativeGrid.CubeIndex {
             nearest(
                 to: center,
                 maximumDistanceSquared: .infinity,
+                seedPosition: nil,
                 bytes: $0
             )!
         }
@@ -417,8 +418,8 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
         let current = Artifact.directoryPosition(
             bucket,
             bytes: bytes,
-            offsetsOffset: artifact.offsetsOffset,
-            bucketCount: artifact.bucketCount
+            basesOffset: artifact.directoryBasesOffset,
+            localsOffset: artifact.directoryLocalsOffset
         )
         #expect(current >= previous)
         #expect(current <= artifact.cellCount)
@@ -466,14 +467,14 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
         let begin = Artifact.directoryPosition(
             bucket,
             bytes: bytes,
-            offsetsOffset: artifact.offsetsOffset,
-            bucketCount: artifact.bucketCount
+            basesOffset: artifact.directoryBasesOffset,
+            localsOffset: artifact.directoryLocalsOffset
         )
         let end = Artifact.directoryPosition(
             bucket + 1,
             bytes: bytes,
-            offsetsOffset: artifact.offsetsOffset,
-            bucketCount: artifact.bucketCount
+            basesOffset: artifact.directoryBasesOffset,
+            localsOffset: artifact.directoryLocalsOffset
         )
         #expect(position >= begin && position < end)
     }
