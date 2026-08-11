@@ -2,7 +2,6 @@ import Foundation
 import OmFileFormat
 import Synchronization
 import Vapor
-@preconcurrency import SwiftEccodes
 
 /// Immutable identity of an operational DWD grid. Both the NetCDF definition and every native
 /// GRIB message must match these values so data cannot silently be paired with another grid order.
@@ -85,7 +84,7 @@ final class IconNativeGridCache: Sendable {
     private let file: String
     private let identity: IconNativeGridIdentity
     private let retryInterval: Duration
-    private let storage = AtomicLazyReference<IconNativeGridStorage>()
+    private let storage = AtomicLazyReference<IconNativeGrid.CubeIndex>()
     private let failure = Mutex<IconNativeGridFailureState?>(nil)
 
     init(file: String, identity: IconNativeGridIdentity, retryInterval: Duration = .seconds(30)) {
@@ -104,21 +103,16 @@ final class IconNativeGridCache: Sendable {
                 return IconNativeGrid(storage: storage)
             }
             let now = ContinuousClock.now
-            if let failure, now < failure.retryAfter {
+            let fingerprint = IconNativeGridFileFingerprint.read(file: file)
+            // Throttle only an unchanged failure. Atomic publication changes inode/size/mtime and
+            // must become visible immediately, while an unchanged artifact is retried after the
+            // interval instead of being rejected forever.
+            if let failure, failure.fingerprint == fingerprint, now < failure.retryAfter {
                 throw failure.error
             }
-            let fingerprint = IconNativeGridFileFingerprint.read(file: file)
             if let storage = storage.load() {
                 failure = nil
                 return IconNativeGrid(storage: storage)
-            }
-            if let previous = failure, previous.fingerprint == fingerprint {
-                failure = IconNativeGridFailureState(
-                    fingerprint: fingerprint,
-                    error: previous.error,
-                    retryAfter: now.advanced(by: retryInterval)
-                )
-                throw previous.error
             }
             do {
                 let loaded = try loadStorage(fingerprint: fingerprint)
@@ -155,12 +149,12 @@ final class IconNativeGridCache: Sendable {
         _ = storage.storeIfNil(loaded)
     }
 
-    private func loadStorage(fingerprint: IconNativeGridFileFingerprint?) throws -> IconNativeGridStorage {
+    private func loadStorage(fingerprint: IconNativeGridFileFingerprint?) throws -> IconNativeGrid.CubeIndex {
         guard fingerprint != nil else {
             throw IconNativeDomainError.missingGridArtifact(file)
         }
         do {
-            let storage = try IconNativeGridStorage(file: URL(fileURLWithPath: file))
+            let storage = try IconNativeGrid.CubeIndex(file: URL(fileURLWithPath: file))
             guard storage.gridNumber == identity.gridNumber else {
                 throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected grid number \(identity.gridNumber), got \(storage.gridNumber)")
             }
@@ -169,6 +163,9 @@ final class IconNativeGridCache: Sendable {
             }
             guard storage.cellCount == identity.cellCount else {
                 throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected \(identity.cellCount) cells, got \(storage.cellCount)")
+            }
+            guard storage.isGlobal == identity.isGlobal else {
+                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "global/regional grid kind does not match")
             }
             return storage
         } catch let error as IconNativeDomainError {
@@ -324,7 +321,7 @@ extension IconDomains {
 
         let grid: IconNativeGrid
         do {
-            grid = try IconNativeGridGenerator.generate(
+            grid = try IconNativeGrid.Generator.generate(
                 sourceFile: sourceFile,
                 identity: identity,
                 artifactFile: stagedArtifactPath
@@ -336,7 +333,7 @@ extension IconDomains {
             try FileManager.default.removeItem(atPath: sourceFile)
             try FileManager.default.removeItemIfExists(at: stagedArtifactPath)
             try await downloadSource()
-            grid = try IconNativeGridGenerator.generate(
+            grid = try IconNativeGrid.Generator.generate(
                 sourceFile: sourceFile,
                 identity: identity,
                 artifactFile: stagedArtifactPath
@@ -379,100 +376,4 @@ struct IconNativeUnavailableGrid: Gridable {
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? { nil }
 
     var crsWkt2: String { "" }
-}
-
-struct IconNativeGribMetadata: Sendable, Equatable {
-    let edition: Int?
-    let gridType: String?
-    let gridDefinitionTemplateNumber: Int?
-    let numberOfGridUsed: Int?
-    let uuidOfHGrid: String?
-    let numberOfDataPoints: Int?
-
-    init(message: GribMessage) {
-        edition = message.getLong(attribute: "edition")
-        gridType = message.get(attribute: "gridType")
-        gridDefinitionTemplateNumber = message.getLong(attribute: "gridDefinitionTemplateNumber")
-        numberOfGridUsed = message.getLong(attribute: "numberOfGridUsed")
-        uuidOfHGrid = message.get(attribute: "uuidOfHGrid")
-        numberOfDataPoints = message.getLong(attribute: "numberOfDataPoints")
-    }
-
-    init(edition: Int?, gridType: String?, gridDefinitionTemplateNumber: Int?, numberOfGridUsed: Int?, uuidOfHGrid: String?, numberOfDataPoints: Int?) {
-        self.edition = edition
-        self.gridType = gridType
-        self.gridDefinitionTemplateNumber = gridDefinitionTemplateNumber
-        self.numberOfGridUsed = numberOfGridUsed
-        self.uuidOfHGrid = uuidOfHGrid
-        self.numberOfDataPoints = numberOfDataPoints
-    }
-}
-
-enum IconNativeGribError: Error, Equatable, CustomStringConvertible {
-    case invalidEdition(Int?)
-    case invalidGridType(String?)
-    case invalidGridDefinitionTemplate(Int?)
-    case invalidGridNumber(expected: UInt32, actual: Int?)
-    case invalidGridUUID(expected: String, actual: String?)
-    case invalidDataPointCount(expected: Int, actual: Int?)
-    case invalidDecodedValueCount(expected: Int, actual: Int)
-
-    var description: String {
-        switch self {
-        case .invalidEdition(let actual):
-            return "Expected GRIB edition 2, got \(String(describing: actual))"
-        case .invalidGridType(let actual):
-            return "Expected unstructured_grid, got \(String(describing: actual))"
-        case .invalidGridDefinitionTemplate(let actual):
-            return "Expected grid definition template 3.101, got \(String(describing: actual))"
-        case .invalidGridNumber(let expected, let actual):
-            return "Expected ICON grid number \(expected), got \(String(describing: actual))"
-        case .invalidGridUUID(let expected, let actual):
-            return "Expected ICON grid UUID \(expected), got \(String(describing: actual))"
-        case .invalidDataPointCount(let expected, let actual):
-            return "Expected \(expected) ICON data points, got \(String(describing: actual))"
-        case .invalidDecodedValueCount(let expected, let actual):
-            return "Expected \(expected) bitmap-expanded ICON values, got \(actual)"
-        }
-    }
-}
-
-extension IconNativeGribMetadata {
-    func validate(identity: IconNativeGridIdentity) throws {
-        guard edition == 2 else {
-            throw IconNativeGribError.invalidEdition(edition)
-        }
-        guard gridType == "unstructured_grid" else {
-            throw IconNativeGribError.invalidGridType(gridType)
-        }
-        guard gridDefinitionTemplateNumber == 101 else {
-            throw IconNativeGribError.invalidGridDefinitionTemplate(gridDefinitionTemplateNumber)
-        }
-        guard numberOfGridUsed == Int(identity.gridNumber) else {
-            throw IconNativeGribError.invalidGridNumber(expected: identity.gridNumber, actual: numberOfGridUsed)
-        }
-        guard uuidOfHGrid?.lowercased() == identity.gridUUIDHex else {
-            throw IconNativeGribError.invalidGridUUID(expected: identity.gridUUIDHex, actual: uuidOfHGrid)
-        }
-        guard numberOfDataPoints == identity.cellCount else {
-            throw IconNativeGribError.invalidDataPointCount(expected: identity.cellCount, actual: numberOfDataPoints)
-        }
-    }
-}
-
-enum IconNativeGribDecoder {
-    static func validateDecodedValueCount(_ count: Int, identity: IconNativeGridIdentity) throws {
-        guard count == identity.cellCount else {
-            throw IconNativeGribError.invalidDecodedValueCount(expected: identity.cellCount, actual: count)
-        }
-    }
-
-    static func decode(message: GribMessage, identity: IconNativeGridIdentity) throws -> Array2D {
-        try IconNativeGribMetadata(message: message).validate(identity: identity)
-        // ecCodes expands a GRIB bitmap to the complete data-point sequence. Verifying the final
-        // length protects the invariant that array offset equals the native cell index.
-        let values = try message.getDouble().map(Float.init)
-        try validateDecodedValueCount(values.count, identity: identity)
-        return Array2D(data: values, nx: identity.cellCount, ny: 1)
-    }
 }
