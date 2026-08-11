@@ -58,6 +58,9 @@ enum IconNativeGridBenchmark {
         let grid = try IconNativeGrid.load(file: file)
         let queries = makeQueries()
 
+        let conversion = measure {
+            conversionChecksum(grid: grid, queries: queries, repeats: repeats)
+        }
         let lookup = measure {
             lookupChecksum(grid: grid, queries: queries, repeats: repeats)
         }
@@ -82,6 +85,8 @@ enum IconNativeGridBenchmark {
         print("  cells: \(cellCount)")
         print("  queries/sample: \(queryCount * repeats)")
         print("  samples: \(sampleCount)")
+        print("  coordinate conversion median: \(conversion.samples[sampleCount / 2]) ns/query")
+        print("  coordinate conversion range: \(conversion.samples[0])...\(conversion.samples[sampleCount - 1]) ns/query")
         print("  lookup median: \(lookup.samples[sampleCount / 2]) ns/query")
         print("  lookup range: \(lookup.samples[0])...\(lookup.samples[sampleCount - 1]) ns/query")
         print("  terrain candidates median: \(terrainCandidates.samples[sampleCount / 2]) ns/query")
@@ -356,6 +361,36 @@ enum IconNativeGridBenchmark {
             )
         }
         return queries
+    }
+
+    @inline(never)
+    private static func conversionChecksum(
+        grid: IconNativeGrid,
+        queries: [(latitude: Float, longitude: Float)],
+        repeats: Int
+    ) -> Int {
+        var checksum = 0
+        for _ in 0..<repeats {
+            for query in queries {
+                let longitude = Float(IconNativeCenter.normalizedLongitude(query.longitude))
+                let vector = IconNativeCenter.fastCubeLookupVector(
+                    latitudeDegrees: query.latitude,
+                    longitudeDegrees: longitude
+                )
+                let location = IconNativeGrid.CubeGeometry.location(
+                    for: vector.center,
+                    resolution: grid.storage.resolution,
+                    resolutionScale: grid.storage.resolutionScale
+                )
+                checksum &+= location.face &+ location.x &+ location.y
+                checksum &+= Int(
+                    vector.x.bitPattern
+                        &+ vector.y.bitPattern
+                        &+ vector.z.bitPattern
+                )
+            }
+        }
+        return checksum
     }
 
     @inline(never)
