@@ -99,8 +99,10 @@ extension IconNativeGrid.CubeIndex {
 
         @inline(__always)
         func scanBucket(_ bucket: Int) {
-            let range = directoryRange(bucket..<(bucket + 1), bytes: bytes)
-            scanRange(range.lowerBound, range.upperBound)
+            scanRange(
+                directoryPosition(bucket, bytes: bytes),
+                directoryPosition(bucket + 1, bytes: bytes)
+            )
         }
 
         @inline(__always)
@@ -121,11 +123,13 @@ extension IconNativeGrid.CubeIndex {
                     x: segmentLowerX,
                     y: y
                 )!
-                let range = directoryRange(
-                    first..<(first + segmentUpperX - segmentLowerX + 1),
-                    bytes: bytes
+                scanRange(
+                    directoryPosition(first, bytes: bytes),
+                    directoryPosition(
+                        first + segmentUpperX - segmentLowerX + 1,
+                        bytes: bytes
+                    )
                 )
-                scanRange(range.lowerBound, range.upperBound)
                 segmentLowerX = segmentUpperX + 1
             }
         }

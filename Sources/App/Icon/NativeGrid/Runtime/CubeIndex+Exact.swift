@@ -2,6 +2,11 @@ import Foundation
 import OmFileFormat
 
 extension IconNativeGrid.CubeIndex {
+    struct ExactRegion: Sendable {
+        let xRange: ClosedRange<Int>
+        let yRange: ClosedRange<Int>
+    }
+
     private struct ScoreCandidate: Sendable {
         var cell: Int
         var score: Double
@@ -14,6 +19,7 @@ extension IconNativeGrid.CubeIndex {
         to unnormalizedQuery: IconNativeCenter,
         maximumDistanceSquared distanceLimitSquared: Double,
         seedPosition: Int?,
+        certifiedRegion: ExactRegion?,
         bytes: borrowing RawSpan
     ) -> Int? {
         let queryNormSquared = unnormalizedQuery.dot(unnormalizedQuery)
@@ -74,6 +80,47 @@ extension IconNativeGrid.CubeIndex {
                     2 - 2 * (bestScore - Self.scoreTieTolerance)
                 )
             }
+        }
+
+        @inline(__always)
+        func selectedCell() -> Int? {
+            guard candidateCount > 0 else { return nil }
+            if candidateOverflow {
+                var bestCell = Int.max
+                for position in 0..<cellCount {
+                    let candidate = scoreAndCell(at: position, query: query, bytes: bytes)
+                    if candidate.score >= bestScore - Self.scoreTieTolerance {
+                        bestCell = min(bestCell, candidate.cell)
+                    }
+                }
+                return bestCell == .max ? nil : bestCell
+            }
+            var bestCell = Int.max
+            for position in 0..<candidateCount where candidates[position].cell < bestCell {
+                bestCell = candidates[position].cell
+            }
+            return bestCell == .max ? nil : bestCell
+        }
+
+        if let certifiedRegion {
+            let section = faceSections[queryLocation.face]
+            let lowerY = max(certifiedRegion.yRange.lowerBound, section.minimumY)
+            let upperY = min(certifiedRegion.yRange.upperBound, section.minimumY + section.rows - 1)
+            let lowerX = max(certifiedRegion.xRange.lowerBound, section.minimumX)
+            let upperX = min(certifiedRegion.xRange.upperBound, section.minimumX + section.columns - 1)
+            if lowerX <= upperX, lowerY <= upperY {
+                for y in lowerY...upperY {
+                    for x in lowerX...upperX {
+                        scanRange(bucketRange(
+                            face: queryLocation.face,
+                            x: x,
+                            y: y,
+                            bytes: bytes
+                        ))
+                    }
+                }
+            }
+            return selectedCell()
         }
 
         var maximumCandidateDistance = sqrt(maximumCandidateDistanceSquared)
@@ -141,23 +188,7 @@ extension IconNativeGrid.CubeIndex {
             }
         }
 
-        guard candidateCount > 0 else { return nil }
-        if candidateOverflow {
-            var bestCell = Int.max
-            for position in 0..<cellCount {
-                let candidate = scoreAndCell(at: position, query: query, bytes: bytes)
-                let score = candidate.score
-                if score >= bestScore - Self.scoreTieTolerance {
-                    bestCell = min(bestCell, candidate.cell)
-                }
-            }
-            return bestCell == .max ? nil : bestCell
-        }
-        var bestCell = Int.max
-        for position in 0..<candidateCount where candidates[position].cell < bestCell {
-            bestCell = candidates[position].cell
-        }
-        return bestCell == .max ? nil : bestCell
+        return selectedCell()
     }
 
     @inline(__always)
@@ -173,7 +204,7 @@ extension IconNativeGrid.CubeIndex {
                 y: y
             )
         else { return 0..<0 }
-        return directoryRange(bucket..<(bucket + 1), bytes: bytes)
+        return directoryPosition(bucket, bytes: bytes)..<directoryPosition(bucket + 1, bytes: bytes)
     }
 
     @inline(__always)
