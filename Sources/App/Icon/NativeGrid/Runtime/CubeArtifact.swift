@@ -30,14 +30,8 @@ extension IconNativeGrid {
             let offsetsOffset: Int
             let centersOffset: Int
             let canonicalPositionsOffset: Int
-            let coverageOffset: Int
-            let coverageNx: Int
-            let coverageNy: Int
-            let coverageLatitudeMinimum: Double
-            let coverageLongitudeMinimum: Double
-            let coverageDx: Double
-            let coverageDy: Double
             let isGlobal: Bool
+            let maximumDistanceMeters: Float
             let cellCount: Int
             let level: Int
             let resolution: Int
@@ -47,31 +41,11 @@ extension IconNativeGrid {
             let gridUUID: [UInt8]
         }
 
-        struct Coverage: Sendable {
-            let nx: Int
-            let ny: Int
-            let latitudeMinimum: Double
-            let longitudeMinimum: Double
-            let dx: Double
-            let dy: Double
-            let bits: [UInt8]
-
-            static let global = Self(
-                nx: 0,
-                ny: 0,
-                latitudeMinimum: 0,
-                longitudeMinimum: 0,
-                dx: 0,
-                dy: 0,
-                bits: []
-            )
-        }
-
         struct Metadata: Sendable {
             let gridNumber: UInt32
             let gridUUID: [UInt8]
             let isGlobal: Bool
-            let coverage: Coverage
+            let maximumDistanceMeters: Float
         }
 
         enum BucketLayout: Sendable {
@@ -130,10 +104,9 @@ extension IconNativeGrid {
             let offsetsOffset: Int
             let centersOffset: Int
             let canonicalPositionsOffset: Int
-            let coverageOffset: Int
             let fileBytes: Int
 
-            init(cellCount: Int, bucketCount: Int, coverageBytes: Int) {
+            init(cellCount: Int, bucketCount: Int) {
                 offsetsOffset = CubeArtifact.headerBytes
                 centersOffset = CubeArtifact.alignedEnd(
                     offset: offsetsOffset,
@@ -144,21 +117,17 @@ extension IconNativeGrid {
                     offset: centersOffset,
                     length: cellCount * CubeArtifact.centerStride
                 )
-                coverageOffset = CubeArtifact.alignedEnd(
+                fileBytes = CubeArtifact.alignedEnd(
                     offset: canonicalPositionsOffset,
                     length: cellCount * 4
-                )
-                fileBytes = CubeArtifact.alignedEnd(
-                    offset: coverageOffset,
-                    length: coverageBytes
                 )
             }
         }
 
-        static let magic = Array("ICONCUB3".utf8)
-        static let version: UInt32 = 3
-        static let headerBytes = 184
-        static let faceSectionsOffset = 88
+        static let magic = Array("ICONCUB4".utf8)
+        static let version: UInt32 = 4
+        static let headerBytes = 144
+        static let faceSectionsOffset = 48
         static let faceSectionStride = 16
         static let centerStride = 16
         static let globalFlag: UInt32 = 1
@@ -223,11 +192,6 @@ extension IconNativeGrid {
             )
         }
 
-        static func coverageByteCount(bitCount: Int) -> Int? {
-            let adjusted = bitCount.addingReportingOverflow(7)
-            return adjusted.overflow ? nil : adjusted.partialValue / 8
-        }
-
         @inline(__always)
         static func directoryPosition(
             _ index: Int,
@@ -266,13 +230,6 @@ extension IconNativeGrid {
         }
 
         @inline(__always)
-        static func readDouble(_ bytes: borrowing RawSpan, at offset: Int) -> Double {
-            Double(bitPattern: UInt64(
-                littleEndian: bytes.unsafeLoadUnaligned(fromByteOffset: offset, as: UInt64.self)
-            ))
-        }
-
-        @inline(__always)
         static func readFloat(_ bytes: borrowing RawSpan, at offset: Int) -> Float {
             Float(bitPattern: readUInt32(bytes, at: offset))
         }
@@ -304,15 +261,12 @@ extension IconNativeGrid.CubeArtifact {
         let gridNumber = readUInt32(bytes, at: 16)
         let cellCount = Int(readUInt32(bytes, at: 20))
         let level = Int(readUInt32(bytes, at: 24))
-        let coverageNx = Int(readUInt32(bytes, at: 28))
-        let coverageNy = Int(readUInt32(bytes, at: 32))
-        let gridUUID = readBytes(bytes, range: 36..<52)
-        let coverageLatitudeMinimum = readDouble(bytes, at: 56)
-        let coverageLongitudeMinimum = readDouble(bytes, at: 64)
-        let coverageDx = readDouble(bytes, at: 72)
-        let coverageDy = readDouble(bytes, at: 80)
+        let maximumDistanceMeters = readFloat(bytes, at: 28)
+        let gridUUID = readBytes(bytes, range: 32..<48)
 
-        guard cellCount > 0, level >= 0, level <= 15 else {
+        guard cellCount > 0, level >= 0, level <= 15,
+            maximumDistanceMeters.isFinite, maximumDistanceMeters > 0
+        else {
             throw IconNativeGrid.ArtifactError.invalidHeader
         }
         let resolution = 1 << level
@@ -347,31 +301,15 @@ extension IconNativeGrid.CubeArtifact {
             $0.minimumX == 0 && $0.minimumY == 0
                 && $0.columns == resolution && $0.rows == resolution
         }
-        let coverageBytes: Int
         if isGlobal {
-            guard coverageNx == 0, coverageNy == 0,
-                coverageLatitudeMinimum == 0, coverageLongitudeMinimum == 0,
-                coverageDx == 0, coverageDy == 0, sectionsCoverGlobalFaces
-            else {
+            guard sectionsCoverGlobalFaces else {
                 throw IconNativeGrid.ArtifactError.invalidHeader
             }
-            coverageBytes = 0
-        } else {
-            let bitCount = coverageNx.multipliedReportingOverflow(by: coverageNy)
-            guard coverageNx > 0, coverageNy > 0, !bitCount.overflow,
-                coverageLatitudeMinimum.isFinite, coverageLongitudeMinimum.isFinite,
-                coverageDx.isFinite, coverageDy.isFinite, coverageDx > 0, coverageDy > 0,
-                let byteCount = coverageByteCount(bitCount: bitCount.partialValue)
-            else {
-                throw IconNativeGrid.ArtifactError.invalidHeader
-            }
-            coverageBytes = byteCount
         }
 
         let layout = SectionLayout(
             cellCount: cellCount,
-            bucketCount: bucketCount,
-            coverageBytes: coverageBytes
+            bucketCount: bucketCount
         )
         guard layout.fileBytes == mapped.data.count else {
             throw IconNativeGrid.ArtifactError.invalidHeader
@@ -398,14 +336,8 @@ extension IconNativeGrid.CubeArtifact {
             offsetsOffset: layout.offsetsOffset,
             centersOffset: layout.centersOffset,
             canonicalPositionsOffset: layout.canonicalPositionsOffset,
-            coverageOffset: layout.coverageOffset,
-            coverageNx: coverageNx,
-            coverageNy: coverageNy,
-            coverageLatitudeMinimum: coverageLatitudeMinimum,
-            coverageLongitudeMinimum: coverageLongitudeMinimum,
-            coverageDx: coverageDx,
-            coverageDy: coverageDy,
             isGlobal: isGlobal,
+            maximumDistanceMeters: maximumDistanceMeters,
             cellCount: cellCount,
             level: level,
             resolution: resolution,
