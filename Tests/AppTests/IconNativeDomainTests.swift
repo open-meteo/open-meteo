@@ -60,26 +60,25 @@ import Testing
         #expect(IconNativeGridIdentity.d2.sourceUrl.hasSuffix("/icon_grid_0047_R19B07_L.nc.bz2"))
     }
 
-    @Test func netcdfConnectivityIsTransposedAndConvertedToNativeIndices() throws {
-        let missing: Int32 = -1
-        // NetCDF stores the three neighbour planes as (nv, cell), while the artifact is cell-major.
+    @Test func netcdfVertexConnectivityIsTransposedAndConvertedToNativeIndices() throws {
+        // NetCDF stores three complete `(nv, cell)` planes; coverage construction uses cell-major
+        // zero-based vertex triples.
         let netcdf: [Int32] = [
             2, 1, 2,
             3, 3, 1,
-            missing, missing, missing,
+            1, 2, 3,
         ]
-        let actual = try IconNativeGridGenerator.transposeConnectivity(
+        let actual = try IconNativeGrid.Generator.transposeConnectivity(
             netcdf,
             cellCount: 3,
             upperBound: 3,
-            variable: "neighbor_cell_index",
-            allowsMissing: true
+            variable: "vertex_of_cell"
         )
 
         #expect(actual == [
-            1, 2, IconNativeGrid.missingIndex,
-            0, 2, IconNativeGrid.missingIndex,
-            1, 0, IconNativeGrid.missingIndex,
+            1, 2, 0,
+            0, 2, 1,
+            1, 0, 2,
         ])
     }
 
