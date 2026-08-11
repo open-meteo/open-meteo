@@ -87,10 +87,9 @@ struct IconNativeCenter: Sendable, Equatable {
         return dx * dx + dy * dy + dz * dz
     }
 
-    @inline(__always) static func normalizedLongitude(_ longitude: Float) -> Double {
-        let value = Double(longitude)
-        if value >= -180, value < 180 { return value }
-        var wrapped = value.truncatingRemainder(dividingBy: 360)
+    @inline(__always) static func normalizedLongitude(_ longitude: Float) -> Float {
+        if longitude >= -180, longitude < 180 { return longitude }
+        var wrapped = longitude.truncatingRemainder(dividingBy: 360)
         if wrapped < -180 { wrapped += 360 }
         if wrapped >= 180 { wrapped -= 360 }
         return wrapped

@@ -200,7 +200,7 @@ enum IconNativeGridBenchmark {
             for query in queries {
                 let vector = IconNativeCenter.fastCubeLookupVector(
                     latitudeDegrees: query.latitude,
-                    longitudeDegrees: Float(IconNativeCenter.normalizedLongitude(query.longitude))
+                    longitudeDegrees: IconNativeCenter.normalizedLongitude(query.longitude)
                 )
                 let location = IconNativeGrid.CubeGeometry.location(
                     for: vector.center,
@@ -269,6 +269,7 @@ enum IconNativeGridBenchmark {
                         to: query.center,
                         maximumDistanceSquared: .infinity,
                         seedPosition: query.seedPosition,
+                        certifiedRegion: nil,
                         bytes: bytes
                     )!
                 }

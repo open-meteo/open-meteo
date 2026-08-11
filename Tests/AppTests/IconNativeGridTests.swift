@@ -11,6 +11,7 @@ private extension IconNativeGrid.CubeIndex {
                 to: center,
                 maximumDistanceSquared: .infinity,
                 seedPosition: nil,
+                certifiedRegion: nil,
                 bytes: $0
             )!
         }
@@ -446,6 +447,7 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
             Issue.record("Invalid canonical cell \(cell) at artifact position \(position)")
             continue
         }
+        #expect(centerDirectionDistance(fixture.centers[cell], center) <= 2)
         #expect(!seen[cell])
         seen[cell] = true
         #expect(
