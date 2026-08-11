@@ -3,9 +3,9 @@ import Foundation
 import OmFileFormat
 import Testing
 
-private extension IconNativeGrid.CubeIndex {
+private extension SphericalCubeIndex {
     /// Preserve the official Double-precision centre during artifact round-trip validation.
-    func findNearestCell(to center: IconNativeCenter) -> Int {
+    func nearestPointID(to center: SphericalPoint) -> Int {
         withBytes {
             nearest(
                 to: center,
@@ -26,7 +26,7 @@ private extension IconNativeGrid.CubeIndex {
 
         for latitude in stride(from: Float(-89), through: 89, by: 4.75) {
             for longitude in stride(from: Float(-179), to: 180, by: 5.25) {
-                let query = IconNativeCenter(
+                let query = SphericalPoint(
                     latitudeDegrees: Double(latitude),
                     longitudeDegrees: Double(longitude)
                 )
@@ -57,13 +57,13 @@ private extension IconNativeGrid.CubeIndex {
                     + (center.y + other.y) * (center.y + other.y)
                     + (center.z + other.z) * (center.z + other.z)
             )
-            let midpoint = IconNativeCenter(
+            let midpoint = SphericalPoint(
                 x: (center.x + other.x) / midpointLength,
                 y: (center.y + other.y) / midpointLength,
                 z: (center.z + other.z) / midpointLength
             )
             let tangentLength = sqrt(center.squaredDistance(to: other))
-            let tangent = IconNativeCenter(
+            let tangent = SphericalPoint(
                 x: (other.x - center.x) / tangentLength,
                 y: (other.y - center.y) / tangentLength,
                 z: (other.z - center.z) / tangentLength
@@ -71,13 +71,13 @@ private extension IconNativeGrid.CubeIndex {
 
             for offsetMeters in [-3.0, 0, 3.0] {
                 let offset = offsetMeters * inverseEarthRadius
-                let raw = IconNativeCenter(
+                let raw = SphericalPoint(
                     x: midpoint.x + offset * tangent.x,
                     y: midpoint.y + offset * tangent.y,
                     z: midpoint.z + offset * tangent.z
                 )
                 let coordinate = raw.coordinate
-                let query = IconNativeCenter(
+                let query = SphericalPoint(
                     latitudeDegrees: Double(coordinate.latitude),
                     longitudeDegrees: Double(coordinate.longitude)
                 )
@@ -105,22 +105,22 @@ private extension IconNativeGrid.CubeIndex {
         ]
 
         for (latitude, longitude) in coordinates {
-            let query = IconNativeCenter.fastCubeLookupVector(
+            let query = SphericalPoint.fastLookupVector(
                 latitudeDegrees: latitude,
                 longitudeDegrees: longitude
-            ).center
+            ).point
             let ranked = fixture.centers.indices.sorted { lhs, rhs in
-                let lhsScore = query.dot(fixture.grid.storage.centerVector(at: lhs))
-                let rhsScore = query.dot(fixture.grid.storage.centerVector(at: rhs))
-                if lhsScore > rhsScore + IconNativeGrid.CubeIndex.scoreTieTolerance { return true }
-                if rhsScore > lhsScore + IconNativeGrid.CubeIndex.scoreTieTolerance { return false }
+                let lhsScore = query.dot(fixture.grid.storage.point(at: lhs))
+                let rhsScore = query.dot(fixture.grid.storage.point(at: rhs))
+                if lhsScore > rhsScore + SphericalCubeIndex.scoreTieTolerance { return true }
+                if rhsScore > lhsScore + SphericalCubeIndex.scoreTieTolerance { return false }
                 return lhs < rhs
             }
-            let actual = try #require(fixture.grid.storage.findNearestCells(
+            let actual = try #require(fixture.grid.storage.nearestCandidates(
                 latitude: latitude,
                 longitude: longitude
             ))
-            let actualCells = (0..<actual.count).map { actual.points[$0] }
+            let actualCells = (0..<actual.count).map { actual.pointIDs[$0] }
             let nearestTen = Set(ranked.prefix(10))
             let nearestTwenty = Set(ranked.prefix(20))
 
@@ -134,7 +134,7 @@ private extension IconNativeGrid.CubeIndex {
 
     @Test func canonicalCoordinatesAndTiesAreStable() throws {
         let centers = (0..<128).map { _ in
-            IconNativeCenter(latitudeDegrees: 0, longitudeDegrees: 0)
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0)
         }
         let fixture = try makeFixture(centers: centers)
         defer { fixture.remove() }
@@ -148,10 +148,10 @@ private extension IconNativeGrid.CubeIndex {
 
     @Test func regionalDistanceLimitAndLongitudeWrappingArePreserved() throws {
         let centers = [
-            IconNativeCenter(latitudeDegrees: 50, longitudeDegrees: 5),
-            IconNativeCenter(latitudeDegrees: 50, longitudeDegrees: 10),
-            IconNativeCenter(latitudeDegrees: 55, longitudeDegrees: 5),
-            IconNativeCenter(latitudeDegrees: 55, longitudeDegrees: 10),
+            SphericalPoint(latitudeDegrees: 50, longitudeDegrees: 5),
+            SphericalPoint(latitudeDegrees: 50, longitudeDegrees: 10),
+            SphericalPoint(latitudeDegrees: 55, longitudeDegrees: 5),
+            SphericalPoint(latitudeDegrees: 55, longitudeDegrees: 10),
         ]
         let fixture = try makeFixture(
             centers: centers,
@@ -173,24 +173,23 @@ private extension IconNativeGrid.CubeIndex {
     @Test func artifactUsesSinglePortableFloat32Format() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        #expect(IconNativeGrid.CubeArtifact.magic == Array("ICONCUB5".utf8))
-        #expect(IconNativeGrid.CubeArtifact.version == 5)
-        #expect(IconNativeGrid.CubeArtifact.globalFlag == 1)
-        #expect(IconNativeGrid.CubeArtifact.headerBytes == 144)
-        #expect(IconNativeGrid.CubeArtifact.centerStride == 16)
-        let artifact = try IconNativeGrid.CubeArtifact.open(file: fixture.file)
-        #expect(artifact.isGlobal)
-        #expect(artifact.gridNumber == globalMetadata.gridNumber)
-        #expect(artifact.cellCount == fixture.centers.count)
+        #expect(SphericalCubeArtifact.magic == Array("SPHCUBE1".utf8))
+        #expect(SphericalCubeArtifact.version == 1)
+        #expect(SphericalCubeArtifact.headerBytes == 144)
+        #expect(SphericalCubeArtifact.pointStride == 16)
+        let artifact = try SphericalCubeArtifact.open(file: fixture.file)
+        #expect(artifact.coversWholeSphere)
+        #expect(artifact.identity == globalMetadata.identity)
+        #expect(artifact.pointCount == fixture.centers.count)
         #expect(artifact.level == 4)
-        #expect(artifact.centersOffset.isMultiple(of: 16))
+        #expect(artifact.pointsOffset.isMultiple(of: 16))
         try validateGeneratedArtifact(fixture)
 
         for cell in fixture.centers.indices {
             let expected = fixture.centers[cell]
-            let actual = fixture.grid.storage.centerVector(at: cell)
+            let actual = fixture.grid.storage.point(at: cell)
             #expect(centerDirectionDistance(expected, actual) <= 2)
-            #expect(fixture.grid.storage.findNearestCell(to: expected) == cell)
+            #expect(fixture.grid.storage.nearestPointID(to: expected) == cell)
         }
     }
 
@@ -201,17 +200,17 @@ private extension IconNativeGrid.CubeIndex {
         defer { try? FileManager.default.removeItem(at: corruptedFile) }
         try FileManager.default.copyItem(at: fixture.file, to: corruptedFile)
         try truncateLastByte(of: corruptedFile)
-        #expect(throws: IconNativeGrid.ArtifactError.invalidHeader) {
+        #expect(throws: SphericalCubeArtifactError.invalidHeader) {
             _ = try IconNativeGrid.load(file: corruptedFile)
         }
 
         let tooSmall = temporaryArtifactFile()
         defer { try? FileManager.default.removeItem(at: tooSmall) }
-        #expect(throws: IconNativeGrid.ArtifactError.self) {
-            try IconNativeGrid.Generator.ArtifactWriter.write(
+        #expect(throws: SphericalCubeArtifactError.self) {
+            try SphericalCubeArtifact.Writer.write(
                 to: tooSmall,
                 metadata: globalMetadata,
-                centers: fixture.centers,
+                points: fixture.centers,
                 level: 4,
                 maximumFileSize: 1
             )
@@ -291,8 +290,8 @@ private extension IconNativeGrid.CubeIndex {
 
     @Test func terrainAndSeaSelectionUseSpatialCandidates() async throws {
         let centers = [
-            IconNativeCenter(latitudeDegrees: 0, longitudeDegrees: 0),
-            IconNativeCenter(latitudeDegrees: 0, longitudeDegrees: 0.1),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1),
         ]
         let fixture = try makeFixture(centers: centers)
         defer { fixture.remove() }
@@ -344,7 +343,7 @@ private extension IconNativeGrid.CubeIndex {
 private struct IconNativeGridFixture {
     let file: URL
     let grid: IconNativeGrid
-    let centers: [IconNativeCenter]
+    let centers: [SphericalPoint]
 
     func remove() {
         try? FileManager.default.removeItem(at: file)
@@ -356,11 +355,10 @@ private struct IconNativeGridElevationFile {
     let reader: OmFileReaderArray<FileHandleWithCount, Float>
 }
 
-private let globalMetadata = IconNativeGrid.CubeArtifact.Metadata(
-    gridNumber: 26,
-    gridUUID: Array(0..<16),
-    isGlobal: true,
-    maximumDistanceMeters: 10_000_000
+private let globalMetadata = SphericalCubeArtifact.Metadata(
+    identity: .init(number: 26, uuid: Array(0..<16)),
+    coversWholeSphere: true,
+    maximumChordDistanceSquared: maximumChordDistanceSquared(meters: 10_000_000)
 )
 
 private func makeGlobalFixture() throws -> IconNativeGridFixture {
@@ -370,7 +368,7 @@ private func makeGlobalFixture() throws -> IconNativeGridFixture {
         let z = 1 - 2 * (Double(cell) + 0.5) / Double(count)
         let radius = sqrt(max(0, 1 - z * z))
         let longitude = Double(cell) * goldenAngle
-        return IconNativeCenter(
+        return SphericalPoint(
             x: radius * cos(longitude),
             y: radius * sin(longitude),
             z: z
@@ -380,22 +378,23 @@ private func makeGlobalFixture() throws -> IconNativeGridFixture {
 }
 
 private func makeFixture(
-    centers: [IconNativeCenter],
+    centers: [SphericalPoint],
     isGlobal: Bool = true,
     maximumDistanceMeters: Float = 10_000_000
 ) throws -> IconNativeGridFixture {
     let file = temporaryArtifactFile()
-    let metadata = isGlobal ? globalMetadata : IconNativeGrid.CubeArtifact.Metadata(
-        gridNumber: 47,
-        gridUUID: Array(repeating: 47, count: 16),
-        isGlobal: false,
-        maximumDistanceMeters: maximumDistanceMeters
+    let metadata = isGlobal ? globalMetadata : SphericalCubeArtifact.Metadata(
+        identity: .init(number: 47, uuid: Array(repeating: 47, count: 16)),
+        coversWholeSphere: false,
+        maximumChordDistanceSquared: maximumChordDistanceSquared(
+            meters: Double(maximumDistanceMeters)
+        )
     )
     do {
-        try IconNativeGrid.Generator.ArtifactWriter.write(
+        try SphericalCubeArtifact.Writer.write(
             to: file,
             metadata: metadata,
-            centers: centers,
+            points: centers,
             level: isGlobal ? 4 : 3
         )
         return IconNativeGridFixture(
@@ -411,7 +410,7 @@ private func makeFixture(
 
 /// Expensive semantic verification belongs to artifact generation tests, not mmap startup.
 private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws {
-    typealias Artifact = IconNativeGrid.CubeArtifact
+    typealias Artifact = SphericalCubeArtifact
     let artifact = try Artifact.open(file: fixture.file)
     let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(artifact.mapped.data))
     var previous = 0
@@ -423,27 +422,27 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
             localsOffset: artifact.directoryLocalsOffset
         )
         #expect(current >= previous)
-        #expect(current <= artifact.cellCount)
+        #expect(current <= artifact.pointCount)
         previous = current
     }
-    #expect(previous == artifact.cellCount)
+    #expect(previous == artifact.pointCount)
 
-    var seen = [Bool](repeating: false, count: artifact.cellCount)
-    for position in 0..<artifact.cellCount {
-        let center = Artifact.center(
+    var seen = [Bool](repeating: false, count: artifact.pointCount)
+    for position in 0..<artifact.pointCount {
+        let center = Artifact.point(
             position: position,
             bytes: bytes,
-            centersOffset: artifact.centersOffset
+            pointsOffset: artifact.pointsOffset
         )
         #expect(center.x.isFinite && center.y.isFinite && center.z.isFinite)
         #expect(abs(center.dot(center) - 1) <= 4e-12)
 
-        let cell = Artifact.cell(
+        let cell = Artifact.pointID(
             position: position,
             bytes: bytes,
-            centersOffset: artifact.centersOffset
+            pointsOffset: artifact.pointsOffset
         )
-        guard cell >= 0, cell < artifact.cellCount else {
+        guard cell >= 0, cell < artifact.pointCount else {
             Issue.record("Invalid canonical cell \(cell) at artifact position \(position)")
             continue
         }
@@ -451,11 +450,11 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
         #expect(!seen[cell])
         seen[cell] = true
         #expect(
-            Artifact.readUInt32(bytes, at: artifact.canonicalPositionsOffset + cell * 4)
+            Artifact.readUInt32(bytes, at: artifact.positionsByIDOffset + cell * 4)
                 == UInt32(position)
         )
 
-        let location = IconNativeGrid.CubeGeometry.location(
+        let location = SphericalCubeGeometry.location(
             for: center,
             resolution: artifact.resolution
         )
@@ -484,28 +483,33 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
 
 }
 
-private func nearest(point: IconNativeCenter, centers: [IconNativeCenter]) -> Int {
+private func nearest(point: SphericalPoint, centers: [SphericalPoint]) -> Int {
     var bestScore = -Double.infinity
     for center in centers { bestScore = max(bestScore, point.dot(center)) }
     return centers.indices.first {
-        point.dot(centers[$0]) >= bestScore - IconNativeGrid.CubeIndex.scoreTieTolerance
+        point.dot(centers[$0]) >= bestScore - SphericalCubeIndex.scoreTieTolerance
     }!
 }
 
 private func distanceRegret(
-    query: IconNativeCenter,
-    expected: IconNativeCenter,
-    actual: IconNativeCenter
+    query: SphericalPoint,
+    expected: SphericalPoint,
+    actual: SphericalPoint
 ) -> Double {
     let expectedDistance = acos(max(-1, min(1, query.dot(expected))))
     let actualDistance = acos(max(-1, min(1, query.dot(actual))))
     return max(0, actualDistance - expectedDistance) * 6_371_229
 }
 
-private func centerDirectionDistance(_ lhs: IconNativeCenter, _ rhs: IconNativeCenter) -> Double {
+private func centerDirectionDistance(_ lhs: SphericalPoint, _ rhs: SphericalPoint) -> Double {
     let inverseNorms = 1 / sqrt(lhs.dot(lhs) * rhs.dot(rhs))
     let dot = max(-1, min(1, lhs.dot(rhs) * inverseNorms))
     return acos(dot) * 6_371_229
+}
+
+private func maximumChordDistanceSquared(meters: Double) -> Float {
+    let chord = 2 * sin(meters / 6_371_229 * 0.5)
+    return Float(chord * chord)
 }
 
 private func makeIdentity(_ fixture: IconNativeGridFixture) -> IconNativeGridIdentity {
@@ -547,10 +551,10 @@ private func validateOfficialGrid(
     #expect(grid.storage.artifactBytes <= maximumArtifactBytes)
     let stride = max(1, source.count / sampleLimit)
     for cell in Swift.stride(from: 0, to: source.count, by: stride) {
-        #expect(grid.storage.findNearestCell(to: source[cell]) == cell)
+        #expect(grid.storage.nearestPointID(to: source[cell]) == cell)
         #expect(centerDirectionDistance(
             source[cell],
-            grid.storage.centerVector(at: cell)
+            grid.storage.point(at: cell)
         ) <= 2)
     }
 }
