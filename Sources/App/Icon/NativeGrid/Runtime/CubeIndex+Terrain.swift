@@ -30,23 +30,9 @@ extension IconNativeGrid.CubeIndex {
     }
 
     func findNearestCells(from lookup: Lookup) -> NearbyCells {
-        findNearestCells(
-            from: lookup,
-            scanLimit: Self.terrainCandidateLimit * 4,
-            certifyTopCandidates: true
-        )
-    }
-
-    func findNearestCells(
-        from lookup: Lookup,
-        scanLimit: Int,
-        certifyTopCandidates: Bool
-    ) -> NearbyCells {
         withBytes {
             nearestCells(
                 from: lookup,
-                scanLimit: scanLimit,
-                certifyTopCandidates: certifyTopCandidates,
                 bytes: $0
             )
         }
@@ -55,11 +41,8 @@ extension IconNativeGrid.CubeIndex {
     @inline(never)
     private func nearestCells(
         from lookup: Lookup,
-        scanLimit: Int,
-        certifyTopCandidates: Bool,
         bytes: borrowing RawSpan
     ) -> NearbyCells {
-        precondition(scanLimit >= Self.terrainCandidateLimit)
         let query = lookup.query
         let queryLocation = lookup.location
         var candidates = InlineArray<16, DistanceCandidate>(repeating: .empty)
@@ -155,7 +138,7 @@ extension IconNativeGrid.CubeIndex {
             canCertify: Bool
         ) -> Bool {
             guard candidateCount == Self.terrainCandidateLimit - 1 else { return false }
-            if certifyTopCandidates, canCertify {
+            if canCertify {
                 let farthestDistance =
                     sqrt(Double(max(0, candidates[candidateCount - 1].distanceSquared)))
                     + Self.floatChordError
@@ -168,7 +151,7 @@ extension IconNativeGrid.CubeIndex {
                     return true
                 }
             }
-            return scannedCenterCount >= scanLimit
+            return scannedCenterCount >= Self.terrainCandidateLimit * 4
         }
 
         let maximumRadius = 8
