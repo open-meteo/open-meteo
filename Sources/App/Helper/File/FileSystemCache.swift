@@ -1,6 +1,8 @@
 //import OmFileFormat
 import SystemPackage
 import Foundation
+import AsyncHTTPClient
+import Logging
 //import NIOFileSystem
 
 #if os(Linux)
@@ -34,12 +36,6 @@ import Darwin
  - Use `inotify` on linux to watch for modifications using events
  */
 enum FileSystemCache {
-    /// Could be a parsed JSON or initialised OM file
-    protocol FilePayload: Sendable {
-        /// Payload can retain a reference to FileHandle to ensure the file stays open
-        init(fd: FileHandle, size: Int64) async throws
-    }
-    
     actor DirectoryEntry: Sendable {
         let fd: FileHandle
         let inode: UInt64
@@ -200,8 +196,8 @@ enum FileSystemCache {
         
         private enum PayloadState {
             case none
-            case initialising([CheckedContinuation<FilePayload, any Error>])
-            case ready(FilePayload)
+            case initialising([CheckedContinuation<FileSystemPayload, any Error>])
+            case ready(FileSystemPayload)
             case error(Error)
         }
         
@@ -213,23 +209,29 @@ enum FileSystemCache {
             payload = .none
         }
         
-        func getPayload<T: FilePayload>(ofType: T.Type) async throws -> T? {
+        func getPayload<T: FileSystemPayload>(ofType: T.Type) async throws -> T {
             switch payload {
             case .none:
                 self.payload = .initialising([])
                 do {
-                    let p = try await T(fd: fd, size: size)
-                    guard case .initialising(let queued) = payload else {
+                    let payload = try await T(fd: fd, size: size)
+                    guard case .initialising(let queued) = self.payload else {
                         fatalError("State was not .initialising()")
                     }
-                    self.payload = .ready(p)
+                    self.payload = .ready(payload)
                     queued.forEach {
-                        $0.resume(with: .success(p))
+                        $0.resume(with: .success(payload))
                     }
-                    return p
+                    return payload
                 } catch {
-                    guard case .initialising(let queued) = payload else {
+                    guard case .initialising(let queued) = self.payload else {
                         fatalError("State was not .initialising()")
+                    }
+                    // Do not cache the cancellation as terminal error.
+                    if error is CancellationError {
+                        self.payload = .none
+                    } else {
+                        self.payload = .error(error)
                     }
                     queued.forEach({
                         $0.resume(throwing: error)
@@ -237,17 +239,34 @@ enum FileSystemCache {
                     throw error
                 }
             case .initialising(let queue):
-                let p = try await withCheckedThrowingContinuation { continuation in
-                    payload = .initialising(queue + [continuation])
+                let payload = try await withCheckedThrowingContinuation { continuation in
+                    self.payload = .initialising(queue + [continuation])
                 }
-                return p as? T
+                guard let payload = payload as? T else {
+                    fatalError("Payload was not of correct type \(T.self)")
+                }
+                return payload
             case .ready(let payload):
-                return payload as? T
+                guard let payload = payload as? T else {
+                    fatalError("Payload was not of correct type \(T.self)")
+                }
+                return payload
             case .error(let error):
                 throw error
             }
         }
     }
+}
+
+protocol FileSystemPayload: Sendable {
+    /// Payload can retain a reference to FileHandle to ensure the file stays open
+    init(fd: FileHandle, size: Int64) async throws
+    
+    /// Initialise from remote source
+    // TODO extent by etag
+    init(client: HTTPClient, logger: Logger, server: String, objectKey: String, size: Int64, lastModified: Timestamp) async throws
+    func remoteUpdated(client: HTTPClient, logger: Logger, server: String, objectKey: String, size: Int64, lastModified: Timestamp) async throws -> Self
+    func remoteDeleted() async throws
 }
 
 #if os(Linux)

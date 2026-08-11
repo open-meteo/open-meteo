@@ -94,19 +94,19 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         self.lastValidatedAtomic = .init(lastValidated.timeIntervalSince1970)
     }
     
-    /// The file has been deleted or modified on the remote server. This instance is not valid anymore
-    func markAsDeleted() {
-        self.lastValidatedAtomic.store(0, ordering: .relaxed)
-    }
-    
     func prefetchData(offset: Int, count: Int) async throws {
         // nothing do do here
     }
     
     func getData(offset: Int, count: Int) async throws -> ByteBuffer {
-        guard lastValidatedAtomic.load(ordering: .relaxed) > 0 else {
-            throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        /// If `lastValidated` is set to `0`, the file received a file modified error,
+        /// if `1` received a file not found error
+        switch lastValidatedAtomic.load(ordering: .relaxed) {
+        case 0: throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        case 1: throw CurlError.fileNotFound
+        default: break
         }
+        
         var request = HTTPClientRequest(url: url)
         if let lastModified {
             request.headers.add(name: "If-Unmodified-Since", value: lastModified)
@@ -118,9 +118,17 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         try request.applyS3Credentials()
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
-        let buffer = try await client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
-        lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
-        return buffer
+        do {
+            let buffer = try await client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
+            lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+            return buffer
+        } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+            self.lastValidatedAtomic.store(0, ordering: .relaxed)
+            throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        } catch CurlError.fileNotFound {
+            self.lastValidatedAtomic.store(1, ordering: .relaxed)
+            throw CurlError.fileNotFound
+        }
     }
     
     func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
