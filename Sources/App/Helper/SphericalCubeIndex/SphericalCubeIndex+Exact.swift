@@ -1,22 +1,22 @@
 import Foundation
 import OmFileFormat
 
-extension IconNativeGrid.CubeIndex {
+extension SphericalCubeIndex {
     struct ExactRegion: Sendable {
         let xRange: ClosedRange<Int>
         let yRange: ClosedRange<Int>
     }
 
     private struct ScoreCandidate: Sendable {
-        var cell: Int
+        var pointID: Int
         var score: Double
 
-        static let empty = Self(cell: -1, score: -.infinity)
+        static let empty = Self(pointID: -1, score: -.infinity)
     }
 
     @inline(never)
     func nearest(
-        to unnormalizedQuery: IconNativeCenter,
+        to unnormalizedQuery: SphericalPoint,
         maximumDistanceSquared distanceLimitSquared: Double,
         seedPosition: Int?,
         certifiedRegion: ExactRegion?,
@@ -24,12 +24,12 @@ extension IconNativeGrid.CubeIndex {
     ) -> Int? {
         let queryNormSquared = unnormalizedQuery.dot(unnormalizedQuery)
         let inverseQueryNorm = 1 / sqrt(queryNormSquared)
-        let query = IconNativeCenter(
+        let query = SphericalPoint(
             x: unnormalizedQuery.x * inverseQueryNorm,
             y: unnormalizedQuery.y * inverseQueryNorm,
             z: unnormalizedQuery.z * inverseQueryNorm
         )
-        let queryLocation = IconNativeGrid.CubeGeometry.location(
+        let queryLocation = SphericalCubeGeometry.location(
             for: query,
             resolution: resolution,
             resolutionScale: resolutionScale
@@ -43,8 +43,8 @@ extension IconNativeGrid.CubeIndex {
         @inline(__always)
         func scanRange(_ range: Range<Int>) {
             for position in range {
-                let candidate = scoreAndCell(at: position, query: query, bytes: bytes)
-                let cell = candidate.cell
+                let candidate = scoreAndPointID(at: position, query: query, bytes: bytes)
+                let pointID = candidate.pointID
                 let score = candidate.score
                 if score > bestScore {
                     bestScore = score
@@ -62,7 +62,7 @@ extension IconNativeGrid.CubeIndex {
                 }
                 if score >= bestScore - Self.scoreTieTolerance {
                     if candidateCount < 4 {
-                        candidates[candidateCount] = ScoreCandidate(cell: cell, score: score)
+                        candidates[candidateCount] = ScoreCandidate(pointID: pointID, score: score)
                         candidateCount += 1
                     } else {
                         candidateOverflow = true
@@ -72,7 +72,7 @@ extension IconNativeGrid.CubeIndex {
         }
 
         if let seedPosition {
-            let seedScore = scoreAndCell(at: seedPosition, query: query, bytes: bytes).score
+            let seedScore = scoreAndPointID(at: seedPosition, query: query, bytes: bytes).score
             if seedScore > bestScore {
                 bestScore = seedScore
                 maximumCandidateDistanceSquared = max(
@@ -83,23 +83,23 @@ extension IconNativeGrid.CubeIndex {
         }
 
         @inline(__always)
-        func selectedCell() -> Int? {
+        func selectedPointID() -> Int? {
             guard candidateCount > 0 else { return nil }
             if candidateOverflow {
-                var bestCell = Int.max
-                for position in 0..<cellCount {
-                    let candidate = scoreAndCell(at: position, query: query, bytes: bytes)
+                var bestPointID = Int.max
+                for position in 0..<pointCount {
+                    let candidate = scoreAndPointID(at: position, query: query, bytes: bytes)
                     if candidate.score >= bestScore - Self.scoreTieTolerance {
-                        bestCell = min(bestCell, candidate.cell)
+                        bestPointID = min(bestPointID, candidate.pointID)
                     }
                 }
-                return bestCell == .max ? nil : bestCell
+                return bestPointID == .max ? nil : bestPointID
             }
-            var bestCell = Int.max
-            for position in 0..<candidateCount where candidates[position].cell < bestCell {
-                bestCell = candidates[position].cell
+            var bestPointID = Int.max
+            for position in 0..<candidateCount where candidates[position].pointID < bestPointID {
+                bestPointID = candidates[position].pointID
             }
-            return bestCell == .max ? nil : bestCell
+            return bestPointID == .max ? nil : bestPointID
         }
 
         if let certifiedRegion {
@@ -111,26 +111,27 @@ extension IconNativeGrid.CubeIndex {
             if lowerX <= upperX, lowerY <= upperY {
                 for y in lowerY...upperY {
                     for x in lowerX...upperX {
-                        scanRange(bucketRange(
-                            face: queryLocation.face,
-                            x: x,
-                            y: y,
-                            bytes: bytes
-                        ))
+                        scanRange(
+                            bucketRange(
+                                face: queryLocation.face,
+                                x: x,
+                                y: y,
+                                bytes: bytes
+                            ))
                     }
                 }
             }
-            return selectedCell()
+            return selectedPointID()
         }
 
         var maximumCandidateDistance = sqrt(maximumCandidateDistanceSquared)
-        var stack = InlineArray<64, IconNativeGrid.CubeGeometry.Node>(repeating: .empty)
+        var stack = InlineArray<64, SphericalCubeGeometry.Node>(repeating: .empty)
         var stackCount = 0
         for face in 0..<6 where face != queryLocation.face {
-            stack[stackCount] = IconNativeGrid.CubeGeometry.Node(face: face, level: 0, x: 0, y: 0)
+            stack[stackCount] = SphericalCubeGeometry.Node(face: face, level: 0, x: 0, y: 0)
             stackCount += 1
         }
-        stack[stackCount] = IconNativeGrid.CubeGeometry.Node(
+        stack[stackCount] = SphericalCubeGeometry.Node(
             face: queryLocation.face,
             level: 0,
             x: 0,
@@ -143,7 +144,7 @@ extension IconNativeGrid.CubeIndex {
             let node = stack[stackCount]
             if !nodeIntersectsStoredBuckets(node) { continue }
             if bestScore != -Double.infinity,
-                IconNativeGrid.CubeGeometry.nodeCannotImprove(
+                SphericalCubeGeometry.nodeCannotImprove(
                     node,
                     query: query,
                     maximumCandidateDistance: maximumCandidateDistance
@@ -167,8 +168,8 @@ extension IconNativeGrid.CubeIndex {
                 ? (queryLocation.y >> queryShift) & 1 : -1
             let preferred = preferredY * 2 + preferredX
             for child in 0..<4 where child != preferred {
-                precondition(stackCount < 64, "ICON cube-bucket traversal stack overflow")
-                stack[stackCount] = IconNativeGrid.CubeGeometry.Node(
+                precondition(stackCount < 64, "spherical cube-bucket traversal stack overflow")
+                stack[stackCount] = SphericalCubeGeometry.Node(
                     face: node.face,
                     level: childLevel,
                     x: node.x * 2 + child % 2,
@@ -177,8 +178,8 @@ extension IconNativeGrid.CubeIndex {
                 stackCount += 1
             }
             if preferred >= 0 {
-                precondition(stackCount < 64, "ICON cube-bucket traversal stack overflow")
-                stack[stackCount] = IconNativeGrid.CubeGeometry.Node(
+                precondition(stackCount < 64, "spherical cube-bucket traversal stack overflow")
+                stack[stackCount] = SphericalCubeGeometry.Node(
                     face: node.face,
                     level: childLevel,
                     x: node.x * 2 + preferredX,
@@ -188,7 +189,7 @@ extension IconNativeGrid.CubeIndex {
             }
         }
 
-        return selectedCell()
+        return selectedPointID()
     }
 
     @inline(__always)
@@ -209,7 +210,7 @@ extension IconNativeGrid.CubeIndex {
 
     @inline(__always)
     private func nodeIntersectsStoredBuckets(
-        _ node: IconNativeGrid.CubeGeometry.Node
+        _ node: SphericalCubeGeometry.Node
     ) -> Bool {
         let shift = level - node.level
         let minimumX = node.x << shift
@@ -223,22 +224,22 @@ extension IconNativeGrid.CubeIndex {
     }
 
     @inline(__always)
-    private func scoreAndCell(
+    private func scoreAndPointID(
         at position: Int,
-        query: IconNativeCenter,
+        query: SphericalPoint,
         bytes: borrowing RawSpan
-    ) -> (score: Double, cell: Int) {
+    ) -> (score: Double, pointID: Int) {
         return (
             Artifact.score(
                 position: position,
                 query: query,
                 bytes: bytes,
-                centersOffset: centersOffset
+                pointsOffset: pointsOffset
             ),
-            Artifact.cell(
+            Artifact.pointID(
                 position: position,
                 bytes: bytes,
-                centersOffset: centersOffset
+                pointsOffset: pointsOffset
             )
         )
     }

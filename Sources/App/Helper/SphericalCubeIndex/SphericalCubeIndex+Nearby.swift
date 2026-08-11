@@ -1,37 +1,37 @@
 import Foundation
 import OmFileFormat
 
-extension IconNativeGrid.CubeIndex {
+extension SphericalCubeIndex {
     private struct DistanceCandidate: Sendable {
-        var cell: Int
+        var pointID: Int
         var distanceSquared: Float
 
-        static let empty = Self(cell: -1, distanceSquared: .infinity)
+        static let empty = Self(pointID: -1, distanceSquared: .infinity)
     }
 
-    struct NearbyCells: Sendable {
-        var points = InlineArray<10, Int>(repeating: -1)
+    struct NearbyPoints: Sendable {
+        var pointIDs = InlineArray<10, Int>(repeating: -1)
         var distancesSquared = InlineArray<10, Float>(repeating: .infinity)
         var count = 0
     }
 
-    private static let terrainCandidateLimit = 10
+    private static let nearbyPointLimit = 10
 
-    /// Returns the exact nearest cell followed by the closest candidates found in nearby buckets.
-    func findNearestCells(
+    /// Returns the exact nearest point followed by close candidates found in nearby buckets.
+    func nearestCandidates(
         latitude: Float,
         longitude: Float
-    ) -> (points: InlineArray<10, Int>, count: Int)? {
-        guard let lookup = findNearestLookup(latitude: latitude, longitude: longitude) else {
+    ) -> (pointIDs: InlineArray<10, Int>, count: Int)? {
+        guard let lookup = nearestLookup(latitude: latitude, longitude: longitude) else {
             return nil
         }
-        let candidates = findNearestCells(from: lookup)
-        return (candidates.points, candidates.count)
+        let candidates = nearestCandidates(from: lookup)
+        return (candidates.pointIDs, candidates.count)
     }
 
-    func findNearestCells(from lookup: Lookup) -> NearbyCells {
+    func nearestCandidates(from lookup: Lookup) -> NearbyPoints {
         withBytes {
-            nearestCells(
+            nearestCandidates(
                 from: lookup,
                 bytes: $0
             )
@@ -39,41 +39,47 @@ extension IconNativeGrid.CubeIndex {
     }
 
     @inline(never)
-    private func nearestCells(
+    private func nearestCandidates(
         from lookup: Lookup,
         bytes: borrowing RawSpan
-    ) -> NearbyCells {
+    ) -> NearbyPoints {
         let query = lookup.query
         let queryLocation = lookup.location
         var candidates = InlineArray<10, DistanceCandidate>(repeating: .empty)
         var candidateCount = 0
-        var scannedCenterCount = 0
+        var scannedPointCount = 0
 
         @inline(__always)
         func precedes(_ lhs: DistanceCandidate, _ rhs: DistanceCandidate) -> Bool {
             if lhs.distanceSquared < rhs.distanceSquared { return true }
             if rhs.distanceSquared < lhs.distanceSquared { return false }
-            return lhs.cell < rhs.cell
+            return lhs.pointID < rhs.pointID
         }
 
         @inline(__always)
         func consider(position: Int, distanceSquared: Float) {
             if position == lookup.position { return }
-            let last = Self.terrainCandidateLimit - 2
-            if candidateCount == Self.terrainCandidateLimit - 1,
-                distanceSquared > candidates[last].distanceSquared { return }
+            let last = Self.nearbyPointLimit - 2
+            if candidateCount == Self.nearbyPointLimit - 1,
+                distanceSquared > candidates[last].distanceSquared
+            {
+                return
+            }
             let candidate = DistanceCandidate(
-                cell: Artifact.cell(
+                pointID: Artifact.pointID(
                     position: position,
                     bytes: bytes,
-                    centersOffset: centersOffset
+                    pointsOffset: pointsOffset
                 ),
                 distanceSquared: distanceSquared
             )
-            if candidateCount == Self.terrainCandidateLimit - 1,
-                !precedes(candidate, candidates[last]) { return }
+            if candidateCount == Self.nearbyPointLimit - 1,
+                !precedes(candidate, candidates[last])
+            {
+                return
+            }
             var destination = min(candidateCount, last)
-            if candidateCount < Self.terrainCandidateLimit - 1 { candidateCount += 1 }
+            if candidateCount < Self.nearbyPointLimit - 1 { candidateCount += 1 }
             while destination > 0, precedes(candidate, candidates[destination - 1]) {
                 candidates[destination] = candidates[destination - 1]
                 destination -= 1
@@ -83,7 +89,7 @@ extension IconNativeGrid.CubeIndex {
 
         @inline(__always)
         func scanRange(_ begin: Int, _ end: Int) {
-            scannedCenterCount += end - begin
+            scannedPointCount += end - begin
             for position in begin..<end {
                 consider(
                     position: position,
@@ -91,7 +97,7 @@ extension IconNativeGrid.CubeIndex {
                         position: position,
                         query: query,
                         bytes: bytes,
-                        centersOffset: centersOffset
+                        pointsOffset: pointsOffset
                     )
                 )
             }
@@ -116,7 +122,8 @@ extension IconNativeGrid.CubeIndex {
             var segmentLowerX = lowerX
             while segmentLowerX <= upperX {
                 let localX = segmentLowerX - section.minimumX
-                let tileUpperX = section.minimumX
+                let tileUpperX =
+                    section.minimumX
                     + (((localX >> tileShift) + 1) << tileShift) - 1
                 let segmentUpperX = min(upperX, tileUpperX)
                 let first = section.bucket(
@@ -140,7 +147,7 @@ extension IconNativeGrid.CubeIndex {
             yRange: ClosedRange<Int>,
             canCertify: Bool
         ) -> Bool {
-            guard candidateCount == Self.terrainCandidateLimit - 1 else { return false }
+            guard candidateCount == Self.nearbyPointLimit - 1 else { return false }
             if canCertify {
                 let farthestDistance =
                     sqrt(Double(max(0, candidates[candidateCount - 1].distanceSquared)))
@@ -154,11 +161,12 @@ extension IconNativeGrid.CubeIndex {
                     return true
                 }
             }
-            return scannedCenterCount >= Self.terrainCandidateLimit * 4
+            return scannedPointCount >= Self.nearbyPointLimit * 4
         }
 
         let maximumRadius = 8
-        let staysOnFace = queryLocation.x >= maximumRadius
+        let staysOnFace =
+            queryLocation.x >= maximumRadius
             && queryLocation.x < resolution - maximumRadius
             && queryLocation.y >= maximumRadius
             && queryLocation.y < resolution - maximumRadius
@@ -175,7 +183,8 @@ extension IconNativeGrid.CubeIndex {
                     xRange: (queryLocation.x - radius)...(queryLocation.x + radius),
                     yRange: (queryLocation.y - radius)...(queryLocation.y + radius),
                     canCertify: true
-                ) {
+                )
+            {
                 radius += 1
                 let lowerX = queryLocation.x - radius
                 let upperX = queryLocation.x + radius
@@ -213,24 +222,26 @@ extension IconNativeGrid.CubeIndex {
 
             @inline(__always)
             func scanOffset(dx: Int, dy: Int) {
-                let point = IconNativeGrid.CubeGeometry.faceVector(
+                let point = SphericalCubeGeometry.faceVector(
                     face: queryLocation.face,
                     u: -1 + (Double(queryLocation.x + dx) + 0.5) * scale,
                     v: -1 + (Double(queryLocation.y + dy) + 0.5) * scale
                 )
-                let location = IconNativeGrid.CubeGeometry.location(
+                let location = SphericalCubeGeometry.location(
                     for: point,
                     resolution: resolution,
                     resolutionScale: resolutionScale
                 )
-                guard let bucket = faceSections[location.face].bucket(
-                    x: location.x,
-                    y: location.y
-                ) else { return }
+                guard
+                    let bucket = faceSections[location.face].bucket(
+                        x: location.x,
+                        y: location.y
+                    )
+                else { return }
                 for position in 0..<scannedBucketCount where scannedBuckets[position] == bucket {
                     return
                 }
-                precondition(scannedBucketCount < 289, "ICON nearby-bucket bound exceeded")
+                precondition(scannedBucketCount < 289, "spherical nearby-bucket bound exceeded")
                 scannedBuckets[scannedBucketCount] = bucket
                 scannedBucketCount += 1
                 scanBucket(bucket)
@@ -249,17 +260,19 @@ extension IconNativeGrid.CubeIndex {
                     xRange: max(0, queryLocation.x - radius)...min(resolution - 1, queryLocation.x + radius),
                     yRange: max(0, queryLocation.y - radius)...min(resolution - 1, queryLocation.y + radius),
                     canCertify: false
-                ) { break }
+                ) {
+                    break
+                }
             }
         }
 
-        var result = NearbyCells()
-        result.points[0] = lookup.cell
+        var result = NearbyPoints()
+        result.pointIDs[0] = lookup.pointID
         result.distancesSquared[0] = lookup.distanceSquared
         result.count = 1
         for position in 0..<candidateCount {
             let destination = position + 1
-            result.points[destination] = candidates[position].cell
+            result.pointIDs[destination] = candidates[position].pointID
             result.distancesSquared[destination] = candidates[position].distanceSquared
             result.count += 1
         }
