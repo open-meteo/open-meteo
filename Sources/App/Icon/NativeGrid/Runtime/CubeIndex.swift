@@ -25,7 +25,8 @@ extension IconNativeGrid {
 
         private let mapped: MmapFile
         let faceSections: [FaceSection]
-        private let offsetsOffset: Int
+        private let directoryBasesOffset: Int
+        private let directoryLocalsOffset: Int
         let centersOffset: Int
         private let canonicalPositionsOffset: Int
         private let maximumDistanceSquared: Float
@@ -37,8 +38,7 @@ extension IconNativeGrid {
         let cellCount: Int
         let level: Int
         let resolution: Int
-        private let bucketCount: Int
-        let artifactBytes: Int
+        var artifactBytes: Int { mapped.data.count }
         let gridNumber: UInt32
         let gridUUID: [UInt8]
 
@@ -46,7 +46,8 @@ extension IconNativeGrid {
             let artifact = try Artifact.open(file: file)
             mapped = artifact.mapped
             faceSections = artifact.faceSections
-            offsetsOffset = artifact.offsetsOffset
+            directoryBasesOffset = artifact.directoryBasesOffset
+            directoryLocalsOffset = artifact.directoryLocalsOffset
             centersOffset = artifact.centersOffset
             canonicalPositionsOffset = artifact.canonicalPositionsOffset
             let maximumAngle = Double(artifact.maximumDistanceMeters) / 6_371_229
@@ -57,8 +58,6 @@ extension IconNativeGrid {
             level = artifact.level
             resolution = artifact.resolution
             resolutionScale = Double(artifact.resolution) * 0.5
-            bucketCount = artifact.bucketCount
-            artifactBytes = artifact.artifactBytes
             gridNumber = artifact.gridNumber
             gridUUID = artifact.gridUUID
             let bucketWidth = 2 / Double(artifact.resolution)
@@ -179,6 +178,7 @@ extension IconNativeGrid {
                 guard let cell = nearest(
                     to: geometryQuery,
                     maximumDistanceSquared: Double(maximumDistanceSquared),
+                    seedPosition: bestPosition >= 0 ? bestPosition : nil,
                     bytes: bytes
                 ) else { return nil }
                 let position = Int(Artifact.readUInt32(
@@ -204,12 +204,10 @@ extension IconNativeGrid {
                     let tileSize = Artifact.tileSize
                     let tileX = x >> tileShift
                     let tileY = y >> tileShift
-                    let tileHeight = min(tileSize, resolution - tileY * tileSize)
-                    let tileWidth = min(tileSize, resolution - tileX * tileSize)
                     return queryLocation.face * resolution * resolution
                         + tileY * tileSize * resolution
-                        + tileX * tileSize * tileHeight
-                        + (y & (tileSize - 1)) * tileWidth
+                        + tileX * tileSize * tileSize
+                        + (y & (tileSize - 1)) * tileSize
                         + (x & (tileSize - 1))
                 }
                 return faceSections[queryLocation.face].bucket(
@@ -221,16 +219,12 @@ extension IconNativeGrid {
             @inline(__always)
             func scanBucket(x: Int, y: Int) {
                 guard let bucket = bucket(x: x, y: y) else { return }
-                let begin = directoryPosition(bucket, bytes: bytes)
-                let end = directoryPosition(bucket + 1, bytes: bytes)
-                scanRange(begin..<end)
+                scanRange(directoryRange(bucket..<(bucket + 1), bytes: bytes))
             }
 
             @inline(__always)
             func scanBucketInterval(firstBucket: Int, lastBucket: Int) {
-                let begin = directoryPosition(firstBucket, bytes: bytes)
-                let end = directoryPosition(lastBucket + 1, bytes: bytes)
-                scanRange(begin..<end)
+                scanRange(directoryRange(firstBucket..<(lastBucket + 1), bytes: bytes))
             }
 
             @inline(__always)
@@ -312,16 +306,28 @@ extension IconNativeGrid {
         }
 
         @inline(__always)
-        func directoryPosition(
-            _ index: Int,
+        func directoryRange(
+            _ buckets: Range<Int>,
             bytes: borrowing RawSpan
-        ) -> Int {
-            Artifact.directoryPosition(
-                index,
-                bytes: bytes,
-                offsetsOffset: offsetsOffset,
-                bucketCount: bucketCount
-            )
+        ) -> Range<Int> {
+            let firstBlock = buckets.lowerBound >> 8
+            let firstBase = Int(Artifact.readUInt32(
+                bytes,
+                at: directoryBasesOffset + firstBlock * 4
+            ))
+            let begin = firstBase + Int(Artifact.readUInt16(
+                bytes,
+                at: directoryLocalsOffset + buckets.lowerBound * 2
+            ))
+            let endBlock = buckets.upperBound >> 8
+            let endBase = endBlock == firstBlock
+                ? firstBase
+                : Int(Artifact.readUInt32(bytes, at: directoryBasesOffset + endBlock * 4))
+            let end = endBase + Int(Artifact.readUInt16(
+                bytes,
+                at: directoryLocalsOffset + buckets.upperBound * 2
+            ))
+            return begin..<end
         }
 
         /// Certifies a direct bucket result without assuming anything about ICON adjacency. Leaving a

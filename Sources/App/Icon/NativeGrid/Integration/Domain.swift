@@ -92,17 +92,12 @@ final class IconNativeGridCache: Sendable {
     private func loadEntry() -> IconNativeGridCacheEntry {
         do {
             return IconNativeGridCacheEntry(.success(try loadStorage()))
-        } catch let error as IconNativeDomainError {
-            return IconNativeGridCacheEntry(.failure(error))
         } catch {
-            return IconNativeGridCacheEntry(.failure(.invalidGridArtifact(
-                path: file,
-                reason: String(describing: error)
-            )))
+            return IconNativeGridCacheEntry(.failure(error))
         }
     }
 
-    private func loadStorage() throws -> IconNativeGrid.CubeIndex {
+    private func loadStorage() throws(IconNativeDomainError) -> IconNativeGrid.CubeIndex {
         guard FileManager.default.fileExists(atPath: file) else {
             throw IconNativeDomainError.missingGridArtifact(file)
         }
@@ -142,12 +137,7 @@ private enum IconNativeGridCaches {
 
 extension IconDomains {
     var isNative: Bool {
-        switch self {
-        case .iconNative, .iconD2Native, .iconD2Native15min:
-            return true
-        default:
-            return false
-        }
+        nativeGridIdentity != nil
     }
 
     var isAvailable: Bool {
@@ -265,11 +255,8 @@ extension IconDomains {
         let artifactPath = "\(staticDirectory)grid.bin"
         let stagedArtifactPath = "\(artifactPath)~"
         try FileManager.default.removeItemIfExists(at: stagedArtifactPath)
-        var published = false
         defer {
-            if !published {
-                try? FileManager.default.removeItem(atPath: stagedArtifactPath)
-            }
+            try? FileManager.default.removeItem(atPath: stagedArtifactPath)
         }
 
         let grid: IconNativeGrid
@@ -297,7 +284,6 @@ extension IconDomains {
         // only after complete validation, then cache that same mapping without reopening the file.
         try FileManager.default.moveFileOverwrite(from: stagedArtifactPath, to: artifactPath)
         nativeGridCache.install(grid)
-        published = true
         try? FileManager.default.removeItem(atPath: sourceFile)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
     }

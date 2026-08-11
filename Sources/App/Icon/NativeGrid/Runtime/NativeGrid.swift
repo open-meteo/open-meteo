@@ -219,9 +219,9 @@ struct IconNativeGrid: Gridable {
         candidates: IconNativeGrid.CubeIndex.NearbyCells,
         knownValue: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
-    ) async throws -> InlineArray<16, Float> {
-        var sortedCells = InlineArray<16, Int>(repeating: -1)
-        var sortedPositions = InlineArray<16, Int>(repeating: -1)
+    ) async throws -> InlineArray<10, Float> {
+        var sortedCells = InlineArray<10, Int>(repeating: -1)
+        var sortedPositions = InlineArray<10, Int>(repeating: -1)
         var sortedCount = 0
         if candidates.count > 1 {
             for originalPosition in 1..<candidates.count {
@@ -237,7 +237,7 @@ struct IconNativeGrid: Gridable {
                 sortedCount += 1
             }
         }
-        var result = InlineArray<16, Float>(repeating: .nan)
+        var result = InlineArray<10, Float>(repeating: .nan)
         result[0] = knownValue
         var start = 0
         while start < sortedCount {

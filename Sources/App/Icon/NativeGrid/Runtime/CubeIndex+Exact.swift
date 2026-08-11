@@ -13,6 +13,7 @@ extension IconNativeGrid.CubeIndex {
     func nearest(
         to unnormalizedQuery: IconNativeCenter,
         maximumDistanceSquared distanceLimitSquared: Double,
+        seedPosition: Int?,
         bytes: borrowing RawSpan
     ) -> Int? {
         let queryNormSquared = unnormalizedQuery.dot(unnormalizedQuery)
@@ -64,76 +65,17 @@ extension IconNativeGrid.CubeIndex {
             }
         }
 
-        @inline(__always)
-        func scanBucket(x: Int, y: Int) {
-            scanRange(bucketRange(face: queryLocation.face, x: x, y: y, bytes: bytes))
-        }
-
-        @inline(__always)
-        func scanBucketRow(y: Int, xRange: ClosedRange<Int>) {
-            let section = faceSections[queryLocation.face]
-            guard y >= section.minimumY, y < section.minimumY + section.rows else { return }
-            let lowerX = max(xRange.lowerBound, section.minimumX)
-            let upperX = min(xRange.upperBound, section.minimumX + section.columns - 1)
-            guard lowerX <= upperX else { return }
-            for x in lowerX...upperX { scanBucket(x: x, y: y) }
-        }
-
-        @inline(__always)
-        func selectedCell() -> Int {
-            var cell = Int.max
-            for position in 0..<candidateCount where candidates[position].cell < cell {
-                cell = candidates[position].cell
-            }
-            return cell
-        }
-
-        // The leaf containing the query is an exceptionally cheap exact fast path whenever
-        // the winning distance is smaller than the distance to all four leaf boundaries.
-        scanBucket(x: queryLocation.x, y: queryLocation.y)
-        if !candidateOverflow, candidateCount > 0,
-            regionIsCertified(
-                location: queryLocation,
-                xRange: queryLocation.x...queryLocation.x,
-                yRange: queryLocation.y...queryLocation.y,
-                maximumCandidateDistanceSquared: maximumCandidateDistanceSquared
-            )
-        {
-            return selectedCell()
-        }
-
-        // A 3x3 leaf window puts an ordinary query at least one complete bucket away from the
-        // searched boundary. Only cube-seam and unusually empty-area queries need the general
-        // implicit-quadtree fallback below.
-        let xRange = max(0, queryLocation.x - 1)...min(resolution - 1, queryLocation.x + 1)
-        let yRange = max(0, queryLocation.y - 1)...min(resolution - 1, queryLocation.y + 1)
-        for y in yRange {
-            if y != queryLocation.y {
-                scanBucketRow(y: y, xRange: xRange)
-                continue
-            }
-            if xRange.lowerBound < queryLocation.x {
-                scanBucketRow(y: y, xRange: xRange.lowerBound...(queryLocation.x - 1))
-            }
-            if queryLocation.x < xRange.upperBound {
-                scanBucketRow(y: y, xRange: (queryLocation.x + 1)...xRange.upperBound)
+        if let seedPosition {
+            let seedScore = scoreAndCell(at: seedPosition, query: query, bytes: bytes).score
+            if seedScore > bestScore {
+                bestScore = seedScore
+                maximumCandidateDistanceSquared = max(
+                    0,
+                    2 - 2 * (bestScore - Self.scoreTieTolerance)
+                )
             }
         }
-        if !candidateOverflow, candidateCount > 0,
-            regionIsCertified(
-                location: queryLocation,
-                xRange: xRange,
-                yRange: yRange,
-                maximumCandidateDistanceSquared: maximumCandidateDistanceSquared
-            )
-        {
-            return selectedCell()
-        }
 
-        // Retain the fast-path winner as an exact pruning seed, but rebuild the tie set while
-        // traversing so a bucket scanned above cannot insert the same candidate twice.
-        candidateCount = 0
-        candidateOverflow = false
         var maximumCandidateDistance = sqrt(maximumCandidateDistanceSquared)
         var stack = InlineArray<64, IconNativeGrid.CubeGeometry.Node>(repeating: .empty)
         var stackCount = 0
@@ -231,9 +173,7 @@ extension IconNativeGrid.CubeIndex {
                 y: y
             )
         else { return 0..<0 }
-        let begin = directoryPosition(bucket, bytes: bytes)
-        let end = directoryPosition(bucket + 1, bytes: bytes)
-        return begin..<end
+        return directoryRange(bucket..<(bucket + 1), bytes: bytes)
     }
 
     @inline(__always)

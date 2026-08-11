@@ -9,23 +9,6 @@ struct IconNativeGribMetadata: Sendable, Equatable {
     let uuidOfHGrid: String?
     let numberOfDataPoints: Int?
 
-    init(message: GribMessage) {
-        edition = message.getLong(attribute: "edition")
-        gridType = message.get(attribute: "gridType")
-        gridDefinitionTemplateNumber = message.getLong(attribute: "gridDefinitionTemplateNumber")
-        numberOfGridUsed = message.getLong(attribute: "numberOfGridUsed")
-        uuidOfHGrid = message.get(attribute: "uuidOfHGrid")
-        numberOfDataPoints = message.getLong(attribute: "numberOfDataPoints")
-    }
-
-    init(edition: Int?, gridType: String?, gridDefinitionTemplateNumber: Int?, numberOfGridUsed: Int?, uuidOfHGrid: String?, numberOfDataPoints: Int?) {
-        self.edition = edition
-        self.gridType = gridType
-        self.gridDefinitionTemplateNumber = gridDefinitionTemplateNumber
-        self.numberOfGridUsed = numberOfGridUsed
-        self.uuidOfHGrid = uuidOfHGrid
-        self.numberOfDataPoints = numberOfDataPoints
-    }
 }
 
 enum IconNativeGribError: Error, Equatable, CustomStringConvertible {
@@ -58,6 +41,15 @@ enum IconNativeGribError: Error, Equatable, CustomStringConvertible {
 }
 
 extension IconNativeGribMetadata {
+    init(message: GribMessage) {
+        edition = message.getLong(attribute: "edition")
+        gridType = message.get(attribute: "gridType")
+        gridDefinitionTemplateNumber = message.getLong(attribute: "gridDefinitionTemplateNumber")
+        numberOfGridUsed = message.getLong(attribute: "numberOfGridUsed")
+        uuidOfHGrid = message.get(attribute: "uuidOfHGrid")
+        numberOfDataPoints = message.getLong(attribute: "numberOfDataPoints")
+    }
+
     func validate(identity: IconNativeGridIdentity) throws {
         guard edition == 2 else {
             throw IconNativeGribError.invalidEdition(edition)
