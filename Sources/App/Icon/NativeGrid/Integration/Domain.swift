@@ -50,107 +50,57 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
     }
 }
 
-private struct IconNativeGridFileFingerprint: Sendable, Equatable {
-    let inode: UInt64
-    let size: Int64
-    let modificationSeconds: Int64
-    let modificationNanoseconds: Int64
+private final class IconNativeGridCacheEntry: Sendable {
+    let result: Result<IconNativeGrid.CubeIndex, IconNativeDomainError>
 
-    static func read(file: String) -> Self? {
-        guard let stats = FileManager.default.fileStats(at: file) else { return nil }
-        #if os(Linux)
-        let modification = stats.st_mtim
-        #else
-        let modification = stats.st_mtimespec
-        #endif
-        return Self(
-            inode: UInt64(stats.st_ino),
-            size: Int64(stats.st_size),
-            modificationSeconds: Int64(modification.tv_sec),
-            modificationNanoseconds: Int64(modification.tv_nsec)
-        )
+    init(_ result: Result<IconNativeGrid.CubeIndex, IconNativeDomainError>) {
+        self.result = result
     }
 }
 
-private struct IconNativeGridFailureState: Sendable {
-    let fingerprint: IconNativeGridFileFingerprint?
-    let error: IconNativeDomainError
-    let retryAfter: ContinuousClock.Instant
-}
-
-/// One cache per physical grid. Once storage is available the hot path is a single atomic load;
-/// the mutex is used only to single-flight initial loading and throttled recovery from failures.
+/// One cache per physical grid. The first lookup result, including failure, remains fixed for the
+/// process lifetime. Downloader preparation validates and installs artifacts explicitly.
 final class IconNativeGridCache: Sendable {
     private let file: String
     private let identity: IconNativeGridIdentity
-    private let retryInterval: Duration
-    private let storage = AtomicLazyReference<IconNativeGrid.CubeIndex>()
-    private let failure = Mutex<IconNativeGridFailureState?>(nil)
+    private let entry = AtomicLazyReference<IconNativeGridCacheEntry>()
 
-    init(file: String, identity: IconNativeGridIdentity, retryInterval: Duration = .seconds(30)) {
+    init(file: String, identity: IconNativeGridIdentity) {
         self.file = file
         self.identity = identity
-        self.retryInterval = retryInterval
     }
 
     func get() throws -> IconNativeGrid {
-        if let storage = storage.load() {
-            return IconNativeGrid(storage: storage)
-        }
-        return try failure.withLock { failure in
-            // Another cold caller may have completed loading while this caller waited for the lock.
-            if let storage = storage.load() {
-                return IconNativeGrid(storage: storage)
-            }
-            let now = ContinuousClock.now
-            let fingerprint = IconNativeGridFileFingerprint.read(file: file)
-            // Throttle only an unchanged failure. Atomic publication changes inode/size/mtime and
-            // must become visible immediately, while an unchanged artifact is retried after the
-            // interval instead of being rejected forever.
-            if let failure, failure.fingerprint == fingerprint, now < failure.retryAfter {
-                throw failure.error
-            }
-            if let storage = storage.load() {
-                failure = nil
-                return IconNativeGrid(storage: storage)
-            }
-            do {
-                let loaded = try loadStorage(fingerprint: fingerprint)
-                let installed = storage.storeIfNil(loaded)
-                failure = nil
-                return IconNativeGrid(storage: installed)
-            } catch {
-                if let storage = storage.load() {
-                    failure = nil
-                    return IconNativeGrid(storage: storage)
-                }
-                let wrapped = error as? IconNativeDomainError
-                    ?? IconNativeDomainError.invalidGridArtifact(path: file, reason: String(describing: error))
-                failure = IconNativeGridFailureState(
-                    fingerprint: fingerprint,
-                    error: wrapped,
-                    retryAfter: now.advanced(by: retryInterval)
-                )
-                throw wrapped
-            }
-        }
+        let resolved = entry.load() ?? entry.storeIfNil(loadEntry())
+        return IconNativeGrid(storage: try resolved.result.get())
     }
 
-    /// Publish a storage mapping produced by the downloader. A previously loaded mapping remains
-    /// pinned by design; unavailable caches transition immediately without waiting for retry.
+    /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
     func install(_ grid: IconNativeGrid) {
-        _ = storage.storeIfNil(grid.storage)
+        _ = entry.storeIfNil(IconNativeGridCacheEntry(.success(grid.storage)))
     }
 
     /// Downloader-only disk validation. Unlike `get()`, this always inspects the final artifact.
     func validateFileAndInstall() throws {
-        let fingerprint = IconNativeGridFileFingerprint.read(file: file)
-        let loaded = try loadStorage(fingerprint: fingerprint)
-        _ = storage.storeIfNil(loaded)
+        let loaded = try loadStorage()
+        _ = entry.storeIfNil(IconNativeGridCacheEntry(.success(loaded)))
     }
 
-    private func loadStorage(fingerprint: IconNativeGridFileFingerprint?) throws -> IconNativeGrid.CubeIndex {
-        guard fingerprint != nil else {
+    private func loadEntry() -> IconNativeGridCacheEntry {
+        do {
+            return IconNativeGridCacheEntry(.success(try loadStorage()))
+        } catch let error as IconNativeDomainError {
+            return IconNativeGridCacheEntry(.failure(error))
+        } catch {
+            return IconNativeGridCacheEntry(.failure(.invalidGridArtifact(
+                path: file,
+                reason: String(describing: error)
+            )))
+        }
+    }
+
+    private func loadStorage() throws -> IconNativeGrid.CubeIndex {
+        guard FileManager.default.fileExists(atPath: file) else {
             throw IconNativeDomainError.missingGridArtifact(file)
         }
         do {
