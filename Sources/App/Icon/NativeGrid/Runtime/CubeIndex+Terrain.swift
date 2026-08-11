@@ -129,14 +129,7 @@ extension IconNativeGrid.CubeIndex {
             let lowerX = max(requestedLowerX, section.minimumX)
             let upperX = min(requestedUpperX, section.minimumX + section.columns - 1)
             guard lowerX <= upperX else { return }
-            guard let tileShift = bucketLayout.tileShift else {
-                let first = section.bucket(x: lowerX, y: y, tileShift: nil)!
-                scanRange(
-                    directoryPosition(first, bytes: bytes),
-                    directoryPosition(first + upperX - lowerX + 1, bytes: bytes)
-                )
-                return
-            }
+            let tileShift = Artifact.tileShift
             var segmentLowerX = lowerX
             while segmentLowerX <= upperX {
                 let localX = segmentLowerX - section.minimumX
@@ -145,8 +138,7 @@ extension IconNativeGrid.CubeIndex {
                 let segmentUpperX = min(upperX, tileUpperX)
                 let first = section.bucket(
                     x: segmentLowerX,
-                    y: y,
-                    tileShift: tileShift
+                    y: y
                 )!
                 scanRange(
                     directoryPosition(first, bytes: bytes),
@@ -247,8 +239,7 @@ extension IconNativeGrid.CubeIndex {
                 )
                 guard let bucket = faceSections[location.face].bucket(
                     x: location.x,
-                    y: location.y,
-                    tileShift: bucketLayout.tileShift
+                    y: location.y
                 ) else { return }
                 for position in 0..<scannedBucketCount where scannedBuckets[position] == bucket {
                     return

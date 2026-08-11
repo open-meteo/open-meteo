@@ -158,8 +158,8 @@ import Testing
     @Test func artifactUsesSinglePortableFloat32Format() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        #expect(IconNativeGrid.CubeArtifact.magic == Array("ICONCUB4".utf8))
-        #expect(IconNativeGrid.CubeArtifact.version == 4)
+        #expect(IconNativeGrid.CubeArtifact.magic == Array("ICONCUB5".utf8))
+        #expect(IconNativeGrid.CubeArtifact.version == 5)
         #expect(IconNativeGrid.CubeArtifact.globalFlag == 1)
         #expect(IconNativeGrid.CubeArtifact.headerBytes == 144)
         #expect(IconNativeGrid.CubeArtifact.centerStride == 16)
@@ -399,8 +399,6 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
     typealias Artifact = IconNativeGrid.CubeArtifact
     let artifact = try Artifact.open(file: fixture.file)
     let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(artifact.mapped.data))
-    let bucketLayout: Artifact.BucketLayout = artifact.isGlobal ? .tiled8 : .rowMajor
-
     var previous = 0
     for bucket in 0...artifact.bucketCount {
         let current = Artifact.directoryPosition(
@@ -447,8 +445,7 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
         )
         guard let bucket = artifact.faceSections[location.face].bucket(
             x: location.x,
-            y: location.y,
-            tileShift: bucketLayout.tileShift
+            y: location.y
         ) else {
             Issue.record("Center \(cell) falls outside its face section")
             continue
