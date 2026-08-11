@@ -21,6 +21,19 @@ extension IconNativeGrid.CubeIndex {
         to unnormalizedQuery: IconNativeCenter,
         bytes: borrowing RawSpan
     ) -> Int {
+        nearest(
+            to: unnormalizedQuery,
+            maximumDistanceSquared: .infinity,
+            bytes: bytes
+        )!
+    }
+
+    @inline(never)
+    func nearest(
+        to unnormalizedQuery: IconNativeCenter,
+        maximumDistanceSquared distanceLimitSquared: Double,
+        bytes: borrowing RawSpan
+    ) -> Int? {
         let queryNormSquared = unnormalizedQuery.dot(unnormalizedQuery)
         let inverseQueryNorm = 1 / sqrt(queryNormSquared)
         let query = IconNativeCenter(
@@ -36,8 +49,8 @@ extension IconNativeGrid.CubeIndex {
         var candidates = InlineArray<4, ScoreCandidate>(repeating: .empty)
         var candidateCount = 0
         var candidateOverflow = false
-        var bestScore = -Double.infinity
-        var maximumCandidateDistanceSquared = Double.infinity
+        var bestScore = distanceLimitSquared.isFinite ? 1 - distanceLimitSquared * 0.5 : -.infinity
+        var maximumCandidateDistanceSquared = distanceLimitSquared
 
         @inline(__always)
         func scanRange(_ range: Range<Int>) {
@@ -215,7 +228,7 @@ extension IconNativeGrid.CubeIndex {
             }
         }
 
-        precondition(bestScore != -Double.infinity, "ICON cube-bucket index contains no centres")
+        guard candidateCount > 0 else { return nil }
         if candidateOverflow {
             var bestCell = Int.max
             for position in 0..<cellCount {
@@ -225,13 +238,13 @@ extension IconNativeGrid.CubeIndex {
                     bestCell = min(bestCell, candidate.cell)
                 }
             }
-            return bestCell
+            return bestCell == .max ? nil : bestCell
         }
         var bestCell = Int.max
         for position in 0..<candidateCount where candidates[position].cell < bestCell {
             bestCell = candidates[position].cell
         }
-        return bestCell
+        return bestCell == .max ? nil : bestCell
     }
 
     @inline(__always)

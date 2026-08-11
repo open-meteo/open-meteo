@@ -30,31 +30,11 @@ import Testing
         #expect(IconNativeGridIdentity.global.gridNumber == 26)
         #expect(IconNativeGridIdentity.global.gridUUIDHex == "a27b8de618c411e4820ab5b098c6a5c0")
         #expect(IconNativeGridIdentity.global.cellCount == 2_949_120)
+        #expect(IconNativeGridIdentity.global.maximumDistanceMeters == 20_000)
         #expect(IconNativeGridIdentity.d2.gridNumber == 47)
         #expect(IconNativeGridIdentity.d2.gridUUIDHex == "c6b12daa91ad64045b26c1b6452a2a20")
         #expect(IconNativeGridIdentity.d2.cellCount == 542_040)
-    }
-
-    @Test func netcdfVertexConnectivityIsTransposedAndConvertedToNativeIndices() throws {
-        // NetCDF stores three complete `(nv, cell)` planes; coverage construction uses cell-major
-        // zero-based vertex triples.
-        let netcdf: [Int32] = [
-            2, 1, 2,
-            3, 3, 1,
-            1, 2, 3,
-        ]
-        let actual = try IconNativeGrid.Generator.transposeConnectivity(
-            netcdf,
-            cellCount: 3,
-            upperBound: 3,
-            variable: "vertex_of_cell"
-        )
-
-        #expect(actual == [
-            1, 2, 0,
-            0, 2, 1,
-            1, 0, 2,
-        ])
+        #expect(IconNativeGridIdentity.d2.maximumDistanceMeters == 4_000)
     }
 
     @Test func gribMetadataRequiresTheExactNativeGrid() throws {

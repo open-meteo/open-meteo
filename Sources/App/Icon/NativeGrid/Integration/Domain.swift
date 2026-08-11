@@ -11,6 +11,7 @@ struct IconNativeGridIdentity: Sendable, Equatable {
     let gridUUIDHex: String
     let cellCount: Int
     let isGlobal: Bool
+    let maximumDistanceMeters: Float
     let sourceFile: String
 
     static let global = Self(
@@ -19,6 +20,7 @@ struct IconNativeGridIdentity: Sendable, Equatable {
         gridUUIDHex: "a27b8de618c411e4820ab5b098c6a5c0",
         cellCount: 2_949_120,
         isGlobal: true,
+        maximumDistanceMeters: 20_000,
         sourceFile: "icon_grid_0026_R03B07_G.nc.bz2"
     )
 
@@ -28,6 +30,7 @@ struct IconNativeGridIdentity: Sendable, Equatable {
         gridUUIDHex: "c6b12daa91ad64045b26c1b6452a2a20",
         cellCount: 542_040,
         isGlobal: false,
+        maximumDistanceMeters: 4_000,
         sourceFile: "icon_grid_0047_R19B07_L.nc.bz2"
     )
 
