@@ -239,9 +239,10 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .pressure_msl:
             return (1 / 100, 0)
         case .shortwave_radiation:
-            /// Note: This is actually wrong. Correct value would be `1/3600`.
-            /// Data is corrected in the reader afterwards
-            return (3600 / 10_000_000, 0)
+            // Preserve the historically incorrect archive conversion for compatibility.
+            // Readers apply `shortwaveRadiationArchiveCorrectionFactor` to recover
+            // physical W/m² values.
+            return (Self.shortwaveRadiationArchiveStorageFactor, 0)
         default:
             return nil
         }

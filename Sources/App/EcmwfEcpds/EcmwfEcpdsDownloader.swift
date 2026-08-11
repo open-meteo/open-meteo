@@ -290,7 +290,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                                     continue
                                 }
                                 // Scaling before compression with scalefactor
-                                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds, domain: domain) {
                                     data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                                 }
                                 let count = await inMemoryAccumulated.data.count
@@ -301,7 +301,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         }
                         
                         // Scaling before compression with scalefactor. Note: does not set dtSeconds because aggregated data is processed above
-                        if let fma = variable.multiplyAdd(dtSeconds: 0) {
+                        if let fma = variable.multiplyAdd(dtSeconds: 0, domain: domain) {
                             grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         
@@ -444,7 +444,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     }
                     
                     // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds, domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     

@@ -11,13 +11,17 @@ import NIOFileSystem
 enum S3Uploader {
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
     static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
+        var buffer = ByteBufferAllocator().buffer(capacity: data.count)
+        buffer.writeData(data)
+        try await upload(client: client, buffer: buffer, url: url, contentType: contentType)
+    }
+    
+    static func upload(client: HTTPClient, buffer: ByteBuffer, url: String, contentType: String = "application/octet-stream") async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .PUT
-        var body = ByteBufferAllocator().buffer(capacity: data.count)
-        body.writeData(data)
-        request.body = .bytes(body)
+        request.body = .bytes(buffer)
         request.headers.add(name: "Content-Type", value: contentType)
-        request.headers.add(name: "x-amz-content-sha256", value: data.sha256Hex)
+        request.headers.add(name: "x-amz-content-sha256", value: buffer.readableBytesView.sha256Hex)
         // executeRetry extracts credentials from the URL, signs the request with
         // AWS4-HMAC-SHA256 on each attempt, and retries on transient errors.
         let logger = Logger(label: "S3Uploader")
@@ -60,7 +64,7 @@ enum S3Uploader {
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let chunks = data.readChunks(chunkLength: .megabytes(8))
+        let chunks = data.readChunks(chunkLength: .mebibytes(8))
         do {
             let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(executor: executor) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")

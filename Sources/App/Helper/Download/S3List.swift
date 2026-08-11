@@ -83,7 +83,7 @@ enum S3List {
 
 extension StringProtocol {
     /// Interpret the given string as XML and iterate over a list of keys
-    func xmlSection(_ section: String) -> AnySequence<SubSequence> {
+    func xmlSection(_ section: StaticString) -> AnySequence<SubSequence> {
         return AnySequence<SubSequence> { () -> AnyIterator<SubSequence> in
             var pos = startIndex
             return AnyIterator<SubSequence> {
@@ -101,7 +101,7 @@ extension StringProtocol {
     }
 
     /// Interpret the given string as XML and get the first key
-    func xmlFirst(_ section: String) -> SubSequence? {
+    func xmlFirst(_ section: StaticString) -> SubSequence? {
         guard let start = range(of: "<\(section)>", range: startIndex..<endIndex) else {
             return nil
         }

@@ -216,7 +216,7 @@ struct SyncCommand: AsyncCommand {
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
             var request = ClientRequest(url: URI("\(server)\(download.name)"))
             if apikey != nil {
-                try request.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
+                try request.query.encode(S3DataController.DownloadParams(apikey: apikey))
             }
             let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
             let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"

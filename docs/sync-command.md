@@ -14,8 +14,6 @@ Per default, serving the database to clients is disabled. To enable it the follo
 
 1. Set the environment variable `API_SYNC_APIKEYS=mykey123` for the API service. For the Ubuntu packages this can be set in `/etc/default/openmeteo-api.env`. For Docker, it need to be prepended to the Docker command.
 
-2. (OPTIONAL) You can use an nginx server running in front of the API instance which enables the NGINX sendfile feature. This is only recommended for large deployments! The location `/data-internal` needs to be mapped to the open-meteo data directory and the API server started with `NGINX_SENDFILE_PREFIX=data-internal`. IF `NGINX_SENDFILE_PREFIX` is not set, the Open-Meteo API server will send the file directly. The configuration could look like this:
-
 ```nginx
 upstream vapor {
     server 127.0.0.1:8080 fail_timeout=0;

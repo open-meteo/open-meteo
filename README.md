@@ -51,10 +51,12 @@ Apps:
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
 - [CycleWeather](https://cycleweather.app) CycleWeather is a free iOS weather app for cyclists, showing a color-coded 7-day hourly forecast — temperature (feels-like), precipitation, wind, air quality, and UV — with rain alerts and radar, all in one glanceable view.
+- [Drizz.li](https://drizz.li) Open-source and statically-hosted weather site that turns Open-Meteo API data into detailed, localized forecasts with custom charts and an embedded weather map.
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
 - [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
+- [Heat Rules](https://heatrules.com/) A free browser-based calculator for occupational heat exposure limits. Inputs: location, work intensity, acclimatization status. Outputs: work/rest schedule, water intake, and the standard each number comes from.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
@@ -118,6 +120,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - .Net 8 / C#: https://github.com/colinnuk/open-meteo-dotnet-client-sdk
 - Android library for Geocoding API: https://github.com/woheller69/OmGeoDialog
 - Dart / Flutter: https://github.com/neursh/open-meteo-dart
+- Dart / Flutter (all APIs, typed): https://github.com/petyaas/weather_open_meteo_client
 - Go: https://github.com/HectorMalot/omgo
 - Kotlin: https://github.com/open-meteo/open-meteo-api-kotlin
 - PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding

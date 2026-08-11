@@ -437,17 +437,24 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         }
     }
     
-    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int, domain: EcmwfEcpdsDomain) -> (multiply: Float, add: Float)? {
         switch self {
         case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m, .sea_surface_temperature:
             return (1, -273.15)
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            if domain == .aifs_europe_ensemble {
+                // AIFS already in percent from 0-100
+                return nil
+            }
             return (100, 0)
        // case .pressure_msl: // for historical backwards compatibility reasons, pressure is stored in pascal
             //return (1 / 100, 0)
         case .albedo:
             return (100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth:
+            if domain == .aifs_europe_ensemble {
+                return nil
+            }
             return (1000, 0) // meters to millimetre
         case .shortwave_radiation, .shortwave_radiation_clear_sky, .direct_radiation:
             return (1 / Float(dtSeconds), 0) // joules to watt
