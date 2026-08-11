@@ -118,11 +118,6 @@ extension IconNativeGrid {
             }
         }
 
-        @inline(__always)
-        func coordinate(at cell: Int) -> LatLon {
-            centerVector(at: cell).coordinate
-        }
-
         /// Minimal production path. Ties and the uncommon implicit-tree traversal are deliberately
         /// delegated to `nearest`: fewer than two queries per thousand reach that cold path on the
         /// current R3B7 and ICON-D2 artifacts.
