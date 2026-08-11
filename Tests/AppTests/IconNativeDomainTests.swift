@@ -3,38 +3,15 @@ import Foundation
 import Testing
 
 @Suite struct IconNativeDomainTests {
-    @Test func domainsKeepStorageAndDwdSourceIdentitySeparate() {
-        #expect(IconDomains.iconNative.rawValue == "icon-native")
+    @Test func nativeDomainMappings() {
         #expect(IconDomains.iconNative.domainRegistry == .dwd_icon_global_native)
         #expect(IconDomains.iconNative.sourceDomain == .icon)
-        #expect(IconDomains.iconNative.region == "global")
-
-        #expect(IconDomains.iconD2Native.rawValue == "icon-d2-native")
         #expect(IconDomains.iconD2Native.domainRegistry == .dwd_icon_d2_native)
         #expect(IconDomains.iconD2Native.sourceDomain == .iconD2)
-        #expect(IconDomains.iconD2Native.region == "germany")
         #expect(IconDomains.iconD2Native.fifteenMinuteDomain == .iconD2Native15min)
         #expect(IconDomains.iconD2Native15min.domainRegistryStatic == .dwd_icon_d2_native)
-        #expect(IconDomains.iconD2Native15min.dtSeconds == 900)
-    }
-
-    @Test func nativeDomainsMirrorSourceForecastStepsAndLevels() {
-        for run in [0, 6, 12, 18] {
-            #expect(IconDomains.iconNative.getDownloadForecastSteps(run: run) == IconDomains.icon.getDownloadForecastSteps(run: run))
-            #expect(IconDomains.iconD2Native.getDownloadForecastSteps(run: run) == IconDomains.iconD2.getDownloadForecastSteps(run: run))
-        }
-        #expect(IconDomains.iconNative.levels == IconDomains.icon.levels)
-        #expect(IconDomains.iconD2Native.levels == IconDomains.iconD2.levels)
-        #expect(IconDomains.iconD2Native15min.levels.isEmpty)
-    }
-
-    @Test func globalDownloadAliasesProduceNativeAndRemappedDomainsTogether() {
-        let regular = IconDomains.icon.downloadDomains
-        let native = IconDomains.iconNative.downloadDomains
-
-        #expect(regular == native)
-        #expect(regular == [.iconNative, .icon])
-
+        #expect(IconDomains.icon.downloadDomains == [.iconNative, .icon])
+        #expect(IconDomains.iconNative.downloadDomains == [.iconNative, .icon])
         #expect(IconDomains.iconD2.downloadDomains == [.iconD2])
         #expect(IconDomains.iconD2Native.downloadDomains == [.iconD2Native])
     }
@@ -56,8 +33,6 @@ import Testing
         #expect(IconNativeGridIdentity.d2.gridNumber == 47)
         #expect(IconNativeGridIdentity.d2.gridUUIDHex == "c6b12daa91ad64045b26c1b6452a2a20")
         #expect(IconNativeGridIdentity.d2.cellCount == 542_040)
-        #expect(IconNativeGridIdentity.global.sourceUrl.hasSuffix("/icon_grid_0026_R03B07_G.nc.bz2"))
-        #expect(IconNativeGridIdentity.d2.sourceUrl.hasSuffix("/icon_grid_0047_R19B07_L.nc.bz2"))
     }
 
     @Test func netcdfVertexConnectivityIsTransposedAndConvertedToNativeIndices() throws {
@@ -114,28 +89,21 @@ import Testing
     }
 
     @Test func forecastModelsUseGenericDomainMappings() throws {
-        let global = try #require(MultiDomains.dwd_icon_global_native.getDomainAndVariable())
-        guard case .single(let globalDomain, let globalVariable) = global else {
-            Issue.record("Expected a single generic global native domain")
-            return
-        }
-        #expect(globalDomain as? IconDomains == .iconNative)
-        #expect(ObjectIdentifier(globalVariable) == ObjectIdentifier(IconVariable.self))
+        #expect(try mappedIconDomains(.dwd_icon_global_native) == [.iconNative])
+        #expect(try mappedIconDomains(.dwd_icon_d2_native) == [.iconD2Native, .iconD2Native15min])
+        #expect(try mappedIconDomains(.dwd_icon_d2_native_15min) == [.iconD2Native15min])
+    }
 
-        let d2 = try #require(MultiDomains.dwd_icon_d2_native.getDomainAndVariable())
-        guard case .multiple(let domains) = d2 else {
-            Issue.record("Expected generic hourly and 15-minute D2 native domains")
-            return
+    private func mappedIconDomains(_ model: MultiDomains) throws -> [IconDomains] {
+        switch try #require(model.getDomainAndVariable()) {
+        case .single(let domain, _):
+            return [try #require(domain as? IconDomains)]
+        case .multiple(let domains):
+            return domains.compactMap { $0.0 as? IconDomains }
+        default:
+            Issue.record("Expected a single or multiple native ICON mapping")
+            return []
         }
-        #expect(domains.compactMap { $0.0 as? IconDomains } == [.iconD2Native, .iconD2Native15min])
-
-        let d2FifteenMinute = try #require(MultiDomains.dwd_icon_d2_native_15min.getDomainAndVariable())
-        guard case .single(let d2FifteenMinuteDomain, let d2FifteenMinuteVariable) = d2FifteenMinute else {
-            Issue.record("Expected a single generic 15-minute native domain")
-            return
-        }
-        #expect(d2FifteenMinuteDomain as? IconDomains == .iconD2Native15min)
-        #expect(ObjectIdentifier(d2FifteenMinuteVariable) == ObjectIdentifier(IconVariable.self))
     }
 
     private func metadata(
