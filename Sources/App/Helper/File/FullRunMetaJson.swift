@@ -46,7 +46,7 @@ struct FullRunMetaJson: Codable {
     }
 }
 
-enum FullRunMetaFile: RemoteFileManageableJson {
+enum FullRunMetaFile/*: RemoteFileManageableJson*/ {
     typealias Value = FullRunMetaJson
     
     case latest(DomainRegistry)
@@ -85,4 +85,12 @@ enum FullRunMetaFile: RemoteFileManageableJson {
             return "\(directory)\(run.format_directoriesYYYYMMddhhmm)/meta.json"
         }
     }
+}
+
+extension FullRunMetaFile: RemoteFileManageable2 {
+    typealias Payload = FullRunMetaJson
+}
+
+extension FullRunMetaJson: FileSystemPayloadCodable {
+
 }

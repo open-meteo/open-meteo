@@ -2,7 +2,7 @@ import OmFileFormat
 import Foundation
 
 /// A simplified interface to cache JSON files
-protocol RemoteFileManageableJson: RemoteFileManageable where Value: Decodable { }
+/*protocol RemoteFileManageableJson: RemoteFileManageable where Value: Decodable { }
 
 extension RemoteFileManageableJson {
     func makeLocalReader(file: MmapFile) async throws -> LocalFileRepresentableSimple<Value> {
@@ -39,3 +39,4 @@ struct LocalFileRepresentableSimple<Value: Sendable>: LocalFileRepresentable {
         return value
     }
 }
+*/

@@ -2,6 +2,57 @@ import OmFileFormat
 import Vapor
 import Synchronization
 
+/**
+ Keep a file system tree in user-space memory. File and directory handles are kept open. Payloads can be associated which are also kept in memory.
+ 
+ Additionally files from a remote S3 server can be cached. The S3 directory tree is periodically updated.
+ */
+final class RemoteFileManager: Sendable {
+    public static let instance = RemoteFileManager()
+    
+    private let localFileSystem: FileSystemCache.DirectoryEntry
+    
+    private let remoteFileSystem: S3Inventory?
+    
+    private init() {
+        self.localFileSystem = try! .makeOmRoot()
+        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { S3Inventory(server: $0) }
+    }
+    
+    func with<R, Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+        
+        /// should be `data/model/variable/file.om`
+        let path = file.getFilePath()
+        assert(path.hasPrefix("/") == false)
+        if let object = await localFileSystem.getFileTraversing(name: path[...]) {
+            let payload = try await object.getPayload(ofType: Key.Payload.self)
+            return try await fn(payload)
+        }
+        guard let remoteFileSystem else {
+            return nil
+        }
+        /// Check for remote file
+        guard let client, let object = try await remoteFileSystem.getObject(path: path, client: client, logger: logger) else {
+            return nil
+        }
+        return try await object.with(client: client, logger: logger, server: remoteFileSystem.server, objectKey: path, fn: fn)
+    }
+    
+    /// Check if the file is available locally or remotely.
+    /// `with<R>()` is recommended to automatically reload files if they are modified during execution
+    /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
+    func get<Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Payload? {
+        return try await self.with(file: file, client: client, logger: logger) {
+            return $0
+        }
+    }
+    
+    /// Called every second from a life cycle handler on an available thread
+    func backgroundTask(application: Application) async throws {
+        await remoteFileSystem?.lifeCycleTick(application: application)
+    }
+}
+/*
 
 /**
  Keep track of local and remote OM files. If a OM file is locally available, use it, otherwise check a remote http endpoint.
@@ -21,13 +72,13 @@ import Synchronization
  - Support multiple cache files. Could be useful if multiple NVMe drive are available for caching
  - Support cache tiering for HDD + NVME cache
  */
-final class RemoteFileManager: Sendable {
-    public static let instance = RemoteFileManager()
+final class RemoteFileManagerOld: Sendable {
+    public static let instance = RemoteFileManagerOld()
     
     /// Isolate requests to files
     private let cache = RemoteFileManagerCache()
     
-    func with2<R, Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+    func with<R, Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         
         let local = try! FileSystemCache.DirectoryEntry(path: "/some/path")
         let remote = S3Inventory(server: "https://key:secret@bucket.s3.amazonaws.com/")
@@ -46,15 +97,24 @@ final class RemoteFileManager: Sendable {
         return try await object.with(client: client, logger: logger, server: remote.server, objectKey: path, fn: fn)
     }
     
+    /// Check if the file is available locally or remotely.
+    /// `with<R>()` is recommended to automatically reload files if they are modified during execution
+    /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
+    func get<Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Payload? {
+        return try await self.with(file: file, client: client, logger: logger) {
+            return $0
+        }
+    }
+    
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
-    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
-        guard let value = try await get(file: file, client: client, logger: logger, forceNew: false) else {
+    func withOld<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
+        guard let value = try await getOld(file: file, client: client, logger: logger, forceNew: false) else {
             return nil
         }
         do {
             return try await fn(value)
         } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
-            guard let value = try await get(file: file, client: client, logger: logger, forceNew: true) else {
+            guard let value = try await getOld(file: file, client: client, logger: logger, forceNew: true) else {
                 return nil
             }
             return try await fn(value)
@@ -64,7 +124,7 @@ final class RemoteFileManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
+    func getOld<Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
         guard let backend = try await cache.get(key: file, client: client, logger: logger, forceNew: forceNew) else {
             return nil
         }
@@ -249,14 +309,6 @@ final class RemoteFileManager: Sendable {
     }
 }
 
-
-protocol RemoteFileManageable2: Sendable, Hashable {
-    associatedtype Payload: FileSystemPayload
-
-    //func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int
-    func getFilePath() -> String
-}
-
 fileprivate enum LocalOrRemote: Sendable {
     case local(any LocalFileRepresentable)
     case remote(any RemoteFileRepresentable)
@@ -337,7 +389,7 @@ fileprivate final actor RemoteFileManagerCache {
             cache[key] = .running([])
             do {
                 OmMetrics.fileCacheCurrentlyOpeningFiles.add(1, ordering: .relaxed)
-                let (data, lastValidated) = try await RemoteFileManager.open(key: key.key, client: client, logger: logger, forceNew: forceNew)
+                let (data, lastValidated) = try await RemoteFileManagerOld.open(key: key.key, client: client, logger: logger, forceNew: forceNew)
                 guard case .running(let queued) = cache.updateValue(.cached(.init(value: data, lastValidated: lastValidated)), forKey: key) else {
                     fatalError("State was not .running()")
                 }
@@ -461,3 +513,4 @@ fileprivate extension RemoteFileManageable {
         }
     }
 }
+*/

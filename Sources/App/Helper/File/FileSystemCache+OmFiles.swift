@@ -30,31 +30,24 @@ extension OmFileLocalRemoteOmReader: FileSystemPayload {
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }
     
-    init(client: HTTPClient, logger: Logger, server: String, objectKey: String, size: Int64, lastModified: Timestamp) async throws {
-        let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: Int(size), lastModified: lastModified, eTag: nil, lastValidated: .now())
-        
-        let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
+    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
         try await self.init(remoteFile: file)
     }
     
-    func remoteUpdated(client: HTTPClient, logger: Logger, server: String, objectKey: String, size: Int64, lastModified: Timestamp) async throws -> OmFileLocalRemoteOmReader {
+    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileLocalRemoteOmReader {
         // Mark the old file as deleted/modified.
         // Cached queries still work, but new queries will immediately throw an error without unnecessarily doing HTTP requests.
         guard let reader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {
             fatalError("remoteUpdated cannot be called on a non-OmFileRemoteOmReader")
         }
-        let fn = reader.fn
         
         let logger = reader.fn.backend.logger
         let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
         
-        let newBackend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: Int(size), lastModified: lastModified, eTag: nil, lastValidated: .now())
-        let newBackendCached = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: newBackend, cache: OpenMeteo.dataBlockCache, cacheKey: newBackend.cacheKey)
-        
-        try await newBackendCached.preloadBlocks(blocks: activeBlocks)
-        let deletedBlocks = fn.deleteCachedBlocks(olderThanSeconds: 60)
+        try await file.preloadBlocks(blocks: activeBlocks)
+        let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
         logger.warning("OmFileRemoteOmReader: Updated file. \(deletedBlocks) previously cached blocks have been deleted. \(activeBlocks.count) active blocks preloaded")
-        return try await OmFileLocalRemoteOmReader(remoteFile: newBackendCached)
+        return try await OmFileLocalRemoteOmReader(remoteFile: file)
     }
     
     func remoteDeleted() async throws {
@@ -65,4 +58,8 @@ extension OmFileLocalRemoteOmReader: FileSystemPayload {
         let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
         logger.warning("OmFileRemoteOmReader: File deleted from server. \(deletedBlocks) previously cached blocks have been deleted.")
     }
+}
+
+extension OmFileType: RemoteFileManageable2 {
+    typealias Payload = OmFileLocalRemoteOmReader
 }

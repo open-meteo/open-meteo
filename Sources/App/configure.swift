@@ -17,7 +17,7 @@ enum OpenMeteo {
     /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
     static let remoteDataDirectory: String? = {
         if let dir = Environment.get("REMOTE_DATA_DIRECTORY") {
-            guard dir.starts(with: "http") else {
+            guard dir.starts(with: "http") || dir.starts(with: "s3://") else {
                 fatalError("REMOTE_DATA_DIRECTORY must start with 'http'")
             }
             guard dir.last == "/" else {

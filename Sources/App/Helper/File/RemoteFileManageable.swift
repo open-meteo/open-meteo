@@ -3,7 +3,7 @@ import Foundation
 import Vapor
 
 /// Represents a "File" that could be read from local or remote
-protocol RemoteFileManageable: Sendable, Hashable {
+/*protocol RemoteFileManageable: Sendable, Hashable {
     associatedtype Value: Sendable
     associatedtype Local: LocalFileRepresentable<Value>
     associatedtype Remote: RemoteFileRepresentable<Value>
@@ -27,4 +27,45 @@ protocol LocalFileRepresentable<Value>: Sendable {
     associatedtype Value
     var fn: MmapFile { get }
     func cast() -> Value
+}*/
+
+
+protocol RemoteFileManageable2 {
+    associatedtype Payload: FileSystemPayload
+
+    //func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int
+    func getFilePath() -> String
+}
+
+protocol FileSystemPayloadCodable: FileSystemPayload, Codable {
+}
+
+enum FileSystemError: Error {
+    case readFailed
+}
+
+extension FileSystemPayloadCodable {
+    init(fd: FileHandle, size: Int64) async throws {
+        guard let data = try fd.readToEnd() else {
+            throw FileSystemError.readFailed
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        self = try decoder.decode(Self.self, from: data)
+    }
+    
+    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
+        let buffer = try await file.getData(offset: 0, count: file.count)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        self = try decoder.decode(Self.self, from: buffer)
+    }
+    
+    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self {
+        return try await Self(file: file)
+    }
+    
+    func remoteDeleted() async throws {
+        return
+    }
 }

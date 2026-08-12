@@ -4,6 +4,7 @@ import Foundation
 import AsyncHTTPClient
 import Logging
 //import NIOFileSystem
+import OmFileFormat
 
 #if os(Linux)
 import Glibc
@@ -37,11 +38,24 @@ import Darwin
  */
 enum FileSystemCache {
     actor DirectoryEntry: Sendable {
-        let fd: FileHandle
+        let fd: FileHandle?
         let inode: UInt64
         var lastRefreshTimestamp: UInt64
         var files: [String: FileEntry]
         var directories: [String: DirectoryEntry]
+        
+        /// Make om root directory with data, data_run and data_spatial
+        static func makeOmRoot() throws -> DirectoryEntry {
+            var directories = [String: DirectoryEntry]()
+            directories["data"] = try DirectoryEntry(path: OpenMeteo.dataDirectory)
+            if let dataRunDirectory = OpenMeteo.dataRunDirectory {
+                directories["data_run"] = try DirectoryEntry(path: dataRunDirectory)
+            }
+            if let dataSpatialDirectory = OpenMeteo.dataSpatialDirectory {
+                directories["data_spatial"] = try DirectoryEntry(path: dataSpatialDirectory)
+            }
+            return DirectoryEntry(directories: directories)
+        }
         
         init(fd: FileHandle, inode: UInt64) {
             self.fd = fd
@@ -49,6 +63,14 @@ enum FileSystemCache {
             self.files = [:]
             self.directories = [:]
             lastRefreshTimestamp = 0
+        }
+        
+        init(directories: [String: DirectoryEntry]) {
+            self.fd = nil
+            self.inode = 0
+            self.lastRefreshTimestamp = 0
+            self.directories = directories
+            self.files = [:]
         }
         
         init(path: String) throws {
@@ -71,7 +93,9 @@ enum FileSystemCache {
         
         /// Updates files and directories by listing all files. Existing files are checked if the same inode is used.
         func update() throws {
-            let fd = FileHandle(fileDescriptor: dup(fd.fileDescriptor))
+            guard let fd = fd.map({FileHandle(fileDescriptor: dup($0.fileDescriptor))}) else {
+                return
+            }
             let dir = fdopendir(fd.fileDescriptor)
             guard let dir else {
                 throw Errno(rawValue: errno)
@@ -263,9 +287,8 @@ protocol FileSystemPayload: Sendable {
     init(fd: FileHandle, size: Int64) async throws
     
     /// Initialise from remote source
-    // TODO extent by etag
-    init(client: HTTPClient, logger: Logger, server: String, objectKey: String, size: Int64, lastModified: Timestamp) async throws
-    func remoteUpdated(client: HTTPClient, logger: Logger, server: String, objectKey: String, size: Int64, lastModified: Timestamp) async throws -> Self
+    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws
+    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self
     func remoteDeleted() async throws
 }
 

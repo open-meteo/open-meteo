@@ -12,7 +12,7 @@ enum OmFileSeriesType: String {
     case rolling
 }
 
-enum OmFileType: Hashable, RemoteFileManageable {
+enum OmFileType /*: Hashable, RemoteFileManageable*/ {
     /// Timestamps are set for "data_run" files, timerangeDt is set for ensemble "rolling" files
     typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?)
     
@@ -22,7 +22,7 @@ enum OmFileType: Hashable, RemoteFileManageable {
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
     
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteOmReader {
+    /*func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteOmReader {
         let reader = try await OmFileReader(fn: file)
         let arrayReader = try reader.expectArray(of: Float.self)
         let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
@@ -36,7 +36,7 @@ enum OmFileType: Hashable, RemoteFileManageable {
         let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         let timerangeDt = try await reader.getTimeRangeDt()
         return OmFileLocalOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
-    }
+    }*/
 
     /// Assemble the full file system path
     func getFilePath() -> String {
@@ -102,7 +102,7 @@ enum OmFileType: Hashable, RemoteFileManageable {
     }
     
     /// Get the remote URL. May replace "data" with "data_run"
-    func getRemoteUrl() -> String? {
+    /*func getRemoteUrl() -> String? {
         guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
             return nil
         }
@@ -115,7 +115,7 @@ enum OmFileType: Hashable, RemoteFileManageable {
         case .staticFile(domain: _, _, _):
             return "\(remoteDirectory)\(file)"
         }
-    }
+    }*/
     
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePath() -> String {
@@ -152,7 +152,7 @@ enum OmFileType: Hashable, RemoteFileManageable {
 
 }
 
-extension RemoteFileManageable {
+extension RemoteFileManageable2 {
     func createDirectory() throws {
         let file = getFilePath()
         guard let last = file.lastIndex(of: "/") else {
@@ -168,7 +168,7 @@ extension RemoteFileManageable {
     }
 }
 
-struct OmFileRemoteOmReader: RemoteFileRepresentable {
+/*struct OmFileRemoteOmReader: RemoteFileRepresentable {
     let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
     let timestamps: [Timestamp]?
     let timeRangeDt: TimerangeDt?
@@ -194,7 +194,7 @@ struct OmFileLocalOmReader: LocalFileRepresentable {
     func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
         return (reader, timestamps, timeRangeDt)
     }
-}
+}*/
 
 extension OmFileReaderArrayProtocol where OmType == Float {
     /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series

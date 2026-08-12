@@ -4,6 +4,7 @@ import Logging
 import NIO
 import NIOConcurrencyHelpers
 import Vapor
+import OmFileFormat
 
 /**
  Caches metadata for objects and directories of an S3 server
@@ -45,6 +46,18 @@ struct S3Inventory {
         }
         let prefix = path[path.startIndex..<objectStart]
         return try await directory.getFile(name: object, server: server, prefix: prefix, client: client, logger: logger)
+    }
+    
+    func lifeCycleTick(application: Application) async {
+        await self.root.lifecycleTick(
+            client: application.dedicatedHttpClient,
+            logger: application.logger,
+            server: server,
+            prefix: "",
+            now: .now,
+            revalidateIntervalSeconds: 120,
+            inactiveSkipSeconds: 30 * 60
+        )
     }
 }
 
@@ -101,7 +114,9 @@ actor S3File {
         case .ready(let old):
             payload = .updating(old: old, [])
             do {
-                let new = try await old.remoteUpdated(client: client, logger: logger, server: server, objectKey: objectKey, size: Int64(contentLength), lastModified: lastModified)
+                let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: nil, lastValidated: .now())
+                let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
+                let new = try await old.remoteUpdated(file: file)
                 guard case .updating(_, let queued) = payload else {
                     fatalError("State was not .updating()")
                 }
@@ -194,7 +209,10 @@ actor S3File {
         case .none:
             self.payload = .initialising([])
             do {
-                let p = try await T(client: client, logger: logger, server: server, objectKey: objectKey, size: Int64(contentLength), lastModified: lastModified)
+                // TODO etag support
+                let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: nil, lastValidated: .now())
+                let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
+                let p = try await T(file: file)
                 guard case .initialising(let queued) = payload else {
                     fatalError("State was not .initialising()")
                 }
@@ -252,7 +270,9 @@ actor S3File {
                 let meta = try await Self.fetchMeta(client: client, logger: logger, server: server, objectKey: objectKey)
                 self.contentLength = meta.contentLength
                 self.lastModified = meta.lastModified
-                let new = try await payload.remoteUpdated(client: client, logger: logger, server: server, objectKey: objectKey, size: Int64(contentLength), lastModified: lastModified)
+                let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: nil, lastValidated: .now())
+                let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
+                let new = try await payload.remoteUpdated(file: file)
                 guard case .updating(old: _, let queued) = self.payload else {
                     fatalError("State was not .updating()")
                 }
@@ -417,7 +437,7 @@ actor S3Directory {
     }
 }
 
-extension Application {
+/*extension Application {
     /// Create S3 inventory instance and start background watcher to get modifications
     func makeS3Inventory(server: String) async throws -> S3Inventory {
         let inventory = S3Inventory(server: server)
@@ -467,7 +487,7 @@ final class S3InventoryLifecycleManager: LifecycleHandler {
             $0?.cancel()
         }
     }
-}
+}*/
 
 private extension String {
     /// Percent-encode each path segment but keep directory separators.

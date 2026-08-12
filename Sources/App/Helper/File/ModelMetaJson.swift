@@ -132,7 +132,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
     }
 }
 
-struct ModelUpdateMetaFile: RemoteFileManageableJson {
+struct ModelUpdateMetaFile/*: RemoteFileManageableJson*/ {
     typealias Value = ModelUpdateMetaJson
     let domain: DomainRegistry
     
@@ -150,4 +150,12 @@ struct ModelUpdateMetaFile: RemoteFileManageableJson {
         }
         return "\(directory)static/meta.json"
     }
+}
+
+extension ModelUpdateMetaFile: RemoteFileManageable2 {
+    typealias Payload = ModelUpdateMetaJson
+}
+
+extension ModelUpdateMetaJson: FileSystemPayloadCodable {
+
 }

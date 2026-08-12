@@ -60,8 +60,8 @@ struct Dem90: GenericDomain {
         var value: Float = .nan
         
         let file = OmFileType.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
-        try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-            try await reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
+        try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+            try await omFile.reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
         }
         return value
     }
