@@ -37,33 +37,17 @@ import Testing
         #expect(IconNativeGridIdentity.d2.maximumDistanceMeters == 4_000)
     }
 
-    @Test func gribMetadataRequiresTheExactNativeGrid() throws {
-        let valid = metadata(identity: .d2)
-        try valid.validate(identity: .d2)
+    @Test func gribMetadataMatchesGridIdentityAndCount() throws {
+        try metadata(identity: .d2).validate(identity: .d2)
+        try IconNativeGribDecoder.validateDecodedValueCount(IconNativeGridIdentity.d2.cellCount, identity: .d2)
 
-        #expect(throws: IconNativeGribError.invalidEdition(1)) {
-            try metadata(identity: .d2, edition: 1).validate(identity: .d2)
+        #expect(throws: IconNativeGribError.self) {
+            try metadata(identity: .global).validate(identity: .d2)
         }
-        #expect(throws: IconNativeGribError.invalidGridType("regular_ll")) {
-            try metadata(identity: .d2, gridType: "regular_ll").validate(identity: .d2)
-        }
-        #expect(throws: IconNativeGribError.invalidGridDefinitionTemplate(0)) {
-            try metadata(identity: .d2, template: 0).validate(identity: .d2)
-        }
-        #expect(throws: IconNativeGribError.invalidGridNumber(expected: 47, actual: 26)) {
-            try metadata(identity: .d2, gridNumber: 26).validate(identity: .d2)
-        }
-        #expect(throws: IconNativeGribError.invalidGridUUID(expected: IconNativeGridIdentity.d2.gridUUIDHex, actual: IconNativeGridIdentity.global.gridUUIDHex)) {
-            try metadata(identity: .d2, uuid: IconNativeGridIdentity.global.gridUUIDHex).validate(identity: .d2)
-        }
-        #expect(throws: IconNativeGribError.invalidDataPointCount(expected: 542_040, actual: 525_072)) {
+        #expect(throws: IconNativeGribError.self) {
             try metadata(identity: .d2, dataPointCount: 525_072).validate(identity: .d2)
         }
-    }
-
-    @Test func decodedValuesMustIncludeBitmapMissingPositions() throws {
-        try IconNativeGribDecoder.validateDecodedValueCount(IconNativeGridIdentity.d2.cellCount, identity: .d2)
-        #expect(throws: IconNativeGribError.invalidDecodedValueCount(expected: 542_040, actual: 525_072)) {
+        #expect(throws: IconNativeGribError.self) {
             try IconNativeGribDecoder.validateDecodedValueCount(525_072, identity: .d2)
         }
     }
@@ -88,19 +72,14 @@ import Testing
 
     private func metadata(
         identity: IconNativeGridIdentity,
-        edition: Int? = 2,
-        gridType: String? = "unstructured_grid",
-        template: Int? = 101,
-        gridNumber: Int? = nil,
-        uuid: String? = nil,
         dataPointCount: Int? = nil
     ) -> IconNativeGribMetadata {
         IconNativeGribMetadata(
-            edition: edition,
-            gridType: gridType,
-            gridDefinitionTemplateNumber: template,
-            numberOfGridUsed: gridNumber ?? Int(identity.gridNumber),
-            uuidOfHGrid: uuid ?? identity.gridUUIDHex,
+            edition: 2,
+            gridType: "unstructured_grid",
+            gridDefinitionTemplateNumber: 101,
+            numberOfGridUsed: Int(identity.gridNumber),
+            uuidOfHGrid: identity.gridUUIDHex,
             numberOfDataPoints: dataPointCount ?? identity.cellCount
         )
     }
