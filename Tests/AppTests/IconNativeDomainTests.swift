@@ -53,20 +53,28 @@ import Testing
     }
 
     @Test func forecastModelsUseGenericDomainMappings() throws {
-        #expect(try mappedIconDomains(.dwd_icon_global_native) == [.iconNative])
-        #expect(try mappedIconDomains(.dwd_icon_d2_native) == [.iconD2Native, .iconD2Native15min])
-        #expect(try mappedIconDomains(.dwd_icon_d2_native_15min) == [.iconD2Native15min])
-    }
-
-    private func mappedIconDomains(_ model: MultiDomains) throws -> [IconDomains] {
-        switch try #require(model.getDomainAndVariable()) {
-        case .single(let domain, _):
-            return [try #require(domain as? IconDomains)]
-        case .multiple(let domains):
-            return domains.compactMap { $0.0 as? IconDomains }
+        switch try #require(MultiDomains.dwd_icon_global_native.getDomainAndVariable()) {
+        case .singleWithPrecipitationProbability(let domain, _, let precipitationProbability):
+            #expect(try #require(domain as? IconDomains) == .iconNative)
+            #expect(try #require(precipitationProbability as? IconDomains) == .iconEps)
         default:
-            Issue.record("Expected a single or multiple native ICON mapping")
-            return []
+            Issue.record("Expected native ICON global with precipitation probability")
+        }
+
+        switch try #require(MultiDomains.dwd_icon_d2_native.getDomainAndVariable()) {
+        case .singleWithSupplementalDomains(let domain, _, let supplemental, let precipitationProbability):
+            #expect(try #require(domain as? IconDomains) == .iconD2Native)
+            #expect(supplemental.compactMap { $0.0 as? IconDomains } == [.iconD2Native15min])
+            #expect(try #require(precipitationProbability as? IconDomains) == .iconD2Eps)
+        default:
+            Issue.record("Expected native ICON-D2 with supplemental 15-minute data and precipitation probability")
+        }
+
+        switch try #require(MultiDomains.dwd_icon_d2_native_15min.getDomainAndVariable()) {
+        case .single(let domain, _):
+            #expect(try #require(domain as? IconDomains) == .iconD2Native15min)
+        default:
+            Issue.record("Expected native ICON-D2 15-minute domain")
         }
     }
 

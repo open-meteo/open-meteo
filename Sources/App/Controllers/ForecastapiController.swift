@@ -1081,12 +1081,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getDomainAndVariable() -> DomainReaderMapping? {
         switch self {
         case .dwd_icon_global_native:
-            return .single(IconDomains.iconNative, IconVariable.self)
+            return .singleWithPrecipitationProbability(
+                IconDomains.iconNative,
+                IconVariable.self,
+                precipitationProb: IconDomains.iconEps
+            )
         case .dwd_icon_d2_native:
-            return .multiple([
-                (IconDomains.iconD2Native, IconVariable.self),
-                (IconDomains.iconD2Native15min, IconVariable.self)
-            ])
+            return .singleWithSupplementalDomains(
+                IconDomains.iconD2Native,
+                IconVariable.self,
+                supplemental: [(IconDomains.iconD2Native15min, IconVariable.self)],
+                precipitationProb: IconDomains.iconD2Eps
+            )
         case .dwd_icon_d2_native_15min:
             return .single(IconDomains.iconD2Native15min, IconVariable.self)
         case .ncep_aigfs025:
