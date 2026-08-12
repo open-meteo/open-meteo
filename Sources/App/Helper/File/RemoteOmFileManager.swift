@@ -21,7 +21,25 @@ final class RemoteFileManager: Sendable {
     
     enum FileType {
         case local(FileSystemCache.FileEntry)
-        case remote(S3File)
+        case remote(OmHttpReaderBackend)
+        
+        var modificationTime: Date {
+            switch self {
+            case .local(let fileEntry):
+                return fileEntry.modificationTimestamp
+            case .remote(let s3File):
+                return s3File.lastModifiedTimestamp!.toDate()
+            }
+        }
+        
+        var size: Int64 {
+            switch self {
+            case .local(let fileEntry):
+                return fileEntry.size
+            case .remote(let s3File):
+                return Int64(s3File.count)
+            }
+        }
     }
     
     func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (Date, Int64)])? {
@@ -45,8 +63,9 @@ final class RemoteFileManager: Sendable {
         if let file = await localFileSystem.getObject(path: path) {
             return .local(file)
         }
-        if let file = try await remoteFileSystem?.getObject(path: path, client: client, logger: logger) {
-            return .remote(file)
+        if let remoteFileSystem, let file = try await remoteFileSystem.getObject(path: path, client: client, logger: logger) {
+            let http = OmHttpReaderBackend(client: client, logger: logger, url: "\(remoteFileSystem.server)\(path)", count: await file.contentLength, lastModified: await file.lastModified, eTag: nil, lastValidated: .now())
+            return .remote(http)
         }
         return nil
     }

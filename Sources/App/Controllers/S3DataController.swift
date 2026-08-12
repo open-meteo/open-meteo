@@ -3,6 +3,7 @@ import Vapor
 import AsyncHTTPClient
 import NIOCore
 import NIOFileSystem
+@_spi(Testing) import NIOFileSystem
 
 /**
  Expose database as S3 endpoint. This can be used to pull data from one server to another. It is used only internally to transfer data between Open-Meteo API nodes. Note: This is only a limited implementation and not fully compatible.
@@ -134,58 +135,36 @@ struct S3DataController: RouteCollection {
             OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
             throw RateLimitError.serviceOverloaded
         }
+        guard req.url.path.hasPrefix("/"), req.url.path.hasSuffix("/") == false, req.url.path.onlyContainsAlphanumericDashSlashDot else {
+            throw S3ApiError.forbidden
+        }
+        let isJson = req.url.path.hasSuffix(".json")
+        
+        let mediaType = isJson ? HTTPMediaType.json : .binary
         if req.url.host == "data-spatial.open-meteo.com" {
             return try await req.withFreeApiRateLimiter(fn: { _ in
                 try validateAllowedReferer(req)
-                let path = req.url.path
-                guard path.hasPrefix("/data_spatial") else {
+                let path = String(req.url.path.dropFirst(1))
+                guard path.hasPrefix("data_spatial/") else {
                     throw S3ApiError.forbidden
                 }
-                guard let absolutePath = resolveObjectPath(path) else {
-                    throw S3ApiError.forbidden
+                guard let file = try await RemoteFileManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger) else {
+                    throw CurlError.fileNotFound
                 }
-                return (1, try await req.fileio.asyncStreamFile(at: absolutePath))
+                return (1, try await req.asyncStreamFile(file: file, mediaType: mediaType))
             })
         }
-        
         let params = try req.query.decode(DownloadParams.self)
-        let path = req.url.path.dropPrefix("/openmeteo")
-        guard let absolutePath = resolveObjectPath(path) else {
-            throw S3ApiError.forbidden
-        }
+        let path = String(req.url.path.dropFirst(1).dropPrefix("openmeteo/"))
         
-        let isJson = path.hasSuffix(".json")
         if !isJson {
             try authorizeReadRequest(req: req, apikey: params.apikey)
         }
         
-        guard let pathNoRoot = path.split(separator: "/").dropFirst().joined(separator: "/").nilIfEmpty else {
-            throw S3ApiError.forbidden
+        guard let file = try await RemoteFileManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger) else {
+            throw CurlError.fileNotFound
         }
-        
-        /// TODO consider caching
-        if let remote = OpenMeteo.remoteDataDirectory,
-           let modelStr = pathNoRoot.firstIndex(of: "/").map({ pathNoRoot[..<$0] }),
-           let _ = DomainRegistry(rawValue: String(modelStr))
-        {
-            var request = HTTPClientRequest(url: "\(remote)\(pathNoRoot)")
-            try request.applyS3Credentials()
-            let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
-            let r = Response(status: response.status, body: .init(asyncStream: { writer in
-                do {
-                    for try await buffer in response.body {
-                        try await writer.write(.buffer(buffer))
-                    }
-                    try await writer.write(.end)
-                } catch {
-                    try? await writer.write(.error(error))
-                }
-            }))
-            r.headers.contentType = response.headers.contentType
-            return r
-        }
-        let response = try await req.fileio.asyncStreamFile(at: absolutePath)
-        return response
+        return try await req.asyncStreamFile(file: file, mediaType: mediaType)
     }
     
     func putObject(_ req: Request) async throws -> Response {
@@ -709,28 +688,6 @@ extension S3List.ListV2Query {
         </ListBucketResult>
         """))
     }
-    
-    private func resolveListPath(_ path: String) -> String? {
-        guard !path.isEmpty,
-              path.last == "/",
-              !path.hasPrefix("/"),
-              !path.contains("//"),
-              !path.contains(".."),
-              path.onlyContainsAlphanumericDashSlashDot else {
-            return nil
-        }
-        let directory: Substring
-        if path.starts(with: "data/") {
-            directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
-        } else if path.starts(with: "data_run/") {
-            directory = (OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")).dropLast("/data_run/".count)
-        } else if path.starts(with: "data_spatial/") {
-            directory = (OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")).dropLast("/data_spatial/".count)
-        } else {
-            return nil
-        }
-        return "\(directory)/\(path)"
-    }
 }
 
 fileprivate extension String {
@@ -937,12 +894,14 @@ extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }
-    
-    func dropPrefix(_ prefix: String) -> String {
+}
+
+extension StringProtocol {
+    func dropPrefix(_ prefix: String) -> some StringProtocol {
         if self.starts(with: prefix) {
-            return String(self.dropFirst(prefix.count))
+            return self.dropFirst(prefix.count)
         }
-        return self
+        return self[...]
     }
 }
 
@@ -960,4 +919,142 @@ extension DateFormatter {
         dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.000'Z'"
         return dateFormat
     }()
+}
+
+
+extension Request {
+    func asyncStreamFile(
+        file: RemoteFileManager.FileType,
+        chunkSize: Int = NonBlockingFileIO.defaultChunkSize,
+        mediaType: HTTPMediaType,
+        advancedETagComparison: Bool = false,
+        onCompleted: @escaping @Sendable (Result<Void, Error>) async throws -> () = { _ in }
+    ) async throws -> Response {
+        let request = self
+        // Get file attributes for this file.
+//        guard let fileInfo = try await FileSystem.shared.info(forFileAt: .init(path)) else {
+//            throw Abort(.internalServerError)
+//        }
+
+        let contentRange: HTTPHeaders.Range?
+        if let rangeFromHeaders = request.headers.range {
+            if rangeFromHeaders.unit == .bytes && rangeFromHeaders.ranges.count == 1 {
+                contentRange = rangeFromHeaders
+            } else {
+                contentRange = nil
+            }
+        } else if request.headers.contains(name: .range) {
+            // Range header was supplied but could not be parsed i.e. it was invalid
+            request.logger.debug("Range header was provided in request but was invalid")
+            throw Abort(.badRequest)
+        } else {
+            contentRange = nil
+        }
+
+        // Generate ETag value, "last modified date in epoch time" + "-" + "file size"
+        let eTag = "\"\(file.modificationTime.timeIntervalSince1970)-\(file.size)\""
+        
+        // Create empty headers array.
+        var headers: HTTPHeaders = [:]
+
+        // Respond with lastModified header
+        headers.lastModified = HTTPHeaders.LastModified(file.modificationTime)
+
+        headers.replaceOrAdd(name: .eTag, value: eTag)
+
+        // Check if file has been cached already and return NotModified response if the etags match
+        if eTag == request.headers.first(name: .ifNoneMatch) {
+            // Per RFC 9110 here: https://www.rfc-editor.org/rfc/rfc9110.html#status.304
+            // and here: https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
+            // A 304 response MUST include the ETag header and a Content-Length header matching what the original resource's content length would have been were this a 200 response.
+            headers.replaceOrAdd(name: .contentLength, value: file.size.description)
+            return Response(status: .notModified, version: .http1_1, headersNoUpdate: headers, body: .empty)
+        }
+
+        // Create the HTTP response.
+        let response = Response(status: .ok, headers: headers)
+        let offset: Int64
+        let byteCount: Int
+        if let contentRange = contentRange {
+            response.status = .partialContent
+            response.headers.add(name: .accept, value: contentRange.unit.serialize())
+            if let firstRange = contentRange.ranges.first {
+                do {
+                    let range = try firstRange.asResponseContentRange(limit: Int(file.size))
+                    response.headers.contentRange = HTTPHeaders.ContentRange(unit: contentRange.unit, range: range)
+                    (offset, byteCount) = try firstRange.asByteBufferBounds(withMaxSize: Int(file.size), logger: request.logger)
+                } catch {
+                    throw Abort(.badRequest)
+                }
+            } else {
+                offset = 0
+                byteCount = Int(file.size)
+            }
+        } else {
+            offset = 0
+            byteCount = Int(file.size)
+        }
+
+        response.headers.contentType = mediaType
+                
+        switch file {
+        case .local(let fileEntry):
+            response.body = .init(asyncStream: { stream in
+                do {
+                    // TODO: `SystemFileHandle(takingOwnershipOf:` is used from testing SPI. Maybe not ideal
+                    let handle = SystemFileHandle(takingOwnershipOf: FileDescriptor(rawValue: dup(fileEntry.fd.fileDescriptor)), path: "", materialization: nil, threadPool: .singleton)
+                    let chunks = handle.readChunks(in: offset..<(offset+Int64(byteCount)), chunkLength: .bytes(Int64(chunkSize)))
+                    do {
+                        for try await chunk in chunks {
+                            try await stream.writeBuffer(chunk)
+                        }
+                        try? await handle.close()
+                    } catch {
+                        try? await handle.close()
+                        throw error
+                    }
+                    try await stream.write(.end)
+                    try await onCompleted(.success(()))
+                } catch {
+                    try? await stream.write(.error(error))
+                    try await onCompleted(.failure(error))
+                }
+            }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
+        case .remote(let omHttpReaderBackend):
+            fatalError()
+        }
+
+        return response
+    }
+}
+
+extension HTTPHeaders.Range.Value {
+    
+    fileprivate func asByteBufferBounds(withMaxSize size: Int, logger: Logger) throws -> (offset: Int64, byteCount: Int) {
+        switch self {
+            case .start(let value):
+                guard value <= size, value >= 0 else {
+                    logger.debug("Requested range start was invalid: \(value)")
+                    throw Abort(.badRequest)
+                }
+                return (offset: numericCast(value), byteCount: size - value)
+            case .tail(let value):
+                guard value <= size, value >= 0 else {
+                    logger.debug("Requested range end was invalid: \(value)")
+                    throw Abort(.badRequest)
+                }
+                return (offset: numericCast(size - value), byteCount: value)
+            case .within(let start, let end):
+                guard start >= 0, end >= 0, start <= end, start <= size, end <= size else {
+                    logger.debug("Requested range was invalid: \(start)-\(end)")
+                    throw Abort(.badRequest)
+                }
+                let (byteCount, overflow) =  (end - start).addingReportingOverflow(1)
+                guard !overflow else {
+                    logger.debug("Requested range was invalid: \(start)-\(end)")
+                    throw Abort(.badRequest)
+                }
+                return (offset: numericCast(start), byteCount: byteCount)
+        }
+    }
 }
