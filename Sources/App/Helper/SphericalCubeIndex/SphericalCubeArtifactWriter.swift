@@ -1,9 +1,17 @@
 import Foundation
 
 extension SphericalCubeArtifact {
+    /// Offline builder for the portable artifact. Generation may allocate proportional to the
+    /// number of points and buckets; none of this machinery participates in runtime lookup.
     enum Writer {
         private typealias FaceSection = SphericalCubeArtifact.FaceSection
 
+        /// Partitions canonical points into cube buckets and writes an atomic, mmap-ready file.
+        ///
+        /// Point array position becomes the canonical point ID. `coversWholeSphere` controls only
+        /// whether all face buckets or occupied face rectangles are materialized. The maximum chord
+        /// distance rejects queries too far from every stored point, which gives partial datasets a
+        /// cheap distance-based coverage rule without storing polygon topology.
         static func write(
             to file: URL,
             metadata: SphericalCubeArtifact.Metadata,
@@ -21,6 +29,8 @@ extension SphericalCubeArtifact {
                 throw SphericalCubeArtifactError.invalidHeader
             }
 
+            // Bucket the exact Float32 value that will be written, so generation and lookup cannot
+            // disagree at a cube-face or leaf boundary because of quantization.
             func storedPoint(_ point: SphericalPoint) -> SphericalPoint {
                 SphericalPoint(
                     x: Double(Float(point.x)),
@@ -30,6 +40,7 @@ extension SphericalCubeArtifact {
             }
 
             let resolution = 1 << level
+            // First pass: derive the occupied rectangle of every face.
             var minimumX = [Int](repeating: resolution, count: 6)
             var minimumY = [Int](repeating: resolution, count: 6)
             var maximumX = [Int](repeating: -1, count: 6)
@@ -81,6 +92,7 @@ extension SphericalCubeArtifact {
                 throw SphericalCubeArtifactError.invalidHeader
             }
 
+            // Second pass: build prefix offsets for the bucket-ordered point section.
             var counts = [Int](repeating: 0, count: bucketCount)
             for point in points {
                 let location = SphericalCubeGeometry.location(
@@ -101,6 +113,8 @@ extension SphericalCubeArtifact {
                 }
             }
 
+            // Third pass: construct both permutations. `order` maps storage position to canonical
+            // ID; `positionsByID` provides the inverse mapping for coordinate access.
             var cursors = offsets.dropLast().map(Int.init)
             var order = [UInt32](repeating: 0, count: points.count)
             var positionsByID = [UInt32](repeating: 0, count: points.count)

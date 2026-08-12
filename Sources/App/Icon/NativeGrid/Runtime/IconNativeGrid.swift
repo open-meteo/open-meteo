@@ -1,7 +1,12 @@
 import Foundation
 import OmFileFormat
 
-/// Metre-bounded nearest-official-mass-point lookup backed by the portable Float32 cube artifact.
+/// ICON-specific `Gridable` adapter around the provider-neutral spherical cube index.
+///
+/// Canonical point IDs are official ICON mass-point offsets, so a lookup result indexes native
+/// GRIB and static-variable arrays directly. Terrain and sea modes reuse the index's local candidate
+/// search; ICON's Earth radius and elevation scoring remain integration policy rather than artifact
+/// format concerns.
 struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
