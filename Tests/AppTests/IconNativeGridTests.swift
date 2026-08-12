@@ -116,10 +116,11 @@ private extension SphericalCubeIndex {
                 if rhsScore > lhsScore + SphericalCubeIndex.scoreTieTolerance { return false }
                 return lhs < rhs
             }
-            let actual = try #require(fixture.grid.storage.nearestCandidates(
+            let lookup = try #require(fixture.grid.storage.nearestLookup(
                 latitude: latitude,
                 longitude: longitude
             ))
+            let actual = fixture.grid.storage.nearestCandidates(from: lookup)
             let actualCells = (0..<actual.count).map { actual.pointIDs[$0] }
             let nearestTen = Set(ranked.prefix(10))
             let nearestTwenty = Set(ranked.prefix(20))
@@ -413,8 +414,9 @@ private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws 
     typealias Artifact = SphericalCubeArtifact
     let artifact = try Artifact.open(file: fixture.file)
     let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(artifact.mapped.data))
+    let bucketCount = artifact.faceSections.reduce(0) { $0 + $1.columns * $1.rows }
     var previous = 0
-    for bucket in 0...artifact.bucketCount {
+    for bucket in 0...bucketCount {
         let current = Artifact.directoryPosition(
             bucket,
             bytes: bytes,
@@ -548,7 +550,10 @@ private func validateOfficialGrid(
     )
 
     #expect(grid.nx == identity.cellCount)
-    #expect(grid.storage.artifactBytes <= maximumArtifactBytes)
+    let artifactBytes = try #require(
+        artifactFile.resourceValues(forKeys: [.fileSizeKey]).fileSize
+    )
+    #expect(artifactBytes <= maximumArtifactBytes)
     let stride = max(1, source.count / sampleLimit)
     for cell in Swift.stride(from: 0, to: source.count, by: stride) {
         #expect(grid.storage.nearestPointID(to: source[cell]) == cell)

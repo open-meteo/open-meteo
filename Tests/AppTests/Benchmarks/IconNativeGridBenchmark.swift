@@ -50,6 +50,9 @@ enum IconNativeGridBenchmark {
             if usesTemporaryArtifact { try? FileManager.default.removeItem(at: file) }
         }
         let grid = try IconNativeGrid.load(file: file)
+        let artifactBytes = try #require(
+            file.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        )
         let queries = configuredArtifact == nil ? makeQueries() : makeQueries(grid: grid)
         let fallbackQueries = makeFallbackQueries(grid: grid, queries: queries)
 
@@ -84,7 +87,7 @@ enum IconNativeGridBenchmark {
         print("  terrain candidates range: \(terrainCandidates.samples[0])...\(terrainCandidates.samples[sampleCount - 1]) ns/query")
         print("  seeded exact fallback median: \(exactFallback.samples[sampleCount / 2]) ns/query")
         print("  seeded exact fallback range: \(exactFallback.samples[0])...\(exactFallback.samples[sampleCount - 1]) ns/query")
-        print("  artifact: \(grid.storage.artifactBytes) bytes")
+        print("  artifact: \(artifactBytes) bytes")
         print("  lookup checksum: \(lookup.checksum)")
         print("  terrain checksum: \(terrainCandidates.checksum)")
         print("  fallback checksum: \(exactFallback.checksum)")
@@ -244,10 +247,11 @@ enum IconNativeGridBenchmark {
         var checksum = 0
         for _ in 0..<repeats {
             for query in queries {
-                let candidates = grid.storage.nearestCandidates(
+                let lookup = grid.storage.nearestLookup(
                     latitude: query.latitude,
                     longitude: query.longitude
                 )!
+                let candidates = grid.storage.nearestCandidates(from: lookup)
                 checksum &+= candidates.pointIDs[0] &+ candidates.count
             }
         }

@@ -54,7 +54,6 @@ final class SphericalCubeIndex: Sendable {
     let pointCount: Int
     let level: Int
     let resolution: Int
-    var artifactBytes: Int { mapped.data.count }
     let identity: SphericalCubeArtifact.DatasetIdentity
 
     /// Opens and validates the artifact, then precomputes leaf-boundary terms used by certification.
