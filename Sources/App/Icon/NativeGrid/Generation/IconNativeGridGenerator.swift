@@ -64,33 +64,24 @@ extension IconNativeGrid {
         /// location offset in native forecast files.
         static func readSource(file: String, identity: IconNativeGridIdentity) throws -> [SphericalPoint] {
             do {
-                return try readSourceUnchecked(file: file, identity: identity)
+                guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
+                    throw IconNativeGridSourceError.couldNotOpen(file)
+                }
+                try validateAttributes(group: group, identity: identity)
+
+                let cellCount = identity.cellCount
+                let clon = try readDouble(group: group, name: "clon")
+                let clat = try readDouble(group: group, name: "clat")
+                guard clon.count == cellCount, clat.count == cellCount else {
+                    throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
+                }
+
+                return try makePoints(longitudes: clon, latitudes: clat)
             } catch let error as IconNativeGridSourceError {
                 throw error
             } catch {
                 throw IconNativeGridSourceError.io(path: file, reason: String(describing: error))
             }
-        }
-
-        private static func readSourceUnchecked(
-            file: String,
-            identity: IconNativeGridIdentity
-        ) throws
-            -> [SphericalPoint]
-        {
-            guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
-                throw IconNativeGridSourceError.couldNotOpen(file)
-            }
-            try validateAttributes(group: group, identity: identity)
-
-            let cellCount = identity.cellCount
-            let clon = try readDouble(group: group, name: "clon")
-            let clat = try readDouble(group: group, name: "clat")
-            guard clon.count == cellCount, clat.count == cellCount else {
-                throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
-            }
-
-            return try makePoints(longitudes: clon, latitudes: clat)
         }
 
         private static func validateAttributes(group: Group, identity: IconNativeGridIdentity) throws {

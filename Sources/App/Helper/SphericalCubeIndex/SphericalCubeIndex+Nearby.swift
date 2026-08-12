@@ -216,6 +216,7 @@ extension SphericalCubeIndex {
             // Near an edge or corner, bucket offsets may cross onto another cube face. Convert each
             // offset through a spherical direction, project it to its actual face, and deduplicate
             // buckets where several offsets map to the same destination.
+            // Radius 8 spans a 17-by-17 stencil, hence at most 289 projected buckets.
             var scannedBuckets = InlineArray<289, Int>(repeating: -1)
             var scannedBucketCount = 0
             let scale = 2 / Double(resolution)
