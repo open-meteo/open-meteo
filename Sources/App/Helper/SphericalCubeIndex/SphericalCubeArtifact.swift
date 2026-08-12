@@ -21,13 +21,26 @@ enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertible {
     }
 }
 
-/// Portable binary-format definitions shared by offline writers and mmap-backed readers.
+/// Portable `SPHCUBE1` binary-format definitions shared by offline writers and mmap-backed readers.
+///
+/// All integers and IEEE-754 values are little-endian. The 144-byte header contains only counts,
+/// lookup policy, an opaque dataset identity, and six occupied cube-face rectangles. Section
+/// offsets are derived from those values; no native pointers or Swift layouts are serialized.
+/// The payload contains, in order:
+///
+/// 1. a compact bucket prefix directory;
+/// 2. aligned `Float32 XYZ + UInt32 point ID` records in bucket order;
+/// 3. one reverse `UInt32` position per canonical point ID.
+///
+/// Consequently the same artifact can be generated and memory-mapped by other languages.
 enum SphericalCubeArtifact {
+    /// Opaque producer-defined identity copied into the artifact and checked by its integration.
     struct DatasetIdentity: Sendable, Equatable {
         let number: UInt32
         let uuid: [UInt8]
     }
 
+    /// Validated mmap and the derived offsets needed by the runtime index.
     struct Mapping {
         let mapped: MmapFile
         let faceSections: [FaceSection]
@@ -44,12 +57,18 @@ enum SphericalCubeArtifact {
         let identity: DatasetIdentity
     }
 
+    /// Writer-supplied policy and identity; it is not involved in spatial partitioning.
     struct Metadata: Sendable {
         let identity: DatasetIdentity
         let coversWholeSphere: Bool
         let maximumChordDistanceSquared: Float
     }
 
+    /// Stored leaf rectangle for one cube face.
+    ///
+    /// Whole-sphere datasets use the complete `resolution × resolution` rectangle on all faces.
+    /// Partial datasets store only each face's occupied bounding rectangle. Buckets inside every
+    /// rectangle use the same 8×8 tiled ordering, including partial edge tiles.
     struct FaceSection: Sendable {
         let minimumX: Int
         let minimumY: Int
@@ -57,6 +76,7 @@ enum SphericalCubeArtifact {
         let rows: Int
         let firstBucket: Int
 
+        /// Returns the artifact-wide bucket number, or `nil` outside the stored rectangle.
         @inline(__always)
         func bucket(x: Int, y: Int) -> Int? {
             let localX = x - minimumX
@@ -90,6 +110,7 @@ enum SphericalCubeArtifact {
         }
     }
 
+    /// Derives every payload position from `pointCount` and the face-derived bucket count.
     struct SectionLayout {
         let directoryBasesOffset: Int
         let directoryLocalsOffset: Int
@@ -116,6 +137,10 @@ enum SphericalCubeArtifact {
         }
     }
 
+    // Header layout:
+    //   0: magic[8], 8: version, 12: pointCount, 16: level,
+    //   20: maximumChordDistanceSquared, 24: identity number, 28: identity UUID[16],
+    //   44: padding[4], 48: six face rectangles of four UInt32 values each.
     static let magic = Array("SPHCUBE1".utf8)
     static let version: UInt32 = 1
     static let headerBytes = 144
@@ -130,6 +155,7 @@ enum SphericalCubeArtifact {
         pointsOffset + position * pointStride
     }
 
+    /// Double-precision normalized dot product used by exact fallback and deterministic ties.
     @inline(__always)
     static func score(
         position: Int,
@@ -148,6 +174,7 @@ enum SphericalCubeArtifact {
         return rawScore / sqrt(x * x + y * y + z * z)
     }
 
+    /// Float squared chord distance used by the allocation-free hot path.
     @inline(__always)
     static func squaredDistance(
         position: Int,
@@ -185,6 +212,7 @@ enum SphericalCubeArtifact {
         )
     }
 
+    /// Decodes a bucket prefix position from one absolute base per 256 values plus a UInt16 delta.
     @inline(__always)
     static func directoryPosition(
         _ index: Int,
@@ -231,6 +259,10 @@ enum SphericalCubeArtifact {
 }
 
 extension SphericalCubeArtifact {
+    /// Maps and validates an artifact before any unchecked hot-path reads are allowed.
+    ///
+    /// Validation proves the complete file layout and monotonic bucket directory. Expensive
+    /// semantic checks such as point normalization and ID uniqueness belong to generator tests.
     static func open(file: URL) throws -> Mapping {
         let handle = try FileHandle.openFileReading(file: file.path)
         let mapped = try MmapFile(fn: handle)

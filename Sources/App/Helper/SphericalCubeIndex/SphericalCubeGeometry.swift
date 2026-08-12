@@ -1,8 +1,15 @@
 import Foundation
 
+/// Cube-map projection shared by artifact generation and runtime search.
+///
+/// A direction is assigned to the cube face whose axis has the largest absolute component. The
+/// remaining components, divided by that dominant component, produce `(u, v)` in `[-1, 1]`.
+/// This avoids the polar singularity and latitude-dependent bucket sizes of a longitude/latitude
+/// raster. Faces are ordered `+X`, `-X`, `+Y`, `-Y`, `+Z`, `-Z`; axis ties prefer X, then Y, then Z.
 enum SphericalCubeGeometry {
-    /// Pure cube-map geometry shared by artifact generation and runtime search.
 
+    /// Projected face coordinates and the corresponding leaf bucket.
+    /// `normalizedNormalComponentSquared` supports exact distance-to-boundary certification.
     struct Location: Sendable {
         let face: Int
         let u: Double
@@ -12,6 +19,7 @@ enum SphericalCubeGeometry {
         let y: Int
     }
 
+    /// An implicit quadtree node. No tree nodes or child links are stored in the artifact.
     struct Node: Sendable {
         var face: Int
         var level: Int
@@ -21,6 +29,7 @@ enum SphericalCubeGeometry {
         static let empty = Self(face: 0, level: 0, x: 0, y: 0)
     }
 
+    /// Projects a direction and maps `(u, v)` to integer leaf coordinates.
     @inline(__always)
     static func location(
         for point: SphericalPoint,
@@ -90,6 +99,7 @@ enum SphericalCubeGeometry {
         return (5, point.y * inverse, point.x * inverse)
     }
 
+    /// Converts cube-face coordinates back to a normalized spherical direction.
     @inline(__always)
     static func faceVector(
         face: Int,

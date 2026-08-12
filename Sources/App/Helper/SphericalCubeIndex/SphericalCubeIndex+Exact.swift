@@ -2,6 +2,8 @@ import Foundation
 import OmFileFormat
 
 extension SphericalCubeIndex {
+    /// Leaf rectangle already proven to contain the answer. The exact path then needs to resolve
+    /// only Float ambiguity and canonical ties inside this region.
     struct ExactRegion: Sendable {
         let xRange: ClosedRange<Int>
         let yRange: ClosedRange<Int>
@@ -14,6 +16,12 @@ extension SphericalCubeIndex {
         static let empty = Self(pointID: -1, score: -.infinity)
     }
 
+    /// Exact nearest-point fallback for the stored Float32 directions.
+    ///
+    /// Distances are ordered by normalized Double dot product. All candidates within
+    /// `scoreTieTolerance` of the best score form a canonical tie, resolved to the lowest point ID.
+    /// With a certified region only those leaves are scanned. Otherwise an implicit six-root
+    /// quadtree is traversed and conservatively pruned by spherical distance bounds.
     @inline(never)
     func nearest(
         to unnormalizedQuery: SphericalPoint,
@@ -34,6 +42,8 @@ extension SphericalCubeIndex {
             resolution: resolution,
             resolutionScale: resolutionScale
         )
+        // Spherical Voronoi edges normally retain two candidates and vertices normally retain
+        // three. Four inline slots avoid allocation; pathological larger ties use a final scan.
         var candidates = InlineArray<4, ScoreCandidate>(repeating: .empty)
         var candidateCount = 0
         var candidateOverflow = false
@@ -102,6 +112,8 @@ extension SphericalCubeIndex {
             return bestPointID == .max ? nil : bestPointID
         }
 
+        // Certification by the hot path means no point outside this rectangle can improve the
+        // answer. Double comparison is still required to make Float-near-ties deterministic.
         if let certifiedRegion {
             let section = faceSections[queryLocation.face]
             let lowerY = max(certifiedRegion.yRange.lowerBound, section.minimumY)
@@ -124,6 +136,8 @@ extension SphericalCubeIndex {
             return selectedPointID()
         }
 
+        // The complete fallback treats each cube face as an implicit quadtree root. Visiting the
+        // query-side child last places it on top of this LIFO stack and tightens pruning early.
         var maximumCandidateDistance = sqrt(maximumCandidateDistanceSquared)
         var stack = InlineArray<64, SphericalCubeGeometry.Node>(repeating: .empty)
         var stackCount = 0

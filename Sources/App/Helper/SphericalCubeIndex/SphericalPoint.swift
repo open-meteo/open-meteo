@@ -2,6 +2,10 @@ import Foundation
 
 typealias LatLon = (latitude: Float, longitude: Float)
 
+/// Float representation used by the hot lookup path.
+///
+/// Query and artifact vectors use the same precision so candidate distances require no
+/// Float-to-Double conversion. Code that proves exact ordering converts `point` to Double.
 struct SphericalLookupVector: Sendable {
     let x: Float
     let y: Float
@@ -12,8 +16,10 @@ struct SphericalLookupVector: Sendable {
     }
 }
 
-/// Canonical Double-precision point on the unit sphere. Artifacts store its XYZ components as
-/// Float32; exact comparisons promote and normalize those values again.
+/// Three-dimensional direction on the unit sphere.
+///
+/// Generation and exact comparisons use Double. Artifacts store each component as Float32, and
+/// exact comparisons promote and normalize the stored value before evaluating its dot product.
 struct SphericalPoint: Sendable, Equatable {
     private static let degreesToRadians = Double.pi / 180
     private static let degreesToRadiansFloat = Float.pi / 180
@@ -36,6 +42,7 @@ struct SphericalPoint: Sendable, Equatable {
         self.z = z / length
     }
 
+    /// Converts geographic radians to a normalized Cartesian direction.
     init(latitudeRadians: Double, longitudeRadians: Double) {
         let latitudeCosine = cos(latitudeRadians)
         self.init(
@@ -52,6 +59,7 @@ struct SphericalPoint: Sendable, Equatable {
         )
     }
 
+    /// Converts geographic degrees directly to the Float representation used by nearest lookup.
     /// Geographic lookup inputs are Float, matching the stored point precision.
     @inline(__always) static func fastLookupVector(
         latitudeDegrees: Float,
@@ -67,6 +75,7 @@ struct SphericalPoint: Sendable, Equatable {
         )
     }
 
+    /// Converts the direction back to geographic degrees.
     var coordinate: LatLon {
         (
             latitude: Float(asin(max(-1, min(1, z))) * 180 / .pi),
@@ -85,6 +94,7 @@ struct SphericalPoint: Sendable, Equatable {
         return dx * dx + dy * dy + dz * dz
     }
 
+    /// Wraps any finite longitude to `[-180, 180)` without changing values already in that range.
     @inline(__always) static func normalizedLongitude(_ longitude: Float) -> Float {
         if longitude >= -180, longitude < 180 { return longitude }
         var wrapped = longitude.truncatingRemainder(dividingBy: 360)

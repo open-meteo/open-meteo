@@ -9,6 +9,12 @@ extension SphericalCubeIndex {
         static let empty = Self(pointID: -1, distanceSquared: .infinity)
     }
 
+    /// Fixed-capacity candidates for terrain and sea selection.
+    ///
+    /// Entry zero is always the result of the main nearest-point lookup. Remaining entries are
+    /// distance-ordered local candidates; unlike nearest lookup, they are not promised to be the
+    /// globally exact k-nearest points because the search may stop after collecting a sufficiently
+    /// useful local set.
     struct NearbyPoints: Sendable {
         var pointIDs = InlineArray<10, Int>(repeating: -1)
         var distancesSquared = InlineArray<10, Float>(repeating: .infinity)
@@ -29,6 +35,7 @@ extension SphericalCubeIndex {
         return (candidates.pointIDs, candidates.count)
     }
 
+    /// Reuses a completed nearest lookup, avoiding duplicate coordinate conversion and search.
     func nearestCandidates(from lookup: Lookup) -> NearbyPoints {
         withBytes {
             nearestCandidates(
@@ -164,6 +171,8 @@ extension SphericalCubeIndex {
             return scannedPointCount >= Self.nearbyPointLimit * 4
         }
 
+        // Away from seams, expand square rings directly in the query face. Certification can stop
+        // as soon as the retained candidates are provably closer than every unscanned bucket.
         let maximumRadius = 8
         let staysOnFace =
             queryLocation.x >= maximumRadius
@@ -216,6 +225,9 @@ extension SphericalCubeIndex {
                 }
             }
         } else {
+            // Near an edge or corner, bucket offsets may cross onto another cube face. Convert each
+            // offset through a spherical direction, project it to its actual face, and deduplicate
+            // buckets where several offsets map to the same destination.
             var scannedBuckets = InlineArray<289, Int>(repeating: -1)
             var scannedBucketCount = 0
             let scale = 2 / Double(resolution)
