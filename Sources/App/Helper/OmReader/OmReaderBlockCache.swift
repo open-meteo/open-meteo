@@ -1,5 +1,6 @@
 import OmFileFormat
 import Foundation
+import NIOCore
 
 
 /**
@@ -135,6 +136,18 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
         case .owned(let data):
             defer { data.deallocate() }
             return try fn(data)
+        }
+    }
+    
+    /// Copy data into an NIO ByteBuffer
+    func getByteBuffer(offset: Int, count: Int) async throws -> ByteBuffer {
+        switch try await fetch(offset: offset, count: count) {
+        case .borrowed(let data):
+            return ByteBufferAllocator().buffer(bytes: data)
+        case .owned(let data):
+            let bb = ByteBufferAllocator().buffer(bytes: data)
+            data.deallocate()
+            return bb
         }
     }
     

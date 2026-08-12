@@ -952,7 +952,7 @@ extension Request {
         }
 
         // Generate ETag value, "last modified date in epoch time" + "-" + "file size"
-        let eTag = "\"\(file.modificationTime.timeIntervalSince1970)-\(file.size)\""
+        let eTag = "\"\(Int(file.modificationTime.timeIntervalSince1970))-\(file.size)\""
         
         // Create empty headers array.
         var headers: HTTPHeaders = [:]
@@ -999,19 +999,34 @@ extension Request {
                 
         switch file {
         case .local(let fileEntry):
+            // Read file from disk using the open file handle and SwiftNIO async reader
+            response.body = .init(asyncStream: { stream in
+                // TODO: `SystemFileHandle(takingOwnershipOf:` is used from testing SPI. Maybe not ideal
+                let handle = SystemFileHandle(takingOwnershipOf: FileDescriptor(rawValue: fileEntry.fd.fileDescriptor), path: "", materialization: nil, threadPool: .singleton)
+                let chunks = handle.readChunks(in: offset..<(offset+Int64(byteCount)), chunkLength: .bytes(Int64(chunkSize)))
+                do {
+                    for try await chunk in chunks {
+                        try await stream.writeBuffer(chunk)
+                    }
+                    let _ = try handle.detachUnsafeFileDescriptor()
+                    try await stream.write(.end)
+                    try await onCompleted(.success(()))
+                } catch {
+                    let _ = try? handle.detachUnsafeFileDescriptor()
+                    try? await stream.write(.error(error))
+                    try await onCompleted(.failure(error))
+                }
+            }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
+        case .remote(let http):
+            // Return cached data or stream from network
             response.body = .init(asyncStream: { stream in
                 do {
-                    // TODO: `SystemFileHandle(takingOwnershipOf:` is used from testing SPI. Maybe not ideal
-                    let handle = SystemFileHandle(takingOwnershipOf: FileDescriptor(rawValue: dup(fileEntry.fd.fileDescriptor)), path: "", materialization: nil, threadPool: .singleton)
-                    let chunks = handle.readChunks(in: offset..<(offset+Int64(byteCount)), chunkLength: .bytes(Int64(chunkSize)))
-                    do {
-                        for try await chunk in chunks {
-                            try await stream.writeBuffer(chunk)
-                        }
-                        try? await handle.close()
-                    } catch {
-                        try? await handle.close()
-                        throw error
+                    let cached = OmReaderBlockCache(backend: http, cache: OpenMeteo.dataBlockCache, cacheKey: http.cacheKey)
+                    for block in offset / Int64(chunkSize) ..< (offset + Int64(byteCount)).divideRoundedUp(divisor: Int64(chunkSize)) {
+                        let offset = max(offset, block*Int64(chunkSize))
+                        let end = min(offset + Int64(byteCount), min(file.size, (block+1)*Int64(chunkSize)))
+                        let chunk = try await cached.getByteBuffer(offset: Int(offset), count: Int(end - offset))
+                        try await stream.writeBuffer(chunk)
                     }
                     try await stream.write(.end)
                     try await onCompleted(.success(()))
@@ -1020,10 +1035,7 @@ extension Request {
                     try await onCompleted(.failure(error))
                 }
             }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
-        case .remote(let omHttpReaderBackend):
-            fatalError()
         }
-
         return response
     }
 }
