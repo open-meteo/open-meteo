@@ -165,5 +165,4 @@ struct IconNativeGrid: Gridable {
         if value >= 9999 { return (gridpoint, .landWithoutElevation) }
         return (gridpoint, .elevation(value))
     }
-
 }
