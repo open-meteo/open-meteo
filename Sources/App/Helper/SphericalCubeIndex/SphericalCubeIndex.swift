@@ -35,8 +35,8 @@ final class SphericalCubeIndex: Sendable {
         let inverseNormSquared: Double
     }
 
-    /// Candidates within this Double dot-product tolerance share a canonical tie; lower ID wins.
-    static let scoreTieTolerance = 1e-15
+    /// Conservative Double score margin retained while pruning the exact fallback tree.
+    static let exactScoreMargin = 1e-15
     private static let floatSelectionUlpMargin: Float = 32
     static let floatChordError = 8 * Double(Float.ulpOfOne)
 

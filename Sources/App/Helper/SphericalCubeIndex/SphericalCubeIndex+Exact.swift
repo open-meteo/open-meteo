@@ -9,19 +9,11 @@ extension SphericalCubeIndex {
         let yRange: ClosedRange<Int>
     }
 
-    private struct ScoreCandidate: Sendable {
-        var pointID: Int
-        var score: Double
-
-        static let empty = Self(pointID: -1, score: -.infinity)
-    }
-
     /// Exact nearest-point fallback for the stored Float32 directions.
     ///
-    /// Distances are ordered by normalized Double dot product. All candidates within
-    /// `scoreTieTolerance` of the best score form a canonical tie, resolved to the lowest point ID.
-    /// With a certified region only those leaves are scanned. Otherwise an implicit six-root
-    /// quadtree is traversed and conservatively pruned by spherical distance bounds.
+    /// Distances are ordered by normalized Double dot product; exactly equal scores prefer the
+    /// lower canonical point ID. With a certified region only those leaves are scanned. Otherwise
+    /// an implicit six-root quadtree is traversed and conservatively pruned by spherical bounds.
     @inline(never)
     func nearest(
         to unnormalizedQuery: SphericalPoint,
@@ -42,74 +34,35 @@ extension SphericalCubeIndex {
             resolution: resolution,
             resolutionScale: resolutionScale
         )
-        // Spherical Voronoi edges normally retain two candidates and vertices normally retain
-        // three. Four inline slots avoid allocation; pathological larger ties use a final scan.
-        var candidates = InlineArray<4, ScoreCandidate>(repeating: .empty)
-        var candidateCount = 0
-        var candidateOverflow = false
         var bestScore = distanceLimitSquared.isFinite ? 1 - distanceLimitSquared * 0.5 : -.infinity
+        var bestPointID = -1
         var maximumCandidateDistanceSquared = distanceLimitSquared
+
+        @inline(__always)
+        func consider(_ candidate: (score: Double, pointID: Int)) {
+            if candidate.score > bestScore {
+                bestScore = candidate.score
+                bestPointID = candidate.pointID
+                maximumCandidateDistanceSquared = max(
+                    0,
+                    2 - 2 * (bestScore - Self.exactScoreMargin)
+                )
+            } else if candidate.score == bestScore,
+                bestPointID < 0 || candidate.pointID < bestPointID
+            {
+                bestPointID = candidate.pointID
+            }
+        }
 
         @inline(__always)
         func scanRange(_ range: Range<Int>) {
             for position in range {
-                let candidate = scoreAndPointID(at: position, query: query, bytes: bytes)
-                let pointID = candidate.pointID
-                let score = candidate.score
-                if score > bestScore {
-                    bestScore = score
-                    maximumCandidateDistanceSquared = max(
-                        0,
-                        2 - 2 * (bestScore - Self.scoreTieTolerance)
-                    )
-                    var destination = 0
-                    for position in 0..<candidateCount
-                    where candidates[position].score >= bestScore - Self.scoreTieTolerance {
-                        candidates[destination] = candidates[position]
-                        destination += 1
-                    }
-                    candidateCount = destination
-                }
-                if score >= bestScore - Self.scoreTieTolerance {
-                    if candidateCount < 4 {
-                        candidates[candidateCount] = ScoreCandidate(pointID: pointID, score: score)
-                        candidateCount += 1
-                    } else {
-                        candidateOverflow = true
-                    }
-                }
+                consider(scoreAndPointID(at: position, query: query, bytes: bytes))
             }
         }
 
         if let seedPosition {
-            let seedScore = scoreAndPointID(at: seedPosition, query: query, bytes: bytes).score
-            if seedScore > bestScore {
-                bestScore = seedScore
-                maximumCandidateDistanceSquared = max(
-                    0,
-                    2 - 2 * (bestScore - Self.scoreTieTolerance)
-                )
-            }
-        }
-
-        @inline(__always)
-        func selectedPointID() -> Int? {
-            guard candidateCount > 0 else { return nil }
-            if candidateOverflow {
-                var bestPointID = Int.max
-                for position in 0..<pointCount {
-                    let candidate = scoreAndPointID(at: position, query: query, bytes: bytes)
-                    if candidate.score >= bestScore - Self.scoreTieTolerance {
-                        bestPointID = min(bestPointID, candidate.pointID)
-                    }
-                }
-                return bestPointID == .max ? nil : bestPointID
-            }
-            var bestPointID = Int.max
-            for position in 0..<candidateCount where candidates[position].pointID < bestPointID {
-                bestPointID = candidates[position].pointID
-            }
-            return bestPointID == .max ? nil : bestPointID
+            consider(scoreAndPointID(at: seedPosition, query: query, bytes: bytes))
         }
 
         // Certification by the hot path means no point outside this rectangle can improve the
@@ -133,7 +86,7 @@ extension SphericalCubeIndex {
                     }
                 }
             }
-            return selectedPointID()
+            return bestPointID >= 0 ? bestPointID : nil
         }
 
         // The complete fallback treats each cube face as an implicit quadtree root. Visiting the
@@ -203,7 +156,7 @@ extension SphericalCubeIndex {
             }
         }
 
-        return selectedPointID()
+        return bestPointID >= 0 ? bestPointID : nil
     }
 
     @inline(__always)
