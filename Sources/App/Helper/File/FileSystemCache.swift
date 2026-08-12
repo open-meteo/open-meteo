@@ -323,10 +323,6 @@ protocol FileSystemPayload: Sendable {
     func remoteDeleted() async throws
 }
 
-#if os(Linux)
-// Linux-specific O_PATH definition
-let O_PATH: Int32 = 0x00200000
-#endif
 
 fileprivate extension FileHandle {
     enum OFlags {
@@ -338,11 +334,7 @@ fileprivate extension FileHandle {
             case .fileReadOnly:
                 return O_RDONLY
             case .pathReadOnly:
-                #if os(Linux)
-                return O_PATH | O_DIRECTORY
-                #else
                 return O_RDONLY | O_DIRECTORY
-                #endif
             }
         }
     }
@@ -353,7 +345,7 @@ fileprivate extension FileHandle {
         repeat {
             fd = open(path, mode.flags)
         } while fd == -1 && errno == EINTR
-        guard fd > 0 else {
+        guard fd != -1 else {
             let error = String(cString: strerror(errno))
             throw FileSystemCacheError.cannotOpenFile(name: String(cString: path), errno: errno, error: error)
         }
@@ -367,7 +359,7 @@ fileprivate extension FileHandle {
         repeat {
             fd = openat(fileDescriptor, path, mode.flags)
         } while fd == -1 && errno == EINTR
-        guard fd > 0 else {
+        guard fd != -1 else {
             let error = String(cString: strerror(errno))
             throw FileSystemCacheError.cannotOpenFile(name: String(cString: path), errno: errno, error: error)
         }
