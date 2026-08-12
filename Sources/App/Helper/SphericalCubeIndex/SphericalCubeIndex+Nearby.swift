@@ -23,18 +23,6 @@ extension SphericalCubeIndex {
 
     private static let nearbyPointLimit = 10
 
-    /// Returns the exact nearest point followed by close candidates found in nearby buckets.
-    func nearestCandidates(
-        latitude: Float,
-        longitude: Float
-    ) -> (pointIDs: InlineArray<10, Int>, count: Int)? {
-        guard let lookup = nearestLookup(latitude: latitude, longitude: longitude) else {
-            return nil
-        }
-        let candidates = nearestCandidates(from: lookup)
-        return (candidates.pointIDs, candidates.count)
-    }
-
     /// Reuses a completed nearest lookup, avoiding duplicate coordinate conversion and search.
     func nearestCandidates(from lookup: Lookup) -> NearbyPoints {
         withBytes {
