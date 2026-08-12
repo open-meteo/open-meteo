@@ -1150,18 +1150,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
             switch self {
             case .single(let domain, let variable):
-                guard domain.isAvailable else {
-                    options.logger.warning("Skipping unavailable domain '\(domain.domainRegistry.rawValue)'")
-                    return nil
-                }
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             case .singleWithPrecipitationProbability(let domain, let variable, let precipitationProb):
                 let forecast = try await Self.makeDomainReaders(sources: [(domain, variable)], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 guard let reader = forecast.readers.first else {
                     return nil
                 }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([prob].compactMap { $0 } + [reader])
+                let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + [reader])
             case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
