@@ -6,6 +6,10 @@ import NIOConcurrencyHelpers
 import Vapor
 import OmFileFormat
 
+enum S3InventoryError: Error {
+    case invalidObjectName
+}
+
 /**
  Caches metadata for objects and directories of an S3 server
  It is used concurrently to get meta data from objects or return if a object does not exist.
@@ -23,11 +27,36 @@ import OmFileFormat
 struct S3Inventory {
     let server: String
     let root = S3Directory()
+
+    /// Find a directory for a path
+    func getDirectory(path: String, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
+        guard path.hasPrefix("/") == false, path.hasSuffix("/") else {
+            throw S3InventoryError.invalidObjectName
+        }
+        let trimmedPath = path.dropLast()
+        var directory = root
+        var componentStart = trimmedPath.startIndex
+        while componentStart < trimmedPath.endIndex {
+            let nextSlash = trimmedPath[componentStart..<trimmedPath.endIndex].firstIndex(of: "/") ?? trimmedPath.endIndex
+            let component = trimmedPath[componentStart..<nextSlash]
+            let prefix = trimmedPath[..<componentStart]
+            guard let next = try await directory.getDirectory(name: component, server: server, prefix: prefix, client: client, logger: logger) else {
+                return nil
+            }
+            directory = next
+
+            guard nextSlash < trimmedPath.endIndex else {
+                break
+            }
+            componentStart = trimmedPath.index(after: nextSlash)
+        }
+        return directory
+    }
     
     /// Find an object for a path
     func getObject(path: String, client: HTTPClient, logger: Logger) async throws -> S3File? {
         guard path.hasPrefix("/") == false, path.hasSuffix("/") == false else {
-            fatalError()
+            throw S3InventoryError.invalidObjectName
         }
         let objectStart = path.lastIndex(of: "/").map { path.index(after: $0) } ?? path.startIndex
         let object = path[objectStart..<path.endIndex]
@@ -68,8 +97,8 @@ struct S3Inventory {
 
 
 actor S3File {
-    private var contentLength: Int
-    private var lastModified: Timestamp
+    var contentLength: Int
+    var lastModified: Timestamp
     
     /// Reference to the open-meteo file or json file
     private var payload: RemotePayloadState
@@ -330,6 +359,7 @@ actor S3Directory {
             }
             return
         }
+        logger.debug("Revalidating remote directory: \(prefix)")
         revalidationQueue = []
         do {
             let listed = try await S3List.s3list(client: client, server: server, prefix: String(prefix), apikey: nil, deadLineHours: 3)
@@ -419,9 +449,25 @@ actor S3Directory {
             )
         }
     }
+        
+    func exportDirectories(directories: inout Set<String>, files: inout [String: (Date, Int64)], server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws {
+        if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
+            try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
+        }
+        lastAccess = .now
+        for name in self.directories.keys {
+            directories.insert(name)
+        }
+        for (name, attr) in self.files {
+            guard files[name] == nil else {
+                continue
+            }
+            files[name] = await (attr.lastModified.toDate(), Int64(attr.contentLength))
+        }
+    }
     
     func getDirectory(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
-        if revalidationQueue == nil || Date.now.timeIntervalSince(lastValidated) > 10*60 {
+        if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
             try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
         }
         lastAccess = .now
@@ -429,7 +475,7 @@ actor S3Directory {
     }
 
     func getFile(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3File? {
-        if revalidationQueue == nil || Date.now.timeIntervalSince(lastValidated) > 10*60 {
+        if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
             try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
         }
         lastAccess = .now

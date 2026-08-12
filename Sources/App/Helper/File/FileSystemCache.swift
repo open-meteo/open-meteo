@@ -41,8 +41,8 @@ enum FileSystemCache {
         let fd: FileHandle?
         let inode: UInt64
         var lastRefreshTimestamp: UInt64
-        var files: [String: FileEntry]
-        var directories: [String: DirectoryEntry]
+        private var files: [String: FileEntry]
+        private var directories: [String: DirectoryEntry]
         
         /// Make om root directory with data, data_run and data_spatial
         static func makeOmRoot() throws -> DirectoryEntry {
@@ -81,10 +81,10 @@ enum FileSystemCache {
             lastRefreshTimestamp = 0
         }
         
-        func refreshIfRequired() {
+        func updateIfRequired() {
             if lastRefreshTimestamp < UInt64(Date().timeIntervalSince1970) - 10 {
                 do {
-                    try update()
+                    try forceUpdate()
                 } catch {
                     print("Directory refresh failed: \(error)")
                 }
@@ -92,15 +92,19 @@ enum FileSystemCache {
         }
         
         /// Updates files and directories by listing all files. Existing files are checked if the same inode is used.
-        func update() throws {
+        func forceUpdate() throws {
             guard let fd = fd.map({FileHandle(fileDescriptor: dup($0.fileDescriptor))}) else {
                 return
             }
-            let dir = fdopendir(fd.fileDescriptor)
-            guard let dir else {
-                throw Errno(rawValue: errno)
+            guard let dir = fdopendir(fd.fileDescriptor) else {
+                let error = String(cString: strerror(errno))
+                throw FileSystemCacheError.cannotOpenFile(name: "", errno: errno, error: error)
             }
             defer { closedir(dir) }
+
+            // dup() shares the same open file description (and directory offset),
+            // so a previous scan may leave this stream at EOF. Always rewind.
+            rewinddir(dir)
 
             var seenFiles = Set<String>()
             var seenDirectories = Set<String>()
@@ -154,57 +158,84 @@ enum FileSystemCache {
                     )
                 }
             }
-            files.keys.filter { !seenFiles.contains($0) }.forEach {
-                files.removeValue(forKey: $0)
+            for name in files.keys where !seenFiles.contains(name) {
+                files.removeValue(forKey: name)
             }
-            directories.keys.filter { !seenDirectories.contains($0) }.forEach {
-                directories.removeValue(forKey: $0)
+            for name in directories.keys where !seenDirectories.contains(name) {
+                directories.removeValue(forKey: name)
             }
             lastRefreshTimestamp = UInt64(Date().timeIntervalSince1970)
         }
         
-        func getFiles() async -> [String: FileEntry] {
-            refreshIfRequired()
-            return files
+        func getDirectoriesAndFiles() -> (directories: [String: DirectoryEntry], files: [String: FileEntry]) {
+            updateIfRequired()
+            return (self.directories, self.files)
         }
         
-        func getDirectories() async -> [String: DirectoryEntry] {
-            refreshIfRequired()
-            return directories
-        }
-        
-        /// Get directory by traversing the file tree
-        func getDirectoryTraversing(name: Substring) async -> DirectoryEntry? {
-            refreshIfRequired()
-            if let slashPos = name.firstIndex(of: "/") {
-                let slashPosAfter = name.index(after: slashPos)
-                guard slashPosAfter < name.endIndex else {
-                    return nil
-                }
-                let directoryName = String(name[..<slashPos])
-                guard let directory = directories[directoryName] else {
-                    return nil
-                }
-                return await directory.getDirectoryTraversing(name: name[slashPosAfter...])
+        func exportDirectories(directories: inout Set<String>, files: inout [String: (Date, Int64)]) async {
+            updateIfRequired()
+            for name in self.directories.keys {
+                directories.insert(name)
             }
-            return directories[String(name)]
+            for (name, attr) in self.files {
+                guard files[name] == nil else {
+                    continue
+                }
+                files[name] = (attr.modificationTimestamp, attr.size)
+            }
         }
         
-        /// Get file by traversing the file tree
-        func getFileTraversing(name: Substring) async -> FileEntry? {
-            refreshIfRequired()
-            if let slashPos = name.firstIndex(of: "/") {
-                let slashPosAfter = name.index(after: slashPos)
-                guard slashPosAfter < name.endIndex else {
+        private func getDirectory(name: String) -> DirectoryEntry? {
+            updateIfRequired()
+            return directories[name]
+        }
+        
+        private func getFile(name: String) -> FileEntry? {
+            updateIfRequired()
+            return files[name]
+        }
+        
+        /// Find a directory for a path. Valid paths are ``, `data/`
+        nonisolated func getDirectory(path: String) async -> DirectoryEntry? {
+            assert(path.hasPrefix("/") == false)
+            assert(path == "" || path.hasSuffix("/") == true)
+            let trimmedPath = path.dropLast()
+            var directory = self
+            var componentStart = trimmedPath.startIndex
+            while componentStart < trimmedPath.endIndex {
+                let nextSlash = trimmedPath[componentStart..<trimmedPath.endIndex].firstIndex(of: "/") ?? trimmedPath.endIndex
+                let component = trimmedPath[componentStart..<nextSlash]
+                guard let next = await directory.getDirectory(name: String(component)) else {
                     return nil
                 }
-                let directoryName = String(name[..<slashPos])
-                guard let directory = directories[directoryName] else {
-                    return nil
+                directory = next
+                guard nextSlash < trimmedPath.endIndex else {
+                    break
                 }
-                return await directory.getFileTraversing(name: name[slashPosAfter...])
+                componentStart = trimmedPath.index(after: nextSlash)
             }
-            return files[String(name)]
+            return directory
+        }
+        
+        /// Find an object for a path
+        nonisolated func getObject(path: String) async -> FileEntry? {
+            assert(path.hasPrefix("/") == false)
+            assert(path.hasSuffix("/") == false)
+            let objectStart = path.lastIndex(of: "/").map { path.index(after: $0) } ?? path.startIndex
+            let object = path[objectStart..<path.endIndex]
+
+            var directory = self
+            var componentStart = path.startIndex
+            while componentStart < objectStart {
+                let nextSlash = path[componentStart..<objectStart].firstIndex(of: "/") ?? objectStart
+                let component = path[componentStart..<nextSlash]
+                guard let next = await directory.getDirectory(name: String(component)) else {
+                    return nil
+                }
+                directory = next
+                componentStart = path.index(after: nextSlash)
+            }
+            return await directory.getFile(name: String(object))
         }
     }
     

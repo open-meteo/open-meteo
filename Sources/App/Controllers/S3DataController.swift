@@ -118,11 +118,11 @@ struct S3DataController: RouteCollection {
         let params = try req.query.decode(S3List.ListV2Query.self)
         if params.apikey != nil || req.headers.first(name: .authorization) != nil {
             try authorizeReadRequest(req: req, apikey: params.apikey)
-            return try params.makeResponse()
+            return try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger)
         } else {
             return try await req.withFreeApiRateLimiter() { _ in
                 try validateAllowedReferer(req)
-                return (1, try params.makeResponse())
+                return (1, try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger))
             }
         }
     }
@@ -665,81 +665,27 @@ extension Request {
 }
 
 extension S3List.ListV2Query {
-    func makeResponse() throws -> Response {
+    func makeResponse(client: HTTPClient, logger: Logger) async throws -> Response {
         let path = self.prefix
-        guard self.list_type == 2, self.delimiter == "/" else {
+        guard self.list_type == 2, self.delimiter == "/", path.hasPrefix("/") == false, (path == "" || path.hasSuffix("/") == true), path.onlyContainsAlphanumericDashSlashDot else {
             throw S3ApiError.forbidden
         }
-        if self.prefix == "" {
-            return Response(body: .init(stringLiteral: """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                    <Name>openmeteo</Name>
-                    <Prefix>/</Prefix>
-                    <KeyCount>3</KeyCount>
-                    <MaxKeys>1000</MaxKeys>
-                    <Delimiter>/</Delimiter>
-                    <IsTruncated>false</IsTruncated>
-                    <CommonPrefixes>
-                    <Prefix>data/</Prefix>
-                    </CommonPrefixes>
-                    <CommonPrefixes>
-                    <Prefix>data_spatial/</Prefix>
-                    </CommonPrefixes>
-                    <CommonPrefixes>
-                    <Prefix>data_run/</Prefix>
-                    </CommonPrefixes>
-                </ListBucketResult>
-                """))
-        }
-        
-        guard let absoluteDirectoryPath = resolveListPath(path) else {
+        guard let directory = try await RemoteFileManager.instance.getDirectoryContents(path: path, client: client, logger: logger) else {
             throw S3ApiError.forbidden
         }
-        
-        let pathUrl = URL(fileURLWithPath: absoluteDirectoryPath, isDirectory: true)
-        let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
-        
-        guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
-            throw S3ApiError.forbidden
-        }
-        
-        var files = [S3List.ListV2File]()
-        var directories = [String]()
-        /// Note: Maybe at some point a async version of the directory enumerator should be used.
-        /// https://forums.swift.org/t/xcode-16-3-cant-use-makeiterator-via-filemanagers-enumerator-at-in-async-function/78976
-        for case let fileURL as URL in AnySequence(directoryEnumerator) {
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
-                  let isDirectory = resourceValues.isDirectory,
-                  let name = resourceValues.name,
-                  !name.contains("~")
-            else {
-                continue
-            }
-            if isDirectory {
-                directories.append(name)
-            } else {
-                guard let modificationTime = resourceValues.contentModificationDate,
-                      let fileSize = resourceValues.fileSize
-                else {
-                    continue
-                }
-                files.append(S3List.ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
-            }
-        }
-        
         let dateFormat = DateFormatter.awsS3DateTimeFloored
-        let filesXml = files.map {
+        let filesXml = directory.files.map { (name, attr) in
             """
             <Contents>
-                <Key>\(path)\($0.name)</Key>
-                <LastModified>\(dateFormat.string(from: $0.modificationTime))</LastModified>
-                <Size>\($0.fileSize)</Size>
+                <Key>\(path)\(name)</Key>
+                <LastModified>\(dateFormat.string(from: attr.0))</LastModified>
+                <Size>\(attr.1)</Size>
                 <StorageClass>STANDARD</StorageClass>
             </Contents>
             """
         }.joined(separator: "\n")
-        let directoriesXml = directories.map {
+        
+        let directoriesXml = directory.directories.map {
             """
             <CommonPrefixes>
             <Prefix>\(path)\($0)/</Prefix>
@@ -754,7 +700,7 @@ extension S3List.ListV2Query {
         <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
             <Name>openmeteo</Name>
             <Prefix>\(path)</Prefix>
-            <KeyCount>\(files.count + directories.count)</KeyCount>
+            <KeyCount>\(directory.directories.count + directory.files.count)</KeyCount>
             <MaxKeys>1000</MaxKeys>
             <Delimiter>/</Delimiter>
             <IsTruncated>false</IsTruncated>

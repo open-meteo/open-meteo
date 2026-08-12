@@ -19,12 +19,44 @@ final class RemoteFileManager: Sendable {
         self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { S3Inventory(server: $0) }
     }
     
+    enum FileType {
+        case local(FileSystemCache.FileEntry)
+        case remote(S3File)
+    }
+    
+    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (Date, Int64)])? {
+        
+        
+        var directories = Set<String>()
+        var files = [String: (Date, Int64)]()
+        
+        if let local = await localFileSystem.getDirectory(path: path) {
+            await local.exportDirectories(directories: &directories, files: &files)
+        }
+        
+        if let remoteFileSystem, let remoteDir = try await remoteFileSystem.getDirectory(path: path, client: client, logger: logger) {
+            try await remoteDir.exportDirectories(directories: &directories, files: &files, server: remoteFileSystem.server, prefix: path[...], client: client, logger: logger)
+        }
+        
+        return (directories, files)
+    }
+    
+    func getFile(path: String, client: HTTPClient, logger: Logger) async throws -> FileType? {
+        if let file = await localFileSystem.getObject(path: path) {
+            return .local(file)
+        }
+        if let file = try await remoteFileSystem?.getObject(path: path, client: client, logger: logger) {
+            return .remote(file)
+        }
+        return nil
+    }
+    
     func with<R, Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         
         /// should be `data/model/variable/file.om`
         let path = file.getFilePath()
         assert(path.hasPrefix("/") == false)
-        if let object = await localFileSystem.getFileTraversing(name: path[...]) {
+        if let object = await localFileSystem.getObject(path: path) {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
             return try await fn(payload)
         }
