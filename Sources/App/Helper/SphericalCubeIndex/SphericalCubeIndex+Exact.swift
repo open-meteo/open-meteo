@@ -2,24 +2,16 @@ import Foundation
 import OmFileFormat
 
 extension SphericalCubeIndex {
-    /// Leaf rectangle already proven to contain the answer. The exact path then needs to resolve
-    /// only Float ambiguity and canonical ties inside this region.
-    struct ExactRegion: Sendable {
-        let xRange: ClosedRange<Int>
-        let yRange: ClosedRange<Int>
-    }
-
     /// Exact nearest-point fallback for the stored Float32 directions.
     ///
     /// Distances are ordered by normalized Double dot product; exactly equal scores prefer the
-    /// lower canonical point ID. With a certified region only those leaves are scanned. Otherwise
-    /// an implicit six-root quadtree is traversed and conservatively pruned by spherical bounds.
+    /// lower canonical point ID. An implicit six-root quadtree is traversed and conservatively
+    /// pruned by spherical bounds.
     @inline(never)
     func nearest(
         to unnormalizedQuery: SphericalPoint,
         maximumDistanceSquared distanceLimitSquared: Double,
         seedPosition: Int?,
-        certifiedRegion: ExactRegion?,
         bytes: borrowing RawSpan
     ) -> Int? {
         let queryNormSquared = unnormalizedQuery.dot(unnormalizedQuery)
@@ -63,30 +55,6 @@ extension SphericalCubeIndex {
 
         if let seedPosition {
             consider(scoreAndPointID(at: seedPosition, query: query, bytes: bytes))
-        }
-
-        // Certification by the hot path means no point outside this rectangle can improve the
-        // answer. Double comparison is still required to make Float-near-ties deterministic.
-        if let certifiedRegion {
-            let section = faceSections[queryLocation.face]
-            let lowerY = max(certifiedRegion.yRange.lowerBound, section.minimumY)
-            let upperY = min(certifiedRegion.yRange.upperBound, section.minimumY + section.rows - 1)
-            let lowerX = max(certifiedRegion.xRange.lowerBound, section.minimumX)
-            let upperX = min(certifiedRegion.xRange.upperBound, section.minimumX + section.columns - 1)
-            if lowerX <= upperX, lowerY <= upperY {
-                for y in lowerY...upperY {
-                    for x in lowerX...upperX {
-                        scanRange(
-                            bucketRange(
-                                face: queryLocation.face,
-                                x: x,
-                                y: y,
-                                bytes: bytes
-                            ))
-                    }
-                }
-            }
-            return bestPointID >= 0 ? bestPointID : nil
         }
 
         // The complete fallback treats each cube face as an implicit quadtree root. Visiting the
