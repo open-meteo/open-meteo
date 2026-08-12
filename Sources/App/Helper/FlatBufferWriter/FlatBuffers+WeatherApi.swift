@@ -990,12 +990,16 @@ extension MultiDomains {
             return .gemHrdpsWest
         case .icon_mix, .icon_seamless, .dwd_icon_seamless:
             return .iconSeamless
-        case .icon_global, .dwd_icon_global, .dwd_icon, .dwd_icon_global_native:
+        case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
+        case .dwd_icon_global_native:
+            return .iconGlobal // TODO: Add to SDK
         case .icon_eu, .dwd_icon_eu:
             return .iconEu
-        case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+        case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
+        case .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+            return .iconD2 // TODO: Add to SDK
         case .ecmwf_ifs04:
             return .ecmwfIfs04
         case .metno_nordic:
