@@ -11,7 +11,6 @@ private extension SphericalCubeIndex {
                 to: center,
                 maximumDistanceSquared: .infinity,
                 seedPosition: nil,
-                certifiedRegion: nil,
                 bytes: $0
             )!
         }
@@ -521,6 +520,78 @@ private func validateOfficialGrid(
             grid.storage.point(at: cell)
         ) <= 2)
     }
+    try validateOfficialLookupRegret(grid: grid, source: source, identity: identity)
+}
+
+private func validateOfficialLookupRegret(
+    grid: IconNativeGrid,
+    source: [SphericalPoint],
+    identity: IconNativeGridIdentity
+) throws {
+    var state: UInt64 = 0x243f_6a88_85a3_08d3
+    var maximumRegretMeters = 0.0
+    var differentPointCount = 0
+    let inverseEarthRadius = 1 / 6_371_229.0
+    for queryIndex in 0..<50_000 {
+        state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        let pointID = Int(state % UInt64(source.count))
+        let center = grid.storage.point(at: pointID)
+        let coordinate = center.coordinate
+        let lookup = try #require(grid.storage.nearestLookup(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        ))
+        let candidates = grid.storage.nearestCandidates(from: lookup)
+        let neighbour = grid.storage.point(at: candidates.pointIDs[1])
+        let midpointLength = sqrt(
+            (center.x + neighbour.x) * (center.x + neighbour.x)
+                + (center.y + neighbour.y) * (center.y + neighbour.y)
+                + (center.z + neighbour.z) * (center.z + neighbour.z)
+        )
+        let midpoint = SphericalPoint(
+            x: (center.x + neighbour.x) / midpointLength,
+            y: (center.y + neighbour.y) / midpointLength,
+            z: (center.z + neighbour.z) / midpointLength
+        )
+        let tangentLength = sqrt(center.squaredDistance(to: neighbour))
+        let tangent = SphericalPoint(
+            x: (neighbour.x - center.x) / tangentLength,
+            y: (neighbour.y - center.y) / tangentLength,
+            z: (neighbour.z - center.z) / tangentLength
+        )
+        let offsetMeters = Double(queryIndex % 3 - 1) * 3
+        let raw = SphericalPoint(
+            x: midpoint.x + offsetMeters * inverseEarthRadius * tangent.x,
+            y: midpoint.y + offsetMeters * inverseEarthRadius * tangent.y,
+            z: midpoint.z + offsetMeters * inverseEarthRadius * tangent.z
+        )
+        let inverseNorm = 1 / sqrt(raw.dot(raw))
+        let queryCoordinate = SphericalPoint(
+            x: raw.x * inverseNorm,
+            y: raw.y * inverseNorm,
+            z: raw.z * inverseNorm
+        ).coordinate
+        let query = SphericalPoint.fastLookupVector(
+            latitudeDegrees: queryCoordinate.latitude,
+            longitudeDegrees: queryCoordinate.longitude
+        ).point
+        let expected = grid.storage.nearestPointID(to: query)
+        let actual = try #require(grid.findPoint(
+            lat: queryCoordinate.latitude,
+            lon: queryCoordinate.longitude
+        ))
+        if actual != expected { differentPointCount += 1 }
+        maximumRegretMeters = max(
+            maximumRegretMeters,
+            distanceRegret(
+                query: query,
+                expected: grid.storage.point(at: expected),
+                actual: grid.storage.point(at: actual)
+            )
+        )
+    }
+    print("Grid \(identity.gridNumber) Float lookup: \(differentPointCount) differing IDs, \(maximumRegretMeters) m maximum regret")
+    #expect(maximumRegretMeters <= 3)
 }
 
 private func temporaryArtifactFile() -> URL {

@@ -32,6 +32,42 @@ enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertible {
 /// 2. aligned `Float32 XYZ + UInt32 point ID` records in bucket order;
 /// 3. one reverse `UInt32` position per canonical point ID.
 ///
+/// ```text
+/// SPHCUBE1 file
+///
+/// byte 0                                                               end
+///   |                                                                    |
+///   v                                                                    v
+///   +-----------------------------+--------------------------------------+
+///   | Header (144 bytes)          | Bucket directory                     |
+///   +-----------------------------+-------------------+------------------+
+///   |  0 magic[8]                 | UInt32 base per   | UInt16 delta per |
+///   |  8 version, point count     | 256 directory     | bucket boundary  |
+///   | 16 level, distance limit    | entries           |                  |
+///   | 24 identity number + UUID   |                   |                  |
+///   | 48 FaceSection[6], 16 B each|                   |                  |
+///   +-----------------------------+-------------------+------------------+
+///                                 directory[i] = base[i / 256] + delta[i]
+///
+///   +-----------------------------+--------------------------------------+
+///   | padding to 16-byte boundary | Points in bucket order               |
+///   +-----------------------------+--------------------------------------+
+///                                 | x:F32 | y:F32 | z:F32 | pointID:U32 |
+///                                 |               16 bytes per point     |
+///   +-----------------------------+--------------------------------------+
+///   | Reverse positions           | optional alignment padding           |
+///   +-----------------------------+--------------------------------------+
+///   | UInt32 storage position for each canonical point ID               |
+///   +--------------------------------------------------------------------+
+///
+/// A bucket's records occupy:
+///   points[directory[bucket] ..< directory[bucket + 1]]
+///
+/// Each face header is `(minimumX, minimumY, columns, rows)`. Complete
+/// datasets store every bucket on all six faces; partial datasets store only
+/// occupied face rectangles. Buckets within a rectangle use tiled 8 x 8 order.
+/// ```
+///
 /// Consequently the same artifact can be generated and memory-mapped by other languages.
 enum SphericalCubeArtifact {
     /// Opaque producer-defined identity copied into the artifact and checked by its integration.

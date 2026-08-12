@@ -14,8 +14,42 @@ import OmFileFormat
 /// 3. if that region still cannot be certified, run the exact implicit-tree search in Double.
 ///
 /// Certification proves that a sphere around the current candidate cannot cross the searched
-/// cube-region boundary. Thus the common path remains small without assuming mesh connectivity;
-/// ambiguous Float ordering is delegated to deterministic Double comparison.
+/// cube-region boundary. Thus the common path remains small without assuming mesh connectivity.
+///
+/// ```text
+/// latitude / longitude
+///         |
+///         v
+/// normalize longitude and form Float32 unit vector (x, y, z)
+///         |
+///         v
+/// choose dominant-axis cube face and project to (u, v)
+///         |
+///         v
+/// quantize to leaf (face, x, y) and derive its tiled bucket number
+///         |
+///         v
+/// decode directory[bucket ..< bucket + 1]
+///         |
+///         v
+/// scan Float32 XYZ records and minimize squared chord distance
+///         |
+/// can the leaf be certified against its four boundaries?
+///         +-- yes --> apply limit --> ID / nil
+///         |
+///         no
+///         |
+///         v
+/// scan the same-face 3 x 3 leaves
+///         |
+/// can that region be certified?
+///         +-- yes --> apply limit --> ID / nil
+///         |
+///         no
+///         |
+///         v
+/// exact implicit-tree search over six faces --> apply limit --> canonical ID / nil
+/// ```
 final class SphericalCubeIndex: Sendable {
     typealias Artifact = SphericalCubeArtifact
     typealias FaceSection = Artifact.FaceSection
@@ -37,7 +71,6 @@ final class SphericalCubeIndex: Sendable {
 
     /// Conservative Double score margin retained while pruning the exact fallback tree.
     static let exactScoreMargin = 1e-15
-    private static let floatSelectionUlpMargin: Float = 32
     static let floatChordError = 8 * Double(Float.ulpOfOne)
 
     private let mapped: MmapFile
@@ -135,8 +168,8 @@ final class SphericalCubeIndex: Sendable {
         }
     }
 
-    /// Allocation-free production path. Float distances choose an obvious winner; ambiguous Float
-    /// ordering and uncommon implicit-tree traversal are delegated to the Double exact search.
+    /// Allocation-free production path. Float distances choose certified local winners; uncommon
+    /// non-local traversal is delegated to the Double exact search.
     @inline(never)
     private func nearestHot(
         to query: SphericalLookupVector,
@@ -145,17 +178,13 @@ final class SphericalCubeIndex: Sendable {
     ) -> (pointID: Int, position: Int, distanceSquared: Float)? {
         let geometryQuery = query.point
         var bestDistanceSquared = Float.infinity
-        var secondBestDistanceSquared = Float.infinity
         var bestPosition = -1
 
         @inline(__always)
         func consider(distanceSquared: Float, position: Int) {
             if distanceSquared < bestDistanceSquared {
-                secondBestDistanceSquared = bestDistanceSquared
                 bestDistanceSquared = distanceSquared
                 bestPosition = position
-            } else if distanceSquared < secondBestDistanceSquared {
-                secondBestDistanceSquared = distanceSquared
             }
         }
 
@@ -191,15 +220,12 @@ final class SphericalCubeIndex: Sendable {
         }
 
         @inline(__always)
-        func exactFallback(
-            certifiedRegion: ExactRegion? = nil
-        ) -> (pointID: Int, position: Int, distanceSquared: Float)? {
+        func exactFallback() -> (pointID: Int, position: Int, distanceSquared: Float)? {
             guard
                 let pointID = nearest(
                     to: geometryQuery,
                     maximumDistanceSquared: Double(maximumDistanceSquared),
                     seedPosition: bestPosition >= 0 ? bestPosition : nil,
-                    certifiedRegion: certifiedRegion,
                     bytes: bytes
                 )
             else { return nil }
@@ -305,44 +331,22 @@ final class SphericalCubeIndex: Sendable {
             )
         }
 
-        /// Float32 distances that are too close in ULPs are recomputed by the deterministic Double
-        /// path. This prevents quantization noise from deciding a Voronoi-boundary query.
-        @inline(__always)
-        func selectionIsUnambiguous() -> Bool {
-            guard secondBestDistanceSquared.isFinite else { return true }
-            let tolerance =
-                Self.floatSelectionUlpMargin
-                * max(bestDistanceSquared.ulp, secondBestDistanceSquared.ulp)
-            return secondBestDistanceSquared - bestDistanceSquared > tolerance
-        }
-
         scanBucket(x: queryLocation.x, y: queryLocation.y)
         let leafXRange = queryLocation.x...queryLocation.x
         let leafYRange = queryLocation.y...queryLocation.y
         if certified(xRange: leafXRange, yRange: leafYRange) {
-            if selectionIsUnambiguous() { return selectedWithinMaximumDistance() }
-            return exactFallback(
-                certifiedRegion: ExactRegion(
-                    xRange: leafXRange,
-                    yRange: leafYRange
-                ))
+            return selectedWithinMaximumDistance()
         }
 
         let xRange = max(0, queryLocation.x - 1)...min(resolution - 1, queryLocation.x + 1)
         let yRange = max(0, queryLocation.y - 1)...min(resolution - 1, queryLocation.y + 1)
         bestDistanceSquared = .infinity
-        secondBestDistanceSquared = .infinity
         bestPosition = -1
         for y in yRange {
             scanBucketRow(y: y, xRange: xRange)
         }
         if certified(xRange: xRange, yRange: yRange) {
-            if selectionIsUnambiguous() { return selectedWithinMaximumDistance() }
-            return exactFallback(
-                certifiedRegion: ExactRegion(
-                    xRange: xRange,
-                    yRange: yRange
-                ))
+            return selectedWithinMaximumDistance()
         }
         return exactFallback()
     }

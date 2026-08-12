@@ -272,7 +272,6 @@ enum IconNativeGridBenchmark {
                         to: query.center,
                         maximumDistanceSquared: .infinity,
                         seedPosition: query.seedPosition,
-                        certifiedRegion: nil,
                         bytes: bytes
                     )!
                 }
