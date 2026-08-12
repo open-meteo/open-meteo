@@ -112,8 +112,8 @@ private extension SphericalCubeIndex {
             let ranked = fixture.centers.indices.sorted { lhs, rhs in
                 let lhsScore = query.dot(fixture.grid.storage.point(at: lhs))
                 let rhsScore = query.dot(fixture.grid.storage.point(at: rhs))
-                if lhsScore > rhsScore + SphericalCubeIndex.scoreTieTolerance { return true }
-                if rhsScore > lhsScore + SphericalCubeIndex.scoreTieTolerance { return false }
+                if lhsScore > rhsScore + SphericalCubeIndex.exactScoreMargin { return true }
+                if rhsScore > lhsScore + SphericalCubeIndex.exactScoreMargin { return false }
                 return lhs < rhs
             }
             let lookup = try #require(fixture.grid.storage.nearestLookup(
@@ -489,7 +489,7 @@ private func nearest(point: SphericalPoint, centers: [SphericalPoint]) -> Int {
     var bestScore = -Double.infinity
     for center in centers { bestScore = max(bestScore, point.dot(center)) }
     return centers.indices.first {
-        point.dot(centers[$0]) >= bestScore - SphericalCubeIndex.scoreTieTolerance
+        point.dot(centers[$0]) >= bestScore - SphericalCubeIndex.exactScoreMargin
     }!
 }
 
