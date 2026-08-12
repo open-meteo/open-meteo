@@ -2097,8 +2097,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, include15Min: Bool) async throws -> [any GenericReaderProtocol] {
         switch self {
-        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
-            return [] // migrated to DomainReaderMapping and GenericReader
         case .best_match:
             return [] // migrated
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless,
@@ -2146,6 +2144,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_d2, .dwd_icon_d2:
             return [] // migrated
         case .dwd_icon_d2_15min:
+            return [] // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
             return [] // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -2373,12 +2373,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native:
-            return IconDomains.iconNative
-        case .dwd_icon_d2_native:
-            return nil // combines hourly and 15-minute native domains
-        case .dwd_icon_d2_native_15min:
-            return IconDomains.iconD2Native15min
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+            return nil // migrated
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
         case .ecmwf_ifs025:
@@ -2621,12 +2617,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native:
-            return try await GenericReader<IconDomains, IconVariable>(domain: .iconNative, position: gridpoint, options: options)
-        case .dwd_icon_d2_native:
-            return try await GenericReader<IconDomains, IconVariable>(domain: .iconD2Native, position: gridpoint, options: options)
-        case .dwd_icon_d2_native_15min:
-            return try await GenericReader<IconDomains, IconVariable>(domain: .iconD2Native15min, position: gridpoint, options: options)
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+            return nil // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs025:
