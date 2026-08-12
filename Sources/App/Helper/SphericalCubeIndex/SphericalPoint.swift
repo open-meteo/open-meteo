@@ -34,19 +34,11 @@ struct SphericalPoint: Sendable, Equatable {
         self.z = z
     }
 
-    private init(normalizingX x: Double, y: Double, z: Double) {
-        let length = sqrt(x * x + y * y + z * z)
-        precondition(length.isFinite && length > 0, "Invalid spherical point vector")
-        self.x = x / length
-        self.y = y / length
-        self.z = z / length
-    }
-
-    /// Converts geographic radians to a normalized Cartesian direction.
+    /// Converts geographic radians to a Cartesian unit direction.
     init(latitudeRadians: Double, longitudeRadians: Double) {
         let latitudeCosine = cos(latitudeRadians)
         self.init(
-            normalizingX: latitudeCosine * cos(longitudeRadians),
+            x: latitudeCosine * cos(longitudeRadians),
             y: latitudeCosine * sin(longitudeRadians),
             z: sin(latitudeRadians)
         )
