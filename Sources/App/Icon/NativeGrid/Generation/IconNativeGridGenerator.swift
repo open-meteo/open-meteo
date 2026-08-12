@@ -28,8 +28,10 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
     }
 }
 
-/// Offline converter from DWD's official ICON grid NetCDF to the compact, mmap-oriented runtime
-/// artifact. Spatial-index work belongs here, never in API coordinate lookup.
+/// Offline converter from DWD's official ICON grid NetCDF to a provider-neutral spherical cube
+/// artifact. It preserves NetCDF cell order as canonical point IDs and supplies ICON-specific
+/// identity, coverage, resolution, distance, and size policies. Spatial-index construction belongs
+/// here, never in API coordinate lookup.
 extension IconNativeGrid {
     enum Generator {
         static func generate(

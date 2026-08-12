@@ -1,15 +1,27 @@
 import Foundation
 import OmFileFormat
 
-/// Bounded nearest-point search over an implicit uniform cube quadtree on the unit sphere.
+/// Memory-mapped nearest-point search over an implicit uniform cube quadtree on the unit sphere.
 ///
-/// The artifact stores Float32 XYZ centres in cube-bucket order. The only spatial index
-/// is a compact prefix-offset directory at the leaf level. Internal nodes, bounds and face
-/// adjacency are derived from `(face, level, x, y)`.
+/// The index is independent of ICON and accepts any set of canonical point directions. Its only
+/// stored spatial structure is a leaf-bucket prefix directory; internal quadtree nodes, bounds,
+/// and cube-face adjacency are derived from `(face, level, x, y)` when needed.
+///
+/// A normal lookup follows three progressively more expensive paths:
+///
+/// 1. compare the query bucket's Float32 point records;
+/// 2. if the result cannot be certified, compare the surrounding 3×3 buckets;
+/// 3. if that region still cannot be certified, run the exact implicit-tree search in Double.
+///
+/// Certification proves that a sphere around the current candidate cannot cross the searched
+/// cube-region boundary. Thus the common path remains small without assuming mesh connectivity;
+/// ambiguous Float ordering is delegated to deterministic Double comparison.
 final class SphericalCubeIndex: Sendable {
     typealias Artifact = SphericalCubeArtifact
     typealias FaceSection = Artifact.FaceSection
 
+    /// Reusable result of nearest lookup. Nearby-point selection retains the query projection so it
+    /// does not repeat trigonometry or the exact-nearest search.
     struct Lookup: Sendable {
         let query: SphericalLookupVector
         let location: SphericalCubeGeometry.Location
@@ -23,6 +35,7 @@ final class SphericalCubeIndex: Sendable {
         let inverseNormSquared: Double
     }
 
+    /// Candidates within this Double dot-product tolerance share a canonical tie; lower ID wins.
     static let scoreTieTolerance = 1e-15
     private static let floatSelectionUlpMargin: Float = 32
     static let floatChordError = 8 * Double(Float.ulpOfOne)
@@ -44,6 +57,7 @@ final class SphericalCubeIndex: Sendable {
     var artifactBytes: Int { mapped.data.count }
     let identity: SphericalCubeArtifact.DatasetIdentity
 
+    /// Opens and validates the artifact, then precomputes leaf-boundary terms used by certification.
     init(file: URL) throws {
         let artifact = try Artifact.open(file: file)
         mapped = artifact.mapped
@@ -66,11 +80,14 @@ final class SphericalCubeIndex: Sendable {
         }
     }
 
+    /// Returns the canonical ID nearest to the coordinate, or `nil` for invalid input or when the
+    /// closest stored point exceeds the artifact's maximum chord distance.
     @inline(__always)
     func nearestPointID(latitude: Float, longitude: Float) -> Int? {
         nearestLookup(latitude: latitude, longitude: longitude)?.pointID
     }
 
+    /// Performs nearest lookup and retains the intermediate state used by nearby-point search.
     @inline(__always)
     func nearestLookup(latitude: Float, longitude: Float) -> Lookup? {
         guard latitude.isFinite, longitude.isFinite, latitude >= -90, latitude <= 90 else {
@@ -100,6 +117,7 @@ final class SphericalCubeIndex: Sendable {
         }
     }
 
+    /// Returns a canonical point direction through the reverse ID-to-storage permutation.
     @inline(__always)
     func point(at pointID: Int) -> SphericalPoint {
         precondition(pointID >= 0 && pointID < pointCount, "Spherical point ID out of range")
@@ -118,8 +136,8 @@ final class SphericalCubeIndex: Sendable {
         }
     }
 
-    /// Minimal production path. Ties and the uncommon implicit-tree traversal are delegated to the
-    /// exact search to keep the common case small.
+    /// Allocation-free production path. Float distances choose an obvious winner; ambiguous Float
+    /// ordering and uncommon implicit-tree traversal are delegated to the Double exact search.
     @inline(never)
     private func nearestHot(
         to query: SphericalLookupVector,
@@ -203,6 +221,8 @@ final class SphericalCubeIndex: Sendable {
             )
         }
 
+        /// The complete-face layout is known analytically and avoids loading face-section fields in
+        /// the global hot path. Partial datasets use their occupied face rectangles.
         @inline(__always)
         func bucket(x: Int, y: Int) -> Int? {
             if coversWholeSphere {
@@ -237,6 +257,7 @@ final class SphericalCubeIndex: Sendable {
             scanRange(begin..<end)
         }
 
+        /// Scans a logical row in contiguous tiled segments, minimizing directory decodes.
         @inline(__always)
         func scanBucketRow(y: Int, xRange: ClosedRange<Int>) {
             let lowerX: Int
@@ -285,6 +306,8 @@ final class SphericalCubeIndex: Sendable {
             )
         }
 
+        /// Float32 distances that are too close in ULPs are recomputed by the deterministic Double
+        /// path. This prevents quantization noise from deciding a Voronoi-boundary query.
         @inline(__always)
         func selectionIsUnambiguous() -> Bool {
             guard secondBestDistanceSquared.isFinite else { return true }
