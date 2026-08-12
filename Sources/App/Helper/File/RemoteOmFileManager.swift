@@ -21,14 +21,14 @@ final class RemoteFileManager: Sendable {
     
     enum FileType {
         case local(FileSystemCache.FileEntry)
-        case remote(OmHttpReaderBackend)
+        case remote(OmReaderBlockCache<OmHttpReaderBackend, MmapFile>)
         
         var modificationTime: Date {
             switch self {
             case .local(let fileEntry):
                 return fileEntry.modificationTimestamp
             case .remote(let s3File):
-                return s3File.lastModifiedTimestamp!.toDate()
+                return s3File.backend.lastModifiedTimestamp!.toDate()
             }
         }
         
@@ -37,7 +37,7 @@ final class RemoteFileManager: Sendable {
             case .local(let fileEntry):
                 return fileEntry.size
             case .remote(let s3File):
-                return Int64(s3File.count)
+                return Int64(s3File.backend.count)
             }
         }
     }
@@ -65,7 +65,8 @@ final class RemoteFileManager: Sendable {
         }
         if let remoteFileSystem, let file = try await remoteFileSystem.getObject(path: path, client: client, logger: logger) {
             let http = OmHttpReaderBackend(client: client, logger: logger, url: "\(remoteFileSystem.server)\(path)", count: await file.contentLength, lastModified: await file.lastModified, eTag: nil, lastValidated: .now())
-            return .remote(http)
+            let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: http, cache: OpenMeteo.dataBlockCache, cacheKey: http.cacheKey)
+            return .remote(file)
         }
         return nil
     }

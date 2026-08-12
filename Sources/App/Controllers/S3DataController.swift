@@ -23,8 +23,7 @@ import NIOFileSystem
  If `S3_UPLOAD_LAZY_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are lazily replicated to those servers after the sync replication completed. Used to upload data to large S3 storage servers afterwards
  
  TODO:
- - Proxy to backend S3 server, cache backend S3 listings
- - FileHandle open cache + maybe also cache local listing
+ - Update Filesystemcache on S3 uploads
  - API key integration with accounting (1 call = 1KB traffic)
  */
 struct S3DataController: RouteCollection {
@@ -1017,11 +1016,10 @@ extension Request {
                     try await onCompleted(.failure(error))
                 }
             }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
-        case .remote(let http):
+        case .remote(let cached):
             // Return cached data or stream from network
             response.body = .init(asyncStream: { stream in
                 do {
-                    let cached = OmReaderBlockCache(backend: http, cache: OpenMeteo.dataBlockCache, cacheKey: http.cacheKey)
                     for block in offset / Int64(chunkSize) ..< (offset + Int64(byteCount)).divideRoundedUp(divisor: Int64(chunkSize)) {
                         let offset = max(offset, block*Int64(chunkSize))
                         let end = min(offset + Int64(byteCount), min(file.size, (block+1)*Int64(chunkSize)))

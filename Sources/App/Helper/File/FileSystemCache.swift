@@ -33,6 +33,8 @@ import Darwin
  - Background checks to revalidate eagerly -> make sure to release deleted files even if not read recently
  
  TODO:
+ - Background check to proactively revalidate directories
+ - Track last access to directories and eject them if not used for a while
  - Should use `getdents64` to speed up directory listing
  - Use `inotify` on linux to watch for modifications using events
  */
