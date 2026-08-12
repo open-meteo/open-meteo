@@ -12,10 +12,6 @@ struct IconNativeGrid: Gridable {
 
     let storage: SphericalCubeIndex
 
-    init(storage: SphericalCubeIndex) {
-        self.storage = storage
-    }
-
     static func load(file: URL) throws -> Self {
         Self(storage: try SphericalCubeIndex(file: file))
     }

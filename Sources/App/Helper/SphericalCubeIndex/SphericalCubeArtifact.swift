@@ -53,7 +53,6 @@ enum SphericalCubeArtifact {
         let pointCount: Int
         let level: Int
         let resolution: Int
-        let bucketCount: Int
         let identity: DatasetIdentity
     }
 
@@ -358,7 +357,6 @@ extension SphericalCubeArtifact {
             pointCount: pointCount,
             level: level,
             resolution: resolution,
-            bucketCount: bucketCount,
             identity: identity
         )
     }
