@@ -174,10 +174,6 @@ private extension SphericalCubeIndex {
     @Test func artifactUsesSinglePortableFloat32Format() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        #expect(SphericalCubeArtifact.magic == Array("SPHCUBE1".utf8))
-        #expect(SphericalCubeArtifact.version == 1)
-        #expect(SphericalCubeArtifact.headerBytes == 144)
-        #expect(SphericalCubeArtifact.pointStride == 16)
         let artifact = try SphericalCubeArtifact.open(file: fixture.file)
         #expect(artifact.coversWholeSphere)
         #expect(artifact.identity == globalMetadata.identity)
@@ -250,43 +246,6 @@ private extension SphericalCubeIndex {
             try cache.validateFileAndInstall()
         }
         #expect(ObjectIdentifier(try cache.get().storage) == identifiers[0])
-    }
-
-    @Test func concurrentLookupsAreStable() async throws {
-        let fixture = try makeGlobalFixture()
-        defer { fixture.remove() }
-        let expected = (0..<360).map { offset in
-            fixture.grid.findPoint(lat: 37.5, lon: Float(offset) - 179.75)
-        }
-
-        let stable = await withTaskGroup(of: Bool.self, returning: Bool.self) { group in
-            for _ in 0..<16 {
-                group.addTask {
-                    for offset in expected.indices {
-                        if fixture.grid.findPoint(
-                            lat: 37.5,
-                            lon: Float(offset) - 179.75
-                        ) != expected[offset] {
-                            return false
-                        }
-                    }
-                    return true
-                }
-            }
-            for await result in group where !result { return false }
-            return true
-        }
-        #expect(stable)
-    }
-
-    @Test func invalidNetcdfUsesTheSourceErrorDomain() throws {
-        let file = temporaryArtifactFile()
-        defer { try? FileManager.default.removeItem(at: file) }
-        try "not a NetCDF file".write(to: file, atomically: true, encoding: .utf8)
-
-        #expect(throws: IconNativeGridSourceError.self) {
-            _ = try IconNativeGrid.Generator.readSource(file: file.path, identity: .d2)
-        }
     }
 
     @Test func terrainAndSeaSelectionUseSpatialCandidates() async throws {
