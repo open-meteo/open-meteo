@@ -140,15 +140,6 @@ extension IconDomains {
         nativeGridIdentity != nil
     }
 
-    var isAvailable: Bool {
-        guard isNative else {
-            return true
-        }
-        // API servers do not generate artifacts. A missing or corrupt grid disables only this
-        // domain; the download command calls `prepareNativeGrid` to create or repair it.
-        return (try? requireNativeGrid()) != nil
-    }
-
     var isD2Deterministic: Bool {
         self == .iconD2 || self == .iconD2Native
     }
