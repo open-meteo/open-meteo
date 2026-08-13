@@ -1,12 +1,13 @@
 import Foundation
 
-/// European Air Quality index: https://www.eea.europa.eu/themes/air/air-quality-index in the right legend press "About the European Air Quality Index"
+/// European Air Quality index: https://airindex.eea.europa.eu/AQI/index.html
+/// Index bands as revised by the EEA in 2024, see ETC HE Report 2024/17. Hourly concentrations are used for all five pollutants.
 enum EuropeanAirQuality {
-    static let no2HourlyThresholds: [Float] = [0, 40, 90, 120, 230, 340]
-    static let o3HourlyThresholds: [Float] = [0, 50, 100, 130, 240, 380]
-    static let so2HourlyThresholds: [Float] = [0, 100, 200, 350, 500, 750]
-    static let pm2_5_24HourlyMeanThresholds: [Float] = [0, 10, 20, 25, 50, 75]
-    static let pm10_24HourlyMeanThresholds: [Float] = [0, 20, 40, 50, 100, 150]
+    static let no2HourlyThresholds: [Float] = [0, 10, 25, 60, 100, 150]
+    static let o3HourlyThresholds: [Float] = [0, 60, 100, 120, 160, 180]
+    static let so2HourlyThresholds: [Float] = [0, 20, 40, 125, 190, 275]
+    static let pm2_5HourlyThresholds: [Float] = [0, 5, 15, 50, 90, 140]
+    static let pm10HourlyThresholds: [Float] = [0, 15, 45, 120, 195, 270]
 
     /// Accept hourly values
     @inlinable static func indexNo2(no2: Float) -> Float {
@@ -23,14 +24,14 @@ enum EuropeanAirQuality {
         return so2HourlyThresholds.positionExtrapolated(of: so2) * 20
     }
 
-    /// Accept 24h running mean
-    @inlinable static func indexPm10(pm10_24h_mean: Float) -> Float {
-        return pm10_24HourlyMeanThresholds.positionExtrapolated(of: pm10_24h_mean) * 20
+    /// Accept hourly values
+    @inlinable static func indexPm10(pm10: Float) -> Float {
+        return pm10HourlyThresholds.positionExtrapolated(of: pm10) * 20
     }
 
-    /// Accept 24h running mean
-    @inlinable static func indexPm2_5(pm2_5_24h_mean: Float) -> Float {
-        return pm2_5_24HourlyMeanThresholds.positionExtrapolated(of: pm2_5_24h_mean) * 20
+    /// Accept hourly values
+    @inlinable static func indexPm2_5(pm2_5: Float) -> Float {
+        return pm2_5HourlyThresholds.positionExtrapolated(of: pm2_5) * 20
     }
 }
 

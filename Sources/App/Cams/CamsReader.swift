@@ -24,13 +24,11 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             })
             return DataAndUnit(max, .europeanAirQualityIndex)
         case .european_aqi_pm2_5:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
-            let pm2_5 = try await get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
+            let pm2_5 = try await get(raw: .pm2_5, time: time).data
             return DataAndUnit(pm2_5.map(EuropeanAirQuality.indexPm2_5), .europeanAirQualityIndex)
         case .european_aqi_pm10:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
-            let pm10avg = try await get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
-            return DataAndUnit(pm10avg.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
+            let pm10 = try await get(raw: .pm10, time: time).data
+            return DataAndUnit(pm10.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
         case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
             let no2 = try await get(raw: .nitrogen_dioxide, time: time).data
             return DataAndUnit(no2.map(EuropeanAirQuality.indexNo2), .europeanAirQualityIndex)
@@ -94,9 +92,9 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try await prefetchData(derived: .european_aqi_o3, time: time)
             try await prefetchData(derived: .european_aqi_so2, time: time)
         case .european_aqi_pm2_5:
-            try await prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .pm2_5, time: time)
         case .european_aqi_pm10:
-            try await prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .pm10, time: time)
         case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
             try await prefetchData(raw: .nitrogen_dioxide, time: time)
         case .european_aqi_ozone, .european_aqi_o3:
