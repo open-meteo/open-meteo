@@ -77,10 +77,10 @@ struct S3Inventory {
         return try await directory.getFile(name: object, server: server, prefix: prefix, client: client, logger: logger)
     }
     
-    func lifeCycleTick(application: Application) async {
-        await self.root.lifecycleTick(
-            client: application.dedicatedHttpClient,
-            logger: application.logger,
+    func revalidateRecursively(client: HTTPClient, logger: Logger) async {
+        await self.root.revalidateRecursively(
+            client: client,
+            logger: logger,
             server: server,
             prefix: "",
             now: .now,
@@ -411,7 +411,7 @@ actor S3Directory {
     /// Periodic lifecycle callback.
     /// - Revalidates directories every `revalidateIntervalSeconds` if they were revalidated at least once before.
     /// - Skips revalidation for directories that were not accessed for more than `inactiveSkipSeconds`.
-    nonisolated func lifecycleTick(
+    nonisolated func revalidateRecursively(
         client: HTTPClient,
         logger: Logger,
         server: String,
@@ -423,11 +423,6 @@ actor S3Directory {
         if now.timeIntervalSince(await lastAccess) > Double(inactiveSkipSeconds) {
             return
         }
-        /// Skip directories that have never been validated
-        guard await revalidationQueue != nil else {
-            return
-        }
-
         if now.timeIntervalSince(await lastValidated) > Double(revalidateIntervalSeconds) {
             do {
                 try await revalidate(client: client, logger: logger, server: server, prefix: prefix[...])
@@ -438,7 +433,7 @@ actor S3Directory {
         }
 
         for (name, directory) in await directories {
-            await directory.lifecycleTick(
+            await directory.revalidateRecursively(
                 client: client,
                 logger: logger,
                 server: server,

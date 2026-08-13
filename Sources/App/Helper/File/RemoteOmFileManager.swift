@@ -101,7 +101,7 @@ final class RemoteFileManager: Sendable {
     
     /// Called every second from a life cycle handler on an available thread
     func backgroundTask(application: Application) async throws {
-        await remoteFileSystem?.lifeCycleTick(application: application)
+        await remoteFileSystem?.revalidateRecursively(client: application.dedicatedHttpClient, logger: application.logger)
     }
 }
 /*
