@@ -2,42 +2,15 @@ import OmFileFormat
 import Foundation
 import Vapor
 
-/// Represents a "File" that could be read from local or remote
-/*protocol RemoteFileManageable: Sendable, Hashable {
-    associatedtype Value: Sendable
-    associatedtype Local: LocalFileRepresentable<Value>
-    associatedtype Remote: RemoteFileRepresentable<Value>
-    
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Remote
-    func makeLocalReader(file: MmapFile) async throws -> Local
-    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int
-    func getFilePath() -> String
-    func getRemoteUrl() -> String?
-}
 
-/// An intermediate **remote** file representation that can be cast to a final value
-protocol RemoteFileRepresentable<Value>: Sendable {
-    associatedtype Value
-    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> { get }
-    func cast() -> Value
-}
-
-/// An intermediate **local** file representation that can be cast to a final value
-protocol LocalFileRepresentable<Value>: Sendable {
-    associatedtype Value
-    var fn: MmapFile { get }
-    func cast() -> Value
-}*/
-
-
-protocol RemoteFileManageable2 {
-    associatedtype Payload: FileSystemPayload
+protocol RemoteFileManageable {
+    associatedtype Payload: RemoteFileManagablePayload
     
     /// Get the relative file prefixed with `data/` or `data_spatial` like `data/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePathWithData() -> String
 }
 
-extension RemoteFileManageable2 {
+extension RemoteFileManageable {
     /// Get the absolute file system path like `/var/lib/openmeteo-`
     func getFilePath() -> String {
         let path = getRelativeFilePathWithData()
@@ -68,7 +41,7 @@ extension RemoteFileManageable2 {
     }
 }
 
-protocol FileSystemPayloadCodable: FileSystemPayload, Codable {
+protocol FileSystemPayloadCodable: RemoteFileManagablePayload, Codable {
 }
 
 enum FileSystemError: Error {

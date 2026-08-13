@@ -953,13 +953,13 @@ extension Request {
         }
 
         // Generate ETag value, "last modified date in epoch time" + "-" + "file size"
-        let eTag = "\"\(Int(file.modificationTime.timeIntervalSince1970))-\(file.size)\""
+        let eTag = "\"\(file.modificationTimestamp.timeIntervalSince1970)-\(file.size)\""
         
         // Create empty headers array.
         var headers: HTTPHeaders = [:]
 
         // Respond with lastModified header
-        headers.lastModified = HTTPHeaders.LastModified(file.modificationTime)
+        headers.lastModified = HTTPHeaders.LastModified(file.modificationTimestamp.toDate())
 
         headers.replaceOrAdd(name: .eTag, value: eTag)
 

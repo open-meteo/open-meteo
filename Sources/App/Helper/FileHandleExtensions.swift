@@ -95,6 +95,16 @@ extension stat {
         #endif
         return Date(timeIntervalSince1970: seconds + nanosends / 1_000_000)
     }
+    
+    /// Last modification time of the file
+    public var modificationTimestamp: Timestamp {
+        #if os(Linux)
+            let seconds = Int(st_mtim.tv_sec)
+        #else
+            let seconds = Int(st_mtimespec.tv_sec)
+        #endif
+        return Timestamp(seconds)
+    }
 
     /// Creation time of the file / inode
     public var creationTime: Date {

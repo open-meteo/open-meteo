@@ -83,18 +83,19 @@ struct S3Inventory {
             logger: logger,
             server: server,
             prefix: "",
-            now: .now,
+            now: .now(),
             revalidateIntervalSeconds: 120,
             inactiveSkipSeconds: 30 * 60
         )
     }
 }
 
-//struct S3FileMeta: Sendable {
-//    let contentLength: Int
-//    let lastModified: Timestamp
-//}
-
+protocol RemotePayload: Sendable {
+    /// Initialise from remote source
+    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws
+    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self
+    func remoteDeleted() async throws
+}
 
 actor S3File {
     var contentLength: Int
@@ -330,8 +331,8 @@ actor S3File {
 actor S3Directory {
     var files = [String: S3File]()
     var directories = [String: S3Directory]()
-    var lastValidated = Date(timeIntervalSince1970: 0)
-    var lastAccess = Date(timeIntervalSince1970: 0)
+    var lastValidated = Timestamp(0)
+    var lastAccessed = Timestamp(0)
     
     /// If set to an array, a revalidation is running in the background
     var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
@@ -377,7 +378,7 @@ actor S3Directory {
                 directories.removeValue(forKey: name)
             }
 
-            lastValidated = .now
+            lastValidated = .now()
             let waiters = revalidationQueue
             revalidationQueue = nil
             waiters?.forEach({
@@ -401,14 +402,14 @@ actor S3Directory {
         logger: Logger,
         server: String,
         prefix: String,
-        now: Date,
+        now: Timestamp,
         revalidateIntervalSeconds: Int,
         inactiveSkipSeconds: Int
     ) async {
-        if now.timeIntervalSince(await lastAccess) > Double(inactiveSkipSeconds) {
+        if await lastAccessed.olderThan(seconds: inactiveSkipSeconds, now: now) {
             return
         }
-        if now.timeIntervalSince(await lastValidated) > Double(revalidateIntervalSeconds) {
+        if await lastValidated.olderThan(seconds: revalidateIntervalSeconds, now: now) {
             do {
                 try await update(client: client, logger: logger, server: server, prefix: prefix[...])
                 OmMetrics.fileCacheRemoteRevalidated.add(1, ordering: .relaxed)
@@ -431,10 +432,11 @@ actor S3Directory {
     }
         
     func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws {
-        if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
+        let now = Timestamp.now()
+        if lastValidated.olderThan(seconds: 10*60, now: now) {
             try await update(client: client, logger: logger, server: server, prefix: prefix)
         }
-        lastAccess = .now
+        lastAccessed = now
         for name in self.directories.keys {
             directories.insert(name)
         }
@@ -447,19 +449,20 @@ actor S3Directory {
     }
     
     func getDirectory(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
-        if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
+        let now = Timestamp.now()
+        if lastValidated.olderThan(seconds: 10*60, now: now) {
             try await update(client: client, logger: logger, server: server, prefix: prefix)
         }
-        lastAccess = .now
+        lastAccessed = now
         return directories[String(name)]
     }
 
     func getFile(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3File? {
-        if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
+        let now = Timestamp.now()
+        if lastValidated.olderThan(seconds: 10*60, now: now) {
             try await update(client: client, logger: logger, server: server, prefix: prefix)
         }
-        lastAccess = .now
+        lastAccessed = now
         return files[String(name)]
     }
 }
-

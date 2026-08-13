@@ -62,7 +62,7 @@ enum FullRunMetaFile/*: RemoteFileManageableJson*/ {
     }
 }
 
-extension FullRunMetaFile: RemoteFileManageable2 {
+extension FullRunMetaFile: RemoteFileManageable {
     func getRelativeFilePathWithData() -> String {
         switch self {
         case .latest(let domainRegistry):

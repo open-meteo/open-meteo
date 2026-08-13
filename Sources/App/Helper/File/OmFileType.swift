@@ -130,7 +130,7 @@ enum OmFileType /*: Hashable, RemoteFileManageable*/ {
     }
 }
 
-extension OmFileType: RemoteFileManageable2 {
+extension OmFileType: RemoteFileManageable {
     /// Relative file path like `data/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePathWithData() -> String {
         switch self {
@@ -154,34 +154,6 @@ extension OmFileType: RemoteFileManageable2 {
     
     typealias Payload = OmFileLocalRemoteOmReader
 }
-
-/*struct OmFileRemoteOmReader: RemoteFileRepresentable {
-    let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
-    let timestamps: [Timestamp]?
-    let timeRangeDt: TimerangeDt?
-    
-    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-        reader.fn
-    }
-    
-    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
-        return (reader, timestamps, timeRangeDt)
-    }
-}
-
-struct OmFileLocalOmReader: LocalFileRepresentable {
-    let reader: OmFileReaderArray<MmapFile, Float>
-    let timestamps: [Timestamp]?
-    let timeRangeDt: TimerangeDt?
-    
-    var fn: MmapFile {
-        reader.fn
-    }
-    
-    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
-        return (reader, timestamps, timeRangeDt)
-    }
-}*/
 
 extension OmFileReaderArrayProtocol where OmType == Float {
     /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series

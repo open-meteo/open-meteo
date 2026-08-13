@@ -37,19 +37,19 @@ import Darwin
  */
 enum FileSystemCache {
     /// Revalidate directories on access after every 10 seconds. Usually the `revalidateBackgroundInterval` should already have revalidated this directory
-    static let revalidateOnAccessInterval: UInt64 = 10
+    static let revalidateOnAccessInterval = 10
     /// Revalidate directories every 5 seconds in a background task
-    static let revalidateBackgroundInterval: UInt64 = 5
+    static let revalidateBackgroundInterval = 5
     /// If a directory has not been accessed for more than 60 second, do not run background revalidation
-    static let revalidateBackgroundIgnoreInterval: UInt64 = 60
+    static let revalidateBackgroundIgnoreInterval = 60
     /// Remove directory and file handles after 10 minutes entirely
-    static let revalidateBackgroundEjectInterval: UInt64 = 600
+    static let revalidateBackgroundEjectInterval = 600
     
     actor DirectoryEntry: Sendable {
         let fd: FileHandle?
         let inode: UInt64
-        var lastRefreshTimestamp: UInt64
-        var lastAccessedTimestamp: UInt64
+        var lastRefresh: Timestamp
+        var lastAccessed: Timestamp
         private var files: [String: FileEntry]
         private var directories: [String: DirectoryEntry]
         
@@ -71,17 +71,17 @@ enum FileSystemCache {
             self.inode = inode
             self.files = [:]
             self.directories = [:]
-            lastRefreshTimestamp = 0
-            lastAccessedTimestamp = 0
+            lastRefresh = Timestamp(0)
+            lastAccessed = Timestamp(0)
         }
         
         init(directories: [String: DirectoryEntry]) {
             self.fd = nil
             self.inode = 0
-            self.lastRefreshTimestamp = 0
+            self.lastRefresh = Timestamp(0)
             self.directories = directories
             self.files = [:]
-            lastAccessedTimestamp = 0
+            lastAccessed = Timestamp(0)
         }
         
         init(path: String) throws {
@@ -89,14 +89,15 @@ enum FileSystemCache {
             self.inode = 0
             self.files = [:]
             self.directories = [:]
-            lastRefreshTimestamp = 0
-            lastAccessedTimestamp = 0
+            lastRefresh = Timestamp(0)
+            lastAccessed = Timestamp(0)
         }
         
         /// Should be called before any access to its contents
         private func updateIfRequired() {
-            lastAccessedTimestamp = UInt64(Date().timeIntervalSince1970)
-            if lastRefreshTimestamp < UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateOnAccessInterval {
+            let now = Timestamp.now()
+            lastAccessed = now
+            if lastRefresh.olderThan(seconds: FileSystemCache.revalidateOnAccessInterval, now: now)  {
                 do {
                     try forceUpdate()
                 } catch {
@@ -106,23 +107,23 @@ enum FileSystemCache {
         }
         
         /// Should be called every second from a life cycle handler
-        func updateRecursivelyIfRequired() async throws {
-            if lastAccessedTimestamp < UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateBackgroundEjectInterval {
+        func updateRecursivelyIfRequired(now: Timestamp) async throws {
+            if lastAccessed.olderThan(seconds: FileSystemCache.revalidateBackgroundEjectInterval, now: now) {
                 /// If not used for more than 10 minutes, release cached file handles and payloads
                 self.files = [:]
                 self.directories = [:]
-                lastRefreshTimestamp = 0
-                lastAccessedTimestamp = 0
+                lastRefresh = Timestamp(0)
+                lastAccessed = Timestamp(0)
                 return
             }
-            guard lastAccessedTimestamp > UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateBackgroundIgnoreInterval else {
+            if lastAccessed.olderThan(seconds: FileSystemCache.revalidateBackgroundIgnoreInterval, now: now) {
                 return // Skip if not accessed for more than 60 seconds
             }
-            if lastRefreshTimestamp < UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateBackgroundInterval {
+            if lastRefresh.olderThan(seconds: FileSystemCache.revalidateBackgroundInterval, now: now) {
                 try forceUpdate()
             }
             for directory in directories.values {
-                try await directory.updateRecursivelyIfRequired()
+                try await directory.updateRecursivelyIfRequired(now: now)
             }
         }
         
@@ -189,7 +190,7 @@ enum FileSystemCache {
                         fd: fd,
                         inode: inode,
                         size: Int64(stat.st_size),
-                        modificationTimestamp: stat.modificationTime
+                        modificationTimestamp: stat.modificationTimestamp
                     )
                 }
             }
@@ -199,7 +200,7 @@ enum FileSystemCache {
             for name in directories.keys where !seenDirectories.contains(name) {
                 directories.removeValue(forKey: name)
             }
-            lastRefreshTimestamp = UInt64(Date().timeIntervalSince1970)
+            lastRefresh = .now()
         }
         
         func getDirectoriesAndFiles() -> (directories: [String: DirectoryEntry], files: [String: FileEntry]) {
@@ -216,7 +217,7 @@ enum FileSystemCache {
                 guard files[name] == nil else {
                     continue
                 }
-                files[name] = (attr.modificationTimestamp, attr.size, nil)
+                files[name] = (attr.modificationTimestamp.toDate(), attr.size, nil)
             }
         }
         
@@ -279,7 +280,7 @@ enum FileSystemCache {
         let fd: FileHandle
         let inode: UInt64 // required to check while looping directories
         let size: Int64
-        let modificationTimestamp: Date
+        let modificationTimestamp: Timestamp
         
         /// Reference to the open-meteo file or json file
         private var payload: PayloadState
@@ -291,7 +292,7 @@ enum FileSystemCache {
             case error(Error)
         }
         
-        init(fd: FileHandle, inode: UInt64, size: Int64, modificationTimestamp: Date) {
+        init(fd: FileHandle, inode: UInt64, size: Int64, modificationTimestamp: Timestamp) {
             self.fd = fd
             self.inode = inode
             self.size = size
@@ -346,17 +347,6 @@ enum FileSystemCache {
             }
         }
     }
-}
-
-protocol FileSystemPayload: RemotePayload, LocalPayload {
-    
-}
-
-protocol RemotePayload: Sendable {
-    /// Initialise from remote source
-    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws
-    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self
-    func remoteDeleted() async throws
 }
 
 protocol LocalPayload: Sendable {
