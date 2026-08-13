@@ -59,7 +59,3 @@ extension OmFileLocalRemoteOmReader: FileSystemPayload {
         logger.warning("OmFileRemoteOmReader: File deleted from server. \(deletedBlocks) previously cached blocks have been deleted.")
     }
 }
-
-extension OmFileType: RemoteFileManageable2 {
-    typealias Payload = OmFileLocalRemoteOmReader
-}

@@ -32,9 +32,40 @@ protocol LocalFileRepresentable<Value>: Sendable {
 
 protocol RemoteFileManageable2 {
     associatedtype Payload: FileSystemPayload
+    
+    /// Get the relative file prefixed with `data/` or `data_spatial` like `data/dwd_icon/temperature_2m/chunk_1234.om`
+    func getRelativeFilePathWithData() -> String
+}
 
-    //func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int
-    func getFilePath() -> String
+extension RemoteFileManageable2 {
+    /// Get the absolute file system path like `/var/lib/openmeteo-`
+    func getFilePath() -> String {
+        let path = getRelativeFilePathWithData()
+        if path.starts(with: "data/") {
+            return path.replacingOccurrences(of: "data/", with: OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_run/") {
+            return path.replacingOccurrences(of: "data_run/", with: OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_spatial/") {
+            return path.replacingOccurrences(of: "data_spatial/", with: OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory)
+        }
+        fatalError("Unexpected data path \(path)")
+    }
+    
+    func createDirectory() throws {
+        let file = getFilePath()
+        guard let last = file.lastIndex(of: "/") else {
+            return
+        }
+        let path = "\(file[file.startIndex..<last])"
+        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+    }
+    
+    func exists() -> Bool {
+        let file = getFilePath()
+        return FileManager.default.fileExists(atPath: file)
+    }
 }
 
 protocol FileSystemPayloadCodable: FileSystemPayload, Codable {

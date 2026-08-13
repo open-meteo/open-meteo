@@ -60,34 +60,18 @@ enum FullRunMetaFile/*: RemoteFileManageableJson*/ {
             return modificationTime == nil ? 30 : run > now.subtract(hours: 24) ? 5*60 : 24*3600
         }
     }
-    
-    func getFilePath() -> String {
-        let directory = OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
-        switch self {
-        case .latest(let domainRegistry):
-            return "\(directory)\(domainRegistry.rawValue)/latest.json"
-        case .run(let domainRegistry, let run):
-            return "\(directory)\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta.json"
-        }
-    }
-    
-    func getRemoteUrl() -> String? {
-        switch self {
-        case .latest(let domain):
-            guard let directory = domain.remoteDataRunDirectory else {
-                return nil
-            }
-            return "\(directory)latest.json"
-        case .run(let domain, let run):
-            guard let directory = domain.remoteDataRunDirectory else {
-                return nil
-            }
-            return "\(directory)\(run.format_directoriesYYYYMMddhhmm)/meta.json"
-        }
-    }
 }
 
 extension FullRunMetaFile: RemoteFileManageable2 {
+    func getRelativeFilePathWithData() -> String {
+        switch self {
+        case .latest(let domainRegistry):
+            return "data_run/\(domainRegistry.rawValue)/latest.json"
+        case .run(let domainRegistry, let run):
+            return "data_run/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta.json"
+        }
+    }
+    
     typealias Payload = FullRunMetaJson
 }
 

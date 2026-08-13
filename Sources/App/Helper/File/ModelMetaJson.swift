@@ -139,20 +139,13 @@ struct ModelUpdateMetaFile/*: RemoteFileManageableJson*/ {
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         return 30
     }
-    
-    func getFilePath() -> String {
-        return "\(OpenMeteo.dataDirectory)\(domain.rawValue)/static/meta.json"
-    }
-    
-    func getRemoteUrl() -> String? {
-        guard let directory = domain.remoteDataDirectory else {
-            return nil
-        }
-        return "\(directory)static/meta.json"
-    }
 }
 
 extension ModelUpdateMetaFile: RemoteFileManageable2 {
+    func getRelativeFilePathWithData() -> String {
+        "data/\(domain.rawValue)/static/meta.json"
+    }
+    
     typealias Payload = ModelUpdateMetaJson
 }
 

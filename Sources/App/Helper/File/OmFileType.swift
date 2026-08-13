@@ -37,11 +37,6 @@ enum OmFileType /*: Hashable, RemoteFileManageable*/ {
         let timerangeDt = try await reader.getTimeRangeDt()
         return OmFileLocalOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
     }*/
-
-    /// Assemble the full file system path
-    func getFilePath() -> String {
-        return "\(getDataDirectoryPath())\(getRelativeFilePath())"
-    }
     
     /// How often this file should be checked for modifications. Some files update every hour, some never update.
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
@@ -101,22 +96,6 @@ enum OmFileType /*: Hashable, RemoteFileManageable*/ {
         }
     }
     
-    /// Get the remote URL. May replace "data" with "data_run"
-    /*func getRemoteUrl() -> String? {
-        guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
-            return nil
-        }
-        let file = getRelativeFilePath()
-        switch self {
-        case .run(_, _, _):
-            return "\(remoteDirectory.replacingLastPathComponent(with: "data_run"))\(file)"
-        case .domainChunk(_, _, _, _, _, _):
-            return "\(remoteDirectory)\(file)"
-        case .staticFile(domain: _, _, _):
-            return "\(remoteDirectory)\(file)"
-        }
-    }*/
-    
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePath() -> String {
         switch self {
@@ -149,23 +128,31 @@ enum OmFileType /*: Hashable, RemoteFileManageable*/ {
             return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
         }
     }
-
 }
 
-extension RemoteFileManageable2 {
-    func createDirectory() throws {
-        let file = getFilePath()
-        guard let last = file.lastIndex(of: "/") else {
-            return
+extension OmFileType: RemoteFileManageable2 {
+    /// Relative file path like `data/dwd_icon/temperature_2m/chunk_1234.om`
+    func getRelativeFilePathWithData() -> String {
+        switch self {
+        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+            let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
+            let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
+            if let chunk {
+                return "data/\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
+            }
+            return "data/\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type).om"
+        case .staticFile(let domain, let variable, let chunk):
+            if let chunk {
+                // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'
+                return "data/\(domain.rawValue)/static/\(variable)_\(chunk).om"
+            }
+            return "data/\(domain.rawValue)/static/\(variable).om"
+        case .run(domain: let domain, variable: let variable, run: let run):
+            return "data_run/\(domain.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(variable).om"
         }
-        let path = "\(file[file.startIndex..<last])"
-        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
     
-    func exists() -> Bool {
-        let file = getFilePath()
-        return FileManager.default.fileExists(atPath: file)
-    }
+    typealias Payload = OmFileLocalRemoteOmReader
 }
 
 /*struct OmFileRemoteOmReader: RemoteFileRepresentable {
