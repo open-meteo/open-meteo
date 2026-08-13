@@ -73,8 +73,7 @@ final class RemoteFileManager: Sendable {
     
     func with<R, Key: RemoteFileManageable2>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         
-        /// should be `data/model/variable/file.om`
-        let path = file.getFilePath()
+        let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getObject(path: path) {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
