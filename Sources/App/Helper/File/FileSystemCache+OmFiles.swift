@@ -3,7 +3,6 @@ import Foundation
 import AsyncHTTPClient
 import Logging
 
-
 struct OmFileLocalRemoteOmReader {
     let reader: any OmFileReaderArrayProtocol<Float>
     let timestamps: [Timestamp]?
@@ -16,9 +15,6 @@ struct OmFileLocalRemoteOmReader {
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }
 }
-
-
-// TODO implement JSON files parsing as well
 
 extension OmFileLocalRemoteOmReader: FileSystemPayload {
     init(fd: FileHandle, size: Int64) async throws {

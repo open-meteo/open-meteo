@@ -31,11 +31,6 @@ import Darwin
  
  Skips all files starting with a dot or ending in tilde
  
- Consider:
- - Currently OM files can be hash-mapped to open. String traversing is expensive. Any options?
- - Store last accessed attribute and release file handles if not used for a whiles
- - Background checks to revalidate eagerly -> make sure to release deleted files even if not read recently
- 
  TODO:
  - Should use `getdents64` to speed up directory listing
  - Use `inotify` on linux to watch for modifications using events
