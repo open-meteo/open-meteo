@@ -989,7 +989,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case singleWithSupplementalDomains(
             any GenericDomain,
             any GenericVariable.Type,
-            supplemental: [(any GenericDomain, any GenericVariable.Type)],
+            lowerPriority: [(any GenericDomain, any GenericVariable.Type)],
+            higherPriority: [(any GenericDomain, any GenericVariable.Type)],
             precipitationProb: (any GenericDomain)?
         )
 
@@ -1018,7 +1019,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             switch self {
             case .single(let domain, _),
                  .singleWithPrecipitationProbability(let domain, _, _),
-                 .singleWithSupplementalDomains(let domain, _, _, _):
+                 .singleWithSupplementalDomains(let domain, _, _, _, _):
                 return domain
             default:
                 return nil
@@ -1051,8 +1052,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let globalForecast = try await Self.makeDomainReaders(sources: global, lat: lat, lon: lon, elevation: localForecast.elevation, mode: mode, options: options)
                 let probability = try await precipitationProb?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: globalForecast.elevation, mode: mode, options: options)?.asOptionalReader
                 return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + globalForecast.readers + localForecast.readers)
-            case .singleWithSupplementalDomains(let domain, let variable, let supplemental, let precipitationProb):
-                let forecast = try await Self.makeDomainReaders(sources: [(domain, variable)] + supplemental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            case .singleWithSupplementalDomains(let domain, let variable, let lowerPriority, let higherPriority, let precipitationProb):
+                let sources = lowerPriority + [(domain, variable)] + higherPriority
+                let forecast = try await Self.makeDomainReaders(sources: sources, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 guard !forecast.readers.isEmpty else {
                     return nil
                 }
@@ -1169,6 +1171,24 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(MeteoFranceDomain.arome_france_15min, MeteoFranceVariable.self)
         case .meteofrance_arome_france_hd_15min:
             return .single(MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
+        case .jma_seamless, .jma_mix:
+            return .multiple([
+                (JmaDomain.gsm, JmaVariable.self),
+                (JmaDomain.msm_upper_level, JmaPressureVariable.self),
+                (JmaDomain.msm, JmaSurfaceVariable.self)
+            ])
+        case .jma_msm:
+            return .singleWithSupplementalDomains(
+                JmaDomain.msm,
+                JmaSurfaceVariable.self,
+                lowerPriority: [(JmaDomain.msm_upper_level, JmaPressureVariable.self)],
+                higherPriority: [],
+                precipitationProb: nil
+            )
+        case .jma_msm_upper_level:
+            return .single(JmaDomain.msm_upper_level, JmaPressureVariable.self)
+        case .jms_gsm, .jma_gsm:
+            return .single(JmaDomain.gsm, JmaVariable.self)
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return .multiple([
                 (IconDomains.iconEps, ProbabilityVariable.self),
@@ -1186,7 +1206,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .singleWithSupplementalDomains(
                 IconDomains.iconD2,
                 IconVariable.self,
-                supplemental: [(IconDomains.iconD2_15min, IconVariable.self)],
+                lowerPriority: [],
+                higherPriority: [(IconDomains.iconD2_15min, IconVariable.self)],
                 precipitationProb: IconDomains.iconD2Eps
             )
         case .dwd_icon_d2_15min:
@@ -1488,15 +1509,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 ])
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
-            if (22.4 + 5..<47.65 - 5).contains(lat), (120 + 5..<150 - 5).contains(lon), let jma_msm = try await JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options), let jma_msm_upper = try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if (22.4 + 5..<47.65 - 5).contains(lat),
+               (120 + 5..<150 - 5).contains(lon),
+               let jmaMsm = try await JmaDomain.msm.makeDerivedHourly(variableType: JmaSurfaceVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+               let jmaMsmUpper = try await JmaDomain.msm_upper_level.makeDerivedHourly(variableType: JmaPressureVariable.self, lat: lat, lon: lon, elevation: jmaMsm.resolvedTargetElevation, mode: mode, options: options) {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     gfs.asOptionalReader,
                     icon,
                     ifsHres.asOptionalReader,
-                    jma_msm_upper.asOptionalReader,
-                    jma_msm.asOptionalReader
+                    jmaMsmUpper,
+                    jmaMsm
                 ])
             }
 
@@ -1678,7 +1702,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             switch mapping {
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _),
-                 .singleWithSupplementalDomains(let domain, let variable, _, _):
+                 .singleWithSupplementalDomains(let domain, let variable, _, _, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
             case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
@@ -1759,19 +1783,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
              .meteofrance_arome_france_15min,
              .meteofrance_arome_france_hd_15min:
             return [] // migrated
-        case .jma_mix, .jma_seamless:
-            return try await JmaMixer(domains: [.gsm, .msm_upper_level, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .jma_msm:
-            return [
-                try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                try await JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
-        case .jma_msm_upper_level:
-            return [
-                try await JmaReader(domain: .msm_upper_level, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-            ].compactMap({ $0 })
-        case .jms_gsm, .jma_gsm:
-            return try await JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .jma_mix, .jma_seamless, .jma_msm, .jma_msm_upper_level, .jms_gsm, .jma_gsm:
+            return [] // migrated
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return [] // migrated
         case .icon_global, .dwd_icon_global, .dwd_icon:
@@ -2119,16 +2132,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
              .meteofrance_arome_france_hd_15min,
              .meteofrance_arome_france_15min:
             return nil // migrated
-        case .jma_seamless:
-            return nil
-        case .jma_mix:
-            return nil
-        case .jma_msm:
-            return JmaDomain.msm
-        case .jma_msm_upper_level:
-            return JmaDomain.msm_upper_level
-        case .jms_gsm, .jma_gsm:
-            return JmaDomain.gsm
+        case .jma_seamless, .jma_mix, .jma_msm, .jma_msm_upper_level, .jms_gsm, .jma_gsm:
+            return nil // migrated
         case .gem_seamless, .cmc_gem_seamless:
             return nil
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
@@ -2384,14 +2389,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .ncep_nbm_conus:
             return try await NbmReader(domain: .nbm_conus, gridpoint: gridpoint, options: options)
-        case .jma_seamless, .jma_mix:
-            return nil
-        case .jma_msm:
-            return try await JmaReader(domain: .msm, gridpoint: gridpoint, options: options)
-        case .jma_msm_upper_level:
-            return try await JmaReader(domain: .msm_upper_level, gridpoint: gridpoint, options: options)
-        case .jms_gsm, .jma_gsm:
-            return try await JmaReader(domain: .gsm, gridpoint: gridpoint, options: options)
+        case .jma_seamless, .jma_mix, .jma_msm, .jma_msm_upper_level, .jms_gsm, .jma_gsm:
+            return nil // migrated
         case .gem_seamless, .cmc_gem_seamless:
             return nil
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
