@@ -18,7 +18,7 @@ enum S3InventoryError: Error {
  
  Each file can be bound to a "payload" type. E.g. an open OM-File which maintains meta data about timestamps and arrays available
  
- Data from object is read using HTTP `If-Unmodified-Since` and HTTP ranges. If a file got modified, perform a HEAD request to quickly get the new modification timestamp and restart execution
+ Data from object is read using HTTP `If-Unmodified-Since` and `If-Match` (eTag) and HTTP ranges. If a file got modified, perform a HEAD request to quickly get the new modification timestamp and restart execution
  
  TODO:
  - Serialise entries to disk for fast boot (option to store in KV cache? Need to prefix size)
@@ -99,6 +99,7 @@ struct S3Inventory {
 actor S3File {
     var contentLength: Int
     var lastModified: Timestamp
+    var eTag: String
     
     /// Reference to the open-meteo file or json file
     private var payload: RemotePayloadState
@@ -126,25 +127,32 @@ actor S3File {
         case error(Error, Date)
     }
 
-    init(contentLength: Int, lastModified: Timestamp) {
+    init(contentLength: Int, lastModified: Timestamp, eTag: String) {
         self.contentLength = contentLength
         self.lastModified = lastModified
+        self.eTag = eTag
         payload = .none
+    }
+    
+    /// Initiate cached HTTP reader
+    func makeCachedClient(client: HTTPClient, logger: Logger, server: String, objectKey: String) -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: eTag)
+        return OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
     }
 
     /// Called from directory listing updates. Most of the times, content length and last modified did not change
-    func updateFromDirectoryListing(client: HTTPClient, logger: Logger, server: String, objectKey: String, contentLength: Int, lastModified: Timestamp) async {
-        if self.contentLength == contentLength && self.lastModified == lastModified {
+    func updateFromDirectoryListing(client: HTTPClient, logger: Logger, server: String, objectKey: String, contentLength: Int, lastModified: Timestamp, eTag: String) async {
+        if self.contentLength == contentLength && self.lastModified == lastModified && eTag == self.eTag {
             return
         }
         self.contentLength = contentLength
         self.lastModified = lastModified
+        self.eTag = eTag
         switch payload {
         case .ready(let old):
             payload = .updating(old: old, [])
             do {
-                let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: nil, lastValidated: .now())
-                let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
+                let file = makeCachedClient(client: client, logger: logger, server: server, objectKey: objectKey)
                 let new = try await old.remoteUpdated(file: file)
                 guard case .updating(_, let queued) = payload else {
                     fatalError("State was not .updating()")
@@ -188,25 +196,6 @@ actor S3File {
             break // do not modify queued requests
         }
     }
-
-    private static func fetchMeta(client: HTTPClient, logger: Logger, server: String, objectKey: String) async throws -> (contentLength: Int, lastModified: Timestamp) {
-        var request = HTTPClientRequest(url: "\(server)\(objectKey.s3PathPercentEncoded)")
-        request.method = .HEAD
-        try request.applyS3Credentials()
-
-        logger.debug("Revalidating S3 object '\(objectKey)' via HEAD")
-        let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2))
-        guard let newContentLength = response.headers["Content-Length"].first.flatMap(Int.init) else {
-            throw OmHttpReaderBackendError.contentLengthMissing
-        }
-        guard let newLastModified = response.headers["Last-Modified"]
-            .first
-            .flatMap(Self.lastModifiedDateFormat.date(from:))
-            .map ({ Timestamp(Int($0.timeIntervalSince1970)) }) else {
-            throw OmHttpReaderBackendError.contentLengthMissing
-        }
-        return (newContentLength, newLastModified)
-    }
     
     /// Execute a closure with the resolved payload. May retries if file modified errors occur
     nonisolated func with<R, Payload: FileSystemPayload>(client: HTTPClient, logger: Logger, server: String, objectKey: String, fn: (_ value: Payload) async throws -> R) async throws -> R? {
@@ -219,7 +208,7 @@ actor S3File {
         } catch CurlError.fileNotFound {
             await self.receivedObjectDeletedError()
             return nil
-        } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+        } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
             guard let payload = try await self.getPayload(ofType: Payload.self, client: client, logger: logger, server: server, objectKey: objectKey, receivedFileModifiedError: true) else {
                 return nil
             }
@@ -238,10 +227,7 @@ actor S3File {
         case .none:
             self.payload = .initialising([])
             do {
-                // TODO etag support
-                let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: nil, lastValidated: .now())
-                let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
-                let p = try await T(file: file)
+                let p = try await T(file: makeCachedClient(client: client, logger: logger, server: server, objectKey: objectKey))
                 guard case .initialising(let queued) = payload else {
                     fatalError("State was not .initialising()")
                 }
@@ -296,12 +282,11 @@ actor S3File {
             // At this stage there could be dozens of failing calls coming in
             self.payload = .updating(old: payload, [])
             do {
-                let meta = try await Self.fetchMeta(client: client, logger: logger, server: server, objectKey: objectKey)
-                self.contentLength = meta.contentLength
-                self.lastModified = meta.lastModified
-                let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: nil, lastValidated: .now())
-                let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
-                let new = try await payload.remoteUpdated(file: file)
+                let newReader = try await OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)")
+                self.contentLength = newReader.count
+                self.lastModified = newReader.lastModifiedTimestamp
+                self.eTag = newReader.eTag
+                let new = try await payload.remoteUpdated(file: OmReaderBlockCache(backend: newReader, cache: OpenMeteo.dataBlockCache, cacheKey: newReader.cacheKey))
                 guard case .updating(old: _, let queued) = self.payload else {
                     fatalError("State was not .updating()")
                 }
@@ -369,9 +354,9 @@ actor S3Directory {
                 listedFiles.insert(name)
                 // Keep existing object actors and directory actors alive whenever possible.
                 if let existing = files[name] {
-                    await existing.updateFromDirectoryListing(client: client, logger: logger, server: server, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp())
+                    await existing.updateFromDirectoryListing(client: client, logger: logger, server: server, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
                 } else {
-                    files[name] = S3File(contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp())
+                    files[name] = S3File(contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
                 }
             }
 
@@ -445,7 +430,7 @@ actor S3Directory {
         }
     }
         
-    func exportDirectories(directories: inout Set<String>, files: inout [String: (Date, Int64)], server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws {
+    func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws {
         if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
             try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
         }
@@ -457,7 +442,7 @@ actor S3Directory {
             guard files[name] == nil else {
                 continue
             }
-            files[name] = await (attr.lastModified.toDate(), Int64(attr.contentLength))
+            files[name] = await (attr.lastModified.toDate(), Int64(attr.contentLength), attr.eTag)
         }
     }
     
@@ -529,13 +514,4 @@ final class S3InventoryLifecycleManager: LifecycleHandler {
         }
     }
 }*/
-
-private extension String {
-    /// Percent-encode each path segment but keep directory separators.
-    var s3PathPercentEncoded: String {
-        split(separator: "/", omittingEmptySubsequences: false)
-            .map { String($0).awsPercentEncoded }
-            .joined(separator: "/")
-    }
-}
 

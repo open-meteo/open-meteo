@@ -28,7 +28,7 @@ final class RemoteFileManager: Sendable {
             case .local(let fileEntry):
                 return fileEntry.modificationTimestamp
             case .remote(let s3File):
-                return s3File.backend.lastModifiedTimestamp!.toDate()
+                return s3File.backend.lastModifiedTimestamp.toDate()
             }
         }
         
@@ -42,11 +42,11 @@ final class RemoteFileManager: Sendable {
         }
     }
     
-    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (Date, Int64)])? {
+    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (lastModified: Date, size: Int64, eTag: String?)])? {
         
         
         var directories = Set<String>()
-        var files = [String: (Date, Int64)]()
+        var files = [String: (lastModified: Date, size: Int64, eTag: String?)]()
         
         if let local = await localFileSystem.getDirectory(path: path) {
             await local.exportDirectories(directories: &directories, files: &files)
@@ -64,9 +64,8 @@ final class RemoteFileManager: Sendable {
             return .local(file)
         }
         if let remoteFileSystem, let file = try await remoteFileSystem.getObject(path: path, client: client, logger: logger) {
-            let http = OmHttpReaderBackend(client: client, logger: logger, url: "\(remoteFileSystem.server)\(path)", count: await file.contentLength, lastModified: await file.lastModified, eTag: nil, lastValidated: .now())
-            let file = OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: http, cache: OpenMeteo.dataBlockCache, cacheKey: http.cacheKey)
-            return .remote(file)
+            let client = await file.makeCachedClient(client: client, logger: logger, server: remoteFileSystem.server, objectKey: path)
+            return .remote(client)
         }
         return nil
     }

@@ -241,7 +241,7 @@ struct SyncCommand: AsyncCommand {
                         try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
                         await progress.add(try response.contentLength() ?? 0)
                         break
-                    } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+                    } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                         /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
                         try FileManager.default.removeItemIfExists(at: localFile)
                     }

@@ -25,6 +25,7 @@ enum S3List {
         let name: String
         let modificationTime: Date
         let fileSize: Int
+        let eTag: String
     }
 
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
@@ -49,15 +50,17 @@ enum S3List {
             }
 
             let files = body.xmlSection("Contents").map {
+                /// eTags are quoted like `<ETag>&quot;705802db9a8f7523eef48c8752b6ae39&quot;</ETag>`
                 guard let name = $0.xmlFirst("Key"),
                       let modificationTimeString = $0.xmlFirst("LastModified"),
                       let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)),
                       let fileSizeString = $0.xmlFirst("Size"),
-                      let fileSize = Int(fileSizeString)
+                      let fileSize = Int(fileSizeString),
+                      let eTag = $0.xmlFirst("ETag")?.dropFirst(6).dropLast(6)
                 else {
                     fatalError()
                 }
-                return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize)
+                return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize, eTag: String(eTag))
             }
             let directories = body.xmlSection("CommonPrefixes").map {
                 guard let prefix = $0.xmlFirst("Prefix") else {

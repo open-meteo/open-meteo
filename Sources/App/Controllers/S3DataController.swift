@@ -652,12 +652,15 @@ extension S3List.ListV2Query {
             throw S3ApiError.forbidden
         }
         let dateFormat = DateFormatter.awsS3DateTimeFloored
+        // eTag uses "timestamp-filesize" for local files
         let filesXml = directory.files.map { (name, attr) in
-            """
+            let eTag = attr.eTag ?? "\(Int(attr.0.timeIntervalSince1970))-\(attr.1)"
+            return """
             <Contents>
                 <Key>\(path)\(name)</Key>
                 <LastModified>\(dateFormat.string(from: attr.0))</LastModified>
                 <Size>\(attr.1)</Size>
+                <ETag>&quot;\(eTag)&quot;</ETag>
                 <StorageClass>STANDARD</StorageClass>
             </Contents>
             """
@@ -926,7 +929,6 @@ extension Request {
         file: RemoteFileManager.FileType,
         chunkSize: Int = NonBlockingFileIO.defaultChunkSize,
         mediaType: HTTPMediaType,
-        advancedETagComparison: Bool = false,
         onCompleted: @escaping @Sendable (Result<Void, Error>) async throws -> () = { _ in }
     ) async throws -> Response {
         let request = self
@@ -968,6 +970,13 @@ extension Request {
             // A 304 response MUST include the ETag header and a Content-Length header matching what the original resource's content length would have been were this a 200 response.
             headers.replaceOrAdd(name: .contentLength, value: file.size.description)
             return Response(status: .notModified, version: .http1_1, headersNoUpdate: headers, body: .empty)
+        }
+        
+        // Ensure that file has NOT been modified
+        if let ifMatch = request.headers.first(name: .ifMatch), eTag != ifMatch {
+            headers.replaceOrAdd(name: .contentLength, value: file.size.description)
+            headers.replaceOrAdd(name: .eTag, value: eTag)
+            return Response(status: .preconditionFailed, version: .http1_1, headersNoUpdate: headers, body: .empty)
         }
 
         // Create the HTTP response.

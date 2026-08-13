@@ -174,7 +174,7 @@ enum FileSystemCache {
             return (self.directories, self.files)
         }
         
-        func exportDirectories(directories: inout Set<String>, files: inout [String: (Date, Int64)]) async {
+        func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)]) async {
             updateIfRequired()
             for name in self.directories.keys {
                 directories.insert(name)
@@ -183,7 +183,7 @@ enum FileSystemCache {
                 guard files[name] == nil else {
                     continue
                 }
-                files[name] = (attr.modificationTimestamp, attr.size)
+                files[name] = (attr.modificationTimestamp, attr.size, nil)
             }
         }
         
