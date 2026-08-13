@@ -71,7 +71,7 @@ struct S3Inventory {
             directory = next
             componentStart = path.index(after: nextSlash)
         }
-        return try await directory.getFile(name: object, server: server, client: client, logger: logger)
+        return try await directory.getFile(name: String(object), server: server, client: client, logger: logger)
     }
     
     func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
@@ -94,6 +94,8 @@ protocol RemotePayload: Sendable {
 }
 
 actor S3File {
+    /// Full object name e.g. `data/dwd_icon/temperature_2m/chunk_1234.om`
+    let objectName: String
     var contentLength: Int
     var lastModified: Timestamp
     var eTag: String
@@ -124,7 +126,8 @@ actor S3File {
         case error(Error, Date)
     }
 
-    init(contentLength: Int, lastModified: Timestamp, eTag: String) {
+    init(objectName: String, contentLength: Int, lastModified: Timestamp, eTag: String) {
+        self.objectName = objectName
         self.contentLength = contentLength
         self.lastModified = lastModified
         self.eTag = eTag
@@ -132,8 +135,8 @@ actor S3File {
     }
     
     /// Initiate cached HTTP reader
-    func makeCachedClient(client: HTTPClient, logger: Logger, server: String, objectKey: String) -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-        let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)", count: contentLength, lastModified: lastModified, eTag: eTag)
+    func makeCachedClient(client: HTTPClient, logger: Logger, server: String) -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        let backend = OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectName)", count: contentLength, lastModified: lastModified, eTag: eTag)
         return OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
     }
 
@@ -149,7 +152,7 @@ actor S3File {
         case .ready(let old):
             payload = .updating(old: old, [])
             do {
-                let file = makeCachedClient(client: client, logger: logger, server: server, objectKey: objectKey)
+                let file = makeCachedClient(client: client, logger: logger, server: server)
                 let new = try await old.remoteUpdated(file: file)
                 guard case .updating(_, let queued) = payload else {
                     fatalError("State was not .updating()")
@@ -195,9 +198,9 @@ actor S3File {
     }
     
     /// Execute a closure with the resolved payload. May retries if file modified errors occur
-    nonisolated func with<R, Payload: RemotePayload>(client: HTTPClient, logger: Logger, server: String, objectKey: String, fn: (_ value: Payload) async throws -> R) async throws -> R? {
+    nonisolated func with<R, Payload: RemotePayload>(client: HTTPClient, logger: Logger, server: String, fn: (_ value: Payload) async throws -> R) async throws -> R? {
         
-        guard let payload = try await self.getPayload(ofType: Payload.self, client: client, logger: logger, server: server, objectKey: objectKey, receivedFileModifiedError: false) else {
+        guard let payload = try await self.getPayload(ofType: Payload.self, client: client, logger: logger, server: server, receivedFileModifiedError: false) else {
             return nil
         }
         do {
@@ -206,7 +209,7 @@ actor S3File {
             await self.receivedObjectDeletedError()
             return nil
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
-            guard let payload = try await self.getPayload(ofType: Payload.self, client: client, logger: logger, server: server, objectKey: objectKey, receivedFileModifiedError: true) else {
+            guard let payload = try await self.getPayload(ofType: Payload.self, client: client, logger: logger, server: server, receivedFileModifiedError: true) else {
                 return nil
             }
             /// Catch error again? If there would a file modified error again, this could indicate some remote server issues
@@ -215,7 +218,7 @@ actor S3File {
     }
     
     /// Resolve payload
-    func getPayload<T: RemotePayload>(ofType: T.Type, client: HTTPClient, logger: Logger, server: String, objectKey: String, receivedFileModifiedError: Bool) async throws -> T? {
+    func getPayload<T: RemotePayload>(ofType: T.Type, client: HTTPClient, logger: Logger, server: String, receivedFileModifiedError: Bool) async throws -> T? {
         // Reset errors of they are older than 5 minutes
         if case .error(_, let issueDate) = payload, Date.now.timeIntervalSince(issueDate) > 5 * 60 {
             payload = .none
@@ -224,7 +227,7 @@ actor S3File {
         case .none:
             self.payload = .initialising([])
             do {
-                let p = try await T(file: makeCachedClient(client: client, logger: logger, server: server, objectKey: objectKey))
+                let p = try await T(file: makeCachedClient(client: client, logger: logger, server: server))
                 guard case .initialising(let queued) = payload else {
                     fatalError("State was not .initialising()")
                 }
@@ -279,7 +282,7 @@ actor S3File {
             // At this stage there could be dozens of failing calls coming in
             self.payload = .updating(old: payload, [])
             do {
-                let newReader = try await OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectKey)")
+                let newReader = try await OmHttpReaderBackend(client: client, logger: logger, url: "\(server)\(objectName)")
                 self.contentLength = newReader.count
                 self.lastModified = newReader.lastModifiedTimestamp
                 self.eTag = newReader.eTag
@@ -358,7 +361,7 @@ actor S3Directory {
                 if let existing = files[name] {
                     await existing.updateFromDirectoryListing(client: client, logger: logger, server: server, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
                 } else {
-                    files[name] = S3File(contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
+                    files[name] = S3File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
                 }
             }
 
@@ -429,13 +432,17 @@ actor S3Directory {
             )
         }
     }
-        
-    func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, client: HTTPClient, logger: Logger) async throws {
+    
+    private func updateIfRequired(client: HTTPClient, logger: Logger, server: String) async throws {
         let now = Timestamp.now()
         if lastValidated.olderThan(seconds: 10*60, now: now) {
             try await update(client: client, logger: logger, server: server)
         }
         lastAccessed = now
+    }
+    
+    func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, client: HTTPClient, logger: Logger) async throws {
+        try await updateIfRequired(client: client, logger: logger, server: server)
         for name in self.directories.keys {
             directories.insert(name)
         }
@@ -448,20 +455,26 @@ actor S3Directory {
     }
     
     func getDirectory(name: String, server: String, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
-        let now = Timestamp.now()
-        if lastValidated.olderThan(seconds: 10*60, now: now) {
-            try await update(client: client, logger: logger, server: server)
-        }
-        lastAccessed = now
+        try await updateIfRequired(client: client, logger: logger, server: server)
         return directories[name]
     }
 
-    func getFile(name: Substring, server: String, client: HTTPClient, logger: Logger) async throws -> S3File? {
-        let now = Timestamp.now()
-        if lastValidated.olderThan(seconds: 10*60, now: now) {
-            try await update(client: client, logger: logger, server: server)
-        }
-        lastAccessed = now
-        return files[String(name)]
+    func getFile(name: String, server: String, client: HTTPClient, logger: Logger) async throws -> S3File? {
+        try await updateIfRequired(client: client, logger: logger, server: server)
+        return files[name]
+    }
+    
+    func getContents(server: String, client: HTTPClient, logger: Logger) async throws -> DirectoryContents {
+        try await updateIfRequired(client: client, logger: logger, server: server)
+        return DirectoryContents(files: files, directories: directories, server: server, client: client, logger: logger)
+    }
+    
+    /// Temporary view of the contents of a directory
+    struct DirectoryContents {
+        let files: [String: S3File]
+        let directories: [String: S3Directory]
+        let server: String
+        let client: HTTPClient
+        let logger: Logger
     }
 }

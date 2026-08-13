@@ -231,6 +231,11 @@ enum FileSystemCache {
             return files[name]
         }
         
+        func getContents() -> DirectoryContents {
+            updateIfRequired()
+            return DirectoryContents(files: files, directories: directories)
+        }
+        
         /// Find a directory for a path. Valid paths are ``, `data/`
         nonisolated func getDirectory(path: String) async -> DirectoryEntry? {
             assert(path.hasPrefix("/") == false)
@@ -346,6 +351,12 @@ enum FileSystemCache {
                 throw error
             }
         }
+    }
+    
+    /// Temporary representation of contents of a directory
+    struct DirectoryContents {
+        let files: [String: FileEntry]
+        let directories: [String: DirectoryEntry]
     }
 }
 
