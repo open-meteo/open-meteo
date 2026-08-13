@@ -98,8 +98,17 @@ final class RemoteFileManager: Sendable {
     }
     
     /// Called every second from a life cycle handler on an available thread
-    func backgroundTask(application: Application) async throws {
-        await remoteFileSystem?.revalidateRecursively(client: application.dedicatedHttpClient, logger: application.logger)
+    func backgroundTaskRemote(application: Application) async throws {
+        await remoteFileSystem?.updateRecursivelyIfRequired(client: application.dedicatedHttpClient, logger: application.logger)
+    }
+    
+    /// Called every second from a life cycle handler on an available thread
+    func backgroundTaskLocal(application: Application) async throws {
+        do {
+            try await localFileSystem.updateRecursivelyIfRequired()
+        } catch {
+            application.logger.error("Local file system update failed: \(error)")
+        }
     }
 }
 /*

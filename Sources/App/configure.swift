@@ -256,7 +256,12 @@ public func configure(_ app: Application) throws {
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(1),
-        RemoteFileManager.instance.backgroundTask
+        RemoteFileManager.instance.backgroundTaskRemote
+    )
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(0),
+        delay: .seconds(1),
+        RemoteFileManager.instance.backgroundTaskLocal
     )
 
     app.lifecycle.repeatedTask(

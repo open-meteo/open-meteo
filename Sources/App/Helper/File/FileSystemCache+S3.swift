@@ -77,8 +77,8 @@ struct S3Inventory {
         return try await directory.getFile(name: object, server: server, prefix: prefix, client: client, logger: logger)
     }
     
-    func revalidateRecursively(client: HTTPClient, logger: Logger) async {
-        await self.root.revalidateRecursively(
+    func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
+        await self.root.updateRecursivelyIfRequired(
             client: client,
             logger: logger,
             server: server,
@@ -337,7 +337,7 @@ actor S3Directory {
     var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
     
     /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
-    func revalidate(client: HTTPClient, logger: Logger, server: String, prefix: Substring) async throws {
+    func update(client: HTTPClient, logger: Logger, server: String, prefix: Substring) async throws {
         guard revalidationQueue == nil else {
             try await withCheckedThrowingContinuation { continuation in
                 revalidationQueue?.append(continuation)
@@ -396,7 +396,7 @@ actor S3Directory {
     /// Periodic lifecycle callback.
     /// - Revalidates directories every `revalidateIntervalSeconds` if they were revalidated at least once before.
     /// - Skips revalidation for directories that were not accessed for more than `inactiveSkipSeconds`.
-    nonisolated func revalidateRecursively(
+    nonisolated func updateRecursivelyIfRequired(
         client: HTTPClient,
         logger: Logger,
         server: String,
@@ -410,7 +410,7 @@ actor S3Directory {
         }
         if now.timeIntervalSince(await lastValidated) > Double(revalidateIntervalSeconds) {
             do {
-                try await revalidate(client: client, logger: logger, server: server, prefix: prefix[...])
+                try await update(client: client, logger: logger, server: server, prefix: prefix[...])
                 OmMetrics.fileCacheRemoteRevalidated.add(1, ordering: .relaxed)
             } catch {
                 logger.warning("S3Inventory lifecycle revalidation failed for prefix '\(prefix)': \(error)")
@@ -418,7 +418,7 @@ actor S3Directory {
         }
 
         for (name, directory) in await directories {
-            await directory.revalidateRecursively(
+            await directory.updateRecursivelyIfRequired(
                 client: client,
                 logger: logger,
                 server: server,
@@ -432,7 +432,7 @@ actor S3Directory {
         
     func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws {
         if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
-            try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
+            try await update(client: client, logger: logger, server: server, prefix: prefix)
         }
         lastAccess = .now
         for name in self.directories.keys {
@@ -448,7 +448,7 @@ actor S3Directory {
     
     func getDirectory(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
         if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
-            try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
+            try await update(client: client, logger: logger, server: server, prefix: prefix)
         }
         lastAccess = .now
         return directories[String(name)]
@@ -456,62 +456,10 @@ actor S3Directory {
 
     func getFile(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3File? {
         if lastValidated.timeIntervalSince1970 == 0 || Date.now.timeIntervalSince(lastValidated) > 10*60 {
-            try await revalidate(client: client, logger: logger, server: server, prefix: prefix)
+            try await update(client: client, logger: logger, server: server, prefix: prefix)
         }
         lastAccess = .now
         return files[String(name)]
     }
 }
-
-/*extension Application {
-    /// Create S3 inventory instance and start background watcher to get modifications
-    func makeS3Inventory(server: String) async throws -> S3Inventory {
-        let inventory = S3Inventory(server: server)
-        let manager = S3InventoryLifecycleManager(inventory: inventory)
-        try manager.didBoot(self)
-        self.lifecycle.use(manager)
-        return inventory
-    }
-}
-
-/// Lifecycle manager for S3 inventory caches. Revalidate active directories in the background.
-/// Runs every 2 minutes and revalidates active directories.
-/// Directories that were not accessed for >30 minutes are skipped but kept in memory.
-final class S3InventoryLifecycleManager: LifecycleHandler {
-    private let inventory: S3Inventory
-    private let backgroundWatcher: NIOLockedValueBox<RepeatedTask?>
-
-    init(inventory: S3Inventory) {
-        self.inventory = inventory
-        self.backgroundWatcher = .init(nil)
-    }
-
-    func didBoot(_ application: Application) throws {
-        let eventLoop = application.eventLoopGroup.next()
-        backgroundWatcher.withLockedValue {
-            $0 = eventLoop.scheduleRepeatedAsyncTask(
-                initialDelay: .seconds(120),
-                delay: .seconds(120)
-            ) { _ in
-                application.eventLoopGroup.makeFutureWithTask {
-                    await self.inventory.root.lifecycleTick(
-                        client: application.dedicatedHttpClient,
-                        logger: application.logger,
-                        server: self.inventory.server,
-                        prefix: "",
-                        now: .now,
-                        revalidateIntervalSeconds: 120,
-                        inactiveSkipSeconds: 30 * 60
-                    )
-                }
-            }
-        }
-    }
-
-    func shutdown(_ application: Application) {
-        backgroundWatcher.withLockedValue {
-            $0?.cancel()
-        }
-    }
-}*/
 

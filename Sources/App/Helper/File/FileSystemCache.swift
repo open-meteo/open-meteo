@@ -17,8 +17,12 @@ import Darwin
  Caches a file system tree and keeps files and directories open.
  Provides functions to traverse the file tree to get individual files.
  
- Directories and its files are revalidated every couple of seconds to check for modifications.
+ Directories and its files are revalidated every couple of seconds to check for modifications by a background task.
  Directories are opened on-demand recursively. Only the parts that are used at least once, are loaded into memory.
+ 
+ Typically files are revalidated every 5 seconds. After 60 seconds inactivity, they are not checked anymore.
+ If a directory has not been revalidated for more then 10 seconds, on access it is revalidated.
+ After 600 seconds file and directory handles are released
  
  Files may have an associated payload that is initialised lazily but then kept in memory.
  E.g. om or JSON files are decoded only once.
@@ -33,16 +37,24 @@ import Darwin
  - Background checks to revalidate eagerly -> make sure to release deleted files even if not read recently
  
  TODO:
- - Background check to proactively revalidate directories
- - Track last access to directories and eject them if not used for a while
  - Should use `getdents64` to speed up directory listing
  - Use `inotify` on linux to watch for modifications using events
  */
 enum FileSystemCache {
+    /// Revalidate directories on access after every 10 seconds. Usually the `revalidateBackgroundInterval` should already have revalidated this directory
+    static let revalidateOnAccessInterval: UInt64 = 10
+    /// Revalidate directories every 5 seconds in a background task
+    static let revalidateBackgroundInterval: UInt64 = 5
+    /// If a directory has not been accessed for more than 60 second, do not run background revalidation
+    static let revalidateBackgroundIgnoreInterval: UInt64 = 60
+    /// Remove directory and file handles after 10 minutes entirely
+    static let revalidateBackgroundEjectInterval: UInt64 = 600
+    
     actor DirectoryEntry: Sendable {
         let fd: FileHandle?
         let inode: UInt64
         var lastRefreshTimestamp: UInt64
+        var lastAccessedTimestamp: UInt64
         private var files: [String: FileEntry]
         private var directories: [String: DirectoryEntry]
         
@@ -65,6 +77,7 @@ enum FileSystemCache {
             self.files = [:]
             self.directories = [:]
             lastRefreshTimestamp = 0
+            lastAccessedTimestamp = 0
         }
         
         init(directories: [String: DirectoryEntry]) {
@@ -73,6 +86,7 @@ enum FileSystemCache {
             self.lastRefreshTimestamp = 0
             self.directories = directories
             self.files = [:]
+            lastAccessedTimestamp = 0
         }
         
         init(path: String) throws {
@@ -81,15 +95,39 @@ enum FileSystemCache {
             self.files = [:]
             self.directories = [:]
             lastRefreshTimestamp = 0
+            lastAccessedTimestamp = 0
         }
         
-        func updateIfRequired() {
-            if lastRefreshTimestamp < UInt64(Date().timeIntervalSince1970) - 10 {
+        /// Should be called before any access to its contents
+        private func updateIfRequired() {
+            lastAccessedTimestamp = UInt64(Date().timeIntervalSince1970)
+            if lastRefreshTimestamp < UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateOnAccessInterval {
                 do {
                     try forceUpdate()
                 } catch {
                     print("Directory refresh failed: \(error)")
                 }
+            }
+        }
+        
+        /// Should be called every second from a life cycle handler
+        func updateRecursivelyIfRequired() async throws {
+            if lastAccessedTimestamp < UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateBackgroundEjectInterval {
+                /// If not used for more than 10 minutes, release cached file handles and payloads
+                self.files = [:]
+                self.directories = [:]
+                lastRefreshTimestamp = 0
+                lastAccessedTimestamp = 0
+                return
+            }
+            guard lastAccessedTimestamp > UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateBackgroundIgnoreInterval else {
+                return // Skip if not accessed for more than 60 seconds
+            }
+            if lastRefreshTimestamp < UInt64(Date().timeIntervalSince1970) - FileSystemCache.revalidateBackgroundInterval {
+                try forceUpdate()
+            }
+            for directory in directories.values {
+                try await directory.updateRecursivelyIfRequired()
             }
         }
         
