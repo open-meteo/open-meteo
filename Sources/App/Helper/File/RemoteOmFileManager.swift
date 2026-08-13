@@ -51,7 +51,7 @@ final class RemoteFileManager: Sendable {
         }
         
         if let remoteFileSystem, let remoteDir = try await remoteFileSystem.getDirectory(path: path, client: client, logger: logger) {
-            try await remoteDir.exportDirectories(directories: &directories, files: &files, server: remoteFileSystem.server, prefix: path[...], client: client, logger: logger)
+            try await remoteDir.exportDirectories(directories: &directories, files: &files, server: remoteFileSystem.server, client: client, logger: logger)
         }
         
         return (directories, files)
@@ -69,7 +69,6 @@ final class RemoteFileManager: Sendable {
     }
     
     func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
-        
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getObject(path: path) {

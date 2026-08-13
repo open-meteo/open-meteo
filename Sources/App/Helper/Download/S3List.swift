@@ -50,15 +50,19 @@ enum S3List {
             }
 
             let files = body.xmlSection("Contents").map {
+                guard let name = $0.xmlFirst("Key") else {
+                    fatalError("Failed to get <Key>")
+                }
+                guard let modificationTimeString = $0.xmlFirst("LastModified"),
+                        let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)) else {
+                    fatalError("Failed to get LastModified date")
+                }
+                guard let fileSizeString = $0.xmlFirst("Size"), let fileSize = Int(fileSizeString) else {
+                    fatalError("Failed to get Size")
+                }
                 /// eTags are quoted like `<ETag>&quot;705802db9a8f7523eef48c8752b6ae39&quot;</ETag>`
-                guard let name = $0.xmlFirst("Key"),
-                      let modificationTimeString = $0.xmlFirst("LastModified"),
-                      let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)),
-                      let fileSizeString = $0.xmlFirst("Size"),
-                      let fileSize = Int(fileSizeString),
-                      let eTag = $0.xmlFirst("ETag")?.dropFirst(6).dropLast(6)
-                else {
-                    fatalError()
+                guard let eTag = $0.xmlFirst("ETag")?.dropFirst(6).dropLast(6) else {
+                    fatalError("Failed to get ETag")
                 }
                 return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize, eTag: String(eTag))
             }

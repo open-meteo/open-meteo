@@ -26,7 +26,7 @@ enum S3InventoryError: Error {
 
 struct S3Inventory {
     let server: String
-    let root = S3Directory()
+    let root = S3Directory(prefix: "")
 
     /// Find a directory for a path
     func getDirectory(path: String, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
@@ -39,8 +39,7 @@ struct S3Inventory {
         while componentStart < trimmedPath.endIndex {
             let nextSlash = trimmedPath[componentStart..<trimmedPath.endIndex].firstIndex(of: "/") ?? trimmedPath.endIndex
             let component = trimmedPath[componentStart..<nextSlash]
-            let prefix = trimmedPath[..<componentStart]
-            guard let next = try await directory.getDirectory(name: component, server: server, prefix: prefix, client: client, logger: logger) else {
+            guard let next = try await directory.getDirectory(name: String(component), server: server, client: client, logger: logger) else {
                 return nil
             }
             directory = next
@@ -66,15 +65,13 @@ struct S3Inventory {
         while componentStart < objectStart {
             let nextSlash = path[componentStart..<objectStart].firstIndex(of: "/") ?? objectStart
             let component = path[componentStart..<nextSlash]
-            let prefix = path[..<componentStart]
-            guard let next = try await directory.getDirectory(name: component, server: server, prefix: prefix, client: client, logger: logger) else {
+            guard let next = try await directory.getDirectory(name: String(component), server: server, client: client, logger: logger) else {
                 return nil
             }
             directory = next
             componentStart = path.index(after: nextSlash)
         }
-        let prefix = path[path.startIndex..<objectStart]
-        return try await directory.getFile(name: object, server: server, prefix: prefix, client: client, logger: logger)
+        return try await directory.getFile(name: object, server: server, client: client, logger: logger)
     }
     
     func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
@@ -82,7 +79,6 @@ struct S3Inventory {
             client: client,
             logger: logger,
             server: server,
-            prefix: "",
             now: .now(),
             revalidateIntervalSeconds: 120,
             inactiveSkipSeconds: 30 * 60
@@ -329,6 +325,7 @@ actor S3File {
 /// Represents the content of a remote S3 directory with files and sub directories.
 /// At initialisation the directory does not fetch contents, but waits until the first request arrives
 actor S3Directory {
+    let prefix: String
     var files = [String: S3File]()
     var directories = [String: S3Directory]()
     var lastValidated = Timestamp(0)
@@ -337,8 +334,12 @@ actor S3Directory {
     /// If set to an array, a revalidation is running in the background
     var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
     
+    init(prefix: String) {
+        self.prefix = prefix
+    }
+    
     /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
-    func update(client: HTTPClient, logger: Logger, server: String, prefix: Substring) async throws {
+    func update(client: HTTPClient, logger: Logger, server: String) async throws {
         guard revalidationQueue == nil else {
             try await withCheckedThrowingContinuation { continuation in
                 revalidationQueue?.append(continuation)
@@ -348,7 +349,7 @@ actor S3Directory {
         logger.debug("Revalidating remote directory: \(prefix)")
         revalidationQueue = []
         do {
-            let listed = try await S3List.s3list(client: client, server: server, prefix: String(prefix), apikey: nil, deadLineHours: 3)
+            let listed = try await S3List.s3list(client: client, server: server, prefix: prefix, apikey: nil, deadLineHours: 3)
             var listedFiles = Set<String>()
             for file in listed.files {
                 let name = String(file.name.dropFirst(prefix.count))
@@ -366,7 +367,7 @@ actor S3Directory {
                 let name = String(directory.dropFirst(prefix.count).dropLast())
                 listedDirectories.insert(name)
                 if directories[name] == nil {
-                    directories[name] = S3Directory()
+                    directories[name] = S3Directory(prefix: "\(prefix)\(name)/")
                 }
             }
 
@@ -401,7 +402,6 @@ actor S3Directory {
         client: HTTPClient,
         logger: Logger,
         server: String,
-        prefix: String,
         now: Timestamp,
         revalidateIntervalSeconds: Int,
         inactiveSkipSeconds: Int
@@ -411,19 +411,18 @@ actor S3Directory {
         }
         if await lastValidated.olderThan(seconds: revalidateIntervalSeconds, now: now) {
             do {
-                try await update(client: client, logger: logger, server: server, prefix: prefix[...])
+                try await update(client: client, logger: logger, server: server)
                 OmMetrics.fileCacheRemoteRevalidated.add(1, ordering: .relaxed)
             } catch {
                 logger.warning("S3Inventory lifecycle revalidation failed for prefix '\(prefix)': \(error)")
             }
         }
 
-        for (name, directory) in await directories {
+        for directory in await directories.values {
             await directory.updateRecursivelyIfRequired(
                 client: client,
                 logger: logger,
                 server: server,
-                prefix: "\(prefix)\(name)/",
                 now: now,
                 revalidateIntervalSeconds: revalidateIntervalSeconds,
                 inactiveSkipSeconds: inactiveSkipSeconds
@@ -431,10 +430,10 @@ actor S3Directory {
         }
     }
         
-    func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws {
+    func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)], server: String, client: HTTPClient, logger: Logger) async throws {
         let now = Timestamp.now()
         if lastValidated.olderThan(seconds: 10*60, now: now) {
-            try await update(client: client, logger: logger, server: server, prefix: prefix)
+            try await update(client: client, logger: logger, server: server)
         }
         lastAccessed = now
         for name in self.directories.keys {
@@ -448,19 +447,19 @@ actor S3Directory {
         }
     }
     
-    func getDirectory(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
+    func getDirectory(name: String, server: String, client: HTTPClient, logger: Logger) async throws -> S3Directory? {
         let now = Timestamp.now()
         if lastValidated.olderThan(seconds: 10*60, now: now) {
-            try await update(client: client, logger: logger, server: server, prefix: prefix)
+            try await update(client: client, logger: logger, server: server)
         }
         lastAccessed = now
-        return directories[String(name)]
+        return directories[name]
     }
 
-    func getFile(name: Substring, server: String, prefix: Substring, client: HTTPClient, logger: Logger) async throws -> S3File? {
+    func getFile(name: Substring, server: String, client: HTTPClient, logger: Logger) async throws -> S3File? {
         let now = Timestamp.now()
         if lastValidated.olderThan(seconds: 10*60, now: now) {
-            try await update(client: client, logger: logger, server: server, prefix: prefix)
+            try await update(client: client, logger: logger, server: server)
         }
         lastAccessed = now
         return files[String(name)]
