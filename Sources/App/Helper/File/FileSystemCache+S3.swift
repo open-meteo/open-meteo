@@ -111,13 +111,13 @@ actor S3File {
         case none
         
         /// Payload is currently initialising. Consecutive requets are queued
-        case initialising([CheckedContinuation<any FileSystemPayload, Error>])
+        case initialising([CheckedContinuation<any RemotePayload, Error>])
         
         /// Payload got initialised and should be in sync with remote server
-        case ready(any FileSystemPayload)
+        case ready(any RemotePayload)
         
         /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload, but keep the old payload
-        case updating(old: any FileSystemPayload, [CheckedContinuation<any FileSystemPayload, Error>])
+        case updating(old: any RemotePayload, [CheckedContinuation<any RemotePayload, Error>])
         
         /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
         case deleted
@@ -198,7 +198,7 @@ actor S3File {
     }
     
     /// Execute a closure with the resolved payload. May retries if file modified errors occur
-    nonisolated func with<R, Payload: FileSystemPayload>(client: HTTPClient, logger: Logger, server: String, objectKey: String, fn: (_ value: Payload) async throws -> R) async throws -> R? {
+    nonisolated func with<R, Payload: RemotePayload>(client: HTTPClient, logger: Logger, server: String, objectKey: String, fn: (_ value: Payload) async throws -> R) async throws -> R? {
         
         guard let payload = try await self.getPayload(ofType: Payload.self, client: client, logger: logger, server: server, objectKey: objectKey, receivedFileModifiedError: false) else {
             return nil
@@ -218,7 +218,7 @@ actor S3File {
     }
     
     /// Resolve payload
-    func getPayload<T: FileSystemPayload>(ofType: T.Type, client: HTTPClient, logger: Logger, server: String, objectKey: String, receivedFileModifiedError: Bool) async throws -> T? {
+    func getPayload<T: RemotePayload>(ofType: T.Type, client: HTTPClient, logger: Logger, server: String, objectKey: String, receivedFileModifiedError: Bool) async throws -> T? {
         // Reset errors of they are older than 5 minutes
         if case .error(_, let issueDate) = payload, Date.now.timeIntervalSince(issueDate) > 5 * 60 {
             payload = .none

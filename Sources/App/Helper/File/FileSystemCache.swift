@@ -286,8 +286,8 @@ enum FileSystemCache {
         
         private enum PayloadState {
             case none
-            case initialising([CheckedContinuation<FileSystemPayload, any Error>])
-            case ready(FileSystemPayload)
+            case initialising([CheckedContinuation<LocalPayload, any Error>])
+            case ready(LocalPayload)
             case error(Error)
         }
         
@@ -299,7 +299,7 @@ enum FileSystemCache {
             payload = .none
         }
         
-        func getPayload<T: FileSystemPayload>(ofType: T.Type) async throws -> T {
+        func getPayload<T: LocalPayload>(ofType: T.Type) async throws -> T {
             switch payload {
             case .none:
                 self.payload = .initialising([])
@@ -348,14 +348,20 @@ enum FileSystemCache {
     }
 }
 
-protocol FileSystemPayload: Sendable {
-    /// Payload can retain a reference to FileHandle to ensure the file stays open
-    init(fd: FileHandle, size: Int64) async throws
+protocol FileSystemPayload: RemotePayload, LocalPayload {
     
+}
+
+protocol RemotePayload: Sendable {
     /// Initialise from remote source
     init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws
     func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self
     func remoteDeleted() async throws
+}
+
+protocol LocalPayload: Sendable {
+    /// Payload can retain a reference to FileHandle to ensure the file stays open
+    init(fd: FileHandle, size: Int64) async throws
 }
 
 
