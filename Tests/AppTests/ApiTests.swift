@@ -4,6 +4,48 @@ import Testing
 import VaporTesting
 
 @Suite struct ApiTests {
+    private func makeRequest(application: Application, url: String) -> Request {
+        Request(
+            application: application,
+            method: .GET,
+            url: URI(string: url),
+            on: application.eventLoopGroup.next()
+        )
+    }
+
+    private func collectBody(_ response: Response, application: Application) async throws -> Data {
+        let collected = try await response.body.collect(on: application.eventLoopGroup.next()).get()
+        var buffer = try #require(collected)
+        let body = buffer.readData(length: buffer.readableBytes)
+        return try #require(body)
+    }
+
+    private func bodyString(_ response: Response, application: Application) async throws -> String {
+        let body = try await collectBody(response, application: application)
+        return try #require(String(data: body, encoding: .utf8))
+    }
+
+    private func nullArray(variable: String, count: Int) -> String {
+        "\"\(variable)\":[\(Array(repeating: "null", count: count).joined(separator: ","))]"
+    }
+
+    private func occurrences(of substring: String, in string: String) -> Int {
+        string.components(separatedBy: substring).count - 1
+    }
+
+    private func expectMissing<Variable>(_ section: ApiSection<Variable>) {
+        for column in section.columns {
+            for variable in column.variables {
+                if case .float(let values) = variable {
+                    #expect(values.count == section.time.count)
+                    #expect(values.allSatisfy { $0.isNaN })
+                } else {
+                    Issue.record("Expected missing float values")
+                }
+            }
+        }
+    }
+
     /*@Test func generateS3SyncCommands() throws {
         for domain in DomainRegistry.allCases {
             let d = domain.rawValue
@@ -25,6 +67,145 @@ import VaporTesting
 
         let b = try ApiQueryParameter.forecastTimeRange2(currentTime: current, utcOffset: 3600, pastSteps: nil, forecastSteps: 4, pastStepsMax: 10, forecastStepsMax: 10, forecastStepsDefault: 7, initialStep: 0, dtSeconds: 3600)
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
+    }
+
+    @Test func unavailableEnsemblePlaceholderPreservesColumnShapes() async throws {
+        let hourly = TimerangeDt(start: Timestamp(2026, 8, 6), nTime: 4, dtSeconds: 3600)
+        let daily = TimerangeDt(start: Timestamp(2026, 8, 6), nTime: 2, dtSeconds: 86400)
+        let minutely15 = TimerangeDt(start: Timestamp(2026, 8, 6), nTime: 4, dtSeconds: 900)
+        let time = ForecastApiTimeRange(dailyDisplay: daily, dailyRead: daily, hourlyDisplay: hourly, hourlyRead: hourly, minutely15: minutely15)
+        let reader = MultiDomainsReaderResult.missing(UnavailableModelLocation(
+            domain: .ncep_aigefs025,
+            latitude: 48.8,
+            longitude: 2.3,
+            elevation: 35,
+            time: time,
+            currentTime: Timestamp(2026, 8, 6),
+            currentName: "current",
+            currentDtSeconds: 900,
+            modelDtSeconds: 3600,
+            ensemble: false
+        ))
+
+        let isDay: ForecastVariable = .surface(.init(.is_day, 0))
+        let hourlySection = try #require(try await reader.hourly(variables: [isDay]))
+        let minutelySection = try #require(try await reader.minutely15(variables: [isDay]))
+        #expect(hourlySection.columns[0].variables.count == 1)
+        #expect(minutelySection.columns[0].variables.count == 1)
+        expectMissing(hourlySection)
+        expectMissing(minutelySection)
+
+        let dailySection = try #require(try await reader.daily(variables: [.temperature_2m_mean, .sunrise, .moon_phase, .daylight_duration]))
+        #expect(dailySection.columns.map { $0.variables.count } == [
+            MultiDomains.ncep_aigefs025.countEnsembleMember,
+            1,
+            1,
+            1
+        ])
+        expectMissing(dailySection)
+    }
+
+    @Test(arguments: [
+        MultiDomains.meteofrance_arome_france,
+        MultiDomains.meteofrance_arome_seamless
+    ])
+    func allLocationsUnavailableThrowBadRequest(model: MultiDomains) async throws {
+        try await withApp { app in
+            let controller = WeatherApiController(defaultModel: model)
+            let request = makeRequest(
+                application: app,
+                url: "/v1/forecast?latitude=-33.8,-34.0&longitude=151.2,150.9&elevation=0,0&models=\(model.rawValue)"
+            )
+
+            do {
+                _ = try await controller.query(request)
+                Issue.record("Expected \(model.rawValue) to be unavailable")
+            } catch let error as ForecastApiError {
+                #expect(error.status == .badRequest)
+                #expect(error.reason == "No data is available for the requested locations")
+            }
+        }
+    }
+
+    @Test func mixedSingleAndMultipleDomainModelsProduceRectangularCsv() async throws {
+        try await withApp { app in
+            let controller = WeatherApiController(defaultModel: .icon_eu)
+            let request = makeRequest(
+                application: app,
+                url: "/v1/forecast?latitude=-33.8,48.8&longitude=151.2,2.3&elevation=0,35&models=icon_eu,meteofrance_arome_seamless&hourly=temperature_2m&forecast_days=1&format=csv"
+            )
+
+            let response = try await controller.query(request)
+            #expect(response.status == .ok)
+            let body = try await collectBody(response, application: app)
+            let csv = try #require(String(data: body, encoding: .utf8))
+            let lines = csv.split(separator: "\n", omittingEmptySubsequences: false)
+            let headerIndex = try #require(lines.firstIndex(where: { $0.hasPrefix("location_id,time,") }))
+            let columnCount = lines[headerIndex].split(separator: ",", omittingEmptySubsequences: false).count
+
+            #expect(lines[headerIndex].contains("temperature_2m_icon_eu"))
+            #expect(lines[headerIndex].contains("temperature_2m_meteofrance_arome_seamless"))
+            let rows = lines.dropFirst(headerIndex + 1).filter { !$0.isEmpty }
+            #expect(rows.allSatisfy {
+                $0.split(separator: ",", omittingEmptySubsequences: false).count == columnCount
+            })
+        }
+    }
+
+    @Test func mixedAvailabilityPreservesLegacyCompositeModelLocations() async throws {
+        try await withApp { app in
+            let controller = WeatherApiController(defaultModel: .satellite_radiation_seamless)
+            let request = makeRequest(
+                application: app,
+                url: "/v1/forecast?latitude=-80,48.8&longitude=10,10&elevation=0,35&models=satellite_radiation_seamless&hourly=shortwave_radiation&temporal_resolution=native&forecast_days=1"
+            )
+
+            let response = try await controller.query(request)
+            #expect(response.status == .ok)
+            let json = try await bodyString(response, application: app)
+            #expect(json.contains(#""latitude":-80"#))
+            #expect(json.contains(#""location_id":1"#))
+            #expect(json.contains(nullArray(variable: "shortwave_radiation", count: 144)))
+        }
+    }
+
+    @Test func multiModelCurrentUsesFirstAvailableReader() async throws {
+        try await withApp { app in
+            let controller = WeatherApiController(defaultModel: .icon_eu)
+            let request = makeRequest(
+                application: app,
+                url: "/v1/forecast?latitude=-33.8&longitude=151.2&elevation=0&models=icon_eu,icon_global&current=is_day"
+            )
+
+            let response = try await controller.query(request)
+            #expect(response.status == .ok)
+            let json = try await bodyString(response, application: app)
+            #expect(json.contains(#""is_day":0"#) || json.contains(#""is_day":1"#))
+            #expect(!json.contains(#""is_day_icon_global":"#))
+        }
+    }
+
+    @Test func mixedAvailabilityPreservesLocations() async throws {
+        try await withApp { app in
+            let controller = WeatherApiController(defaultModel: .meteofrance_arome_france)
+            let query = "/v1/forecast?latitude=-33.8,48.8&longitude=151.2,2.3&elevation=0,35&models=meteofrance_arome_france&hourly=temperature_2m&daily=sunrise,moon_phase,daylight_duration&forecast_days=1"
+            let request = makeRequest(
+                application: app,
+                url: query
+            )
+
+            let response = try await controller.query(request)
+            #expect(response.status == .ok)
+            let json = try await bodyString(response, application: app)
+            #expect(json.contains(#""latitude":-33.8"#))
+            #expect(json.contains(#""longitude":151.2"#))
+            #expect(json.contains(#""location_id":1"#))
+            #expect(json.contains(nullArray(variable: "temperature_2m", count: 24)))
+            for variable in ["sunrise", "moon_phase", "daylight_duration"] {
+                #expect(occurrences(of: "\"\(variable)\":[", in: json) == 2)
+                #expect(json.contains(nullArray(variable: variable, count: 1)))
+            }
+        }
     }
 
     @Test func singleRunDailyRequiresLocalMidnight() throws {

@@ -23,6 +23,7 @@ protocol ModelFlatbufferSerialisable {
 
     var flatBufferModel: openmeteo_sdk_Model { get }
     var modelName: String {get}
+    var isModelAvailable: Bool { get }
 
 
     var latitude: Float { get }
@@ -57,6 +58,10 @@ struct FlatBuffersVariableNone: FlatBuffersVariable {
 
 
 extension ModelFlatbufferSerialisable {
+    var isModelAvailable: Bool {
+        true
+    }
+
     static var memberOffset: Int {
         return 0
     }
