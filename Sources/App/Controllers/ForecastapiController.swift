@@ -1077,8 +1077,58 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
     
     /// Generic domains with hourly data that can use the generic deriver controller
-    func getDomainAndVariable() -> DomainReaderMapping? {
+    func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
         switch self {
+        case .gfs025, .ncep_gfs025:
+            return .single(GfsDomain.gfs025, GfsVariable.self)
+        case .gfs013, .ncep_gfs013:
+            return .single(GfsDomain.gfs013, GfsVariable.self)
+        case .ncep_nam_conus:
+            return .single(GfsDomain.nam_conus, GfsVariable.self)
+        case .ncep_hrrr_conus_15min:
+            return .single(GfsDomain.hrrr_conus_15min, GfsVariable.self)
+        case .gfs_hrrr, .ncep_hrrr_conus:
+            let higherPriority: [(any GenericDomain, any GenericVariable.Type)] = include15Min
+                ? [(GfsDomain.hrrr_conus_15min, GfsVariable.self)]
+                : []
+            return .singleWithSupplementalDomains(
+                GfsDomain.hrrr_conus,
+                GfsVariable.self,
+                lowerPriority: [(NbmDomain.nbm_conus, ProbabilityVariable.self)],
+                higherPriority: higherPriority,
+                precipitationProb: nil
+            )
+        case .gfs_global, .ncep_gfs_global:
+            return .multiple([
+                (GfsDomain.gfs05_ens, ProbabilityVariable.self),
+                (GfsDomain.gfs025_ens, ProbabilityVariable.self),
+                (GfsDomain.gfs025, GfsVariable.self),
+                (GfsDomain.gfs013, GfsVariable.self)
+            ])
+        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
+            var sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (GfsDomain.gfs05_ens, ProbabilityVariable.self),
+                (GfsDomain.gfs025_ens, ProbabilityVariable.self),
+                (NbmDomain.nbm_conus, ProbabilityVariable.self),
+                (GfsDomain.gfs025, GfsVariable.self),
+                (GfsDomain.gfs013, GfsVariable.self),
+                (GfsDomain.hrrr_conus, GfsVariable.self)
+            ]
+            if include15Min {
+                sources.append((GfsDomain.hrrr_conus_15min, GfsVariable.self))
+            }
+            return .multiple(sources)
+        case .ncep_gefs025:
+            return .single(GfsDomain.gfs025_ens, GfsVariable.self)
+        case .gfs05, .ncep_gefs05:
+            return .single(GfsDomain.gfs05_ens, GfsVariable.self)
+        case .ncep_gefs_seamless:
+            return .multiple([
+                (GfsDomain.gfs05_ens, GfsVariable.self),
+                (GfsDomain.gfs025_ens, GfsVariable.self)
+            ])
+        case .ncep_nbm_conus:
+            return .single(NbmDomain.nbm_conus, NbmVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
@@ -1381,7 +1431,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        if let d = getDomainAndVariable() {
+        if let d = getDomainAndVariable(include15Min: include15Min) {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         
@@ -1393,8 +1443,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let gfsForecast = try await DomainReaderMapping.multiple([
+                (GfsDomain.gfs025, GfsVariable.self),
+                (GfsDomain.gfs013, GfsVariable.self)
+            ]).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard
-                let gfs: any GenericReaderProtocol = try await GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                let gfs = gfsForecast?.hourly,
                 let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifs025 = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1444,7 +1498,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
                     iconProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     ifsHres.asOptionalReader,
                     icon,
                     iconEu,
@@ -1472,7 +1526,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     return MultiDomains.hourlyToMultiSameType([
                         gfsProbabilites.asOptionalReader,
                         iconProbabilities.asOptionalReader,
-                        gfs.asOptionalReader,
+                        gfs,
                         icon,
                         ifsHres.asOptionalReader,
                         arpegeEurope,
@@ -1489,7 +1543,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     icon,
                     iconEu,
                     ifs025.asOptionalReader,
@@ -1498,14 +1552,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 ])
             }
             // For North America, use HRRR
-            if let hrrr = try await GfsReader(domains: include15Min ? [.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if let hrrr = try await GfsDomain.hrrr_conus.makeDerivedHourly(variableType: GfsVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let hrrr15Min = include15Min
+                    ? try await GfsDomain.hrrr_conus_15min.makeDerivedHourly(variableType: GfsVariable.self, lat: lat, lon: lon, elevation: hrrr.resolvedTargetElevation, mode: mode, options: options)
+                    : nil
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     nbmProbabilities?.asOptionalReader,
                     icon,
-                    gfs.asOptionalReader,
-                    hrrr.asOptionalReader
+                    gfs,
+                    hrrr,
+                    hrrr15Min
                 ])
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
@@ -1516,7 +1574,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     icon,
                     ifsHres.asOptionalReader,
                     jmaMsmUpper,
@@ -1530,7 +1588,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     iconProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     ifsHres.asOptionalReader,
                     icon,
                     iconEu
@@ -1541,7 +1599,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return MultiDomains.hourlyToMultiSameType([
                 gfsProbabilites.asOptionalReader,
                 ifsProbabilities.asOptionalReader,
-                gfs.asOptionalReader,
+                gfs,
                 icon,
                 ifsHres.asOptionalReader
             ])
@@ -1735,28 +1793,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         switch self {
         case .best_match:
             return [] // migrated
-        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
-            return [
-                try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as any GenericReaderProtocol,
-                try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await GfsReader(domains: include15Min ? [.gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min] : [.gfs025, .gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
-        case .gfs_global, .ncep_gfs_global:
-            let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [gfsProbabilites] + (try await GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
-        case .gfs025, .ncep_gfs025:
-            return try await GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs013, .ncep_gfs013:
-            return try await GfsReader(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs_hrrr, .ncep_hrrr_conus:
-            return [
-                try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await GfsReader(domains: include15Min ? [.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
-        case .ncep_hrrr_conus_15min:
-            return try await GfsReader(domains: [.hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ncep_nam_conus:
-            return try await GfsReader(domains: [.nam_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless,
+             .gfs_global, .ncep_gfs_global,
+             .gfs025, .ncep_gfs025,
+             .gfs013, .ncep_gfs013,
+             .gfs_hrrr, .ncep_hrrr_conus,
+             .ncep_hrrr_conus_15min,
+             .ncep_nam_conus:
+            return [] // migrated
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
 //            return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
             return []
@@ -1878,7 +1922,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ukmo_uk_deterministic_2km:
             return [] // migrated to upper level
         case .ncep_nbm_conus:
-            return try await NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .eumetsat_sarah3:
             return [] // migrated to upper level
         case .jma_jaxa_himawari:
@@ -1921,12 +1965,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await EcmwfReader(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_aifs025_ensemble:
             return try await EcmwfReader(domain: .aifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ncep_gefs025:
-            return try await GfsReader(domains: [.gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs05, .ncep_gefs05:
-            return try await GfsReader(domains: [.gfs05_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ncep_gefs_seamless:
-            return try await GfsReader(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_gefs025, .gfs05, .ncep_gefs05, .ncep_gefs_seamless:
+            return [] // migrated
         case .gem_global_ensemble, .cmc_gem_geps:
             return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global_ensemble:
@@ -2299,16 +2339,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         switch self {
-        case .gfs025, .ncep_gfs025:
-            return try await GfsReader(domain: .gfs025, gridpoint: gridpoint, options: options)
-        case .gfs013, .ncep_gfs013:
-            return try await GfsReader(domain: .gfs013, gridpoint: gridpoint, options: options)
-        case .gfs_hrrr, .ncep_hrrr_conus:
-            return try await GfsReader(domain: .hrrr_conus, gridpoint: gridpoint, options: options)
-        case .ncep_hrrr_conus_15min:
-            return try await GfsReader(domain: .hrrr_conus_15min, gridpoint: gridpoint, options: options)
-        case .ncep_nam_conus:
-            return try await GfsReader(domain: .nam_conus, gridpoint: gridpoint, options: options)
+        case .gfs025, .ncep_gfs025,
+             .gfs013, .ncep_gfs013,
+             .gfs_hrrr, .ncep_hrrr_conus,
+             .ncep_hrrr_conus_15min,
+             .ncep_nam_conus:
+            return nil // migrated
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return nil // defined in the upper function
         case .ncep_aigfs025:
@@ -2388,7 +2424,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gfs_global, .ncep_gfs_global:
             return nil
         case .ncep_nbm_conus:
-            return try await NbmReader(domain: .nbm_conus, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .jma_seamless, .jma_mix, .jma_msm, .jma_msm_upper_level, .jms_gsm, .jma_gsm:
             return nil // migrated
         case .gem_seamless, .cmc_gem_seamless:

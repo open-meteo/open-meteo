@@ -646,6 +646,80 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         }
     }
 
+    private var isGfsForecastDomain: Bool {
+        switch reader.domain.domainRegistry {
+        case .ncep_gfs013,
+             .ncep_gfs025,
+             .ncep_nam_conus,
+             .ncep_hrrr_conus,
+             .ncep_hrrr_conus_15min,
+             .ncep_gefs025,
+             .ncep_gefs05,
+             .ncep_gefs025_ensemble_mean,
+             .ncep_gefs05_ensemble_mean:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var usesZeroConvectivePrecipitation: Bool {
+        switch reader.domain.domainRegistry {
+        case .ncep_gfs025,
+             .ncep_nam_conus,
+             .ncep_hrrr_conus,
+             .ncep_hrrr_conus_15min,
+             .ncep_gefs025,
+             .ncep_gefs05,
+             .ncep_gefs025_ensemble_mean,
+             .ncep_gefs05_ensemble_mean,
+             .ncep_nbm_conus:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var estimatesDiffuseRadiationFromShortwave: Bool {
+        switch reader.domain.domainRegistry {
+        case .ncep_nam_conus,
+             .ncep_gefs025,
+             .ncep_gefs05,
+             .ncep_gefs025_ensemble_mean,
+             .ncep_gefs05_ensemble_mean,
+             .ncep_nbm_conus:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func convectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        if usesZeroConvectivePrecipitation {
+            guard let precipitation = Reader.variableFromString("precipitation") else {
+                return nil
+            }
+            return .mapped(.one(.raw(precipitation)) { precipitation, _ in
+                return Self.zeroPrecipitationComponent(precipitation)
+            })
+        }
+
+        return Reader.variableFromString("showers").map { .raw($0) }
+    }
+
+    private func weatherCodeConvectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        // The legacy NBM adapter deliberately passed nil here, which is not equivalent to a zero
+        // value in the thunderstorm confidence calculation.
+        guard reader.domain.domainRegistry != .ncep_nbm_conus else {
+            return nil
+        }
+        return convectivePrecipitationInput()
+    }
+
+    static func zeroPrecipitationComponent(_ precipitation: DataAndUnit) -> DataAndUnit {
+        return DataAndUnit(precipitation.data.map { $0 * 0 }, precipitation.unit)
+    }
+
     private func shortwaveRadiationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
         guard let shortwave = Reader.variableFromString("shortwave_radiation") else {
             return nil
@@ -739,6 +813,17 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         }
 
         let pressure = variable.variable
+        if reader.domain.domainRegistry == .ncep_hrrr_conus,
+           pressure.variable.remapped == .cloud_cover,
+           let relativeHumidity = pressureLevelInput(.relative_humidity, at: pressure.level) {
+            return .one(relativeHumidity) { relativeHumidity, _ in
+                let cloudCover = relativeHumidity.data.map {
+                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))
+                }
+                return DataAndUnit(cloudCover, .percentage)
+            }
+        }
+
         // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
         if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
             if isJmaForecastDomain && pressure.variable == .geopotential_height {
@@ -873,6 +958,55 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 }
             default:
                 break
+            }
+        }
+
+        // GFS-family and NBM compatibility that cannot be inferred from the raw variable type.
+        // Some fields are structurally valid for the shared enum but are not stored by every domain.
+        if variable == .showers, usesZeroConvectivePrecipitation,
+           let convectivePrecipitation = convectivePrecipitationInput() {
+            return .from(input: convectivePrecipitation)
+        }
+
+        if variable == .rain, isGfsForecastDomain,
+           let precipitation = Reader.variableFromString("precipitation"),
+           let snowfallWaterEquivalent = getDeriverMap(variable: .snowfall_water_equivalent),
+           let convectivePrecipitation = convectivePrecipitationInput() {
+            return .three(.raw(precipitation), .mapped(snowfallWaterEquivalent), convectivePrecipitation) { precipitation, snowfallWaterEquivalent, convectivePrecipitation, _ in
+                let rain = zip(precipitation.data, zip(snowfallWaterEquivalent.data, convectivePrecipitation.data)).map {
+                    max($0.0 - $0.1.0 - $0.1.1, 0)
+                }
+                return DataAndUnit(rain, precipitation.unit)
+            }
+        }
+
+        if variable == .rain, reader.domain.domainRegistry == .ncep_nbm_conus,
+           let precipitation = Reader.variableFromString("precipitation"),
+           let snowfallWaterEquivalent = Reader.variableFromString("snowfall_water_equivalent") {
+            return .two(.raw(precipitation), .raw(snowfallWaterEquivalent)) { precipitation, snowfallWaterEquivalent, _ in
+                return DataAndUnit(zip(precipitation.data, snowfallWaterEquivalent.data).map(-), precipitation.unit)
+            }
+        }
+
+        if variable == .diffuse_radiation, estimatesDiffuseRadiationFromShortwave,
+           let shortwave = shortwaveRadiationInput() {
+            return .one(shortwave) { shortwave, time in
+                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                return DataAndUnit(diffuse, shortwave.unit)
+            }
+        }
+
+        if variable == .diffuse_radiation, isGfsForecastDomain, let rawVariable {
+            // The legacy GFS adapter exposed the stored values without the generic non-negative clamp.
+            return .direct(rawVariable)
+        }
+
+        if variable == .direct_radiation,
+           (isGfsForecastDomain || reader.domain.domainRegistry == .ncep_nbm_conus),
+           let shortwave = shortwaveRadiationInput(),
+           let diffuse = getDeriverMap(variable: .diffuse_radiation) {
+            return .two(shortwave, .mapped(diffuse)) { shortwave, diffuse, _ in
+                return DataAndUnit(zip(shortwave.data, diffuse.data).map(-), diffuse.unit)
             }
         }
 
@@ -1265,8 +1399,8 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             else {
                 return nil
             }
-            if let showers = Reader.variableFromString("showers") {
-                return .three(.raw(precip), .mapped(snowwater), .raw(showers)) { precip, snowwater, showers, _ in
+            if let showers = convectivePrecipitationInput() {
+                return .three(.raw(precip), .mapped(snowwater), showers) { precip, snowwater, showers, _ in
                     let rain = zip(precip.data, zip(snowwater.data, showers.data)).map({
                         return max($0.0 - $0.1.0 - ($0.1.1.isNaN ? 0 : $0.1.1), 0)
                     })
@@ -1305,7 +1439,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return .weatherCode(
                 cloudcover: .mapped(cloudCover),
                 precipitation: precipitation,
-                convectivePrecipitation: Reader.variableFromString("showers"),
+                convectivePrecipitation: weatherCodeConvectivePrecipitationInput(),
                 snowfallCentimeters: .mapped(snowfall),
                 gusts: Reader.variableFromString("wind_gusts_10m"),
                 cape: Reader.variableFromString("cape"),
