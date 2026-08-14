@@ -33,6 +33,19 @@ import VaporTesting
         string.components(separatedBy: substring).count - 1
     }
 
+    private func expectMissing<Variable>(_ section: ApiSection<Variable>) {
+        for column in section.columns {
+            for variable in column.variables {
+                if case .float(let values) = variable {
+                    #expect(values.count == section.time.count)
+                    #expect(values.allSatisfy { $0.isNaN })
+                } else {
+                    Issue.record("Expected missing float values")
+                }
+            }
+        }
+    }
+
     /*@Test func generateS3SyncCommands() throws {
         for domain in DomainRegistry.allCases {
             let d = domain.rawValue
@@ -57,35 +70,30 @@ import VaporTesting
     }
 
     @Test func unavailableEnsemblePlaceholderPreservesColumnShapes() async throws {
-        let params = try JSONDecoder().decode(
-            ApiQueryParameter.self,
-            from: Data(#"{"latitude":[48.8],"longitude":[2.3]}"#.utf8)
-        )
         let hourly = TimerangeDt(start: Timestamp(2026, 8, 6), nTime: 4, dtSeconds: 3600)
         let daily = TimerangeDt(start: Timestamp(2026, 8, 6), nTime: 2, dtSeconds: 86400)
         let minutely15 = TimerangeDt(start: Timestamp(2026, 8, 6), nTime: 4, dtSeconds: 900)
         let time = ForecastApiTimeRange(dailyDisplay: daily, dailyRead: daily, hourlyDisplay: hourly, hourlyRead: hourly, minutely15: minutely15)
-        let reader = MultiDomainsReader(
+        let reader = MultiDomainsReaderResult.missing(UnavailableModelLocation(
             domain: .ncep_aigefs025,
-            readerHourly: nil,
-            readerDaily: nil,
-            readerWeekly: nil,
-            readerMonthly: nil,
-            params: params,
-            run: nil,
-            has15minutely: true,
+            latitude: 48.8,
+            longitude: 2.3,
+            elevation: 35,
             time: time,
-            timezone: .gmt,
             currentTime: Timestamp(2026, 8, 6),
-            temporalResolution: .hourly,
-            unavailableModelLocation: .init(latitude: 48.8, longitude: 2.3, elevation: 35, modelDtSeconds: 3600)
-        )
+            currentName: "current",
+            currentDtSeconds: 900,
+            modelDtSeconds: 3600,
+            ensemble: false
+        ))
 
         let isDay: ForecastVariable = .surface(.init(.is_day, 0))
         let hourlySection = try #require(try await reader.hourly(variables: [isDay]))
         let minutelySection = try #require(try await reader.minutely15(variables: [isDay]))
         #expect(hourlySection.columns[0].variables.count == 1)
         #expect(minutelySection.columns[0].variables.count == 1)
+        expectMissing(hourlySection)
+        expectMissing(minutelySection)
 
         let dailySection = try #require(try await reader.daily(variables: [.temperature_2m_mean, .sunrise, .moon_phase, .daylight_duration]))
         #expect(dailySection.columns.map { $0.variables.count } == [
@@ -94,11 +102,7 @@ import VaporTesting
             1,
             1
         ])
-        if case .timestamp(let values) = dailySection.columns[1].variables[0] {
-            #expect(values.allSatisfy { !$0.isNoData })
-        } else {
-            Issue.record("Expected timestamp sunrise values")
-        }
+        expectMissing(dailySection)
     }
 
     @Test(arguments: [
@@ -199,7 +203,7 @@ import VaporTesting
             #expect(json.contains(nullArray(variable: "temperature_2m", count: 24)))
             for variable in ["sunrise", "moon_phase", "daylight_duration"] {
                 #expect(occurrences(of: "\"\(variable)\":[", in: json) == 2)
-                #expect(!json.contains(nullArray(variable: variable, count: 1)))
+                #expect(json.contains(nullArray(variable: variable, count: 1)))
             }
         }
     }
