@@ -22,6 +22,16 @@ enum S3InventoryError: Error {
  
  TODO:
  - Serialise entries to disk for fast boot (option to store in KV cache? Need to prefix size)
+ - Use different update times per directory. E.g. recent data_run needs to be validated more often
+ - Consider back propagation of file-updated to directory. E.g. flag "should_do_background_update" for directory
+ - Consider dynamic update strategy using meta JSON files... or implement some sort of WAL or transaction log
+ 
+ Transaction log:
+ - Log each individual model update operation to data, data_run, data_spatial... data spatial might be updated every couple of seconds
+ - S3 path: logs/2026/09/14/dwd_icon_eps-00z-spatial.json  logs/2026/09/14/dwd_icon_eps-00z.json logs/2026/09/14/dwd_icon_eps-00z-data-run.json
+ - could also do data/log/YYYYMMDD/dwd_icon_eps-00zjson
+ - could also do data/log/YYYYMMDD/dwd_icon_eps-00zjson
+ - Each contains a list of modified files
  */
 
 struct S3Inventory {

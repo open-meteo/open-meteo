@@ -354,6 +354,7 @@ enum FileSystemCache {
     }
     
     /// Temporary representation of contents of a directory
+    /// TODO: Consider if this leads to a lot of ARC and it would be better to pass the actor
     struct DirectoryContents {
         let files: [String: FileEntry]
         let directories: [String: DirectoryEntry]
