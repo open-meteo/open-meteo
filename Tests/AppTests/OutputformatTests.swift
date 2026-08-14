@@ -113,6 +113,14 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         })
     }*/
 
+    @Test func hourlyMinMaxFlatBufferAggregation() {
+        let minimum = VariableAndPreviousDay(.temperature_2m_min, 0).getFlatBuffersMeta()
+        let maximum = VariableAndPreviousDay(.temperature_2m_max, 0).getFlatBuffersMeta()
+
+        #expect(minimum.aggregation == .minimum)
+        #expect(maximum.aggregation == .maximum)
+    }
+
     /// Test adjustment of API call weights
     /// "Heavy" API calls are counted more than just 1 API call
     ///
