@@ -7,18 +7,31 @@ import Testing
     @Test func europeanAirQuality() {
         #expect(EuropeanAirQuality.indexNo2(no2: -1).isNaN)
         #expect(EuropeanAirQuality.indexNo2(no2: 0) == 0)
-        #expect(EuropeanAirQuality.indexNo2(no2: 20) == 10)
-        #expect(EuropeanAirQuality.indexNo2(no2: 65) == 30)
-        #expect(EuropeanAirQuality.indexNo2(no2: 105) == 50)
-        #expect(EuropeanAirQuality.indexNo2(no2: 175) == 70)
-        #expect(EuropeanAirQuality.indexNo2(no2: 285) == 90)
-        #expect(EuropeanAirQuality.indexNo2(no2: 395) == 110)
+        #expect(EuropeanAirQuality.indexNo2(no2: 5) == 10)
+        #expect(EuropeanAirQuality.indexNo2(no2: 17.5) == 30)
+        #expect(EuropeanAirQuality.indexNo2(no2: 42.5) == 50)
+        #expect(EuropeanAirQuality.indexNo2(no2: 80) == 70)
+        #expect(EuropeanAirQuality.indexNo2(no2: 125) == 90)
+        #expect(EuropeanAirQuality.indexNo2(no2: 175) == 110)
 
-        #expect(EuropeanAirQuality.indexO3(o3: 30) == 12.0)
-        #expect(EuropeanAirQuality.indexO3(o3: 90) == 36.0)
-        #expect(EuropeanAirQuality.indexO3(o3: 150).isApproximatelyEqual(to: 63.636364, absoluteTolerance: 0.001))
-        #expect(EuropeanAirQuality.indexO3(o3: 210).isApproximatelyEqual(to: 74.545456, absoluteTolerance: 0.001))
-        #expect(EuropeanAirQuality.indexO3(o3: 260).isApproximatelyEqual(to: 82.85714, absoluteTolerance: 0.001))
+        #expect(EuropeanAirQuality.indexO3(o3: 30) == 10)
+        #expect(EuropeanAirQuality.indexO3(o3: 80) == 30)
+        #expect(EuropeanAirQuality.indexO3(o3: 110) == 50)
+        #expect(EuropeanAirQuality.indexO3(o3: 140) == 70)
+        #expect(EuropeanAirQuality.indexO3(o3: 170) == 90)
+        #expect(EuropeanAirQuality.indexO3(o3: 190) == 110)
+
+        #expect(EuropeanAirQuality.indexPm2_5(pm2_5: 2.5) == 10)
+        #expect(EuropeanAirQuality.indexPm2_5(pm2_5: 10) == 30)
+        #expect(EuropeanAirQuality.indexPm2_5(pm2_5: 32.5) == 50)
+        #expect(EuropeanAirQuality.indexPm2_5(pm2_5: 70) == 70)
+        #expect(EuropeanAirQuality.indexPm2_5(pm2_5: 115) == 90)
+
+        #expect(EuropeanAirQuality.indexPm10(pm10: 7.5) == 10)
+        #expect(EuropeanAirQuality.indexPm10(pm10: 30) == 30)
+        #expect(EuropeanAirQuality.indexPm10(pm10: 82.5) == 50)
+        #expect(EuropeanAirQuality.indexPm10(pm10: 157.5) == 70)
+        #expect(EuropeanAirQuality.indexPm10(pm10: 232.5) == 90)
     }
 
     @Test func usAirQuality() {

@@ -637,6 +637,15 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         }
     }
 
+    private var isJmaForecastDomain: Bool {
+        switch reader.domain.domainRegistry {
+        case .jma_gsm, .jma_msm_upper_level:
+            return true
+        default:
+            return false
+        }
+    }
+
     private func shortwaveRadiationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
         guard let shortwave = Reader.variableFromString("shortwave_radiation") else {
             return nil
@@ -732,6 +741,12 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         let pressure = variable.variable
         // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
         if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
+            if isJmaForecastDomain && pressure.variable == .geopotential_height {
+                // Preserve the legacy JMA API conversion applied after download-time scaling.
+                return .one(input) { geopotentialHeight, _ in
+                    return DataAndUnit(geopotentialHeight.data.map { $0 * 9.80665 }, geopotentialHeight.unit)
+                }
+            }
             return .from(input: input)
         }
 

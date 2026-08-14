@@ -397,9 +397,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .snow_depth_water_equivalent:
             return .init(variable: .snowDepthWaterEquivalent, previousDay: previousDay)
         case .temperature_2m_max:
-            return .init(variable: .temperature, aggregation: .max, altitude: 2, previousDay: previousDay)
+            return .init(variable: .temperature, aggregation: .maximum, altitude: 2, previousDay: previousDay)
         case .temperature_2m_min:
-            return .init(variable: .temperature, aggregation: .min, altitude: 2, previousDay: previousDay)
+            return .init(variable: .temperature, aggregation: .minimum, altitude: 2, previousDay: previousDay)
         case .soil_moisture_81_to_243cm:
             return .init(variable: .soilMoisture, depth: 81, depthTo: 243, previousDay: previousDay)
         case .soil_moisture_243_to_729cm:
