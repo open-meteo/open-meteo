@@ -229,6 +229,8 @@ struct OmFileSystemS3 {
                     throw error
                 }
             case .initialising(let queue):
+                OmMetrics.fileRemotePayloadWaiting.add(1, ordering: .relaxed)
+                defer { OmMetrics.fileRemotePayloadWaiting.add(-1, ordering: .relaxed) }
                 return try await withCheckedThrowingContinuation { continuation in
                     payload = .initialising(queue + [continuation])
                 } as? T
@@ -236,6 +238,8 @@ struct OmFileSystemS3 {
                 // If the file is actively being updated, allow access to the old file, because cached responses still work
                 if receivedFileModifiedError {
                     // If the access fails, enqueue to get the new file
+                    OmMetrics.fileRemotePayloadUpdateWaiting.add(1, ordering: .relaxed)
+                    defer { OmMetrics.fileRemotePayloadUpdateWaiting.add(-1, ordering: .relaxed) }
                     let payload = try await withCheckedThrowingContinuation { continuation in
                         self.payload = .updating(old: old, queue + [continuation])
                     }
@@ -387,13 +391,14 @@ struct OmFileSystemS3 {
         func update(context: ServerContext) async throws {
             OmMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             let logger = context.logger
-            OmMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
-            defer {
-                OmMetrics.fileRemoteDirectoryUpdateWaiting.add(-1, ordering: .relaxed)
-            }
+
             guard revalidationQueue == nil else {
+                OmMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
                 try await withCheckedThrowingContinuation { continuation in
                     revalidationQueue?.append(continuation)
+                }
+                defer {
+                    OmMetrics.fileRemoteDirectoryUpdateWaiting.add(-1, ordering: .relaxed)
                 }
                 return
             }

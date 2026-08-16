@@ -18,6 +18,9 @@ enum OmMetrics {
     static let fileRemoteDirectoryUpdateWaiting = Atomic(0)
     static let fileRemoteDirectoryModifiedTotal = Atomic(0)
     
+    static let fileRemotePayloadWaiting = Atomic(0)
+    static let fileRemotePayloadUpdateWaiting = Atomic(0)
+    
     static let requestsQueued = Atomic(0)
     static let requestsRunning = Atomic(0)
     static let requestsTooManyLocationsTotal = Atomic(0)
@@ -89,6 +92,12 @@ om_file_remote_directory_update_waiting \(OmMetrics.fileRemoteDirectoryUpdateWai
 # TYPE om_file_remote_directory_modified_total counter
 # HELP om_file_remote_directory_modified_total Number of remote directory content changes
 om_file_remote_directory_modified_total \(OmMetrics.fileRemoteDirectoryModifiedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_payload_waiting gauge
+# HELP om_file_remote_payload_waiting Number of callers waiting for a remote payload to resolve
+om_file_remote_payload_waiting \(OmMetrics.fileRemotePayloadWaiting.load(ordering: .relaxed))
+# TYPE om_file_remote_payload_update_waiting gauge
+# HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
+om_file_remote_payload_update_waiting \(OmMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes
