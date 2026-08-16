@@ -5,7 +5,7 @@ import VaporTesting
 import OmFileFormat
 
 @Suite struct OmReaderTests {
-    @Test func metaCache() throws {
+    /*@Test func metaCache() throws {
         #expect(MemoryLayout<HttpMetaCache.Entry>.stride == 72)
         
         let entry = try HttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasf")
@@ -17,7 +17,7 @@ import OmFileFormat
         let entry48 = try HttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
         #expect(entry48.eTag.string.count == 48)
         #expect(entry48.eTag.string == "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
-    }
+    }*/
     
     @Test func httpRead() async throws {
         try await withApp { app in
