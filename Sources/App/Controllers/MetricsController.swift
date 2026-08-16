@@ -12,6 +12,7 @@ enum OmMetrics {
     
     static let fileRemoteOpen = Atomic(0)
     static let fileRemoteModifiedTotal = Atomic(0)
+    static let fileRemoteModifiedUnexpectedlyTotal = Atomic(0)
     static let fileRemoteDirectoriesOpen = Atomic(0)
     static let fileRemoteDirectoryUpdatedTotal = Atomic(0)
     static let fileRemoteDirectoryUpdateWaiting = Atomic(0)
@@ -58,6 +59,9 @@ om_file_local_open \(OmMetrics.fileLocalOpen.load(ordering: .relaxed))
 # TYPE om_file_local_modified_total counter
 # HELP om_file_local_modified_total Number of local file metadata updates
 om_file_local_modified_total \(OmMetrics.fileLocalModifiedTotal.load(ordering: .relaxed))
+# TYPE om_file_local_modified_unexpectedly_total counter
+# HELP om_file_local_modified_unexpectedly_total Number of local file metadata updates thrown while reading data
+om_file_local_modified_unexpectedly_total \(OmMetrics.fileRemoteModifiedUnexpectedlyTotal.load(ordering: .relaxed))
 # TYPE om_file_local_directories_open gauge
 # HELP om_file_local_directories_open Number of open local directories
 om_file_local_directories_open \(OmMetrics.fileLocalDirectoriesOpen.load(ordering: .relaxed))

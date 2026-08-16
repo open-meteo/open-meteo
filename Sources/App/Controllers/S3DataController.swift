@@ -715,20 +715,14 @@ fileprivate extension String {
             return date
         }
         
-        let rfc1123 = DateFormatter()
-        rfc1123.locale = Locale(identifier: "en_US_POSIX")
-        rfc1123.timeZone = TimeZone(secondsFromGMT: 0)
-        rfc1123.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        let rfc1123 = DateFormatter.httpLastModifiedFormater
         return rfc1123.date(from: self)
     }
 }
 
 fileprivate extension Date {
     var lastModifiedHttpDateFormat: String {
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = TimeZone(secondsFromGMT: 0)
-        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        let fmt = DateFormatter.httpLastModifiedFormater
         return fmt.string(from: self)
     }
 }

@@ -28,7 +28,7 @@ final class OmFileSystemManager: Sendable {
             case .local(let fileEntry):
                 return fileEntry.modificationTimestamp
             case .remote(let s3File):
-                return s3File.backend.lastModifiedTimestamp
+                return s3File.backend.lastModified
             }
         }
         

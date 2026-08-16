@@ -6,7 +6,7 @@ import NIOConcurrencyHelpers
 import Vapor
 import OmFileFormat
 
-enum S3InventoryError: Error {
+enum OmFileSystemS3Error: Error {
     case invalidObjectName
 }
 
@@ -33,7 +33,6 @@ enum S3InventoryError: Error {
  - could also do data/log/YYYYMMDD/dwd_icon_eps-00zjson
  - Each contains a list of modified files
  */
-
 struct OmFileSystemS3 {
     let server: String
     let root = Directory(prefix: "")
@@ -133,7 +132,7 @@ struct OmFileSystemS3 {
         
         /// Initiate cached HTTP reader
         func makeCachedClient(context: ServerContext) -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-            let backend = OmHttpReaderBackend(client: context.client, logger: context.logger, url: "\(context.server)\(objectName)", count: contentLength, lastModified: lastModified, eTag: eTag)
+            let backend = OmHttpReaderBackend(context: context, object: objectName, count: contentLength, eTag: eTag, lastModified: lastModified)
             return OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
         }
 
@@ -260,9 +259,9 @@ struct OmFileSystemS3 {
                 // At this stage there could be dozens of failing calls coming in
                 self.payload = .updating(old: payload, [])
                 do {
-                    let newReader = try await OmHttpReaderBackend(client: context.client, logger: context.logger, url: "\(context.server)\(objectName)")
+                    let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
                     self.contentLength = newReader.count
-                    self.lastModified = newReader.lastModifiedTimestamp
+                    self.lastModified = newReader.lastModified
                     self.eTag = newReader.eTag
                     let new = try await payload.remoteUpdated(file: OmReaderBlockCache(backend: newReader, cache: OpenMeteo.dataBlockCache, cacheKey: newReader.cacheKey))
                     guard case .updating(old: _, let queued) = self.payload else {
@@ -293,16 +292,7 @@ struct OmFileSystemS3 {
                 throw error
             }
         }
-
-        private static let lastModifiedDateFormat: DateFormatter = {
-            let fmt = DateFormatter()
-            fmt.locale = Locale(identifier: "en_US_POSIX")
-            fmt.timeZone = TimeZone(secondsFromGMT: 0)
-            fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-            return fmt
-        }()
     }
-
 
     struct DirectoryWithContext: OmFileSystemDirectory {
         let directory: Directory
@@ -311,7 +301,7 @@ struct OmFileSystemS3 {
         /// Find a directory for a path
         func getDirectory(fullPath: String) async throws -> DirectoryWithContext? {
             guard fullPath.hasPrefix("/") == false, fullPath.hasSuffix("/") else {
-                throw S3InventoryError.invalidObjectName
+                throw OmFileSystemS3Error.invalidObjectName
             }
             let trimmedPath = fullPath.dropLast()
             var directory = directory
@@ -335,7 +325,7 @@ struct OmFileSystemS3 {
         /// Find an object for a path
         func getFile(fullPath: String) async throws -> FileWithContext? {
             guard fullPath.hasPrefix("/") == false, fullPath.hasSuffix("/") == false else {
-                throw S3InventoryError.invalidObjectName
+                throw OmFileSystemS3Error.invalidObjectName
             }
             let objectStart = fullPath.lastIndex(of: "/").map { fullPath.index(after: $0) } ?? fullPath.startIndex
             let object = fullPath[objectStart..<fullPath.endIndex]
@@ -522,6 +512,4 @@ struct OmFileSystemS3 {
             return files[name]
         }
     }
-
 }
-
