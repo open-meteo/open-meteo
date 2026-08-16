@@ -122,7 +122,7 @@ enum OmFileSystemLocal {
                 lastAccessed = Timestamp(0)
                 return
             }
-            if lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundIgnoreInterval, now: now) {
+            if self.fd != nil && lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundIgnoreInterval, now: now) {
                 return // Skip if not accessed for more than 60 seconds
             }
             if lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundInterval, now: now) {
@@ -165,6 +165,7 @@ enum OmFileSystemLocal {
                 if ["cache.bin", "cache_file_meta.bin"].contains(name) {
                     continue
                 }
+                let entryInode = UInt64(entry.pointee.d_ino)
                 
                 var isDirectory = false
                 if entry.pointee.d_type == DT_DIR {
@@ -181,18 +182,18 @@ enum OmFileSystemLocal {
                 }
                 if isDirectory {
                     seenDirectories.insert(name)
-                    if let existing = directories[name], existing.inode == inode {
+                    if let existing = directories[name], existing.inode == entryInode {
                         continue // directory name exists and is the same inode
                     }
                     OmMetrics.fileLocalDirectoryModifiedTotal.add(1, ordering: .relaxed)
                     let fileFd = try fd.openRelative(path: name, mode: .pathReadOnly)
                     directories[name] = Directory(
                         fd: fileFd,
-                        inode: inode
+                        inode: entryInode
                     )
                 } else {
                     seenFiles.insert(name)
-                    if let existing = files[name], existing.inode == inode {
+                    if let existing = files[name], existing.inode == entryInode {
                         continue // file name exists and is the same inode
                     }
                     OmMetrics.fileLocalModifiedTotal.add(1, ordering: .relaxed)
@@ -200,7 +201,7 @@ enum OmFileSystemLocal {
                     let stat = fd.fileStats()
                     files[name] = File(
                         fd: fd,
-                        inode: inode,
+                        inode: entryInode,
                         size: Int64(stat.st_size),
                         modificationTimestamp: stat.modificationTimestamp
                     )
