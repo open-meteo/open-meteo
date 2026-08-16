@@ -23,7 +23,10 @@ enum OpenMeteo {
             guard dir.last == "/" else {
                 fatalError("REMOTE_DATA_DIRECTORY must end with a trailing slash")
             }
-            return dir
+            guard dir.hasSuffix("/data/") else {
+                fatalError("REMOTE_DATA_DIRECTORY must end with '/data/'")
+            }
+            return String(dir.dropLast(5))
         }
         return nil
     }()

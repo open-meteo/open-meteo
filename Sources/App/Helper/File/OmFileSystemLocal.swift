@@ -162,6 +162,9 @@ enum OmFileSystemLocal {
                 if name.hasSuffix("~") {
                     continue
                 }
+                if ["cache.bin", "cache_file_meta.bin"].contains(name) {
+                    continue
+                }
                 
                 var isDirectory = false
                 if entry.pointee.d_type == DT_DIR {
