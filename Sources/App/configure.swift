@@ -313,7 +313,7 @@ extension ErrorMiddleware {
             switch error {
             case _ as RateLimitError:
                 fallthrough
-            case _ as ApiKeyManagerError:
+            case _ as ApiKeyManagerError, _ as TimeError, _ as ForecastApiError:
                 // Do not log errors
                 break
             default:
