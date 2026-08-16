@@ -10,9 +10,9 @@ import Synchronization
 final class OmFileSystemManager: Sendable {
     public static let instance = OmFileSystemManager()
     
-    private let localFileSystem: OmFileSystemLocal.Directory
+    let localFileSystem: OmFileSystemLocal.Directory
     
-    private let remoteFileSystem: OmFileSystemS3?
+    let remoteFileSystem: OmFileSystemS3?
     
     private init() {
         self.localFileSystem = try! .makeOmRoot()
@@ -40,6 +40,11 @@ final class OmFileSystemManager: Sendable {
                 return Int64(s3File.backend.count)
             }
         }
+    }
+    
+    /// Called after a file has been uploaded using the integrated S3 server
+    func updateLocalDirectory(path: String) async {
+        await localFileSystem.getDirectory(fullPath: path)?.updateIfRequired(force: true)
     }
     
     func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (lastModified: Date, size: Int64, eTag: String?)])? {

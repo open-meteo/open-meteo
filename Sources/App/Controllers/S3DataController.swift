@@ -7,6 +7,7 @@ import NIOFileSystem
 
 /**
  Expose database as S3 endpoint. This can be used to pull data from one server to another. It is used only internally to transfer data between Open-Meteo API nodes. Note: This is only a limited implementation and not fully compatible.
+ After upload, the local cached file manager is updated as well to immediately reflect the file changes
  
  List example:
  `http://127.0.0.1:8080/?list-type=2&delimiter=/&prefix=data/cmc_gem_gdps/shortwave_radiation/&apikey=123`
@@ -23,7 +24,6 @@ import NIOFileSystem
  If `S3_UPLOAD_LAZY_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are lazily replicated to those servers after the sync replication completed. Used to upload data to large S3 storage servers afterwards
  
  TODO:
- - Update Filesystemcache on S3 uploads
  - API key integration with accounting (1 call = 1KB traffic)
  */
 struct S3DataController: RouteCollection {
@@ -284,10 +284,17 @@ struct S3DataController: RouteCollection {
             try await handle.setLastDataModificationTime(to: ts)
             return modifiedDate
         }
-        try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         try await replicateSinglePut(req: req, body: body, lastModified: modifiedDate)
+        try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
+        
+        /// Full path `/somedir/object.ext`
+        let path = req.url.path
+        /// Object directory `somedir/`
+        let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
+        await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
+        
         for queue in await lazyReplicationQueues(req) {
-            await queue.upload(buffer: body, objectName: String(req.url.path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
+            await queue.upload(buffer: body, objectName: String(path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
         }
     }
     
@@ -407,10 +414,15 @@ struct S3DataController: RouteCollection {
             let ts = FileInfo.Timespec(seconds: Int(lastModified.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
         }
-                
+        /// Full path `/somedir/object.ext`
+        let path = req.url.path
+        /// Object directory `somedir/`
+        let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
+        await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
+        
         for queue in await lazyReplicationQueues(req) {
             let session = queue.startMultiPartUploads()
-            await session.uploadMultipart(file: absolutePath, objectName: String(req.url.path.dropFirst(1)))
+            await session.uploadMultipart(file: absolutePath, objectName: String(path.dropFirst(1)))
             await queue.finishMultiPartUploads(session)
         }
     }

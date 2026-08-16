@@ -94,10 +94,10 @@ enum OmFileSystemLocal {
         }
         
         /// Should be called before any access to its contents
-        func updateIfRequired() {
+        func updateIfRequired(force: Bool = false) {
             let now = Timestamp.now()
             lastAccessed = now
-            if lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateOnAccessInterval, now: now)  {
+            if force || lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateOnAccessInterval, now: now)  {
                 do {
                     try forceUpdate()
                 } catch {
