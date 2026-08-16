@@ -119,11 +119,16 @@ struct OmFileSystemS3 {
         }
 
         init(objectName: String, contentLength: Int, lastModified: Timestamp, eTag: String) {
+            OmMetrics.fileRemoteOpen.add(1, ordering: .relaxed)
             self.objectName = objectName
             self.contentLength = contentLength
             self.lastModified = lastModified
             self.eTag = eTag
             payload = .none
+        }
+        
+        deinit {
+            OmMetrics.fileRemoteOpen.add(-1, ordering: .relaxed)
         }
         
         /// Initiate cached HTTP reader
@@ -137,6 +142,7 @@ struct OmFileSystemS3 {
             if self.contentLength == contentLength && self.lastModified == lastModified && eTag == self.eTag {
                 return
             }
+            OmMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
             self.contentLength = contentLength
             self.lastModified = lastModified
             self.eTag = eTag
@@ -379,12 +385,22 @@ struct OmFileSystemS3 {
         var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
         
         init(prefix: String) {
+            OmMetrics.fileRemoteDirectoriesOpen.add(1, ordering: .relaxed)
             self.prefix = prefix
+        }
+        
+        deinit {
+            OmMetrics.fileRemoteDirectoriesOpen.add(-1, ordering: .relaxed)
         }
         
         /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
         func update(context: ServerContext) async throws {
+            OmMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             let logger = context.logger
+            OmMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
+            defer {
+                OmMetrics.fileRemoteDirectoryUpdateWaiting.add(-1, ordering: .relaxed)
+            }
             guard revalidationQueue == nil else {
                 try await withCheckedThrowingContinuation { continuation in
                     revalidationQueue?.append(continuation)
@@ -403,6 +419,7 @@ struct OmFileSystemS3 {
                     if let existing = files[name] {
                         await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
                     } else {
+                        OmMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
                         files[name] = File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
                     }
                 }
@@ -412,15 +429,18 @@ struct OmFileSystemS3 {
                     let name = String(directory.dropFirst(prefix.count).dropLast())
                     listedDirectories.insert(name)
                     if directories[name] == nil {
+                        OmMetrics.fileRemoteDirectoryModifiedTotal.add(1, ordering: .relaxed)
                         directories[name] = Directory(prefix: "\(prefix)\(name)/")
                     }
                 }
 
                 for name in Array(files.keys) where !listedFiles.contains(name) {
+                    OmMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
                     files.removeValue(forKey: name)
                 }
 
                 for name in Array(directories.keys) where !listedDirectories.contains(name) {
+                    OmMetrics.fileRemoteDirectoryModifiedTotal.add(1, ordering: .relaxed)
                     directories.removeValue(forKey: name)
                 }
 
@@ -455,7 +475,6 @@ struct OmFileSystemS3 {
             if lastValidated.olderThan(seconds: revalidateIntervalSeconds, now: now) {
                 do {
                     try await update(context: context)
-                    OmMetrics.fileCacheRemoteRevalidated.add(1, ordering: .relaxed)
                 } catch {
                     context.logger.warning("S3Inventory lifecycle revalidation failed for prefix '\(prefix)': \(error)")
                 }

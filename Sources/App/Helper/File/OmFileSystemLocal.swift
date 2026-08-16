@@ -67,6 +67,7 @@ enum OmFileSystemLocal {
         }
         
         init(fd: FileHandle, inode: UInt64) {
+            OmMetrics.fileLocalDirectoriesOpen.add(1, ordering: .relaxed)
             self.fd = fd
             self.inode = inode
             self.files = [:]
@@ -85,12 +86,17 @@ enum OmFileSystemLocal {
         }
         
         init(path: String) throws {
+            OmMetrics.fileLocalDirectoriesOpen.add(1, ordering: .relaxed)
             self.fd = try FileHandle.openFor(path: path, mode: .pathReadOnly)
             self.inode = 0
             self.files = [:]
             self.directories = [:]
             lastRefresh = Timestamp(0)
             lastAccessed = Timestamp(0)
+        }
+        
+        deinit {
+            OmMetrics.fileLocalDirectoriesOpen.add(-1, ordering: .relaxed)
         }
         
         /// Should be called before any access to its contents
@@ -132,6 +138,7 @@ enum OmFileSystemLocal {
             guard let fd = fd.map({FileHandle(fileDescriptor: dup($0.fileDescriptor))}) else {
                 return
             }
+            OmMetrics.fileLocalDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             guard let dir = fdopendir(fd.fileDescriptor) else {
                 let error = String(cString: strerror(errno))
                 throw FileSystemCacheError.cannotOpenFile(name: "", errno: errno, error: error)
@@ -174,6 +181,7 @@ enum OmFileSystemLocal {
                     if let existing = directories[name], existing.inode == inode {
                         continue // directory name exists and is the same inode
                     }
+                    OmMetrics.fileLocalDirectoryModifiedTotal.add(1, ordering: .relaxed)
                     let fileFd = try fd.openRelative(path: name, mode: .pathReadOnly)
                     directories[name] = Directory(
                         fd: fileFd,
@@ -184,6 +192,7 @@ enum OmFileSystemLocal {
                     if let existing = files[name], existing.inode == inode {
                         continue // file name exists and is the same inode
                     }
+                    OmMetrics.fileLocalModifiedTotal.add(1, ordering: .relaxed)
                     let fd = try fd.openRelative(path: &entry.pointee.d_name.0, mode: .fileReadOnly)
                     let stat = fd.fileStats()
                     files[name] = File(
@@ -195,9 +204,11 @@ enum OmFileSystemLocal {
                 }
             }
             for name in files.keys where !seenFiles.contains(name) {
+                OmMetrics.fileLocalModifiedTotal.add(1, ordering: .relaxed)
                 files.removeValue(forKey: name)
             }
             for name in directories.keys where !seenDirectories.contains(name) {
+                OmMetrics.fileLocalDirectoryModifiedTotal.add(1, ordering: .relaxed)
                 directories.removeValue(forKey: name)
             }
             lastRefresh = .now()
@@ -291,11 +302,16 @@ enum OmFileSystemLocal {
         }
         
         init(fd: FileHandle, inode: UInt64, size: Int64, modificationTimestamp: Timestamp) {
+            OmMetrics.fileLocalOpen.add(1, ordering: .relaxed)
             self.fd = fd
             self.inode = inode
             self.size = size
             self.modificationTimestamp = modificationTimestamp
             payload = .none
+        }
+        
+        deinit {
+            OmMetrics.fileLocalOpen.add(-1, ordering: .relaxed)
         }
         
         func getPayload<T: OmLocalPayload>(ofType: T.Type) async throws -> T {
