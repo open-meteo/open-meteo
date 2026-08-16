@@ -29,13 +29,13 @@ enum S3List {
     }
 
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
-    static func s3list(client: HTTPClient, server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
+    static func s3list(context: OmFileSystemS3.ServerContext, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
         var allFiles: [S3List.ListV2File] = []
         var allDirectories: [String] = []
         var continuation: String? = nil
-        let logger = Logger(label: "S3List")
+        let logger = context.logger
         while true {
-            var url = "\(server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
+            var url = "\(context.server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
             if let continuation {
                 url += "&continuation-token=\(continuation.awsPercentEncoded)"
             }
@@ -44,7 +44,7 @@ enum S3List {
             }
             let request = HTTPClientRequest(url: url)
 
-            var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
+            var response = try await context.client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
             guard let body = response.readString(length: response.readableBytes) else {
                 return (allFiles, allDirectories)
             }

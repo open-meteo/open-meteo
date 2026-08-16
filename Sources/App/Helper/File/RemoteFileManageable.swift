@@ -10,6 +10,23 @@ protocol RemoteFileManageable {
     func getRelativeFilePathWithData() -> String
 }
 
+protocol RemoteFileManagablePayload: RemotePayload, LocalPayload {
+    
+}
+
+protocol RemotePayload: Sendable {
+    /// Initialise from remote source
+    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws
+    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self
+    func remoteDeleted() async throws
+}
+
+protocol LocalPayload: Sendable {
+    /// Payload can retain a reference to FileHandle to ensure the file stays open
+    init(fd: FileHandle, size: Int64) async throws
+}
+
+
 extension RemoteFileManageable {
     /// Get the absolute file system path like `/var/lib/openmeteo-`
     func getFilePath() -> String {

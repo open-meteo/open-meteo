@@ -10,17 +10,17 @@ import Synchronization
 final class RemoteFileManager: Sendable {
     public static let instance = RemoteFileManager()
     
-    private let localFileSystem: FileSystemCache.DirectoryEntry
+    private let localFileSystem: OmFileSystemLocal.Directory
     
-    private let remoteFileSystem: S3Inventory?
+    private let remoteFileSystem: OmFileSystemS3?
     
     private init() {
         self.localFileSystem = try! .makeOmRoot()
-        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { S3Inventory(server: $0) }
+        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { OmFileSystemS3(server: $0) }
     }
     
     enum FileType {
-        case local(FileSystemCache.FileEntry)
+        case local(OmFileSystemLocal.File)
         case remote(OmReaderBlockCache<OmHttpReaderBackend, MmapFile>)
         
         var modificationTimestamp: Timestamp {
@@ -46,12 +46,12 @@ final class RemoteFileManager: Sendable {
         var directories = Set<String>()
         var files = [String: (lastModified: Date, size: Int64, eTag: String?)]()
         
-        if let local = await localFileSystem.getDirectory(path: path) {
+        if let local = await localFileSystem.getDirectory(fullPath: path) {
             await local.exportDirectories(directories: &directories, files: &files)
         }
         
-        if let remoteFileSystem, let remoteDir = try await remoteFileSystem.getDirectory(path: path, client: client, logger: logger) {
-            try await remoteDir.exportDirectories(directories: &directories, files: &files, server: remoteFileSystem.server, client: client, logger: logger)
+        if let remoteFileSystem, let remoteDir = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path) {
+            await remoteDir.directory.exportDirectories(directories: &directories, files: &files)
         }
         
         return (directories, files)
@@ -61,21 +61,20 @@ final class RemoteFileManager: Sendable {
     /// E.g can get /data/dwd_icon/ directory and check if a variable is present at all
     /// Or get all chunks from a directory
     func getDirectory(path: String, client: HTTPClient, logger: Logger) async throws -> LocalAndRemoteDirectory? {
-        let local = await localFileSystem.getDirectory(path: path)?.getContents()
+        let local = await localFileSystem.getDirectory(fullPath: path)
         guard let remoteFileSystem else {
             return LocalAndRemoteDirectory(local: local, remote: nil)
         }
-        let remote = try await remoteFileSystem.getDirectory(path: path, client: client, logger: logger)?
-            .getContents(server: remoteFileSystem.server, client: client, logger: logger)
+        let remote = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path)
         return LocalAndRemoteDirectory(local: local, remote: remote)
     }
     
     func getFile(path: String, client: HTTPClient, logger: Logger) async throws -> FileType? {
-        if let file = await localFileSystem.getObject(path: path) {
+        if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
         }
-        if let remoteFileSystem, let file = try await remoteFileSystem.getObject(path: path, client: client, logger: logger) {
-            let client = await file.makeCachedClient(client: client, logger: logger, server: remoteFileSystem.server)
+        if let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
+            let client = await file.file.makeCachedClient(context: file.context)
             return .remote(client)
         }
         return nil
@@ -84,7 +83,7 @@ final class RemoteFileManager: Sendable {
     func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
-        if let object = await localFileSystem.getObject(path: path) {
+        if let object = await localFileSystem.getFile(fullPath: path) {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
             return try await fn(payload)
         }
@@ -92,10 +91,10 @@ final class RemoteFileManager: Sendable {
             return nil
         }
         /// Check for remote file
-        guard let client, let object = try await remoteFileSystem.getObject(path: path, client: client, logger: logger) else {
+        guard let client, let object = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) else {
             return nil
         }
-        return try await object.with(client: client, logger: logger, server: remoteFileSystem.server, fn: fn)
+        return try await object.with(fn: fn)
     }
     
     /// Check if the file is available locally or remotely.
@@ -122,46 +121,45 @@ final class RemoteFileManager: Sendable {
     }
 }
 
-protocol RemoteFileManagablePayload: RemotePayload, LocalPayload {
-    
-}
+extension RemoteFileManager {
+    struct LocalAndRemoteDirectory {
+        let local: OmFileSystemLocal.Directory?
+        let remote: OmFileSystemS3.DirectoryWithContext?
+        
+        /// Get a sub directory in this directory
+        func getDirectory(name: String) async throws -> LocalAndRemoteDirectory {
+            let local = await local?.getDirectory(name: name)
+            guard let remote else {
+                return LocalAndRemoteDirectory(local: local, remote: nil)
+            }
+            let remoteContents = try await remote.getDirectory(name: name)
+            return LocalAndRemoteDirectory(local: local, remote: remoteContents)
+        }
+        
+        /// Get a file in this directory
+        func getFile(name: String) async -> LocalOrRemoteFile? {
+            if let file = await local?.getFile(name: name) {
+                return .local(file)
+            }
+            if let remote, let file = await remote.getFile(name: name) {
+                return .remote(file)
+            }
+            return nil
+        }
+    }
 
-struct LocalAndRemoteDirectory {
-    let local: FileSystemCache.DirectoryContents?
-    let remote: S3Directory.DirectoryContents?
-    
-    /// Get a sub directory in this directory
-    func getDirectory(name: String) async throws -> LocalAndRemoteDirectory {
-        let local = await local?.directories[name]?.getContents()
-        guard let remote else {
-            return LocalAndRemoteDirectory(local: local, remote: nil)
+    enum LocalOrRemoteFile {
+        case local(OmFileSystemLocal.File)
+        case remote(OmFileSystemS3.FileWithContext)
+        
+        func with<R, Key: RemoteFileManageable>(payloadType: Key.Type, client: HTTPClient, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+            switch self {
+            case .local(let file):
+                return try await fn(file.getPayload(ofType: Key.Payload.self))
+            case .remote(let file):
+                return try await file.with(fn: fn)
+            }
         }
-        let remoteContents = try await remote.directories[name]?.getContents(server: remote.server, client: remote.client, logger: remote.logger)
-        return LocalAndRemoteDirectory(local: local, remote: remoteContents)
     }
-    
-    /// Get a file in this directory
-    func getFile(name: String) async throws -> LocalOrRemoteFile? {
-        if let file = local?.files[name] {
-            return .local(file)
-        }
-        if let remote, let file = remote.files[name] {
-            return .remote(file, client: remote.client, logger: remote.logger, server: remote.server)
-        }
-        return nil
-    }
-}
 
-enum LocalOrRemoteFile {
-    case local(FileSystemCache.FileEntry)
-    case remote(S3File, client: HTTPClient, logger: Logger, server: String)
-    
-    func with<R, Key: RemoteFileManageable>(payloadType: Key.Type, client: HTTPClient, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
-        switch self {
-        case .local(let file):
-            return try await fn(file.getPayload(ofType: Key.Payload.self))
-        case .remote(let file, client: let client, logger: let logger, server: let server):
-            return try await file.with(client: client, logger: logger, server: server, fn: fn)
-        }
-    }
 }

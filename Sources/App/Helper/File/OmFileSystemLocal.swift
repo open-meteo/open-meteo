@@ -35,7 +35,7 @@ import Darwin
  - Should use `getdents64` to speed up directory listing
  - Use `inotify` on linux to watch for modifications using events
  */
-enum FileSystemCache {
+enum OmFileSystemLocal {
     /// Revalidate directories on access after every 10 seconds. Usually the `revalidateBackgroundInterval` should already have revalidated this directory
     static let revalidateOnAccessInterval = 10
     /// Revalidate directories every 5 seconds in a background task
@@ -45,25 +45,25 @@ enum FileSystemCache {
     /// Remove directory and file handles after 10 minutes entirely
     static let revalidateBackgroundEjectInterval = 600
     
-    actor DirectoryEntry: Sendable {
+    actor Directory: Sendable, OmFileSystemDirectory {
         let fd: FileHandle?
         let inode: UInt64
         var lastRefresh: Timestamp
         var lastAccessed: Timestamp
-        private var files: [String: FileEntry]
-        private var directories: [String: DirectoryEntry]
+        private var files: [String: File]
+        private var directories: [String: Directory]
         
         /// Make om root directory with data, data_run and data_spatial
-        static func makeOmRoot() throws -> DirectoryEntry {
-            var directories = [String: DirectoryEntry]()
-            directories["data"] = try DirectoryEntry(path: OpenMeteo.dataDirectory)
+        static func makeOmRoot() throws -> Directory {
+            var directories = [String: Directory]()
+            directories["data"] = try Directory(path: OpenMeteo.dataDirectory)
             if let dataRunDirectory = OpenMeteo.dataRunDirectory {
-                directories["data_run"] = try DirectoryEntry(path: dataRunDirectory)
+                directories["data_run"] = try Directory(path: dataRunDirectory)
             }
             if let dataSpatialDirectory = OpenMeteo.dataSpatialDirectory {
-                directories["data_spatial"] = try DirectoryEntry(path: dataSpatialDirectory)
+                directories["data_spatial"] = try Directory(path: dataSpatialDirectory)
             }
-            return DirectoryEntry(directories: directories)
+            return Directory(directories: directories)
         }
         
         init(fd: FileHandle, inode: UInt64) {
@@ -75,7 +75,7 @@ enum FileSystemCache {
             lastAccessed = Timestamp(0)
         }
         
-        init(directories: [String: DirectoryEntry]) {
+        init(directories: [String: Directory]) {
             self.fd = nil
             self.inode = 0
             self.lastRefresh = Timestamp(0)
@@ -94,10 +94,10 @@ enum FileSystemCache {
         }
         
         /// Should be called before any access to its contents
-        private func updateIfRequired() {
+        func updateIfRequired() {
             let now = Timestamp.now()
             lastAccessed = now
-            if lastRefresh.olderThan(seconds: FileSystemCache.revalidateOnAccessInterval, now: now)  {
+            if lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateOnAccessInterval, now: now)  {
                 do {
                     try forceUpdate()
                 } catch {
@@ -108,7 +108,7 @@ enum FileSystemCache {
         
         /// Should be called every second from a life cycle handler
         func updateRecursivelyIfRequired(now: Timestamp) async throws {
-            if lastAccessed.olderThan(seconds: FileSystemCache.revalidateBackgroundEjectInterval, now: now) {
+            if lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundEjectInterval, now: now) {
                 /// If not used for more than 10 minutes, release cached file handles and payloads
                 self.files = [:]
                 self.directories = [:]
@@ -116,10 +116,10 @@ enum FileSystemCache {
                 lastAccessed = Timestamp(0)
                 return
             }
-            if lastAccessed.olderThan(seconds: FileSystemCache.revalidateBackgroundIgnoreInterval, now: now) {
+            if lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundIgnoreInterval, now: now) {
                 return // Skip if not accessed for more than 60 seconds
             }
-            if lastRefresh.olderThan(seconds: FileSystemCache.revalidateBackgroundInterval, now: now) {
+            if lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundInterval, now: now) {
                 try forceUpdate()
             }
             for directory in directories.values {
@@ -128,7 +128,7 @@ enum FileSystemCache {
         }
         
         /// Updates files and directories by listing all files. Existing files are checked if the same inode is used.
-        func forceUpdate() throws {
+        private func forceUpdate() throws {
             guard let fd = fd.map({FileHandle(fileDescriptor: dup($0.fileDescriptor))}) else {
                 return
             }
@@ -175,7 +175,7 @@ enum FileSystemCache {
                         continue // directory name exists and is the same inode
                     }
                     let fileFd = try fd.openRelative(path: name, mode: .pathReadOnly)
-                    directories[name] = DirectoryEntry(
+                    directories[name] = Directory(
                         fd: fileFd,
                         inode: inode
                     )
@@ -186,7 +186,7 @@ enum FileSystemCache {
                     }
                     let fd = try fd.openRelative(path: &entry.pointee.d_name.0, mode: .fileReadOnly)
                     let stat = fd.fileStats()
-                    files[name] = FileEntry(
+                    files[name] = File(
                         fd: fd,
                         inode: inode,
                         size: Int64(stat.st_size),
@@ -203,13 +203,7 @@ enum FileSystemCache {
             lastRefresh = .now()
         }
         
-        func getDirectoriesAndFiles() -> (directories: [String: DirectoryEntry], files: [String: FileEntry]) {
-            updateIfRequired()
-            return (self.directories, self.files)
-        }
-        
         func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)]) async {
-            updateIfRequired()
             for name in self.directories.keys {
                 directories.insert(name)
             }
@@ -221,23 +215,22 @@ enum FileSystemCache {
             }
         }
         
-        private func getDirectory(name: String) -> DirectoryEntry? {
-            updateIfRequired()
-            return directories[name]
+        /// Return a sub directory and update its contents
+        public func getDirectory(name: String) async -> Directory? {
+            guard let directory = directories[name] else {
+                return nil
+            }
+            await directory.updateIfRequired()
+            return directory
         }
         
-        private func getFile(name: String) -> FileEntry? {
-            updateIfRequired()
+        /// Get a file from this directory. Does not updates its contents on access because the directory access was already doing it
+        public func getFile(name: String) -> File? {
             return files[name]
         }
         
-        func getContents() -> DirectoryContents {
-            updateIfRequired()
-            return DirectoryContents(files: files, directories: directories)
-        }
-        
         /// Find a directory for a path. Valid paths are ``, `data/`
-        nonisolated func getDirectory(path: String) async -> DirectoryEntry? {
+        nonisolated func getDirectory(fullPath path: String) async -> Directory? {
             assert(path.hasPrefix("/") == false)
             assert(path == "" || path.hasSuffix("/") == true)
             let trimmedPath = path.dropLast()
@@ -259,7 +252,7 @@ enum FileSystemCache {
         }
         
         /// Find an object for a path
-        nonisolated func getObject(path: String) async -> FileEntry? {
+        nonisolated func getFile(fullPath path: String) async -> File? {
             assert(path.hasPrefix("/") == false)
             assert(path.hasSuffix("/") == false)
             let objectStart = path.lastIndex(of: "/").map { path.index(after: $0) } ?? path.startIndex
@@ -281,7 +274,7 @@ enum FileSystemCache {
     }
     
     /// File needs to be in sync with size and modification timestamp.
-    actor FileEntry {
+    actor File: OmFileSystemFile {
         let fd: FileHandle
         let inode: UInt64 // required to check while looping directories
         let size: Int64
@@ -352,18 +345,6 @@ enum FileSystemCache {
             }
         }
     }
-    
-    /// Temporary representation of contents of a directory
-    /// TODO: Consider if this leads to a lot of ARC and it would be better to pass the actor
-    struct DirectoryContents {
-        let files: [String: FileEntry]
-        let directories: [String: DirectoryEntry]
-    }
-}
-
-protocol LocalPayload: Sendable {
-    /// Payload can retain a reference to FileHandle to ensure the file stays open
-    init(fd: FileHandle, size: Int64) async throws
 }
 
 

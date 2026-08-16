@@ -15,15 +15,12 @@ import SystemPackage
     @Test func fileSystemCache() async throws {
         try FileManager.default.createDirectory(atPath: "cachetest/dir1/dir2", withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: "cachetest/dir1/dir2/file", contents: Data("Hello".utf8))
-        let a = try FileSystemCache.DirectoryEntry(path: "cachetest")
-        try await a.forceUpdate()
-        try await a.forceUpdate()
+        let a = try OmFileSystemLocal.Directory(path: "cachetest")
+        await a.updateIfRequired()
         
-        let content = await a.getDirectoriesAndFiles()
-        print(content.directories.keys)
-        print(await a.getObject(path: "dir1/dir2/file")?.size ?? -1)
-        #expect(await content.directories.keys.first == "dir1")
-        #expect(await a.getObject(path: "dir1/dir2/file")?.size == 5)
+        #expect(await a.getDirectory(name: "dir1")?.getDirectory(name: "dir2")?.getFile(name: "file")?.size == 5)
+        #expect(await a.getDirectory(fullPath: "dir1/dir2/")?.getFile(name: "file")?.size == 5)
+        #expect(await a.getFile(fullPath: "dir1/dir2/file")?.size == 5)
     }
     
     @Test func testAwsSign() async throws {
