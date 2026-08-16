@@ -62,9 +62,9 @@ om_file_local_open \(OmMetrics.fileLocalOpen.load(ordering: .relaxed))
 # TYPE om_file_local_modified_total counter
 # HELP om_file_local_modified_total Number of local file metadata updates
 om_file_local_modified_total \(OmMetrics.fileLocalModifiedTotal.load(ordering: .relaxed))
-# TYPE om_file_local_modified_unexpectedly_total counter
-# HELP om_file_local_modified_unexpectedly_total Number of local file metadata updates thrown while reading data
-om_file_local_modified_unexpectedly_total \(OmMetrics.fileRemoteModifiedUnexpectedlyTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_modified_unexpectedly_total counter
+# HELP om_file_remote_modified_unexpectedly_total Number of remote file metadata updates thrown while reading data
+om_file_remote_modified_unexpectedly_total \(OmMetrics.fileRemoteModifiedUnexpectedlyTotal.load(ordering: .relaxed))
 # TYPE om_file_local_directories_open gauge
 # HELP om_file_local_directories_open Number of open local directories
 om_file_local_directories_open \(OmMetrics.fileLocalDirectoriesOpen.load(ordering: .relaxed))
