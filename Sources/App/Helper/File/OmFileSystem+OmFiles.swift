@@ -42,7 +42,7 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         
         try await file.preloadBlocks(blocks: activeBlocks)
         let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
-        logger.warning("OmFileRemoteOmReader: Updated file. \(deletedBlocks) previously cached blocks have been deleted. \(activeBlocks.count) active blocks preloaded")
+        logger.warning("OmFileRemoteOmReader: Blocks freed=\(deletedBlocks) preloaded=\(activeBlocks.count). Updated file \(file.backend.object). ")
         return try await OmFileLocalRemoteOmReader(remoteFile: file)
     }
     
