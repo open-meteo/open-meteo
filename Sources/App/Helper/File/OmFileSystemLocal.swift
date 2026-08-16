@@ -114,7 +114,7 @@ enum OmFileSystemLocal {
         
         /// Should be called every second from a life cycle handler
         func updateRecursivelyIfRequired(now: Timestamp) async throws {
-            if lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundEjectInterval, now: now) {
+            if self.fd != nil && lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundEjectInterval, now: now) {
                 /// If not used for more than 10 minutes, release cached file handles and payloads
                 self.files = [:]
                 self.directories = [:]
