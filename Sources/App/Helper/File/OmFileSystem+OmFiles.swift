@@ -16,7 +16,7 @@ struct OmFileLocalRemoteOmReader {
     }
 }
 
-extension OmFileLocalRemoteOmReader: RemoteFileManagablePayload {
+extension OmFileLocalRemoteOmReader: OmFilePayload {
     init(fd: FileHandle, size: Int64) async throws {
         // TODO because the size is known already, this should be passed to MmapFile.init
         let file = try MmapFile(fn: fd)

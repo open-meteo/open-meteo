@@ -66,7 +66,7 @@ struct OmFileSystemS3 {
         let context: ServerContext
         
         /// Execute a closure with the resolved payload. May retries if file modified errors occur
-        func with<R, Payload: RemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
+        func with<R, Payload: OmRemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
             guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: false) else {
                 return nil
             }
@@ -102,13 +102,13 @@ struct OmFileSystemS3 {
             case none
             
             /// Payload is currently initialising. Consecutive requets are queued
-            case initialising([CheckedContinuation<any RemotePayload, Error>])
+            case initialising([CheckedContinuation<any OmRemotePayload, Error>])
             
             /// Payload got initialised and should be in sync with remote server
-            case ready(any RemotePayload)
+            case ready(any OmRemotePayload)
             
             /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload, but keep the old payload
-            case updating(old: any RemotePayload, [CheckedContinuation<any RemotePayload, Error>])
+            case updating(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
             case deleted
@@ -190,7 +190,7 @@ struct OmFileSystemS3 {
         }
         
         /// Resolve payload
-        func getPayload<T: RemotePayload>(ofType: T.Type, context: ServerContext, receivedFileModifiedError: Bool) async throws -> T? {
+        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: ServerContext, receivedFileModifiedError: Bool) async throws -> T? {
             // Reset errors of they are older than 5 minutes
             if case .error(_, let issueDate) = payload, Date.now.timeIntervalSince(issueDate) > 5 * 60 {
                 payload = .none

@@ -12,7 +12,7 @@ enum OmFileSeriesType: String {
     case rolling
 }
 
-enum OmFileType /*: Hashable, RemoteFileManageable*/ {
+enum OmFileType {
     /// Timestamps are set for "data_run" files, timerangeDt is set for ensemble "rolling" files
     typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?)
     
@@ -21,22 +21,6 @@ enum OmFileType /*: Hashable, RemoteFileManageable*/ {
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
-    
-    /*func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteOmReader {
-        let reader = try await OmFileReader(fn: file)
-        let arrayReader = try reader.expectArray(of: Float.self)
-        let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
-        let timerangeDt = try await reader.getTimeRangeDt()
-        return OmFileRemoteOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
-    }
-    
-    func makeLocalReader(file: MmapFile) async throws -> OmFileLocalOmReader {
-        let reader = try await OmFileReader(fn: file)
-        let arrayReader = try reader.expectArray(of: Float.self)
-        let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
-        let timerangeDt = try await reader.getTimeRangeDt()
-        return OmFileLocalOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
-    }*/
     
     /// How often this file should be checked for modifications. Some files update every hour, some never update.
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
@@ -130,7 +114,7 @@ enum OmFileType /*: Hashable, RemoteFileManageable*/ {
     }
 }
 
-extension OmFileType: RemoteFileManageable {
+extension OmFileType: OmFileManagable {
     /// Relative file path like `data/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePathWithData() -> String {
         switch self {

@@ -285,8 +285,8 @@ enum OmFileSystemLocal {
         
         private enum PayloadState {
             case none
-            case initialising([CheckedContinuation<LocalPayload, any Error>])
-            case ready(LocalPayload)
+            case initialising([CheckedContinuation<OmLocalPayload, any Error>])
+            case ready(OmLocalPayload)
             case error(Error)
         }
         
@@ -298,7 +298,7 @@ enum OmFileSystemLocal {
             payload = .none
         }
         
-        func getPayload<T: LocalPayload>(ofType: T.Type) async throws -> T {
+        func getPayload<T: OmLocalPayload>(ofType: T.Type) async throws -> T {
             switch payload {
             case .none:
                 self.payload = .initialising([])

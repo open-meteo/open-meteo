@@ -147,7 +147,7 @@ struct S3DataController: RouteCollection {
                 guard path.hasPrefix("data_spatial/") else {
                     throw S3ApiError.forbidden
                 }
-                guard let file = try await RemoteFileManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger) else {
+                guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger) else {
                     throw CurlError.fileNotFound
                 }
                 return (1, try await req.asyncStreamFile(file: file, mediaType: mediaType))
@@ -160,7 +160,7 @@ struct S3DataController: RouteCollection {
             try authorizeReadRequest(req: req, apikey: params.apikey)
         }
         
-        guard let file = try await RemoteFileManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger) else {
+        guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger) else {
             throw CurlError.fileNotFound
         }
         return try await req.asyncStreamFile(file: file, mediaType: mediaType)
@@ -648,7 +648,7 @@ extension S3List.ListV2Query {
         guard self.list_type == 2, self.delimiter == "/", path.hasPrefix("/") == false, (path == "" || path.hasSuffix("/") == true), path.onlyContainsAlphanumericDashSlashDot else {
             throw S3ApiError.forbidden
         }
-        guard let directory = try await RemoteFileManager.instance.getDirectoryContents(path: path, client: client, logger: logger) else {
+        guard let directory = try await OmFileSystemManager.instance.getDirectoryContents(path: path, client: client, logger: logger) else {
             throw S3ApiError.forbidden
         }
         let dateFormat = DateFormatter.awsS3DateTimeFloored
@@ -926,7 +926,7 @@ extension DateFormatter {
 
 extension Request {
     func asyncStreamFile(
-        file: RemoteFileManager.FileType,
+        file: OmFileSystemManager.FileType,
         chunkSize: Int = NonBlockingFileIO.defaultChunkSize,
         mediaType: HTTPMediaType,
         onCompleted: @escaping @Sendable (Result<Void, Error>) async throws -> () = { _ in }

@@ -141,7 +141,7 @@ struct ModelUpdateMetaFile/*: RemoteFileManageableJson*/ {
     }
 }
 
-extension ModelUpdateMetaFile: RemoteFileManageable {
+extension ModelUpdateMetaFile: OmFileManagable {
     func getRelativeFilePathWithData() -> String {
         "data/\(domain.rawValue)/static/meta.json"
     }
@@ -149,6 +149,6 @@ extension ModelUpdateMetaFile: RemoteFileManageable {
     typealias Payload = ModelUpdateMetaJson
 }
 
-extension ModelUpdateMetaJson: FileSystemPayloadCodable {
+extension ModelUpdateMetaJson: OmFilePayloadCodable {
 
 }

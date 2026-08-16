@@ -42,13 +42,13 @@ enum OpenMeteo {
     }()
     
     /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
-    static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
+    /*static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
         let cacheFile = Environment.get("CACHE_META_FILE") ?? "\(dataDirectory)/cache_file_meta.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_META_SIZE") ?? "1MB")
         let blockSize = MemoryLayout<HttpMetaCache.Entry>.stride
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
         return try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount)
-    }()
+    }()*/
     
     /// Data directory with trailing slash
     static let dataSpatialDirectory: String? = {
@@ -256,12 +256,12 @@ public func configure(_ app: Application) throws {
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(1),
-        RemoteFileManager.instance.backgroundTaskRemote
+        OmFileSystemManager.instance.backgroundTaskRemote
     )
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(1),
-        RemoteFileManager.instance.backgroundTaskLocal
+        OmFileSystemManager.instance.backgroundTaskLocal
     )
 
     app.lifecycle.repeatedTask(

@@ -7,8 +7,8 @@ import Synchronization
  
  Additionally files from a remote S3 server can be cached. The S3 directory tree is periodically updated.
  */
-final class RemoteFileManager: Sendable {
-    public static let instance = RemoteFileManager()
+final class OmFileSystemManager: Sendable {
+    public static let instance = OmFileSystemManager()
     
     private let localFileSystem: OmFileSystemLocal.Directory
     
@@ -80,7 +80,7 @@ final class RemoteFileManager: Sendable {
         return nil
     }
     
-    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+    func with<R, Key: OmFileManagable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getFile(fullPath: path) {
@@ -100,7 +100,7 @@ final class RemoteFileManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Payload? {
+    func get<Key: OmFileManagable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Payload? {
         return try await self.with(file: file, client: client, logger: logger) {
             return $0
         }
@@ -121,7 +121,7 @@ final class RemoteFileManager: Sendable {
     }
 }
 
-extension RemoteFileManager {
+extension OmFileSystemManager {
     struct LocalAndRemoteDirectory {
         let local: OmFileSystemLocal.Directory?
         let remote: OmFileSystemS3.DirectoryWithContext?
@@ -152,7 +152,7 @@ extension RemoteFileManager {
         case local(OmFileSystemLocal.File)
         case remote(OmFileSystemS3.FileWithContext)
         
-        func with<R, Key: RemoteFileManageable>(payloadType: Key.Type, client: HTTPClient, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+        func with<R, Key: OmFileManagable>(payloadType: Key.Type, client: HTTPClient, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
             switch self {
             case .local(let file):
                 return try await fn(file.getPayload(ofType: Key.Payload.self))
