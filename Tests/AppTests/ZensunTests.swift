@@ -81,7 +81,12 @@ import Testing
         .init(name: "Sydney solstice", latitude: -33.87, longitude: 151.21, utcOffsetSeconds: 39600, date: (2023, 12, 21), sunrise: (5, 40, 31), sunset: (20, 5, 16)),
         .init(name: "Ushuaia winter solstice", latitude: -54.8, longitude: -68.3, utcOffsetSeconds: -10800, date: (2024, 6, 21), sunrise: (9, 58, 56), sunset: (17, 11, 24)),
         .init(name: "Reykjavik", latitude: 64.15, longitude: -21.94, utcOffsetSeconds: 0, date: (2024, 6, 12), sunrise: (3, 0, 5), sunset: (23, 56, 40)),
-        .init(name: "Nome", latitude: 64.5, longitude: -165.4, utcOffsetSeconds: -28800, date: (2024, 6, 12), sunrise: (4, 24, 34), sunset: (1, 40, 9), setDayOffset: 1)
+        .init(name: "Nome", latitude: 64.5, longitude: -165.4, utcOffsetSeconds: -28800, date: (2024, 6, 12), sunrise: (4, 24, 34), sunset: (1, 40, 9), setDayOffset: 1),
+        .init(name: "Anchorage equinox", latitude: 61.22, longitude: -149.9, utcOffsetSeconds: -28800, date: (2024, 3, 20), sunrise: (7, 58, 24), sunset: (20, 16, 37)),
+        .init(name: "Oslo equinox", latitude: 59.91, longitude: 10.75, utcOffsetSeconds: 7200, date: (2024, 3, 20), sunrise: (7, 17, 30), sunset: (19, 32, 30)),
+        .init(name: "Helsinki equinox", latitude: 60.17, longitude: 24.94, utcOffsetSeconds: 10800, date: (2024, 9, 23), sunrise: (7, 7, 35), sunset: (19, 15, 55)),
+        .init(name: "Tromso", latitude: 69.65, longitude: 18.96, utcOffsetSeconds: 7200, date: (2024, 8, 15), sunrise: (3, 47, 5), sunset: (21, 46, 13)),
+        .init(name: "Fairbanks", latitude: 64.84, longitude: -147.72, utcOffsetSeconds: -28800, date: (2024, 4, 15), sunrise: (6, 13, 11), sunset: (21, 30, 23))
     ]
 
     @Test(arguments: sunReferences) func sunRiseSetReference(reference: SunReference) {
@@ -90,9 +95,9 @@ import Testing
 
         let riseError = times.rise[0].timeIntervalSince1970 - reference.expectedRise.timeIntervalSince1970
         let setError = times.set[0].timeIntervalSince1970 - reference.expectedSet.timeIntervalSince1970
-        /// Declination is sampled only at local noon, so allow errors of up to 120s
-        #expect(abs(riseError) <= 120, "\(reference.name) sunrise off by \(riseError) seconds")
-        #expect(abs(setError) <= 120, "\(reference.name) sunset off by \(setError) seconds")
+        /// Output truncates seconds, so allow errors of up to 30s
+        #expect(abs(riseError) <= 30, "\(reference.name) sunrise off by \(riseError) seconds")
+        #expect(abs(setError) <= 30, "\(reference.name) sunset off by \(setError) seconds")
     }
 
     @Test func sunRiseSetPolar() {
