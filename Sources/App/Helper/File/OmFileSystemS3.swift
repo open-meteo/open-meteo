@@ -304,6 +304,9 @@ struct OmFileSystemS3 {
         
         /// Find a directory for a path
         func getDirectory(fullPath: String) async throws -> DirectoryWithContext? {
+            guard !fullPath.isEmpty else {
+                return .init(directory: directory, context: context)
+            }
             guard fullPath.hasPrefix("/") == false, fullPath.hasSuffix("/") else {
                 throw OmFileSystemS3Error.invalidObjectName
             }

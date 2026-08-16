@@ -25,6 +25,7 @@ import NIOFileSystem
  
  TODO:
  - API key integration with accounting (1 call = 1KB traffic)
+ - Consider: Replicate fetches from the backend the other replication server. Or use client side sharding to better split cache between multiple servers
  */
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
