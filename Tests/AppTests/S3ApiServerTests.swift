@@ -17,7 +17,7 @@ struct S3ApiServerTests {
             let path = "/data/\(objectName)"
             let absolutePath = OpenMeteo.dataDirectory + objectName
             try? FileManager.default.removeItemIfExists(at: absolutePath)
-            try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)/data/s3-upload-tests/", withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)s3-upload-tests/", withIntermediateDirectories: true)
             let dir = await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
             #expect(dir != nil)
             #expect(await dir?.getFile(name: file) == nil)
@@ -62,7 +62,7 @@ struct S3ApiServerTests {
             let absolutePath = OpenMeteo.dataDirectory + objectName
             
             try? FileManager.default.removeItemIfExists(at: absolutePath)
-            try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)/data/s3-upload-tests/", withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)s3-upload-tests/", withIntermediateDirectories: true)
             let dir = await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
             
             #expect(dir != nil)
@@ -138,7 +138,7 @@ struct S3ApiServerTests {
                 additionalHeaders: [:]
             )
             let completeResponse = try await controller.postObject(completeRequest)
-            #expect(completeResponse.status == .ok)            
+            #expect(completeResponse.status == .ok)
             
             /// Check that the cached local directory got updated and now contains the new file
             let storedFile = await dir?.getFile(name: file)
