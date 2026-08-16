@@ -113,8 +113,8 @@ struct OmFileSystemS3 {
             case deleted
             
             /// An error occurred while initialising the payload. This could also contains unrecoverable network errors, corrupted file errors, file not found, modified errors and others.
-            /// Errors are cleared every 5 minutes
-            case error(Error, Date)
+            /// Errors are cleared every minute
+            case error(Error, Timestamp)
         }
 
         init(objectName: String, contentLength: Int, lastModified: Timestamp, eTag: String) {
@@ -165,7 +165,7 @@ struct OmFileSystemS3 {
                     if error is CancellationError {
                         self.payload = .none
                     } else {
-                        self.payload = .error(error, .now)
+                        self.payload = .error(error, .now())
                     }
                     queued.forEach({
                         $0.resume(throwing: error)
@@ -196,8 +196,8 @@ struct OmFileSystemS3 {
         
         /// Resolve payload
         func getPayload<T: OmRemotePayload>(ofType: T.Type, context: ServerContext, receivedFileModifiedError: Bool) async throws -> T? {
-            // Reset errors of they are older than 5 minutes
-            if case .error(_, let issueDate) = payload, Date.now.timeIntervalSince(issueDate) > 5 * 60 {
+            // Reset errors if they are older than one minute
+            if case .error(_, let issueDate) = payload, issueDate.olderThan(seconds: 60, now: .now()) {
                 payload = .none
             }
             switch payload {
@@ -221,7 +221,7 @@ struct OmFileSystemS3 {
                     if error is CancellationError {
                         self.payload = .none
                     } else {
-                        self.payload = .error(error, .now)
+                        self.payload = .error(error, .now())
                     }
                     queued.forEach({
                         $0.resume(throwing: error)
@@ -283,7 +283,7 @@ struct OmFileSystemS3 {
                     if error is CancellationError {
                         self.payload = .none
                     } else {
-                        self.payload = .error(error, .now)
+                        self.payload = .error(error, .now())
                     }
                     queued.forEach({
                         $0.resume(throwing: error)
