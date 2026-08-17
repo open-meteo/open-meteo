@@ -54,43 +54,6 @@ struct GfsVariableMetadata {
     }
 }
 
-enum GfsSurfaceVariableCatalog {
-    static let temperature2m = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 20, interpolation: .hermite(bounds: nil), unit: .celsius, isElevationCorrectable: true)
-    static let temperature80m = GfsVariableMetadata(scalefactor: 20, interpolation: .hermite(bounds: nil), unit: .celsius, isElevationCorrectable: true)
-    static let temperature100m = temperature80m
-    static let cloudCover = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 1, interpolation: .hermite(bounds: 0...100), unit: .percentage)
-    static let cloudCoverLow = GfsVariableMetadata(scalefactor: 1, interpolation: .hermite(bounds: 0...100), unit: .percentage)
-    static let cloudCoverMid = cloudCoverLow
-    static let cloudCoverHigh = cloudCoverLow
-    static let pressureMsl = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .hectopascal)
-    static let relativeHumidity2m = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 1, interpolation: .hermite(bounds: 0...100), unit: .percentage)
-    static let precipitation = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 10, interpolation: .backwards_sum, unit: .millimetre)
-    static let windComponent = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .metrePerSecond)
-    static let surfaceTemperature = GfsVariableMetadata(scalefactor: 20, interpolation: .hermite(bounds: nil), unit: .celsius, isElevationCorrectable: true)
-    static let soilTemperature = surfaceTemperature
-    static let soilMoisture = GfsVariableMetadata(scalefactor: 1000, interpolation: .hermite(bounds: nil), unit: .cubicMetrePerCubicMetre)
-    static let snowDepth = GfsVariableMetadata(scalefactor: 100, interpolation: .linear, unit: .metre)
-    static let sensibleHeatFlux = GfsVariableMetadata(scalefactor: 0.144, interpolation: .hermite(bounds: nil), unit: .wattPerSquareMetre)
-    static let latentHeatFlux = sensibleHeatFlux
-    static let showers = precipitation
-    static let frozenPrecipitationPercent = GfsVariableMetadata(scalefactor: 1, interpolation: .backwards, unit: .percentage)
-    static let categoricalFreezingRain = GfsVariableMetadata(scalefactor: 1, interpolation: .backwards, unit: .dimensionless)
-    static let snowfallWaterEquivalent = precipitation
-    static let convectiveInhibition = GfsVariableMetadata(scalefactor: 1, interpolation: .hermite(bounds: 0...10e9), unit: .joulePerKilogram)
-    static let windGusts10m = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: 0...10e9), unit: .metrePerSecond)
-    static let freezingLevelHeight = GfsVariableMetadata(scalefactor: 0.1, interpolation: .linear, unit: .metre)
-    static let shortwaveRadiation = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 1, interpolation: .solar_backwards_averaged, unit: .wattPerSquareMetre)
-    static let diffuseRadiation = shortwaveRadiation
-    static let uvIndex = GfsVariableMetadata(scalefactor: 20, interpolation: .solar_backwards_averaged, unit: .dimensionless)
-    static let uvIndexClearSky = uvIndex
-    static let cape = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 0.1, interpolation: .hermite(bounds: 0...10e9), unit: .joulePerKilogram)
-    static let liftedIndex = GfsVariableMetadata(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .dimensionless)
-    static let visibility = GfsVariableMetadata(scalefactor: 0.05, interpolation: .linear, unit: .metre)
-    static let boundaryLayerHeight = GfsVariableMetadata(scalefactor: 0.2, interpolation: .hermite(bounds: 0...10e9), unit: .metre)
-    static let totalColumnIntegratedWaterVapour = GfsVariableMetadata(scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .kilogramPerSquareMetre)
-    static let massDensity8m = GfsVariableMetadata(scalefactor: 0.1, interpolation: .linear, unit: .microgramsPerCubicMetre)
-}
-
 protocol GfsSurfaceVariableMetadataBacked: GenericVariable {
     var field: GfsSurfaceField { get }
 }
@@ -196,47 +159,59 @@ enum GfsSurfaceField: String, Sendable, Hashable {
 
     var metadata: GfsVariableMetadata {
         switch self {
-        case .temperature_2m: return GfsSurfaceVariableCatalog.temperature2m
-        case .temperature_80m: return GfsSurfaceVariableCatalog.temperature80m
-        case .temperature_100m: return GfsSurfaceVariableCatalog.temperature100m
-        case .cloud_cover: return GfsSurfaceVariableCatalog.cloudCover
-        case .cloud_cover_low: return GfsSurfaceVariableCatalog.cloudCoverLow
-        case .cloud_cover_mid: return GfsSurfaceVariableCatalog.cloudCoverMid
-        case .cloud_cover_high: return GfsSurfaceVariableCatalog.cloudCoverHigh
-        case .pressure_msl: return GfsSurfaceVariableCatalog.pressureMsl
-        case .relative_humidity_2m: return GfsSurfaceVariableCatalog.relativeHumidity2m
-        case .precipitation: return GfsSurfaceVariableCatalog.precipitation
+        case .temperature_2m:
+            return .init(storePreviousForecast: true, scalefactor: 20, interpolation: .hermite(bounds: nil), unit: .celsius, isElevationCorrectable: true)
+        case .temperature_80m, .temperature_100m, .surface_temperature,
+             .soil_temperature_0_to_10cm, .soil_temperature_10_to_40cm,
+             .soil_temperature_40_to_100cm, .soil_temperature_100_to_200cm:
+            return .init(scalefactor: 20, interpolation: .hermite(bounds: nil), unit: .celsius, isElevationCorrectable: true)
+        case .cloud_cover:
+            return .init(storePreviousForecast: true, scalefactor: 1, interpolation: .hermite(bounds: 0...100), unit: .percentage)
+        case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            return .init(scalefactor: 1, interpolation: .hermite(bounds: 0...100), unit: .percentage)
+        case .pressure_msl:
+            return .init(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .hectopascal)
+        case .relative_humidity_2m:
+            return .init(storePreviousForecast: true, scalefactor: 1, interpolation: .hermite(bounds: 0...100), unit: .percentage)
+        case .precipitation, .showers, .snowfall_water_equivalent:
+            return .init(storePreviousForecast: true, scalefactor: 10, interpolation: .backwards_sum, unit: .millimetre)
         case .wind_v_component_10m, .wind_u_component_10m,
              .wind_v_component_80m, .wind_u_component_80m,
              .wind_v_component_100m, .wind_u_component_100m:
-            return GfsSurfaceVariableCatalog.windComponent
-        case .surface_temperature: return GfsSurfaceVariableCatalog.surfaceTemperature
-        case .soil_temperature_0_to_10cm, .soil_temperature_10_to_40cm,
-             .soil_temperature_40_to_100cm, .soil_temperature_100_to_200cm:
-            return GfsSurfaceVariableCatalog.soilTemperature
+            return .init(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .metrePerSecond)
         case .soil_moisture_0_to_10cm, .soil_moisture_10_to_40cm,
              .soil_moisture_40_to_100cm, .soil_moisture_100_to_200cm:
-            return GfsSurfaceVariableCatalog.soilMoisture
-        case .snow_depth: return GfsSurfaceVariableCatalog.snowDepth
-        case .sensible_heat_flux: return GfsSurfaceVariableCatalog.sensibleHeatFlux
-        case .latent_heat_flux: return GfsSurfaceVariableCatalog.latentHeatFlux
-        case .showers: return GfsSurfaceVariableCatalog.showers
-        case .frozen_precipitation_percent: return GfsSurfaceVariableCatalog.frozenPrecipitationPercent
-        case .categorical_freezing_rain: return GfsSurfaceVariableCatalog.categoricalFreezingRain
-        case .snowfall_water_equivalent: return GfsSurfaceVariableCatalog.snowfallWaterEquivalent
-        case .convective_inhibition: return GfsSurfaceVariableCatalog.convectiveInhibition
-        case .wind_gusts_10m: return GfsSurfaceVariableCatalog.windGusts10m
-        case .freezing_level_height: return GfsSurfaceVariableCatalog.freezingLevelHeight
-        case .shortwave_radiation: return GfsSurfaceVariableCatalog.shortwaveRadiation
-        case .diffuse_radiation: return GfsSurfaceVariableCatalog.diffuseRadiation
-        case .uv_index: return GfsSurfaceVariableCatalog.uvIndex
-        case .uv_index_clear_sky: return GfsSurfaceVariableCatalog.uvIndexClearSky
-        case .cape: return GfsSurfaceVariableCatalog.cape
-        case .lifted_index: return GfsSurfaceVariableCatalog.liftedIndex
-        case .visibility: return GfsSurfaceVariableCatalog.visibility
-        case .boundary_layer_height: return GfsSurfaceVariableCatalog.boundaryLayerHeight
-        case .total_column_integrated_water_vapour: return GfsSurfaceVariableCatalog.totalColumnIntegratedWaterVapour
-        case .mass_density_8m: return GfsSurfaceVariableCatalog.massDensity8m
+            return .init(scalefactor: 1000, interpolation: .hermite(bounds: nil), unit: .cubicMetrePerCubicMetre)
+        case .snow_depth:
+            return .init(scalefactor: 100, interpolation: .linear, unit: .metre)
+        case .sensible_heat_flux, .latent_heat_flux:
+            return .init(scalefactor: 0.144, interpolation: .hermite(bounds: nil), unit: .wattPerSquareMetre)
+        case .frozen_precipitation_percent:
+            return .init(scalefactor: 1, interpolation: .backwards, unit: .percentage)
+        case .categorical_freezing_rain:
+            return .init(scalefactor: 1, interpolation: .backwards, unit: .dimensionless)
+        case .convective_inhibition:
+            return .init(scalefactor: 1, interpolation: .hermite(bounds: 0...10e9), unit: .joulePerKilogram)
+        case .wind_gusts_10m:
+            return .init(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: 0...10e9), unit: .metrePerSecond)
+        case .freezing_level_height:
+            return .init(scalefactor: 0.1, interpolation: .linear, unit: .metre)
+        case .shortwave_radiation, .diffuse_radiation:
+            return .init(storePreviousForecast: true, scalefactor: 1, interpolation: .solar_backwards_averaged, unit: .wattPerSquareMetre)
+        case .uv_index, .uv_index_clear_sky:
+            return .init(scalefactor: 20, interpolation: .solar_backwards_averaged, unit: .dimensionless)
+        case .cape:
+            return .init(storePreviousForecast: true, scalefactor: 0.1, interpolation: .hermite(bounds: 0...10e9), unit: .joulePerKilogram)
+        case .lifted_index:
+            return .init(storePreviousForecast: true, scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .dimensionless)
+        case .visibility:
+            return .init(scalefactor: 0.05, interpolation: .linear, unit: .metre)
+        case .boundary_layer_height:
+            return .init(scalefactor: 0.2, interpolation: .hermite(bounds: 0...10e9), unit: .metre)
+        case .total_column_integrated_water_vapour:
+            return .init(scalefactor: 10, interpolation: .hermite(bounds: nil), unit: .kilogramPerSquareMetre)
+        case .mass_density_8m:
+            return .init(scalefactor: 0.1, interpolation: .linear, unit: .microgramsPerCubicMetre)
         }
     }
 }
