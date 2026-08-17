@@ -141,7 +141,7 @@ struct S3DataController: RouteCollection {
         let isJson = req.url.path.hasSuffix(".json")
         
         let mediaType = isJson ? HTTPMediaType.json : .binary
-        if req.url.host == "data-spatial.open-meteo.com" {
+        if req.headers.first(name: .host) == "data-spatial.open-meteo.com" {
             return try await req.withFreeApiRateLimiter(fn: { _ in
                 try validateAllowedReferer(req)
                 let path = String(req.url.path.dropFirst(1))
