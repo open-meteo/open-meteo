@@ -118,11 +118,7 @@ final class OmFileSystemManager: Sendable {
     
     /// Called every second from a life cycle handler on an available thread
     func backgroundTaskLocal(application: Application) async throws {
-        do {
-            try await localFileSystem.updateRecursivelyIfRequired(now: .now())
-        } catch {
-            application.logger.error("Local file system update failed: \(error)")
-        }
+        await localFileSystem.updateRecursivelyIfRequired(now: .now())
     }
 }
 

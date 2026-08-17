@@ -104,16 +104,12 @@ enum OmFileSystemLocal {
             let now = Timestamp.now()
             lastAccessed = now
             if force || lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateOnAccessInterval, now: now)  {
-                do {
-                    try forceUpdate()
-                } catch {
-                    print("Directory refresh failed: \(error)")
-                }
+                forceUpdate()
             }
         }
         
         /// Should be called every second from a life cycle handler
-        func updateRecursivelyIfRequired(now: Timestamp) async throws {
+        func updateRecursivelyIfRequired(now: Timestamp) async {
             if self.fd != nil && lastAccessed.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundEjectInterval, now: now) {
                 /// If not used for more than 10 minutes, release cached file handles and payloads
                 self.files = [:]
@@ -126,22 +122,23 @@ enum OmFileSystemLocal {
                 return // Skip if not accessed for more than 60 seconds
             }
             if lastRefresh.olderThan(seconds: OmFileSystemLocal.revalidateBackgroundInterval, now: now) {
-                try forceUpdate()
+                forceUpdate()
             }
             for directory in directories.values {
-                try await directory.updateRecursivelyIfRequired(now: now)
+                await directory.updateRecursivelyIfRequired(now: now)
             }
         }
         
         /// Updates files and directories by listing all files. Existing files are checked if the same inode is used.
-        private func forceUpdate() throws {
+        private func forceUpdate() {
             guard let fd = fd.map({FileHandle(fileDescriptor: dup($0.fileDescriptor))}) else {
                 return
             }
             OmMetrics.fileLocalDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             guard let dir = fdopendir(fd.fileDescriptor) else {
                 let error = String(cString: strerror(errno))
-                throw FileSystemCacheError.cannotOpenFile(name: "", errno: errno, error: error)
+                print("[ WARNING ] OmFileSystemLocal: Skipping directory update: \(error)")
+                return
             }
             defer { closedir(dir) }
 
@@ -186,25 +183,33 @@ enum OmFileSystemLocal {
                         continue // directory name exists and is the same inode
                     }
                     OmMetrics.fileLocalDirectoryModifiedTotal.add(1, ordering: .relaxed)
-                    let fileFd = try fd.openRelative(path: name, mode: .pathReadOnly)
-                    directories[name] = Directory(
-                        fd: fileFd,
-                        inode: entryInode
-                    )
+                    do {
+                        let fileFd = try fd.openRelative(path: name, mode: .pathReadOnly)
+                        directories[name] = Directory(
+                            fd: fileFd,
+                            inode: entryInode
+                        )
+                    } catch {
+                        print("[ WARNING ] OmFileSystemLocal: Failed to open directory \(name): \(error)")
+                    }
                 } else {
                     seenFiles.insert(name)
                     if let existing = files[name], existing.inode == entryInode {
                         continue // file name exists and is the same inode
                     }
                     OmMetrics.fileLocalModifiedTotal.add(1, ordering: .relaxed)
-                    let fd = try fd.openRelative(path: &entry.pointee.d_name.0, mode: .fileReadOnly)
-                    let stat = fd.fileStats()
-                    files[name] = File(
-                        fd: fd,
-                        inode: entryInode,
-                        size: Int64(stat.st_size),
-                        modificationTimestamp: stat.modificationTimestamp
-                    )
+                    do {
+                        let fd = try fd.openRelative(path: &entry.pointee.d_name.0, mode: .fileReadOnly)
+                        let stat = fd.fileStats()
+                        files[name] = File(
+                            fd: fd,
+                            inode: entryInode,
+                            size: Int64(stat.st_size),
+                            modificationTimestamp: stat.modificationTimestamp
+                        )
+                    } catch {
+                        print("[ WARNING ] OmFileSystemLocal: Failed to open file \(name): \(error)")
+                    }
                 }
             }
             for name in files.keys where !seenFiles.contains(name) {
