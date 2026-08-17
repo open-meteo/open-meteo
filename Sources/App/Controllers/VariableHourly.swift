@@ -616,6 +616,19 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
     }
 }
 
+private typealias SurroundingPressureLevels = (lowerLevel: Int, upperLevel: Int)
+
+/// API pressure levels that must be interpolated because a domain does not store them directly.
+private let pressureLevelInterpolationTable: [DomainRegistry: [Int: SurroundingPressureLevels]] = [
+    .dwd_icon: [975: (950, 1000)],
+    .dwd_icon_eu: [975: (950, 1000)],
+    .dwd_icon_d2: [
+        800: (700, 850),
+        900: (850, 950),
+        925: (850, 950),
+    ],
+]
+
 private struct VariableHourlyDerivationCompatibility {
     enum ConvectivePrecipitation: Equatable {
         case storedShowers
@@ -715,8 +728,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
 
     let reader: Reader
     let options: GenericReaderOptions
-    let domainRegistry: DomainRegistry
     private let compatibility: VariableHourlyDerivationCompatibility
+    private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
 
     init(
         reader: Reader,
@@ -725,8 +738,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     ) {
         self.reader = reader
         self.options = options
-        self.domainRegistry = domainRegistry
         self.compatibility = .init(domain: domainRegistry)
+        self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
     }
 
     private func convectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
@@ -770,20 +783,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         return .raw(shortwave)
     }
 
-    /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
-    static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
-        switch (domain, level) {
-        case (.dwd_icon, 975), (.dwd_icon_eu, 975):
-            return (950, 1000)
-        case (.dwd_icon_d2, 800):
-            return (700, 850)
-        case (.dwd_icon_d2, 900), (.dwd_icon_d2, 925):
-            return (850, 950)
-        default:
-            return nil
-        }
-    }
-
     /// Resolve a pressure-level field to either its stored raw variable or a finite interpolation graph (only ICON).
     /// This function never calls `getDeriverMap`, keeping pressure-level derivations acyclic.
     private func pressureLevelInput(_ variable: ForecastPressureVariableType, at level: Int) -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
@@ -791,7 +790,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return Reader.variableFromString("\(variable.rawValue)_\(level)hPa").map { .raw($0) }
         }
 
-        guard let interpolation = Self.iconPressureLevelInterpolation(domain: domainRegistry, level: level) else {
+        guard let interpolation = pressureLevelInterpolations[level] else {
             return raw()
         }
 
