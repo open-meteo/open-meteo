@@ -1135,10 +1135,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     resolvedElevation = result.elevation
                     return result.reader
                 }.reversed()
-                guard !compositeReaders.isEmpty else {
+                let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                guard !compositeReaders.isEmpty || !supplementalReaders.readers.isEmpty else {
                     return nil
                 }
-                let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(
                     supplementalReaders.readers + compositeReaders,
                     prefetchAllReaders: true
