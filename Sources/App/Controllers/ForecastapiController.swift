@@ -1276,7 +1276,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (GfsDomain.gfs025_ens, Gefs025Variable.self)
             ])
         case .ncep_nbm_conus:
-            return .single(NbmDomain.nbm_conus, NbmVariable.self)
+            return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
