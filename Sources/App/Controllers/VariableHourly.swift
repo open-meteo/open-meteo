@@ -934,7 +934,7 @@ struct VariableHourlyDeriverReader<Reader: GenericReaderProtocol>: GenericDerive
 
         let rawVariable = Reader.variableFromString(variable.rawValue)
 
-        // corrections for ICON if elevation difference exceeds 100m
+        // corrections if elevation difference exceeds 100m
         if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
             switch variable {
             case .snowfall_water_equivalent:
