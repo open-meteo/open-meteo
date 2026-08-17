@@ -512,11 +512,11 @@ extension ForecastVariable {
 }
 
 extension GenericDomain {
-    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<Self, Variable>? {
+    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<GenericReaderCached<Self, Variable>>? {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     func makeWeeklyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
@@ -539,7 +539,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     /// Make a default reader for a single domain with hourly data
@@ -553,7 +553,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
-        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
+        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
     
@@ -561,7 +561,7 @@ extension GenericDomain {
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
-        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
+        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
 }
@@ -615,9 +615,6 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
         try await reader.getStatic(type: type)
     }
 }
-
-typealias VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & Hashable> =
-    VariableHourlyDeriverReader<GenericReaderCached<Domain, Variable>>
 
 private struct VariableHourlyDerivationCompatibility {
     enum ConvectivePrecipitation: Equatable {
@@ -713,7 +710,7 @@ private struct VariableHourlyDerivationCompatibility {
     }
 }
 
-struct VariableHourlyDeriverReader<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
+struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
     typealias VariableOpt = ForecastVariable
 
     let reader: Reader

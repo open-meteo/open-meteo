@@ -1019,7 +1019,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     return nil
                 }
                 let mixer = GenericReaderMixerSameVariableType(reader: initialized)
-                let reader = VariableHourlyDeriverReader(
+                let reader = VariableHourlyDeriver(
                     reader: mixer,
                     options: options,
                     domainRegistry: derivationDomain.domainRegistry
@@ -1063,7 +1063,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<PrimaryVariable, SupplementalVariable>>(
                     reader: rawReaders
                 )
-                let reader = VariableHourlyDeriverReader(
+                let reader = VariableHourlyDeriver(
                     reader: mixer,
                     options: options,
                     domainRegistry: primary.0.domainRegistry
@@ -1768,7 +1768,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             
             let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
+            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
             let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: EcmwfEC46Variable6Hourly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
