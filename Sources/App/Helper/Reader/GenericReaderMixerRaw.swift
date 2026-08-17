@@ -47,28 +47,17 @@ struct GenericReaderMixerDifferentVariables<Variable: GenericVariable>: GenericR
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        var data: [Float]?
-        var unit: SiUnit?
+        var result: DataAndUnit?
         for reader in reader.reversed() {
             guard let value = try await reader.get(mixed: variable.rawValue, time: time) else {
                 continue
             }
-            if data == nil {
-                data = value.data
-                unit = value.unit
-            } else if let unit, [.wmoCode, .dimensionless].contains(unit) {
-                data?.integrateIfNaN(value.data)
-            } else {
-                data?.integrateIfNaNSmooth(value.data)
-            }
-            if data?.containsNaN() == false {
+            result = result?.combined(withLowerPriority: value) ?? value
+            if result?.data.containsNaN() == false {
                 break
             }
         }
-        return DataAndUnit(
-            data ?? Array(repeating: .nan, count: time.time.count),
-            unit ?? variable.unit
-        )
+        return result ?? DataAndUnit(Array(repeating: .nan, count: time.time.count), variable.unit)
     }
 }
 
@@ -130,34 +119,36 @@ extension GenericReaderMixerRaw {
     func get(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data: [Float]?
-        var unit: SiUnit?
+        var result: DataAndUnit?
         // default case, just place new data in 1:1
         for r in reader.reversed() {
             let d = try await r.get(variable: variable, time: time)
-            if data == nil {
-                // first iteration
-                data = d.data
-                unit = d.unit
-            } else {
-                if let unit, [.wmoCode, .dimensionless].contains(unit) {
-                    data?.integrateIfNaN(d.data)
-                } else {
-                    data?.integrateIfNaNSmooth(d.data)
-                }
-            }
-            if data?.containsNaN() == false {
+            result = result?.combined(withLowerPriority: d) ?? d
+            if result?.data.containsNaN() == false {
                 break
             }
         }
-        guard let data, let unit else {
+        guard let result else {
             fatalError("Expected data in mixer for variable \(variable)")
         }
-        return DataAndUnit(data, unit)
+        return result
     }
 }
 
 extension VariableOrDerived: GenericVariableMixable where Raw: GenericVariableMixable, Derived: GenericVariableMixable {
+}
+
+extension DataAndUnit {
+    /// Combines this higher-priority result with lower-priority data where needed.
+    func combined(withLowerPriority other: DataAndUnit) -> DataAndUnit {
+        var data = self.data
+        if [.wmoCode, .dimensionless].contains(unit) {
+            data.integrateIfNaN(other.data)
+        } else {
+            data.integrateIfNaNSmooth(other.data)
+        }
+        return DataAndUnit(data, unit)
+    }
 }
 
 extension Array where Element == Float {

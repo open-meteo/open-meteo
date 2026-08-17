@@ -47,31 +47,17 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data: [Float]?
-        var unit: SiUnit?
+        var result: DataAndUnit?
         for r in reader.reversed() {
             guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
                 continue
             }
-            if data == nil {
-                // first iteration
-                data = d.data
-                unit = d.unit
-            } else {
-                if let unit, [.wmoCode, .dimensionless].contains(unit) {
-                    data?.integrateIfNaN(d.data)
-                } else {
-                    data?.integrateIfNaNSmooth(d.data)
-                }
-            }
-            if data?.containsNaN() == false {
+            result = result?.combined(withLowerPriority: d) ?? d
+            if result?.data.containsNaN() == false {
                 break
             }
         }
-        guard let data, let unit else {
-            return nil
-        }
-        return DataAndUnit(data, unit)
+        return result
     }
 }
 
@@ -147,30 +133,16 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data: [Float]?
-        var unit: SiUnit?
+        var result: DataAndUnit?
         for r in reader.reversed() {
             guard let d = try await r.get(variable: variable, time: time) else {
                 continue
             }
-            if data == nil {
-                // first iteration
-                data = d.data
-                unit = d.unit
-            } else {
-                if let unit, [.wmoCode, .dimensionless].contains(unit) {
-                    data?.integrateIfNaN(d.data)
-                } else {
-                    data?.integrateIfNaNSmooth(d.data)
-                }
-            }
-            if data?.containsNaN() == false {
+            result = result?.combined(withLowerPriority: d) ?? d
+            if result?.data.containsNaN() == false {
                 break
             }
         }
-        guard let data, let unit else {
-            return nil
-        }
-        return DataAndUnit(data, unit)
+        return result
     }
 }
