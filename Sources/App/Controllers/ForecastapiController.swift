@@ -979,9 +979,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     struct RawCompositeDomainReaderMapping {
         typealias ReaderResult = (reader: any GenericReaderOptionalProtocol<ForecastVariable>, elevation: Float)
 
-        let sources: [(any GenericDomain, any GenericVariable.Type)]
-        /// Required source whose generic compatibility rules are applied after raw mixing.
-        let derivationDomain: DomainRegistry
         let primarySource: (any GenericDomain, any GenericVariable.Type)?
         private let makeReaderClosure: (Float, Float, Float, GridSelectionMode, GenericReaderOptions) async throws -> ReaderResult?
 
@@ -994,8 +991,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             Domain: GenericDomain,
             Variable: GenericVariable & Hashable
         {
-            self.sources = domains.map { ($0, variableType) }
-            self.derivationDomain = derivationDomain.domainRegistry
             self.primarySource = primaryDomain.map { ($0, variableType) }
             self.makeReaderClosure = { lat, lon, elevation, mode, options in
                 var resolvedElevation = elevation
@@ -1042,8 +1037,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             SupplementalDomain: GenericDomain,
             SupplementalVariable: GenericVariable
         {
-            self.sources = [supplemental, primary]
-            self.derivationDomain = primary.0.domainRegistry
             self.primarySource = nil
             self.makeReaderClosure = { lat, lon, elevation, mode, options in
                 guard let primaryRawReader = try await GenericReader<PrimaryDomain, PrimaryVariable>(
