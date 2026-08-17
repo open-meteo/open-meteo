@@ -636,45 +636,29 @@ private struct VariableHourlyDerivationCompatibility {
     }
 
     let convectivePrecipitation: ConvectivePrecipitation
-    let derivesRainBySubtractingSnowfallAndShowers: Bool
-    let estimatesDiffuseRadiationFromShortwave: Bool
     let omitsConvectivePrecipitationFromWeatherCode: Bool
-    let derivesPressureCloudCoverFromRelativeHumidity: Bool
     let shortwaveRadiationScale: Float?
     let pressureLevelGeopotentialHeightScale: Float?
     let usesLegacyIconEpsRadiationStorage: Bool
 
     private init(
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
-        derivesRainBySubtractingSnowfallAndShowers: Bool = false,
-        estimatesDiffuseRadiationFromShortwave: Bool = false,
         omitsConvectivePrecipitationFromWeatherCode: Bool = false,
-        derivesPressureCloudCoverFromRelativeHumidity: Bool = false,
         shortwaveRadiationScale: Float? = nil,
         pressureLevelGeopotentialHeightScale: Float? = nil,
         usesLegacyIconEpsRadiationStorage: Bool = false
     ) {
         self.convectivePrecipitation = convectivePrecipitation
-        self.derivesRainBySubtractingSnowfallAndShowers = derivesRainBySubtractingSnowfallAndShowers
-        self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
-        self.derivesPressureCloudCoverFromRelativeHumidity = derivesPressureCloudCoverFromRelativeHumidity
         self.shortwaveRadiationScale = shortwaveRadiationScale
         self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
         self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
     }
 
     private static func gfs(
-        convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
-        estimatesDiffuseRadiationFromShortwave: Bool = false,
-        derivesPressureCloudCoverFromRelativeHumidity: Bool = false
+        convectivePrecipitation: ConvectivePrecipitation = .storedShowers
     ) -> Self {
-        return .init(
-            convectivePrecipitation: convectivePrecipitation,
-            derivesRainBySubtractingSnowfallAndShowers: true,
-            estimatesDiffuseRadiationFromShortwave: estimatesDiffuseRadiationFromShortwave,
-            derivesPressureCloudCoverFromRelativeHumidity: derivesPressureCloudCoverFromRelativeHumidity
-        )
+        return .init(convectivePrecipitation: convectivePrecipitation)
     }
 
     init(domain: DomainRegistry) {
@@ -688,22 +672,14 @@ private struct VariableHourlyDerivationCompatibility {
              .ncep_gefs05,
              .ncep_gefs025_ensemble_mean,
              .ncep_gefs05_ensemble_mean:
-            self = .gfs(
-                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
-                estimatesDiffuseRadiationFromShortwave: true
-            )
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
         case .ncep_hrrr_conus:
-            self = .gfs(
-                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
-                derivesPressureCloudCoverFromRelativeHumidity: true
-            )
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
         case .ncep_hrrr_conus_15min:
             self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
         case .ncep_nbm_conus:
             self = .init(
                 convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
-                derivesRainBySubtractingSnowfallAndShowers: true,
-                estimatesDiffuseRadiationFromShortwave: true,
                 omitsConvectivePrecipitationFromWeatherCode: true
             )
         case .meteofrance_arome_france0025,
@@ -847,17 +823,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
 
         let pressure = variable.variable
-        if compatibility.derivesPressureCloudCoverFromRelativeHumidity,
-           pressure.variable.remapped == .cloud_cover,
-           let relativeHumidity = pressureLevelInput(.relative_humidity, at: pressure.level) {
-            return .one(relativeHumidity) { relativeHumidity, _ in
-                let cloudCover = relativeHumidity.data.map {
-                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))
-                }
-                return DataAndUnit(cloudCover, .percentage)
-            }
-        }
-
         // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
         if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
             if let scale = compatibility.pressureLevelGeopotentialHeightScale,
@@ -996,31 +961,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         }
 
-        // GFS-family and NBM compatibility that cannot be inferred from the raw variable type.
-        // Some fields are structurally valid for the shared enum but are not stored by every domain.
+        // Some NCEP domains do not store showers; synthesize zero where precipitation is available.
         if variable == .showers, compatibility.convectivePrecipitation == .zeroWherePrecipitationIsAvailable,
            let convectivePrecipitation = convectivePrecipitationInput() {
             return .from(input: convectivePrecipitation)
-        }
-
-        if variable == .rain, compatibility.derivesRainBySubtractingSnowfallAndShowers,
-           let precipitation = Reader.variableFromString("precipitation"),
-           let snowfallWaterEquivalent = getDeriverMap(variable: .snowfall_water_equivalent),
-           let convectivePrecipitation = convectivePrecipitationInput() {
-            return .three(.raw(precipitation), .mapped(snowfallWaterEquivalent), convectivePrecipitation) { precipitation, snowfallWaterEquivalent, convectivePrecipitation, _ in
-                let rain = zip(precipitation.data, zip(snowfallWaterEquivalent.data, convectivePrecipitation.data)).map {
-                    max($0.0 - $0.1.0 - $0.1.1, 0)
-                }
-                return DataAndUnit(rain, precipitation.unit)
-            }
-        }
-
-        if variable == .diffuse_radiation, compatibility.estimatesDiffuseRadiationFromShortwave,
-           let shortwave = shortwaveRadiationInput() {
-            return .one(shortwave) { shortwave, time in
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(diffuse, shortwave.unit)
-            }
         }
 
         if let rawVariable {
