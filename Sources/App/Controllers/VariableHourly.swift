@@ -516,7 +516,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     func makeWeeklyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
@@ -539,7 +539,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     /// Make a default reader for a single domain with hourly data
@@ -553,7 +553,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
-        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
     
@@ -561,7 +561,7 @@ extension GenericDomain {
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
-        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
 }
@@ -616,15 +616,28 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
     }
 }
 
-struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & Hashable>: GenericDeriverProtocol {
+typealias VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & Hashable> =
+    VariableHourlyDeriverReader<GenericReaderCached<Domain, Variable>>
+
+struct VariableHourlyDeriverReader<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
     typealias VariableOpt = ForecastVariable
-    typealias Reader = GenericReaderCached<Domain, Variable>
-    
+
     let reader: Reader
     let options: GenericReaderOptions
+    let domainRegistry: DomainRegistry
+
+    init(
+        reader: Reader,
+        options: GenericReaderOptions,
+        domainRegistry: DomainRegistry
+    ) {
+        self.reader = reader
+        self.options = options
+        self.domainRegistry = domainRegistry
+    }
 
     private var isMeteoFranceForecastDomain: Bool {
-        switch reader.domain.domainRegistry {
+        switch domainRegistry {
         case .meteofrance_arome_france0025,
              .meteofrance_arome_france_hd,
              .meteofrance_arome_france0025_15min,
@@ -638,7 +651,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     }
 
     private var isJmaForecastDomain: Bool {
-        switch reader.domain.domainRegistry {
+        switch domainRegistry {
         case .jma_gsm, .jma_msm_upper_level:
             return true
         default:
@@ -647,7 +660,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     }
 
     private var isGfsForecastDomain: Bool {
-        switch reader.domain.domainRegistry {
+        switch domainRegistry {
         case .ncep_gfs013,
              .ncep_gfs025,
              .ncep_nam_conus,
@@ -664,7 +677,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     }
 
     private var usesZeroConvectivePrecipitation: Bool {
-        switch reader.domain.domainRegistry {
+        switch domainRegistry {
         case .ncep_gfs025,
              .ncep_nam_conus,
              .ncep_hrrr_conus,
@@ -681,7 +694,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     }
 
     private var estimatesDiffuseRadiationFromShortwave: Bool {
-        switch reader.domain.domainRegistry {
+        switch domainRegistry {
         case .ncep_nam_conus,
              .ncep_gefs025,
              .ncep_gefs05,
@@ -710,7 +723,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     private func weatherCodeConvectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
         // The legacy NBM adapter deliberately passed nil here, which is not equivalent to a zero
         // value in the thunderstorm confidence calculation.
-        guard reader.domain.domainRegistry != .ncep_nbm_conus else {
+        guard domainRegistry != .ncep_nbm_conus else {
             return nil
         }
         return convectivePrecipitationInput()
@@ -756,7 +769,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return Reader.variableFromString("\(variable.rawValue)_\(level)hPa").map { .raw($0) }
         }
 
-        guard let interpolation = Self.iconPressureLevelInterpolation(domain: reader.domain.domainRegistry, level: level) else {
+        guard let interpolation = Self.iconPressureLevelInterpolation(domain: domainRegistry, level: level) else {
             return raw()
         }
 
@@ -813,7 +826,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         }
 
         let pressure = variable.variable
-        if reader.domain.domainRegistry == .ncep_hrrr_conus,
+        if domainRegistry == .ncep_hrrr_conus,
            pressure.variable.remapped == .cloud_cover,
            let relativeHumidity = pressureLevelInput(.relative_humidity, at: pressure.level) {
             return .one(relativeHumidity) { relativeHumidity, _ in
@@ -887,7 +900,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
-        if reader.domain.domainRegistry == .dwd_icon_eps || reader.domain.domainRegistry == .dwd_icon_eps_ensemble_mean {
+        if domainRegistry == .dwd_icon_eps || domainRegistry == .dwd_icon_eps_ensemble_mean {
             switch variable {
             case .shortwave_radiation:
                 guard
@@ -980,7 +993,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             }
         }
 
-        if variable == .rain, reader.domain.domainRegistry == .ncep_nbm_conus,
+        if variable == .rain, domainRegistry == .ncep_nbm_conus,
            let precipitation = Reader.variableFromString("precipitation"),
            let snowfallWaterEquivalent = Reader.variableFromString("snowfall_water_equivalent") {
             return .two(.raw(precipitation), .raw(snowfallWaterEquivalent)) { precipitation, snowfallWaterEquivalent, _ in
@@ -1002,7 +1015,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         }
 
         if variable == .direct_radiation,
-           (isGfsForecastDomain || reader.domain.domainRegistry == .ncep_nbm_conus),
+           (isGfsForecastDomain || domainRegistry == .ncep_nbm_conus),
            let shortwave = shortwaveRadiationInput(),
            let diffuse = getDeriverMap(variable: .diffuse_radiation) {
             return .two(shortwave, .mapped(diffuse)) { shortwave, diffuse, _ in

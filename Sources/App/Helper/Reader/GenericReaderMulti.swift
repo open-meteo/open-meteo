@@ -96,6 +96,15 @@ extension GenericReaderProtocol {
 /// Combine multiple independent weather models, that may not have given forecast variable
 struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
     let reader: [any GenericReaderOptionalProtocol<Variable>]
+    let prefetchAllReaders: Bool
+
+    init(
+        reader: [any GenericReaderOptionalProtocol<Variable>],
+        prefetchAllReaders: Bool = false
+    ) {
+        self.reader = reader
+        self.prefetchAllReaders = prefetchAllReaders
+    }
 
     var modelLat: Float {
         reader.last?.modelLat ?? .nan
@@ -118,12 +127,15 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
+        var prefetched = false
         for reader in reader {
-            if try await reader.prefetchData(variable: variable, time: time) {
-                return true
+            let accepted = try await reader.prefetchData(variable: variable, time: time)
+            prefetched = prefetched || accepted
+            if accepted && !prefetchAllReaders {
+                break
             }
         }
-        return false
+        return prefetched
     }
 
     func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
