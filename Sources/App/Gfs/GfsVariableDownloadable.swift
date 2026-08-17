@@ -612,23 +612,25 @@ private func pressureGribIndexName(_ field: GfsPressureField, verticalVelocityNa
     }
 }
 
-extension Gfs025PressureVariable: GfsVariableDownloadable {
-    var downloadField: GfsDownloadField { .pressure(.init(variable: variable, level: level)) }
-    func gribIndexName(timestep: Int?) -> String? { pressureGribIndexName(.init(variable: variable, level: level), verticalVelocityName: "DZDT") }
-    var skipHour0: Bool { false }
-    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? { variable == .temperature ? (1, -273.15) : nil }
+protocol GfsPressureVariableDownloadSchema: GfsPressureVariableSchema {
+    static var verticalVelocityGribName: String { get }
 }
 
-extension HrrrPressureVariable: GfsVariableDownloadable {
-    var downloadField: GfsDownloadField { .pressure(.init(variable: variable, level: level)) }
-    func gribIndexName(timestep: Int?) -> String? { pressureGribIndexName(.init(variable: variable, level: level), verticalVelocityName: "VVEL") }
-    var skipHour0: Bool { false }
-    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? { variable == .temperature ? (1, -273.15) : nil }
+extension GfsPressureVariableDownloadSchema {
+    static var verticalVelocityGribName: String { "VVEL" }
 }
 
-extension Gefs05PressureVariable: GfsVariableDownloadable {
+extension Gfs025PressureVariableSchema: GfsPressureVariableDownloadSchema {
+    static let verticalVelocityGribName = "DZDT"
+}
+
+extension HrrrPressureVariableSchema: GfsPressureVariableDownloadSchema {}
+
+extension Gefs05PressureVariableSchema: GfsPressureVariableDownloadSchema {}
+
+extension GfsPressureVariable: GfsVariableDownloadable where Schema: GfsPressureVariableDownloadSchema {
     var downloadField: GfsDownloadField { .pressure(.init(variable: variable, level: level)) }
-    func gribIndexName(timestep: Int?) -> String? { pressureGribIndexName(.init(variable: variable, level: level), verticalVelocityName: "VVEL") }
+    func gribIndexName(timestep: Int?) -> String? { pressureGribIndexName(.init(variable: variable, level: level), verticalVelocityName: Schema.verticalVelocityGribName) }
     var skipHour0: Bool { false }
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? { variable == .temperature ? (1, -273.15) : nil }
 }

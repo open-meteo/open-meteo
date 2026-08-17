@@ -253,26 +253,31 @@ struct GfsPressureField: PressureVariableRespresentable, Hashable, Sendable {
     let level: Int
 }
 
-protocol GfsPressureVariableMetadataBacked: GenericVariable {
+protocol GfsPressureVariableSchema {
     static var levels: [Int] { get }
     static var variableTypes: [GfsPressureVariableType] { get }
-
-    var variable: GfsPressureVariableType { get }
-    var level: Int { get }
-
-    init(variable: GfsPressureVariableType, level: Int)
     static func supports(variable: GfsPressureVariableType, level: Int) -> Bool
 }
 
-extension GfsPressureVariableMetadataBacked {
+extension GfsPressureVariableSchema {
     static func supports(variable: GfsPressureVariableType, level: Int) -> Bool {
         levels.contains(level) && variableTypes.contains(variable)
     }
+}
+
+struct GfsPressureVariable<Schema: GfsPressureVariableSchema>: GenericVariable {
+    let variable: GfsPressureVariableType
+    let level: Int
+
+    init(variable: GfsPressureVariableType, level: Int) {
+        self.variable = variable
+        self.level = level
+    }
 
     static var allVariables: [Self] {
-        levels.reversed().flatMap { level in
-            variableTypes.compactMap { variable in
-                supports(variable: variable, level: level) ? Self(variable: variable, level: level) : nil
+        Schema.levels.reversed().flatMap { level in
+            Schema.variableTypes.compactMap { variable in
+                Schema.supports(variable: variable, level: level) ? Self(variable: variable, level: level) : nil
             }
         }
     }
@@ -280,7 +285,7 @@ extension GfsPressureVariableMetadataBacked {
     init?(rawValue: String) {
         guard
             let field = GfsPressureField(rawValue: rawValue),
-            Self.supports(variable: field.variable, level: field.level)
+            Schema.supports(variable: field.variable, level: field.level)
         else {
             return nil
         }
@@ -360,17 +365,9 @@ extension GfsPressureVariableMetadataBacked {
     }
 }
 
-struct Gfs025PressureVariable: GfsPressureVariableMetadataBacked {
+enum Gfs025PressureVariableSchema: GfsPressureVariableSchema {
     static let levels = [10, 15, 20, 30, 40, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
     static let variableTypes = GfsPressureVariableType.allCases
-
-    let variable: GfsPressureVariableType
-    let level: Int
-
-    init(variable: GfsPressureVariableType, level: Int) {
-        self.variable = variable
-        self.level = level
-    }
 
     static func supports(variable: GfsPressureVariableType, level: Int) -> Bool {
         guard levels.contains(level), variableTypes.contains(variable) else {
@@ -380,31 +377,19 @@ struct Gfs025PressureVariable: GfsPressureVariableMetadataBacked {
     }
 }
 
-struct HrrrPressureVariable: GfsPressureVariableMetadataBacked {
+enum HrrrPressureVariableSchema: GfsPressureVariableSchema {
     static let levels = [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
     static let variableTypes: [GfsPressureVariableType] = [.temperature, .wind_u_component, .wind_v_component, .geopotential_height, .relative_humidity, .vertical_velocity]
-
-    let variable: GfsPressureVariableType
-    let level: Int
-
-    init(variable: GfsPressureVariableType, level: Int) {
-        self.variable = variable
-        self.level = level
-    }
 }
 
-struct Gefs05PressureVariable: GfsPressureVariableMetadataBacked {
+enum Gefs05PressureVariableSchema: GfsPressureVariableSchema {
     static let levels = [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
     static let variableTypes: [GfsPressureVariableType] = [.temperature, .wind_u_component, .wind_v_component, .geopotential_height, .relative_humidity, .vertical_velocity]
-
-    let variable: GfsPressureVariableType
-    let level: Int
-
-    init(variable: GfsPressureVariableType, level: Int) {
-        self.variable = variable
-        self.level = level
-    }
 }
+
+typealias Gfs025PressureVariable = GfsPressureVariable<Gfs025PressureVariableSchema>
+typealias HrrrPressureVariable = GfsPressureVariable<HrrrPressureVariableSchema>
+typealias Gefs05PressureVariable = GfsPressureVariable<Gefs05PressureVariableSchema>
 
 /// Product-specific enums explicitly define availability while sharing GFS metadata.
 enum Gfs013SurfaceVariable: String, CaseIterable, GfsSurfaceVariableMetadataBacked {
