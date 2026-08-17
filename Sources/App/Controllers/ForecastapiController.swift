@@ -1033,6 +1033,52 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
+        init<PrimaryDomain, PrimaryVariable, SupplementalDomain, SupplementalVariable>(
+            primary: (PrimaryDomain, PrimaryVariable.Type),
+            supplemental: (SupplementalDomain, SupplementalVariable.Type)
+        ) where
+            PrimaryDomain: GenericDomain,
+            PrimaryVariable: GenericVariable,
+            SupplementalDomain: GenericDomain,
+            SupplementalVariable: GenericVariable
+        {
+            self.sources = [supplemental, primary]
+            self.derivationDomain = primary.0.domainRegistry
+            self.primarySource = nil
+            self.makeReaderClosure = { lat, lon, elevation, mode, options in
+                guard let primaryRawReader = try await GenericReader<PrimaryDomain, PrimaryVariable>(
+                    domain: primary.0,
+                    lat: lat,
+                    lon: lon,
+                    elevation: elevation,
+                    mode: mode,
+                    options: options
+                ) else {
+                    return nil
+                }
+                let primaryReader = GenericReaderCached(reader: primaryRawReader)
+                let resolvedElevation = elevation.isFinite ? elevation : primaryReader.resolvedTargetElevation
+                let supplementalReader = try await GenericReader<SupplementalDomain, SupplementalVariable>(
+                    domain: supplemental.0,
+                    lat: lat,
+                    lon: lon,
+                    elevation: resolvedElevation,
+                    mode: mode,
+                    options: options
+                ).map { GenericReaderCached(reader: $0) }
+                let rawReaders: [any GenericReaderProtocol] = [supplementalReader].compactMap { $0 } + [primaryReader]
+                let mixer = GenericReaderMixerDifferentVariables<VariableUnion<PrimaryVariable, SupplementalVariable>>(
+                    reader: rawReaders
+                )
+                let reader = VariableHourlyDeriverReader(
+                    reader: mixer,
+                    options: options,
+                    domainRegistry: primary.0.domainRegistry
+                )
+                return (reader, resolvedElevation)
+            }
+        }
+
         func makeReader(
             lat: Float,
             lon: Float,
@@ -1175,11 +1221,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    private static var gfsGlobalDomains: [(any GenericDomain, any GenericVariable.Type)] {
-        [
-            (GfsDomain.gfs025, Gfs025Variable.self),
-            (GfsDomain.gfs013, Gfs013Variable.self)
-        ]
+    private static var gfsGlobalRawComposite: RawCompositeDomainReaderMapping {
+        RawCompositeDomainReaderMapping(
+            primary: (GfsDomain.gfs013, Gfs013Variable.self),
+            supplemental: (GfsDomain.gfs025, Gfs025Variable.self)
+        )
     }
 
     private static func hrrrRawComposite(include15Min: Bool, exposeAsSingleDomain: Bool = true) -> RawCompositeDomainReaderMapping {
@@ -1208,18 +1254,24 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 supplemental: [(NbmDomain.nbm_conus, ProbabilityVariable.self)]
             )
         case .gfs_global, .ncep_gfs_global:
-            return .multiple([
-                (GfsDomain.gfs05_ens, ProbabilityVariable.self),
-                (GfsDomain.gfs025_ens, ProbabilityVariable.self)
-            ] + Self.gfsGlobalDomains)
+            return .rawComposites(
+                groups: [Self.gfsGlobalRawComposite],
+                supplemental: [
+                    (GfsDomain.gfs05_ens, ProbabilityVariable.self),
+                    (GfsDomain.gfs025_ens, ProbabilityVariable.self)
+                ]
+            )
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .rawComposites(
-                groups: [Self.hrrrRawComposite(include15Min: include15Min, exposeAsSingleDomain: false)],
+                groups: [
+                    Self.gfsGlobalRawComposite,
+                    Self.hrrrRawComposite(include15Min: include15Min, exposeAsSingleDomain: false)
+                ],
                 supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
                     (GfsDomain.gfs025_ens, ProbabilityVariable.self),
                     (NbmDomain.nbm_conus, ProbabilityVariable.self)
-                ] + Self.gfsGlobalDomains
+                ]
             )
         case .ncep_gefs025:
             return .single(GfsDomain.gfs025_ens, Gefs025Variable.self)
@@ -1552,7 +1604,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let gfsForecast = try await DomainReaderMapping.multiple(Self.gfsGlobalDomains)
+            let gfsForecast = try await DomainReaderMapping.rawComposites(
+                groups: [Self.gfsGlobalRawComposite],
+                supplemental: []
+            )
                 .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard
                 let gfs = gfsForecast?.hourly,

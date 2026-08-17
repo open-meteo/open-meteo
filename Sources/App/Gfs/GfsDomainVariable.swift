@@ -229,3 +229,4 @@ typealias HrrrVariable = SurfaceAndPressureVariable<HrrrSurfaceVariable, HrrrPre
 typealias Hrrr15MinVariable = Hrrr15MinSurfaceVariable
 typealias Gefs025Variable = Gefs025SurfaceVariable
 typealias Gefs05Variable = SurfaceAndPressureVariable<Gefs05SurfaceVariable, Gefs05PressureVariable>
+typealias GfsGlobalVariable = VariableUnion<Gfs013Variable, Gfs025Variable>

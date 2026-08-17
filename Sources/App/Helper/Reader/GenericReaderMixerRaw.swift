@@ -23,6 +23,55 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
     let reader: [Reader]
 }
 
+/// Mixes raw readers with different explicit variable schemas by their common raw names.
+struct GenericReaderMixerDifferentVariables<Variable: GenericVariable>: GenericReaderProtocol {
+    typealias MixingVar = Variable
+
+    /// Lowest to highest priority.
+    let reader: [any GenericReaderProtocol]
+
+    var modelLat: Float { reader.last?.modelLat ?? .nan }
+    var modelLon: Float { reader.last?.modelLon ?? .nan }
+    var modelElevation: ElevationOrSea { reader.last?.modelElevation ?? .noData }
+    var targetElevation: Float { reader.last?.targetElevation ?? .nan }
+    var modelDtSeconds: Int { reader.last?.modelDtSeconds ?? 3600 }
+
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        try await reader.last?.getStatic(type: type)
+    }
+
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+        for reader in reader {
+            _ = try await reader.prefetchData(mixed: variable.rawValue, time: time)
+        }
+    }
+
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        var data: [Float]?
+        var unit: SiUnit?
+        for reader in reader.reversed() {
+            guard let value = try await reader.get(mixed: variable.rawValue, time: time) else {
+                continue
+            }
+            if data == nil {
+                data = value.data
+                unit = value.unit
+            } else if let unit, [.wmoCode, .dimensionless].contains(unit) {
+                data?.integrateIfNaN(value.data)
+            } else {
+                data?.integrateIfNaNSmooth(value.data)
+            }
+            if data?.containsNaN() == false {
+                break
+            }
+        }
+        return DataAndUnit(
+            data ?? Array(repeating: .nan, count: time.time.count),
+            unit ?? variable.unit
+        )
+    }
+}
+
 extension GenericReaderMixer {
     /// Initialises highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
     public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
