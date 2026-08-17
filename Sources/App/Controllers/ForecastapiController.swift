@@ -976,10 +976,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     )
 
-    struct RawCompositeDomainReaderMapping {
+    struct RawReaderDerivationGroup {
         typealias ReaderResult = (reader: any GenericReaderOptionalProtocol<ForecastVariable>, elevation: Float)
 
-        let primarySource: (any GenericDomain, any GenericVariable.Type)?
+        let singleDomainSource: (any GenericDomain, any GenericVariable.Type)?
         private let makeReaderClosure: (Float, Float, Float, GridSelectionMode, GenericReaderOptions) async throws -> ReaderResult?
 
         init<Domain, Variable>(
@@ -991,7 +991,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             Domain: GenericDomain,
             Variable: GenericVariable & Hashable
         {
-            self.primarySource = primaryDomain.map { ($0, variableType) }
+            self.singleDomainSource = primaryDomain.map { ($0, variableType) }
             self.makeReaderClosure = { lat, lon, elevation, mode, options in
                 var resolvedElevation = elevation
                 var derivationDomainInitialized = false
@@ -1018,7 +1018,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard derivationDomainInitialized else {
                     return nil
                 }
-                let mixer = GenericReaderMixerSameDomain(reader: initialized)
+                let mixer = GenericReaderMixerSameVariableType(reader: initialized)
                 let reader = VariableHourlyDeriverReader(
                     reader: mixer,
                     options: options,
@@ -1037,7 +1037,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             SupplementalDomain: GenericDomain,
             SupplementalVariable: GenericVariable
         {
-            self.primarySource = nil
+            self.singleDomainSource = nil
             self.makeReaderClosure = { lat, lon, elevation, mode, options in
                 guard let primaryRawReader = try await GenericReader<PrimaryDomain, PrimaryVariable>(
                     domain: primary.0,
@@ -1060,7 +1060,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     options: options
                 ).map { GenericReaderCached(reader: $0) }
                 let rawReaders: [any GenericReaderProtocol] = [supplementalReader].compactMap { $0 } + [primaryReader]
-                let mixer = GenericReaderMixerDifferentVariables<VariableUnion<PrimaryVariable, SupplementalVariable>>(
+                let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<PrimaryVariable, SupplementalVariable>>(
                     reader: rawReaders
                 )
                 let reader = VariableHourlyDeriverReader(
@@ -1087,8 +1087,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case single(any GenericDomain, any GenericVariable.Type)
         case multiple([(any GenericDomain, any GenericVariable.Type)])
         /// Mixes raw fields within each group, then places derived groups above supplemental readers.
-        case rawComposites(
-            groups: [RawCompositeDomainReaderMapping],
+        case mixedBeforeDerivation(
+            groups: [RawReaderDerivationGroup],
             supplemental: [(any GenericDomain, any GenericVariable.Type)]
         )
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
@@ -1134,8 +1134,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                  .singleWithPrecipitationProbability(let domain, _, _),
                  .singleWithSupplementalDomains(let domain, _, _, _, _):
                 return domain
-            case .rawComposites(let groups, _):
-                return groups.count == 1 ? groups.first?.primarySource?.0 : nil
+            case .mixedBeforeDerivation(let groups, _):
+                return groups.count == 1 ? groups.first?.singleDomainSource?.0 : nil
             default:
                 return nil
             }
@@ -1159,10 +1159,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             case .multiple(let domains):
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(forecast.readers)
-            case .rawComposites(let groups, let supplemental):
+            case .mixedBeforeDerivation(let groups, let supplemental):
                 var resolvedElevation = elevation
-                let compositeReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await groups.reversed().asyncCompactMap { composite in
-                    guard let result = try await composite.makeReader(
+                let derivedGroupReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await groups.reversed().asyncCompactMap { group in
+                    guard let result = try await group.makeReader(
                         lat: lat,
                         lon: lon,
                         elevation: resolvedElevation,
@@ -1175,11 +1175,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     return result.reader
                 }.reversed()
                 let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
-                guard !compositeReaders.isEmpty || !supplementalReaders.readers.isEmpty else {
+                guard !derivedGroupReaders.isEmpty || !supplementalReaders.readers.isEmpty else {
                     return nil
                 }
                 return MultiDomains.hourlyToMultiSameType(
-                    supplementalReaders.readers + compositeReaders,
+                    supplementalReaders.readers + derivedGroupReaders,
                     prefetchAllReaders: true
                 )
             case .seamlessLocal(let global, let local, let precipitationProb):
@@ -1214,15 +1214,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    private static var gfsGlobalRawComposite: RawCompositeDomainReaderMapping {
-        RawCompositeDomainReaderMapping(
+    private static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
+        RawReaderDerivationGroup(
             primary: (GfsDomain.gfs013, Gfs013Variable.self),
             supplemental: (GfsDomain.gfs025, Gfs025Variable.self)
         )
     }
 
-    private static func hrrrRawComposite(include15Min: Bool, exposeAsSingleDomain: Bool = true) -> RawCompositeDomainReaderMapping {
-        RawCompositeDomainReaderMapping(
+    private static func hrrrDerivationGroup(include15Min: Bool, exposeAsSingleDomain: Bool = true) -> RawReaderDerivationGroup {
+        RawReaderDerivationGroup(
             domains: include15Min ? [GfsDomain.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus],
             variableType: HrrrVariable.self,
             derivationDomain: .hrrr_conus,
@@ -1242,23 +1242,23 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_hrrr_conus_15min:
             return .single(GfsDomain.hrrr_conus_15min, Hrrr15MinVariable.self)
         case .gfs_hrrr, .ncep_hrrr_conus:
-            return .rawComposites(
-                groups: [Self.hrrrRawComposite(include15Min: include15Min)],
+            return .mixedBeforeDerivation(
+                groups: [Self.hrrrDerivationGroup(include15Min: include15Min)],
                 supplemental: [(NbmDomain.nbm_conus, ProbabilityVariable.self)]
             )
         case .gfs_global, .ncep_gfs_global:
-            return .rawComposites(
-                groups: [Self.gfsGlobalRawComposite],
+            return .mixedBeforeDerivation(
+                groups: [Self.gfsGlobalDerivationGroup],
                 supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
                     (GfsDomain.gfs025_ens, ProbabilityVariable.self)
                 ]
             )
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
-            return .rawComposites(
+            return .mixedBeforeDerivation(
                 groups: [
-                    Self.gfsGlobalRawComposite,
-                    Self.hrrrRawComposite(include15Min: include15Min, exposeAsSingleDomain: false)
+                    Self.gfsGlobalDerivationGroup,
+                    Self.hrrrDerivationGroup(include15Min: include15Min, exposeAsSingleDomain: false)
                 ],
                 supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
@@ -1597,8 +1597,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let gfsForecast = try await DomainReaderMapping.rawComposites(
-                groups: [Self.gfsGlobalRawComposite],
+            let gfsForecast = try await DomainReaderMapping.mixedBeforeDerivation(
+                groups: [Self.gfsGlobalDerivationGroup],
                 supplemental: []
             )
                 .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1707,8 +1707,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 ])
             }
             // For North America, use HRRR
-            if let hrrr = try await DomainReaderMapping.rawComposites(
-                groups: [Self.hrrrRawComposite(include15Min: include15Min)],
+            if let hrrr = try await DomainReaderMapping.mixedBeforeDerivation(
+                groups: [Self.hrrrDerivationGroup(include15Min: include15Min)],
                 supplemental: []
             ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1916,11 +1916,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                  .singleWithPrecipitationProbability(let domain, let variable, _),
                  .singleWithSupplementalDomains(let domain, let variable, _, _, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-            case .rawComposites(let groups, _):
-                guard groups.count == 1, let primarySource = groups.first?.primarySource else {
+            case .mixedBeforeDerivation(let groups, _):
+                guard groups.count == 1, let singleDomainSource = groups.first?.singleDomainSource else {
                     return (nil, nil, nil, nil)
                 }
-                return try await primarySource.0.makeGenericHourlyDaily(variableType: primarySource.1, position: gridpoint, options: options)
+                return try await singleDomainSource.0.makeGenericHourlyDaily(variableType: singleDomainSource.1, position: gridpoint, options: options)
             case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
@@ -2602,7 +2602,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 // Not possible
                 throw ForecastApiError.noDataAvailableForThisLocation
             }
-            return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
+            return Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameVariableType(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         case .era5_ensemble, .copernicus_era5_ensemble:
             return try await Era5Factory.makeReader(domain: .era5_ensemble, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs_analysis:

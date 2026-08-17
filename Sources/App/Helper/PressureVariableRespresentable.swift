@@ -127,12 +127,12 @@ protocol RawRepresentableString {
 }
 
 /// Combines two explicit variable schemas without claiming that either source stores the other's fields.
-enum VariableUnion<Primary: Sendable, Supplemental: Sendable>: Sendable {
+enum VariableSchemaUnion<Primary: Sendable, Supplemental: Sendable>: Sendable {
     case primary(Primary)
     case supplemental(Supplemental)
 }
 
-extension VariableUnion: RawRepresentableString
+extension VariableSchemaUnion: RawRepresentableString
 where Primary: RawRepresentableString, Supplemental: RawRepresentableString {
     init?(rawValue: String) {
         if let primary = Primary(rawValue: rawValue) {
@@ -154,10 +154,10 @@ where Primary: RawRepresentableString, Supplemental: RawRepresentableString {
     }
 }
 
-extension VariableUnion: Hashable, Equatable
+extension VariableSchemaUnion: Hashable, Equatable
 where Primary: Hashable, Supplemental: Hashable {}
 
-extension VariableUnion: GenericVariable
+extension VariableSchemaUnion: GenericVariable
 where Primary: GenericVariable, Supplemental: GenericVariable {
     private var variable: any GenericVariable {
         switch self {
@@ -174,7 +174,7 @@ where Primary: GenericVariable, Supplemental: GenericVariable {
     var isElevationCorrectable: Bool { variable.isElevationCorrectable }
 }
 
-extension VariableUnion: GenericVariableMixable
+extension VariableSchemaUnion: GenericVariableMixable
 where Primary: GenericVariableMixable, Supplemental: GenericVariableMixable {}
 
 /// Enum with surface and pressure variable

@@ -956,7 +956,7 @@ enum ExportFormat: String, RawRepresentableString, CaseIterable {
                 // Not possible
                 throw ForecastapiError.noDataAvailableForThisLocation
             }
-            return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
+            return Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameVariableType(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         }
     }
 

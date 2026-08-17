@@ -17,14 +17,14 @@ protocol GenericReaderMixer: GenericReaderMixerRaw {
     static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Reader?
 }
 
-struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {
+struct GenericReaderMixerSameVariableType<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {
     typealias MixingVar = Reader.MixingVar
 
     let reader: [Reader]
 }
 
 /// Mixes raw readers with different explicit variable schemas by their common raw names.
-struct GenericReaderMixerDifferentVariables<Variable: GenericVariable>: GenericReaderProtocol {
+struct GenericReaderMixerByVariableName<Variable: GenericVariable>: GenericReaderProtocol {
     typealias MixingVar = Variable
 
     /// Lowest to highest priority.
