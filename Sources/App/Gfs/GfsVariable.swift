@@ -1,33 +1,9 @@
 import Foundation
 
-enum GfsUvIndexVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+enum GfsUvIndexVariable: String, CaseIterable, GfsSurfaceVariableMetadataBacked, GenericVariableMixable {
     /// only GFS013
     case uv_index
     case uv_index_clear_sky
-    
-    var storePreviousForecast: Bool {
-        return false
-    }
-
-    var omFileName: (file: String, level: Int) {
-        return (rawValue, 0)
-    }
-
-    var scalefactor: Float {
-        return 20
-    }
-
-    var interpolation: ReaderInterpolation {
-        return .solar_backwards_averaged
-    }
-
-    var unit: SiUnit {
-        return .dimensionless
-    }
-
-    var isElevationCorrectable: Bool {
-        return false
-    }
 }
 
 
