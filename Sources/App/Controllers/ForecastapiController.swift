@@ -1182,12 +1182,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         ]
     }
 
-    private static func hrrrRawComposite(include15Min: Bool) -> RawCompositeDomainReaderMapping {
+    private static func hrrrRawComposite(include15Min: Bool, exposeAsSingleDomain: Bool = true) -> RawCompositeDomainReaderMapping {
         RawCompositeDomainReaderMapping(
             domains: include15Min ? [GfsDomain.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus],
             variableType: HrrrVariable.self,
             derivationDomain: .hrrr_conus,
-            primaryDomain: .hrrr_conus
+            primaryDomain: exposeAsSingleDomain ? .hrrr_conus : nil
         )
     }
 
@@ -1214,7 +1214,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ] + Self.gfsGlobalDomains)
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .rawComposites(
-                groups: [Self.hrrrRawComposite(include15Min: include15Min)],
+                groups: [Self.hrrrRawComposite(include15Min: include15Min, exposeAsSingleDomain: false)],
                 supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
                     (GfsDomain.gfs025_ens, ProbabilityVariable.self),
