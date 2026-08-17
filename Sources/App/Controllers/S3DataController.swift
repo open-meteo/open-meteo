@@ -463,7 +463,7 @@ struct S3DataController: RouteCollection {
         guard let host = req.getRefererHost() else {
             throw S3ApiError.forbidden
         }
-        guard host == "localhost" || host == "open-meteo.com" || host.hasSuffix(".open-meteo.com") else {
+        guard host == "localhost" || host == "open-meteo.com" || host.hasSuffix(".open-meteo.com") || host == "drizz.li" else {
             throw S3ApiError.forbidden
         }
     }
