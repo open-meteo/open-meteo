@@ -1175,18 +1175,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    private static var gfsGlobalRawComposite: RawCompositeDomainReaderMapping {
-        RawCompositeDomainReaderMapping(
-            domains: [GfsDomain.gfs025, .gfs013],
-            variableType: GfsVariable.self,
-            derivationDomain: .gfs013
-        )
+    private static var gfsGlobalDomains: [(any GenericDomain, any GenericVariable.Type)] {
+        [
+            (GfsDomain.gfs025, Gfs025Variable.self),
+            (GfsDomain.gfs013, Gfs013Variable.self)
+        ]
     }
 
     private static func hrrrRawComposite(include15Min: Bool) -> RawCompositeDomainReaderMapping {
         RawCompositeDomainReaderMapping(
             domains: include15Min ? [GfsDomain.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus],
-            variableType: GfsVariable.self,
+            variableType: HrrrVariable.self,
             derivationDomain: .hrrr_conus,
             primaryDomain: .hrrr_conus
         )
@@ -1196,51 +1195,41 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
         switch self {
         case .gfs025, .ncep_gfs025:
-            return .single(GfsDomain.gfs025, GfsVariable.self)
+            return .single(GfsDomain.gfs025, Gfs025Variable.self)
         case .gfs013, .ncep_gfs013:
-            return .single(GfsDomain.gfs013, GfsVariable.self)
+            return .single(GfsDomain.gfs013, Gfs013Variable.self)
         case .ncep_nam_conus:
-            return .single(GfsDomain.nam_conus, GfsVariable.self)
+            return .single(GfsDomain.nam_conus, NamVariable.self)
         case .ncep_hrrr_conus_15min:
-            return .single(GfsDomain.hrrr_conus_15min, GfsVariable.self)
+            return .single(GfsDomain.hrrr_conus_15min, Hrrr15MinVariable.self)
         case .gfs_hrrr, .ncep_hrrr_conus:
             return .rawComposites(
                 groups: [Self.hrrrRawComposite(include15Min: include15Min)],
                 supplemental: [(NbmDomain.nbm_conus, ProbabilityVariable.self)]
             )
         case .gfs_global, .ncep_gfs_global:
-            return .rawComposites(
-                groups: [Self.gfsGlobalRawComposite],
-                supplemental: [
-                    (GfsDomain.gfs05_ens, ProbabilityVariable.self),
-                    (GfsDomain.gfs025_ens, ProbabilityVariable.self)
-                ]
-            )
+            return .multiple([
+                (GfsDomain.gfs05_ens, ProbabilityVariable.self),
+                (GfsDomain.gfs025_ens, ProbabilityVariable.self)
+            ] + Self.gfsGlobalDomains)
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .rawComposites(
-                groups: [
-                    Self.gfsGlobalRawComposite,
-                    Self.hrrrRawComposite(include15Min: include15Min)
-                ],
+                groups: [Self.hrrrRawComposite(include15Min: include15Min)],
                 supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
                     (GfsDomain.gfs025_ens, ProbabilityVariable.self),
                     (NbmDomain.nbm_conus, ProbabilityVariable.self)
-                ]
+                ] + Self.gfsGlobalDomains
             )
         case .ncep_gefs025:
-            return .single(GfsDomain.gfs025_ens, GfsVariable.self)
+            return .single(GfsDomain.gfs025_ens, Gefs025Variable.self)
         case .gfs05, .ncep_gefs05:
-            return .single(GfsDomain.gfs05_ens, GfsVariable.self)
+            return .single(GfsDomain.gfs05_ens, Gefs05Variable.self)
         case .ncep_gefs_seamless:
-            return .rawComposites(
-                groups: [RawCompositeDomainReaderMapping(
-                    domains: [GfsDomain.gfs05_ens, .gfs025_ens],
-                    variableType: GfsVariable.self,
-                    derivationDomain: .gfs025_ens
-                )],
-                supplemental: []
-            )
+            return .multiple([
+                (GfsDomain.gfs05_ens, Gefs05Variable.self),
+                (GfsDomain.gfs025_ens, Gefs025Variable.self)
+            ])
         case .ncep_nbm_conus:
             return .single(NbmDomain.nbm_conus, NbmVariable.self)
         case .ncep_aigfs025:
@@ -1403,9 +1392,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025_ensemble_mean:
             return .single(EcmwfDomain.aifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
         case .ncep_gefs025_ensemble_mean:
-            return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+            return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
         case .ncep_gefs05_ensemble_mean:
-            return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+            return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self)
         case .ecmwf_ifs_europe_ensemble:
             return .single(EcmwfEcpdsDomain.ifs_europe_ensemble, EcmwfEcdpsIfsEuropeEnsembleVariable.self)
         case .ecmwf_ifs_europe_ensemble_mean:
@@ -1416,8 +1405,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(EcmwfEcpdsDomain.aifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsAifsEuropeEnsembleVariable>.self)
         case .ncep_gefs_ensemble_mean_seamless:
             return .multiple([
-                (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self),
-                (GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+                (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self),
+                (GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
             ])
         case .cmc_gem_geps_ensemble_mean:
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
@@ -1563,10 +1552,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let gfsForecast = try await DomainReaderMapping.rawComposites(
-                groups: [Self.gfsGlobalRawComposite],
-                supplemental: []
-            ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let gfsForecast = try await DomainReaderMapping.multiple(Self.gfsGlobalDomains)
+                .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard
                 let gfs = gfsForecast?.hourly,
                 let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
