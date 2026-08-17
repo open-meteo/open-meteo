@@ -1047,11 +1047,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     enum DomainReaderMapping {
         case single(any GenericDomain, any GenericVariable.Type)
         case multiple([(any GenericDomain, any GenericVariable.Type)])
-        /// Mixes raw fields within each group before derivation, then mixes the derived groups by priority.
+        /// Mixes raw fields within each group, then places derived groups above supplemental readers.
         case rawComposites(
-            [RawCompositeDomainReaderMapping],
-            lowerPriority: [(any GenericDomain, any GenericVariable.Type)],
-            higherPriority: [(any GenericDomain, any GenericVariable.Type)]
+            groups: [RawCompositeDomainReaderMapping],
+            supplemental: [(any GenericDomain, any GenericVariable.Type)]
         )
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
         case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
@@ -1096,8 +1095,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                  .singleWithPrecipitationProbability(let domain, _, _),
                  .singleWithSupplementalDomains(let domain, _, _, _, _):
                 return domain
-            case .rawComposites(let composites, _, _):
-                return composites.count == 1 ? composites.first?.primarySource?.0 : nil
+            case .rawComposites(let groups, _):
+                return groups.count == 1 ? groups.first?.primarySource?.0 : nil
             default:
                 return nil
             }
@@ -1121,10 +1120,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             case .multiple(let domains):
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(forecast.readers)
-            case .rawComposites(let composites, let lowerPriority, let higherPriority):
-                let higher = try await Self.makeDomainReaders(sources: higherPriority, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                var resolvedElevation = higher.elevation
-                let compositeReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await composites.reversed().asyncCompactMap { composite in
+            case .rawComposites(let groups, let supplemental):
+                var resolvedElevation = elevation
+                let compositeReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await groups.reversed().asyncCompactMap { composite in
                     guard let result = try await composite.makeReader(
                         lat: lat,
                         lon: lon,
@@ -1140,9 +1138,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard !compositeReaders.isEmpty else {
                     return nil
                 }
-                let lower = try await Self.makeDomainReaders(sources: lowerPriority, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(
-                    lower.readers + compositeReaders + higher.readers,
+                    supplementalReaders.readers + compositeReaders,
                     prefetchAllReaders: true
                 )
             case .seamlessLocal(let global, let local, let precipitationProb):
@@ -1207,31 +1205,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GfsDomain.hrrr_conus_15min, GfsVariable.self)
         case .gfs_hrrr, .ncep_hrrr_conus:
             return .rawComposites(
-                [Self.hrrrRawComposite(include15Min: include15Min)],
-                lowerPriority: [(NbmDomain.nbm_conus, ProbabilityVariable.self)],
-                higherPriority: []
+                groups: [Self.hrrrRawComposite(include15Min: include15Min)],
+                supplemental: [(NbmDomain.nbm_conus, ProbabilityVariable.self)]
             )
         case .gfs_global, .ncep_gfs_global:
             return .rawComposites(
-                [Self.gfsGlobalRawComposite],
-                lowerPriority: [
+                groups: [Self.gfsGlobalRawComposite],
+                supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
                     (GfsDomain.gfs025_ens, ProbabilityVariable.self)
-                ],
-                higherPriority: []
+                ]
             )
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .rawComposites(
-                [
+                groups: [
                     Self.gfsGlobalRawComposite,
                     Self.hrrrRawComposite(include15Min: include15Min)
                 ],
-                lowerPriority: [
+                supplemental: [
                     (GfsDomain.gfs05_ens, ProbabilityVariable.self),
                     (GfsDomain.gfs025_ens, ProbabilityVariable.self),
                     (NbmDomain.nbm_conus, ProbabilityVariable.self)
-                ],
-                higherPriority: []
+                ]
             )
         case .ncep_gefs025:
             return .single(GfsDomain.gfs025_ens, GfsVariable.self)
@@ -1239,13 +1234,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GfsDomain.gfs05_ens, GfsVariable.self)
         case .ncep_gefs_seamless:
             return .rawComposites(
-                [RawCompositeDomainReaderMapping(
+                groups: [RawCompositeDomainReaderMapping(
                     domains: [GfsDomain.gfs05_ens, .gfs025_ens],
                     variableType: GfsVariable.self,
                     derivationDomain: .gfs025_ens
                 )],
-                lowerPriority: [],
-                higherPriority: []
+                supplemental: []
             )
         case .ncep_nbm_conus:
             return .single(NbmDomain.nbm_conus, NbmVariable.self)
@@ -1570,9 +1564,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let gfsForecast = try await DomainReaderMapping.rawComposites(
-                [Self.gfsGlobalRawComposite],
-                lowerPriority: [],
-                higherPriority: []
+                groups: [Self.gfsGlobalRawComposite],
+                supplemental: []
             ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard
                 let gfs = gfsForecast?.hourly,
@@ -1680,9 +1673,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For North America, use HRRR
             if let hrrr = try await DomainReaderMapping.rawComposites(
-                [Self.hrrrRawComposite(include15Min: include15Min)],
-                lowerPriority: [],
-                higherPriority: []
+                groups: [Self.hrrrRawComposite(include15Min: include15Min)],
+                supplemental: []
             ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType([
@@ -1889,8 +1881,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                  .singleWithPrecipitationProbability(let domain, let variable, _),
                  .singleWithSupplementalDomains(let domain, let variable, _, _, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-            case .rawComposites(let composites, _, _):
-                guard composites.count == 1, let primarySource = composites.first?.primarySource else {
+            case .rawComposites(let groups, _):
+                guard groups.count == 1, let primarySource = groups.first?.primarySource else {
                     return (nil, nil, nil, nil)
                 }
                 return try await primarySource.0.makeGenericHourlyDaily(variableType: primarySource.1, position: gridpoint, options: options)
