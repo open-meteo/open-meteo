@@ -415,10 +415,10 @@ struct OmFileSystemS3 {
                     listedFiles.insert(name)
                     // Keep existing object actors and directory actors alive whenever possible.
                     if let existing = files[name] {
-                        await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
+                        await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
                     } else {
                         OmMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
-                        files[name] = File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime.toTimestamp(), eTag: file.eTag)
+                        files[name] = File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
                     }
                 }
 
@@ -496,7 +496,7 @@ struct OmFileSystemS3 {
             lastAccessed = now
         }
         
-        func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Date, size: Int64, eTag: String?)]) async {
+        func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Timestamp, size: Int64, eTag: String?)]) async {
             for name in self.directories.keys {
                 directories.insert(name)
             }
@@ -504,7 +504,7 @@ struct OmFileSystemS3 {
                 guard files[name] == nil else {
                     continue
                 }
-                files[name] = await (attr.lastModified.toDate(), Int64(attr.contentLength), attr.eTag)
+                files[name] = await (attr.lastModified, Int64(attr.contentLength), attr.eTag)
             }
         }
         

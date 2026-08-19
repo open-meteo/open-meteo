@@ -110,15 +110,15 @@ extension IsoDate {
     }
 }
 
-extension String {
-    subscript(_ range: Range<Int>) -> Substring {
-        let start = index(startIndex, offsetBy: max(0, range.lowerBound))
-        let end = index(start, offsetBy: min(self.count - range.lowerBound, range.upperBound - range.lowerBound))
+extension StringProtocol {
+    subscript(_ range: Range<Int>) -> Self.SubSequence {
+        let start = index(startIndex, offsetBy: Swift.max(0, range.lowerBound))
+        let end = index(start, offsetBy: Swift.min(self.count - range.lowerBound, range.upperBound - range.lowerBound))
         return self[start..<end]
     }
 
-    subscript(_ range: CountablePartialRangeFrom<Int>) -> Substring {
-        let start = index(startIndex, offsetBy: max(0, range.lowerBound))
+    subscript(_ range: CountablePartialRangeFrom<Int>) -> Self.SubSequence {
+        let start = index(startIndex, offsetBy: Swift.max(0, range.lowerBound))
          return self[start...]
     }
 }

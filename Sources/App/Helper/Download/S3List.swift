@@ -23,7 +23,7 @@ enum S3List {
 
     struct ListV2File {
         let name: String
-        let modificationTime: Date
+        let modificationTime: Timestamp
         let fileSize: Int
         let eTag: String
     }
@@ -49,12 +49,11 @@ enum S3List {
                 return (allFiles, allDirectories)
             }
 
-            let files = body.xmlSection("Contents").map {
+            let files = try body.xmlSection("Contents").map {
                 guard let name = $0.xmlFirst("Key") else {
                     fatalError("Failed to get <Key>")
                 }
-                guard let modificationTimeString = $0.xmlFirst("LastModified"),
-                        let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)) else {
+                guard let modificationTime = try $0.xmlFirst("LastModified")?.parseXmlS3Date() else {
                     fatalError("Failed to get LastModified date")
                 }
                 guard let fileSizeString = $0.xmlFirst("Size"), let fileSize = Int(fileSizeString) else {

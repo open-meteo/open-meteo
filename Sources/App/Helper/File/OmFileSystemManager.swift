@@ -47,9 +47,9 @@ final class OmFileSystemManager: Sendable {
         await localFileSystem.getDirectory(fullPath: path)?.updateIfRequired(force: true)
     }
     
-    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (lastModified: Date, size: Int64, eTag: String?)])? {
+    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64, eTag: String?)])? {
         var directories = Set<String>()
-        var files = [String: (lastModified: Date, size: Int64, eTag: String?)]()
+        var files = [String: (lastModified: Timestamp, size: Int64, eTag: String?)]()
         
         if let local = await localFileSystem.getDirectory(fullPath: path) {
             await local.exportDirectories(directories: &directories, files: &files)

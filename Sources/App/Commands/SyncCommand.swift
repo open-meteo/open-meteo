@@ -313,10 +313,10 @@ fileprivate extension Array where Element == S3List.ListV2File {
             if remoteFile.name.contains("meta.json") {
                 /// meta.json is modified during sync to replace the `last_run_availability_time`.
                 /// Size might be different. Only check for modification time.
-                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
             }
             // Add one seconds delay due to inaccuracy in timestamps
-            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
         })
     }
 }

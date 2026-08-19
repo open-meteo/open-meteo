@@ -687,14 +687,13 @@ extension S3List.ListV2Query {
         guard let directory = try await OmFileSystemManager.instance.getDirectoryContents(path: path, client: client, logger: logger) else {
             throw S3ApiError.forbidden
         }
-        let dateFormat = DateFormatter.awsS3DateTimeFloored
         // eTag uses "timestamp-filesize" for local files
         let filesXml = directory.files.map { (name, attr) in
             let eTag = attr.eTag ?? "\(Int(attr.0.timeIntervalSince1970))-\(attr.1)"
             return """
             <Contents>
                 <Key>\(path)\(name)</Key>
-                <LastModified>\(dateFormat.string(from: attr.0))</LastModified>
+                <LastModified>\(attr.0.s3ListXmlDateFormat)</LastModified>
                 <Size>\(attr.1)</Size>
                 <ETag>&quot;\(eTag)&quot;</ETag>
                 <StorageClass>STANDARD</StorageClass>
@@ -728,7 +727,7 @@ extension S3List.ListV2Query {
     }
 }
 
-extension String {
+extension StringProtocol {
     /// Formats from: "EEE, dd MMM yyyy HH:mm:ss GMT".. like `Wed, 19 Aug 2026 09:38:00 GMT`
     func parseLastModifiedDate() throws -> Timestamp {
         guard self.count == 29 else {
@@ -770,6 +769,34 @@ extension String {
         }
         return Timestamp(year, month, day, hour, minute, second)
     }
+    
+    /// Formats from: "EEE, dd MMM yyyy HH:mm:ss GMT".. like `2026-08-19T09:38:00.000Z`
+    func parseXmlS3Date() throws -> Timestamp {
+        let str = self
+        print(self.count)
+        guard str.count == 24 else {
+            throw TimeError.InvalidDateFromat
+        }
+        guard let year = Int(str[0..<4]), year >= 1900, year <= 2200 else {
+            throw TimeError.InvalidDate
+        }
+        guard let month = Int(str[5..<7]), month >= 1, month <= 12 else {
+            throw TimeError.InvalidDate
+        }
+        guard let day = Int(str[8..<10]), day >= 1, day <= 31 else {
+            throw TimeError.InvalidDate
+        }
+        guard let hour = Int(str[11..<13]), hour >= 0, hour <= 23 else {
+            throw TimeError.InvalidDate
+        }
+        guard let minute = Int(str[14..<16]), minute >= 0, minute <= 59 else {
+            throw TimeError.InvalidDate
+        }
+        guard let second = Int(str[17..<18]), second >= 0, second <= 59 else {
+            throw TimeError.InvalidDate
+        }
+        return Timestamp(year, month, day, hour, minute, second)
+    }
 }
 
 extension Timestamp {
@@ -794,6 +821,20 @@ extension Timestamp {
         
         // Formats to: "EEE, dd MMM yyyy HH:mm:ss GMT"
         return "\(wdayStr), \(day) \(monthStr) \(year) \(hour):\(minute):\(second) GMT"
+    }
+    
+    /// Format dates like `2023-11-14T04:32:17.000Z`
+    var s3ListXmlDateFormat: String {
+        var time = timeIntervalSince1970
+        var t = tm()
+        gmtime_r(&time, &t)
+        let year = Int(t.tm_year + 1900)
+        let month = Int(t.tm_mon + 1)
+        let day = Int(t.tm_mday)
+        let hour = Int(t.tm_hour)
+        let minute = Int(t.tm_min)
+        let second = Int(t.tm_sec)
+        return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2)):\(second.zeroPadded(len: 2)).000Z"
     }
 }
 
@@ -982,23 +1023,6 @@ extension StringProtocol {
         return self[...]
     }
 }
-
-extension DateFormatter {
-    /// Format dates like `2023-11-14T04:32:17.123Z`
-    static let awsS3DateTime = {
-        let dateFormat = DateFormatter()
-        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.SSS'Z'"
-        return dateFormat
-    }()
-    
-    /// Format dates like `2023-11-14T04:32:17.000Z`
-    static let awsS3DateTimeFloored = {
-        let dateFormat = DateFormatter()
-        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.000'Z'"
-        return dateFormat
-    }()
-}
-
 
 extension Request {
     func asyncStreamFile(
