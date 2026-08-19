@@ -99,7 +99,7 @@ enum S3Uploader {
     /// `server` in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
     /// `basePath` offsets the object names relative to the local directory .e.g. `some-path/` in this example
     /// `exclude` can be used to exclude file names. Supports "*" and "?" wildcards
-    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
+    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, dryRun: Bool = false, exclude: [String] = [".*", "*~"]) async throws {
         let logger = Logger(label: "S3Uploader")
         let normalizedBasePath = basePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let remoteRoot = normalizedBasePath.isEmpty ? "" : normalizedBasePath + "/"
@@ -175,62 +175,33 @@ enum S3Uploader {
             return remote.fileSize != local.size || local.modificationTime > remote.modificationTime
         }
         
+        let totalBytes = toUpload.reduce(0) { $0 + $1.size }
+        logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
+
+        if dryRun {
+            return
+        }
+
         guard toUpload.count > 0 else {
             logger.info("No files to upload. Exiting.")
             return
         }
 
-        let totalBytes = toUpload.reduce(0) { $0 + $1.size }
-        let uploadStart = DispatchTime.now()
-        logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
-
         // Step 4: Upload 4 files concurrently, with up to 16 parts in flight.
+        let uploadStart = DispatchTime.now()
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 16)
-        let uploadResults: [Result<S3MultiPartUploadPrepared, any Error>] = await toUpload.mapConcurrent(nConcurrent: 4) { file in
+        try await toUpload.foreachConcurrent(nConcurrent: 4) { file in
             let encodedRemoteKey = file.remoteKey
                 .split(separator: "/", omittingEmptySubsequences: false)
                 .map { String($0).awsPercentEncoded }
                 .joined(separator: "/")
             let url = serverBase + "/" + encodedRemoteKey
-            do {
-                return .success(try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor))
-            } catch {
-                return .failure(error)
-            }
-        }
-        let prepared = uploadResults.compactMap { try? $0.get() }
-        if let uploadError = uploadResults.compactMap({ result -> (any Error)? in
-            guard case .failure(let error) = result else { return nil }
-            return error
-        }).first {
-            // Do not leave successful multipart preparations dangling if another
-            // file failed before the commit phase.
-            try? await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
-                try await prepared.abort(client: client)
-            }
-            throw uploadError
+            let prepared = try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor)
+            try await prepared.commit(client: client)
         }
         let uploadTime = Double(DispatchTime.now().uptimeNanoseconds - uploadStart.uptimeNanoseconds) / 1_000_000_000
         let rate = Double(totalBytes) / uploadTime
-        logger.info("Upload completed in \(uploadTime.asSecondsPrettyPrint) \(rate.asRatePrettyPrint). Commit changes now")
-        let commitStart = DispatchTime.now()
-        
-        // Commit all OM file changes
-        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
-            if prepared.url.hasSuffix(".json") {
-                return
-            }
-            try await prepared.commit(client: client)
-        }
-        // Commit all json files. E.g. meta.json which should be committed last
-        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
-            if prepared.url.hasSuffix(".json") == false {
-                return
-            }
-            try await prepared.commit(client: client)
-        }
-        
-        logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
+        logger.info("Upload completed in \(uploadTime.asSecondsPrettyPrint) \(rate.asRatePrettyPrint)")
     }
 }
 

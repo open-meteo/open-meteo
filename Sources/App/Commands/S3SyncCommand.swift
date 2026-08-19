@@ -16,6 +16,9 @@ struct S3SyncCommand: AsyncCommand {
 
         @Argument(name: "base-path", help: "Remote object prefix for the local directory.")
         var basePath: String
+
+        @Flag(name: "dry-run", help: "Scan and report files without uploading them.")
+        var dryRun: Bool
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -34,7 +37,8 @@ struct S3SyncCommand: AsyncCommand {
             client: context.application.http1Client,
             localDirectory: signature.localDirectory,
             server: remoteServer,
-            basePath: signature.basePath
+            basePath: signature.basePath,
+            dryRun: signature.dryRun
         )
     }
 }
