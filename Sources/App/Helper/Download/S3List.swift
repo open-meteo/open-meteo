@@ -117,4 +117,15 @@ extension StringProtocol {
         }
         return self[start.upperBound..<end.lowerBound]
     }
+    
+    /// Interpret the given string as XML and get the first key
+    func xmlFirstIgnoreAttributes(_ section: StaticString) -> SubSequence? {
+        guard let startTag = range(of: "<\(section)", range: startIndex..<endIndex), let start = self[startTag.upperBound...].firstIndex(of: ">"), self.index(after: start) <= endIndex else {
+            return nil
+        }
+        guard let end = range(of: "</\(section)>", range: self.index(after: start)..<endIndex) else {
+            return nil
+        }
+        return self[self.index(after: start)..<end.lowerBound]
+    }
 }

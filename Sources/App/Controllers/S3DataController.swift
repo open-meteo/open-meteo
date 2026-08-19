@@ -207,7 +207,7 @@ struct S3DataController: RouteCollection {
             let partNumber: Int?
         }
         
-        if req.url.query == "uploads" {
+        if req.url.query == "uploads" || req.url.query == "uploads=" {
             let prepared = try await initiateMultipartUpload(req)
             try await replicateMultipartInitiate(req: req, uploadId: prepared.uploadId, fileSize: prepared.fileSize)
             return prepared.response
@@ -313,11 +313,15 @@ struct S3DataController: RouteCollection {
         guard let absolutePath = resolveObjectPath(req.url.path) else {
             throw S3ApiError.forbidden
         }
-        guard let fileSizeRaw = req.headers.first(name: "x-file-size"),
-              let fileSize = Int64(fileSizeRaw), fileSize >= 0, fileSize <= Self.uploadMaximumFileSize else {
-            throw S3ApiError.missingOrInvalidFileSizeHeader
+        let fileSize: Int64
+        if let fileSizeRaw = req.headers.first(name: "x-file-size") {
+            guard let size = Int64(fileSizeRaw), size >= 0, size <= Self.uploadMaximumFileSize else {
+                throw S3ApiError.missingOrInvalidFileSizeHeader
+            }
+            fileSize = size
+        } else {
+            fileSize = 0
         }
-        
         let uploadId: Int
         if let customUploadId = req.headers.first(name: "x-upload-id") {
             guard let id = Int(customUploadId), Self.uploadIdRange.contains(id) else {
@@ -363,16 +367,20 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.multipartUploadNotFound
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
-        let isLastPart = partNumber == numParts
-        guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
-            throw S3ApiError.partSizeNotChunkSize
+        if tempInfo.size % Int64(Self.multipartChunkSize) > 0 {
+            let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
+            let isLastPart = partNumber == numParts
+            guard isLastPart || body.readableBytes <= Self.multipartChunkSize else {
+                throw S3ApiError.partSizeNotChunkSize
+            }
+            guard offset + Int64(body.readableBytes) <= tempInfo.size else {
+                throw S3ApiError.partExceedsAllocatedFileSize
+            }
         }
-        guard offset + Int64(body.readableBytes) <= tempInfo.size else {
-            throw S3ApiError.partExceedsAllocatedFileSize
-        }
-        
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
+            if offset + Int64(body.readableBytes) < tempInfo.size {
+                try await handle.resize(to: .bytes(offset + Int64(body.readableBytes)))
+            }
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
@@ -432,7 +440,7 @@ struct S3DataController: RouteCollection {
     }
     
     private func parseMultipartCompleteXML(_ xml: String) throws -> [(partNumber: Int, etagSha256: Substring)] {
-        guard let root = xml.xmlFirst("CompleteMultipartUpload") else {
+        guard let root = xml.xmlFirstIgnoreAttributes("CompleteMultipartUpload") else {
             throw S3ApiError.invalidCompletionXML
         }
         return try root.xmlSection("Part").map { partSection in
@@ -624,7 +632,7 @@ struct S3DataController: RouteCollection {
             return nil
         }
         let directory: Substring
-        var path = path.dropPrefix("/openmeteo")
+        let path = path.dropPrefix("/openmeteo")
         if path.starts(with: "/data/") {
             directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
         } else if path.starts(with: "/data_run/") {
