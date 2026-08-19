@@ -200,7 +200,7 @@ public struct AWSSigner {
         guard let headerPayloadHash = headers.first(name: "x-amz-content-sha256") else {
             throw SigningError.missingPayloadHash
         }
-        guard headerPayloadHash == "UNSIGNED-PAYLOAD" || headerPayloadHash.caseInsensitiveCompare(payloadHashSha256) == .orderedSame else {
+        guard headerPayloadHash.caseInsensitiveCompare(payloadHashSha256) == .orderedSame else {
             throw SigningError.payloadHashMismatch
         }
 

@@ -64,9 +64,6 @@ struct S3DataController: RouteCollection {
                 routes.on(.PUT, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.putObject)
                 routes.on(.POST, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.postObject)
                 routes.on(.DELETE, [PathComponent(stringLiteral: root), .catchall], use: self.deleteObject)
-                routes.on(.PUT, ["openmeteo", PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.putObject)
-                routes.on(.POST, ["openmeteo", PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.postObject)
-                routes.on(.DELETE, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.deleteObject)
             }
         }
     }
@@ -207,7 +204,7 @@ struct S3DataController: RouteCollection {
             let partNumber: Int?
         }
         
-        if req.url.query == "uploads" || req.url.query == "uploads=" {
+        if req.url.query == "uploads" {
             let prepared = try await initiateMultipartUpload(req)
             try await replicateMultipartInitiate(req: req, uploadId: prepared.uploadId, fileSize: prepared.fileSize)
             return prepared.response
@@ -246,7 +243,7 @@ struct S3DataController: RouteCollection {
             try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
-            return makeUploadCompletedResponse()
+            return Response(status: .ok)
         }
         
         throw S3ApiError.unsupportedPostOperation
@@ -292,7 +289,7 @@ struct S3DataController: RouteCollection {
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         
         /// Full path `/somedir/object.ext`
-        let path = req.url.path.dropPrefix("/openmeteo")
+        let path = req.url.path
         /// Object directory `somedir/`
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
@@ -313,14 +310,9 @@ struct S3DataController: RouteCollection {
         guard let absolutePath = resolveObjectPath(req.url.path) else {
             throw S3ApiError.forbidden
         }
-        let fileSize: Int64
-        if let fileSizeRaw = req.headers.first(name: "x-file-size") {
-            guard let size = Int64(fileSizeRaw), size >= 0, size <= Self.uploadMaximumFileSize else {
-                throw S3ApiError.missingOrInvalidFileSizeHeader
-            }
-            fileSize = size
-        } else {
-            fileSize = 0
+        guard let fileSizeRaw = req.headers.first(name: "x-file-size"),
+              let fileSize = Int64(fileSizeRaw), fileSize >= 0, fileSize <= Self.uploadMaximumFileSize else {
+            throw S3ApiError.missingOrInvalidFileSizeHeader
         }
         let uploadId: Int
         if let customUploadId = req.headers.first(name: "x-upload-id") {
@@ -367,20 +359,15 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.multipartUploadNotFound
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        if tempInfo.size % Int64(Self.multipartChunkSize) > 0 {
-            let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
-            let isLastPart = partNumber == numParts
-            guard isLastPart || body.readableBytes <= Self.multipartChunkSize else {
-                throw S3ApiError.partSizeNotChunkSize
-            }
-            guard offset + Int64(body.readableBytes) <= tempInfo.size else {
-                throw S3ApiError.partExceedsAllocatedFileSize
-            }
+        let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
+        let isLastPart = partNumber == numParts
+        guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
+            throw S3ApiError.partSizeNotChunkSize
+        }
+        guard offset + Int64(body.readableBytes) <= tempInfo.size else {
+            throw S3ApiError.partExceedsAllocatedFileSize
         }
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
-            if offset + Int64(body.readableBytes) > tempInfo.size {
-                try await handle.resize(to: .bytes(offset + Int64(body.readableBytes)))
-            }
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
@@ -427,7 +414,7 @@ struct S3DataController: RouteCollection {
             try await handle.setLastDataModificationTime(to: ts)
         }
         /// Full path `/somedir/object.ext`
-        let path = req.url.path.dropPrefix("/openmeteo")
+        let path = req.url.path
         /// Object directory `somedir/`
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
@@ -440,7 +427,7 @@ struct S3DataController: RouteCollection {
     }
     
     private func parseMultipartCompleteXML(_ xml: String) throws -> [(partNumber: Int, etagSha256: Substring)] {
-        guard let root = xml.xmlFirstIgnoreAttributes("CompleteMultipartUpload") else {
+        guard let root = xml.xmlFirst("CompleteMultipartUpload") else {
             throw S3ApiError.invalidCompletionXML
         }
         return try root.xmlSection("Part").map { partSection in
@@ -458,17 +445,6 @@ struct S3DataController: RouteCollection {
         var headers = HTTPHeaders()
         headers.add(name: "ETag", value: "\(body.readableBytesView.sha256Hex)")
         return Response(status: .ok, headers: headers)
-    }
-    
-    private func makeUploadCompletedResponse() -> Response {
-        let responseBody = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-        </CompleteMultipartUploadResult>
-        """
-        var headers = HTTPHeaders()
-        headers.add(name: .contentType, value: "application/xml")
-        return Response(status: .ok, headers: headers, body: .init(string: responseBody))
     }
     
     private func authorizeReadRequest(req: Request, apikey: String?) throws {
@@ -643,7 +619,6 @@ struct S3DataController: RouteCollection {
             return nil
         }
         let directory: Substring
-        let path = path.dropPrefix("/openmeteo")
         if path.starts(with: "/data/") {
             directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
         } else if path.starts(with: "/data_run/") {
