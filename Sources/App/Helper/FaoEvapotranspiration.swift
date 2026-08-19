@@ -200,6 +200,6 @@ extension Meteorology {
         // evapotranspiration
         let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + γ * (37.0 / (temperature2mCelsius + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + γ * (1 + 0.34 * windspeed2m))
 
-        return max(et0 * Float(dtSeconds / 3600), 0)
+        return max(et0 * Float(dtSeconds) / 3600, 0)
     }
 }
