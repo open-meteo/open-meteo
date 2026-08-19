@@ -20,7 +20,26 @@ import Testing
         #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 0, precipitation: 0, cloudcover: 54, gusts: 2, cape: 2810, liftedIndex: -8.6, convectiveInhibition: 5, pblHeight: 1760, modelDtSeconds: 3600, latitude: 39) == 47.352947)
         #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 0, precipitation: 0, cloudcover: 75, gusts: 2, cape: 2280, liftedIndex: -8.1, convectiveInhibition: 7, pblHeight: 2050, modelDtSeconds: 3600, latitude: 39) == 49.411762)
     }
-    
+
+    @Test func weatherCodeCalculation() {
+        // Very high thunderstorm probability escalates to 97 (heavy, no hail data)
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 5, convectivePrecipitation: 5, snowfallCentimeters: 0, gusts: 20, cape: 3000, liftedIndex: -9, convectiveInhibition: 0, pblHeight: 2000, visibilityMeters: nil, categoricalFreezingRain: nil, modelDtSeconds: 3600, latitude: 45) == .thunderstormHeavyWithoutHail)
+        // With an explicit hail forecast, 96/99 depending on amount
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 5, convectivePrecipitation: 5, snowfallCentimeters: 0, gusts: 20, cape: 3000, liftedIndex: -9, convectiveInhibition: 0, pblHeight: 2000, visibilityMeters: nil, categoricalFreezingRain: nil, hail: 0.5, modelDtSeconds: 3600, latitude: 45) == .thunderstormWithSlightHail)
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 5, convectivePrecipitation: 5, snowfallCentimeters: 0, gusts: 20, cape: 3000, liftedIndex: -9, convectiveInhibition: 0, pblHeight: 2000, visibilityMeters: nil, categoricalFreezingRain: nil, hail: 2, modelDtSeconds: 3600, latitude: 45) == .thunderstormWithHeavyHail)
+        // Moderate probability stays 95
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 3, convectivePrecipitation: 3, snowfallCentimeters: 0, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, visibilityMeters: nil, categoricalFreezingRain: nil, modelDtSeconds: 3600, latitude: 45) == .thunderstormSlightOrModerate)
+        // Freezing rain fallback: liquid precipitation at sub-zero temperature
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 2, convectivePrecipitation: nil, snowfallCentimeters: 0, gusts: nil, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: nil, categoricalFreezingRain: nil, temperature2m: -2, modelDtSeconds: 3600, latitude: 45) == .lightFreezingRain)
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 2, convectivePrecipitation: nil, snowfallCentimeters: 0, gusts: nil, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: nil, categoricalFreezingRain: nil, temperature2m: 2, modelDtSeconds: 3600, latitude: 45) == .lightRain)
+        // Snow at sub-zero temperature is not freezing rain
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 2, convectivePrecipitation: nil, snowfallCentimeters: 0.5, gusts: nil, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: nil, categoricalFreezingRain: nil, temperature2m: -2, modelDtSeconds: 3600, latitude: 45) == .moderateSnowfall)
+        // Fog turns to depositing rime fog below zero
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 0, convectivePrecipitation: nil, snowfallCentimeters: 0, gusts: nil, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: 500, categoricalFreezingRain: nil, temperature2m: -1, modelDtSeconds: 3600, latitude: 45) == .depositingRimeFog)
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 0, convectivePrecipitation: nil, snowfallCentimeters: 0, gusts: nil, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: 500, categoricalFreezingRain: nil, temperature2m: 1, modelDtSeconds: 3600, latitude: 45) == .fog)
+        #expect(WeatherCode.calculate(cloudcover: 100, precipitation: 0, convectivePrecipitation: nil, snowfallCentimeters: 0, gusts: nil, cape: nil, liftedIndex: nil, convectiveInhibition: nil, pblHeight: nil, visibilityMeters: 500, categoricalFreezingRain: nil, modelDtSeconds: 3600, latitude: 45) == .fog)
+    }
+
     @Test func wetbulbTemperature() {
         #expect(Meteorology.wetBulbTemperature(temperature: 10, relativeHumidity: 50).isApproximatelyEqual(to: 5.10125499, absoluteTolerance: 0.001))
         #expect(Meteorology.wetBulbTemperature(temperature: 5, relativeHumidity: 90).isApproximatelyEqual(to: 3.99465138, absoluteTolerance: 0.001))

@@ -168,6 +168,7 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 try await prefetchData(raw: .surface(.cape), time: time)
                 try await prefetchData(raw: .surface(.wind_gusts_10m), time: time)
                 try await prefetchData(raw: .surface(.visibility), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
             case .is_day:
                 break
             case .wet_bulb_temperature_2m:
@@ -263,6 +264,7 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 let cape = try await get(raw: .surface(.cape), time: time).data
                 let gusts = try await get(raw: .surface(.wind_gusts_10m), time: time).data
                 let visibility = try await get(raw: .surface(.visibility), time: time).data
+                let temperature = try await get(raw: .surface(.temperature_2m), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -275,6 +277,7 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
+                    temperature2m: temperature,
                     modelDtSeconds: time.dtSeconds,
                     latitude: reader.modelLat), .wmoCode
                 )

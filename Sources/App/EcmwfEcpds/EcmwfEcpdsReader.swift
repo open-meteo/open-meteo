@@ -169,6 +169,7 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             let cape = try await get(raw: .cape, time: time).data
             let cin = try await get(raw: .convective_inhibition, time: time).data
             let pbl = try await get(raw: .boundary_layer_height, time: time).data
+            let temperature = try await get(raw: .temperature_2m, time: time).data
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
@@ -181,6 +182,7 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
                 pblHeight: pbl,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
+                temperature2m: temperature,
                 modelDtSeconds: time.dtSeconds,
                 latitude: reader.modelLat), .wmoCode
             )
@@ -412,6 +414,7 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .cape, time: time)
             try await prefetchData(raw: .convective_inhibition, time: time)
             try await prefetchData(raw: .boundary_layer_height, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
         case .rain:
             try await prefetchData(raw: .precipitation, time: time)
             try await prefetchData(raw: .snowfall_water_equivalent, time: time)

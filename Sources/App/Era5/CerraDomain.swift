@@ -117,6 +117,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try await prefetchData(derived: .cloudcover, time: time)
             try await prefetchData(raw: .precipitation, time: time)
             try await prefetchData(derived: .snowfall, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
         case .is_day:
             break
         case .shortwave_radiation_instant:
@@ -222,6 +223,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let cloudcover = try await get(derived: .cloudcover, time: time).data
             let precipitation = try await get(raw: .precipitation, time: time).data
             let snowfall = try await get(derived: .snowfall, time: time).data
+            let temperature = try await get(raw: .temperature_2m, time: time).data
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
@@ -234,6 +236,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 pblHeight: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
+                temperature2m: temperature,
                 modelDtSeconds: time.dtSeconds,
                 latitude: reader.modelLat), .wmoCode
            )

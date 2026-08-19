@@ -150,6 +150,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try await prefetchData(raw: .surface(.showers), time: time)
                 try await prefetchData(raw: .surface(.cape), time: time)
                 try await prefetchData(raw: .surface(.wind_gusts_10m), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
             case .is_day:
                 break
             case .wet_bulb_temperature_2m:
@@ -299,6 +300,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let showers = try await get(raw: .surface(.showers), time: time).data
                 let cape = try await get(raw: .surface(.cape), time: time).data
                 let gusts = try await get(raw: .surface(.wind_gusts_10m), time: time).data
+                let temperature = try await get(raw: .surface(.temperature_2m), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -311,6 +313,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: nil,
                     categoricalFreezingRain: nil,
+                    temperature2m: temperature,
                     modelDtSeconds: time.dtSeconds,
                     latitude: reader.modelLat), .wmoCode
                 )

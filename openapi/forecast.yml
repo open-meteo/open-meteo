@@ -629,10 +629,10 @@ paths:
                 - kma_seamless
                 - kma_ldps
                 - kma_gdps
-                - icon_seamless
-                - icon_global
-                - icon_eu
-                - icon_d2
+                - dwd_icon_seamless
+                - dwd_icon_global
+                - dwd_icon_eu
+                - dwd_icon_d2
                 - cmc_gem_seamless
                 - cmc_gem_gdps
                 - cmc_gem_rdps
@@ -766,6 +766,19 @@ paths:
                         type: array
                         items:
                           type: integer
+                        description: >-
+                          WMO weather interpretation code. 0 = Clear sky, 1 = Mainly clear, 2 = Partly
+                          cloudy, 3 = Overcast, 45 = Fog, 48 = Depositing rime fog, 51 = Light drizzle, 53
+                          = Moderate drizzle, 55 = Dense drizzle, 56 = Light freezing drizzle, 57 = Dense
+                          freezing drizzle, 61 = Slight rain, 63 = Moderate rain, 65 = Heavy rain, 66 =
+                          Light freezing rain, 67 = Heavy freezing rain, 71 = Slight snowfall, 73 =
+                          Moderate snowfall, 75 = Heavy snowfall, 77 = Snow grains, 80 = Slight rain
+                          showers, 81 = Moderate rain showers, 82 = Violent rain showers, 85 = Slight snow
+                          showers, 86 = Heavy snow showers, 95 = Thunderstorm, 96 = Thunderstorm with
+                          slight hail, 97 = Heavy thunderstorm, 99 = Thunderstorm with heavy hail. Codes
+                          96 and 99 are only reported by models with an explicit hail forecast such as DWD
+                          ICON or UKMO; other models derive thunderstorms from instability parameters and
+                          report codes 95 and 97.
                       pressure_msl:
                         type: array
                         items:
@@ -3190,6 +3203,9 @@ paths:
                         type: array
                         items:
                           type: integer
+                        description: >-
+                          Most severe WMO weather interpretation code of the day (see hourly weather_code
+                          for the code table).
                       temperature_2m_max:
                         type: array
                         items:
@@ -3374,6 +3390,8 @@ paths:
                         format: float
                       weather_code:
                         type: integer
+                        description: >-
+                          WMO weather interpretation code (see hourly weather_code for the code table).
                       cloud_cover:
                         type: number
                         format: float
@@ -3488,6 +3506,8 @@ paths:
                         type: array
                         items:
                           type: integer
+                        description: >-
+                          WMO weather interpretation code (see hourly weather_code for the code table).
                       wind_speed_10m:
                         type: array
                         items:

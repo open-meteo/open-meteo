@@ -174,6 +174,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 try await prefetchData(variable: .cape, time: time)
                 try await prefetchData(variable: .visibility, time: time)
                 try await prefetchData(variable: .wind_gusts_10m, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
                 if reader.domain == .gdps {
                     try await prefetchData(variable: .showers, time: time)
                 }
@@ -294,6 +295,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let gusts = try await get(raw: .wind_gusts_10m, time: time).data
                 let visibility = try await get(raw: .visibility, time: time).data
                 let showers = reader.domain == .gdps ? try await get(raw: .showers, time: time).data : nil
+                let temperature = try await get(raw: .temperature_2m, time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -306,6 +308,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
+                    temperature2m: temperature,
                     modelDtSeconds: time.dtSeconds,
                     latitude: reader.modelLat), .wmoCode
                 )

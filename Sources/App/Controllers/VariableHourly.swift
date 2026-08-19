@@ -1313,7 +1313,9 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
                 convectiveInhibition: Reader.variableFromString("convective_inhibition"),
                 boundaryLayerHeight: Reader.variableFromString("boundary_layer_height"),
                 visibilityMeters: Reader.variableFromString("visibility"),
-                categoricalFreezingRain: Reader.variableFromString("categorical_freezing_rain")
+                categoricalFreezingRain: Reader.variableFromString("categorical_freezing_rain"),
+                temperature2m: Reader.variableFromString("temperature_2m"),
+                hail: Reader.variableFromString("hail")
             )
         case .shortwave_radiation_instant:
             guard let radiation = getDeriverMap(variable: .shortwave_radiation) else {
