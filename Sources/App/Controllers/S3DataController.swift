@@ -242,7 +242,7 @@ struct S3DataController: RouteCollection {
             guard let body else {
                 throw S3ApiError.expectedCompletionXMLBody
             }
-            let modifiedDate = req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? Date.now
+            let modifiedDate = try req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
             try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
@@ -283,7 +283,7 @@ struct S3DataController: RouteCollection {
             try await handle.resize(to: .bytes(Int64(body.readableBytes)))
             try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
             
-            let modifiedDate = req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? Date.now
+            let modifiedDate = try req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
             let ts = FileInfo.Timespec(seconds: Int(modifiedDate.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
             return modifiedDate
@@ -419,7 +419,7 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Date) async throws {
+    private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Timestamp) async throws {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(absolutePath), options: .modifyFile(createIfNecessary: false)) { handle in
@@ -536,7 +536,7 @@ struct S3DataController: RouteCollection {
         return await req.application.s3SyncManager.getQueues(buckets: servers)
     }
     
-    private func replicateSinglePut(req: Request, body: ByteBuffer, lastModified: Date) async throws {
+    private func replicateSinglePut(req: Request, body: ByteBuffer, lastModified: Timestamp) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
@@ -586,7 +586,7 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func replicateMultipartComplete(req: Request, uploadId: Int, body: ByteBuffer, lastModified: Date) async throws {
+    private func replicateMultipartComplete(req: Request, uploadId: Int, body: ByteBuffer, lastModified: Timestamp) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
@@ -717,26 +717,72 @@ extension S3List.ListV2Query {
     }
 }
 
-fileprivate extension String {
-    func parseLastModifiedDate() -> Date? {
-        if let unix = Double(self) {
-            return Date(timeIntervalSince1970: unix)
+extension String {
+    /// Formats from: "EEE, dd MMM yyyy HH:mm:ss GMT".. like `Wed, 19 Aug 2026 09:38:00 GMT`
+    func parseLastModifiedDate() throws -> Timestamp {
+        guard self.count == 29 else {
+            throw TimeError.InvalidDateFromat
         }
-        
-        let iso = ISO8601DateFormatter()
-        if let date = iso.date(from: self) {
-            return date
+        guard let day = Int(self[5..<7]), day >= 1, day <= 31 else {
+            throw TimeError.InvalidDate
         }
-        
-        let rfc1123 = DateFormatter.httpLastModifiedFormater
-        return rfc1123.date(from: self)
+        let month: Int
+        switch self[8..<11] {
+        case "Jan": month = 1
+        case "Feb": month = 2
+        case "Mar": month = 3
+        case "Apr": month = 4
+        case "May": month = 5
+        case "Jun": month = 6
+        case "Jul": month = 7
+        case "Aug": month = 8
+        case "Sep": month = 9
+        case "Oct": month = 10
+        case "Nov": month = 11
+        case "Dec": month = 12
+        default: throw TimeError.InvalidDate
+        }
+        guard let year = Int(self[12..<16]), year >= 1900, year <= 2200 else {
+            throw TimeError.InvalidDate
+        }
+        guard let hour = Int(self[17..<19]), hour >= 0, hour <= 23 else {
+            throw TimeError.InvalidDate
+        }
+        guard let minute = Int(self[20..<22]), minute >= 0, minute <= 59 else {
+            throw TimeError.InvalidDate
+        }
+        guard let second = Int(self[23..<25]), second >= 0, second <= 59 else {
+            throw TimeError.InvalidDate
+        }
+        guard self[25..<29] == " GMT" else {
+            throw TimeError.InvalidDate
+        }
+        return Timestamp(year, month, day, hour, minute, second)
     }
 }
 
-fileprivate extension Date {
+extension Timestamp {
     var lastModifiedHttpDateFormat: String {
-        let fmt = DateFormatter.httpLastModifiedFormater
-        return fmt.string(from: self)
+        var time = timeIntervalSince1970
+        var t = tm()
+        gmtime_r(&time, &t)
+        
+        // HTTP days of the week (0 = Sunday)
+        let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        let wdayStr = days[Int(t.tm_wday)]
+        
+        // HTTP months (0 = January)
+        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        let monthStr = months[Int(t.tm_mon)]
+        
+        let day = Int(t.tm_mday).zeroPadded(len: 2)
+        let year = Int(t.tm_year + 1900)
+        let hour = Int(t.tm_hour).zeroPadded(len: 2)
+        let minute = Int(t.tm_min).zeroPadded(len: 2)
+        let second = Int(t.tm_sec).zeroPadded(len: 2)
+        
+        // Formats to: "EEE, dd MMM yyyy HH:mm:ss GMT"
+        return "\(wdayStr), \(day) \(monthStr) \(year) \(hour):\(minute):\(second) GMT"
     }
 }
 
