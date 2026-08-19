@@ -78,7 +78,7 @@ extension Meteorology {
         return vaporPressureDeficit
     }
 
-    /// FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
+    /// Daily FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
     public static func et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, temperature2mCelsiusDailyMean: Float, windspeed10mMeterPerSecondMean: Float, shortwaveRadiationMJSum: Float, elevation: Float, extraTerrestrialRadiationSum: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
         /// short wave radiaton or use Hargreaves' radiation formula (Page 60)
         let Rs = shortwaveRadiationMJSum.isNaN ? 0.16 * sqrtf(temperature2mCelsiusDailyMax - temperature2mCelsiusDailyMin) * extraTerrestrialRadiationSum : shortwaveRadiationMJSum
@@ -137,16 +137,14 @@ extension Meteorology {
         // radiation balance
         let Rn = Rns - Rnl
 
-        /// soil heat flux [MJ m-2 day-1], During night, calculation is different
-        let Ghr = (Rs <= 0) ? 0.5 * Rn : 0.1 * Rn
-
-        // evapotranspiration
-        let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + γ * (37.0 / (temperature2mCelsiusDailyMean + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + γ * (1 + 0.34 * windspeed2m))
+        /// FAO-56 Equation 42 assumes soil heat flux G = 0 for daily and ten-day periods.
+        /// FAO-56 Equation 6 uses 900 for the aerodynamic term of the daily equation.
+        let et0 = (0.408 * vaporPressurCurveSlope * Rn + γ * (900.0 / (temperature2mCelsiusDailyMean + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + γ * (1 + 0.34 * windspeed2m))
 
         return max(et0, 0)
     }
 
-    /// FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
+    /// Hourly and sub-hourly FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
     public static func et0Evapotranspiration(temperature2mCelsius: Float, windspeed10mMeterPerSecond: Float, dewpointCelsius: Float, shortwaveRadiationWatts: Float, elevation: Float, extraTerrestrialRadiation: Float, dtSeconds: Int) -> Float {
         let Rs = shortwaveRadiationWatts
 
@@ -174,10 +172,10 @@ extension Meteorology {
         /// 0.23 is defined by FAO for albedo
         let albedo = Float(0.23)
 
-        /// net solar or shortwave radiation [MJ m-2 day-1], (Page 51)
+        /// net solar or shortwave radiation [MJ m-2 hour-1], (Page 51)
         let Rns = Rs * (1 - albedo) * 0.0864 / 24
 
-        /// clear-sky solar radiation [MJ m-2 day-1] approximated, (Page 51)
+        /// clear-sky solar radiation [W m-2] approximated for the relative radiation ratio, (Page 51)
         let Rso = (0.75 + 0.00002 * elevation) * extraTerrestrialRadiation
 
         let relativeHumidity = relativeHumidity(temperature: temperature2mCelsius, dewpoint: dewpointCelsius)
@@ -188,16 +186,17 @@ extension Meteorology {
         /// relative shortwave radiation (limited to ≤ 1.0
         let Rrel = extraTerrestrialRadiation <= 0 ? RrelAproximation : min(Rs / Rso, 1)
 
-        /// net outgoing longwave radiation [MJ m-2 day-1]
+        /// net outgoing longwave radiation [MJ m-2 hour-1]
         let Rnl = boltzmanConstant * powf(temperature2mCelsius + 273.16, 4) * (0.34 - 0.14 * sqrt(ea)) * (1.35 * Rrel - 0.35)
 
         // radiation balance
         let Rn = Rns - Rnl
 
-        /// soil heat flux [MJ m-2 day-1], During night, calculation is different
+        /// Hourly soil heat flux [MJ m-2 hour-1], using FAO-56 Equations 45 and 46.
         let Ghr = (Rs <= 0) ? 0.5 * Rn : 0.1 * Rn
 
-        // evapotranspiration
+        /// FAO-56 Equation 53 uses 37 for hourly and shorter calculation periods. This
+        /// calculates an hourly rate, which is scaled to the requested period below.
         let et0 = (0.408 * vaporPressurCurveSlope * (Rn - Ghr) + γ * (37.0 / (temperature2mCelsius + 273)) * windspeed2m * vaporPressureDeficit) / (vaporPressurCurveSlope + γ * (1 + 0.34 * windspeed2m))
 
         return max(et0 * Float(dtSeconds) / 3600, 0)
