@@ -79,9 +79,9 @@ extension Meteorology {
     }
 
     /// Daily FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
-    public static func et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, temperature2mCelsiusDailyMean: Float, windspeed10mMeterPerSecondMean: Float, shortwaveRadiationMJSum: Float, elevation: Float, extraTerrestrialRadiationSum: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
+    public static func et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, temperature2mCelsiusDailyMean: Float, windspeed10mMeterPerSecondMean: Float, shortwaveRadiationMJSum: Float, elevation: Float, extraTerrestrialRadiationMJSum: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
         /// short wave radiaton or use Hargreaves' radiation formula (Page 60)
-        let Rs = shortwaveRadiationMJSum.isNaN ? 0.16 * sqrtf(temperature2mCelsiusDailyMax - temperature2mCelsiusDailyMin) * extraTerrestrialRadiationSum : shortwaveRadiationMJSum
+        let Rs = shortwaveRadiationMJSum.isNaN ? 0.16 * sqrtf(temperature2mCelsiusDailyMax - temperature2mCelsiusDailyMin) * extraTerrestrialRadiationMJSum : shortwaveRadiationMJSum
 
         let windspeed2m = scaleWindFactor(from: 10, to: 2) * windspeed10mMeterPerSecondMean
 
@@ -126,10 +126,10 @@ extension Meteorology {
         let Rns = Rs * (1 - albedo)
 
         /// clear-sky solar radiation [MJ m-2 day-1] approximated, (Page 51)
-        let Rso = (0.75 + 0.00002 * elevation) * extraTerrestrialRadiationSum
+        let Rso = (0.75 + 0.00002 * elevation) * extraTerrestrialRadiationMJSum
 
         /// relative shortwave radiation (limited to ≤ 1.0. Although daily, could still happen at poles
-        let Rrel = extraTerrestrialRadiationSum <= 0 ? RrelAproximation : min(Rs / Rso, 1)
+        let Rrel = extraTerrestrialRadiationMJSum <= 0 ? RrelAproximation : min(Rs / Rso, 1)
 
         /// net outgoing longwave radiation [MJ m-2 day-1]
         let Rnl = boltzmanConstant * (powf(temperature2mCelsiusDailyMax + 273.16, 4) + powf(temperature2mCelsiusDailyMin + 273.16, 4)) / 2 * (0.34 - 0.14 * sqrt(ea)) * (1.35 * Rrel - 0.35)
