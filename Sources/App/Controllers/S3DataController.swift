@@ -367,7 +367,7 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.multipartUploadNotFound
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        if tempInfo.size % Int64(Self.multipartChunkSize) > 0 {
+//        if tempInfo.size % Int64(Self.multipartChunkSize) > 0 {
             let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
             let isLastPart = partNumber == numParts
             guard isLastPart || body.readableBytes <= Self.multipartChunkSize else {
@@ -376,11 +376,11 @@ struct S3DataController: RouteCollection {
             guard offset + Int64(body.readableBytes) <= tempInfo.size else {
                 throw S3ApiError.partExceedsAllocatedFileSize
             }
-        }
+//        }
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
-            if offset + Int64(body.readableBytes) < tempInfo.size {
-                try await handle.resize(to: .bytes(offset + Int64(body.readableBytes)))
-            }
+//            if offset + Int64(body.readableBytes) < tempInfo.size {
+//                try await handle.resize(to: .bytes(offset + Int64(body.readableBytes)))
+//            }
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
