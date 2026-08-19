@@ -1024,7 +1024,7 @@ extension Request {
         var headers: HTTPHeaders = [:]
 
         // Respond with lastModified header
-        headers.lastModified = HTTPHeaders.LastModified(file.modificationTimestamp.toDate())
+        headers.replaceOrAdd(name: .lastModified, value: file.modificationTimestamp.lastModifiedHttpDateFormat)
 
         headers.replaceOrAdd(name: .eTag, value: eTag)
 
