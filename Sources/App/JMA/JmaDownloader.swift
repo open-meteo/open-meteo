@@ -17,14 +17,8 @@ struct JmaDownload: AsyncCommand {
         @Option(name: "run")
         var run: String?
 
-        @Option(name: "past-days")
-        var pastDays: Int?
-
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
-
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        var upperLevel: Bool
 
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
