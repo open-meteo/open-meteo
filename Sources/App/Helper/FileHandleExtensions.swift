@@ -93,7 +93,7 @@ extension stat {
             let seconds = Double(st_mtimespec.tv_sec)
             let nanosends = Double(st_mtimespec.tv_nsec)
         #endif
-        return Date(timeIntervalSince1970: seconds + nanosends / 1_000_000)
+        return Date(timeIntervalSince1970: seconds + nanosends / 1_000_000_000)
     }
     
     /// Last modification time of the file
