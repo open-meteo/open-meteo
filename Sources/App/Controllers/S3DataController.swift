@@ -773,7 +773,6 @@ extension StringProtocol {
     /// Formats from: "EEE, dd MMM yyyy HH:mm:ss GMT".. like `2026-08-19T09:38:00.000Z`
     func parseXmlS3Date() throws -> Timestamp {
         let str = self
-        print(self.count)
         guard str.count == 24 else {
             throw TimeError.InvalidDateFromat
         }
@@ -792,7 +791,7 @@ extension StringProtocol {
         guard let minute = Int(str[14..<16]), minute >= 0, minute <= 59 else {
             throw TimeError.InvalidDate
         }
-        guard let second = Int(str[17..<18]), second >= 0, second <= 59 else {
+        guard let second = Int(str[17..<19]), second >= 0, second <= 59 else {
             throw TimeError.InvalidDate
         }
         return Timestamp(year, month, day, hour, minute, second)

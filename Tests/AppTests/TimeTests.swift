@@ -19,8 +19,8 @@ import Testing
     }
     
     @Test func s3XmlDate() throws {
-        let a = try "2026-08-19T09:38:00.123Z".parseXmlS3Date()
-        #expect(a.s3ListXmlDateFormat == "2026-08-19T09:38:00.000Z")
+        let a = try "2026-08-19T09:38:57.123Z".parseXmlS3Date()
+        #expect(a.s3ListXmlDateFormat == "2026-08-19T09:38:57.000Z")
     }
     
 

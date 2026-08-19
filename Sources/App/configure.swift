@@ -219,6 +219,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(SatelliteDownloadCommand(), as: "download-satellite")
     app.asyncCommands.use(MeteoSwissDownload(), as: "download-meteoswiss")
     app.asyncCommands.use(SyncCommand(), as: "sync")
+    app.asyncCommands.use(S3SyncCommand(), as: "s3-sync")
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")

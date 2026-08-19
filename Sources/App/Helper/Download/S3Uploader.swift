@@ -99,16 +99,17 @@ enum S3Uploader {
     /// `server` in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
     /// `basePath` offsets the object names relative to the local directory .e.g. `some-path/` in this example
     /// `exclude` can be used to exclude file names. Supports "*" and "?" wildcards
-    /*static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
+    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
         let logger = Logger(label: "S3Uploader")
-        let remoteRoot = basePath.hasSuffix("/") ? basePath : basePath + "/"
+        let normalizedBasePath = basePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let remoteRoot = normalizedBasePath.isEmpty ? "" : normalizedBasePath + "/"
         let serverBase = server.hasSuffix("/") ? String(server.dropLast()) : server
 
         struct LocalFile {
             let absolutePath: FilePath
             let remoteKey: String
             let size: Int
-            let modificationTime: Date
+            let modificationTime: Timestamp
         }
 
         // Step 1: Traverse local directory tree and collect all files.
@@ -124,7 +125,7 @@ enum S3Uploader {
                     if !exclude.isEmpty && exclude.contains(where: { name.matchesGlob($0) }) { continue }
                     if entry.type == .regular {
                         if let info = try await FileSystem.shared.info(forFileAt: entry.path) {
-                            let modTime = Date(timeIntervalSince1970: Double(info.lastDataModificationTime.seconds) + Double(info.lastDataModificationTime.nanoseconds) / 1_000_000_000)
+                            let modTime = Timestamp(Int(info.lastDataModificationTime.seconds))
                             localFiles.append(LocalFile(
                                 absolutePath: entry.path,
                                 remoteKey: remotePrefix + name,
@@ -155,7 +156,12 @@ enum S3Uploader {
 
         // Step 2: Fetch remote directory listings concurrently, max 4 S3 list operations at a time.
         let remoteListings = try await remotePrefixes.mapConcurrent(nConcurrent: 4) { prefix in
-            try await S3List.s3list(client: client, server: server, prefix: prefix, apikey: nil, deadLineHours: 1).files
+            try await S3List.s3list(
+                context: .init(server: server, client: client, logger: logger),
+                prefix: prefix,
+                apikey: nil,
+                deadLineHours: 1
+            ).files
         }
         var remoteFiles: [String: S3List.ListV2File] = [:]
         for files in remoteListings {
@@ -178,11 +184,31 @@ enum S3Uploader {
         let uploadStart = DispatchTime.now()
         logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
 
-        // Step 4: Upload 2 files concurrently.
+        // Step 4: Upload 4 files concurrently, with up to 16 parts in flight.
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 16)
-        let prepared = try await toUpload.mapConcurrent(nConcurrent: 4) { file in
-            let url = serverBase + "/" + file.remoteKey
-            return try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor)
+        let uploadResults: [Result<S3MultiPartUploadPrepared, any Error>] = await toUpload.mapConcurrent(nConcurrent: 4) { file in
+            let encodedRemoteKey = file.remoteKey
+                .split(separator: "/", omittingEmptySubsequences: false)
+                .map { String($0).awsPercentEncoded }
+                .joined(separator: "/")
+            let url = serverBase + "/" + encodedRemoteKey
+            do {
+                return .success(try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor))
+            } catch {
+                return .failure(error)
+            }
+        }
+        let prepared = uploadResults.compactMap { try? $0.get() }
+        if let uploadError = uploadResults.compactMap({ result -> (any Error)? in
+            guard case .failure(let error) = result else { return nil }
+            return error
+        }).first {
+            // Do not leave successful multipart preparations dangling if another
+            // file failed before the commit phase.
+            try? await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
+                try await prepared.abort(client: client)
+            }
+            throw uploadError
         }
         let uploadTime = Double(DispatchTime.now().uptimeNanoseconds - uploadStart.uptimeNanoseconds) / 1_000_000_000
         let rate = Double(totalBytes) / uploadTime
@@ -205,7 +231,7 @@ enum S3Uploader {
         }
         
         logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
-    }*/
+    }
 }
 
 /// Protocol of how a file can be chunked into 8 MB parts and upload as individual ByteBuffers. Unfortunately, `AsyncHTTPClient` only accepts ByteBuffers so a memory copy can not be avoided.
