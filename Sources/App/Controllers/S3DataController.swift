@@ -64,6 +64,9 @@ struct S3DataController: RouteCollection {
                 routes.on(.PUT, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.putObject)
                 routes.on(.POST, [PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.postObject)
                 routes.on(.DELETE, [PathComponent(stringLiteral: root), .catchall], use: self.deleteObject)
+                routes.on(.PUT, ["openmeteo", PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.putObject)
+                routes.on(.POST, ["openmeteo", PathComponent(stringLiteral: root), .catchall], body: .collect(maxSize: "9mb"), use: self.postObject)
+                routes.on(.DELETE, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.deleteObject)
             }
         }
     }
@@ -289,7 +292,7 @@ struct S3DataController: RouteCollection {
         try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         
         /// Full path `/somedir/object.ext`
-        let path = req.url.path
+        let path = req.url.path.dropPrefix("/openmeteo")
         /// Object directory `somedir/`
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
@@ -416,7 +419,7 @@ struct S3DataController: RouteCollection {
             try await handle.setLastDataModificationTime(to: ts)
         }
         /// Full path `/somedir/object.ext`
-        let path = req.url.path
+        let path = req.url.path.dropPrefix("/openmeteo")
         /// Object directory `somedir/`
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
@@ -621,6 +624,7 @@ struct S3DataController: RouteCollection {
             return nil
         }
         let directory: Substring
+        var path = path.dropPrefix("/openmeteo")
         if path.starts(with: "/data/") {
             directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
         } else if path.starts(with: "/data_run/") {
