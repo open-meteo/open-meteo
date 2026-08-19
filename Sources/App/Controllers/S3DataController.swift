@@ -246,7 +246,7 @@ struct S3DataController: RouteCollection {
             try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
-            return Response(status: .ok)
+            return makeUploadCompletedResponse()
         }
         
         throw S3ApiError.unsupportedPostOperation
@@ -367,7 +367,7 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.multipartUploadNotFound
         }
         let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-//        if tempInfo.size % Int64(Self.multipartChunkSize) > 0 {
+        if tempInfo.size % Int64(Self.multipartChunkSize) > 0 {
             let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
             let isLastPart = partNumber == numParts
             guard isLastPart || body.readableBytes <= Self.multipartChunkSize else {
@@ -376,11 +376,11 @@ struct S3DataController: RouteCollection {
             guard offset + Int64(body.readableBytes) <= tempInfo.size else {
                 throw S3ApiError.partExceedsAllocatedFileSize
             }
-//        }
+        }
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
-//            if offset + Int64(body.readableBytes) < tempInfo.size {
-//                try await handle.resize(to: .bytes(offset + Int64(body.readableBytes)))
-//            }
+            if offset + Int64(body.readableBytes) > tempInfo.size {
+                try await handle.resize(to: .bytes(offset + Int64(body.readableBytes)))
+            }
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
@@ -458,6 +458,17 @@ struct S3DataController: RouteCollection {
         var headers = HTTPHeaders()
         headers.add(name: "ETag", value: "\(body.readableBytesView.sha256Hex)")
         return Response(status: .ok, headers: headers)
+    }
+    
+    private func makeUploadCompletedResponse() -> Response {
+        let responseBody = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+        </CompleteMultipartUploadResult>
+        """
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/xml")
+        return Response(status: .ok, headers: headers, body: .init(string: responseBody))
     }
     
     private func authorizeReadRequest(req: Request, apikey: String?) throws {
