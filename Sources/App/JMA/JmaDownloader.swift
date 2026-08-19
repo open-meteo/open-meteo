@@ -464,7 +464,9 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
         case .geopotential_height:
             return .metre
         case .vertical_velocity:
-            return .metrePerSecond
+            // Stored in the provider-native pressure coordinate unit Pa/s and
+            // converted to geometric m/s by VariableHourlyDeriver.
+            return .undefined
         case .relative_humidity:
             return .percentage
         }
