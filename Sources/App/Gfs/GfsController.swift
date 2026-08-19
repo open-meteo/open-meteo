@@ -289,8 +289,6 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try await prefetchData(raw: .surface(.lifted_index), time: time)
                 try await prefetchData(raw: .surface(.convective_inhibition), time: time)
                 try await prefetchData(raw: .surface(.boundary_layer_height), time: time)
-                try await prefetchData(raw: .surface(.categorical_freezing_rain), time: time)
-                try await prefetchData(raw: .surface(.temperature_2m), time: time)
             case .is_day:
                 break
             case .temperature_120m:
@@ -463,7 +461,6 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let liftedIndex = try await get(raw: .surface(.lifted_index), time: time).data
                 let convective_inhibition = try await get(raw: .surface(.convective_inhibition), time: time).data
                 let boundary_layer_height = try await get(raw: .surface(.boundary_layer_height), time: time).data
-                let temperature = try await get(raw: .surface(.temperature_2m), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -476,7 +473,6 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                     pblHeight: boundary_layer_height,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: categoricalFreezingRain,
-                    temperature2m: temperature,
                     modelDtSeconds: time.dtSeconds,
                     latitude: reader.modelLat), .wmoCode
                 )

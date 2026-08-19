@@ -197,7 +197,6 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try await prefetchData(derived: .cloudcover, time: time)
             try await prefetchData(raw: .precipitation, time: time)
             try await prefetchData(derived: .snowfall, time: time)
-            try await prefetchData(raw: .temperature_2m, time: time)
         case .soil_moisture_0_to_100cm:
             try await prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
             try await prefetchData(raw: .soil_moisture_7_to_28cm, time: time)
@@ -352,7 +351,6 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let cloudcover = try await get(derived: .cloudcover, time: time).data
             let precipitation = try await get(raw: .precipitation, time: time).data
             let snowfall = try await get(derived: .snowfall, time: time).data
-            let temperature = try await get(raw: .temperature_2m, time: time).data
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
@@ -365,7 +363,6 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 pblHeight: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
-                temperature2m: temperature,
                 modelDtSeconds: time.dtSeconds,
                 latitude: reader.modelLat), .wmoCode
             )

@@ -185,7 +185,6 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try await prefetchData(variable: .cape, time: time)
                 try await prefetchData(variable: .visibility, time: time)
                 try await prefetchData(variable: .wind_gusts_10m, time: time)
-                try await prefetchData(variable: .temperature_2m, time: time)
             case .is_day:
                 break
             case .temperature_80m:
@@ -324,7 +323,6 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let cape = try await get(raw: .cape, time: time).data
                 let gusts = try await get(raw: .wind_gusts_10m, time: time).data
                 let visibility = try await get(raw: .visibility, time: time).data
-                let temperature = try await get(raw: .temperature_2m, time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -337,7 +335,6 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                     pblHeight: nil,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
-                    temperature2m: temperature,
                     modelDtSeconds: time.dtSeconds,
                     latitude: reader.modelLat), .wmoCode
                 )
