@@ -285,40 +285,37 @@ struct UkmoDownload: AsyncCommand {
                 let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
                 let data = try memory.readUkmoNetCDF()
                 logger.info("Processing \(data.name) [\(data.unit)]")
-                for (level, member, array2d) in data.data {
-                    var data = array2d.data
-                    if let scaling = variable.multiplyAdd {
-                        data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
-                    }
+                for (level, member, downloadedArray2d) in data.data {
+                    var array2d = variable.convertDownloadUnits(downloadedArray2d)
                     if let variable = variable as? UkmoSurfaceVariable {
                         if variable == .cloud_base {
-                            for i in data.indices {
-                                if data[i].isNaN {
-                                    data[i] = 0
+                            for i in array2d.data.indices {
+                                if array2d.data[i].isNaN {
+                                    array2d.data[i] = 0
                                 }
                             }
                         }
                         /// UKMO provides solar radiation as instant values. Convert to backwards averaged data.
                         if variable == .direct_radiation || variable == .shortwave_radiation {
                             let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                            for i in data.indices {
+                            for i in array2d.data.indices {
                                 if factor.data[i] < 0.05 {
                                     continue
                                 }
-                                data[i] /= factor.data[i]
+                                array2d.data[i] /= factor.data[i]
                             }
                         }
                         // UKMO provides freezing level as AGL. Convert to ASL
                         if variable == .freezing_level_height {
-                            for i in data.indices {
-                                data[i] += domainElevation[i]
+                            for i in array2d.data.indices {
+                                array2d.data[i] += domainElevation[i]
                             }
                         }
                         /// CIN is set to -1000 for no convection. Set to 0.
                         if variable == .convective_inhibition {
-                            for i in data.indices {
-                                if data[i] <= -999 {
-                                    data[i] = 0
+                            for i in array2d.data.indices {
+                                if array2d.data[i] <= -999 {
+                                    array2d.data[i] = 0
                                 }
                             }
                         }
@@ -328,7 +325,7 @@ struct UkmoDownload: AsyncCommand {
                         }
                     }
                     let variable = variable.withLevel(level: level)
-                    try await writer.write(member: member, variable: variable, data: data)
+                    try await writer.write(member: member, variable: variable, data: array2d.data)
                 }
             }
             if let writerProbabilities {

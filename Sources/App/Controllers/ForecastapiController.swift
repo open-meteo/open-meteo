@@ -1259,25 +1259,35 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
         case .bom_access_global_ensemble_mean:
             return .single(BomDomain.access_global_ensemble, VariableOrSpread<BomVariable>.self)
+        case .google_weathernext2_ensemble_mean:
+            return .single(WeatherNextDomain.weathernext_global_ensemble_mean, VariableOrSpread<WeatherNextVariable>.self)
         case .ukmo_global_ensemble_20km:
             return .single(UkmoDomain.global_ensemble_20km, UkmoGlobalEnsembleVariable.self)
         case .ukmo_uk_ensemble_2km:
             return .single(UkmoDomain.uk_ensemble_2km, UkmoUkvEnsembleVariable.self)
-        case .google_weathernext2_ensemble_mean:
-            return .single(WeatherNextDomain.weathernext_global_ensemble_mean, VariableOrSpread<WeatherNextVariable>.self)
         case .ukmo_global_ensemble_mean_20km:
             return .single(UkmoDomain.global_ensemble_mean_20km, VariableOrSpread<UkmoGlobalEnsembleVariable>.self)
         case .ukmo_uk_ensemble_mean_2km:
             return .single(UkmoDomain.uk_ensemble_mean_2km, VariableOrSpread<UkmoUkvEnsembleVariable>.self)
         case .ukmo_seamless:
-                return .multiple([
-                    (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
-                    (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
-                ])// , precipitationProb: UkmoDomain.global_ensemble_20km) // probabilities are not calculated for UK global ens
+            return .multiple([
+                (UkmoDomain.global_ensemble_20km, ProbabilityVariable.self),
+                (UkmoDomain.uk_ensemble_2km, ProbabilityVariable.self),
+                (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
+                (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+            ])
         case .ukmo_uk_deterministic_2km:
-            return .single(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+            return .singleWithPrecipitationProbability(
+                UkmoDomain.uk_deterministic_2km,
+                UkmoVariable.self,
+                precipitationProb: UkmoDomain.uk_ensemble_2km
+            )
         case .ukmo_global_deterministic_10km:
-            return .single(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self)
+            return .singleWithPrecipitationProbability(
+                UkmoDomain.global_deterministic_10km,
+                SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self,
+                precipitationProb: UkmoDomain.global_ensemble_20km
+            )
         case .meteoswiss_icon_ch1:
             return .singleWithPrecipitationProbability(MeteoSwissDomain.icon_ch1, MeteoSwissVariable.self, precipitationProb: MeteoSwissDomain.icon_ch1_ensemble)
         case .meteoswiss_icon_ch2:

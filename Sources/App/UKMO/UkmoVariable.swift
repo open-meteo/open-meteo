@@ -712,6 +712,17 @@ protocol UkmoVariableDownloadable: GenericVariable {
     func withLevel(level: Float) -> Self
 }
 
+extension UkmoVariableDownloadable {
+    func convertDownloadUnits(_ input: Array2D) -> Array2D {
+        guard let scaling = multiplyAdd else {
+            return input
+        }
+        var output = input
+        output.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+        return output
+    }
+}
+
 enum UkmoGlobalDeterministicSurfaceVariable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case cloud_cover
