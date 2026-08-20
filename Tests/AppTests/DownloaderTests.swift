@@ -57,7 +57,7 @@ import SystemPackage
 
         try Data("new".utf8).write(to: directoryUrl.appendingPathComponent("new-file"))
         let refreshTime = Timestamp.now().add(OmFileSystemLocal.revalidateBackgroundInterval + 1)
-        try await root.updateRecursivelyIfRequired(now: refreshTime)
+        await root.updateRecursivelyIfRequired(now: refreshTime)
 
         #expect(await dataDirectory.getFile(name: "new-file") != nil)
     }
@@ -214,7 +214,7 @@ import SystemPackage
         defer { let _ = client.shutdown() }
 
         let data = randomData(byteCount: 1 * 1024 * 1024)
-        try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin")
+        try await S3Uploader.upload(client: client, data: data, url: "\(server)test/s3uploader-single.bin", lastModified: .now())
     }
 
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
@@ -228,7 +228,7 @@ import SystemPackage
 
         let data = ByteBuffer(data: randomData(byteCount: 10 * 1024 * 1024))
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 8)
-        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin", executor: executor).commit(client: client)
+        try await S3Uploader.uploadMultipart(client: client, data: data, url: "\(server)test/s3uploader-multipart.bin", lastModified: .now(), executor: executor).commit(client: client)
     }
     
     /// Multipart upload — 10 MB splits into two 8 MB / 2 MB parts.
@@ -261,7 +261,7 @@ import SystemPackage
         ]
 
         for upload in uploads {
-            await manager.upload(data: upload.data, objectName: "test/s3uploader-three-\(upload.suffix).bin", contentType: "application/octet-stream")
+            await manager.upload(data: upload.data, objectName: "test/s3uploader-three-\(upload.suffix).bin", contentType: "application/octet-stream", lastModified: .now())
         }
 
         // Ensure all queued uploads complete before ending the test.
