@@ -639,6 +639,7 @@ private struct VariableHourlyDerivationCompatibility {
     let omitsConvectivePrecipitationFromWeatherCode: Bool
     let shortwaveRadiationScale: Float?
     let pressureLevelGeopotentialHeightScale: Float?
+    let convertsPressureLevelVerticalVelocity: Bool
     let usesLegacyIconEpsRadiationStorage: Bool
 
     private init(
@@ -646,12 +647,14 @@ private struct VariableHourlyDerivationCompatibility {
         omitsConvectivePrecipitationFromWeatherCode: Bool = false,
         shortwaveRadiationScale: Float? = nil,
         pressureLevelGeopotentialHeightScale: Float? = nil,
+        convertsPressureLevelVerticalVelocity: Bool = false,
         usesLegacyIconEpsRadiationStorage: Bool = false
     ) {
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
         self.shortwaveRadiationScale = shortwaveRadiationScale
         self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
+        self.convertsPressureLevelVerticalVelocity = convertsPressureLevelVerticalVelocity
         self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
     }
 
@@ -690,7 +693,10 @@ private struct VariableHourlyDerivationCompatibility {
              .meteofrance_arpege_world025:
             self = .init(shortwaveRadiationScale: MeteoFranceSurfaceVariable.shortwaveRadiationArchiveCorrectionFactor)
         case .jma_gsm, .jma_msm_upper_level:
-            self = .init(pressureLevelGeopotentialHeightScale: 9.80665)
+            self = .init(
+                pressureLevelGeopotentialHeightScale: 9.80665,
+                convertsPressureLevelVerticalVelocity: true
+            )
         case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
             self = .init(usesLegacyIconEpsRadiationStorage: true)
         default:
@@ -825,6 +831,23 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         let pressure = variable.variable
         // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
         if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
+            if compatibility.convertsPressureLevelVerticalVelocity,
+               pressure.variable == .vertical_velocity {
+                guard let temperature = pressureLevelInput(.temperature, at: pressure.level) else {
+                    return nil
+                }
+                // JMA archives store pressure vertical velocity (omega) in Pa/s.
+                // Convert at read time so historical and newly downloaded files use
+                // the same on-disk representation.
+                return .two(input, temperature) { omega, temperature, _ in
+                    let verticalVelocity = Meteorology.verticalVelocityPressureToGeometric(
+                        omega: omega.data,
+                        temperature: temperature.data,
+                        pressureLevel: Float(pressure.level)
+                    )
+                    return DataAndUnit(verticalVelocity, .metrePerSecondNotUnitConverted)
+                }
+            }
             if let scale = compatibility.pressureLevelGeopotentialHeightScale,
                pressure.variable == .geopotential_height {
                 // Preserve the legacy JMA API conversion applied after download-time scaling.

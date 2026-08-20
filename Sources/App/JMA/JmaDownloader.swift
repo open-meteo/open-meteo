@@ -17,14 +17,8 @@ struct JmaDownload: AsyncCommand {
         @Option(name: "run")
         var run: String?
 
-        @Option(name: "past-days")
-        var pastDays: Int?
-
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
-
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        var upperLevel: Bool
 
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
@@ -464,7 +458,9 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
         case .geopotential_height:
             return .metre
         case .vertical_velocity:
-            return .metrePerSecond
+            // Stored in the provider-native pressure coordinate unit Pa/s and
+            // converted to geometric m/s by VariableHourlyDeriver.
+            return .undefined
         case .relative_humidity:
             return .percentage
         }
@@ -579,7 +575,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         case .msm:
             return []
         case .msm_upper_level:
-            return [1000, 975, 950, 529, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
+            return [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
         }
     }
 
