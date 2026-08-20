@@ -126,6 +126,57 @@ protocol RawRepresentableString {
     var rawValue: String { get }
 }
 
+/// Combines two explicit variable schemas without claiming that either source stores the other's fields.
+enum VariableSchemaUnion<Primary: Sendable, Supplemental: Sendable>: Sendable {
+    case primary(Primary)
+    case supplemental(Supplemental)
+}
+
+extension VariableSchemaUnion: RawRepresentableString
+where Primary: RawRepresentableString, Supplemental: RawRepresentableString {
+    init?(rawValue: String) {
+        if let primary = Primary(rawValue: rawValue) {
+            self = .primary(primary)
+            return
+        }
+        if let supplemental = Supplemental(rawValue: rawValue) {
+            self = .supplemental(supplemental)
+            return
+        }
+        return nil
+    }
+
+    var rawValue: String {
+        switch self {
+        case .primary(let variable): return variable.rawValue
+        case .supplemental(let variable): return variable.rawValue
+        }
+    }
+}
+
+extension VariableSchemaUnion: Hashable, Equatable
+where Primary: Hashable, Supplemental: Hashable {}
+
+extension VariableSchemaUnion: GenericVariable
+where Primary: GenericVariable, Supplemental: GenericVariable {
+    private var variable: any GenericVariable {
+        switch self {
+        case .primary(let variable): return variable
+        case .supplemental(let variable): return variable
+        }
+    }
+
+    var storePreviousForecast: Bool { variable.storePreviousForecast }
+    var omFileName: (file: String, level: Int) { variable.omFileName }
+    var scalefactor: Float { variable.scalefactor }
+    var interpolation: ReaderInterpolation { variable.interpolation }
+    var unit: SiUnit { variable.unit }
+    var isElevationCorrectable: Bool { variable.isElevationCorrectable }
+}
+
+extension VariableSchemaUnion: GenericVariableMixable
+where Primary: GenericVariableMixable, Supplemental: GenericVariableMixable {}
+
 /// Enum with surface and pressure variable
 enum SurfaceAndPressureVariable<Surface: Sendable, Pressure: Sendable>: Sendable
 {
