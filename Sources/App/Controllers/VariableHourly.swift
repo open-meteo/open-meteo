@@ -512,11 +512,11 @@ extension ForecastVariable {
 }
 
 extension GenericDomain {
-    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<Self, Variable>? {
+    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<GenericReaderCached<Self, Variable>>? {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     func makeWeeklyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
@@ -539,7 +539,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     /// Make a default reader for a single domain with hourly data
@@ -553,7 +553,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
-        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
     
@@ -561,7 +561,7 @@ extension GenericDomain {
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
-        let hourly = VariableHourlyDeriver<Self, Variable>(reader: GenericReaderCached(reader: reader), options: options)
+        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
     }
 }
@@ -616,34 +616,139 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
     }
 }
 
-struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & Hashable>: GenericDeriverProtocol {
-    typealias VariableOpt = ForecastVariable
-    typealias Reader = GenericReaderCached<Domain, Variable>
-    
-    let reader: Reader
-    let options: GenericReaderOptions
+private typealias SurroundingPressureLevels = (lowerLevel: Int, upperLevel: Int)
 
-    private var isMeteoFranceForecastDomain: Bool {
-        switch reader.domain.domainRegistry {
+/// API pressure levels that must be interpolated because a domain does not store them directly.
+private let pressureLevelInterpolationTable: [DomainRegistry: [Int: SurroundingPressureLevels]] = [
+    .dwd_icon: [975: (950, 1000)],
+    .dwd_icon_eu: [975: (950, 1000)],
+    .dwd_icon_d2: [
+        800: (700, 850),
+        900: (850, 950),
+        925: (850, 950),
+    ],
+]
+
+private struct VariableHourlyDerivationCompatibility {
+    enum ConvectivePrecipitation: Equatable {
+        case storedShowers
+        case zeroWherePrecipitationIsAvailable
+    }
+
+    let convectivePrecipitation: ConvectivePrecipitation
+    let omitsConvectivePrecipitationFromWeatherCode: Bool
+    let shortwaveRadiationScale: Float?
+    let pressureLevelGeopotentialHeightScale: Float?
+    let convertsPressureLevelVerticalVelocity: Bool
+    let usesLegacyIconEpsRadiationStorage: Bool
+
+    private init(
+        convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
+        omitsConvectivePrecipitationFromWeatherCode: Bool = false,
+        shortwaveRadiationScale: Float? = nil,
+        pressureLevelGeopotentialHeightScale: Float? = nil,
+        convertsPressureLevelVerticalVelocity: Bool = false,
+        usesLegacyIconEpsRadiationStorage: Bool = false
+    ) {
+        self.convectivePrecipitation = convectivePrecipitation
+        self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
+        self.shortwaveRadiationScale = shortwaveRadiationScale
+        self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
+        self.convertsPressureLevelVerticalVelocity = convertsPressureLevelVerticalVelocity
+        self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
+    }
+
+    private static func gfs(
+        convectivePrecipitation: ConvectivePrecipitation = .storedShowers
+    ) -> Self {
+        return .init(convectivePrecipitation: convectivePrecipitation)
+    }
+
+    init(domain: DomainRegistry) {
+        switch domain {
+        case .ncep_gfs013:
+            self = .gfs()
+        case .ncep_gfs025:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_nam_conus,
+             .ncep_gefs025,
+             .ncep_gefs05,
+             .ncep_gefs025_ensemble_mean,
+             .ncep_gefs05_ensemble_mean:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_hrrr_conus:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_hrrr_conus_15min:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_nbm_conus:
+            self = .init(
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true
+            )
         case .meteofrance_arome_france0025,
              .meteofrance_arome_france_hd,
              .meteofrance_arome_france0025_15min,
              .meteofrance_arome_france_hd_15min,
              .meteofrance_arpege_europe,
              .meteofrance_arpege_world025:
-            return true
+            self = .init(shortwaveRadiationScale: MeteoFranceSurfaceVariable.shortwaveRadiationArchiveCorrectionFactor)
+        case .jma_gsm, .jma_msm_upper_level:
+            self = .init(
+                pressureLevelGeopotentialHeightScale: 9.80665,
+                convertsPressureLevelVerticalVelocity: true
+            )
+        case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
+            self = .init(usesLegacyIconEpsRadiationStorage: true)
         default:
-            return false
+            self = .init()
+        }
+    }
+}
+
+struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
+    typealias VariableOpt = ForecastVariable
+
+    let reader: Reader
+    let options: GenericReaderOptions
+    private let compatibility: VariableHourlyDerivationCompatibility
+    private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
+
+    init(
+        reader: Reader,
+        options: GenericReaderOptions,
+        domainRegistry: DomainRegistry
+    ) {
+        self.reader = reader
+        self.options = options
+        self.compatibility = .init(domain: domainRegistry)
+        self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
+    }
+
+    private func convectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        switch compatibility.convectivePrecipitation {
+        case .zeroWherePrecipitationIsAvailable:
+            guard let precipitation = Reader.variableFromString("precipitation") else {
+                return nil
+            }
+            return .mapped(.one(.raw(precipitation)) { precipitation, _ in
+                return Self.zeroPrecipitationComponent(precipitation)
+            })
+        case .storedShowers:
+            return Reader.variableFromString("showers").map { .raw($0) }
         }
     }
 
-    private var isJmaForecastDomain: Bool {
-        switch reader.domain.domainRegistry {
-        case .jma_gsm, .jma_msm_upper_level:
-            return true
-        default:
-            return false
+    private func weatherCodeConvectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        // The legacy NBM adapter deliberately passed nil here, which is not equivalent to a zero
+        // value in the thunderstorm confidence calculation.
+        guard !compatibility.omitsConvectivePrecipitationFromWeatherCode else {
+            return nil
         }
+        return convectivePrecipitationInput()
+    }
+
+    static func zeroPrecipitationComponent(_ precipitation: DataAndUnit) -> DataAndUnit {
+        return DataAndUnit(precipitation.data.map { $0 * 0 }, precipitation.unit)
     }
 
     private func shortwaveRadiationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
@@ -651,28 +756,13 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return nil
         }
 
-        if isMeteoFranceForecastDomain {
+        if let scale = compatibility.shortwaveRadiationScale {
             return .mapped(.one(.raw(shortwave)) { shortwave, _ in
-                let correctionFactor = MeteoFranceSurfaceVariable.shortwaveRadiationArchiveCorrectionFactor
-                return DataAndUnit(shortwave.data.map { $0 * correctionFactor }, shortwave.unit)
+                return DataAndUnit(shortwave.data.map { $0 * scale }, shortwave.unit)
             })
         }
 
         return .raw(shortwave)
-    }
-
-    /// These levels are valid API inputs but are not stored by the corresponding ICON domains.
-    static func iconPressureLevelInterpolation(domain: DomainRegistry, level: Int) -> (lowerLevel: Int, upperLevel: Int)? {
-        switch (domain, level) {
-        case (.dwd_icon, 975), (.dwd_icon_eu, 975):
-            return (950, 1000)
-        case (.dwd_icon_d2, 800):
-            return (700, 850)
-        case (.dwd_icon_d2, 900), (.dwd_icon_d2, 925):
-            return (850, 950)
-        default:
-            return nil
-        }
     }
 
     /// Resolve a pressure-level field to either its stored raw variable or a finite interpolation graph (only ICON).
@@ -682,7 +772,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return Reader.variableFromString("\(variable.rawValue)_\(level)hPa").map { .raw($0) }
         }
 
-        guard let interpolation = Self.iconPressureLevelInterpolation(domain: reader.domain.domainRegistry, level: level) else {
+        guard let interpolation = pressureLevelInterpolations[level] else {
             return raw()
         }
 
@@ -741,10 +831,28 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         let pressure = variable.variable
         // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
         if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
-            if isJmaForecastDomain && pressure.variable == .geopotential_height {
+            if compatibility.convertsPressureLevelVerticalVelocity,
+               pressure.variable == .vertical_velocity {
+                guard let temperature = pressureLevelInput(.temperature, at: pressure.level) else {
+                    return nil
+                }
+                // JMA archives store pressure vertical velocity (omega) in Pa/s.
+                // Convert at read time so historical and newly downloaded files use
+                // the same on-disk representation.
+                return .two(input, temperature) { omega, temperature, _ in
+                    let verticalVelocity = Meteorology.verticalVelocityPressureToGeometric(
+                        omega: omega.data,
+                        temperature: temperature.data,
+                        pressureLevel: Float(pressure.level)
+                    )
+                    return DataAndUnit(verticalVelocity, .metrePerSecondNotUnitConverted)
+                }
+            }
+            if let scale = compatibility.pressureLevelGeopotentialHeightScale,
+               pressure.variable == .geopotential_height {
                 // Preserve the legacy JMA API conversion applied after download-time scaling.
                 return .one(input) { geopotentialHeight, _ in
-                    return DataAndUnit(geopotentialHeight.data.map { $0 * 9.80665 }, geopotentialHeight.unit)
+                    return DataAndUnit(geopotentialHeight.data.map { $0 * scale }, geopotentialHeight.unit)
                 }
             }
             return .from(input: input)
@@ -802,7 +910,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
     
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
-        if reader.domain.domainRegistry == .dwd_icon_eps || reader.domain.domainRegistry == .dwd_icon_eps_ensemble_mean {
+        if compatibility.usesLegacyIconEpsRadiationStorage {
             switch variable {
             case .shortwave_radiation:
                 guard
@@ -836,7 +944,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
 
         let rawVariable = Reader.variableFromString(variable.rawValue)
 
-        // corrections for ICON if elevation difference exceeds 100m
+        // corrections if elevation difference exceeds 100m
         if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
             switch variable {
             case .snowfall_water_equivalent:
@@ -874,6 +982,12 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             default:
                 break
             }
+        }
+
+        // Some NCEP domains do not store showers; synthesize zero where precipitation is available.
+        if variable == .showers, compatibility.convectivePrecipitation == .zeroWherePrecipitationIsAvailable,
+           let convectivePrecipitation = convectivePrecipitationInput() {
+            return .from(input: convectivePrecipitation)
         }
 
         if let rawVariable {
@@ -1265,8 +1379,8 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             else {
                 return nil
             }
-            if let showers = Reader.variableFromString("showers") {
-                return .three(.raw(precip), .mapped(snowwater), .raw(showers)) { precip, snowwater, showers, _ in
+            if let showers = convectivePrecipitationInput() {
+                return .three(.raw(precip), .mapped(snowwater), showers) { precip, snowwater, showers, _ in
                     let rain = zip(precip.data, zip(snowwater.data, showers.data)).map({
                         return max($0.0 - $0.1.0 - ($0.1.1.isNaN ? 0 : $0.1.1), 0)
                     })
@@ -1305,7 +1419,7 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
             return .weatherCode(
                 cloudcover: .mapped(cloudCover),
                 precipitation: precipitation,
-                convectivePrecipitation: Reader.variableFromString("showers"),
+                convectivePrecipitation: weatherCodeConvectivePrecipitationInput(),
                 snowfallCentimeters: .mapped(snowfall),
                 gusts: Reader.variableFromString("wind_gusts_10m"),
                 cape: Reader.variableFromString("cape"),
