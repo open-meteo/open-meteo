@@ -42,15 +42,15 @@ struct S3UploadQueue {
         }
     }
     
-    func upload<D: DataProtocol & Sendable>(data: D, objectName: String, contentType: String = "application/octet-stream") async {
+    func upload<D: DataProtocol & Sendable>(data: D, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
         await queue.enqueueIgnoreError(logger: logger) {
-            try await S3Uploader.upload(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType)
+            try await S3Uploader.upload(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified)
         }
     }
     
-    func upload(buffer: ByteBuffer, objectName: String, contentType: String = "application/octet-stream") async {
+    func upload(buffer: ByteBuffer, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
         await queue.enqueueIgnoreError(logger: logger) {
-            try await S3Uploader.upload(client: client, buffer: buffer, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType)
+            try await S3Uploader.upload(client: client, buffer: buffer, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified)
         }
     }
 
@@ -96,15 +96,15 @@ struct S3MultiFileUploadQueue {
         self.endpoint = endpoint
     }
     
-    func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream") async {
+    func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
         await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
-            try await S3Uploader.uploadMultipart(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, executor: partUploadExecutor)
+            try await S3Uploader.uploadMultipart(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified, executor: partUploadExecutor)
         }
     }
     
-    func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream") async {
+    func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
         await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
-            try await S3Uploader.uploadMultipart(client: client, file: file, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, executor: partUploadExecutor)
+            try await S3Uploader.uploadMultipart(client: client, file: file, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified, executor: partUploadExecutor)
         }
     }
 
@@ -112,7 +112,7 @@ struct S3MultiFileUploadQueue {
         guard shouldUploadTimeSeriesFile(file) else {
             return
         }
-        await uploadMultipart(file: file.getFilePath(), objectName: "data/\(file.getRelativeFilePath())")
+        await uploadMultipart(file: file.getFilePath(), objectName: "data/\(file.getRelativeFilePath())", lastModified: .now())
     }
 
     private func shouldUploadTimeSeriesFile(_ file: OmFileType) -> Bool {

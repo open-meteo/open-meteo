@@ -239,7 +239,7 @@ struct S3DataController: RouteCollection {
             guard let body else {
                 throw S3ApiError.expectedCompletionXMLBody
             }
-            let modifiedDate = try req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
             try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
@@ -280,7 +280,7 @@ struct S3DataController: RouteCollection {
             try await handle.resize(to: .bytes(Int64(body.readableBytes)))
             try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
             
-            let modifiedDate = try req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
             let ts = FileInfo.Timespec(seconds: Int(modifiedDate.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
             return modifiedDate
@@ -295,7 +295,7 @@ struct S3DataController: RouteCollection {
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
         
         for queue in await lazyReplicationQueues(req) {
-            await queue.upload(buffer: body, objectName: String(path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
+            await queue.upload(buffer: body, objectName: String(path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream", lastModified: modifiedDate)
         }
     }
     
@@ -421,7 +421,7 @@ struct S3DataController: RouteCollection {
         
         for queue in await lazyReplicationQueues(req) {
             let session = queue.startMultiPartUploads()
-            await session.uploadMultipart(file: absolutePath, objectName: String(path.dropFirst(1)))
+            await session.uploadMultipart(file: absolutePath, objectName: String(path.dropFirst(1)), lastModified: lastModified)
             await queue.finishMultiPartUploads(session)
         }
     }
@@ -538,7 +538,7 @@ struct S3DataController: RouteCollection {
             if let contentType = req.headers.first(name: .contentType) {
                 request.headers.add(name: .contentType, value: contentType)
             }
-            request.headers.add(name: "x-last-modified", value: lastModified.lastModifiedHttpDateFormat)
+            request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
@@ -587,7 +587,7 @@ struct S3DataController: RouteCollection {
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentType, value: "application/xml")
-            request.headers.add(name: "x-last-modified", value: lastModified.lastModifiedHttpDateFormat)
+            request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
@@ -837,6 +837,7 @@ enum S3ApiError: AbortError, Equatable {
     case missingSha256HashHeader
     case invalidRequestSignature
     case unknownAccessKey
+    case invalidXAmzMetaMtimeHeaderValue
     
     var status: NIOHTTP1.HTTPResponseStatus {
         switch self {
@@ -905,6 +906,8 @@ enum S3ApiError: AbortError, Equatable {
             return "Invalid request signature"
         case .unknownAccessKey:
             return "Unknown access key"
+        case .invalidXAmzMetaMtimeHeaderValue:
+            return "Invalid x-amz-meta-mtime header value"
         }
     }
 }
@@ -1118,6 +1121,20 @@ extension Request {
             }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
         }
         return response
+    }
+}
+
+extension HTTPHeaders {
+    /// rclone encodes modification time in `x-amz-meta-mtime` as a floating point seconds past epoch
+    /// Nil is header is not set, throws is malformated
+    func  getXAmzMetaMtime() throws -> Timestamp? {
+        guard let seconds = self.first(name: "x-amz-meta-mtime") else {
+            return nil
+        }
+        guard let seconds = Double(seconds) else {
+            throw S3ApiError.invalidXAmzMetaMtimeHeaderValue
+        }
+        return Timestamp(Int(seconds))
     }
 }
 

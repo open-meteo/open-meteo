@@ -214,6 +214,7 @@ actor OmSpatialTimestepWriter {
                     client: client,
                     file: filename,
                     url: endpoint.uploadURL(remotePath: remoteFile),
+                    lastModified: .now(),
                     executor: executor
                 )
                 try await prepared.commit(client: client)
@@ -222,7 +223,8 @@ actor OmSpatialTimestepWriter {
                         client: client,
                         data: metaUpload.data,
                         url: endpoint.uploadURL(remotePath: metaUpload.objectName),
-                        contentType: "application/json"
+                        contentType: "application/json",
+                        lastModified: .now()
                     )
                 }
                 logger.info("AWS spatial upload to \(endpoint) took \(uploadStart.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")

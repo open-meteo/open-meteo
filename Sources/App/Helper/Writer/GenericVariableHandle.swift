@@ -96,7 +96,7 @@ struct GenericVariableHandle: Sendable {
                 try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
                 let metaData = try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
                 for upload in uploadQueues ?? [] {
-                    await upload.upload(data: metaData, objectName: "data/\(domain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json")
+                    await upload.upload(data: metaData, objectName: "data/\(domain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json", lastModified: .now())
                 }
             }
         }
@@ -143,7 +143,7 @@ struct GenericVariableHandle: Sendable {
         }
         let objectName = "data_run/\(file.getRelativeFilePath())"
         for queue in queues {
-            await queue.uploadMultipart(file: file.getFilePath(), objectName: objectName)
+            await queue.uploadMultipart(file: file.getFilePath(), objectName: objectName, lastModified: .now())
         }
     }
 
@@ -152,7 +152,7 @@ struct GenericVariableHandle: Sendable {
             return
         }
         for queue in queues {
-            await queue.upload(data: data, objectName: meta.s3ObjectName, contentType: "application/json")
+            await queue.upload(data: data, objectName: meta.s3ObjectName, contentType: "application/json", lastModified: .now())
         }
     }
 
