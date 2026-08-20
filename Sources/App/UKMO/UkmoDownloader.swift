@@ -286,7 +286,10 @@ struct UkmoDownload: AsyncCommand {
                 let data = try memory.readUkmoNetCDF()
                 logger.info("Processing \(data.name) [\(data.unit)]")
                 for (level, member, downloadedArray2d) in data.data {
-                    var array2d = variable.convertDownloadUnits(downloadedArray2d)
+                    var array2d = downloadedArray2d
+                    if let scaling = variable.multiplyAdd {
+                        array2d.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+                    }
                     if let variable = variable as? UkmoSurfaceVariable {
                         if variable == .cloud_base {
                             for i in array2d.data.indices {
