@@ -805,6 +805,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_icon_global_native
+    case dwd_icon_d2_native
+    case dwd_icon_d2_native_15min
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
@@ -1150,8 +1153,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard let reader = forecast.readers.first else {
                     return nil
                 }
-                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([prob].compactMap { $0 } + [reader])
+                let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + [reader])
             case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
@@ -1398,6 +1401,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ])
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return .singleWithPrecipitationProbability(IconDomains.icon, IconVariable.self, precipitationProb: IconDomains.iconEps)
+        case .dwd_icon_global_native:
+            return .singleWithPrecipitationProbability(
+                IconDomains.iconNative,
+                IconVariable.self,
+                precipitationProb: IconDomains.iconEps
+            )
         case .icon_eu, .dwd_icon_eu:
             return .singleWithPrecipitationProbability(IconDomains.iconEu, IconVariable.self, precipitationProb: IconDomains.iconEuEps)
         case .icon_d2, .dwd_icon_d2:
@@ -1410,6 +1419,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             )
         case .dwd_icon_d2_15min:
             return .single(IconDomains.iconD2_15min, IconVariable.self)
+        case .dwd_icon_d2_native:
+            return .singleWithSupplementalDomains(
+                IconDomains.iconD2Native,
+                IconVariable.self,
+                lowerPriority: [],
+                higherPriority: [(IconDomains.iconD2Native15min, IconVariable.self)],
+                precipitationProb: IconDomains.iconD2Eps
+            )
+        case .dwd_icon_d2_native_15min:
+            return .single(IconDomains.iconD2Native15min, IconVariable.self)
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .multiple([
                 (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
@@ -2008,6 +2027,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .dwd_icon_d2_15min:
             return [] // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+            return [] // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs025:
@@ -2285,6 +2306,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+            return nil // migrated
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
         case .ecmwf_ifs025:
@@ -2541,6 +2564,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_d2, .dwd_icon_d2:
             return nil // migrated
         case .dwd_icon_d2_15min:
+            return nil // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
             return nil // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)

@@ -86,6 +86,9 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_icon_global_native
+    case dwd_icon_d2_native
+    case dwd_icon_d2_native_15min
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
@@ -356,6 +359,12 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
+        case .dwd_icon_global_native:
+            return IconDomains.iconNative
+        case .dwd_icon_d2_native:
+            return IconDomains.iconD2Native
+        case .dwd_icon_d2_native_15min:
+            return IconDomains.iconD2Native15min
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
         case .dwd_icon_eps:
