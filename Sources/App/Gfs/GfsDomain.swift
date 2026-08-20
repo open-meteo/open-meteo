@@ -214,42 +214,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    /// Pressure levels. Variables HGT, TMP, RH/SPFH , UGRD, VGRD... TCDC starts at 50mb for GFS, HRR has only RH and Cloud Mixing Ratio
-    /// https://earthscience.stackexchange.com/questions/12204/what-is-the-mixing-ratio-of-a-cloud
-    /// http://funnel.sfsu.edu/courses/metr302/f96/handouts/moist_sum.html
-    /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
-    var levels: [Int] {
-        switch self {
-        case .gfs05_ens, .gefs05_ensemble_mean:
-            /// a files: 10,50,100,200,250,300,400,500,700,850,925,1000
-            /// b files: 1,2,3,5,7,20,30,70,150,350,450,550,600,750,800,900,950,975
-            /// ecmwf open data: 50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000
-            return [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
-        case .gfs025_ens, .gefs025_ensemble_mean:
-            return []
-        case .gfs013:
-            return []
-        case .gfs025:
-            // pgrb2
-            // let all = [0.01, 0.02, 0.04, 0.07, 0.1, 0.2, 0.4, 0.7, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 975, 1000]
-            // pgrb2b
-            return [10, 15, 20, 30, 40, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
-        case .nam_conus:
-            return []
-            // nam uses level 75 instead of 70. Level 15 and 40 missing. Only use the same levels as HRRR.
-            // return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000] // disabled: 50, 75,
-        case .hrrr_conus:
-            // Note: HRRR uses level 70 instead of 75
-            return [                           50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
-            // all available
-            // return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
-        case .hrrr_conus_15min:
-            return []
-        case .gfswave025, .gfswave025_ens, .gfswave016, .gefswave025_ensemble_mean:
-            return []
-        }
-    }
-
     var omFileLength: Int {
         switch self {
         case .gfs05_ens, .gefs05_ensemble_mean:

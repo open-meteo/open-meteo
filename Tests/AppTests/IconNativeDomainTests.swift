@@ -62,9 +62,9 @@ import Testing
         }
 
         switch try #require(MultiDomains.dwd_icon_d2_native.getDomainAndVariable()) {
-        case .singleWithSupplementalDomains(let domain, _, let supplemental, let precipitationProbability):
+        case .singleWithSupplementalDomains(let domain, _, _, let higher, let precipitationProbability):
             #expect(try #require(domain as? IconDomains) == .iconD2Native)
-            #expect(supplemental.compactMap { $0.0 as? IconDomains } == [.iconD2Native15min])
+            #expect(higher.compactMap { $0.0 as? IconDomains } == [.iconD2Native15min])
             #expect(try #require(precipitationProbability as? IconDomains) == .iconD2Eps)
         default:
             Issue.record("Expected native ICON-D2 with supplemental 15-minute data and precipitation probability")

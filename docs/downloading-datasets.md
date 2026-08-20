@@ -8,29 +8,50 @@ Please note, that only the command arguments are listed below. Whether you are u
 Usage: /usr/local/bin/openmeteo-api <command>
 
 Commands:
-                   benchmark Benchmark Open-Meteo core functions like data manipulation and compression
-                        boot Boots the application's providers.
-                  convert-om Convert an om file to to NetCDF
-                     cronjob Emits the cronjob definition
-                    download Download a specified icon model run
-               download-cams Download global and european CAMS air quality forecasts
-              download-cmip6 Download CMIP6 data and convert
-                download-dem Convert digital elevation model
-              download-ecmwf Download a specified ecmwf model run
-               download-era5 Download ERA5 from the ECMWF climate data store and convert
-                download-gem Download Gem models
-                download-gfs Download GFS from NOAA NCEP
-             download-glofas Download river discharge data from GloFAS
-           download-iconwave Download a specified wave model run
-                download-jma Download JMA models
-        download-meteofrance Download MeteoFrance models
-              download-metno Download MetNo models
-          download-satellite Download satellite datasets
-  download-seasonal-forecast Download seasonal forecasts from Copernicus
-                      export Export to dataset to NetCDF
-                      routes Displays all registered routes.
-                       serve Begins serving the app over HTTP.
-                        sync Synchronise weather database from a remote server
+                    benchmark Benchmark Open-Meteo core functions like data manipulation and compression
+                   convert-om Convert between om file format version or convert to NetCDF
+                     download Download a specified icon model run
+                 download-bom Download a specified Bom model run
+                download-cams Download global and european CAMS air quality forecasts
+                download-chmi Download ČHMÚ ALADIN Czech model
+                 download-cma Download a specified CMA model run
+               download-cmip6 Download CMIP6 data and convert
+                 download-dem Convert digital elevation model
+                 download-dmi Download Dmi models
+             download-dwd-sis Download DWD satellite radiation data
+               download-ecmwf Download a specified ecmwf model run
+         download-ecmwf-ecpds Download a specified ecmwf model run
+          download-ecmwf-seas Download a specified ecmwf model run
+                download-era5 Download ERA5 from the ECMWF climate data store and convert
+    download-eumetsat-lsa-saf Download Eumetsat Sarah data
+      download-eumetsat-sarah Download Eumetsat Sarah data
+                 download-gem Download Gem models
+           download-geosphere Download GeoSphere Austria models
+                 download-gfs Download GFS from NOAA NCEP
+       download-gfs-graphcast Download a specified GFS GraphCast model run
+              download-glofas Download river discharge data from GloFAS
+            download-iconwave Download a specified wave model run
+  download-italia-meteo-arpae Download ItaliaMeteo Arpae models
+       download-jaxa-himawari Download Jaxa Himawari satellite data download
+                 download-jma Download JMA models
+                 download-kma Download Kma models
+                download-knmi Download KNMI models
+         download-meteofrance Download MeteoFrance models
+          download-meteoswiss Download MeteoSwiss ICON CH models
+               download-metno Download MetNo models
+              download-mfwave Download a specified wave model run
+                 download-nbm Download GFS from NOAA NCEP
+           download-satellite Download satellite datasets
+                download-ukmo Download UKMO models
+         download-weathernext Download a specified WeatherNext-2 model run
+                       export Export to dataset to NetCDF
+                 merge-yearly Merge database chunks into yearly files
+                    migration Perform database migration
+                       routes Displays all registered routes.
+                        serve Begins serving the app over HTTP.
+                         sync Download the open-meteo weather database from a S3 server.
+            validate-om-files Recursively read the data variable of all .om files in DATA_DIRECTORY.
+                      version Print the Open-Meteo build version
 
 Use `/usr/local/bin/openmeteo-api <command> [--help,-h]` for more information on a command.
 ```
