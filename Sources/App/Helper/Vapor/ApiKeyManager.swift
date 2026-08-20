@@ -155,6 +155,50 @@ extension Request {
     var scheme: String {
         return (headers.first(name: "X-Forwarded-Proto") == "https" ? "https" : nil) ?? url.scheme ?? "http"
     }
+    
+    /// Only respond to a query if the rate limits are not exceeded
+    /// Limit is IP based, except for CF Workers, where limits are applied per user
+    func withFreeApiRateLimiter(fn: (_ slot: Int) async throws -> (Float, Response)) async throws -> Response {
+        guard let address = peerAddress ?? remoteAddress else {
+            throw ForecastApiError.generic(message: "Could not get remote address")
+        }
+        /// For CloudFlare worker applications, use the `CF-Worker` header for rate limiting instead of IP address
+        let isCFWorker = RateLimiter.cloudFlareWorkerIPs.contains(address)
+        let slot: Int
+        if isCFWorker, let cfHash = self.headers["CF-Worker"].first?.hashValue {
+            slot = cfHash
+        } else {
+            slot = address.rateLimitSlot
+        }
+        if isCFWorker {
+            OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
+            try await RateLimiter.instance.check(int64: slot)
+        } else {
+            try await RateLimiter.instance.check(address: address)
+        }
+        try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
+        do {
+            let (weight, response) = try await fn(slot)
+            if isCFWorker {
+                await RateLimiter.instance.increment(int64: slot, count: weight)
+            } else {
+                await RateLimiter.instance.increment(address: address, count: weight)
+            }
+            await ConcurrencyGroupLimiter.instance.release(slot: slot)
+            return response
+        } catch {
+            // In an error case, also increment to API rate limiter by 1
+            // Some users do infinite retries on errors!
+            if isCFWorker {
+                await RateLimiter.instance.increment(int64: slot, count: 1)
+            } else {
+                await RateLimiter.instance.increment(address: address, count: 1)
+            }
+            OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
+            await ConcurrencyGroupLimiter.instance.release(slot: slot)
+            throw error
+        }
+    }
 
     /// fn params: hostname, unlockSlot, numberOfLocationsMaximum, params
     @discardableResult
@@ -176,26 +220,7 @@ extension Request {
         }
 
         if isFreeApi {
-            guard let address = peerAddress ?? remoteAddress else {
-                throw ForecastApiError.generic(message: "Could not get remote address")
-            }
-            /// For CloudFlare worker applications, use the `CF-Worker` header for rate limiting instead of IP address
-            let isCFWorker = RateLimiter.cloudFlareWorkerIPs.contains(address)
-            let slot: Int
-            if isCFWorker, let cfHash = self.headers["CF-Worker"].first?.hashValue {
-                slot = cfHash
-            } else {
-                slot = address.rateLimitSlot
-            }
-            if isCFWorker {
-                OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
-                try await RateLimiter.instance.check(int64: slot)
-            } else {
-                try await RateLimiter.instance.check(address: address)
-            }
-            try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
-            let response: Response
-            do {
+            return try await withFreeApiRateLimiter() { (slot) in
                 let params = try parseApiParams()
                 guard params.apikey == nil && headers.contains(name: "X-Api-Key") == false else {
                     guard self.method != .POST else {
@@ -205,34 +230,16 @@ extension Request {
                     guard url.count < 3500 else {
                         throw ForecastApiError.generic(message: "Your API URL is too long for automatic redirection from the open-access API to the commercial endpoints. Instead, use the 'customer-' prefixed URLs directly. Refer to the API documentation and select 'Usage -> Commercial' to obtain the correct customer URLs.")
                     }
-                    await ConcurrencyGroupLimiter.instance.release(slot: slot)
-                    return self.redirect(to: url)
+                    return (0, self.redirect(to: url))
                 }
                 let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: OpenMeteo.numberOfLocationsMaximum), params)
                 let weight = responder.calculateQueryWeight()
                 guard weight <= RateLimiter.limitHourly else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
                 }
-                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
-                if isCFWorker {
-                    await RateLimiter.instance.increment(int64: slot, count: weight)
-                } else {
-                    await RateLimiter.instance.increment(address: address, count: weight)
-                }
-            } catch {
-                // In an error case, also increment to API rate limiter by 1
-                // Some users do infinite retries on errors!
-                if isCFWorker {
-                    await RateLimiter.instance.increment(int64: slot, count: 1)
-                } else {
-                    await RateLimiter.instance.increment(address: address, count: 1)
-                }
-                OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
-                await ConcurrencyGroupLimiter.instance.release(slot: slot)
-                throw error
+                let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
+                return (weight, response)
             }
-            await ConcurrencyGroupLimiter.instance.release(slot: slot)
-            return response
         }
 
         let params = try parseApiParams()

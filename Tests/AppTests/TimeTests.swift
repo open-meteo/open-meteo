@@ -11,6 +11,18 @@ import Testing
         #expect(date.day == 23)
         #expect(date.toIsoString() == "2021-11-23")
     }
+    
+    @Test func lastHttpModifiedDate() throws {
+        let a = try "Wed, 19 Aug 2026 09:38:00 GMT".parseLastModifiedDate()
+        #expect(a.iso8601_YYYY_MM_dd_HH_mmZ == "2026-08-19T09:38Z")
+        #expect(a.lastModifiedHttpDateFormat == "Wed, 19 Aug 2026 09:38:00 GMT")
+    }
+    
+    @Test func s3XmlDate() throws {
+        let a = try "2026-08-19T09:38:57.123Z".parseXmlS3Date()
+        #expect(a.s3ListXmlDateFormat == "2026-08-19T09:38:57.000Z")
+    }
+    
 
     @Test func timeFormats() throws {
         #expect(try Timestamp.from(yyyymmdd: "20211123").format_YYYYMMddHH == "2021112300")

@@ -7,7 +7,7 @@ import NIOHTTP1
 
 enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
-    case fileModifiedSinceLastDownload
+    case fileModifiedOrPrevalidationFailed
     case forbidden(body: String?)
     case badRequest(body: String?)
     case other(HTTPResponseStatus)
@@ -53,7 +53,7 @@ extension HTTPClientResponse {
         case .unauthorized:
             throw CurlErrorNonRetry.unauthorized
         case .preconditionFailed:
-            throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+            throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
         case .forbidden:
             throw CurlErrorNonRetry.forbidden(body: try await self.readStringImmutable())
         case .badRequest:

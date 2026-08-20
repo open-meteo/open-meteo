@@ -88,8 +88,8 @@ struct OmFileSplitter {
                 throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
             }
             let file = OmFileType.run(domain: domain, variable: variable, run: run)
-            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps, _) in
-                guard let timestamps else {
+            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                guard let timestamps = omFile.timestamps else {
                     return
                 }
                 let fullRunTime = TimerangeDt(start: timestamps[0], to: timestamps[timestamps.count - 1].add(time.dtSeconds), dtSeconds: time.dtSeconds)
@@ -97,12 +97,12 @@ struct OmFileSplitter {
                 /// Fixed time resolution. Can use linear reads into output array
                 if fullRunTime.count == timestamps.count {
                     if let offsets = indexTime.intersect(fileTime: fullRunTime.toIndexTime()) {
-                        try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                        try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     }
                     return
                 }
                 /// Prefetch entire run
-                try await reader.willNeed3D(ny: ny, nx: nx, nTime: timestamps.count, nMembers: nMembers, location: location, level: level, timeOffsets: (file: 0..<timestamps.count, array:  0..<timestamps.count))
+                try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: timestamps.count, nMembers: nMembers, location: location, level: level, timeOffsets: (file: 0..<timestamps.count, array:  0..<timestamps.count))
             }
             return
         }
@@ -112,8 +112,8 @@ struct OmFileSplitter {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-                    try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                    try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
             }
@@ -134,8 +134,8 @@ struct OmFileSplitter {
                     continue
                 }
                 let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-                    try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                    try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
             }
@@ -147,14 +147,14 @@ struct OmFileSplitter {
         // Rolling files for ensemble data
         if nMembers > 1 {
             let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            if try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger, fn: { (reader, _, fileTime) in
-                guard let fileTime else {
+            if try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger, fn: { omFile -> Bool in
+                guard let fileTime = omFile.timeRangeDt else {
                     return true
                 }
                 guard let offsets = indexTime.intersect(fileTime: fileTime.toIndexTime()) else {
                     return true
                 }
-                try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                 return true
             }) == true {
                 return
@@ -168,8 +168,8 @@ struct OmFileSplitter {
                 continue
             }
             let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-                try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
             }
         }
     }
@@ -194,8 +194,8 @@ struct OmFileSplitter {
                 throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
             }
             let file = OmFileType.run(domain: domain, variable: variable.omFileName.file, run: run)
-            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps, _) in
-                guard let timestamps else {
+            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                guard let timestamps = omFile.timestamps else {
                     return
                 }
                 let fullRunTime = TimerangeDt(start: run.toTimestamp(), to: timestamps[timestamps.count - 1].add(time.dtSeconds), dtSeconds: time.dtSeconds)
@@ -205,13 +205,13 @@ struct OmFileSplitter {
                 
                 /// Fixed time resolution. Can use linear reads into output array
                 if fullRunTime.count == timestamps.count {
-                    try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                    try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     return
                 }
                 
                 /// Run is using irregular time spacing. Read entire run and copy timestamps afterwards
                 var runData = [Float](repeating: .nan, count: fullRunTime.count * location.count)
-                try await reader.read3D(into: &runData, ny: ny, nx: nx, nTime: timestamps.count, nMembers: nMembers, location: location, level: level, timeOffsets: (file: 0..<timestamps.count, array:  0..<timestamps.count))
+                try await omFile.reader.read3D(into: &runData, ny: ny, nx: nx, nTime: timestamps.count, nMembers: nMembers, location: location, level: level, timeOffsets: (file: 0..<timestamps.count, array:  0..<timestamps.count))
                 
                 /// Correct the timestep placement... E.g. DDDDD--- to DDDD-D-D-D
                 for t in timestamps.enumerated().reversed() {
@@ -244,8 +244,8 @@ struct OmFileSplitter {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-                    try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                    try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
             }
@@ -263,8 +263,8 @@ struct OmFileSplitter {
                     continue
                 }
                 let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-                    try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                    try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
             }
@@ -277,14 +277,14 @@ struct OmFileSplitter {
         // Rolling files for ensemble data
         if nMembers > 1 {
             let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .rolling, chunk: nil, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            if try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger, fn: { (reader, _, fileTime) in
-                guard let fileTime else {
+            if try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger, fn: { omFile in
+                guard let fileTime = omFile.timeRangeDt else {
                     return true
                 }
                 guard let offsets = indexTime.intersect(fileTime: fileTime.toIndexTime()) else {
                     return true
                 }
-                try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                 return true
             }) == true {
                 return out
@@ -298,8 +298,8 @@ struct OmFileSplitter {
                 continue
             }
             let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-                try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
+            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }
         }
         return out

@@ -49,6 +49,13 @@ extension Float {
     }
 }
 
+extension Int64 {
+    /// Integer division, but round up instead of floor
+    @inlinable func divideRoundedUp(divisor: Int64) -> Int64 {
+        return (self + divisor - 1) / divisor
+    }
+}
+
 extension Int {
     /// Integer division, but round up instead of floor
     @inlinable func divideRoundedUp(divisor: Int) -> Int {

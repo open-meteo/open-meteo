@@ -320,6 +320,12 @@ public struct Timestamp: Hashable, Sendable {
     }
 }
 
+extension Timestamp {
+    func olderThan(seconds: Int, now: Timestamp) -> Bool {
+        return self.timeIntervalSince1970 < now.timeIntervalSince1970 - seconds
+    }
+}
+
 extension Date {
     func toTimestamp() -> Timestamp {
         return Timestamp(Int(self.timeIntervalSince1970))

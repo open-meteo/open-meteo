@@ -10,38 +10,39 @@ import NIOFileSystem
  */
 enum S3Uploader {
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream") async throws {
+    static func upload<D: DataProtocol>(client: HTTPClient, data: D, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async throws {
         var buffer = ByteBufferAllocator().buffer(capacity: data.count)
         buffer.writeData(data)
-        try await upload(client: client, buffer: buffer, url: url, contentType: contentType)
+        try await upload(client: client, buffer: buffer, url: url, contentType: contentType, lastModified: lastModified)
     }
     
-    static func upload(client: HTTPClient, buffer: ByteBuffer, url: String, contentType: String = "application/octet-stream") async throws {
+    static func upload(client: HTTPClient, buffer: ByteBuffer, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async throws {
         var request = HTTPClientRequest(url: url)
         request.method = .PUT
         request.body = .bytes(buffer)
         request.headers.add(name: "Content-Type", value: contentType)
         request.headers.add(name: "x-amz-content-sha256", value: buffer.readableBytesView.sha256Hex)
+        request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
         // executeRetry extracts credentials from the URL, signs the request with
         // AWS4-HMAC-SHA256 on each attempt, and retries on transient errors.
         let logger = Logger(label: "S3Uploader")
         let _ = try await client.executeRetry(request, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
     }
     
-    static func uploadMultipart(client: HTTPClient, file: String, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
-        try await uploadMultipart(client: client, file: FilePath(file), url: url, contentType: contentType, executor: executor)
+    static func uploadMultipart(client: HTTPClient, file: String, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp, executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
+        try await uploadMultipart(client: client, file: FilePath(file), url: url, contentType: contentType, lastModified: lastModified, executor: executor)
     }
     
-    static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
+    static func uploadMultipart(client: HTTPClient, file: FilePath, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp, executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
         return try await FileSystem.shared.withFileHandle(forReadingAt: file) { fh in
-            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, executor: executor)
+            return try await uploadMultipart(client: client, data: fh, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
         }
     }
     
     /// Uploads files to S3 in 8 MB chunks, with part concurrency controlled by `executor`.
     /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
-    static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
+    static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp, executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
         
         // Step 1: Initiate multipart upload
@@ -81,7 +82,8 @@ enum S3Uploader {
             let prepared = S3MultiPartUploadPrepared(
                 etags: uploaded.map(\.etag),
                 url: url,
-                encodedUploadId: encodedUploadId
+                encodedUploadId: encodedUploadId,
+                lastModified: lastModified
             )
             let size = uploaded.map(\.size).reduce(0, +)
             let timeChunkedRequest = Double(DispatchTime.now().uptimeNanoseconds - timeChunkedRequestStart) / 1_000_000_000
@@ -89,7 +91,7 @@ enum S3Uploader {
             logger.info("Upload \(url.asUrlGetQueryForLogging) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
         } catch {
-            try await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId).abort(client: client)
+            try await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified).abort(client: client)
             throw error
         }
     }
@@ -99,16 +101,17 @@ enum S3Uploader {
     /// `server` in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/"
     /// `basePath` offsets the object names relative to the local directory .e.g. `some-path/` in this example
     /// `exclude` can be used to exclude file names. Supports "*" and "?" wildcards
-    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, exclude: [String] = [".*", "*~"]) async throws {
+    static func uploadSync(client: HTTPClient, localDirectory: String, server: String, basePath: String, dryRun: Bool = false, exclude: [String] = [".*", "*~"]) async throws {
         let logger = Logger(label: "S3Uploader")
-        let remoteRoot = basePath.hasSuffix("/") ? basePath : basePath + "/"
+        let normalizedBasePath = basePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let remoteRoot = normalizedBasePath.isEmpty ? "" : normalizedBasePath + "/"
         let serverBase = server.hasSuffix("/") ? String(server.dropLast()) : server
 
         struct LocalFile {
             let absolutePath: FilePath
             let remoteKey: String
             let size: Int
-            let modificationTime: Date
+            let modificationTime: Timestamp
         }
 
         // Step 1: Traverse local directory tree and collect all files.
@@ -124,7 +127,7 @@ enum S3Uploader {
                     if !exclude.isEmpty && exclude.contains(where: { name.matchesGlob($0) }) { continue }
                     if entry.type == .regular {
                         if let info = try await FileSystem.shared.info(forFileAt: entry.path) {
-                            let modTime = Date(timeIntervalSince1970: Double(info.lastDataModificationTime.seconds) + Double(info.lastDataModificationTime.nanoseconds) / 1_000_000_000)
+                            let modTime = Timestamp(Int(info.lastDataModificationTime.seconds))
                             localFiles.append(LocalFile(
                                 absolutePath: entry.path,
                                 remoteKey: remotePrefix + name,
@@ -155,7 +158,12 @@ enum S3Uploader {
 
         // Step 2: Fetch remote directory listings concurrently, max 4 S3 list operations at a time.
         let remoteListings = try await remotePrefixes.mapConcurrent(nConcurrent: 4) { prefix in
-            try await S3List.s3list(client: client, server: server, prefix: prefix, apikey: nil, deadLineHours: 1).files
+            try await S3List.s3list(
+                context: .init(server: server, client: client, logger: logger),
+                prefix: prefix,
+                apikey: nil,
+                deadLineHours: 1
+            ).files
         }
         var remoteFiles: [String: S3List.ListV2File] = [:]
         for files in remoteListings {
@@ -169,42 +177,33 @@ enum S3Uploader {
             return remote.fileSize != local.size || local.modificationTime > remote.modificationTime
         }
         
+        let totalBytes = toUpload.reduce(0) { $0 + $1.size }
+        logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
+
+        if dryRun {
+            return
+        }
+
         guard toUpload.count > 0 else {
             logger.info("No files to upload. Exiting.")
             return
         }
 
-        let totalBytes = toUpload.reduce(0) { $0 + $1.size }
+        // Step 4: Upload 4 files concurrently, with up to 16 parts in flight.
         let uploadStart = DispatchTime.now()
-        logger.info("Collected remote files in \(startRemote.timeElapsedPretty()). Uploading \(toUpload.count) of \(localFiles.count) files (\(totalBytes.bytesHumanReadable))")
-
-        // Step 4: Upload 2 files concurrently.
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 16)
-        let prepared = try await toUpload.mapConcurrent(nConcurrent: 4) { file in
-            let url = serverBase + "/" + file.remoteKey
-            return try await uploadMultipart(client: client, file: file.absolutePath, url: url, executor: executor)
+        try await toUpload.foreachConcurrent(nConcurrent: 4) { file in
+            let encodedRemoteKey = file.remoteKey
+                .split(separator: "/", omittingEmptySubsequences: false)
+                .map { String($0).awsPercentEncoded }
+                .joined(separator: "/")
+            let url = serverBase + "/" + encodedRemoteKey
+            let prepared = try await uploadMultipart(client: client, file: file.absolutePath, url: url, lastModified: .now(), executor: executor)
+            try await prepared.commit(client: client)
         }
         let uploadTime = Double(DispatchTime.now().uptimeNanoseconds - uploadStart.uptimeNanoseconds) / 1_000_000_000
         let rate = Double(totalBytes) / uploadTime
-        logger.info("Upload completed in \(uploadTime.asSecondsPrettyPrint) \(rate.asRatePrettyPrint). Commit changes now")
-        let commitStart = DispatchTime.now()
-        
-        // Commit all OM file changes
-        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
-            if prepared.url.hasSuffix(".json") {
-                return
-            }
-            try await prepared.commit(client: client)
-        }
-        // Commit all json files. E.g. meta.json which should be committed last
-        try await prepared.foreachConcurrent(nConcurrent: 8) { prepared in
-            if prepared.url.hasSuffix(".json") == false {
-                return
-            }
-            try await prepared.commit(client: client)
-        }
-        
-        logger.info("Commit completed in \(commitStart.timeElapsedPretty())")
+        logger.info("Upload completed in \(uploadTime.asSecondsPrettyPrint) \(rate.asRatePrettyPrint)")
     }
 }
 
@@ -289,6 +288,7 @@ struct S3MultiPartUploadPrepared: Sendable {
     let etags: [String]
     let url: String
     let encodedUploadId: String
+    let lastModified: Timestamp
 
     func abort(client: HTTPClient) async throws {
         let logger = Logger(label: "S3Uploader")
@@ -311,6 +311,7 @@ struct S3MultiPartUploadPrepared: Sendable {
         completeRequest.body = .bytes(ByteBuffer(data: completionData))
         completeRequest.headers.add(name: "Content-Type", value: "application/xml")
         completeRequest.headers.add(name: "x-amz-content-sha256", value: completionData.sha256Hex)
+        completeRequest.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
         let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
         let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000

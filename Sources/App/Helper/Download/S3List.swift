@@ -23,18 +23,19 @@ enum S3List {
 
     struct ListV2File {
         let name: String
-        let modificationTime: Date
+        let modificationTime: Timestamp
         let fileSize: Int
+        let eTag: String
     }
 
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
-    static func s3list(client: HTTPClient, server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
+    static func s3list(context: OmFileSystemS3.ServerContext, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
         var allFiles: [S3List.ListV2File] = []
         var allDirectories: [String] = []
         var continuation: String? = nil
-        let logger = Logger(label: "S3List")
+        let logger = context.logger
         while true {
-            var url = "\(server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
+            var url = "\(context.server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
             if let continuation {
                 url += "&continuation-token=\(continuation.awsPercentEncoded)"
             }
@@ -43,21 +44,26 @@ enum S3List {
             }
             let request = HTTPClientRequest(url: url)
 
-            var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
+            var response = try await context.client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
             guard let body = response.readString(length: response.readableBytes) else {
                 return (allFiles, allDirectories)
             }
 
-            let files = body.xmlSection("Contents").map {
-                guard let name = $0.xmlFirst("Key"),
-                      let modificationTimeString = $0.xmlFirst("LastModified"),
-                      let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)),
-                      let fileSizeString = $0.xmlFirst("Size"),
-                      let fileSize = Int(fileSizeString)
-                else {
-                    fatalError()
+            let files = try body.xmlSection("Contents").map {
+                guard let name = $0.xmlFirst("Key") else {
+                    fatalError("Failed to get <Key>")
                 }
-                return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize)
+                guard let modificationTime = try $0.xmlFirst("LastModified")?.parseXmlS3Date() else {
+                    fatalError("Failed to get LastModified date")
+                }
+                guard let fileSizeString = $0.xmlFirst("Size"), let fileSize = Int(fileSizeString) else {
+                    fatalError("Failed to get Size")
+                }
+                /// eTags are quoted like `<ETag>&quot;705802db9a8f7523eef48c8752b6ae39&quot;</ETag>`
+                guard let eTag = $0.xmlFirst("ETag")?.dropFirst(6).dropLast(6) else {
+                    fatalError("Failed to get ETag")
+                }
+                return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize, eTag: String(eTag))
             }
             let directories = body.xmlSection("CommonPrefixes").map {
                 guard let prefix = $0.xmlFirst("Prefix") else {

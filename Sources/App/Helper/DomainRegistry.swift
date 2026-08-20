@@ -554,7 +554,7 @@ enum DomainRegistry: String, CaseIterable {
     
     /// Get meta information of a specific run
     func getFullRunMeta(client: HTTPClient?, logger: Logger, run: Timestamp) async throws -> FullRunMetaJson? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: FullRunMetaFile.run(self, run),
             client: client,
             logger: logger
