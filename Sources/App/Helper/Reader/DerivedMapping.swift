@@ -11,6 +11,8 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     
     case direct(Variable)
     case directShift24Hour(Variable)
+    /// Read additional samples before the requested range and return a trailing mean aligned to the request.
+    case runningMean(RawOrMapped, windowSeconds: Int)
     //case independent((TimerangeDtAndSettings) -> DataAndUnit)
     case one(RawOrMapped, (DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case two(RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
@@ -212,6 +214,11 @@ extension GenericDeriverProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .runningMean(let input, let windowSeconds):
+            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
+            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
+            let input = try await get(mapping: input, time: paddedTime)
+            return DataAndUnit(input.data.slidingAverageDroppingFirstDt(dt: windowSteps), input.unit)
 //        case .independent(let fn):
 //            return fn(time)
         case .one(let a, let fn):
@@ -278,6 +285,10 @@ extension GenericDeriverProtocol {
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .runningMean(let input, let windowSeconds):
+            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
+            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
+            try await prefetchData(mapping: input, time: paddedTime)
 //        case .independent(_):
 //            break
         case .one(let a, _):
@@ -389,6 +400,13 @@ extension GenericDeriverOptionalProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .runningMean(let input, let windowSeconds):
+            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
+            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
+            guard let input = try await get(mapping: input, time: paddedTime) else {
+                return nil
+            }
+            return DataAndUnit(input.data.slidingAverageDroppingFirstDt(dt: windowSteps), input.unit)
 //        case .independent(let fn):
 //            return fn(time)
         case .one(let a, let fn):
@@ -469,6 +487,10 @@ extension GenericDeriverOptionalProtocol {
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .runningMean(let input, let windowSeconds):
+            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
+            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
+            return try await prefetchData(mapping: input, time: paddedTime)
 //        case .independent(_):
 //            return true
         case .one(let a, _):
