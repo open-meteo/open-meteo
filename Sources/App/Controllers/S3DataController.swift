@@ -1089,10 +1089,6 @@ extension Request {
             offset = 0
             byteCount = Int(file.size)
         }
-        
-        if self.method == .HEAD {
-            return response
-        }
                 
         switch file {
         case .local(let fileEntry):
