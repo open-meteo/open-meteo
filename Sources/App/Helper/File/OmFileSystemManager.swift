@@ -47,7 +47,7 @@ final class OmFileSystemManager: Sendable {
         await localFileSystem.getDirectory(fullPath: path)?.updateIfRequired(force: true)
     }
     
-    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64, eTag: String?)])? {
+    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64, eTag: String?)])? {
         var directories = Set<String>()
         var files = [String: (lastModified: Timestamp, size: Int64, eTag: String?)]()
         
@@ -55,7 +55,7 @@ final class OmFileSystemManager: Sendable {
             await local.exportDirectories(directories: &directories, files: &files)
         }
         
-        if let remoteFileSystem, let remoteDir = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path) {
+        if localOnly == false, let remoteFileSystem, let remoteDir = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path) {
             await remoteDir.directory.exportDirectories(directories: &directories, files: &files)
         }
         
@@ -74,11 +74,11 @@ final class OmFileSystemManager: Sendable {
         return LocalAndRemoteDirectory(local: local, remote: remote)
     }
     
-    func getFile(path: String, client: HTTPClient, logger: Logger) async throws -> FileType? {
+    func getFile(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> FileType? {
         if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
         }
-        if let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
+        if localOnly == false, let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
             let client = await file.file.makeCachedClient(context: file.context)
             return .remote(client)
         }
