@@ -741,10 +741,28 @@ struct VariableHourlyDeriver<Domain: GenericDomain, Variable: GenericVariable & 
         let pressure = variable.variable
         // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
         if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
-            if isJmaForecastDomain && pressure.variable == .geopotential_height {
-                // Preserve the legacy JMA API conversion applied after download-time scaling.
-                return .one(input) { geopotentialHeight, _ in
-                    return DataAndUnit(geopotentialHeight.data.map { $0 * 9.80665 }, geopotentialHeight.unit)
+            if isJmaForecastDomain {
+                if pressure.variable == .vertical_velocity {
+                    guard let temperature = pressureLevelInput(.temperature, at: pressure.level) else {
+                        return nil
+                    }
+                    // JMA archives store pressure vertical velocity (omega) in Pa/s.
+                    // Convert at read time so historical and newly downloaded files use
+                    // the same on-disk representation.
+                    return .two(input, temperature) { omega, temperature, _ in
+                        let verticalVelocity = Meteorology.verticalVelocityPressureToGeometric(
+                            omega: omega.data,
+                            temperature: temperature.data,
+                            pressureLevel: Float(pressure.level)
+                        )
+                        return DataAndUnit(verticalVelocity, .metrePerSecondNotUnitConverted)
+                    }
+                }
+                if pressure.variable == .geopotential_height {
+                    // Preserve the legacy JMA API conversion applied after download-time scaling.
+                    return .one(input) { geopotentialHeight, _ in
+                        return DataAndUnit(geopotentialHeight.data.map { $0 * 9.80665 }, geopotentialHeight.unit)
+                    }
                 }
             }
             return .from(input: input)
