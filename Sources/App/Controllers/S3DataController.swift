@@ -1037,6 +1037,11 @@ extension Request {
         headers.replaceOrAdd(name: .lastModified, value: file.modificationTimestamp.lastModifiedHttpDateFormat)
 
         headers.replaceOrAdd(name: .eTag, value: eTag)
+        headers.contentType = mediaType
+        
+        if self.method == .HEAD {
+            headers.responseCompression = .disable
+        }
 
         // Check if file has been cached already and return NotModified response if the etags match
         if eTag == request.headers.first(name: .ifNoneMatch) {
@@ -1084,8 +1089,10 @@ extension Request {
             offset = 0
             byteCount = Int(file.size)
         }
-
-        response.headers.contentType = mediaType
+        
+        if self.method == .HEAD {
+            return response
+        }
                 
         switch file {
         case .local(let fileEntry):
