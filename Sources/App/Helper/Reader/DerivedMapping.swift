@@ -487,8 +487,6 @@ extension GenericDeriverOptionalProtocol {
             let windowSteps = max(windowSeconds / time.dtSeconds, 1)
             let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
             return try await prefetchData(variable: input, time: paddedTime)
-//        case .independent(_):
-//            return true
         case .one(let a, _):
             return try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):
