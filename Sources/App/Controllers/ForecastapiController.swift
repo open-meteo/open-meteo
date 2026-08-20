@@ -282,7 +282,7 @@ struct WeatherApiController {
                 domains = domainsParam.map{$0.remappedToEnsembleApi}
             case .airQuality:
                 // Air quality API used domains=auto, global or europe
-                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsApiDomain.load(commaSeparatedOptional: params.models) ?? [.auto])
                 domains = camsDomains.map(\.multiDomain)
             default:
                 domains = domainsParam
