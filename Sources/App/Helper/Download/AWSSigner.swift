@@ -444,7 +444,7 @@ public struct AWSSigner {
         }
     }
 
-    public enum SigningError: Error, Equatable {
+    public enum SigningError: Error, Equatable, AbortError {
         case invalidURL
         case missingAuthorization
         case unsupportedAuthorizationType
@@ -458,6 +458,10 @@ public struct AWSSigner {
         case payloadHashMismatch
         case missingSignedHeader(String)
         case invalidSignature
+        
+        public var status: NIOHTTP1.HTTPResponseStatus {
+            .unauthorized
+        }
     }
 
     func getSignatureKey<T: StringProtocol>(date: T, region: String? = nil) -> HashedAuthenticationCode<SHA256> {

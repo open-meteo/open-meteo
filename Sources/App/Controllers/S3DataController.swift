@@ -120,7 +120,7 @@ struct S3DataController: RouteCollection {
             throw RateLimitError.serviceOverloaded
         }
         let params = try req.query.decode(S3List.ListV2Query.self)
-        let localOnly = req.url.path == "/openmeteo-local"
+        let localOnly = req.url.path == "/openmeteo-local" || req.url.path == "/openmeteo-local/"
         if params.apikey != nil || req.headers.first(name: .authorization) != nil {
             try authorizeReadRequest(req: req, apikey: params.apikey)
             return try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly)
@@ -483,7 +483,6 @@ struct S3DataController: RouteCollection {
         }
         let canonicalURL = "\(req.scheme)://\(host)\(req.url.string)"
         
-        var hasMatchingAccessKey = false
         for credentials in credentials {
             let signer = AWSSigner(accessKey: credentials.accessKey, secretKey: credentials.secretKey, region: "us-west-2", service: "s3")
             do {
@@ -491,13 +490,7 @@ struct S3DataController: RouteCollection {
                 return
             } catch AWSSigner.SigningError.invalidAccessKey {
                 continue
-            } catch {
-                hasMatchingAccessKey = true
             }
-        }
-        
-        if hasMatchingAccessKey {
-            throw S3ApiError.invalidRequestSignature
         }
         throw S3ApiError.unknownAccessKey
     }
