@@ -462,6 +462,37 @@ public struct AWSSigner {
         public var status: NIOHTTP1.HTTPResponseStatus {
             .unauthorized
         }
+        
+        public var reason: String {
+            switch self {
+            case .invalidURL:
+                return "Invalid URL"
+            case .missingAuthorization:
+                return "Missing Authorization header"
+            case .unsupportedAuthorizationType:
+                return "Unsupported Authorization type"
+            case .invalidAuthorizationHeader:
+                return "Invalid Authorization header"
+            case .invalidCredentialScope:
+                return "Invalid credential scope"
+            case .invalidAccessKey:
+                return "Invalid access key"
+            case .missingXAmzDate:
+                return "Missing x-amz-date header"
+            case .invalidXAmzDate:
+                return "Invalid x-amz-date header"
+            case .requestDateOutOfRange:
+                return "Request date out of acceptable range"
+            case .missingPayloadHash:
+                return "Missing x-amz-content-sha256 header"
+            case .payloadHashMismatch:
+                return "Payload hash mismatch"
+            case .missingSignedHeader(let headerName):
+                return "Missing signed header: \(headerName)"
+            case .invalidSignature:
+                return "Invalid signature"
+            }
+        }
     }
 
     func getSignatureKey<T: StringProtocol>(date: T, region: String? = nil) -> HashedAuthenticationCode<SHA256> {
