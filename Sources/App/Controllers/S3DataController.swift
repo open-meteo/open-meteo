@@ -1055,6 +1055,13 @@ extension Request {
             headers.replaceOrAdd(name: .eTag, value: eTag)
             return Response(status: .preconditionFailed, version: .http1_1, headersNoUpdate: headers, body: .empty)
         }
+        
+        // Check `If-Unmodified-Since` header and return precondition failed if modified
+        if let ifUnmodifiedSince = try request.headers.first(name: .ifUnmodifiedSince)?.parseLastModifiedDate() {
+            guard ifUnmodifiedSince >= file.modificationTimestamp else {
+                return Response(status: .preconditionFailed, headersNoUpdate: headers, body: .empty)
+            }
+        }
 
         // Create the HTTP response.
         let response = Response(status: .ok, headers: headers)
