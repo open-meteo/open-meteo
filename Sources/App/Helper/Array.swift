@@ -21,9 +21,9 @@ extension Sequence where Element == Float {
 }
 
 extension Array where Element == Float {
-    /// Return a trailing mean for every sample after the initial lookback window.
-    func slidingAverageDroppingFirstDt(dt: Int) -> [Float] {
-        return (0 ..< Swift.max(count - dt, 0)).map { i in
+    /// Return trailing means after the initial lookback window, optionally keeping every nth result.
+    func slidingAverageDroppingFirstDt(dt: Int, outputStride: Int = 1) -> [Float] {
+        return stride(from: 0, to: Swift.max(count - dt, 0), by: outputStride).map { i in
             return self[i ..< Swift.min(i + dt, count)].reduce(0, +) / Float(dt)
         }
     }

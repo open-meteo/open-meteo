@@ -12,7 +12,7 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     case direct(Variable)
     case directShift24Hour(Variable)
     /// Read additional samples before the requested range and return a trailing mean aligned to the request.
-    case runningMean(Variable, windowSeconds: Int)
+    case runningMean(Variable, windowSeconds: Int, maximumStepSeconds: Int)
     //case independent((TimerangeDtAndSettings) -> DataAndUnit)
     case one(RawOrMapped, (DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case two(RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
@@ -138,6 +138,19 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
 }
 
+extension TimerangeDt {
+    func runningMeanReadTime(windowSeconds: Int, maximumStepSeconds: Int) -> TimerangeDt {
+        let calculationDtSeconds = Swift.min(self.dtSeconds, maximumStepSeconds)
+        precondition(windowSeconds % calculationDtSeconds == 0)
+        precondition(dtSeconds % calculationDtSeconds == 0)
+        return TimerangeDt(
+            start: range.lowerBound.add(-windowSeconds),
+            to: range.upperBound,
+            dtSeconds: calculationDtSeconds
+        )
+    }
+}
+
 protocol GenericDeriverProtocol: GenericReaderOptionalProtocol {
     associatedtype Reader: GenericReaderProtocol
     
@@ -214,11 +227,16 @@ extension GenericDeriverProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .runningMean(let input, let windowSeconds):
-            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
-            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
-            let input = try await reader.get(variable: input, time: paddedTime)
-            return DataAndUnit(input.data.slidingAverageDroppingFirstDt(dt: windowSteps), input.unit)
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            let input = try await reader.get(variable: input, time: time.with(time: readTime))
+            return DataAndUnit(
+                input.data.slidingAverageDroppingFirstDt(
+                    dt: windowSeconds / readTime.dtSeconds,
+                    outputStride: time.dtSeconds / readTime.dtSeconds
+                ),
+                input.unit
+            )
         case .one(let a, let fn):
             let a = try await get(mapping: a, time: time)
             return fn(a, time)
@@ -283,10 +301,9 @@ extension GenericDeriverProtocol {
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .runningMean(let input, let windowSeconds):
-            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
-            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
-            try await prefetchData(variable: input, time: paddedTime)
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            try await prefetchData(variable: input, time: time.with(time: readTime))
         case .one(let a, _):
             try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):
@@ -396,15 +413,18 @@ extension GenericDeriverOptionalProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .runningMean(let input, let windowSeconds):
-            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
-            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
-            guard let input = try await get(variable: input, time: paddedTime) else {
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            guard let input = try await get(variable: input, time: time.with(time: readTime)) else {
                 return nil
             }
-            return DataAndUnit(input.data.slidingAverageDroppingFirstDt(dt: windowSteps), input.unit)
-//        case .independent(let fn):
-//            return fn(time)
+            return DataAndUnit(
+                input.data.slidingAverageDroppingFirstDt(
+                    dt: windowSeconds / readTime.dtSeconds,
+                    outputStride: time.dtSeconds / readTime.dtSeconds
+                ),
+                input.unit
+            )
         case .one(let a, let fn):
             guard let a = try await get(mapping: a, time: time) else {
                 return nil
@@ -483,10 +503,9 @@ extension GenericDeriverOptionalProtocol {
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .runningMean(let input, let windowSeconds):
-            let windowSteps = max(windowSeconds / time.dtSeconds, 1)
-            let paddedTime = time.with(start: time.range.lowerBound.add(-windowSteps * time.dtSeconds))
-            return try await prefetchData(variable: input, time: paddedTime)
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            return try await prefetchData(variable: input, time: time.with(time: readTime))
         case .one(let a, _):
             return try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):

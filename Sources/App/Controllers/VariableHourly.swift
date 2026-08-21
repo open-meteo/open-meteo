@@ -1067,14 +1067,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             guard let pm2_5 = Reader.variableFromString("pm2_5") else {
                 return nil
             }
-            return .one(.mapped(.runningMean(pm2_5, windowSeconds: 24 * 3600))) { pm2_5, _ in
+            return .one(.mapped(.runningMean(pm2_5, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { pm2_5, _ in
                 return DataAndUnit(pm2_5.data.map(UnitedStatesAirQuality.indexPm2_5), .usAirQualityIndex)
             }
         case .us_aqi_pm10:
             guard let pm10 = Reader.variableFromString("pm10") else {
                 return nil
             }
-            return .one(.mapped(.runningMean(pm10, windowSeconds: 24 * 3600))) { pm10, _ in
+            return .one(.mapped(.runningMean(pm10, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { pm10, _ in
                 return DataAndUnit(pm10.data.map(UnitedStatesAirQuality.indexPm10), .usAirQualityIndex)
             }
         case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
@@ -1088,7 +1088,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             guard let ozone = Reader.variableFromString("ozone") else {
                 return nil
             }
-            return .two(.raw(ozone), .mapped(.runningMean(ozone, windowSeconds: 8 * 3600))) { ozone, ozoneMean, _ in
+            return .two(.raw(ozone), .mapped(.runningMean(ozone, windowSeconds: 8 * 3600, maximumStepSeconds: 3600))) { ozone, ozoneMean, _ in
                 return DataAndUnit(zip(ozone.data, ozoneMean.data).map {
                     UnitedStatesAirQuality.indexO3(o3: $0 / 1.96, o3_8h_mean: $1 / 1.96)
                 }, .usAirQualityIndex)
@@ -1097,7 +1097,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             guard let sulphurDioxide = Reader.variableFromString("sulphur_dioxide") else {
                 return nil
             }
-            return .two(.raw(sulphurDioxide), .mapped(.runningMean(sulphurDioxide, windowSeconds: 24 * 3600))) { sulphurDioxide, sulphurDioxideMean, _ in
+            return .two(.raw(sulphurDioxide), .mapped(.runningMean(sulphurDioxide, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { sulphurDioxide, sulphurDioxideMean, _ in
                 return DataAndUnit(zip(sulphurDioxide.data, sulphurDioxideMean.data).map {
                     UnitedStatesAirQuality.indexSo2(so2: $0 / 2.62, so2_24h_mean: $1 / 2.62)
                 }, .usAirQualityIndex)
@@ -1106,7 +1106,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             guard let carbonMonoxide = Reader.variableFromString("carbon_monoxide") else {
                 return nil
             }
-            return .one(.mapped(.runningMean(carbonMonoxide, windowSeconds: 8 * 3600))) { carbonMonoxide, _ in
+            return .one(.mapped(.runningMean(carbonMonoxide, windowSeconds: 8 * 3600, maximumStepSeconds: 3600))) { carbonMonoxide, _ in
                 return DataAndUnit(carbonMonoxide.data.map {
                     UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)
                 }, .usAirQualityIndex)
