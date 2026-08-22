@@ -42,20 +42,8 @@ import Testing
         let sunrise: (hour: Int, minute: Int, second: Int)
         let sunset: (hour: Int, minute: Int, second: Int)
         /// Close to the poles a day can start before local midnight or end after it
-        let riseDayOffset: Int
-        let setDayOffset: Int
-
-        init(name: String, latitude: Float, longitude: Float, utcOffsetSeconds: Int, date: (Int, Int, Int), sunrise: (Int, Int, Int), sunset: (Int, Int, Int), riseDayOffset: Int = 0, setDayOffset: Int = 0) {
-            self.name = name
-            self.latitude = latitude
-            self.longitude = longitude
-            self.utcOffsetSeconds = utcOffsetSeconds
-            self.date = date
-            self.sunrise = sunrise
-            self.sunset = sunset
-            self.riseDayOffset = riseDayOffset
-            self.setDayOffset = setDayOffset
-        }
+        private(set) var riseDayOffset: Int = 0
+        private(set) var setDayOffset: Int = 0
 
         /// Local midnight of `date` expressed in UTC
         var localMidnight: Timestamp {
