@@ -76,21 +76,21 @@ enum Era5Factory {
     }
 
     /// Combine ERA5 and ensemble spread. Used to generate wind speed uncertainties scaled from 0.5° ERA5-Ensemble to 0.25° ERA5.
-    public static func makeEra5WithEnsemble(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+    public static func makeEra5WithEnsemble(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
               let era5ens = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         else {
             // should not be possible
             throw ForecastApiError.noDataAvailableForThisLocation
         }
-        return .init(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5ens), GenericReaderCached(reader: era5)]), options: options)
+        return .init(reader: GenericReaderMixerSameVariableType(reader: [GenericReaderCached(reader: era5ens), GenericReaderCached(reader: era5)]), options: options)
     }
 
     /**
      Build a combined ERA5 and ERA5-Land reader.
      Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5
      */
-    public static func makeEra5CombinedLand(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+    public static func makeEra5CombinedLand(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard /*let era5ocean = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),*/
             let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
             let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -98,10 +98,10 @@ enum Era5Factory {
             // should not be possible
             throw ForecastApiError.noDataAvailableForThisLocation
         }
-        return .init(reader: GenericReaderMixerSameDomain(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
+        return .init(reader: GenericReaderMixerSameVariableType(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
     }
 
-    public static func makeArchiveBestMatch(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+    public static func makeArchiveBestMatch(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
               let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
               let ecmwfIfs = try await GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -109,7 +109,7 @@ enum Era5Factory {
             // should not be possible
             throw ForecastApiError.noDataAvailableForThisLocation
         }
-        return .init(reader: GenericReaderMixerSameDomain(reader: [
+        return .init(reader: GenericReaderMixerSameVariableType(reader: [
             GenericReaderCached(reader: era5),
             GenericReaderCached(reader: era5land),
             GenericReaderCached(reader: ecmwfIfs)

@@ -112,7 +112,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .cloud_cover_mid:
             return .hermite(bounds: 0...100)
         case .cloud_cover_high:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
