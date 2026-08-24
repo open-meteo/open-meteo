@@ -3,6 +3,20 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
+    @Test func runningMeanUsesExactWindowForNonDivisibleOutputSteps() {
+        let threeHourly = TimerangeDt(start: Timestamp(0), nTime: 2, dtSeconds: 3 * 3600)
+        let threeHourlyRead = threeHourly.runningMeanReadTime(windowSeconds: 8 * 3600, maximumStepSeconds: 3600)
+        #expect(threeHourlyRead.dtSeconds == 3600)
+        #expect(threeHourlyRead.count == 14)
+        #expect((0..<14).map(Float.init).slidingAverageDroppingFirstDt(dt: 8, outputStride: 3) == [3.5, 6.5])
+
+        let sixHourly = TimerangeDt(start: Timestamp(0), nTime: 2, dtSeconds: 6 * 3600)
+        let sixHourlyRead = sixHourly.runningMeanReadTime(windowSeconds: 8 * 3600, maximumStepSeconds: 3600)
+        #expect(sixHourlyRead.dtSeconds == 3600)
+        #expect(sixHourlyRead.count == 20)
+        #expect((0..<20).map(Float.init).slidingAverageDroppingFirstDt(dt: 8, outputStride: 6) == [3.5, 9.5])
+    }
+
     @Test func transpose() {
         let spatial = Array2DFastSpace(data: [1, 2, 3, 4, 5, 6], nLocations: 2, nTime: 3)
         let temporal = spatial.transpose()

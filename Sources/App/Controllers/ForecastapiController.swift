@@ -282,7 +282,7 @@ struct WeatherApiController {
                 domains = domainsParam.map{$0.remappedToEnsembleApi}
             case .airQuality:
                 // Air quality API used domains=auto, global or europe
-                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsApiDomain.load(commaSeparatedOptional: params.models) ?? [.auto])
                 domains = camsDomains.map(\.multiDomain)
             default:
                 domains = domainsParam
@@ -1542,6 +1542,55 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (ChmiDomain.aladin_central_europe_2km, ChmiVariable.self),
                 (ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .air_quality_best_match:
+            return .mixedBeforeDerivation(
+                groups: [
+                    RawReaderDerivationGroup(
+                        domains: [
+                            CamsDomain.cams_global,
+                            .cams_global_greenhouse_gases,
+                            .cams_europe,
+                            .cams_europe_reanalysis_interim,
+                            .cams_europe_reanalysis_validated,
+                            .cams_europe_reanalysis_validated_pre2020,
+                            .cams_europe_reanalysis_validated_pre2018
+                        ],
+                        variableType: CamsVariable.self,
+                        derivationDomain: CamsDomain.cams_global
+                    )
+                ],
+                supplemental: []
+            )
+        case .cams_global:
+            return .mixedBeforeDerivation(
+                groups: [
+                    RawReaderDerivationGroup(
+                        domains: [CamsDomain.cams_global, .cams_global_greenhouse_gases],
+                        variableType: CamsVariable.self,
+                        derivationDomain: CamsDomain.cams_global,
+                        primaryDomain: CamsDomain.cams_global
+                    )
+                ],
+                supplemental: []
+            )
+        case .cams_europe:
+            return .mixedBeforeDerivation(
+                groups: [
+                    RawReaderDerivationGroup(
+                        domains: [
+                            CamsDomain.cams_europe,
+                            .cams_europe_reanalysis_interim,
+                            .cams_europe_reanalysis_validated,
+                            .cams_europe_reanalysis_validated_pre2020,
+                            .cams_europe_reanalysis_validated_pre2018
+                        ],
+                        variableType: CamsVariable.self,
+                        derivationDomain: CamsDomain.cams_europe,
+                        primaryDomain: CamsDomain.cams_europe
+                    )
+                ],
+                supplemental: []
+            )
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
@@ -2232,20 +2281,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_gfswave016:
             return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .air_quality_best_match:
-            guard let reader = try await CamsMixer(domains: [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return []
-            }
-            return [reader]
+            return [] // migrated
         case .cams_global:
-            guard let reader = try await CamsMixer(domains: [.cams_global, .cams_global_greenhouse_gases], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return []
-            }
-            return [reader]
+            return [] // migrated
         case .cams_europe:
-            guard let reader = try await CamsMixer(domains: [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return []
-            }
-            return [reader]
+            return [] // migrated
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return []
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
@@ -2503,11 +2543,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_currents:
             return MfWaveDomain.mfcurrents
         case .air_quality_best_match:
-            return nil
+            return nil // migrated
         case .cams_global:
-            return CamsDomain.cams_global
+            return nil // migrated
         case .cams_europe:
-            return CamsDomain.cams_europe
+            return nil // migrated
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
@@ -2757,13 +2797,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_currents:
             return nil // defined in the upper function
         case .air_quality_best_match:
-            return nil
+            return nil // migrated
         case .cams_global:
-            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint, options: options)
-            return CamsReader(reader: GenericReaderCached(reader: reader))
+            return nil // migrated
         case .cams_europe:
-            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint, options: options)
-            return CamsReader(reader: GenericReaderCached(reader: reader))
+            return nil // migrated
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
