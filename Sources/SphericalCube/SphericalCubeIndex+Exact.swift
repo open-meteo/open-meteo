@@ -1,5 +1,4 @@
 import Foundation
-import OmFileFormat
 
 extension SphericalCubeIndex {
     /// Exact nearest-point fallback for the stored Float32 directions.

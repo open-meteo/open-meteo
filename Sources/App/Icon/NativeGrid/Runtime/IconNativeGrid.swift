@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import SphericalCube
 
 /// ICON-specific `Gridable` adapter around the provider-neutral spherical cube index.
 ///
@@ -42,7 +43,7 @@ struct IconNativeGrid: Gridable {
 
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
 
-    func getCoordinates(gridpoint: Int) -> LatLon {
+    func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
         precondition(gridpoint >= 0 && gridpoint < storage.pointCount, "ICON grid point out of range")
         return storage.point(at: gridpoint).coordinate
     }

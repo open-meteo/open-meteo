@@ -1,7 +1,5 @@
 import Foundation
 
-typealias LatLon = (latitude: Float, longitude: Float)
-
 /// Float representation used by the hot lookup path.
 ///
 /// Query and artifact vectors use the same precision so candidate distances require no
@@ -20,7 +18,7 @@ struct SphericalLookupVector: Sendable {
 ///
 /// Generation and exact comparisons use Double. Artifacts store each component as Float32, and
 /// exact comparisons promote and normalize the stored value before evaluating its dot product.
-struct SphericalPoint: Sendable, Equatable {
+package struct SphericalPoint: Sendable, Equatable {
     private static let degreesToRadians = Double.pi / 180
     private static let degreesToRadiansFloat = Float.pi / 180
 
@@ -35,7 +33,7 @@ struct SphericalPoint: Sendable, Equatable {
     }
 
     /// Converts geographic radians to a Cartesian unit direction.
-    init(latitudeRadians: Double, longitudeRadians: Double) {
+    package init(latitudeRadians: Double, longitudeRadians: Double) {
         let latitudeCosine = cos(latitudeRadians)
         self.init(
             x: latitudeCosine * cos(longitudeRadians),
@@ -68,7 +66,7 @@ struct SphericalPoint: Sendable, Equatable {
     }
 
     /// Converts the direction back to geographic degrees.
-    var coordinate: LatLon {
+    package var coordinate: (latitude: Float, longitude: Float) {
         (
             latitude: Float(asin(max(-1, min(1, z))) * 180 / .pi),
             longitude: Float(atan2(y, x) * 180 / .pi)

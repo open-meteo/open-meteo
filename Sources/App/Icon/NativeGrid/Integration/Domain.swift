@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import SphericalCube
 import Synchronization
 import Vapor
 
@@ -292,7 +293,7 @@ struct IconNativeUnavailableGrid: Gridable {
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Range<Int>? { nil }
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
-    func getCoordinates(gridpoint: Int) -> LatLon { (.nan, .nan) }
+    func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) { (.nan, .nan) }
     func findPointTerrainOptimised(
         lat: Float,
         lon: Float,

@@ -50,16 +50,16 @@ import OmFileFormat
 ///         v
 /// exact implicit-tree search over six faces --> apply limit --> canonical ID / nil
 /// ```
-final class SphericalCubeIndex: Sendable {
+package final class SphericalCubeIndex: Sendable {
     typealias Artifact = SphericalCubeArtifact
     typealias FaceSection = Artifact.FaceSection
 
     /// Reusable result of nearest lookup. Nearby-point selection retains the query projection so it
     /// does not repeat trigonometry or the exact-nearest search.
-    struct Lookup: Sendable {
+    package struct Lookup: Sendable {
         let query: SphericalLookupVector
         let location: SphericalCubeGeometry.Location
-        let pointID: Int
+        package let pointID: Int
         let position: Int
         let distanceSquared: Float
     }
@@ -82,15 +82,15 @@ final class SphericalCubeIndex: Sendable {
     private let maximumDistanceSquared: Float
     let resolutionScale: Double
     private let boundaries: [Boundary]
-    let coversWholeSphere: Bool
+    package let coversWholeSphere: Bool
 
-    let pointCount: Int
-    let level: Int
-    let resolution: Int
-    let identity: SphericalCubeArtifact.DatasetIdentity
+    package let pointCount: Int
+    package let level: Int
+    package let resolution: Int
+    package let identity: SphericalCubeArtifact.DatasetIdentity
 
     /// Opens and validates the artifact, then precomputes leaf-boundary terms used by certification.
-    init(file: URL) throws {
+    package init(file: URL) throws {
         let artifact = try Artifact.open(file: file)
         mapped = artifact.mapped
         faceSections = artifact.faceSections
@@ -115,13 +115,13 @@ final class SphericalCubeIndex: Sendable {
     /// Returns the canonical ID nearest to the coordinate, or `nil` for invalid input or when the
     /// closest stored point exceeds the artifact's maximum chord distance.
     @inline(__always)
-    func nearestPointID(latitude: Float, longitude: Float) -> Int? {
+    package func nearestPointID(latitude: Float, longitude: Float) -> Int? {
         nearestLookup(latitude: latitude, longitude: longitude)?.pointID
     }
 
     /// Performs nearest lookup and retains the intermediate state used by nearby-point search.
     @inline(__always)
-    func nearestLookup(latitude: Float, longitude: Float) -> Lookup? {
+    package func nearestLookup(latitude: Float, longitude: Float) -> Lookup? {
         guard latitude.isFinite, longitude.isFinite, latitude >= -90, latitude <= 90 else {
             return nil
         }
@@ -151,7 +151,7 @@ final class SphericalCubeIndex: Sendable {
 
     /// Returns a canonical point direction through the reverse ID-to-storage permutation.
     @inline(__always)
-    func point(at pointID: Int) -> SphericalPoint {
+    package func point(at pointID: Int) -> SphericalPoint {
         precondition(pointID >= 0 && pointID < pointCount, "Spherical point ID out of range")
         return withBytes { bytes in
             let position = Int(

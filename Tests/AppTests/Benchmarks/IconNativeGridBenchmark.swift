@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import App
+@testable import SphericalCube
 
 /// Opt-in because this generates an R3B7-scale artifact and performs several million lookups.
 /// Run with:

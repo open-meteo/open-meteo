@@ -1,5 +1,4 @@
 import Foundation
-import OmFileFormat
 
 extension SphericalCubeIndex {
     private struct DistanceCandidate: Sendable {
@@ -15,16 +14,16 @@ extension SphericalCubeIndex {
     /// distance-ordered local candidates; unlike nearest lookup, they are not promised to be the
     /// globally exact k-nearest points because the search may stop after collecting a sufficiently
     /// useful local set.
-    struct NearbyPoints: Sendable {
-        var pointIDs = InlineArray<10, Int>(repeating: -1)
-        var distancesSquared = InlineArray<10, Float>(repeating: .infinity)
-        var count = 0
+    package struct NearbyPoints: Sendable {
+        package var pointIDs = InlineArray<10, Int>(repeating: -1)
+        package var distancesSquared = InlineArray<10, Float>(repeating: .infinity)
+        package var count = 0
     }
 
     private static let nearbyPointLimit = 10
 
     /// Reuses a completed nearest lookup, avoiding duplicate coordinate conversion and search.
-    func nearestCandidates(from lookup: Lookup) -> NearbyPoints {
+    package func nearestCandidates(from lookup: Lookup) -> NearbyPoints {
         withBytes {
             nearestCandidates(
                 from: lookup,
