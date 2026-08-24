@@ -449,6 +449,10 @@ public struct TimerangeDt: Hashable, Sendable {
         return TimerangeDt(range: range, dtSeconds: dtSeconds)
     }
 
+    func with(start: Timestamp) -> TimerangeDt {
+        return TimerangeDt(start: start, to: range.upperBound, dtSeconds: dtSeconds)
+    }
+
     /// Format to a nice string like `2022-06-30 to 2022-07-13`
     func prettyString() -> String {
         /// Closed range end
