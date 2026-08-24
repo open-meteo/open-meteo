@@ -9,8 +9,14 @@ extension Zensun {
         let nDays = (timeRange.upperBound.timeIntervalSince1970 - timeRange.lowerBound.timeIntervalSince1970) / 86400
         rises.reserveCapacity(nDays)
         sets.reserveCapacity(nDays)
+
+        /// Time zones deviating more than 12 hours from local solar time anchor the wrong solar day, see #847.
+        /// Shift by whole days to put solar noon into the local day.
+        let solarNoonSinceLocalMidnight = Int((12 - lon / 15) * 3600) + utcOffsetSeconds
+        let solarDayShift = solarNoonSinceLocalMidnight - solarNoonSinceLocalMidnight.moduloPositive(86400)
+
         for time in timeRange.stride(dtSeconds: 86400) {
-            let utc = time.add(utcOffsetSeconds)
+            let utc = time.add(utcOffsetSeconds - solarDayShift)
             switch calculateSunTransit(utcMidnight: utc, lat: lat, lon: lon) {
             case .polarNight:
                 rises.append(time)
