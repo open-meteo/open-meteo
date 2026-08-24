@@ -1,14 +1,14 @@
 import Foundation
 import OmFileFormat
 
-enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertible {
+package enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertible {
     case invalidMagic
     case unsupportedVersion(UInt32)
     case invalidHeader
     case invalidPoint(Int)
     case artifactTooLarge(actual: Int, maximum: Int)
 
-    var description: String {
+    package var description: String {
         switch self {
         case .invalidMagic: "Invalid spherical cube artifact magic"
         case .unsupportedVersion(let version):
@@ -69,11 +69,16 @@ enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertible {
 /// ```
 ///
 /// Consequently the same artifact can be generated and memory-mapped by other languages.
-enum SphericalCubeArtifact {
+package enum SphericalCubeArtifact {
     /// Opaque producer-defined identity copied into the artifact and checked by its integration.
-    struct DatasetIdentity: Sendable, Equatable {
-        let number: UInt32
-        let uuid: [UInt8]
+    package struct DatasetIdentity: Sendable, Equatable {
+        package let number: UInt32
+        package let uuid: [UInt8]
+
+        package init(number: UInt32, uuid: [UInt8]) {
+            self.number = number
+            self.uuid = uuid
+        }
     }
 
     /// Validated mmap and the derived offsets needed by the runtime index.
@@ -93,10 +98,20 @@ enum SphericalCubeArtifact {
     }
 
     /// Writer-supplied policy and identity; it is not involved in spatial partitioning.
-    struct Metadata: Sendable {
-        let identity: DatasetIdentity
-        let coversWholeSphere: Bool
-        let maximumChordDistanceSquared: Float
+    package struct Metadata: Sendable {
+        package let identity: DatasetIdentity
+        package let coversWholeSphere: Bool
+        package let maximumChordDistanceSquared: Float
+
+        package init(
+            identity: DatasetIdentity,
+            coversWholeSphere: Bool,
+            maximumChordDistanceSquared: Float
+        ) {
+            self.identity = identity
+            self.coversWholeSphere = coversWholeSphere
+            self.maximumChordDistanceSquared = maximumChordDistanceSquared
+        }
     }
 
     /// Stored leaf rectangle for one cube face.

@@ -3,7 +3,7 @@ import Foundation
 extension SphericalCubeArtifact {
     /// Offline builder for the portable artifact. Generation may allocate proportional to the
     /// number of points and buckets; none of this machinery participates in runtime lookup.
-    enum Writer {
+    package enum Writer {
         private typealias FaceSection = SphericalCubeArtifact.FaceSection
 
         /// Partitions canonical points into cube buckets and writes an atomic, mmap-ready file.
@@ -12,7 +12,7 @@ extension SphericalCubeArtifact {
         /// whether all face buckets or occupied face rectangles are materialized. The maximum chord
         /// distance rejects queries too far from every stored point, which gives partial datasets a
         /// cheap distance-based coverage rule without storing polygon topology.
-        static func write(
+        package static func write(
             to file: URL,
             metadata: SphericalCubeArtifact.Metadata,
             points: [SphericalPoint],
