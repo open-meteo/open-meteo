@@ -11,13 +11,15 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     
     case direct(Variable)
     case directShift24Hour(Variable)
+    /// Read additional samples before the requested range and return a trailing mean aligned to the request.
+    case runningMean(Variable, windowSeconds: Int, maximumStepSeconds: Int)
     //case independent((TimerangeDtAndSettings) -> DataAndUnit)
     case one(RawOrMapped, (DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case two(RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case three(RawOrMapped, RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case four(RawOrMapped, RawOrMapped, RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     
-    case weatherCode(cloudcover: RawOrMapped, precipitation: Variable, convectivePrecipitation: Variable?, snowfallCentimeters: RawOrMapped, gusts: Variable?, cape: Variable?, liftedIndex: Variable?, convectiveInhibition: Variable?, boundaryLayerHeight: Variable?, visibilityMeters: Variable?, categoricalFreezingRain: Variable?)
+    case weatherCode(cloudcover: RawOrMapped, precipitation: Variable, convectivePrecipitation: RawOrMapped?, snowfallCentimeters: RawOrMapped, gusts: Variable?, cape: Variable?, liftedIndex: Variable?, convectiveInhibition: Variable?, boundaryLayerHeight: Variable?, visibilityMeters: Variable?, categoricalFreezingRain: Variable?)
     
     init?(rawValue: String) {
         fatalError("DerivedMapping must not be used via string initializer")
@@ -136,6 +138,19 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
 }
 
+extension TimerangeDt {
+    func runningMeanReadTime(windowSeconds: Int, maximumStepSeconds: Int) -> TimerangeDt {
+        let calculationDtSeconds = Swift.min(self.dtSeconds, maximumStepSeconds)
+        precondition(windowSeconds % calculationDtSeconds == 0)
+        precondition(dtSeconds % calculationDtSeconds == 0)
+        return TimerangeDt(
+            start: range.lowerBound.add(-windowSeconds),
+            to: range.upperBound,
+            dtSeconds: calculationDtSeconds
+        )
+    }
+}
+
 protocol GenericDeriverProtocol: GenericReaderOptionalProtocol {
     associatedtype Reader: GenericReaderProtocol
     
@@ -191,6 +206,13 @@ extension GenericDeriverProtocol {
             return try await get(variable: derivedMapping, time: time)
         }
     }
+
+    fileprivate func getOptional(mapping: DerivedMapping<Reader.MixingVar>.RawOrMapped?, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        guard let mapping else {
+            return nil
+        }
+        return try await get(mapping: mapping, time: time)
+    }
     
     fileprivate func get(variable: Reader.MixingVar?, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         guard let variable else {
@@ -205,8 +227,16 @@ extension GenericDeriverProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
-//        case .independent(let fn):
-//            return fn(time)
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            let input = try await reader.get(variable: input, time: time.with(time: readTime))
+            return DataAndUnit(
+                input.data.slidingAverageDroppingFirstDt(
+                    dt: windowSeconds / readTime.dtSeconds,
+                    outputStride: time.dtSeconds / readTime.dtSeconds
+                ),
+                input.unit
+            )
         case .one(let a, let fn):
             let a = try await get(mapping: a, time: time)
             return fn(a, time)
@@ -234,7 +264,7 @@ extension GenericDeriverProtocol {
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover.data,
                 precipitation: precipitation.data,
-                convectivePrecipitation: try await get(variable: convectivePrecipitation, time: time)?.data,
+                convectivePrecipitation: try await getOptional(mapping: convectivePrecipitation, time: time)?.data,
                 snowfallCentimeters: snowfall.data,
                 gusts: try await get(variable: gusts, time: time)?.data,
                 cape: try await get(variable: cape, time: time)?.data,
@@ -271,8 +301,9 @@ extension GenericDeriverProtocol {
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
-//        case .independent(_):
-//            break
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            try await prefetchData(variable: input, time: time.with(time: readTime))
         case .one(let a, _):
             try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):
@@ -291,7 +322,9 @@ extension GenericDeriverProtocol {
             try await prefetchData(mapping: cloudcover, time: time)
             try await prefetchData(mapping: snowfallCentimeters, time: time)
             try await prefetchData(variable: precipitation, time: time)
-            try await prefetchData(variable: convectivePrecipitation, time: time)
+            if let convectivePrecipitation {
+                try await prefetchData(mapping: convectivePrecipitation, time: time)
+            }
             try await prefetchData(variable: gusts, time: time)
             try await prefetchData(variable: cape, time: time)
             try await prefetchData(variable: liftedIndex, time: time)
@@ -365,6 +398,13 @@ extension GenericDeriverOptionalProtocol {
             return try await get(variable: derivedMapping, time: time)
         }
     }
+
+    fileprivate func getOptional(mapping: DerivedMapping<ReaderVariable>.RawOrMapped?, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        guard let mapping else {
+            return nil
+        }
+        return try await get(mapping: mapping, time: time)
+    }
     
     
     fileprivate func get(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
@@ -373,8 +413,18 @@ extension GenericDeriverOptionalProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
-//        case .independent(let fn):
-//            return fn(time)
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            guard let input = try await get(variable: input, time: time.with(time: readTime)) else {
+                return nil
+            }
+            return DataAndUnit(
+                input.data.slidingAverageDroppingFirstDt(
+                    dt: windowSeconds / readTime.dtSeconds,
+                    outputStride: time.dtSeconds / readTime.dtSeconds
+                ),
+                input.unit
+            )
         case .one(let a, let fn):
             guard let a = try await get(mapping: a, time: time) else {
                 return nil
@@ -416,7 +466,7 @@ extension GenericDeriverOptionalProtocol {
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover.data,
                 precipitation: precipitation.data,
-                convectivePrecipitation: try await get(variable: convectivePrecipitation, time: time)?.data,
+                convectivePrecipitation: try await getOptional(mapping: convectivePrecipitation, time: time)?.data,
                 snowfallCentimeters: snowfall.data,
                 gusts: try await get(variable: gusts, time: time)?.data,
                 cape: try await get(variable: cape, time: time)?.data,
@@ -453,8 +503,9 @@ extension GenericDeriverOptionalProtocol {
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
-//        case .independent(_):
-//            return true
+        case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
+            let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
+            return try await prefetchData(variable: input, time: time.with(time: readTime))
         case .one(let a, _):
             return try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):
@@ -476,7 +527,9 @@ extension GenericDeriverOptionalProtocol {
             let a = try await prefetchData(mapping: cloudcover, time: time)
             let b = try await prefetchData(mapping: snowfallCentimeters, time: time)
             let c = try await prefetchData(variable: precipitation, time: time)
-            let _ = try await prefetchData(variable: convectivePrecipitation, time: time)
+            if let convectivePrecipitation {
+                let _ = try await prefetchData(mapping: convectivePrecipitation, time: time)
+            }
             let _ = try await prefetchData(variable: gusts, time: time)
             let _ = try await prefetchData(variable: cape, time: time)
             let _ = try await prefetchData(variable: liftedIndex, time: time)

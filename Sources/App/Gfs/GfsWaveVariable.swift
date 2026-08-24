@@ -109,7 +109,9 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
 }
 
 extension GfsWaveVariable: GfsVariableDownloadable {
-    func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String? {
+    var downloadField: GfsDownloadField { .wave }
+
+    func gribIndexName(timestep: Int?) -> String? {
         switch self {
         case .wave_height:
             return ":HTSGW:surface:"
@@ -144,11 +146,9 @@ extension GfsWaveVariable: GfsVariableDownloadable {
         }
     }
 
-    func skipHour0(for domain: GfsDomain) -> Bool {
-        return false
-    }
+    var skipHour0: Bool { false }
 
-    func multiplyAdd(domain: GfsDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         return nil
     }
 }

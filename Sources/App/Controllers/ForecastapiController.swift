@@ -282,7 +282,7 @@ struct WeatherApiController {
                 domains = domainsParam.map{$0.remappedToEnsembleApi}
             case .airQuality:
                 // Air quality API used domains=auto, global or europe
-                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsApiDomain.load(commaSeparatedOptional: params.models) ?? [.auto])
                 domains = camsDomains.map(\.multiDomain)
             default:
                 domains = domainsParam
@@ -976,9 +976,121 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     )
 
+    struct RawReaderDerivationGroup {
+        typealias ReaderResult = (reader: any GenericReaderOptionalProtocol<ForecastVariable>, elevation: Float)
+
+        let singleDomainSource: (any GenericDomain, any GenericVariable.Type)?
+        private let makeReaderClosure: (Float, Float, Float, GridSelectionMode, GenericReaderOptions) async throws -> ReaderResult?
+
+        init<Domain, Variable>(
+            domains: [Domain],
+            variableType: Variable.Type,
+            derivationDomain: Domain,
+            primaryDomain: Domain? = nil
+        ) where
+            Domain: GenericDomain,
+            Variable: GenericVariable & Hashable
+        {
+            self.singleDomainSource = primaryDomain.map { ($0, variableType) }
+            self.makeReaderClosure = { lat, lon, elevation, mode, options in
+                var resolvedElevation = elevation
+                var derivationDomainInitialized = false
+                let initialized: [GenericReaderCached<Domain, Variable>] = try await domains.reversed().asyncCompactMap { domain in
+                    guard let rawReader = try await GenericReader<Domain, Variable>(
+                        domain: domain,
+                        lat: lat,
+                        lon: lon,
+                        elevation: resolvedElevation,
+                        mode: mode,
+                        options: options
+                    ) else {
+                        return nil
+                    }
+                    let reader = GenericReaderCached(reader: rawReader)
+                    if resolvedElevation.isNaN {
+                        resolvedElevation = reader.resolvedTargetElevation
+                    }
+                    if domain.domainRegistry == derivationDomain.domainRegistry {
+                        derivationDomainInitialized = true
+                    }
+                    return reader
+                }.reversed()
+                guard derivationDomainInitialized else {
+                    return nil
+                }
+                let mixer = GenericReaderMixerSameVariableType(reader: initialized)
+                let reader = VariableHourlyDeriver(
+                    reader: mixer,
+                    options: options,
+                    domainRegistry: derivationDomain.domainRegistry
+                )
+                return (reader, resolvedElevation)
+            }
+        }
+
+        init<PrimaryDomain, PrimaryVariable, SupplementalDomain, SupplementalVariable>(
+            primary: (PrimaryDomain, PrimaryVariable.Type),
+            supplemental: (SupplementalDomain, SupplementalVariable.Type)
+        ) where
+            PrimaryDomain: GenericDomain,
+            PrimaryVariable: GenericVariable,
+            SupplementalDomain: GenericDomain,
+            SupplementalVariable: GenericVariable
+        {
+            self.singleDomainSource = nil
+            self.makeReaderClosure = { lat, lon, elevation, mode, options in
+                guard let primaryRawReader = try await GenericReader<PrimaryDomain, PrimaryVariable>(
+                    domain: primary.0,
+                    lat: lat,
+                    lon: lon,
+                    elevation: elevation,
+                    mode: mode,
+                    options: options
+                ) else {
+                    return nil
+                }
+                let primaryReader = GenericReaderCached(reader: primaryRawReader)
+                let resolvedElevation = elevation.isFinite ? elevation : primaryReader.resolvedTargetElevation
+                let supplementalReader = try await GenericReader<SupplementalDomain, SupplementalVariable>(
+                    domain: supplemental.0,
+                    lat: lat,
+                    lon: lon,
+                    elevation: resolvedElevation,
+                    mode: mode,
+                    options: options
+                ).map { GenericReaderCached(reader: $0) }
+                let rawReaders: [any GenericReaderProtocol] = [supplementalReader].compactMap { $0 } + [primaryReader]
+                let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<PrimaryVariable, SupplementalVariable>>(
+                    reader: rawReaders
+                )
+                let reader = VariableHourlyDeriver(
+                    reader: mixer,
+                    options: options,
+                    domainRegistry: primary.0.domainRegistry
+                )
+                return (reader, resolvedElevation)
+            }
+        }
+
+        func makeReader(
+            lat: Float,
+            lon: Float,
+            elevation: Float,
+            mode: GridSelectionMode,
+            options: GenericReaderOptions
+        ) async throws -> ReaderResult? {
+            try await makeReaderClosure(lat, lon, elevation, mode, options)
+        }
+    }
+
     enum DomainReaderMapping {
         case single(any GenericDomain, any GenericVariable.Type)
         case multiple([(any GenericDomain, any GenericVariable.Type)])
+        /// Mixes raw fields within each group, then places derived groups above supplemental readers.
+        case mixedBeforeDerivation(
+            groups: [RawReaderDerivationGroup],
+            supplemental: [(any GenericDomain, any GenericVariable.Type)]
+        )
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
         case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
         case seamlessLocal(
@@ -986,6 +1098,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             local: [(any GenericDomain, any GenericVariable.Type)],
             precipitationProb: (any GenericDomain)?
         )
+        /// Derives each domain independently, then mixes supplemental results by priority.
         case singleWithSupplementalDomains(
             any GenericDomain,
             any GenericVariable.Type,
@@ -1021,6 +1134,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                  .singleWithPrecipitationProbability(let domain, _, _),
                  .singleWithSupplementalDomains(let domain, _, _, _, _):
                 return domain
+            case .mixedBeforeDerivation(let groups, _):
+                return groups.count == 1 ? groups.first?.singleDomainSource?.0 : nil
             default:
                 return nil
             }
@@ -1044,6 +1159,29 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             case .multiple(let domains):
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(forecast.readers)
+            case .mixedBeforeDerivation(let groups, let supplemental):
+                var resolvedElevation = elevation
+                let derivedGroupReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await groups.reversed().asyncCompactMap { group in
+                    guard let result = try await group.makeReader(
+                        lat: lat,
+                        lon: lon,
+                        elevation: resolvedElevation,
+                        mode: mode,
+                        options: options
+                    ) else {
+                        return nil
+                    }
+                    resolvedElevation = result.elevation
+                    return result.reader
+                }.reversed()
+                let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                guard !derivedGroupReaders.isEmpty || !supplementalReaders.readers.isEmpty else {
+                    return nil
+                }
+                return MultiDomains.hourlyToMultiSameType(
+                    supplementalReaders.readers + derivedGroupReaders,
+                    prefetchAllReaders: true
+                )
             case .seamlessLocal(let global, let local, let precipitationProb):
                 let localForecast = try await Self.makeDomainReaders(sources: local, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 guard !localForecast.readers.isEmpty else {
@@ -1075,10 +1213,70 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return false
         }
     }
-    
+
+    private static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
+        RawReaderDerivationGroup(
+            primary: (GfsDomain.gfs013, Gfs013Variable.self),
+            supplemental: (GfsDomain.gfs025, Gfs025Variable.self)
+        )
+    }
+
+    private static func hrrrDerivationGroup(include15Min: Bool, exposeAsSingleDomain: Bool = true) -> RawReaderDerivationGroup {
+        RawReaderDerivationGroup(
+            domains: include15Min ? [GfsDomain.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus],
+            variableType: HrrrVariable.self,
+            derivationDomain: .hrrr_conus,
+            primaryDomain: exposeAsSingleDomain ? .hrrr_conus : nil
+        )
+    }
+
     /// Generic domains with hourly data that can use the generic deriver controller
-    func getDomainAndVariable() -> DomainReaderMapping? {
+    func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
         switch self {
+        case .gfs025, .ncep_gfs025:
+            return .single(GfsDomain.gfs025, Gfs025Variable.self)
+        case .gfs013, .ncep_gfs013:
+            return .single(GfsDomain.gfs013, Gfs013Variable.self)
+        case .ncep_nam_conus:
+            return .single(GfsDomain.nam_conus, NamVariable.self)
+        case .ncep_hrrr_conus_15min:
+            return .single(GfsDomain.hrrr_conus_15min, Hrrr15MinVariable.self)
+        case .gfs_hrrr, .ncep_hrrr_conus:
+            return .mixedBeforeDerivation(
+                groups: [Self.hrrrDerivationGroup(include15Min: include15Min)],
+                supplemental: [(NbmDomain.nbm_conus, ProbabilityVariable.self)]
+            )
+        case .gfs_global, .ncep_gfs_global:
+            return .mixedBeforeDerivation(
+                groups: [Self.gfsGlobalDerivationGroup],
+                supplemental: [
+                    (GfsDomain.gfs05_ens, ProbabilityVariable.self),
+                    (GfsDomain.gfs025_ens, ProbabilityVariable.self)
+                ]
+            )
+        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
+            return .mixedBeforeDerivation(
+                groups: [
+                    Self.gfsGlobalDerivationGroup,
+                    Self.hrrrDerivationGroup(include15Min: include15Min, exposeAsSingleDomain: false)
+                ],
+                supplemental: [
+                    (GfsDomain.gfs05_ens, ProbabilityVariable.self),
+                    (GfsDomain.gfs025_ens, ProbabilityVariable.self),
+                    (NbmDomain.nbm_conus, ProbabilityVariable.self)
+                ]
+            )
+        case .ncep_gefs025:
+            return .single(GfsDomain.gfs025_ens, Gefs025Variable.self)
+        case .gfs05, .ncep_gefs05:
+            return .single(GfsDomain.gfs05_ens, Gefs05Variable.self)
+        case .ncep_gefs_seamless:
+            return .multiple([
+                (GfsDomain.gfs05_ens, Gefs05Variable.self),
+                (GfsDomain.gfs025_ens, Gefs025Variable.self)
+            ])
+        case .ncep_nbm_conus:
+            return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
@@ -1239,9 +1437,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025_ensemble_mean:
             return .single(EcmwfDomain.aifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
         case .ncep_gefs025_ensemble_mean:
-            return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+            return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
         case .ncep_gefs05_ensemble_mean:
-            return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+            return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self)
         case .ecmwf_ifs_europe_ensemble:
             return .single(EcmwfEcpdsDomain.ifs_europe_ensemble, EcmwfEcdpsIfsEuropeEnsembleVariable.self)
         case .ecmwf_ifs_europe_ensemble_mean:
@@ -1252,32 +1450,42 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(EcmwfEcpdsDomain.aifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsAifsEuropeEnsembleVariable>.self)
         case .ncep_gefs_ensemble_mean_seamless:
             return .multiple([
-                (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self),
-                (GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+                (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self),
+                (GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
             ])
         case .cmc_gem_geps_ensemble_mean:
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
         case .bom_access_global_ensemble_mean:
             return .single(BomDomain.access_global_ensemble, VariableOrSpread<BomVariable>.self)
+        case .google_weathernext2_ensemble_mean:
+            return .single(WeatherNextDomain.weathernext_global_ensemble_mean, VariableOrSpread<WeatherNextVariable>.self)
         case .ukmo_global_ensemble_20km:
             return .single(UkmoDomain.global_ensemble_20km, UkmoGlobalEnsembleVariable.self)
         case .ukmo_uk_ensemble_2km:
             return .single(UkmoDomain.uk_ensemble_2km, UkmoUkvEnsembleVariable.self)
-        case .google_weathernext2_ensemble_mean:
-            return .single(WeatherNextDomain.weathernext_global_ensemble_mean, VariableOrSpread<WeatherNextVariable>.self)
         case .ukmo_global_ensemble_mean_20km:
             return .single(UkmoDomain.global_ensemble_mean_20km, VariableOrSpread<UkmoGlobalEnsembleVariable>.self)
         case .ukmo_uk_ensemble_mean_2km:
             return .single(UkmoDomain.uk_ensemble_mean_2km, VariableOrSpread<UkmoUkvEnsembleVariable>.self)
         case .ukmo_seamless:
-                return .multiple([
-                    (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
-                    (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
-                ])// , precipitationProb: UkmoDomain.global_ensemble_20km) // probabilities are not calculated for UK global ens
+            return .multiple([
+                (UkmoDomain.global_ensemble_20km, ProbabilityVariable.self),
+                (UkmoDomain.uk_ensemble_2km, ProbabilityVariable.self),
+                (UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
+                (UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+            ])
         case .ukmo_uk_deterministic_2km:
-            return .single(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+            return .singleWithPrecipitationProbability(
+                UkmoDomain.uk_deterministic_2km,
+                UkmoVariable.self,
+                precipitationProb: UkmoDomain.uk_ensemble_2km
+            )
         case .ukmo_global_deterministic_10km:
-            return .single(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self)
+            return .singleWithPrecipitationProbability(
+                UkmoDomain.global_deterministic_10km,
+                SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self,
+                precipitationProb: UkmoDomain.global_ensemble_20km
+            )
         case .meteoswiss_icon_ch1:
             return .singleWithPrecipitationProbability(MeteoSwissDomain.icon_ch1, MeteoSwissVariable.self, precipitationProb: MeteoSwissDomain.icon_ch1_ensemble)
         case .meteoswiss_icon_ch2:
@@ -1315,6 +1523,55 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (ChmiDomain.aladin_central_europe_2km, ChmiVariable.self),
                 (ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .air_quality_best_match:
+            return .mixedBeforeDerivation(
+                groups: [
+                    RawReaderDerivationGroup(
+                        domains: [
+                            CamsDomain.cams_global,
+                            .cams_global_greenhouse_gases,
+                            .cams_europe,
+                            .cams_europe_reanalysis_interim,
+                            .cams_europe_reanalysis_validated,
+                            .cams_europe_reanalysis_validated_pre2020,
+                            .cams_europe_reanalysis_validated_pre2018
+                        ],
+                        variableType: CamsVariable.self,
+                        derivationDomain: CamsDomain.cams_global
+                    )
+                ],
+                supplemental: []
+            )
+        case .cams_global:
+            return .mixedBeforeDerivation(
+                groups: [
+                    RawReaderDerivationGroup(
+                        domains: [CamsDomain.cams_global, .cams_global_greenhouse_gases],
+                        variableType: CamsVariable.self,
+                        derivationDomain: CamsDomain.cams_global,
+                        primaryDomain: CamsDomain.cams_global
+                    )
+                ],
+                supplemental: []
+            )
+        case .cams_europe:
+            return .mixedBeforeDerivation(
+                groups: [
+                    RawReaderDerivationGroup(
+                        domains: [
+                            CamsDomain.cams_europe,
+                            .cams_europe_reanalysis_interim,
+                            .cams_europe_reanalysis_validated,
+                            .cams_europe_reanalysis_validated_pre2020,
+                            .cams_europe_reanalysis_validated_pre2018
+                        ],
+                        variableType: CamsVariable.self,
+                        derivationDomain: CamsDomain.cams_europe,
+                        primaryDomain: CamsDomain.cams_europe
+                    )
+                ],
+                supplemental: []
+            )
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
                 (EcmwfDomain.ifs025, EcmwfVariable.self),
@@ -1368,20 +1625,26 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         return (hourlyReader, daily, nil, nil)
     }
 
-    static func hourlyToMultiSameType(_ readers: [any GenericReaderOptionalProtocol<ForecastVariable>]) -> ForecastReaderResult? {
+    static func hourlyToMultiSameType(
+        _ readers: [any GenericReaderOptionalProtocol<ForecastVariable>],
+        prefetchAllReaders: Bool = false
+    ) -> ForecastReaderResult? {
         guard readers.count > 0 else {
             return nil
         }
-        let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
+        let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: prefetchAllReaders)
         return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
     }
 
-    static func hourlyToMultiSameType(_ readers: [(any GenericReaderOptionalProtocol<ForecastVariable>)?]) -> ForecastReaderResult? {
-        return hourlyToMultiSameType(readers.compactMap { $0 })
+    static func hourlyToMultiSameType(
+        _ readers: [(any GenericReaderOptionalProtocol<ForecastVariable>)?],
+        prefetchAllReaders: Bool = false
+    ) -> ForecastReaderResult? {
+        return hourlyToMultiSameType(readers.compactMap { $0 }, prefetchAllReaders: prefetchAllReaders)
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        if let d = getDomainAndVariable() {
+        if let d = getDomainAndVariable(include15Min: include15Min) {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         
@@ -1393,8 +1656,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let gfsForecast = try await DomainReaderMapping.mixedBeforeDerivation(
+                groups: [Self.gfsGlobalDerivationGroup],
+                supplemental: []
+            )
+                .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard
-                let gfs: any GenericReaderProtocol = try await GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                let gfs = gfsForecast?.hourly,
                 let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifs025 = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1444,7 +1712,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
                     iconProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     ifsHres.asOptionalReader,
                     icon,
                     iconEu,
@@ -1472,7 +1740,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     return MultiDomains.hourlyToMultiSameType([
                         gfsProbabilites.asOptionalReader,
                         iconProbabilities.asOptionalReader,
-                        gfs.asOptionalReader,
+                        gfs,
                         icon,
                         ifsHres.asOptionalReader,
                         arpegeEurope,
@@ -1489,7 +1757,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     icon,
                     iconEu,
                     ifs025.asOptionalReader,
@@ -1498,14 +1766,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 ])
             }
             // For North America, use HRRR
-            if let hrrr = try await GfsReader(domains: include15Min ? [.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if let hrrr = try await DomainReaderMapping.mixedBeforeDerivation(
+                groups: [Self.hrrrDerivationGroup(include15Min: include15Min)],
+                supplemental: []
+            ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     nbmProbabilities?.asOptionalReader,
                     icon,
-                    gfs.asOptionalReader,
-                    hrrr.asOptionalReader
+                    gfs,
+                    hrrr
                 ])
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
@@ -1516,7 +1787,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     icon,
                     ifsHres.asOptionalReader,
                     jmaMsmUpper,
@@ -1530,7 +1801,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     iconProbabilities.asOptionalReader,
-                    gfs.asOptionalReader,
+                    gfs,
                     ifsHres.asOptionalReader,
                     icon,
                     iconEu
@@ -1541,7 +1812,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return MultiDomains.hourlyToMultiSameType([
                 gfsProbabilites.asOptionalReader,
                 ifsProbabilities.asOptionalReader,
-                gfs.asOptionalReader,
+                gfs,
                 icon,
                 ifsHres.asOptionalReader
             ])
@@ -1556,7 +1827,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             
             let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
+            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
             let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: EcmwfEC46Variable6Hourly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
@@ -1704,6 +1975,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                  .singleWithPrecipitationProbability(let domain, let variable, _),
                  .singleWithSupplementalDomains(let domain, let variable, _, _, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
+            case .mixedBeforeDerivation(let groups, _):
+                guard groups.count == 1, let singleDomainSource = groups.first?.singleDomainSource else {
+                    return (nil, nil, nil, nil)
+                }
+                return try await singleDomainSource.0.makeGenericHourlyDaily(variableType: singleDomainSource.1, position: gridpoint, options: options)
             case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
@@ -1735,28 +2011,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         switch self {
         case .best_match:
             return [] // migrated
-        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
-            return [
-                try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as any GenericReaderProtocol,
-                try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await GfsReader(domains: include15Min ? [.gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min] : [.gfs025, .gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
-        case .gfs_global, .ncep_gfs_global:
-            let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [gfsProbabilites] + (try await GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
-        case .gfs025, .ncep_gfs025:
-            return try await GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs013, .ncep_gfs013:
-            return try await GfsReader(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs_hrrr, .ncep_hrrr_conus:
-            return [
-                try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await GfsReader(domains: include15Min ? [.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
-        case .ncep_hrrr_conus_15min:
-            return try await GfsReader(domains: [.hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ncep_nam_conus:
-            return try await GfsReader(domains: [.nam_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless,
+             .gfs_global, .ncep_gfs_global,
+             .gfs025, .ncep_gfs025,
+             .gfs013, .ncep_gfs013,
+             .gfs_hrrr, .ncep_hrrr_conus,
+             .ncep_hrrr_conus_15min,
+             .ncep_nam_conus:
+            return [] // migrated
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
 //            return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
             return []
@@ -1878,7 +2140,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ukmo_uk_deterministic_2km:
             return [] // migrated to upper level
         case .ncep_nbm_conus:
-            return try await NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .eumetsat_sarah3:
             return [] // migrated to upper level
         case .jma_jaxa_himawari:
@@ -1921,12 +2183,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await EcmwfReader(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_aifs025_ensemble:
             return try await EcmwfReader(domain: .aifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ncep_gefs025:
-            return try await GfsReader(domains: [.gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs05, .ncep_gefs05:
-            return try await GfsReader(domains: [.gfs05_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ncep_gefs_seamless:
-            return try await GfsReader(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_gefs025, .gfs05, .ncep_gefs05, .ncep_gefs_seamless:
+            return [] // migrated
         case .gem_global_ensemble, .cmc_gem_geps:
             return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global_ensemble:
@@ -2002,20 +2260,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_gfswave016:
             return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .air_quality_best_match:
-            guard let reader = try await CamsMixer(domains: [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return []
-            }
-            return [reader]
+            return [] // migrated
         case .cams_global:
-            guard let reader = try await CamsMixer(domains: [.cams_global, .cams_global_greenhouse_gases], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return []
-            }
-            return [reader]
+            return [] // migrated
         case .cams_europe:
-            guard let reader = try await CamsMixer(domains: [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return []
-            }
-            return [reader]
+            return [] // migrated
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return []
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
@@ -2271,11 +2520,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_currents:
             return MfWaveDomain.mfcurrents
         case .air_quality_best_match:
-            return nil
+            return nil // migrated
         case .cams_global:
-            return CamsDomain.cams_global
+            return nil // migrated
         case .cams_europe:
-            return CamsDomain.cams_europe
+            return nil // migrated
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
@@ -2299,16 +2548,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         switch self {
-        case .gfs025, .ncep_gfs025:
-            return try await GfsReader(domain: .gfs025, gridpoint: gridpoint, options: options)
-        case .gfs013, .ncep_gfs013:
-            return try await GfsReader(domain: .gfs013, gridpoint: gridpoint, options: options)
-        case .gfs_hrrr, .ncep_hrrr_conus:
-            return try await GfsReader(domain: .hrrr_conus, gridpoint: gridpoint, options: options)
-        case .ncep_hrrr_conus_15min:
-            return try await GfsReader(domain: .hrrr_conus_15min, gridpoint: gridpoint, options: options)
-        case .ncep_nam_conus:
-            return try await GfsReader(domain: .nam_conus, gridpoint: gridpoint, options: options)
+        case .gfs025, .ncep_gfs025,
+             .gfs013, .ncep_gfs013,
+             .gfs_hrrr, .ncep_hrrr_conus,
+             .ncep_hrrr_conus_15min,
+             .ncep_nam_conus:
+            return nil // migrated
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return nil // defined in the upper function
         case .ncep_aigfs025:
@@ -2388,7 +2633,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gfs_global, .ncep_gfs_global:
             return nil
         case .ncep_nbm_conus:
-            return try await NbmReader(domain: .nbm_conus, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .jma_seamless, .jma_mix, .jma_msm, .jma_msm_upper_level, .jms_gsm, .jma_gsm:
             return nil // migrated
         case .gem_seamless, .cmc_gem_seamless:
@@ -2407,7 +2652,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 // Not possible
                 throw ForecastApiError.noDataAvailableForThisLocation
             }
-            return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
+            return Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameVariableType(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         case .era5_ensemble, .copernicus_era5_ensemble:
             return try await Era5Factory.makeReader(domain: .era5_ensemble, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs_analysis:
@@ -2527,13 +2772,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_currents:
             return nil // defined in the upper function
         case .air_quality_best_match:
-            return nil
+            return nil // migrated
         case .cams_global:
-            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint, options: options)
-            return CamsReader(reader: GenericReaderCached(reader: reader))
+            return nil // migrated
         case .cams_europe:
-            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint, options: options)
-            return CamsReader(reader: GenericReaderCached(reader: reader))
+            return nil // migrated
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:

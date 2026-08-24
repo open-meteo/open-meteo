@@ -103,11 +103,11 @@ enum Meteorology {
         }
     }
     
-    /// Calculate mea nsea level pressure, corrected by temperature.
+    /// Calculate mean sea level pressure, corrected by temperature.
     static func sealevelPressure(temperature2m: Array2DFastTime, surfacePressure: Array2DFastTime, elevation: [Float]) -> [Float] {
         return zip(temperature2m.data, surfacePressure.data).enumerated().map { i, arg1 -> Float in
             let (t, p) = arg1
-            let elevation = elevation[i % temperature2m.nTime]
+            let elevation = elevation[i / temperature2m.nTime]
             return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: elevation)
         }
     }

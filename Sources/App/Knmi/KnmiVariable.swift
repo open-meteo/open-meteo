@@ -36,6 +36,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
 
     case surface_temperature
     case visibility
+    case snow_depth
     case snow_depth_water_equivalent
 
     case wind_gusts_10m
@@ -92,6 +93,8 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return 10
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return 20
+        case .snow_depth:
+            return 100 // 1cm res
         case .snow_depth_water_equivalent:
             return 1
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
@@ -112,7 +115,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .cloud_cover_mid:
             return .hermite(bounds: 0...100)
         case .cloud_cover_high:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
@@ -123,7 +126,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .backwards_sum
         case .snowfall_water_equivalent:
             return .backwards_sum
-        case .snow_depth_water_equivalent:
+        case .snow_depth, .snow_depth_water_equivalent:
             return .linear
         case .wind_gusts_10m:
             return .hermite(bounds: 0...10e9)
@@ -154,6 +157,8 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .percentage
         case .rain, .precipitation, .snow_depth_water_equivalent:
             return .millimetre
+        case .snow_depth:
+            return .metre
         case .wind_gusts_10m:
             return .metrePerSecond
         case .pressure_msl:
