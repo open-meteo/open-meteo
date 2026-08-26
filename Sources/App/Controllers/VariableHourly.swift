@@ -641,6 +641,7 @@ private struct VariableHourlyDerivationCompatibility {
     let pressureLevelGeopotentialHeightScale: Float?
     let convertsPressureLevelVerticalVelocity: Bool
     let usesLegacyIconEpsRadiationStorage: Bool
+    let allowsSoilDepthCompatibilityAliases: Bool
 
     private init(
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
@@ -648,7 +649,8 @@ private struct VariableHourlyDerivationCompatibility {
         shortwaveRadiationScale: Float? = nil,
         pressureLevelGeopotentialHeightScale: Float? = nil,
         convertsPressureLevelVerticalVelocity: Bool = false,
-        usesLegacyIconEpsRadiationStorage: Bool = false
+        usesLegacyIconEpsRadiationStorage: Bool = false,
+        allowsSoilDepthCompatibilityAliases: Bool = true
     ) {
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
@@ -656,12 +658,16 @@ private struct VariableHourlyDerivationCompatibility {
         self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
         self.convertsPressureLevelVerticalVelocity = convertsPressureLevelVerticalVelocity
         self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
+        self.allowsSoilDepthCompatibilityAliases = allowsSoilDepthCompatibilityAliases
     }
 
     private static func gfs(
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers
     ) -> Self {
-        return .init(convectivePrecipitation: convectivePrecipitation)
+        return .init(
+            convectivePrecipitation: convectivePrecipitation,
+            allowsSoilDepthCompatibilityAliases: false
+        )
     }
 
     init(domain: DomainRegistry) {
@@ -683,7 +689,8 @@ private struct VariableHourlyDerivationCompatibility {
         case .ncep_nbm_conus:
             self = .init(
                 convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
-                omitsConvectivePrecipitationFromWeatherCode: true
+                omitsConvectivePrecipitationFromWeatherCode: true,
+                allowsSoilDepthCompatibilityAliases: false
             )
         case .meteofrance_arome_france0025,
              .meteofrance_arome_france_hd,
@@ -1646,23 +1653,32 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .windDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
         case .soil_temperature_0cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))
         case .soil_temperature_6cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_0_to_10cm.rawValue))
         case .soil_temperature_18cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_10_to_40cm.rawValue))
         case .soil_temperature_54cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_40_to_100cm.rawValue))
             
         case .soil_moisture_0_to_1cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
         case .soil_moisture_1_to_3cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
         case .soil_moisture_3_to_9cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
         case .soil_moisture_9_to_27cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_10_to_40cm.rawValue))
         case .soil_moisture_27_to_81cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_40_to_100cm.rawValue))
             
         case .soil_moisture_0_to_100cm:
