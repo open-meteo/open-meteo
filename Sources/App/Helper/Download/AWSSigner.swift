@@ -461,7 +461,7 @@ public struct AWSSigner {
         
         public var status: NIOHTTP1.HTTPResponseStatus {
             switch self {
-            case .missingPayloadHash:
+            case .payloadHashMismatch:
                 return .internalServerError
             default:
                 return .unauthorized
