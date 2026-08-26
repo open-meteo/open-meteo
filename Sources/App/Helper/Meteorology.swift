@@ -28,6 +28,15 @@ enum Meteorology {
             initializedCount += u.count
         }
     }
+
+    @inlinable static func oppositeDirection(_ direction: Float) -> Float {
+        return (direction + 180).truncatingRemainder(dividingBy: 360)
+    }
+
+    /// Calculate the direction a current is flowing towards from its vector components.
+    @inlinable static func oceanCurrentDirection(u: [Float], v: [Float]) -> [Float] {
+        return windirectionFast(u: u, v: v).map(oppositeDirection)
+    }
     
     /// Calculate evapotranspiration
     @inlinable static func evapotranspiration(latentHeatFlux: Float) -> Float {
