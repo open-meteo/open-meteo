@@ -6,12 +6,16 @@ import OmFileIO
 
 struct OmFileLocalRemoteOmReader {
     let reader: any OmFileReaderArrayProtocol<Float>
+    /// Native point selection can opt into the lazy decoded cache while ordinary OM reads and
+    /// remote invalidation retain the original reader. A file has only one filesystem payload.
+    let nativeElevationReader: any OmFileReaderArrayProtocol<Float>
     let timestamps: [Timestamp]?
     let timeRangeDt: TimerangeDt?
     
     init(remoteFile: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
         let readerRaw = try await OmFileReader(fn: remoteFile)
         self.reader = try readerRaw.expectArray(of: Float.self)
+        self.nativeElevationReader = OmFileLazyInt16ArrayReader(wrapping: self.reader) ?? self.reader
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }
@@ -23,6 +27,7 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         let file = try MmapFile(fn: fd)
         let readerRaw = try await OmFileReader(fn: file)
         self.reader = try readerRaw.expectArray(of: Float.self)
+        self.nativeElevationReader = OmFileLazyInt16ArrayReader(wrapping: self.reader) ?? self.reader
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }

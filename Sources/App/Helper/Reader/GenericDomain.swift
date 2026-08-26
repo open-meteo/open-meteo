@@ -77,11 +77,17 @@ extension GenericDomain {
                 logger: logger
             )?.reader
         case .elevation:
-            return try? await OmFileSystemManager.instance.get(
+            let payload = try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger
-            )?.reader
+            )
+            switch domainRegistryStatic {
+            case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+                return payload?.nativeElevationReader
+            default:
+                return payload?.reader
+            }
         }
     }
 
