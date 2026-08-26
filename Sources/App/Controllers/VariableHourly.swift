@@ -765,6 +765,15 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         return .raw(shortwave)
     }
 
+    private func maximum(
+        _ lhs: DerivedMapping<Reader.MixingVar>,
+        _ rhs: DerivedMapping<Reader.MixingVar>
+    ) -> DerivedMapping<Reader.MixingVar> {
+        return .two(.mapped(lhs), .mapped(rhs)) { lhs, rhs, _ in
+            return DataAndUnit(zip(lhs.data, rhs.data).map(Swift.max), lhs.unit)
+        }
+    }
+
     /// Resolve a pressure-level field to either its stored raw variable or a finite interpolation graph (only ICON).
     /// This function never calls `getDeriverMap`, keeping pressure-level derivations acyclic.
     private func pressureLevelInput(_ variable: ForecastPressureVariableType, at level: Int) -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
@@ -1008,6 +1017,121 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
 
         switch variable {
+        case .european_aqi_pm2_5:
+            guard let pm2_5 = Reader.variableFromString("pm2_5") else {
+                return nil
+            }
+            return .one(.raw(pm2_5)) { pm2_5, _ in
+                return DataAndUnit(pm2_5.data.map(EuropeanAirQuality.indexPm2_5), .europeanAirQualityIndex)
+            }
+        case .european_aqi_pm10:
+            guard let pm10 = Reader.variableFromString("pm10") else {
+                return nil
+            }
+            return .one(.raw(pm10)) { pm10, _ in
+                return DataAndUnit(pm10.data.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
+            }
+        case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
+            guard let nitrogenDioxide = Reader.variableFromString("nitrogen_dioxide") else {
+                return nil
+            }
+            return .one(.raw(nitrogenDioxide)) { nitrogenDioxide, _ in
+                return DataAndUnit(nitrogenDioxide.data.map(EuropeanAirQuality.indexNo2), .europeanAirQualityIndex)
+            }
+        case .european_aqi_ozone, .european_aqi_o3:
+            guard let ozone = Reader.variableFromString("ozone") else {
+                return nil
+            }
+            return .one(.raw(ozone)) { ozone, _ in
+                return DataAndUnit(ozone.data.map(EuropeanAirQuality.indexO3), .europeanAirQualityIndex)
+            }
+        case .european_aqi_sulphur_dioxide, .european_aqi_so2:
+            guard let sulphurDioxide = Reader.variableFromString("sulphur_dioxide") else {
+                return nil
+            }
+            return .one(.raw(sulphurDioxide)) { sulphurDioxide, _ in
+                return DataAndUnit(sulphurDioxide.data.map(EuropeanAirQuality.indexSo2), .europeanAirQualityIndex)
+            }
+        case .european_aqi:
+            guard
+                let pm2_5 = getDeriverMap(variable: .european_aqi_pm2_5),
+                let pm10 = getDeriverMap(variable: .european_aqi_pm10),
+                let nitrogenDioxide = getDeriverMap(variable: .european_aqi_no2),
+                let ozone = getDeriverMap(variable: .european_aqi_o3),
+                let sulphurDioxide = getDeriverMap(variable: .european_aqi_so2)
+            else {
+                return nil
+            }
+            return maximum(maximum(maximum(maximum(pm2_5, pm10), nitrogenDioxide), ozone), sulphurDioxide)
+        case .us_aqi_pm2_5:
+            guard let pm2_5 = Reader.variableFromString("pm2_5") else {
+                return nil
+            }
+            return .one(.mapped(.runningMean(pm2_5, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { pm2_5, _ in
+                return DataAndUnit(pm2_5.data.map(UnitedStatesAirQuality.indexPm2_5), .usAirQualityIndex)
+            }
+        case .us_aqi_pm10:
+            guard let pm10 = Reader.variableFromString("pm10") else {
+                return nil
+            }
+            return .one(.mapped(.runningMean(pm10, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { pm10, _ in
+                return DataAndUnit(pm10.data.map(UnitedStatesAirQuality.indexPm10), .usAirQualityIndex)
+            }
+        case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
+            guard let nitrogenDioxide = Reader.variableFromString("nitrogen_dioxide") else {
+                return nil
+            }
+            return .one(.raw(nitrogenDioxide)) { nitrogenDioxide, _ in
+                return DataAndUnit(nitrogenDioxide.data.map { UnitedStatesAirQuality.indexNo2(no2: $0 / 1.88) }, .usAirQualityIndex)
+            }
+        case .us_aqi_ozone, .us_aqi_o3:
+            guard let ozone = Reader.variableFromString("ozone") else {
+                return nil
+            }
+            return .two(.raw(ozone), .mapped(.runningMean(ozone, windowSeconds: 8 * 3600, maximumStepSeconds: 3600))) { ozone, ozoneMean, _ in
+                return DataAndUnit(zip(ozone.data, ozoneMean.data).map {
+                    UnitedStatesAirQuality.indexO3(o3: $0 / 1.96, o3_8h_mean: $1 / 1.96)
+                }, .usAirQualityIndex)
+            }
+        case .us_aqi_sulphur_dioxide, .us_aqi_so2:
+            guard let sulphurDioxide = Reader.variableFromString("sulphur_dioxide") else {
+                return nil
+            }
+            return .two(.raw(sulphurDioxide), .mapped(.runningMean(sulphurDioxide, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { sulphurDioxide, sulphurDioxideMean, _ in
+                return DataAndUnit(zip(sulphurDioxide.data, sulphurDioxideMean.data).map {
+                    UnitedStatesAirQuality.indexSo2(so2: $0 / 2.62, so2_24h_mean: $1 / 2.62)
+                }, .usAirQualityIndex)
+            }
+        case .us_aqi_carbon_monoxide, .us_aqi_co:
+            guard let carbonMonoxide = Reader.variableFromString("carbon_monoxide") else {
+                return nil
+            }
+            return .one(.mapped(.runningMean(carbonMonoxide, windowSeconds: 8 * 3600, maximumStepSeconds: 3600))) { carbonMonoxide, _ in
+                return DataAndUnit(carbonMonoxide.data.map {
+                    UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)
+                }, .usAirQualityIndex)
+            }
+        case .us_aqi:
+            guard
+                let pm2_5 = getDeriverMap(variable: .us_aqi_pm2_5),
+                let pm10 = getDeriverMap(variable: .us_aqi_pm10),
+                let nitrogenDioxide = getDeriverMap(variable: .us_aqi_no2),
+                let ozone = getDeriverMap(variable: .us_aqi_o3),
+                let sulphurDioxide = getDeriverMap(variable: .us_aqi_so2),
+                let carbonMonoxide = getDeriverMap(variable: .us_aqi_co)
+            else {
+                return nil
+            }
+            return maximum(
+                maximum(
+                    maximum(
+                        maximum(pm2_5, maximum(pm10, carbonMonoxide)),
+                        nitrogenDioxide
+                    ),
+                    ozone
+                ),
+                sulphurDioxide
+            )
         case .windspeed_10m:
             return getDeriverMap(variable: .wind_speed_10m)
         case .wind_speed_10m:

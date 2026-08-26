@@ -33,20 +33,71 @@ import Testing
         #expect(isDay == [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     }
 
-    @Test func sunRiseSetLosAngeles() {
-        // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
-        let utcOffsetSeconds = -25200
-       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
+    struct SunReference: Sendable {
+        let name: String
+        let latitude: Float
+        let longitude: Float
+        let utcOffsetSeconds: Int
+        let date: (year: Int, month: Int, day: Int)
+        let sunrise: (hour: Int, minute: Int, second: Int)
+        let sunset: (hour: Int, minute: Int, second: Int)
+        /// Close to the poles a day can start before local midnight or end after it
+        private(set) var riseDayOffset: Int = 0
+        private(set) var setDayOffset: Int = 0
 
-        // vancouver: lat: 49.25, lon: -123.12
-        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 34.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
-        #expect(times.rise[0] == Timestamp(1636208261))
-        #expect(times.set[0] == Timestamp(1636246534))
-        let sunset = times.set.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
-        let sunrise = times.rise.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
-        #expect(sunrise[0] == "2021-11-06T07:17") // supposed to be 07:17
-        #expect(sunset[0] == "2021-11-06T17:55") // supposed to be 17:55
+        /// Local midnight of `date` expressed in UTC
+        var localMidnight: Timestamp {
+            Timestamp(date.year, date.month, date.day).add(-utcOffsetSeconds)
+        }
+
+        var expectedRise: Timestamp {
+            Timestamp(date.year, date.month, date.day, sunrise.hour, sunrise.minute, sunrise.second).add(days: riseDayOffset).add(-utcOffsetSeconds)
+        }
+
+        var expectedSet: Timestamp {
+            Timestamp(date.year, date.month, date.day, sunset.hour, sunset.minute, sunset.second).add(days: setDayOffset).add(-utcOffsetSeconds)
+        }
+    }
+
+    /// Date line crossings, extreme and fractional time zone offsets, equinoxes, solstices and high latitudes.
+    /// Generated with Skyfield using the JPL DE440s ephemeris.
+    static let sunReferences: [SunReference] = [
+        .init(name: "Los Angeles", latitude: 34.05223, longitude: -118.24368, utcOffsetSeconds: -25200, date: (2021, 11, 6), sunrise: (7, 17, 30), sunset: (17, 55, 20)),
+        .init(name: "Vancouver", latitude: 49.25, longitude: -123.12, utcOffsetSeconds: -25200, date: (2021, 11, 6), sunrise: (8, 9, 8), sunset: (17, 42, 29)),
+        .init(name: "Chatham Islands", latitude: -44.0, longitude: -176.5833, utcOffsetSeconds: 45900, date: (2024, 6, 12), sunrise: (8, 3, 15), sunset: (16, 59, 3)),
+        .init(name: "Chatham Islands", latitude: -44.0, longitude: -176.5833, utcOffsetSeconds: 45900, date: (2024, 6, 13), sunrise: (8, 3, 45), sunset: (16, 58, 59)),
+        .init(name: "Kiritimati", latitude: 1.87, longitude: -157.43, utcOffsetSeconds: 50400, date: (2024, 6, 12), sunrise: (6, 22, 43), sunset: (18, 36, 27)),
+        .init(name: "Apia Samoa", latitude: -13.83, longitude: -171.77, utcOffsetSeconds: 46800, date: (2024, 6, 12), sunrise: (6, 47, 20), sunset: (18, 6, 32)),
+        .init(name: "Nukualofa Tonga", latitude: -21.13, longitude: -175.2, utcOffsetSeconds: 46800, date: (2024, 6, 12), sunrise: (7, 14, 45), sunset: (18, 6, 32)),
+        .init(name: "Attu Aleutians", latitude: 52.88, longitude: 173.18, utcOffsetSeconds: -32400, date: (2024, 6, 12), sunrise: (7, 1, 55), sunset: (23, 53, 7)),
+        .init(name: "Marquesas UTC-9:30", latitude: -9.78, longitude: -139.03, utcOffsetSeconds: -34200, date: (2024, 6, 12), sunrise: (5, 59, 24), sunset: (17, 32, 56)),
+        .init(name: "Kathmandu UTC+5:45", latitude: 27.72, longitude: 85.32, utcOffsetSeconds: 20700, date: (2024, 6, 12), sunrise: (5, 7, 25), sunset: (18, 59, 58)),
+        .init(name: "Delhi UTC+5:30", latitude: 28.61, longitude: 77.21, utcOffsetSeconds: 19800, date: (2024, 6, 12), sunrise: (5, 22, 48), sunset: (19, 19, 29)),
+        .init(name: "Kashgar", latitude: 39.47, longitude: 75.99, utcOffsetSeconds: 28800, date: (2024, 6, 12), sunrise: (7, 28, 21), sunset: (22, 23, 45)),
+        .init(name: "Vigo", latitude: 42.24, longitude: -8.72, utcOffsetSeconds: 7200, date: (2024, 6, 12), sunrise: (6, 57, 57), sunset: (22, 11, 57)),
+        .init(name: "Berlin", latitude: 52.52, longitude: 13.42, utcOffsetSeconds: 7200, date: (2023, 4, 6), sunrise: (6, 29, 59), sunset: (19, 48, 44)),
+        .init(name: "Quito equinox", latitude: -0.18, longitude: -78.47, utcOffsetSeconds: -18000, date: (2024, 3, 20), sunrise: (6, 17, 52), sunset: (18, 24, 22)),
+        .init(name: "Singapore equinox", latitude: 1.35, longitude: 103.82, utcOffsetSeconds: 28800, date: (2024, 9, 23), sunrise: (6, 53, 46), sunset: (19, 0, 11)),
+        .init(name: "Sydney solstice", latitude: -33.87, longitude: 151.21, utcOffsetSeconds: 39600, date: (2023, 12, 21), sunrise: (5, 40, 31), sunset: (20, 5, 16)),
+        .init(name: "Ushuaia winter solstice", latitude: -54.8, longitude: -68.3, utcOffsetSeconds: -10800, date: (2024, 6, 21), sunrise: (9, 58, 56), sunset: (17, 11, 24)),
+        .init(name: "Reykjavik", latitude: 64.15, longitude: -21.94, utcOffsetSeconds: 0, date: (2024, 6, 12), sunrise: (3, 0, 5), sunset: (23, 56, 40)),
+        .init(name: "Nome", latitude: 64.5, longitude: -165.4, utcOffsetSeconds: -28800, date: (2024, 6, 12), sunrise: (4, 24, 34), sunset: (1, 40, 9), setDayOffset: 1),
+        .init(name: "Anchorage equinox", latitude: 61.22, longitude: -149.9, utcOffsetSeconds: -28800, date: (2024, 3, 20), sunrise: (7, 58, 24), sunset: (20, 16, 37)),
+        .init(name: "Oslo equinox", latitude: 59.91, longitude: 10.75, utcOffsetSeconds: 7200, date: (2024, 3, 20), sunrise: (7, 17, 30), sunset: (19, 32, 30)),
+        .init(name: "Helsinki equinox", latitude: 60.17, longitude: 24.94, utcOffsetSeconds: 10800, date: (2024, 9, 23), sunrise: (7, 7, 35), sunset: (19, 15, 55)),
+        .init(name: "Tromso", latitude: 69.65, longitude: 18.96, utcOffsetSeconds: 7200, date: (2024, 8, 15), sunrise: (3, 47, 5), sunset: (21, 46, 13)),
+        .init(name: "Fairbanks", latitude: 64.84, longitude: -147.72, utcOffsetSeconds: -28800, date: (2024, 4, 15), sunrise: (6, 13, 11), sunset: (21, 30, 23))
+    ]
+
+    @Test(arguments: sunReferences) func sunRiseSetReference(reference: SunReference) {
+        let time = reference.localMidnight ..< reference.localMidnight.add(86400)
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: reference.latitude, lon: reference.longitude, utcOffsetSeconds: reference.utcOffsetSeconds)
+
+        let riseError = times.rise[0].timeIntervalSince1970 - reference.expectedRise.timeIntervalSince1970
+        let setError = times.set[0].timeIntervalSince1970 - reference.expectedSet.timeIntervalSince1970
+        /// Output truncates seconds, so allow errors of up to 30s
+        #expect(abs(riseError) <= 30, "\(reference.name) sunrise off by \(riseError) seconds")
+        #expect(abs(setError) <= 30, "\(reference.name) sunset off by \(setError) seconds")
     }
 
     @Test func sunRiseSetPolar() {
@@ -72,25 +123,59 @@ import Testing
         #expect(sunset2[0] == "2021-11-07T00:00") // //
     }
 
-    @Test func sunRiseSetVancouver() {
-        // https://www.timeanddate.com/sun/canada/vancouver?month=11&year=2021
-        let utcOffsetSeconds = -25200
-       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
+    /// Sunrise/set must be labelled with the correct local day, see #847
+    @Test func sunRiseSetChathamIslandsFormatted() {
+        // Chatham Islands use UTC+12:45, although -176.58° longitude corresponds to solar time UTC-11:47
+        let utcOffsetSeconds = 12 * 3600 + 45 * 60
+        // Local midnight 2024-06-12T00:00+12:45 and 2024-06-13T00:00+12:45 expressed in UTC
+        let time = Timestamp(2024, 6, 11, 11, 15) ..< Timestamp(2024, 6, 13, 11, 15)
 
-        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
-        #expect(times.rise[0] == Timestamp(1636211364))
-        #expect(times.set[0] == Timestamp(1636245772))
-        let sunset = times.set.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: -44, lon: -176.5833, utcOffsetSeconds: utcOffsetSeconds)
         let sunrise = times.rise.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
-        #expect(sunset[0] == "2021-11-06T17:42") // supposed to be 17:42
-        #expect(sunrise[0] == "2021-11-06T08:09") // supposed to be 08:09
+        let sunset = times.set.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
+
+        #expect(sunrise[0] == "2024-06-12T08:03")
+        #expect(sunrise[1] == "2024-06-13T08:03")
+        // Sunset 16:59:03 and 16:58:59 are within seconds of a minute boundary, so only assert the date
+        #expect(sunset[0].hasPrefix("2024-06-12T"))
+        #expect(sunset[1].hasPrefix("2024-06-13T"))
+    }
+
+    @Test func sunRiseSetDateLineEquivalence() {
+        /// longitude -180 and +180 are the same meridian, but take different paths through the day offset.
+        for utcOffsetSeconds in [0, 12 * 3600, -12 * 3600, 14 * 3600] {
+            let midnight = Timestamp(2024, 6, 12).add(-utcOffsetSeconds)
+            let time = midnight ..< midnight.add(2 * 86400)
+            let west = Zensun.calculateSunRiseSet(timeRange: time, lat: 20, lon: -180, utcOffsetSeconds: utcOffsetSeconds)
+            let east = Zensun.calculateSunRiseSet(timeRange: time, lat: 20, lon: 180, utcOffsetSeconds: utcOffsetSeconds)
+            for i in west.rise.indices {
+                let riseDelta = west.rise[i].timeIntervalSince1970 - east.rise[i].timeIntervalSince1970
+                let setDelta = west.set[i].timeIntervalSince1970 - east.set[i].timeIntervalSince1970
+                #expect(abs(riseDelta) <= 2, "sunrise differs by \(riseDelta)s for ±180° at offset \(utcOffsetSeconds)")
+                #expect(abs(setDelta) <= 2, "sunset differs by \(setDelta)s for ±180° at offset \(utcOffsetSeconds)")
+            }
+        }
+    }
+
+    @Test func sunRiseSetPolarTransitionContinuity() {
+        for lat in [Float(66), 66.5, 67, 68, 70, -66, -66.5, -67, -68, -70] {
+            for (year, month, day) in [(2024, 3, 15), (2024, 6, 15), (2024, 9, 15), (2024, 12, 15)] {
+                let midnight = Timestamp(year, month, day)
+                let time = midnight ..< midnight.add(40 * 86400)
+                let times = Zensun.calculateSunRiseSet(timeRange: time, lat: lat, lon: 25, utcOffsetSeconds: 0)
+                for i in times.rise.indices {
+                    #expect(times.set[i] >= times.rise[i], "sunset before sunrise at lat \(lat) day \(i) of \(year)-\(month)-\(day)")
+                    let length = times.set[i].timeIntervalSince1970 - times.rise[i].timeIntervalSince1970
+                    #expect(length >= 0 && length <= 86400, "day length \(length)s out of range at lat \(lat) day \(i)")
+                }
+            }
+        }
     }
 
     @Test func extraTerrestrialRadiation() {
-        // jaunary 3rd sun is closest to earth
+        // january 3rd sun is closest to earth
         #expect(Zensun.extraTerrestrialRadiationBackwards(latitude: -23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 12, 26, 12), nTime: 1, dtSeconds: 3600))[0] == 1400.073)
-        // on jyuly 4rd the sun is the farthest away from earth
+        // on july 4th the sun is the farthest away from earth
         #expect(Zensun.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0] == 1308.9365)
     }
 
