@@ -14,7 +14,7 @@ enum OpenMeteo {
         return  "./data/"
     }()
     
-    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
+    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`. If multiple servers separated by coma are given, requests are hashed between them
     static let remoteDataDirectory: [S3BucketEndpoint]? = {
         return Environment.get("REMOTE_DATA_DIRECTORY")?.split(separator: ",").map { dir in
             guard dir.starts(with: "http") || dir.starts(with: "s3://") else {
