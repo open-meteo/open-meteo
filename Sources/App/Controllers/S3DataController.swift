@@ -356,22 +356,19 @@ struct S3DataController: RouteCollection {
         guard body.readableBytes <= Self.multipartChunkSize else {
             throw S3ApiError.chunkSizeExceeds8MB
         }
-        
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        let tempInfo = try await FileSystem.shared.info(forFileAt: FilePath(tempPath))
-        guard let tempInfo else {
-            throw S3ApiError.multipartUploadNotFound
-        }
-        let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
-        let isLastPart = partNumber == numParts
-        guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
-            throw S3ApiError.partSizeNotChunkSize
-        }
-        guard offset + Int64(body.readableBytes) <= tempInfo.size else {
-            throw S3ApiError.partExceedsAllocatedFileSize
-        }
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
+            let tempInfo = try await handle.fileHandle.info()
+            
+            let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
+            let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
+            let isLastPart = partNumber == numParts
+            guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
+                throw S3ApiError.partSizeNotChunkSize
+            }
+            guard offset + Int64(body.readableBytes) <= tempInfo.size else {
+                throw S3ApiError.partExceedsAllocatedFileSize
+            }
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
@@ -819,7 +816,6 @@ enum S3ApiError: AbortError, Equatable {
     case unsupportedPostOperation
     case missingOrInvalidFileSizeHeader
     case chunkSizeExceeds8MB
-    case multipartUploadNotFound
     case partExceedsAllocatedFileSize
     case partSizeNotChunkSize
     case couldNotDecodeCompletionXML
@@ -842,8 +838,6 @@ enum S3ApiError: AbortError, Equatable {
             return .unauthorized
         case .forbidden:
             return .forbidden
-        case .multipartUploadNotFound:
-            return .notFound
         case .missingReadCredentials, .missingUploadCredentials:
             return .serviceUnavailable
         case .missingHostHeader, .invalidRequestSignature, .unknownAccessKey:
@@ -873,8 +867,6 @@ enum S3ApiError: AbortError, Equatable {
             return "Missing or invalid x-file-size header"
         case .chunkSizeExceeds8MB:
             return "Chunk size exceeds 8MB"
-        case .multipartUploadNotFound:
-            return "Multipart upload not found"
         case .partExceedsAllocatedFileSize:
             return "Part exceeds allocated file size"
         case .partSizeNotChunkSize:

@@ -460,7 +460,12 @@ public struct AWSSigner {
         case invalidSignature
         
         public var status: NIOHTTP1.HTTPResponseStatus {
-            .unauthorized
+            switch self {
+            case .missingPayloadHash:
+                return .internalServerError
+            default:
+                return .unauthorized
+            }
         }
         
         public var reason: String {
