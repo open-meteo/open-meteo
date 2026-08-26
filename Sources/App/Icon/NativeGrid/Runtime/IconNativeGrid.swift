@@ -57,7 +57,10 @@ struct IconNativeGrid: Gridable {
             return nil
         }
         let nearest = lookup.pointID
-        let nearestElevation = try await readFromStaticFile(gridpoint: nearest, file: elevationFile)
+        let nearestElevation = try await readElevation(
+            pointID: nearest,
+            elevationFile: elevationFile
+        )
         if nearestElevation <= -999 {
             return (nearest, .sea)
         }
@@ -84,7 +87,10 @@ struct IconNativeGrid: Gridable {
             return nil
         }
         let nearest = lookup.pointID
-        let nearestElevation = try await readFromStaticFile(gridpoint: nearest, file: elevationFile)
+        let nearestElevation = try await readElevation(
+            pointID: nearest,
+            elevationFile: elevationFile
+        )
         if nearestElevation.isFinite, nearestElevation > -999, abs(nearestElevation - elevation) <= 100 {
             return elevationResult(gridpoint: nearest, value: nearestElevation)
         }
@@ -125,6 +131,15 @@ struct IconNativeGrid: Gridable {
         knownValue: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> InlineArray<10, Float> {
+        if let indexedReader = elevationFile as? any OmFileIndexedFloatReaderProtocol {
+            var result = try await indexedReader.read(
+                pointIDs: candidates.pointIDs,
+                count: candidates.count
+            )
+            result[0] = knownValue
+            return result
+        }
+
         var sortedCells = InlineArray<10, Int>(repeating: -1)
         var sortedPositions = InlineArray<10, Int>(repeating: -1)
         var sortedCount = 0
@@ -159,6 +174,16 @@ struct IconNativeGrid: Gridable {
             start = end + 1
         }
         return result
+    }
+
+    private func readElevation(
+        pointID: Int,
+        elevationFile: any OmFileReaderArrayProtocol<Float>
+    ) async throws -> Float {
+        if let indexedReader = elevationFile as? any OmFileIndexedFloatReaderProtocol {
+            return try await indexedReader.read(pointID: pointID)
+        }
+        return try await readFromStaticFile(gridpoint: pointID, file: elevationFile)
     }
 
     private func elevationResult(gridpoint: Int, value: Float) -> (gridpoint: Int, gridElevation: ElevationOrSea)? {

@@ -19,6 +19,23 @@ private extension SphericalCubeIndex {
 }
 
 @Suite struct IconNativeGridTests {
+    @Test func int16ElevationCacheEncodingIsLossless() throws {
+        let source: [Float] = [-999, 0, 2_048, 8_765, 9_999, .nan]
+        let encoded = try OmFileLazyInt16ArrayReader.encode(source)
+
+        #expect(encoded == [-999, 0, 2_048, 8_765, 9_999, .min])
+        let decoded = encoded.map(OmFileLazyInt16ArrayReader.decode)
+        #expect(decoded.dropLast() == source.dropLast())
+        #expect(decoded.last?.isNaN == true)
+
+        #expect(throws: OmFileLazyInt16ArrayReader.EncodingError.self) {
+            try OmFileLazyInt16ArrayReader.encode([1.5])
+        }
+        #expect(throws: OmFileLazyInt16ArrayReader.EncodingError.self) {
+            try OmFileLazyInt16ArrayReader.encode([Float(Int16.min)])
+        }
+    }
+
     @Test func cacheMemoizesItsFirstLookupResult() async throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
@@ -83,6 +100,100 @@ private extension SphericalCubeIndex {
         #expect(sea.gridpoint == 1)
     }
 
+    @Test func terrainElevationReadsReuseDecodedGrid() async throws {
+        var centers = (0..<400).map { pointID in
+            SphericalPoint(
+                latitudeDegrees: -80 + Double(pointID) * 160 / 399,
+                longitudeDegrees: 180
+            )
+        }
+        for localPoint in 0..<10 {
+            centers[localPoint * 40] = SphericalPoint(
+                latitudeDegrees: 0,
+                longitudeDegrees: Double(localPoint) * 0.01
+            )
+        }
+        let fixture = try makeFixture(centers: centers)
+        defer { fixture.remove() }
+
+        var elevations = [Float](repeating: 0, count: centers.count)
+        elevations[40] = 500
+        let elevationFile = try await makeElevationFile(elevations)
+        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
+        let recordingReader = RecordingElevationReader(reader: elevationFile.reader)
+        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
+
+        let terrain = try #require(try await fixture.grid.findPointTerrainOptimised(
+            lat: 0,
+            lon: 0,
+            elevation: 500,
+            elevationFile: cachedReader
+        ))
+
+        #expect(terrain.gridpoint == 40)
+        #expect(recordingReader.arrayReadRanges == [0..<400])
+    }
+
+    @Test func surfaceElevationCacheInitializesLazilyOnce() async throws {
+        let elevationFile = try await makeElevationFile(
+            (0..<800).map(Float.init),
+            chunkWidth: 400
+        )
+        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
+        let recordingReader = RecordingElevationReader(reader: elevationFile.reader)
+        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
+        var pointIDs = InlineArray<10, Int>(repeating: -1)
+        pointIDs[0] = 10
+        pointIDs[1] = 20
+        pointIDs[2] = 410
+
+        #expect(recordingReader.arrayReadRanges.isEmpty)
+        #expect(try await cachedReader.read(range: [0..<1, 10..<11]) == [10])
+        #expect(recordingReader.arrayReadRanges == [10..<11])
+
+        let first = try await cachedReader.read(pointIDs: pointIDs, count: 3)
+        #expect(first[0] == 10)
+        #expect(first[1] == 20)
+        #expect(first[2] == 410)
+        #expect(recordingReader.arrayReadRanges == [10..<11, 0..<800])
+
+        _ = try await cachedReader.read(pointIDs: pointIDs, count: 3)
+        #expect(recordingReader.arrayReadRanges == [10..<11, 0..<800])
+    }
+
+    @Test func surfaceElevationCacheCoalescesConcurrentLoads() async throws {
+        let elevationFile = try await makeElevationFile(
+            (0..<400).map(Float.init),
+            chunkWidth: 400
+        )
+        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
+        let recordingReader = RecordingElevationReader(reader: elevationFile.reader)
+        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
+
+        let values = try await withThrowingTaskGroup(of: Float.self) { group in
+            for _ in 0..<16 {
+                group.addTask { try await cachedReader.read(pointID: 17) }
+            }
+            var values = [Float]()
+            for try await value in group { values.append(value) }
+            return values
+        }
+
+        #expect(values == [Float](repeating: 17, count: 16))
+        #expect(recordingReader.arrayReadRanges == [0..<400])
+    }
+
+    @Test func surfacePayloadOffersLazyNativeElevationReader() async throws {
+        let elevationFile = try await makeElevationFile([0, 1], chunkWidth: 2)
+        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
+
+        let handle = try FileHandle.openFileReading(file: elevationFile.path)
+        let size = Int64(try handle.seekToEnd())
+        let payload = try await OmFileLocalRemoteOmReader(fd: handle, size: size)
+        #expect(payload.nativeElevationReader is OmFileLazyInt16ArrayReader)
+        #expect(!(payload.reader is OmFileLazyInt16ArrayReader))
+    }
+
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_GLOBAL_GRID_TEST_FILE"] != nil))
     func officialGlobalGridMeetsTheFloat32Contract() throws {
         try validateOfficialGrid(
@@ -118,6 +229,126 @@ private struct IconNativeGridFixture {
 private struct IconNativeGridElevationFile {
     let path: String
     let reader: OmFileReaderArray<FileHandleWithCount, Float>
+}
+
+private final class RecordingElevationReader: OmFileReaderArrayProtocol, @unchecked Sendable {
+    typealias OmType = Float
+
+    private let reader: OmFileReaderArray<FileHandleWithCount, Float>
+    private let lock = NSLock()
+    private var recordedArrayReadRanges = [Range<UInt64>]()
+
+    init(reader: OmFileReaderArray<FileHandleWithCount, Float>) {
+        self.reader = reader
+    }
+
+    var arrayReadRanges: [Range<UInt64>] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedArrayReadRanges
+    }
+
+    private func recordArrayReadRange(_ range: Range<UInt64>) {
+        lock.lock()
+        recordedArrayReadRanges.append(range)
+        lock.unlock()
+    }
+
+    var compression: OmCompressionType { reader.compression }
+    var scaleFactor: Float { reader.scaleFactor }
+    var addOffset: Float { reader.addOffset }
+
+    func withDimensions<R>(_ body: (_: UnsafeBufferPointer<UInt64>) -> R) -> R {
+        reader.withDimensions(body)
+    }
+
+    func withChunkDimensions<R>(_ body: (_: UnsafeBufferPointer<UInt64>) -> R) -> R {
+        reader.withChunkDimensions(body)
+    }
+
+    func getDimensionsCount() -> UInt64 { reader.getDimensionsCount() }
+    func getDimensions() -> [UInt64] { reader.getDimensions() }
+    func getChunkDimensions() -> [UInt64] { reader.getChunkDimensions() }
+
+    func getDimensionsInline<let nDimensions: Int>() -> InlineArray<nDimensions, UInt64> {
+        reader.getDimensionsInline()
+    }
+
+    func getChunkDimensionsInline<let nDimensions: Int>() -> InlineArray<nDimensions, UInt64> {
+        reader.getChunkDimensionsInline()
+    }
+
+    func willNeed<let nDimensions: Int>(
+        range: InlineArray<nDimensions, Range<UInt64>>
+    ) async throws {
+        try await reader.willNeed(range: range)
+    }
+
+    func willNeed<let nDimensions: Int>(
+        offset: InlineArray<nDimensions, UInt64>,
+        count: InlineArray<nDimensions, UInt64>
+    ) async throws {
+        try await reader.willNeed(offset: offset, count: count)
+    }
+
+    func read() async throws -> [Float] { try await reader.read() }
+
+    func read<let nDimensions: Int>(
+        offset: InlineArray<nDimensions, UInt64>,
+        count: InlineArray<nDimensions, UInt64>
+    ) async throws -> [Float] {
+        try await reader.read(offset: offset, count: count)
+    }
+
+    func read<let nDimensions: Int>(
+        range: InlineArray<nDimensions, Range<UInt64>>
+    ) async throws -> [Float] {
+        if nDimensions == 2 {
+            recordArrayReadRange(range[1])
+        }
+        return try await reader.read(range: range)
+    }
+
+    func read<let nDimensions: Int>(
+        into: UnsafeMutablePointer<Float>,
+        range: InlineArray<nDimensions, Range<UInt64>>,
+        intoCubeOffset: InlineArray<nDimensions, UInt64>?,
+        intoCubeDimension: InlineArray<nDimensions, UInt64>?
+    ) async throws {
+        try await reader.read(
+            into: into,
+            range: range,
+            intoCubeOffset: intoCubeOffset,
+            intoCubeDimension: intoCubeDimension
+        )
+    }
+
+    func readConcurrent<let nDimensions: Int>(
+        offset: InlineArray<nDimensions, UInt64>,
+        count: InlineArray<nDimensions, UInt64>
+    ) async throws -> [Float] {
+        try await reader.readConcurrent(offset: offset, count: count)
+    }
+
+    func readConcurrent<let nDimensions: Int>(
+        range: InlineArray<nDimensions, Range<UInt64>>
+    ) async throws -> [Float] {
+        try await reader.readConcurrent(range: range)
+    }
+
+    func readConcurrent<let nDimensions: Int>(
+        into: UnsafeMutablePointer<Float>,
+        range: InlineArray<nDimensions, Range<UInt64>>,
+        intoCubeOffset: InlineArray<nDimensions, UInt64>?,
+        intoCubeDimension: InlineArray<nDimensions, UInt64>?
+    ) async throws {
+        try await reader.readConcurrent(
+            into: into,
+            range: range,
+            intoCubeOffset: intoCubeOffset,
+            intoCubeDimension: intoCubeDimension
+        )
+    }
 }
 
 private let globalMetadata = SphericalCubeArtifact.Metadata(
@@ -412,14 +643,17 @@ private func truncateLastByte(of file: URL) throws {
     try handle.truncate(atOffset: size - 1)
 }
 
-private func makeElevationFile(_ elevations: [Float]) async throws -> IconNativeGridElevationFile {
+private func makeElevationFile(
+    _ elevations: [Float],
+    chunkWidth: Int? = nil
+) async throws -> IconNativeGridElevationFile {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("icon-native-elevation-\(UUID().uuidString).om").path
     let handle = try FileHandle.createNewFile(file: path)
     try elevations.writeOmFile(
         fn: handle,
         dimensions: [1, elevations.count],
-        chunks: [1, elevations.count],
+        chunks: [1, min(chunkWidth ?? elevations.count, elevations.count)],
         compression: .pfor_delta2d_int16,
         scalefactor: 1
     )
