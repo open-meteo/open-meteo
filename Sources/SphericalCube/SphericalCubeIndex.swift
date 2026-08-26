@@ -90,9 +90,15 @@ package final class SphericalCubeIndex: Sendable {
     package let identity: SphericalCubeArtifact.DatasetIdentity
 
     /// Opens and validates the artifact, then precomputes leaf-boundary terms used by certification.
-    package init(file: URL) throws {
-        let artifact = try Artifact.open(file: file)
-        mapped = artifact.mapped
+    package convenience init(file: URL) throws {
+        let handle = try FileHandle.openFileReading(file: file.path)
+        try self.init(mapped: MmapFile(fn: handle))
+    }
+
+    /// Validates an existing mapping, including an unpublished temporary artifact.
+    package init(mapped: MmapFile) throws {
+        let artifact = try Artifact.open(mapped: mapped)
+        self.mapped = artifact.mapped
         faceSections = artifact.faceSections
         directoryBasesOffset = artifact.directoryBasesOffset
         directoryLocalsOffset = artifact.directoryLocalsOffset

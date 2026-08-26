@@ -316,6 +316,11 @@ extension SphericalCubeArtifact {
     static func open(file: URL) throws -> Mapping {
         let handle = try FileHandle.openFileReading(file: file.path)
         let mapped = try MmapFile(fn: handle)
+        return try open(mapped: mapped)
+    }
+
+    /// Validates an existing mapping, including an unpublished temporary file.
+    static func open(mapped: MmapFile) throws -> Mapping {
         guard mapped.data.count >= headerBytes else { throw SphericalCubeArtifactError.invalidHeader }
         let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
 

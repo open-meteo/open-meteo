@@ -1,4 +1,5 @@
 import Foundation
+import OmFileFormat
 import SphericalCube
 import SwiftNetCDF
 
@@ -35,7 +36,7 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
 /// here, never in API coordinate lookup.
 extension IconNativeGrid {
     enum Generator {
-        static func generate(
+        static func generateAndPublish(
             sourceFile: String,
             identity: IconNativeGridIdentity,
             artifactFile: String
@@ -51,14 +52,21 @@ extension IconNativeGrid {
                 coversWholeSphere: identity.isGlobal,
                 maximumChordDistanceSquared: Float(maximumChord * maximumChord)
             )
+            let artifactHandle = try FileHandle.createNewFile(
+                file: artifactFile,
+                overwrite: true,
+                temporary: true
+            )
             try SphericalCubeArtifact.Writer.write(
-                to: URL(fileURLWithPath: artifactFile),
+                to: artifactHandle,
                 metadata: metadata,
                 points: points,
                 level: identity.isGlobal ? 9 : 11,
                 maximumFileSize: maximumFileSize
             )
-            return try IconNativeGrid.load(file: URL(fileURLWithPath: artifactFile))
+            let grid = IconNativeGrid(storage: try SphericalCubeIndex(mapped: MmapFile(fn: artifactHandle)))
+            try artifactHandle.linkTemporary(file: artifactFile)
+            return grid
         }
 
         /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
