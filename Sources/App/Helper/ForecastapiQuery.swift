@@ -112,7 +112,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let ensemble: Bool // Glofas
 
     /// In Air Quality API
-    let domains: CamsQuery.Domain? // sams
+    let domains: CamsApiDomain?
 
     /// iso starting date `2022-02-01`
     let start_date: [IsoDate]
@@ -187,7 +187,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         tilt = try c.decodeIfPresent(Float.self, forKey: .tilt)
         azimuth = try c.decodeIfPresent(Float.self, forKey: .azimuth)
         disable_bias_correction = try c.decodeIfPresent(Bool.self, forKey: .disable_bias_correction)
-        domains = try c.decodeIfPresent(CamsQuery.Domain.self, forKey: .domains)
+        domains = try c.decodeIfPresent(CamsApiDomain.self, forKey: .domains)
         run = try c.decodeIfPresent(IsoDateTime.self, forKey: .run)
 
         bounding_box = try (try? c.decodeIfPresent([Float].self, forKey: .bounding_box)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .bounding_box)) ?? []

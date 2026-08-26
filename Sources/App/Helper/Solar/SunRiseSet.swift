@@ -9,8 +9,14 @@ extension Zensun {
         let nDays = (timeRange.upperBound.timeIntervalSince1970 - timeRange.lowerBound.timeIntervalSince1970) / 86400
         rises.reserveCapacity(nDays)
         sets.reserveCapacity(nDays)
+
+        /// Time zones deviating more than 12 hours from local solar time anchor the wrong solar day, see #847.
+        /// Shift by whole days to put solar noon into the local day.
+        let solarNoonSinceLocalMidnight = Int((12 - lon / 15) * 3600) + utcOffsetSeconds
+        let solarDayShift = solarNoonSinceLocalMidnight - solarNoonSinceLocalMidnight.moduloPositive(86400)
+
         for time in timeRange.stride(dtSeconds: 86400) {
-            let utc = time.add(utcOffsetSeconds)
+            let utc = time.add(utcOffsetSeconds - solarDayShift)
             switch calculateSunTransit(utcMidnight: utc, lat: lat, lon: lon) {
             case .polarNight:
                 rises.append(time)
@@ -59,24 +65,41 @@ extension Zensun {
         case transit(rise: Int, set: Int)
     }
 
+    /// Cosine of the hour angle between solar noon and sunrise/set. `> 1` polar night, `< -1` polar day.
+    @inlinable static func sunTransitHourAngleCosine(latitude: Float, declination: Float) -> Float {
+        let alpha = Float(0.83333).degreesToRadians
+        let t0 = latitude.degreesToRadians
+        let t1 = declination.degreesToRadians
+        return -(sin(alpha) + sin(t0) * sin(t1)) / (cos(t0) * cos(t1))
+    }
+
     /// Time MUST be 0 UTC, it will add the time to match the noon time based on longitude
     /// The correct time is important to get the correct sun declination at local noon
     @inlinable static func calculateSunTransit(utcMidnight: Timestamp, lat: Float, lon: Float) -> SunTransit {
-        let localMidday = utcMidnight.add(Int((12 - lon / 15) * 3600))
-        let eqtime = localMidday.getSunEquationOfTime()
-        let t1 = localMidday.getSunDeclination().degreesToRadians
-        let alpha = Float(0.83333).degreesToRadians
         let noon = 12 - lon / 15
-        let t0 = lat.degreesToRadians
-        let arg = -(sin(alpha) + sin(t0) * sin(t1)) / (cos(t0) * cos(t1))
+        let localMidday = utcMidnight.add(Int(noon * 3600))
+        let arg = sunTransitHourAngleCosine(latitude: lat, declination: localMidday.getSunDeclination())
 
         guard arg <= 1 && arg >= -1 else {
             return arg > 1 ? .polarNight : .polarDay
         }
 
         let dtime = acos(arg) / (Float(15).degreesToRadians)
-        let sunrise = noon - dtime - eqtime
-        let sunset = noon + dtime - eqtime
+        let eqtime = localMidday.getSunEquationOfTime()
+
+        /// Declination and equation of time sampled at noon are up to 12 hours off sunrise/sunset, causing an error
+        /// of up to 2 minutes near the polar circles. Re-sampling at the event keeps the error below 30 seconds.
+        func refine(approximation: Float, hourAngleSign: Float) -> Float {
+            let time = utcMidnight.add(Int(approximation * 3600))
+            let arg = sunTransitHourAngleCosine(latitude: lat, declination: time.getSunDeclination())
+            guard arg <= 1 && arg >= -1 else {
+                return approximation
+            }
+            return noon + hourAngleSign * acos(arg) / (Float(15).degreesToRadians) - time.getSunEquationOfTime()
+        }
+
+        let sunrise = refine(approximation: noon - dtime - eqtime, hourAngleSign: -1)
+        let sunset = refine(approximation: noon + dtime - eqtime, hourAngleSign: 1)
         return .transit(rise: Int(sunrise * 3600), set: Int(sunset * 3600))
     }
 

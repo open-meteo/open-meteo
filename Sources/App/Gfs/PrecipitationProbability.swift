@@ -37,16 +37,16 @@ enum ProbabilityVariable: String, CaseIterable, GenericVariable, GenericVariable
  */
 enum ProbabilityReader {
     /// Read probabilities from GFS ensemble models 0.25° and 0.5°
-    static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameDomain<GenericReader<GfsDomain, ProbabilityVariable>> {
-        return await GenericReaderMixerSameDomain(reader: [
+    static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameVariableType<GenericReader<GfsDomain, ProbabilityVariable>> {
+        return await GenericReaderMixerSameVariableType(reader: [
             try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
             try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         ].compactMap({ $0 }))
     }
 
     /// Notes: Does not use ICON-D2, because it has fewer members. It need some kind of mixing
-    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameDomain<GenericReader<IconDomains, ProbabilityVariable>> {
-        return await GenericReaderMixerSameDomain(reader: [
+    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameVariableType<GenericReader<IconDomains, ProbabilityVariable>> {
+        return await GenericReaderMixerSameVariableType(reader: [
             try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
             try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         ].compactMap({ $0 }))

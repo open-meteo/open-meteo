@@ -354,6 +354,8 @@ struct KnmiDownload: AsyncCommand {
             return KnmiSurfaceVariable.temperature_300m
         case (65, "heightAboveGround", "0"):
             return KnmiSurfaceVariable.snow_depth_water_equivalent
+        case (66, "heightAboveGround", "0"):
+            return KnmiSurfaceVariable.snow_depth
         default:
             break
         }
