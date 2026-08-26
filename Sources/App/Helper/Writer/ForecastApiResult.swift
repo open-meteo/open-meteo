@@ -111,6 +111,10 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             timezone.utcOffsetSeconds
         }
 
+        var metadataModel: Model? {
+            results.first(where: \.isModelAvailable) ?? results.first
+        }
+
         func runAllSections(variables: RequestVariables) async throws -> [ApiSectionString] {
             return [
                 try await minutely15(variables: variables.minutely15Variables),
