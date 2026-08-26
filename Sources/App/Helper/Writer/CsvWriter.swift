@@ -11,18 +11,18 @@ extension ForecastapiResult {
                 let multiLocation = results.count > 1
 
                 if withLocationHeader {
-                    if !multiLocation, let location = results.first, let first = location.results.first {
+                    if !multiLocation, let location = results.first, let metadataModel = location.metadataModel {
                         b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                        let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                        b.buffer.writeString("\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                        let elevation = metadataModel.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                        b.buffer.writeString("\(metadataModel.latitude),\(metadataModel.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                     } else {
                         b.buffer.writeString("location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                         for location in results {
-                            guard let first = location.results.first else {
+                            guard let metadataModel = location.metadataModel else {
                                 continue
                             }
-                            let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                            b.buffer.writeString("\(location.locationId),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                            let elevation = metadataModel.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                            b.buffer.writeString("\(location.locationId),\(metadataModel.latitude),\(metadataModel.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                         }
                     }
                 }
@@ -51,7 +51,7 @@ extension ForecastapiResult {
         }, count: -1))
 
         response.headers.replaceOrAdd(name: .contentType, value: "text/csv; charset=utf-8")
-        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").csv\"")
+        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.metadataModel?.formatedCoordinatesFilename ?? "").csv\"")
         return response
     }
 }

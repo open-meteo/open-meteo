@@ -169,7 +169,7 @@ import VaporTesting
         }
     }
 
-    @Test func multiModelCurrentUsesFirstAvailableReader() async throws {
+    @Test func multiModelCurrentAndMetadataUseFirstAvailableReader() async throws {
         try await withApp { app in
             let controller = WeatherApiController(defaultModel: .icon_eu)
             let request = makeRequest(
@@ -182,6 +182,8 @@ import VaporTesting
             let json = try await bodyString(response, application: app)
             #expect(json.contains(#""is_day":0"#) || json.contains(#""is_day":1"#))
             #expect(!json.contains(#""is_day_icon_global":"#))
+            #expect(!json.contains(#""latitude":-33.8,"#))
+            #expect(!json.contains(#""longitude":151.2,"#))
         }
     }
 

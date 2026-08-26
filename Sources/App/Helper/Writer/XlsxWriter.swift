@@ -22,15 +22,15 @@ extension ForecastapiResult {
 
             for location in results {
                 sheet.startRow()
-                guard let first = location.results.first else {
+                guard let metadataModel = location.metadataModel else {
                     continue
                 }
                 if multiLocation {
                     sheet.write(location.locationId)
                 }
-                sheet.write(first.latitude, significantDigits: 4)
-                sheet.write(first.longitude, significantDigits: 4)
-                sheet.write(first.elevation ?? .nan, significantDigits: 0)
+                sheet.write(metadataModel.latitude, significantDigits: 4)
+                sheet.write(metadataModel.longitude, significantDigits: 4)
+                sheet.write(metadataModel.elevation ?? .nan, significantDigits: 0)
                 sheet.write(location.utc_offset_seconds)
                 sheet.write(location.timezone.identifier)
                 sheet.write(location.timezone.abbreviation)
@@ -60,7 +60,7 @@ extension ForecastapiResult {
         let data = sheet.write(timestamp: timestamp)
         let response = Response(body: .init(buffer: data))
         response.headers.replaceOrAdd(name: .contentType, value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").xlsx\"")
+        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.metadataModel?.formatedCoordinatesFilename ?? "").xlsx\"")
         return response
     }
 }
