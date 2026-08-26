@@ -16,7 +16,7 @@ final class OmFileSystemManager: Sendable {
     
     private init() {
         self.localFileSystem = try! .makeOmRoot()
-        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { OmFileSystemS3(server: S3ServerHealthService(client: .shared, logger: .init(label: ""), servers: S3BucketEndpoint.parseList($0))) }
+        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { OmFileSystemS3(server: S3ServerHealthService(client: .shared, logger: .init(label: ""), servers: $0)) }
     }
     
     enum FileType {
@@ -47,9 +47,9 @@ final class OmFileSystemManager: Sendable {
         await localFileSystem.getDirectory(fullPath: path)?.updateIfRequired(force: true)
     }
     
-    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64, eTag: String?)])? {
+    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64)])? {
         var directories = Set<String>()
-        var files = [String: (lastModified: Timestamp, size: Int64, eTag: String?)]()
+        var files = [String: (lastModified: Timestamp, size: Int64)]()
         
         if let local = await localFileSystem.getDirectory(fullPath: path) {
             await local.exportDirectories(directories: &directories, files: &files)

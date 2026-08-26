@@ -75,18 +75,18 @@ actor S3ServerHealth {
                 )
 
                 if states[i].isOnline == false {
-                    logger.error("Replication server is online again: \(server.uploadServer.stripHttpPassword())")
+                    logger.error("S3 server is online again: \(server.uploadServer.stripHttpPassword())")
                 }
                 states[i].isOnline = true
             } catch {
-                logger.error("Replication server HEAD failed: \(server.uploadServer.stripHttpPassword()). Error: \(error)")
+                logger.error("S3 server HEAD failed: \(server.uploadServer.stripHttpPassword()). Error: \(error)")
                 states[i].isOnline = false
             }
         }
     }
 }
 
-/// Wraps `S3ServerHealth` into a vapor usable service what does not allow an async init
+/// Wraps `S3ServerHealth` into a vapor usable service that does not allow an async init
 actor S3ServerHealthService {
     private var state: State
     

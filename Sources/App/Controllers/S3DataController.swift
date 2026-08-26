@@ -662,7 +662,7 @@ extension S3List.ListV2Query {
         }
         // eTag uses "timestamp-filesize" for local files
         let filesXml = directory.files.map { (name, attr) in
-            let eTag = attr.eTag ?? "\(Int(attr.0.timeIntervalSince1970))-\(attr.1)"
+            let eTag = "\(Int(attr.0.timeIntervalSince1970))-\(attr.1)"
             return """
             <Contents>
                 <Key>\(path)\(name)</Key>

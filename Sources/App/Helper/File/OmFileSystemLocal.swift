@@ -223,7 +223,7 @@ enum OmFileSystemLocal {
             lastRefresh = .now()
         }
         
-        func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Timestamp, size: Int64, eTag: String?)]) async {
+        func exportDirectories(directories: inout Set<String>, files: inout [String: (lastModified: Timestamp, size: Int64)]) async {
             for name in self.directories.keys {
                 directories.insert(name)
             }
@@ -231,7 +231,7 @@ enum OmFileSystemLocal {
                 guard files[name] == nil else {
                     continue
                 }
-                files[name] = (attr.modificationTimestamp, attr.size, nil)
+                files[name] = (attr.modificationTimestamp, attr.size)
             }
         }
         

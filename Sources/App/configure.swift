@@ -15,8 +15,8 @@ enum OpenMeteo {
     }()
     
     /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
-    static let remoteDataDirectory: String? = {
-        if let dir = Environment.get("REMOTE_DATA_DIRECTORY") {
+    static let remoteDataDirectory: [S3BucketEndpoint]? = {
+        return Environment.get("REMOTE_DATA_DIRECTORY")?.split(separator: ",").map { dir in
             guard dir.starts(with: "http") || dir.starts(with: "s3://") else {
                 fatalError("REMOTE_DATA_DIRECTORY must start with 'http'")
             }
@@ -26,9 +26,8 @@ enum OpenMeteo {
             guard dir.hasSuffix("/data/") else {
                 fatalError("REMOTE_DATA_DIRECTORY must end with '/data/'")
             }
-            return String(dir.dropLast(5))
+            return S3BucketEndpoint(rawEndpoint: String(dir.dropLast(5)), profile: nil)
         }
-        return nil
     }()
     
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.

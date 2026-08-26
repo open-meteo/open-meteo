@@ -42,7 +42,7 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     init(context: S3ServerHealth, object: String) async throws {
         self.server = context
         let serverUrl = try await context.getServerFor(hash: object.fnv1aHash64)
-        var headRequest = HTTPClientRequest(url: "\(serverUrl)\(object)")
+        var headRequest = HTTPClientRequest(url: serverUrl.uploadURL(remotePath: object))
         headRequest.method = .HEAD
         context.logger.debug("Sending HEAD requests to \(headRequest.url.stripHttpPassword())")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(2))
@@ -90,10 +90,9 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         default: break
         }
         let serverUrl = try await server.getServerFor(hash: object.fnv1aHash64)
-        var request = HTTPClientRequest(url: "\(serverUrl)\(object)")
+        var request = HTTPClientRequest(url: serverUrl.uploadURL(remotePath: object))
         request.headers.add(name: "If-Match", value: eTag)
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
-        try request.applyS3Credentials()
         let logger = server.logger
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
