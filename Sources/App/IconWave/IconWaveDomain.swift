@@ -252,6 +252,3 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
         }
     }
 }
-
-
-typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
