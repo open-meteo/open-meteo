@@ -530,7 +530,7 @@ private func validateOfficialGrid(
     let sourceFile = try #require(sourceFile)
     let artifactFile = temporaryArtifactFile()
     defer { try? FileManager.default.removeItem(at: artifactFile) }
-    let grid = try IconNativeGrid.Generator.generate(
+    let grid = try IconNativeGrid.Generator.generateAndPublish(
         sourceFile: sourceFile,
         identity: identity,
         artifactFile: artifactFile.path

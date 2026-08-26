@@ -245,38 +245,26 @@ extension IconDomains {
         }
 
         let artifactPath = "\(staticDirectory)grid.bin"
-        let stagedArtifactPath = "\(artifactPath)~"
-        try FileManager.default.removeItemIfExists(at: stagedArtifactPath)
-        defer {
-            try? FileManager.default.removeItem(atPath: stagedArtifactPath)
-        }
-
         let grid: IconNativeGrid
         do {
-            grid = try IconNativeGrid.Generator.generate(
+            grid = try IconNativeGrid.Generator.generateAndPublish(
                 sourceFile: sourceFile,
                 identity: identity,
-                artifactFile: stagedArtifactPath
+                artifactFile: artifactPath
             )
         } catch let error as IconNativeGridSourceError where sourceExisted {
             // A cached source may be truncated or may belong to an older operational grid. Retry
-            // source errors once with a fresh download; generation errors are retained for diagnosis.
-            application.logger.warning("Discarding unusable cached ICON grid definition and downloading it again: \(error)")
-            try FileManager.default.removeItem(atPath: sourceFile)
-            try FileManager.default.removeItemIfExists(at: stagedArtifactPath)
+            // source errors once with an atomic replacement; readers of the old inode stay valid.
+            application.logger.warning("Replacing unusable cached ICON grid definition: \(error)")
             try await downloadSource()
-            grid = try IconNativeGrid.Generator.generate(
+            grid = try IconNativeGrid.Generator.generateAndPublish(
                 sourceFile: sourceFile,
                 identity: identity,
-                artifactFile: stagedArtifactPath
+                artifactFile: artifactPath
             )
         }
 
-        // The mmap remains valid across rename because it owns the staged file descriptor. Publish
-        // only after complete validation, then cache that same mapping without reopening the file.
-        try FileManager.default.moveFileOverwrite(from: stagedArtifactPath, to: artifactPath)
         nativeGridCache.install(grid)
-        try? FileManager.default.removeItem(atPath: sourceFile)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
     }
 }

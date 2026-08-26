@@ -1,4 +1,5 @@
 import Foundation
+import OmFileFormat
 
 extension SphericalCubeArtifact {
     /// Offline builder for the portable artifact. Generation may allocate proportional to the
@@ -6,7 +7,7 @@ extension SphericalCubeArtifact {
     package enum Writer {
         private typealias FaceSection = SphericalCubeArtifact.FaceSection
 
-        /// Partitions canonical points into cube buckets and writes an atomic, mmap-ready file.
+        /// Partitions canonical points into cube buckets and atomically publishes an mmap-ready file.
         ///
         /// Point array position becomes the canonical point ID. `coversWholeSphere` controls only
         /// whether all face buckets or occupied face rectangles are materialized. The maximum chord
@@ -14,6 +15,29 @@ extension SphericalCubeArtifact {
         /// cheap distance-based coverage rule without storing polygon topology.
         package static func write(
             to file: URL,
+            metadata: SphericalCubeArtifact.Metadata,
+            points: [SphericalPoint],
+            level: Int,
+            maximumFileSize: Int = .max
+        ) throws {
+            let handle = try FileHandle.createNewFile(
+                file: file.path,
+                overwrite: true,
+                temporary: true
+            )
+            try write(
+                to: handle,
+                metadata: metadata,
+                points: points,
+                level: level,
+                maximumFileSize: maximumFileSize
+            )
+            try handle.linkTemporary(file: file.path)
+        }
+
+        /// Writes a complete artifact to an existing handle without publishing a filesystem name.
+        package static func write(
+            to file: FileHandle,
             metadata: SphericalCubeArtifact.Metadata,
             points: [SphericalPoint],
             level: Int,
@@ -178,7 +202,9 @@ extension SphericalCubeArtifact {
             for (pointID, position) in positionsByID.enumerated() {
                 data.writeSphericalCubeInteger(position, at: layout.positionsByIDOffset + pointID * 4)
             }
-            try data.write(to: file, options: .atomic)
+            try file.truncate(atOffset: 0)
+            try file.seek(toOffset: 0)
+            try file.write(contentsOf: data)
         }
     }
 }
