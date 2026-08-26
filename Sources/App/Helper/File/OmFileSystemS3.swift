@@ -34,35 +34,28 @@ enum OmFileSystemS3Error: Error {
  - Each contains a list of modified files
  */
 struct OmFileSystemS3 {
-    let server: String
+    let server: S3ServerHealthService
     let root = Directory(prefix: "")
     
     /// Make initial root directory access given a HTTP client and logger. Refreshes root if required
     func getRoot(client: HTTPClient, logger: Logger) async throws -> DirectoryWithContext {
-        let context = ServerContext(server: server, client: client, logger: logger)
-        try await root.updateIfRequired(context: context)
-        return DirectoryWithContext.init(directory: root, context: context)
+        let server = await self.server.getInstance()
+        try await root.updateIfRequired(context: server)
+        return DirectoryWithContext.init(directory: root, context: server)
     }
 
     func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
         await self.root.updateRecursivelyIfRequired(
-            context: .init(server: server, client: client, logger: logger),
+            context: server.getInstance(),
             now: .now(),
             revalidateIntervalSeconds: 120,
             inactiveSkipSeconds: 30 * 60
         )
     }
     
-    /// Server string with HTTP client and Logger
-    struct ServerContext {
-        let server: String
-        let client: HTTPClient
-        let logger: Logger
-    }
-    
     struct FileWithContext: OmFileSystemFile {
         let file: File
-        let context: ServerContext
+        let context: S3ServerHealth
         
         /// Execute a closure with the resolved payload. May retries if file modified errors occur
         func with<R, Payload: OmRemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
@@ -131,13 +124,13 @@ struct OmFileSystemS3 {
         }
         
         /// Initiate cached HTTP reader
-        func makeCachedClient(context: ServerContext) -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        func makeCachedClient(context: S3ServerHealth) -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
             let backend = OmHttpReaderBackend(context: context, object: objectName, count: contentLength, eTag: eTag, lastModified: lastModified)
             return OmReaderBlockCache<OmHttpReaderBackend, MmapFile>(backend: backend, cache: OpenMeteo.dataBlockCache, cacheKey: backend.cacheKey)
         }
 
         /// Called from directory listing updates. Most of the times, content length and last modified did not change
-        func updateFromDirectoryListing(context: ServerContext, objectKey: String, contentLength: Int, lastModified: Timestamp, eTag: String) async {
+        func updateFromDirectoryListing(context: S3ServerHealth, objectKey: String, contentLength: Int, lastModified: Timestamp, eTag: String) async {
             if self.contentLength == contentLength && self.lastModified == lastModified && eTag == self.eTag {
                 return
             }
@@ -195,7 +188,7 @@ struct OmFileSystemS3 {
         }
         
         /// Resolve payload
-        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: ServerContext, receivedFileModifiedError: Bool) async throws -> T? {
+        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool) async throws -> T? {
             // Reset errors if they are older than one minute
             if case .error(_, let issueDate) = payload, issueDate.olderThan(seconds: 60, now: .now()) {
                 payload = .none
@@ -300,7 +293,7 @@ struct OmFileSystemS3 {
 
     struct DirectoryWithContext: OmFileSystemDirectory {
         let directory: Directory
-        let context: ServerContext
+        let context: S3ServerHealth
         
         /// Find a directory for a path
         func getDirectory(fullPath: String) async throws -> DirectoryWithContext? {
@@ -391,7 +384,7 @@ struct OmFileSystemS3 {
         }
         
         /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
-        func update(context: ServerContext) async throws {
+        func update(context: S3ServerHealth) async throws {
             OmMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             let logger = context.logger
 
@@ -408,7 +401,7 @@ struct OmFileSystemS3 {
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
             do {
-                let listed = try await S3List.s3list(context: context, prefix: prefix, apikey: nil, deadLineHours: 3)
+                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: context.client, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))
@@ -462,7 +455,7 @@ struct OmFileSystemS3 {
         /// - Revalidates directories every `revalidateIntervalSeconds` if they were revalidated at least once before.
         /// - Skips revalidation for directories that were not accessed for more than `inactiveSkipSeconds`.
         func updateRecursivelyIfRequired(
-            context: ServerContext,
+            context: S3ServerHealth,
             now: Timestamp,
             revalidateIntervalSeconds: Int,
             inactiveSkipSeconds: Int
@@ -488,7 +481,7 @@ struct OmFileSystemS3 {
             }
         }
         
-        func updateIfRequired(context: ServerContext) async throws {
+        func updateIfRequired(context: S3ServerHealth) async throws {
             let now = Timestamp.now()
             if lastValidated.olderThan(seconds: 10*60, now: now) {
                 try await update(context: context)
@@ -509,7 +502,7 @@ struct OmFileSystemS3 {
         }
         
         /// Get directory inside this directory and update its contents
-        func getDirectory(name: String, context: ServerContext) async throws -> Directory? {
+        func getDirectory(name: String, context: S3ServerHealth) async throws -> Directory? {
             let directory = directories[name]
             try await directory?.updateIfRequired(context: context)
             return directory

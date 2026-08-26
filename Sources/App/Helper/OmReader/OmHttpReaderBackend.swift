@@ -15,19 +15,15 @@ enum OmHttpReaderBackendError: Error {
  Reader backend to read from an HTTP server on demand. Checks last modified header and ETag.
  */
 final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
-    let client: HTTPClient
-    
-    /// Size of remote http file
+        /// Size of remote http file
     let count: Int
     
     let eTag: String
     
-    let server: String
+    let server: S3ServerHealth
     
     let object: String
-    
-    let logger: Logger
-    
+        
     let lastModified: Timestamp
     
     /// Timestamp in seconds when the last data was successfully fetched from the backend.
@@ -43,13 +39,14 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     }
     
     /// Note: Only used if S3 based eTag throws an error after the file got updated on the remote end. Per default S3 List attributes are used to initialise this client.
-    init(context: OmFileSystemS3.ServerContext, object: String) async throws {
-        self.client = context.client
-        var headRequest = HTTPClientRequest(url: "\(context.server)\(object)")
+    init(context: S3ServerHealth, object: String) async throws {
+        self.server = context
+        let serverUrl = try await context.getServerFor(hash: object.fnv1aHash64)
+        var headRequest = HTTPClientRequest(url: "\(serverUrl)\(object)")
         headRequest.method = .HEAD
         context.logger.debug("Sending HEAD requests to \(headRequest.url.stripHttpPassword())")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(2))
-        let headResponse = try await client.executeRetry(headRequest, logger: context.logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
+        let headResponse = try await context.client.executeRetry(headRequest, logger: context.logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
         guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
             throw OmHttpReaderBackendError.contentLengthMissing
         }
@@ -66,17 +63,13 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         self.lastModified = lastModified
         self.eTag = eTag
         self.count = contentLength
-        self.server = context.server
         self.object = object
-        self.logger = context.logger
         self.lastValidatedAtomic = .init(Timestamp.now().timeIntervalSince1970)
     }
     
     /// Last modified, eTag and count is used from S3 list operations
-    init(context: OmFileSystemS3.ServerContext, object: String, count: Int, eTag: String, lastModified: Timestamp) {
-        self.client = context.client
-        self.logger = context.logger
-        self.server = context.server
+    init(context: S3ServerHealth, object: String, count: Int, eTag: String, lastModified: Timestamp) {
+        self.server = context
         self.object = object
         self.count = count
         self.eTag = eTag
@@ -96,15 +89,16 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         case 1: throw CurlError.fileNotFound
         default: break
         }
-        
-        var request = HTTPClientRequest(url: "\(server)\(object)")
+        let serverUrl = try await server.getServerFor(hash: object.fnv1aHash64)
+        var request = HTTPClientRequest(url: "\(serverUrl)\(object)")
         request.headers.add(name: "If-Match", value: eTag)
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
         try request.applyS3Credentials()
+        let logger = server.logger
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
         do {
-            let buffer = try await client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
+            let buffer = try await server.client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
             lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
             return buffer
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {

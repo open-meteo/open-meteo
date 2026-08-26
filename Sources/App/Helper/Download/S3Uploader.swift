@@ -159,7 +159,7 @@ enum S3Uploader {
         // Step 2: Fetch remote directory listings concurrently, max 4 S3 list operations at a time.
         let remoteListings = try await remotePrefixes.mapConcurrent(nConcurrent: 4) { prefix in
             try await S3List.s3list(
-                context: .init(server: server, client: client, logger: logger),
+                server: server, client: client, logger: logger,
                 prefix: prefix,
                 apikey: nil,
                 deadLineHours: 1

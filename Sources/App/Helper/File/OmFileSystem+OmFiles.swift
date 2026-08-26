@@ -37,7 +37,7 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
             fatalError("remoteUpdated cannot be called on a non-OmFileRemoteOmReader")
         }
         
-        let logger = reader.fn.backend.logger
+        let logger = reader.fn.backend.server.logger
         let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
         
         try await file.preloadBlocks(blocks: activeBlocks)
@@ -50,7 +50,7 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         guard let reader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {
             fatalError("remoteDeleted cannot be called on a non-OmFileRemoteOmReader")
         }
-        let logger = reader.fn.backend.logger
+        let logger = reader.fn.backend.server.logger
         let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
         logger.warning("OmFileRemoteOmReader: File deleted from server. \(deletedBlocks) previously cached blocks have been deleted.")
     }
