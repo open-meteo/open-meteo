@@ -1,12 +1,13 @@
 import Foundation
 import OmFileFormat
+import OmFileIO
 import SphericalCube
 import Synchronization
 import Vapor
 
 /// Immutable identity of an operational DWD grid. Both the NetCDF definition and every native
 /// GRIB message must match these values so data cannot silently be paired with another grid order.
-struct IconNativeGridIdentity: Sendable, Equatable {
+struct IconNativeGridIdentity: Sendable, Hashable {
     let gridNumber: UInt32
     let gridUUID: [UInt8]
     let gridUUIDHex: String
@@ -55,15 +56,15 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
 }
 
 private final class IconNativeGridCacheEntry: Sendable {
-    let result: Result<SphericalCubeIndex, IconNativeDomainError>
+    let storage: SphericalCubeIndex
 
-    init(_ result: Result<SphericalCubeIndex, IconNativeDomainError>) {
-        self.result = result
+    init(_ storage: SphericalCubeIndex) {
+        self.storage = storage
     }
 }
 
-/// One cache per physical grid. The first lookup result, including failure, remains fixed for the
-/// process lifetime. Downloader preparation validates and installs artifacts explicitly.
+/// Pins a successfully resolved mapping for the synchronous lookup path. Local and remote file
+/// discovery belongs to `OmFileSystemManager`.
 final class IconNativeGridCache: Sendable {
     private let file: String
     private let identity: IconNativeGridIdentity
@@ -75,27 +76,21 @@ final class IconNativeGridCache: Sendable {
     }
 
     func get() throws -> IconNativeGrid {
-        let resolved = entry.load() ?? entry.storeIfNil(loadEntry())
-        return IconNativeGrid(storage: try resolved.result.get())
+        guard let resolved = entry.load() else {
+            throw IconNativeDomainError.missingGridArtifact(file)
+        }
+        return IconNativeGrid(storage: resolved.storage)
     }
 
     /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
     func install(_ grid: IconNativeGrid) {
-        _ = entry.storeIfNil(IconNativeGridCacheEntry(.success(grid.storage)))
+        _ = entry.storeIfNil(IconNativeGridCacheEntry(grid.storage))
     }
 
     /// Downloader-only disk validation. Unlike `get()`, this always inspects the final artifact.
     func validateFileAndInstall() throws {
         let loaded = try loadStorage()
-        _ = entry.storeIfNil(IconNativeGridCacheEntry(.success(loaded)))
-    }
-
-    private func loadEntry() -> IconNativeGridCacheEntry {
-        do {
-            return IconNativeGridCacheEntry(.success(try loadStorage()))
-        } catch {
-            return IconNativeGridCacheEntry(.failure(error))
-        }
+        _ = entry.storeIfNil(IconNativeGridCacheEntry(loaded))
     }
 
     private func loadStorage() throws(IconNativeDomainError) -> SphericalCubeIndex {
@@ -103,24 +98,15 @@ final class IconNativeGridCache: Sendable {
             throw IconNativeDomainError.missingGridArtifact(file)
         }
         do {
-            let storage = try SphericalCubeIndex(file: URL(fileURLWithPath: file))
-            guard storage.identity.number == identity.gridNumber else {
-                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected grid number \(identity.gridNumber), got \(storage.identity.number)")
-            }
-            guard storage.identity.uuid == identity.gridUUID else {
-                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "grid UUID does not match \(identity.gridUUIDHex)")
-            }
-            guard storage.pointCount == identity.cellCount else {
-                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "expected \(identity.cellCount) cells, got \(storage.pointCount)")
-            }
-            guard storage.coversWholeSphere == identity.isGlobal else {
-                throw IconNativeDomainError.invalidGridArtifact(path: file, reason: "global/regional grid kind does not match")
-            }
-            return storage
+            let handle = try FileHandle.openFileReading(file: file)
+            return try identity.loadGrid(mapped: MmapFile(fn: handle), path: file).storage
         } catch let error as IconNativeDomainError {
             throw error
         } catch {
-            throw IconNativeDomainError.invalidGridArtifact(path: file, reason: String(describing: error))
+            throw IconNativeDomainError.invalidGridArtifact(
+                path: file,
+                reason: String(describing: error)
+            )
         }
     }
 }
@@ -199,7 +185,29 @@ extension IconDomains {
         try nativeGridCache.get()
     }
 
-    func prepareNativeGrid(application: Application) async throws {
+    func getGrid(context: DomainInitContext) async throws -> any Gridable {
+        guard let identity = nativeGridIdentity, let registry = domainRegistryStatic else {
+            return grid
+        }
+        if let grid = try? nativeGridCache.get() {
+            return grid
+        }
+        let file = IconNativeGridFile(registry: registry, identity: identity)
+        guard
+            let payload = try await OmFileSystemManager.instance.get(
+                file: file,
+                client: context.httpClient,
+                logger: context.logger
+            )
+        else {
+            throw IconNativeDomainError.missingGridArtifact(file.getFilePath())
+        }
+        let grid = try identity.validate(grid: payload.grid, path: file.getFilePath())
+        nativeGridCache.install(grid)
+        return grid
+    }
+
+    func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
         guard let identity = nativeGridIdentity else {
             return
         }
@@ -266,6 +274,15 @@ extension IconDomains {
 
         nativeGridCache.install(grid)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
+        for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
+            let uploads = queue.startMultiPartUploads()
+            await uploads.uploadMultipart(
+                file: artifactPath,
+                objectName: "data/\(registry.rawValue)/static/grid.bin",
+                lastModified: .now()
+            )
+            await queue.finishMultiPartUploads(uploads)
+        }
     }
 }
 

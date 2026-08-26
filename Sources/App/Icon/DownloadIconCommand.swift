@@ -570,7 +570,10 @@ struct DownloadIconCommand: AsyncCommand {
         let outputNames = domains.map(\.rawValue).joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         if domain.isNative {
-            try await domain.prepareNativeGrid(application: context.application)
+            try await domain.prepareNativeGrid(
+                application: context.application,
+                uploadS3Bucket: signature.uploadS3Bucket
+            )
         }
         try await convertSurfaceElevation(application: context.application, domains: domains, run: run)
 

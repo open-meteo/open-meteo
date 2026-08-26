@@ -38,9 +38,16 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
+
+    /// Returns the domain grid after resolving any asynchronous prerequisite such as a remotely
+    /// stored grid artifact. Most domains use the default implementation, which returns the
+    /// synchronous `grid` property directly; remotely backed domains override this entry point.
+    func getGrid(context: DomainInitContext) async throws -> any Gridable
 }
 
 extension GenericDomain {
+    func getGrid(context: DomainInitContext) async throws -> any Gridable { grid }
+
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }

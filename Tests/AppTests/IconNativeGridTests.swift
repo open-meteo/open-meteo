@@ -36,10 +36,14 @@ private extension SphericalCubeIndex {
         }
     }
 
-    @Test func cacheMemoizesItsFirstLookupResult() async throws {
+    @Test func cachePinsExplicitlyResolvedGrid() async throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let cache = IconNativeGridCache(file: fixture.file.path, identity: makeIdentity(fixture))
+        #expect(throws: IconNativeDomainError.missingGridArtifact(fixture.file.path)) {
+            _ = try cache.get()
+        }
+        try cache.validateFileAndInstall()
         let identifiers = try await withThrowingTaskGroup(of: ObjectIdentifier.self) { group in
             for _ in 0..<16 {
                 group.addTask { ObjectIdentifier(try cache.get().storage) }
@@ -56,18 +60,46 @@ private extension SphericalCubeIndex {
         #expect(throws: IconNativeDomainError.missingGridArtifact(published.path)) {
             _ = try unavailable.get()
         }
-        try FileManager.default.copyItem(at: fixture.file, to: published)
-        #expect(throws: IconNativeDomainError.missingGridArtifact(published.path)) {
-            _ = try unavailable.get()
-        }
-        let fresh = IconNativeGridCache(file: published.path, identity: makeIdentity(fixture))
-        #expect(try fresh.get().nx == fixture.centers.count)
+        unavailable.install(fixture.grid)
+        #expect(try unavailable.get().nx == fixture.centers.count)
 
         try truncateLastByte(of: fixture.file)
         #expect(throws: IconNativeDomainError.self) {
             try cache.validateFileAndInstall()
         }
         #expect(ObjectIdentifier(try cache.get().storage) == identifiers[0])
+    }
+
+    @Test func remoteArtifactIsValidatedBeforeLocalPublication() async throws {
+        let fixture = try makeGlobalFixture()
+        defer { fixture.remove() }
+        let published = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: published) }
+        let file = IconNativeGridFile(
+            localFile: published.path,
+            identity: makeIdentity(fixture)
+        )
+
+        let grid = try await file.materialize(
+            file: DataAsClass(data: try Data(contentsOf: fixture.file))
+        )
+        #expect(grid.nx == fixture.centers.count)
+        #expect(FileManager.default.fileExists(atPath: published.path))
+
+        let handle = try FileHandle.openFileReading(file: published.path)
+        let payload = try IconNativeGridPayload(fd: handle, size: Int64(try handle.seekToEnd()))
+        #expect(try makeIdentity(fixture).validate(grid: payload.grid, path: published.path).nx == grid.nx)
+        #expect(throws: IconNativeDomainError.self) {
+            try IconNativeGridIdentity.d2.validate(grid: payload.grid, path: published.path)
+        }
+
+        try FileManager.default.removeItem(at: published)
+        var invalid = try Data(contentsOf: fixture.file)
+        invalid.removeLast()
+        await #expect(throws: IconNativeDomainError.self) {
+            _ = try await file.materialize(file: DataAsClass(data: invalid))
+        }
+        #expect(!FileManager.default.fileExists(atPath: published.path))
     }
 
     @Test func terrainAndSeaSelectionUseSpatialCandidates() async throws {
