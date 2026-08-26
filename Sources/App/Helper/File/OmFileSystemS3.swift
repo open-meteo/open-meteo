@@ -115,6 +115,8 @@ struct OmFileSystemS3 {
             self.objectName = objectName
             self.contentLength = contentLength
             self.lastModified = lastModified
+            assert(eTag.hasPrefix("\""))
+            assert(eTag.hasSuffix("\""))
             self.eTag = eTag
             payload = .none
         }
@@ -137,6 +139,8 @@ struct OmFileSystemS3 {
             OmMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
             self.contentLength = contentLength
             self.lastModified = lastModified
+            assert(eTag.hasPrefix("\""))
+            assert(eTag.hasSuffix("\""))
             self.eTag = eTag
             switch payload {
             case .ready(let old):
@@ -407,6 +411,8 @@ struct OmFileSystemS3 {
                     let name = String(file.name.dropFirst(prefix.count))
                     listedFiles.insert(name)
                     // Keep existing object actors and directory actors alive whenever possible.
+                    assert(file.eTag.hasPrefix("\""))
+                    assert(file.eTag.hasSuffix("\""))
                     if let existing = files[name] {
                         await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
                     } else {

@@ -62,7 +62,7 @@ enum S3List {
                 guard let eTag = $0.xmlFirst("ETag")?.dropFirst(6).dropLast(6) else {
                     fatalError("Failed to get ETag")
                 }
-                return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize, eTag: String(eTag))
+                return S3List.ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize, eTag: "\"\(eTag)\"")
             }
             let directories = body.xmlSection("CommonPrefixes").map {
                 guard let prefix = $0.xmlFirst("Prefix") else {

@@ -60,6 +60,8 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         guard let eTag = headResponse.headers["ETag"].first else {
             throw OmHttpReaderBackendError.eTagMissing
         }
+        assert(eTag.hasPrefix("\""))
+        assert(eTag.hasSuffix("\""))
         self.lastModified = lastModified
         self.eTag = eTag
         self.count = contentLength
@@ -69,6 +71,8 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     
     /// Last modified, eTag and count is used from S3 list operations
     init(context: S3ServerHealth, object: String, count: Int, eTag: String, lastModified: Timestamp) {
+        assert(eTag.hasPrefix("\""))
+        assert(eTag.hasSuffix("\""))
         self.server = context
         self.object = object
         self.count = count
