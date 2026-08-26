@@ -138,6 +138,7 @@ final class Curl: Sendable {
                 }
                 if let range = range {
                     request.headers.add(name: "range", value: "bytes=\(range)")
+                    request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
                 }
                 request.headers.add(contentsOf: self.headers)
                 request.headers.add(contentsOf: headers)

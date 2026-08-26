@@ -97,6 +97,7 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         var request = HTTPClientRequest(url: serverUrl.uploadURL(remotePath: object))
         request.headers.add(name: "If-Match", value: eTag)
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
+        request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
         let logger = server.logger
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))

@@ -276,6 +276,7 @@ extension HTTPClient {
             let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
             var request = request
             request.headers.add(name: "range", value: "bytes=\(range)")
+            request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
             if let lastModified = responseHeaders.first(name: "Last-Modified") {
                 request.headers.replaceOrAdd(name: "Last-Modified", value: lastModified)
             }

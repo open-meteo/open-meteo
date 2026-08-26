@@ -1038,7 +1038,8 @@ extension Request {
         headers.replaceOrAdd(name: .eTag, value: eTag)
         headers.contentType = mediaType
         
-        if self.method == .HEAD {
+        /// Disable response compression for HEAD requests, content range and non JSON request
+        if self.method == .HEAD || contentRange != nil || mediaType != .json {
             headers.responseCompression = .disable
         }
 
