@@ -541,7 +541,7 @@ extension GenericDomain {
         }
         return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
-    
+
     /// Make a default reader for a single domain with hourly data
     func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -641,6 +641,7 @@ private struct VariableHourlyDerivationCompatibility {
     let pressureLevelGeopotentialHeightScale: Float?
     let convertsPressureLevelVerticalVelocity: Bool
     let usesLegacyIconEpsRadiationStorage: Bool
+    let reversesWaveDirections: Bool
 
     private init(
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
@@ -648,7 +649,8 @@ private struct VariableHourlyDerivationCompatibility {
         shortwaveRadiationScale: Float? = nil,
         pressureLevelGeopotentialHeightScale: Float? = nil,
         convertsPressureLevelVerticalVelocity: Bool = false,
-        usesLegacyIconEpsRadiationStorage: Bool = false
+        usesLegacyIconEpsRadiationStorage: Bool = false,
+        reversesWaveDirections: Bool = false
     ) {
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
@@ -656,6 +658,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
         self.convertsPressureLevelVerticalVelocity = convertsPressureLevelVerticalVelocity
         self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
+        self.reversesWaveDirections = reversesWaveDirections
     }
 
     private static func gfs(
@@ -699,6 +702,8 @@ private struct VariableHourlyDerivationCompatibility {
             )
         case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
             self = .init(usesLegacyIconEpsRadiationStorage: true)
+        case .meteofrance_wave:
+            self = .init(reversesWaveDirections: true)
         default:
             self = .init()
         }
@@ -952,6 +957,17 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
 
         let rawVariable = Reader.variableFromString(variable.rawValue)
+
+        if compatibility.reversesWaveDirections, let rawVariable {
+            switch variable {
+            case .wave_direction, .wind_wave_direction, .swell_wave_direction, .secondary_swell_wave_direction:
+                return .one(.raw(rawVariable)) { direction, _ in
+                    return DataAndUnit(direction.data.map(Meteorology.oppositeDirection), .degreeDirection)
+                }
+            default:
+                break
+            }
+        }
 
         // corrections if elevation difference exceeds 100m
         if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
@@ -1643,7 +1659,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .ocean_current_velocity:
             return .windSpeed(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
         case .ocean_current_direction:
-            return .windDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
+            return .oceanCurrentDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
         case .soil_temperature_0cm:
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))

@@ -70,6 +70,14 @@ import Testing
         #expect(arraysEqual(Meteorology.windirectionFast(u: [-4, 4, 0, 0], v: [0, 0, -4, 4]), [90, 270, 360, 180], accuracy: 0.0001))
         #expect(arraysEqual(Meteorology.windirectionFast(u: [.nan, 0, 1, -1, 1, -1], v: [1, 0, -1, -1, 1, 1]), [.nan, 270, 315.00012, 44.999893, 224.99991, 135.00009], accuracy: 0.0001))
         #expect(Meteorology.windirectionFast(u: [-1, -0, 0, 1, 2, 3, 4, 5, 6], v: [-3, -2, -1, -0, 0, 1, 2, 3, 4]) == [18.435053, 360.0, 360.0, 270.0, 270.0, 251.56496, 243.43501, 239.0363, 236.3099])
+
+        #expect(Meteorology.oppositeDirection(0) == 180)
+        #expect(Meteorology.oppositeDirection(90) == 270)
+        #expect(Meteorology.oppositeDirection(180) == 0)
+        #expect(Meteorology.oppositeDirection(270) == 90)
+        #expect(Meteorology.oppositeDirection(360) == 180)
+        #expect(Meteorology.oppositeDirection(.nan).isNaN)
+        #expect(arraysEqual(Meteorology.oceanCurrentDirection(u: [-4, 4, 0, 0, .nan], v: [0, 0, -4, 4, 1]), [270, 90, 180, 0, .nan], accuracy: 0.0001))
     }
 
     @Test func evapotranspiration() {
