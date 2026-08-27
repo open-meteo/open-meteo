@@ -92,11 +92,11 @@ import SystemPackage
         try signer.sign(request: &request, now: Date(timeIntervalSince1970: 12345))
         #expect(request.headers["Authorization"].first == "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=d88b4ffeba0ad306663853a7280ffeda745d25ead6c775ab59af84a272dc853a")
         
-        try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+        try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, payloadSize: 0, now: Date(timeIntervalSince1970: 12345))
         
         request.headers.replaceOrAdd(name: "Authorization", value: "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date, Signature=d88b4ffeba0ad306663853a7280ffeda745d25ead6c775ab59af84a272dc853b")
         #expect(throws: AWSSigner.SigningError.invalidSignature) {
-            try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+            try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, payloadSize: 0, now: Date(timeIntervalSince1970: 12345))
         }
     }
     
@@ -109,12 +109,12 @@ import SystemPackage
         try signer.sign(request: &request, now: Date(timeIntervalSince1970: 12345))
         #expect(request.headers["Authorization"].first == "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=additional-headers;host;x-amz-content-sha256;x-amz-date;zzzz_header, Signature=20719d0a85515709f170eb36677d2115a6608bffb133c9bf3c1be76c8bdfe1da")
         
-        try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+        try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, payloadSize: 0, now: Date(timeIntervalSince1970: 12345))
         
         // skip zzzz_header
         request.headers.replaceOrAdd(name: "Authorization", value: "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/19700101/us-west-2/s3/aws4_request, SignedHeaders=additional-headers;host;x-amz-content-sha256;x-amz-date, Signature=20719d0a85515709f170eb36677d2115a6608bffb133c9bf3c1be76c8bdfe1da")
         #expect(throws: AWSSigner.SigningError.invalidSignature) {
-            try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, now: Date(timeIntervalSince1970: 12345))
+            try signer.verify(url: url, method: .GET, headers: request.headers, payloadHashSha256: Data().sha256Hex, payloadSize: 0, now: Date(timeIntervalSince1970: 12345))
         }
     }
     

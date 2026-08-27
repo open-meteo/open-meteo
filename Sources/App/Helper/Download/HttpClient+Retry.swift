@@ -192,7 +192,8 @@ extension HTTPClient {
 
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(url)\(request.headers.rangePrettyPrint)")
+                    let contentLength = request.headers.first(name: "content-length") ?? "-1"
+                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(url)\(request.headers.rangePrettyPrint) Content-Length=\(contentLength)")
                     lastPrint = Date()
                 }
                 if Date() > deadline {

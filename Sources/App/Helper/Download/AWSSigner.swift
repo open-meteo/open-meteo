@@ -121,7 +121,7 @@ public struct AWSSigner {
         request.headers.add(name: "Authorization", value: authorizationHeader)
     }
     
-    public func verify(url: String, method: HTTPMethod, headers: HTTPHeaders, payloadHashSha256: String, now: Date = Date()) throws {
+    public func verify(url: String, method: HTTPMethod, headers: HTTPHeaders, payloadHashSha256: String, payloadSize: Int, now: Date = Date()) throws {
         guard let parsedURL = ParsedVerificationURL(url: url) else {
             throw SigningError.invalidURL
         }
@@ -201,7 +201,8 @@ public struct AWSSigner {
             throw SigningError.missingPayloadHash
         }
         guard headerPayloadHash.caseInsensitiveCompare(payloadHashSha256) == .orderedSame else {
-            throw SigningError.payloadHashMismatch
+            let headSize: Int = headers.first(name: "content-length").map({Int($0) ?? -2}) ?? -1
+            throw SigningError.payloadHashMismatch(payloadSize: payloadSize, headSize: headSize, calculatedHash: payloadHashSha256, headerHash: headerPayloadHash)
         }
 
         let path = parsedURL.path
@@ -455,7 +456,7 @@ public struct AWSSigner {
         case invalidXAmzDate
         case requestDateOutOfRange
         case missingPayloadHash
-        case payloadHashMismatch
+        case payloadHashMismatch(payloadSize: Int, headSize: Int, calculatedHash: String, headerHash: String)
         case missingSignedHeader(String)
         case invalidSignature
         
@@ -490,8 +491,8 @@ public struct AWSSigner {
                 return "Request date out of acceptable range"
             case .missingPayloadHash:
                 return "Missing x-amz-content-sha256 header"
-            case .payloadHashMismatch:
-                return "Payload hash mismatch"
+            case .payloadHashMismatch(payloadSize: let payloadSize, headSize: let headSize, calculatedHash: let calculatedHash, headerHash: let headerHash):
+                return "Payload hash mismatch [payloadSize=\(payloadSize), headSize=\(headSize) calculatedHash=\(calculatedHash), headerHash=\(headerHash)]"
             case .missingSignedHeader(let headerName):
                 return "Missing signed header: \(headerName)"
             case .invalidSignature:

@@ -482,7 +482,7 @@ struct S3DataController: RouteCollection {
         for credentials in credentials {
             let signer = AWSSigner(accessKey: credentials.accessKey, secretKey: credentials.secretKey, region: "us-west-2", service: "s3")
             do {
-                try signer.verify(url: canonicalURL, method: req.method, headers: req.headers, payloadHashSha256: payloadHash)
+                try signer.verify(url: canonicalURL, method: req.method, headers: req.headers, payloadHashSha256: payloadHash, payloadSize: body.readableBytes)
                 return
             } catch AWSSigner.SigningError.invalidAccessKey {
                 continue
