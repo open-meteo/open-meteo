@@ -1106,10 +1106,13 @@ extension Request {
             // Return cached data or stream from network
             response.body = .init(asyncStream: { stream in
                 do {
+                    let end = offset + Int64(byteCount)
                     for block in offset / Int64(chunkSize) ..< (offset + Int64(byteCount)).divideRoundedUp(divisor: Int64(chunkSize)) {
-                        let offset = max(offset, block*Int64(chunkSize))
-                        let end = min(offset + Int64(byteCount), min(file.size, (block+1)*Int64(chunkSize)))
-                        let chunk = try await cached.getByteBuffer(offset: Int(offset), count: Int(end - offset))
+                        let blockStart = block * Int64(chunkSize)
+                        let blockEnd = min(file.size, (block+1)*Int64(chunkSize))
+                        let readOffset = max(offset, blockStart)
+                        let readEnd = min(end, blockEnd)
+                        let chunk = try await cached.getByteBuffer(offset: Int(readOffset), count: Int(readEnd - readOffset))
                         try await stream.writeBuffer(chunk)
                     }
                     try await stream.write(.end)
