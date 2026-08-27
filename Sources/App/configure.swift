@@ -229,9 +229,6 @@ public func configure(_ app: Application) throws {
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
-    // https://github.com/vapor/vapor/pull/2677
-    app.http.server.configuration.supportPipelining = false
-
     app.http.server.configuration.responseCompression = .enabled(initialByteBufferCapacity: 4096)
 
     // Higher backlog value to handle more connections
