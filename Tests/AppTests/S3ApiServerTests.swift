@@ -8,6 +8,27 @@ import NIOCore
 
 @Suite(.serialized)
 struct S3ApiServerTests {
+    @Test func rejectsIncompleteRequestBody() async throws {
+        try await withApp { app in
+            let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+            let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
+            let body = ByteBuffer(string: "truncated")
+            let request = try makeSignedRequest(
+                app: app,
+                method: .PUT,
+                uri: "/data/s3-upload-tests/incomplete.bin",
+                body: body,
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            request.headers.replaceOrAdd(name: .contentLength, value: "100")
+
+            await #expect(throws: S3ApiError.incompleteBodyPayload(expected: 100, actual: body.readableBytes)) {
+                _ = try await controller.putObject(request)
+            }
+        }
+    }
+
     @Test func singlePutUpload() async throws {
         try await withApp { app in
             let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")

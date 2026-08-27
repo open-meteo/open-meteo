@@ -472,6 +472,11 @@ struct S3DataController: RouteCollection {
         guard !credentials.isEmpty else {
             throw isRead ? S3ApiError.missingReadCredentials : S3ApiError.missingUploadCredentials
         }
+        if let contentLength = req.headers.first(name: .contentLength) {
+            guard let expectedBodySize = Int(contentLength), expectedBodySize == body.readableBytes else {
+                throw S3ApiError.incompleteBodyPayload(expected: Int(contentLength), actual: body.readableBytes)
+            }
+        }
         let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
         guard let host else {
@@ -482,7 +487,7 @@ struct S3DataController: RouteCollection {
         for credentials in credentials {
             let signer = AWSSigner(accessKey: credentials.accessKey, secretKey: credentials.secretKey, region: "us-west-2", service: "s3")
             do {
-                try signer.verify(url: canonicalURL, method: req.method, headers: req.headers, payloadHashSha256: payloadHash, payloadSize: body.readableBytes, transferEncoding: req.headers.first(name: "transfer-encoding") ?? "n/a", contentEncoding: req.headers.first(name: "content-encoding") ?? "n/a")
+                try signer.verify(url: canonicalURL, method: req.method, headers: req.headers, payloadHashSha256: payloadHash)
                 return
             } catch AWSSigner.SigningError.invalidAccessKey {
                 continue
@@ -810,6 +815,7 @@ enum S3ApiError: AbortError, Equatable {
     case invalidApiKey
     case forbidden
     case expectedBodyPayload
+    case incompleteBodyPayload(expected: Int?, actual: Int)
     case invalidUploadId
     case invalidPartNumber
     case expectedCompletionXMLBody
@@ -842,6 +848,8 @@ enum S3ApiError: AbortError, Equatable {
             return .serviceUnavailable
         case .missingHostHeader, .invalidRequestSignature, .unknownAccessKey:
             return .unauthorized
+        case .incompleteBodyPayload:
+            return .requestTimeout
         default:
             return .badRequest
         }
@@ -855,6 +863,9 @@ enum S3ApiError: AbortError, Equatable {
             return "Forbidden"
         case .expectedBodyPayload:
             return "Expected body payload"
+        case .incompleteBodyPayload(let expected, let actual):
+            let expectedDescription = expected.map(String.init) ?? "a valid Content-Length"
+            return "Incomplete body payload: expected \(expectedDescription) bytes, received \(actual)"
         case .invalidUploadId:
             return "Invalid uploadId"
         case .invalidPartNumber:
