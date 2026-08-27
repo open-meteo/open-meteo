@@ -59,10 +59,10 @@ struct OmFileSystemS3 {
         
         /// Execute a closure with the resolved payload. May retries if file modified errors occur
         func with<R, Payload: OmRemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
-            guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: false) else {
-                return nil
-            }
             do {
+                guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: false) else {
+                    return nil
+                }
                 return try await fn(payload)
             } catch CurlError.fileNotFound {
                 await file.receivedObjectDeletedError()
