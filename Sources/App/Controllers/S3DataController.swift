@@ -290,7 +290,7 @@ struct S3DataController: RouteCollection {
             return modifiedDate
         }
         try await replicateSinglePut(req: req, body: body, lastModified: modifiedDate)
-        try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
+        try await FileSystem.shared.moveItem(at: FilePath(tempPath), to: FilePath(absolutePath))
         
         /// Full path `/somedir/object.ext`
         let path = req.url.path
@@ -409,7 +409,7 @@ struct S3DataController: RouteCollection {
     
     private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Timestamp) async throws {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
+        try await FileSystem.shared.moveItem(at: FilePath(tempPath), to: FilePath(absolutePath))
         try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(absolutePath), options: .modifyFile(createIfNecessary: false)) { handle in
             let ts = FileInfo.Timespec(seconds: Int(lastModified.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
