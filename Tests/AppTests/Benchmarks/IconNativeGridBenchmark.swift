@@ -20,8 +20,6 @@ enum IconNativeGridBenchmark {
     private static let syntheticCellCount = 2_949_120
     private static let queryCount = 65_536
     private static let repeats = 8
-    private static let fallbackQueryCount = 8_192
-    private static let fallbackRepeats = 2
     private static let elevationQueryCount = 1_024
     private static let sampleCount = 9
 
@@ -57,8 +55,6 @@ enum IconNativeGridBenchmark {
             file.resourceValues(forKeys: [.fileSizeKey]).fileSize
         )
         let queries = configuredArtifact == nil ? makeQueries() : makeQueries(grid: grid)
-        let fallbackQueries = makeFallbackQueries(grid: grid, queries: queries)
-
         let conversion = measure {
             conversionChecksum(grid: grid, queries: queries, repeats: repeats)
         }
@@ -67,15 +63,6 @@ enum IconNativeGridBenchmark {
         }
         let terrainCandidates = measure {
             terrainCandidateChecksum(grid: grid, queries: queries, repeats: repeats)
-        }
-        let exactFallback = measure(
-            executions: fallbackQueries.count * fallbackRepeats
-        ) {
-            exactFallbackChecksum(
-                grid: grid,
-                queries: fallbackQueries,
-                repeats: fallbackRepeats
-            )
         }
         let elevationBenchmark = try await measureElevationSelection(
             grid: grid,
@@ -92,8 +79,6 @@ enum IconNativeGridBenchmark {
         print("  lookup range: \(lookup.samples[0])...\(lookup.samples[sampleCount - 1]) ns/query")
         print("  terrain candidates median: \(terrainCandidates.samples[sampleCount / 2]) ns/query")
         print("  terrain candidates range: \(terrainCandidates.samples[0])...\(terrainCandidates.samples[sampleCount - 1]) ns/query")
-        print("  seeded exact fallback median: \(exactFallback.samples[sampleCount / 2]) ns/query")
-        print("  seeded exact fallback range: \(exactFallback.samples[0])...\(exactFallback.samples[sampleCount - 1]) ns/query")
         print("  elevation queries/path: \(elevationQueryCount)")
         printResult("cold full-grid load", elevationBenchmark.coldGridLoad, unit: "ns/load")
         printResult("raw sea hit", elevationBenchmark.rawSea)
@@ -108,7 +93,6 @@ enum IconNativeGridBenchmark {
         print("  artifact: \(artifactBytes) bytes")
         print("  lookup checksum: \(lookup.checksum)")
         print("  terrain checksum: \(terrainCandidates.checksum)")
-        print("  fallback checksum: \(exactFallback.checksum)")
         print("  elevation checksum: \(elevationBenchmark.checksum)")
     }
 
@@ -393,24 +377,6 @@ enum IconNativeGridBenchmark {
         return queries
     }
 
-    private struct FallbackQuery {
-        let center: SphericalPoint
-        let seedPosition: Int
-    }
-
-    private static func makeFallbackQueries(
-        grid: IconNativeGrid,
-        queries: [(latitude: Float, longitude: Float)]
-    ) -> [FallbackQuery] {
-        queries.prefix(fallbackQueryCount).compactMap { query in
-            guard let lookup = grid.storage.nearestLookup(
-                latitude: query.latitude,
-                longitude: query.longitude
-            ) else { return nil }
-            return FallbackQuery(center: lookup.query.point, seedPosition: lookup.position)
-        }
-    }
-
     @inline(never)
     private static func conversionChecksum(
         grid: IconNativeGrid,
@@ -513,28 +479,6 @@ enum IconNativeGridBenchmark {
             checksum &+= result?.gridpoint ?? -1
         }
         return checksum
-    }
-
-    @inline(never)
-    private static func exactFallbackChecksum(
-        grid: IconNativeGrid,
-        queries: [FallbackQuery],
-        repeats: Int
-    ) -> Int {
-        grid.storage.withBytes { bytes in
-            var checksum = 0
-            for _ in 0..<repeats {
-                for query in queries {
-                    checksum &+= grid.storage.nearest(
-                        to: query.center,
-                        maximumDistanceSquared: .infinity,
-                        seedPosition: query.seedPosition,
-                        bytes: bytes
-                    )!
-                }
-            }
-            return checksum
-        }
     }
 
     private static func maximumChordDistanceSquared(meters: Double) -> Float {

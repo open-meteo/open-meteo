@@ -9,7 +9,7 @@ import Foundation
 enum SphericalCubeGeometry {
 
     /// Projected face coordinates and the corresponding leaf bucket.
-    /// `normalizedNormalComponentSquared` supports exact distance-to-boundary certification.
+    /// `normalizedNormalComponentSquared` supports conservative distance-to-boundary certification.
     struct Location: Sendable {
         let face: Int
         let u: Double
@@ -17,16 +17,6 @@ enum SphericalCubeGeometry {
         let normalizedNormalComponentSquared: Double
         let x: Int
         let y: Int
-    }
-
-    /// An implicit quadtree node. No tree nodes or child links are stored in the artifact.
-    struct Node: Sendable {
-        var face: Int
-        var level: Int
-        var x: Int
-        var y: Int
-
-        static let empty = Self(face: 0, level: 0, x: 0, y: 0)
     }
 
     /// Projects a direction and maps `(u, v)` to integer leaf coordinates.
@@ -57,24 +47,6 @@ enum SphericalCubeGeometry {
             x: x,
             y: y
         )
-    }
-
-    /// The normalized cube projection is 1-Lipschitz because every unnormalized face vector has
-    /// length at least one. Every point in the node is therefore within `sqrt(2) / 2^level` chord
-    /// distance of its centre. The triangle inequality supplies an exact conservative prune.
-    @inline(__always)
-    static func nodeCannotImprove(
-        _ node: Node,
-        query: SphericalPoint,
-        maximumCandidateDistance: Double
-    ) -> Bool {
-        let scale = Double(1 << node.level)
-        let u = -1 + (Double(node.x) + 0.5) * 2 / scale
-        let v = -1 + (Double(node.y) + 0.5) * 2 / scale
-        let center = faceVector(face: node.face, u: u, v: v)
-        let centerDistanceSquared = max(0, 2 - 2 * query.dot(center))
-        let maximumDistance = maximumCandidateDistance + sqrt(2.0) / scale + 1e-14
-        return centerDistanceSquared > maximumDistance * maximumDistance
     }
 
     @inline(__always)

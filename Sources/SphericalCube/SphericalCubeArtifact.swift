@@ -205,25 +205,6 @@ package enum SphericalCubeArtifact {
         pointsOffset + position * pointStride
     }
 
-    /// Double-precision normalized dot product used by exact fallback and deterministic ties.
-    @inline(__always)
-    static func score(
-        position: Int,
-        query: SphericalPoint,
-        bytes: borrowing RawSpan,
-        pointsOffset: Int
-    ) -> Double {
-        let offset = pointOffset(position: position, pointsOffset: pointsOffset)
-        let x = Double(readFloat(bytes, at: offset))
-        let y = Double(readFloat(bytes, at: offset + 4))
-        let z = Double(readFloat(bytes, at: offset + 8))
-        let rawScore =
-            query.x * x
-            + query.y * y
-            + query.z * z
-        return rawScore / sqrt(x * x + y * y + z * z)
-    }
-
     /// Float squared chord distance used by the allocation-free hot path.
     @inline(__always)
     static func squaredDistance(

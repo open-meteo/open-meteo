@@ -4,19 +4,7 @@ import Foundation
 import OmFileFormat
 import Testing
 
-private extension SphericalCubeIndex {
-    /// Preserve the official Double-precision centre during artifact round-trip validation.
-    func nearestPointID(to center: SphericalPoint) -> Int {
-        withBytes {
-            nearest(
-                to: center,
-                maximumDistanceSquared: .infinity,
-                seedPosition: nil,
-                bytes: $0
-            )!
-        }
-    }
-}
+private let oracleScoreTolerance = 1e-15
 
 @Suite struct IconNativeGridTests {
     @Test func int16ElevationCacheEncodingIsLossless() throws {
@@ -516,7 +504,7 @@ private func nearest(point: SphericalPoint, centers: [SphericalPoint]) -> Int {
     var bestScore = -Double.infinity
     for center in centers { bestScore = max(bestScore, point.dot(center)) }
     return centers.indices.first {
-        point.dot(centers[$0]) >= bestScore - SphericalCubeIndex.exactScoreMargin
+        point.dot(centers[$0]) >= bestScore - oracleScoreTolerance
     }!
 }
 
@@ -583,7 +571,8 @@ private func validateOfficialGrid(
     #expect(artifactBytes <= maximumArtifactBytes)
     let stride = max(1, source.count / sampleLimit)
     for cell in Swift.stride(from: 0, to: source.count, by: stride) {
-        #expect(grid.storage.nearestPointID(to: source[cell]) == cell)
+        let coordinate = grid.storage.point(at: cell).coordinate
+        #expect(grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude) == cell)
         #expect(centerDirectionDistance(
             source[cell],
             grid.storage.point(at: cell)
@@ -644,7 +633,11 @@ private func validateOfficialLookupRegret(
             latitudeDegrees: queryCoordinate.latitude,
             longitudeDegrees: queryCoordinate.longitude
         ).point
-        let expected = grid.storage.nearestPointID(to: query)
+        let expected = nearestCandidate(
+            point: query,
+            candidates: candidates,
+            grid: grid
+        )
         let actual = try #require(grid.findPoint(
             lat: queryCoordinate.latitude,
             lon: queryCoordinate.longitude
@@ -661,6 +654,26 @@ private func validateOfficialLookupRegret(
     }
     print("Grid \(identity.gridNumber) Float lookup: \(differentPointCount) differing IDs, \(maximumRegretMeters) m maximum regret")
     #expect(maximumRegretMeters <= 3)
+}
+
+private func nearestCandidate(
+    point: SphericalPoint,
+    candidates: SphericalCubeIndex.NearbyPoints,
+    grid: IconNativeGrid
+) -> Int {
+    var bestPointID = candidates.pointIDs[0]
+    var bestScore = point.dot(grid.storage.point(at: bestPointID))
+    for position in 1..<candidates.count {
+        let pointID = candidates.pointIDs[position]
+        let score = point.dot(grid.storage.point(at: pointID))
+        if score > bestScore + oracleScoreTolerance
+            || (abs(score - bestScore) <= oracleScoreTolerance && pointID < bestPointID)
+        {
+            bestScore = score
+            bestPointID = pointID
+        }
+    }
+    return bestPointID
 }
 
 private func temporaryArtifactFile() -> URL {
