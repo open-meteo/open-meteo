@@ -702,11 +702,11 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         case .total_column_integrated_water_vapour_anomaly:
             return .kilogramPerSquareMetre
         case .temperature_2m_sot10, .temperature_2m_sot90:
-            return .kelvin
+            return .dimensionless
         case .temperature_2m_efi:
             return .dimensionless
         case .precipitation_efi:
-            return .millimetre
+            return .dimensionless
         case .precipitation_sot90:
             return .dimensionless
         case .temperature_2m_anomaly_gt1, .temperature_2m_anomaly_gt2, .temperature_2m_anomaly_gt0, .temperature_2m_anomaly_ltm1, .temperature_2m_anomaly_ltm2:

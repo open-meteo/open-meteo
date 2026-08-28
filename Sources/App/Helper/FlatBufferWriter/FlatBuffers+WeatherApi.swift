@@ -121,15 +121,15 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .soil_moisture_9_to_27cm:
             return .init(variable: .soilMoisture, depth: 9, depthTo: 27, previousDay: previousDay)
         case .soil_moisture_index_0_to_100cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 100, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 0, depthTo: 100, previousDay: previousDay)
         case .soil_moisture_index_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 0, depthTo: 7, previousDay: previousDay)
         case .soil_moisture_index_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 100, depthTo: 255, previousDay: previousDay)
         case .soil_moisture_index_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 28, depthTo: 100, previousDay: previousDay)
         case .soil_moisture_index_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 7, depthTo: 28, previousDay: previousDay)
         case .soil_temperature_0_to_100cm:
             return .init(variable: .soilTemperature, depth: 0, depthTo: 100, previousDay: previousDay)
         case .soil_temperature_0_to_10cm:
@@ -449,7 +449,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .ocean_current_direction:
             return .init(variable: .oceanCurrentDirection)
         case .wave_peak_period:
-            return .init(variable: .wavePeriod)
+            return .init(variable: .wavePeakPeriod)
         case .sea_level_height_msl:
             return .init(variable: .seaLevelHeightMsl)
         case .invert_barometer_height:

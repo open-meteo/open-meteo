@@ -129,7 +129,7 @@ enum ForecastVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
         case .temperature_2m_anomaly:
             return .init(variable: .temperature, aggregation: .anomaly, altitude: 2)
         case .dew_point_2m_mean:
-            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .mean, altitude: 2)
         case .dew_point_2m_anomaly:
             return .init(variable: .dewPoint, aggregation: .anomaly, altitude: 2)
         case .pressure_msl_mean:
@@ -197,7 +197,7 @@ enum ForecastVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
         case .pressure_msl_anomaly_gt0:
             return .init(variable: .pressureMsl, aggregation: .anomaly, probability: .gt0)
         case .surface_temperature_anomaly_gt0:
-            return .init(variable: .surfacePressure, aggregation: .anomaly, probability: .gt0)
+            return .init(variable: .surfaceTemperature, aggregation: .anomaly, probability: .gt0)
         case .precipitation_anomaly_gt0:
             return .init(variable: .precipitation, aggregation: .anomaly, probability: .gt0)
         case .precipitation_anomaly_gt10:
@@ -213,7 +213,7 @@ enum ForecastVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
         case .precipitation_efi:
             return .init(variable: .precipitation, aggregation: .efi)
         case .precipitation_sot90:
-            return .init(variable: .precipitation, aggregation: .sot10)
+            return .init(variable: .precipitation, aggregation: .sot90)
         }
     }
 }
