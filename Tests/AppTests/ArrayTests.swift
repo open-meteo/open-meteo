@@ -3,6 +3,17 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
+    @Test func percentile() {
+        let ensemble = (0...50).reversed().map(Float.init)
+        #expect(ensemble.percentile(0) == 0)
+        #expect(ensemble.percentile(0.25) == 12.5)
+        #expect(ensemble.percentile(0.5) == 25)
+        #expect(ensemble.percentile(0.75) == 37.5)
+        #expect(ensemble.percentile(1) == 50)
+        #expect([Float(4), 1, 3, 2].percentile(0.5) == 2.5)
+        #expect([Float(42)].percentile(0.75) == 42)
+    }
+
     @Test func runningMeanUsesExactWindowForNonDivisibleOutputSteps() {
         let threeHourly = TimerangeDt(start: Timestamp(0), nTime: 2, dtSeconds: 3 * 3600)
         let threeHourlyRead = threeHourly.runningMeanReadTime(windowSeconds: 8 * 3600, maximumStepSeconds: 3600)
