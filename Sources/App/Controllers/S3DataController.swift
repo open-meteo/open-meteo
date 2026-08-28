@@ -246,11 +246,8 @@ struct S3DataController: RouteCollection {
             let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
             let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
             if !FileManager.default.fileExists(atPath: tempPath) {
+                req.logger.warning("Multipart upload completion, but temp file is missing. Validating the destination file instead")
                 try await validateMultipartCompletionBody(filePath: absolutePath, body: body)
-                req.logger.warning("Multipart upload completion was received after the temporary file was already moved to the destination", metadata: [
-                    "path": "\(req.url.path)",
-                    "uploadId": "\(uploadId)"
-                ])
                 return Response(status: .ok)
             }
             try await validateMultipartCompletionBody(filePath: tempPath, body: body)
