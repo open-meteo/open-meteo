@@ -41,13 +41,13 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     }
 
     func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) async throws {
-        for member in 0..<51 {
+        for member in 0..<reader.domain.countEnsembleMember {
             try await reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
         }
     }
 
     func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        let data = try await (0..<51).asyncMap({
+        let data = try await (0..<reader.domain.countEnsembleMember).asyncMap({
             try await reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
         })
         if data[0].onlyNaN() {
