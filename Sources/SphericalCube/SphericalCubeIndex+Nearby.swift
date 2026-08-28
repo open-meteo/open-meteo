@@ -158,30 +158,31 @@ extension SphericalCubeIndex {
             return scannedPointCount >= Self.nearbyPointLimit * 4
         }
 
-        // Away from seams, expand square rings directly in the query face. Certification can stop
-        // as soon as the retained candidates are provably closer than every unscanned bucket.
+        // Expand directly on the query face for every ring that fits. Only rings that actually
+        // cross a cube edge need the more expensive spherical projection and bucket deduplication.
+        // Certification can stop as soon as the retained candidates are provably closer than every
+        // unscanned bucket in the current face rectangle.
         let maximumRadius = 8
-        let staysOnFace =
-            queryLocation.x >= maximumRadius
-            && queryLocation.x < resolution - maximumRadius
-            && queryLocation.y >= maximumRadius
-            && queryLocation.y < resolution - maximumRadius
+        let maximumDirectRadius = min(
+            maximumRadius,
+            queryLocation.x,
+            resolution - queryLocation.x - 1,
+            queryLocation.y,
+            resolution - queryLocation.y - 1
+        )
         scanRow(
             face: queryLocation.face,
             y: queryLocation.y,
             lowerX: queryLocation.x,
             upperX: queryLocation.x
         )
-        if staysOnFace {
-            var radius = 0
-            while radius < maximumRadius,
-                !searchIsComplete(
-                    xRange: (queryLocation.x - radius)...(queryLocation.x + radius),
-                    yRange: (queryLocation.y - radius)...(queryLocation.y + radius),
-                    canCertify: true
-                )
-            {
-                radius += 1
+        var searchComplete = searchIsComplete(
+            xRange: queryLocation.x...queryLocation.x,
+            yRange: queryLocation.y...queryLocation.y,
+            canCertify: true
+        )
+        if !searchComplete, maximumDirectRadius > 0 {
+            for radius in 1...maximumDirectRadius {
                 let lowerX = queryLocation.x - radius
                 let upperX = queryLocation.x + radius
                 scanRow(
@@ -210,11 +211,19 @@ extension SphericalCubeIndex {
                         upperX: upperX
                     )
                 }
+                searchComplete = searchIsComplete(
+                    xRange: (queryLocation.x - radius)...(queryLocation.x + radius),
+                    yRange: (queryLocation.y - radius)...(queryLocation.y + radius),
+                    canCertify: true
+                )
+                if searchComplete { break }
             }
-        } else {
-            // Near an edge or corner, bucket offsets may cross onto another cube face. Convert each
-            // offset through a spherical direction, project it to its actual face, and deduplicate
-            // buckets where several offsets map to the same destination.
+        }
+        if !searchComplete, maximumDirectRadius < maximumRadius {
+            // The next ring crosses an edge or corner. Convert its offsets through a spherical
+            // direction, project them to their actual faces, and deduplicate buckets where several
+            // offsets map to the same destination. Earlier direct rings cannot overlap these
+            // adjacent-face buckets.
             // Radius 8 spans a 17-by-17 stencil, hence at most 289 projected buckets.
             var scannedBuckets = InlineArray<289, Int>(repeating: -1)
             var scannedBucketCount = 0
@@ -234,7 +243,7 @@ extension SphericalCubeIndex {
                 scanBucket(bucket)
             }
 
-            for radius in 1...maximumRadius {
+            for radius in (maximumDirectRadius + 1)...maximumRadius {
                 for dx in -radius...radius {
                     scanOffset(dx: dx, dy: -radius)
                     scanOffset(dx: dx, dy: radius)
