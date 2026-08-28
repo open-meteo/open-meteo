@@ -37,23 +37,29 @@ actor S3ServerHealth {
     }
     
     /// Deterministically returns the same server for the same hash. Used to distribute load to different endpoints. Throws `S3ServerHealthError.allEndpointsUnavailable` if all servers are offline
-    /// If a server is offline, the hash is distributed to other server endpoints.
+    /// If a server is offline, the hash is distributed to other server endpoints evenly.
     func getServerFor(hash: UInt64) throws -> S3BucketEndpoint {
-        guard !states.isEmpty else {
-            throw S3ServerHealthError.allEndpointsUnavailable
-        }
+        var selected: S3BucketEndpoint?
+        var highestScore: UInt64 = 0
 
-        let count = UInt64(states.count)
-        // Probe in a deterministic ring order so each hash is stable, while
-        // still failing over to the next online endpoint when needed.
-        for offset in 0..<count {
-            let index = Int(hash.addFnv1aHash(offset) % count)
-            if states[index].isOnline {
-                return states[index].server
+        for (index, state) in states.enumerated() where state.isOnline {
+            // Rendezvous hashing assigns a stable score to every key/server
+            // pair. Removing an offline server only remaps its own keys.
+            var score = hash ^ ((UInt64(index) &+ 1) &* 0x9e3779b97f4a7c15)
+            score = (score ^ (score >> 30)) &* 0xbf58476d1ce4e5b9
+            score = (score ^ (score >> 27)) &* 0x94d049bb133111eb
+            score ^= score >> 31
+
+            if selected == nil || score > highestScore {
+                selected = state.server
+                highestScore = score
             }
         }
 
-        throw S3ServerHealthError.allEndpointsUnavailable
+        guard let selected else {
+            throw S3ServerHealthError.allEndpointsUnavailable
+        }
+        return selected
     }
     
     func activeServers() async -> [S3BucketEndpoint] {
