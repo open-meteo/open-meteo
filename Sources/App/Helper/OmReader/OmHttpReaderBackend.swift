@@ -46,7 +46,7 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         headRequest.method = .HEAD
         context.logger.debug("Sending HEAD requests to \(headRequest.url.stripHttpPassword())")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(2))
-        let headResponse = try await context.client.executeRetry(headRequest, logger: context.logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
+        let headResponse = try await HTTPClient.shared.executeRetry(headRequest, logger: context.logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
         guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
             throw OmHttpReaderBackendError.contentLengthMissing
         }
@@ -102,7 +102,7 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
         do {
-            let buffer = try await server.client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
+            let buffer = try await HTTPClient.shared.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
             lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
             return buffer
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {

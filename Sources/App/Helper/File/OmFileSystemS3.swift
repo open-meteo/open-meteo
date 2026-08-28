@@ -405,7 +405,7 @@ struct OmFileSystemS3 {
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
             do {
-                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: context.client, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: .shared, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))

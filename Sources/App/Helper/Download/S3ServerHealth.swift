@@ -9,7 +9,6 @@ enum S3ServerHealthError: Error {
 
 /// Monitors a list of S3 Servers. On initialisation performs the first server check and then checks every 10 seconds in the background
 actor S3ServerHealth {
-    let client: HTTPClient
     let logger: Logger
     var states: [ServerState]
     var monitor: Task<Void, Never>?
@@ -19,8 +18,7 @@ actor S3ServerHealth {
         var isOnline: Bool
     }
     
-    init(client: HTTPClient, logger: Logger, servers: [S3BucketEndpoint]) async {
-        self.client = client
+    init(logger: Logger, servers: [S3BucketEndpoint]) async {
         self.logger = logger
         self.states = servers.map({ .init(server: $0, isOnline: true) })
         await performHealthChecks()
@@ -67,6 +65,7 @@ actor S3ServerHealth {
     }
     
     private func performHealthChecks() async {
+        let client = HTTPClient.shared
         for i in states.indices {
             let server = states[i].server
             do {
@@ -97,20 +96,20 @@ actor S3ServerHealthService {
     private var state: State
     
     private enum State {
-        case uninitialised(servers: [S3BucketEndpoint], client: HTTPClient, logger: Logger)
+        case uninitialised(servers: [S3BucketEndpoint], logger: Logger)
         case initialising(queue: [CheckedContinuation<S3ServerHealth, Never>])
         case initialised(states: S3ServerHealth)
     }
 
-    init(client: HTTPClient, logger: Logger, servers: [S3BucketEndpoint]) {
-        self.state = .uninitialised(servers: servers, client: client, logger: logger)
+    init(logger: Logger, servers: [S3BucketEndpoint]) {
+        self.state = .uninitialised(servers: servers, logger: logger)
     }
     
     func getInstance() async -> S3ServerHealth {
         switch state {
-        case .uninitialised(let servers, let client, let logger):
+        case .uninitialised(let servers, let logger):
             self.state = .initialising(queue: [])
-            let watcher = await S3ServerHealth(client: client, logger: logger, servers: servers)
+            let watcher = await S3ServerHealth(logger: logger, servers: servers)
             guard case .initialising(let queued) = self.state else {
                 fatalError("State was not .initialising()")
             }
@@ -148,7 +147,7 @@ extension Application {
             return existing
         }
         let servers = S3BucketEndpoint.loadFromEnvironment(variable: "S3_UPLOAD_REPLICATION_SERVERS")
-        let manager = S3ServerHealthService(client: dedicatedHttpClient, logger: logger, servers: servers)
+        let manager = S3ServerHealthService(logger: logger, servers: servers)
         self.storage[S3ServerHealthKey.self] = manager
         return manager
     }
