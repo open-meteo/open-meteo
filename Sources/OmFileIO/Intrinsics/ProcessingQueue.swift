@@ -39,9 +39,9 @@ import Logging
 actor ProcessingSerialQueue {
     private var continuation: AsyncStream<() async -> ()>.Continuation
     private var processingTask: Task<Void, Never>
-    private let onError: @Sendable (any Error) async -> Void
+    private let onError: @Sendable () -> Void
     
-    init(onError: @escaping @Sendable (any Error) async -> Void = { _ in }) {
+    init(onError: @escaping @Sendable () -> Void = {}) {
         let (stream, continuation) = AsyncStream<() async -> ()>.makeStream()
         self.continuation = continuation
         self.onError = onError
@@ -64,7 +64,7 @@ actor ProcessingSerialQueue {
                 try await work()
             } catch {
                 logger.error("Error during queued work: \(error)")
-                await onError(error)
+                onError()
             }
         })
     }
@@ -84,9 +84,9 @@ actor ProcessingSerialQueue {
 actor ProcessingParallelQueue<T: Sendable> {
     private var continuation: AsyncStream<@Sendable () async -> T?>.Continuation
     private var processingTask: Task<[T], Never>
-    private let onError: @Sendable (any Error) async -> Void
+    private let onError: @Sendable () -> Void
     
-    init(executor: LimitedConcurrencyExecutor, onError: @escaping @Sendable (any Error) async -> Void = { _ in }) {
+    init(executor: LimitedConcurrencyExecutor, onError: @escaping @Sendable () -> Void = {}) {
         let (stream, continuation) = AsyncStream<@Sendable () async -> T?>.makeStream()
         self.continuation = continuation
         self.onError = onError
@@ -137,7 +137,7 @@ actor ProcessingParallelQueue<T: Sendable> {
                 return try await work()
             } catch {
                 logger.error("Error during queued work: \(error)")
-                await onError(error)
+                onError()
             }
             return nil
         })

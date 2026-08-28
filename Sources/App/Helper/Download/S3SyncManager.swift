@@ -21,7 +21,7 @@ actor S3SyncManager: LifecycleHandler {
         if let queue = queues.first(where: {$0.endpoint == endpoint}) {
             return queue
         }
-        let queue = S3UploadQueue(endpoint: endpoint, client: client, logger: logger) { _ in
+        let queue = S3UploadQueue(endpoint: endpoint, client: client, logger: logger) {
             self.exitStatus.markFailure()
         }
         queues.append(queue)

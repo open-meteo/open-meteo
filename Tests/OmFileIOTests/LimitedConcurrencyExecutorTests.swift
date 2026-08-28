@@ -1,5 +1,6 @@
 @testable import OmFileIO
 import Logging
+import Synchronization
 import Testing
 
 @Suite struct LimitedConcurrencyExecutorTests {
@@ -95,10 +96,10 @@ import Testing
             case failed
         }
 
-        let errorCounter = Counter()
+        let failed = Atomic(false)
         let queue = ProcessingParallelQueue<Int>(
             executor: LimitedConcurrencyExecutor(maxConcurrency: 2),
-            onError: { _ in await errorCounter.increment() }
+            onError: { failed.store(true, ordering: .relaxed) }
         )
         await queue.enqueueIgnoreError(logger: Logger(label: "ProcessingParallelQueueTests")) {
             throw TestError.failed
@@ -107,7 +108,8 @@ import Testing
 
         let results = await queue.collect()
         #expect(results == [42])
-        #expect(await errorCounter.value == 1)
+        let hasFailed = failed.load(ordering: .relaxed)
+        #expect(hasFailed)
     }
 }
 

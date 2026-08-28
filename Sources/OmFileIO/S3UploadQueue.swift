@@ -9,11 +9,11 @@ public struct S3UploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
     let client: HTTPClient
     let logger: Logger
-    let onError: @Sendable (any Error) async -> Void
+    let onError: @Sendable () -> Void
     
     let queue: ProcessingSerialQueue
     
-    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3UploadQueue"), onError: @escaping @Sendable (any Error) async -> Void = { _ in }) {
+    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3UploadQueue"), onError: @escaping @Sendable () -> Void = {}) {
         self.endpoint = endpoint
         self.client = client
         self.logger = logger
@@ -64,7 +64,7 @@ public struct S3UploadQueue: Sendable {
                 try await work(client, endpoint)
             } catch {
                 logger.error("Error during queued upload \(description) to \(endpoint): \(error)")
-                await onError(error)
+                onError()
             }
         }
     }
@@ -93,7 +93,7 @@ public struct S3MultiFileUploadQueue: Sendable {
     /// Max number of concurrent file uploads. 4 should be fine
     let queue: ProcessingParallelQueue<S3MultiPartUploadPrepared>
     
-    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable (any Error) async -> Void = { _ in }, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int) {
+    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int) {
         self.partUploadExecutor = .init(maxConcurrency: maxConcurrentPartUploads)
         self.queue = .init(executor: LimitedConcurrencyExecutor(maxConcurrency: maxConcurrentFiles), onError: onError)
         self.client = client
