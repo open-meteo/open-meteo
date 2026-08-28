@@ -30,6 +30,19 @@ extension FileHandle {
         }
         return stats
     }
+
+    /// Return the `stat` structure for a path relative to this open directory.
+    public func fileStats(at path: UnsafePointer<CChar>) -> stat? {
+        var stats = stat()
+        var ret: Int32
+        repeat {
+            ret = fstatat(fileDescriptor, path, &stats, 0)
+        } while ret == -1 && errno == EINTR
+        guard ret != -1 else {
+            return nil
+        }
+        return stats
+    }
 }
 
 public enum FileHandleError: Error {

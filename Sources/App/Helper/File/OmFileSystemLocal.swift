@@ -170,8 +170,7 @@ enum OmFileSystemLocal {
                 } else if entry.pointee.d_type == DT_UNKNOWN {
                     // We need to do an additional stat on this to see if it's really a directory or not.
                     // This path should be uncommon.
-                    var statBuf = stat()
-                    if fstatat(fd.fileDescriptor, &entry.pointee.d_name.0, &statBuf, 0) == 0 {
+                    if let statBuf = fd.fileStats(at: &entry.pointee.d_name.0) {
                         if (mode_t(statBuf.st_mode) & S_IFMT) == S_IFDIR {
                             isDirectory = true
                         }
