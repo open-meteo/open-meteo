@@ -34,19 +34,18 @@ enum OmFileSystemS3Error: Error {
  - Each contains a list of modified files
  */
 struct OmFileSystemS3 {
-    let server: S3ServerHealthService
+    let server: S3ServerHealth
     let root = Directory(prefix: "")
     
     /// Make initial root directory access given a HTTP client and logger. Refreshes root if required
     func getRoot(client: HTTPClient, logger: Logger) async throws -> DirectoryWithContext {
-        let server = await self.server.getInstance()
         try await root.updateIfRequired(context: server)
         return DirectoryWithContext.init(directory: root, context: server)
     }
 
     func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
         await self.root.updateRecursivelyIfRequired(
-            context: server.getInstance(),
+            context: server,
             now: .now(),
             revalidateIntervalSeconds: 120,
             inactiveSkipSeconds: 30 * 60

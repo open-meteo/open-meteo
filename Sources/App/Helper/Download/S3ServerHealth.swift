@@ -7,36 +7,49 @@ enum S3ServerHealthError: Error {
     case allEndpointsUnavailable
 }
 
-/// Monitors a list of S3 Servers. On initialisation performs the first server check and then checks every 10 seconds in the background
+/// Wraps `S3ServerHealth` into a vapor usable service that does not allow an async init
 actor S3ServerHealth {
     let logger: Logger
     var states: [ServerState]
     var monitor: Task<Void, Never>?
+    var initialWaitQueue: [CheckedContinuation<Void, Never>]?
     
     struct ServerState: Sendable {
         let server: S3BucketEndpoint
         var isOnline: Bool
     }
     
-    init(logger: Logger, servers: [S3BucketEndpoint]) async {
+    init(logger: Logger, servers: [S3BucketEndpoint]) {
         self.logger = logger
         self.states = servers.map({ .init(server: $0, isOnline: true) })
-        await performHealthChecks()
-        self.monitor = Task { [weak self] in
-            while let self {
-                do {
-                    try await Task.sleep(nanoseconds: 10 * 1_000_000_000)
-                } catch {
-                    return
+        self.initialWaitQueue = []
+    }
+    
+    private func ensureChecks() async {
+        if monitor == nil {
+            monitor = Task { [weak self] in
+                while let self {
+                    await self.performHealthChecks()
+                    do {
+                        try await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+                    } catch {
+                        return
+                    }
                 }
-                await self.performHealthChecks()
             }
+        }
+        if initialWaitQueue != nil {
+            await withCheckedContinuation({
+                self.initialWaitQueue?.append($0)
+            })
         }
     }
     
     /// Deterministically returns the same server for the same hash. Used to distribute load to different endpoints. Throws `S3ServerHealthError.allEndpointsUnavailable` if all servers are offline
     /// If a server is offline, the hash is distributed to other server endpoints evenly.
-    func getServerFor(hash: UInt64) throws -> S3BucketEndpoint {
+    func getServerFor(hash: UInt64) async throws -> S3BucketEndpoint {
+        await ensureChecks()
+        
         var selected: S3BucketEndpoint?
         var highestScore: UInt64 = 0
 
@@ -61,6 +74,7 @@ actor S3ServerHealth {
     }
     
     func activeServers() async -> [S3BucketEndpoint] {
+        await ensureChecks()
         return states.filter(\.isOnline).map(\.server)
     }
     
@@ -88,58 +102,21 @@ actor S3ServerHealth {
                 states[i].isOnline = false
             }
         }
-    }
-}
-
-/// Wraps `S3ServerHealth` into a vapor usable service that does not allow an async init
-actor S3ServerHealthService {
-    private var state: State
-    
-    private enum State {
-        case uninitialised(servers: [S3BucketEndpoint], logger: Logger)
-        case initialising(queue: [CheckedContinuation<S3ServerHealth, Never>])
-        case initialised(states: S3ServerHealth)
-    }
-
-    init(logger: Logger, servers: [S3BucketEndpoint]) {
-        self.state = .uninitialised(servers: servers, logger: logger)
-    }
-    
-    func getInstance() async -> S3ServerHealth {
-        switch state {
-        case .uninitialised(let servers, let logger):
-            self.state = .initialising(queue: [])
-            let watcher = await S3ServerHealth(logger: logger, servers: servers)
-            guard case .initialising(let queued) = self.state else {
-                fatalError("State was not .initialising()")
-            }
-            self.state = .initialised(states: watcher)
-            queued.forEach {
-                $0.resume(with: .success(watcher))
-            }
-            return watcher
-        case .initialising(let queue):
-            let watcher = await withCheckedContinuation { continuation in
-                self.state = .initialising(queue: queue + [continuation])
-            }
-            return watcher
-        case .initialised(let watcher):
-            return watcher
+        
+        if let initialWaitQueue {
+            initialWaitQueue.forEach({ $0.resume() })
+            self.initialWaitQueue = nil
         }
-    }
-
-    nonisolated func activeServers() async -> [S3BucketEndpoint] {
-        return await getInstance().activeServers()
     }
 }
 
 extension Application {
     fileprivate struct S3ServerHealthKey: StorageKey, LockKey {
-        typealias Value = S3ServerHealthService
+        typealias Value = S3ServerHealth
     }
 
     /// Monitored S3 hosts to replicate upload S3 files
-    var s3UploadReplicationServer: S3ServerHealthService {
+    var s3UploadReplicationServer: S3ServerHealth {
         let lock = self.locks.lock(for: S3ServerHealthKey.self)
         lock.lock()
         defer { lock.unlock() }
@@ -147,7 +124,7 @@ extension Application {
             return existing
         }
         let servers = S3BucketEndpoint.loadFromEnvironment(variable: "S3_UPLOAD_REPLICATION_SERVERS")
-        let manager = S3ServerHealthService(logger: logger, servers: servers)
+        let manager = S3ServerHealth(logger: logger, servers: servers)
         self.storage[S3ServerHealthKey.self] = manager
         return manager
     }
