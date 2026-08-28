@@ -244,7 +244,16 @@ struct S3DataController: RouteCollection {
                 throw S3ApiError.expectedCompletionXMLBody
             }
             let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
-            try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
+            let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
+            if !FileManager.default.fileExists(atPath: tempPath) {
+                try await validateMultipartCompletionBody(filePath: absolutePath, body: body)
+                req.logger.warning("Multipart upload completion was received after the temporary file was already moved to the destination", metadata: [
+                    "path": "\(req.url.path)",
+                    "uploadId": "\(uploadId)"
+                ])
+                return Response(status: .ok)
+            }
+            try await validateMultipartCompletionBody(filePath: tempPath, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
             return Response(status: .ok)
@@ -373,14 +382,13 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func validateMultipartCompletionBody(absolutePath: String, uploadId: Int, body: ByteBuffer) async throws {
-        let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
+    private func validateMultipartCompletionBody(filePath: String, body: ByteBuffer) async throws {
         guard let completionXML = body.getString(at: body.readerIndex, length: body.readableBytes) else {
             throw S3ApiError.couldNotDecodeCompletionXML
         }
         let parts = try parseMultipartCompleteXML(completionXML)
         
-        _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(tempPath)) { handle in
+        _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(filePath)) { handle in
             let fileSize = try await handle.getFileSize()
             guard fileSize > 0 else {
                 return

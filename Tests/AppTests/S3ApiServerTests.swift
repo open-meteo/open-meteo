@@ -160,6 +160,18 @@ struct S3ApiServerTests {
             )
             let completeResponse = try await controller.postObject(completeRequest)
             #expect(completeResponse.status == .ok)
+
+            // A retried completion validates the already-moved destination and returns successfully.
+            let duplicateCompleteRequest = try makeSignedRequest(
+                app: app,
+                method: .POST,
+                uri: "\(path)?uploadId=\(uploadId)",
+                body: ByteBuffer(string: completionXml),
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            let duplicateCompleteResponse = try await controller.postObject(duplicateCompleteRequest)
+            #expect(duplicateCompleteResponse.status == .ok)
             
             /// Check that the cached local directory got updated and now contains the new file
             let storedFile = await dir?.getFile(name: file)
