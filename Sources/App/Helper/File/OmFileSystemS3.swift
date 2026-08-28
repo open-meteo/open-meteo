@@ -18,7 +18,7 @@ enum OmFileSystemS3Error: Error {
  
  Each file can be bound to a "payload" type. E.g. an open OM-File which maintains meta data about timestamps and arrays available
  
- Data from object is read using HTTP `If-Unmodified-Since` and `If-Match` (eTag) and HTTP ranges. If a file got modified, perform a HEAD request to quickly get the new modification timestamp and restart execution
+ Data from object is read using HTTP `If-Match` (eTag) and HTTP ranges. If a file got modified, perform a HEAD request to quickly get the new etag and size and restart execution
  
  TODO:
  - Serialise entries to disk for fast boot (option to store in KV cache? Need to prefix size)
