@@ -19,9 +19,14 @@ extension FileHandle {
     /// Return file `stat` structure
     public func fileStats() -> stat {
         var stats = stat()
-        guard fstat(fileDescriptor, &stats) != -1 else {
-            let error = String(cString: strerror(errno))
-            fatalError("fstat failed on open file descriptor. Error \(errno) \(error)")
+        var ret: Int32
+        repeat {
+            ret = fstat(fileDescriptor, &stats)
+        } while ret == -1 && errno == EINTR
+        guard ret != -1 else {
+            let failureErrno = errno
+            let error = String(cString: strerror(failureErrno))
+            fatalError("fstat failed on open file descriptor. Error \(failureErrno) \(error)")
         }
         return stats
     }
@@ -34,9 +39,14 @@ public enum FileHandleError: Error {
 extension FileManager {
     /// Rename file and replace if `to` already exists. https://www.gnu.org/software/libc/manual/html_node/Renaming-Files.html
     public func moveFileOverwrite(from: String, to: String) throws {
-        guard rename(from, to) != -1 else {
-            let error = String(cString: strerror(errno))
-            throw FileHandleError.cannotMoveFile(from: from, to: to, errno: errno, error: error)
+        var ret: Int32
+        repeat {
+            ret = rename(from, to)
+        } while ret == -1 && errno == EINTR
+        guard ret != -1 else {
+            let failureErrno = errno
+            let error = String(cString: strerror(failureErrno))
+            throw FileHandleError.cannotMoveFile(from: from, to: to, errno: failureErrno, error: error)
         }
     }
 
@@ -49,14 +59,18 @@ extension FileManager {
     /// Return file `stat` structure
     public func fileStats(at: String) -> stat? {
         var stats = stat()
-        let ret = stat(at, &stats)
+        var ret: Int32
+        repeat {
+            ret = stat(at, &stats)
+        } while ret == -1 && errno == EINTR
         guard ret != -1 else {
-            if errno == 2 {
+            let failureErrno = errno
+            if failureErrno == ENOENT {
                 // No such file or directory
                 return nil
             }
-            let error = String(cString: strerror(errno))
-            fatalError("fstat failed on open file descriptor. Error \(errno) \(error), ret=\(ret)")
+            let error = String(cString: strerror(failureErrno))
+            fatalError("stat failed for path \(at). Error \(failureErrno) \(error), ret=\(ret)")
         }
         return stats
     }
