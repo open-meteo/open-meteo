@@ -3,7 +3,7 @@ import Foundation
 /// Float representation used by the hot lookup path.
 ///
 /// Query and artifact vectors use the same precision so candidate distances require no
-/// Float-to-Double conversion. Code that proves exact ordering converts `point` to Double.
+/// Float-to-Double conversion. `point` is used by cube geometry and coordinate conversion.
 struct SphericalLookupVector: Sendable {
     let x: Float
     let y: Float
@@ -16,8 +16,8 @@ struct SphericalLookupVector: Sendable {
 
 /// Three-dimensional direction on the unit sphere.
 ///
-/// Generation and exact comparisons use Double. Artifacts store each component as Float32, and
-/// exact comparisons promote and normalize the stored value before evaluating its dot product.
+/// Generation uses Double. Artifacts and runtime candidate comparisons use Float32; coordinate
+/// access promotes and normalizes stored values before converting them back to latitude/longitude.
 package struct SphericalPoint: Sendable, Equatable {
     private static let degreesToRadians = Double.pi / 180
     private static let degreesToRadiansFloat = Float.pi / 180

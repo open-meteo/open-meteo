@@ -218,26 +218,13 @@ extension SphericalCubeIndex {
             // Radius 8 spans a 17-by-17 stencil, hence at most 289 projected buckets.
             var scannedBuckets = InlineArray<289, Int>(repeating: -1)
             var scannedBucketCount = 0
-            let scale = 2 / Double(resolution)
-
             @inline(__always)
             func scanOffset(dx: Int, dy: Int) {
-                let point = SphericalCubeGeometry.faceVector(
-                    face: queryLocation.face,
-                    u: -1 + (Double(queryLocation.x + dx) + 0.5) * scale,
-                    v: -1 + (Double(queryLocation.y + dy) + 0.5) * scale
-                )
-                let location = SphericalCubeGeometry.location(
-                    for: point,
-                    resolution: resolution,
-                    resolutionScale: resolutionScale
-                )
-                guard
-                    let bucket = faceSections[location.face].bucket(
-                        x: location.x,
-                        y: location.y
-                    )
-                else { return }
+                guard let bucket = projectedBucket(
+                    around: queryLocation,
+                    dx: dx,
+                    dy: dy
+                ) else { return }
                 for position in 0..<scannedBucketCount where scannedBuckets[position] == bucket {
                     return
                 }

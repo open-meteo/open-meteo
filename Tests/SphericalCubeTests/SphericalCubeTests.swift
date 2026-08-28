@@ -3,19 +3,7 @@ import OmFileFormat
 @testable import SphericalCube
 import Testing
 
-private extension SphericalCubeIndex {
-    /// Preserve the official Double-precision centre during artifact round-trip validation.
-    func nearestPointID(to center: SphericalPoint) -> Int {
-        withBytes {
-            nearest(
-                to: center,
-                maximumDistanceSquared: .infinity,
-                seedPosition: nil,
-                bytes: $0
-            )!
-        }
-    }
-}
+private let oracleScoreTolerance = 1e-15
 
 @Suite struct SphericalCubeTests {
     @Test func nearestLookupStaysWithinMeterBudgetAcrossCubeFaces() throws {
@@ -113,8 +101,8 @@ private extension SphericalCubeIndex {
             let ranked = fixture.centers.indices.sorted { lhs, rhs in
                 let lhsScore = query.dot(fixture.index.point(at: lhs))
                 let rhsScore = query.dot(fixture.index.point(at: rhs))
-                if lhsScore > rhsScore + SphericalCubeIndex.exactScoreMargin { return true }
-                if rhsScore > lhsScore + SphericalCubeIndex.exactScoreMargin { return false }
+                if lhsScore > rhsScore + oracleScoreTolerance { return true }
+                if rhsScore > lhsScore + oracleScoreTolerance { return false }
                 return lhs < rhs
             }
             let lookup = try #require(fixture.index.nearestLookup(
@@ -145,6 +133,18 @@ private extension SphericalCubeIndex {
         let coordinate = fixture.index.point(at: 37).coordinate
         #expect(abs(coordinate.latitude) < 1e-5)
         #expect(abs(coordinate.longitude) < 1e-5)
+    }
+
+    @Test func crossFaceFloatTiePrefersLowerPointID() throws {
+        // ID 1 occupies the query's +X face while lower ID 0 occupies +Y. A query on the seam
+        // therefore verifies that projected fallback order does not decide an equal Float distance.
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 46),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 44),
+        ])
+        defer { fixture.remove() }
+
+        #expect(fixture.index.nearestPointID(latitude: 0, longitude: 45) == 0)
     }
 
     @Test func regionalDistanceLimitAndLongitudeWrappingArePreserved() throws {
@@ -185,7 +185,11 @@ private extension SphericalCubeIndex {
             let expected = fixture.centers[cell]
             let actual = fixture.index.point(at: cell)
             #expect(centerDirectionDistance(expected, actual) <= 2)
-            #expect(fixture.index.nearestPointID(to: expected) == cell)
+            let coordinate = fixture.index.point(at: cell).coordinate
+            #expect(fixture.index.nearestPointID(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
+            ) == cell)
         }
     }
 
@@ -356,7 +360,7 @@ private func nearest(point: SphericalPoint, centers: [SphericalPoint]) -> Int {
     var bestScore = -Double.infinity
     for center in centers { bestScore = max(bestScore, point.dot(center)) }
     return centers.indices.first {
-        point.dot(centers[$0]) >= bestScore - SphericalCubeIndex.exactScoreMargin
+        point.dot(centers[$0]) >= bestScore - oracleScoreTolerance
     }!
 }
 
