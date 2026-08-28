@@ -7,12 +7,13 @@ import OmFileIO
 actor S3SyncManager: LifecycleHandler {
     private let logger: Logger
     private var queues: [S3UploadQueue] = []
-    private var isShuttingDown = false
     private let client: HTTPClient
+    private let exitStatus: ProcessExitStatus
 
-    init(client: HTTPClient, logger: Logger) {
+    init(client: HTTPClient, logger: Logger, exitStatus: ProcessExitStatus = .shared) {
         self.client = client
         self.logger = logger
+        self.exitStatus = exitStatus
     }
 
     /// Get task queue for S3 Endpoint
@@ -20,7 +21,9 @@ actor S3SyncManager: LifecycleHandler {
         if let queue = queues.first(where: {$0.endpoint == endpoint}) {
             return queue
         }
-        let queue = S3UploadQueue(endpoint: endpoint, client: client, logger: logger)
+        let queue = S3UploadQueue(endpoint: endpoint, client: client, logger: logger) { _ in
+            self.exitStatus.markFailure()
+        }
         queues.append(queue)
         return queue
     }
@@ -44,13 +47,16 @@ actor S3SyncManager: LifecycleHandler {
         return getQueues(buckets: bucketsOpt)
     }
     
-    /// Called from lifecycle manager to shutdown application
-    /// Stop accepting new work and wait for all queued syncs to finish.
-    func shutdownAsync(_ application: Application) async {
-        isShuttingDown = true
+    /// Wait for all queued syncs to finish.
+    func finish() async {
         for queue in queues {
             await queue.finish()
         }
+    }
+
+    /// Called from lifecycle manager to shutdown application.
+    func shutdownAsync(_ application: Application) async {
+        await finish()
     }
 }
 
