@@ -221,7 +221,7 @@ struct OmFileSystemS3 {
                     if receivedFileModifiedError {
                         // File modified errors can happen if the S3 listing is already outdated the first time the file is retrieved
                         let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
-                        context.logger.warning("Initial s3 file open but received file modified error for \(objectName) [Old size: \(self.contentLength), new size: \(newReader.count), old etag: \(self.eTag), new etag: \(newReader.eTag), old lastModified: \(self.lastModified), new lastModified: \(newReader.lastModified)]")
+                        context.logger.warning("Initial s3 file open but received file modified error for \(objectName) [Old size: \(self.contentLength), new size: \(newReader.count), old etag: \(self.eTag), new etag: \(newReader.eTag), old lastModified: \(self.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), new lastModified: \(newReader.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), delta: \(Double(newReader.lastModified.timeIntervalSince1970 - lastModified.timeIntervalSince1970).asSecondsPrettyPrint)]")
                         self.contentLength = newReader.count
                         self.lastModified = newReader.lastModified
                         self.eTag = newReader.eTag
