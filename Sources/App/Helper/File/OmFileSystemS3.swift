@@ -200,7 +200,17 @@ struct OmFileSystemS3 {
             case .none:
                 self.payload = .initialising([])
                 do {
-                    let p = try await T(file: makeCachedClient(context: context))
+                    let p: T
+                    if receivedFileModifiedError {
+                        // File modified errors can happen if the S3 listing is already outdated the first time the file is retrieved
+                        let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
+                        self.contentLength = newReader.count
+                        self.lastModified = newReader.lastModified
+                        self.eTag = newReader.eTag
+                        p = try await T(file: OmReaderBlockCache(backend: newReader, cache: OpenMeteo.dataBlockCache, cacheKey: newReader.cacheKey))
+                    } else {
+                        p = try await T(file: makeCachedClient(context: context))
+                    }
                     guard case .initialising(let queued) = payload else {
                         fatalError("State was not .initialising()")
                     }
