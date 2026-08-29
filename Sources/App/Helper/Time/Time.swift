@@ -185,7 +185,7 @@ public struct Timestamp: Hashable, Sendable {
         let hour = Int(t.tm_hour)
         let minute = Int(t.tm_min)
         let second = Int(t.tm_sec)
-        return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2))\(second.zeroPadded(len: 2))"
+        return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2)):\(second.zeroPadded(len: 2))"
     }
     
     var iso8601_YYYY_MM_dd_HH_mmZ: String {

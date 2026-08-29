@@ -13,9 +13,9 @@ import Testing
     }
     
     @Test func lastHttpModifiedDate() throws {
-        let a = try "Wed, 19 Aug 2026 09:38:00 GMT".parseLastModifiedDate()
-        #expect(a.iso8601_YYYY_MM_dd_HH_mmZ == "2026-08-19T09:38Z")
-        #expect(a.lastModifiedHttpDateFormat == "Wed, 19 Aug 2026 09:38:00 GMT")
+        let a = try "Wed, 19 Aug 2026 19:38:12 GMT".parseLastModifiedDate()
+        #expect(a.iso8601_YYYY_MM_dd_HH_mm_ss == "2026-08-19T19:38:12")
+        #expect(a.lastModifiedHttpDateFormat == "Wed, 19 Aug 2026 19:38:12 GMT")
     }
     
     @Test func s3XmlDate() throws {
