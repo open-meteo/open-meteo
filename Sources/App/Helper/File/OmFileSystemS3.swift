@@ -109,6 +109,23 @@ struct OmFileSystemS3 {
             case error(Error, Timestamp)
         }
 
+        /// Cancellation and stale remote metadata are not terminal payload
+        /// initialisation errors. In particular, caching a 412 here would make
+        /// every request replay it for a minute without attempting another
+        /// HEAD revalidation.
+        private static func shouldResetPayload(after error: Error) -> Bool {
+            if error is CancellationError {
+                return true
+            }
+            guard let error = error as? CurlErrorNonRetry else {
+                return false
+            }
+            if case .fileModifiedOrPrevalidationFailed = error {
+                return true
+            }
+            return false
+        }
+
         init(objectName: String, contentLength: Int, lastModified: Timestamp, eTag: String) {
             OmMetrics.fileRemoteOpen.add(1, ordering: .relaxed)
             self.objectName = objectName
@@ -158,7 +175,7 @@ struct OmFileSystemS3 {
                     guard case .updating(_, let queued) = payload else {
                         fatalError("State was not .updating()")
                     }
-                    if error is CancellationError {
+                    if Self.shouldResetPayload(after: error) {
                         self.payload = .none
                     } else {
                         self.payload = .error(error, .now())
@@ -224,7 +241,7 @@ struct OmFileSystemS3 {
                         fatalError("State was not .initialising()")
                     }
                     // Do not cache the cancellation as terminal error.
-                    if error is CancellationError {
+                    if Self.shouldResetPayload(after: error) {
                         self.payload = .none
                     } else {
                         self.payload = .error(error, .now())
@@ -286,7 +303,7 @@ struct OmFileSystemS3 {
                     guard case .updating(old: _, let queued) = self.payload else {
                         fatalError("State was not .updating()")
                     }
-                    if error is CancellationError {
+                    if Self.shouldResetPayload(after: error) {
                         self.payload = .none
                     } else {
                         self.payload = .error(error, .now())
