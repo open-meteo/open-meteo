@@ -414,11 +414,12 @@ struct S3DataController: RouteCollection {
     
     private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Timestamp) async throws {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        try FileManager.default.moveFileOverwrite(from: tempPath, to: absolutePath)
-        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(absolutePath), options: .modifyFile(createIfNecessary: false)) { handle in
+        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
             let ts = FileInfo.Timespec(seconds: Int(lastModified.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
         }
+        try FileManager.default.moveFileOverwrite(from: tempPath, to: absolutePath)
+        
         /// Full path `/somedir/object.ext`
         let path = req.url.path
         /// Object directory `somedir/`
