@@ -421,11 +421,11 @@ public struct OmFileSystemS3: Sendable {
 
             guard revalidationQueue == nil else {
                 OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
-                try await withCheckedThrowingContinuation { continuation in
-                    revalidationQueue?.append(continuation)
-                }
                 defer {
                     OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.add(-1, ordering: .relaxed)
+                }
+                try await withCheckedThrowingContinuation { continuation in
+                    revalidationQueue?.append(continuation)
                 }
                 return
             }
