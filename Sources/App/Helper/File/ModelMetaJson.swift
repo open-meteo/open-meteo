@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import OmFileIO
 
 
 /*enum ModelTimeVariable: String, GenericVariable {
@@ -132,22 +133,23 @@ struct ModelUpdateMetaJson: Codable, Sendable {
     }
 }
 
-struct ModelUpdateMetaFile: RemoteFileManageableJson {
+struct ModelUpdateMetaFile/*: RemoteFileManageableJson*/ {
     typealias Value = ModelUpdateMetaJson
     let domain: DomainRegistry
     
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         return 30
     }
-    
-    func getFilePath() -> String {
-        return "\(OpenMeteo.dataDirectory)\(domain.rawValue)/static/meta.json"
+}
+
+extension ModelUpdateMetaFile: OmFileManagable {
+    func getRelativeFilePathWithData() -> String {
+        "data/\(domain.rawValue)/static/meta.json"
     }
     
-    func getRemoteUrl() -> String? {
-        guard let directory = domain.remoteDataDirectory else {
-            return nil
-        }
-        return "\(directory)static/meta.json"
-    }
+    typealias Payload = ModelUpdateMetaJson
+}
+
+extension ModelUpdateMetaJson: OmFilePayloadCodable {
+
 }

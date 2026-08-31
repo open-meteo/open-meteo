@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import OmFileIO
 
 /**
 Upgrade legacy om-files to new version. Transposes data to proper 3d context.

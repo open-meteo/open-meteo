@@ -3,9 +3,12 @@ import Vapor
 import AsyncHTTPClient
 import NIOCore
 import NIOFileSystem
+@_spi(Testing) import NIOFileSystem
+import OmFileIO
 
 /**
  Expose database as S3 endpoint. This can be used to pull data from one server to another. It is used only internally to transfer data between Open-Meteo API nodes. Note: This is only a limited implementation and not fully compatible.
+ After upload, the local cached file manager is updated as well to immediately reflect the file changes
  
  List example:
  `http://127.0.0.1:8080/?list-type=2&delimiter=/&prefix=data/cmc_gem_gdps/shortwave_radiation/&apikey=123`
@@ -20,6 +23,9 @@ import NIOFileSystem
  If `S3_UPLOAD_REPLICATION_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are replicated to those servers. Servers are checked every couple of seconds. If offline, they are ignored. Also non standard S3 implementation. Used to replicate uploads to a fail-over server in realtime. If the server is available. This is a blocking operation.
  
  If `S3_UPLOAD_LAZY_SERVERS` is set to "s3://key1:secret1@server1.tld/,s3://key1:secret1@server2.tld/" all uploads are lazily replicated to those servers after the sync replication completed. Used to upload data to large S3 storage servers afterwards
+ 
+ TODO:
+ - API key integration with accounting (1 call = 1KB traffic)
  */
 struct S3DataController: RouteCollection {
     static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
@@ -42,13 +48,17 @@ struct S3DataController: RouteCollection {
         
         if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
             routes.get("", use: self.list)
+            routes.get("index.html", use: self.index)
             routes.get("openmeteo", use: self.list)
+            routes.get("openmeteo-local", use: self.list)
             routes.on(.HEAD, [], use: self.headRoot)
             for root in ["data", "data_run", "data_spatial"] {
                 routes.on(.HEAD, [PathComponent(stringLiteral: root), .catchall], use: self.get)
                 routes.on(.HEAD, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.get)
+                routes.on(.HEAD, ["openmeteo-local", PathComponent(stringLiteral: root), .catchall], use: self.get)
                 routes.get(PathComponent(stringLiteral: root), "**", use: self.get)
                 routes.get("openmeteo", PathComponent(stringLiteral: root), "**", use: self.get)
+                routes.get("openmeteo-local", PathComponent(stringLiteral: root), "**", use: self.get)
             }
         }
         
@@ -110,146 +120,56 @@ struct S3DataController: RouteCollection {
             throw RateLimitError.serviceOverloaded
         }
         let params = try req.query.decode(S3List.ListV2Query.self)
-        try authorizeReadRequest(req: req, apikey: params.apikey)
-        
-        let path = params.prefix
-        guard params.list_type == 2, params.delimiter == "/" else {
-            throw S3ApiError.forbidden
-        }
-        if params.prefix == "" {
-            return Response(body: .init(stringLiteral: """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-                    <Name>openmeteo</Name>
-                    <Prefix>/</Prefix>
-                    <KeyCount>3</KeyCount>
-                    <MaxKeys>1000</MaxKeys>
-                    <Delimiter>/</Delimiter>
-                    <IsTruncated>false</IsTruncated>
-                    <CommonPrefixes>
-                    <Prefix>data/</Prefix>
-                    </CommonPrefixes>
-                    <CommonPrefixes>
-                    <Prefix>data_spatial/</Prefix>
-                    </CommonPrefixes>
-                    <CommonPrefixes>
-                    <Prefix>data_run/</Prefix>
-                    </CommonPrefixes>
-                </ListBucketResult>
-                """))
-        }
-        
-        guard let absoluteDirectoryPath = resolveListPath(path) else {
-            throw S3ApiError.forbidden
-        }
-        
-        let pathUrl = URL(fileURLWithPath: absoluteDirectoryPath, isDirectory: true)
-        let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
-        
-        guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
-            throw S3ApiError.forbidden
-        }
-        
-        var files = [S3List.ListV2File]()
-        var directories = [String]()
-        /// Note: Maybe at some point a async version of the directory enumerator should be used.
-        /// https://forums.swift.org/t/xcode-16-3-cant-use-makeiterator-via-filemanagers-enumerator-at-in-async-function/78976
-        for case let fileURL as URL in AnySequence(directoryEnumerator) {
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
-                  let isDirectory = resourceValues.isDirectory,
-                  let name = resourceValues.name,
-                  !name.contains("~")
-            else {
-                continue
-            }
-            if isDirectory {
-                directories.append(name)
-            } else {
-                guard let modificationTime = resourceValues.contentModificationDate,
-                      let fileSize = resourceValues.fileSize
-                else {
-                    continue
-                }
-                files.append(S3List.ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
+        let localOnly = req.url.path == "/openmeteo-local" || req.url.path == "/openmeteo-local/"
+        if params.apikey != nil || req.headers.first(name: .authorization) != nil {
+            try authorizeReadRequest(req: req, apikey: params.apikey)
+            return try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly)
+        } else {
+            return try await req.withFreeApiRateLimiter() { _ in
+                try validateAllowedReferer(req)
+                return (1, try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly))
             }
         }
-        
-        let dateFormat = DateFormatter.awsS3DateTimeFloored
-        let filesXml = files.map {
-            """
-            <Contents>
-                <Key>\(path)\($0.name)</Key>
-                <LastModified>\(dateFormat.string(from: $0.modificationTime))</LastModified>
-                <Size>\($0.fileSize)</Size>
-                <StorageClass>STANDARD</StorageClass>
-            </Contents>
-            """
-        }.joined(separator: "\n")
-        let directoriesXml = directories.map {
-            """
-            <CommonPrefixes>
-            <Prefix>\(path)\($0)/</Prefix>
-            </CommonPrefixes>
-            """
-        }.joined(separator: "\n")
-        
-        var headers = HTTPHeaders()
-        headers.add(name: .contentType, value: "application/xml")
-        return Response(status: .ok, headers: headers, body: .init(string: """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-            <Name>openmeteo</Name>
-            <Prefix>\(path)</Prefix>
-            <KeyCount>\(files.count + directories.count)</KeyCount>
-            <MaxKeys>1000</MaxKeys>
-            <Delimiter>/</Delimiter>
-            <IsTruncated>false</IsTruncated>
-            \(directoriesXml)
-            \(filesXml)
-        </ListBucketResult>
-        """))
     }
     
-    /// Serve file through nginx send file
+    /// Serve static files
     func get(_ req: Request) async throws -> Response {
-        let params = try req.query.decode(DownloadParams.self)
-        let path = req.url.path.dropPrefix("/openmeteo")
-        guard let absolutePath = resolveObjectPath(path) else {
+        OmMetrics.requestsS3ApiTotal.add(1, ordering: .relaxed)
+        guard OmMetrics.requestsRunning.load(ordering: .relaxed) <= RateLimiter.concurrencyLimitTotal else {
+            OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
+            throw RateLimitError.serviceOverloaded
+        }
+        guard req.url.path.hasPrefix("/"), req.url.path.hasSuffix("/") == false, req.url.path.onlyContainsAlphanumericDashSlashDot else {
             throw S3ApiError.forbidden
         }
+        let isJson = req.url.path.hasSuffix(".json")
+        let localOnly = req.url.path.hasPrefix("/openmeteo-local/")
         
-        let isJson = path.hasSuffix(".json")
+        let mediaType = isJson ? HTTPMediaType.json : .binary
+        if req.headers.first(name: .host) == "data-spatial.open-meteo.com" {
+            return try await req.withFreeApiRateLimiter(fn: { _ in
+                try validateAllowedReferer(req)
+                let path = String(req.url.path.dropFirst(1))
+                guard path.hasPrefix("data_spatial/") else {
+                    throw S3ApiError.forbidden
+                }
+                guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly) else {
+                    throw CurlError.fileNotFound
+                }
+                return (1, try await req.asyncStreamFile(file: file, mediaType: mediaType))
+            })
+        }
+        let params = try req.query.decode(DownloadParams.self)
+        let path = String(req.url.path.dropFirst(1).dropPrefix("openmeteo/").dropPrefix("openmeteo-local/"))
+        
         if !isJson {
             try authorizeReadRequest(req: req, apikey: params.apikey)
         }
         
-        guard let pathNoRoot = path.split(separator: "/").dropFirst().joined(separator: "/").nilIfEmpty else {
-            throw S3ApiError.forbidden
+        guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly) else {
+            throw CurlError.fileNotFound
         }
-        
-        /// TODO consider caching
-        if let remote = OpenMeteo.remoteDataDirectory,
-           let modelStr = pathNoRoot.firstIndex(of: "/").map({ pathNoRoot[..<$0] }),
-           let _ = DomainRegistry(rawValue: String(modelStr))
-        {
-            var request = HTTPClientRequest(url: "\(remote)\(pathNoRoot)")
-            try request.applyS3Credentials()
-            let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
-            let r = Response(status: response.status, body: .init(asyncStream: { writer in
-                do {
-                    for try await buffer in response.body {
-                        try await writer.write(.buffer(buffer))
-                    }
-                    try await writer.write(.end)
-                } catch {
-                    try? await writer.write(.error(error))
-                }
-            }))
-            r.headers.contentType = response.headers.contentType
-            return r
-        }
-        let response = try await req.fileio.asyncStreamFile(at: absolutePath)
-        return response
+        return try await req.asyncStreamFile(file: file, mediaType: mediaType)
     }
     
     func putObject(_ req: Request) async throws -> Response {
@@ -324,8 +244,14 @@ struct S3DataController: RouteCollection {
             guard let body else {
                 throw S3ApiError.expectedCompletionXMLBody
             }
-            let modifiedDate = req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? Date.now
-            try await validateMultipartCompletionBody(absolutePath: absolutePath, uploadId: uploadId, body: body)
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
+            let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
+            if !FileManager.default.fileExists(atPath: tempPath) {
+                req.logger.warning("Multipart upload completion, but temp file is missing. Validating the destination file instead")
+                try await validateMultipartCompletionBody(filePath: absolutePath, body: body)
+                return Response(status: .ok)
+            }
+            try await validateMultipartCompletionBody(filePath: tempPath, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
             return Response(status: .ok)
@@ -365,15 +291,22 @@ struct S3DataController: RouteCollection {
             try await handle.resize(to: .bytes(Int64(body.readableBytes)))
             try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
             
-            let modifiedDate = req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? Date.now
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
             let ts = FileInfo.Timespec(seconds: Int(modifiedDate.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
             return modifiedDate
         }
-        try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
         try await replicateSinglePut(req: req, body: body, lastModified: modifiedDate)
+        try FileManager.default.moveFileOverwrite(from: tempPath, to: absolutePath)
+        
+        /// Full path `/somedir/object.ext`
+        let path = req.url.path
+        /// Object directory `somedir/`
+        let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
+        await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
+        
         for queue in await lazyReplicationQueues(req) {
-            await queue.upload(buffer: body, objectName: String(req.url.path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream")
+            await queue.upload(buffer: body, objectName: String(path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream", lastModified: modifiedDate)
         }
     }
     
@@ -392,7 +325,6 @@ struct S3DataController: RouteCollection {
               let fileSize = Int64(fileSizeRaw), fileSize >= 0, fileSize <= Self.uploadMaximumFileSize else {
             throw S3ApiError.missingOrInvalidFileSizeHeader
         }
-        
         let uploadId: Int
         if let customUploadId = req.headers.first(name: "x-upload-id") {
             guard let id = Int(customUploadId), Self.uploadIdRange.contains(id) else {
@@ -431,35 +363,30 @@ struct S3DataController: RouteCollection {
         guard body.readableBytes <= Self.multipartChunkSize else {
             throw S3ApiError.chunkSizeExceeds8MB
         }
-        
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        let tempInfo = try await FileSystem.shared.info(forFileAt: FilePath(tempPath))
-        guard let tempInfo else {
-            throw S3ApiError.multipartUploadNotFound
-        }
-        let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-        let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
-        let isLastPart = partNumber == numParts
-        guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
-            throw S3ApiError.partSizeNotChunkSize
-        }
-        guard offset + Int64(body.readableBytes) <= tempInfo.size else {
-            throw S3ApiError.partExceedsAllocatedFileSize
-        }
-        
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
+            let tempInfo = try await handle.fileHandle.info()
+            
+            let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
+            let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
+            let isLastPart = partNumber == numParts
+            guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
+                throw S3ApiError.partSizeNotChunkSize
+            }
+            guard offset + Int64(body.readableBytes) <= tempInfo.size else {
+                throw S3ApiError.partExceedsAllocatedFileSize
+            }
             try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
         }
     }
     
-    private func validateMultipartCompletionBody(absolutePath: String, uploadId: Int, body: ByteBuffer) async throws {
-        let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
+    private func validateMultipartCompletionBody(filePath: String, body: ByteBuffer) async throws {
         guard let completionXML = body.getString(at: body.readerIndex, length: body.readableBytes) else {
             throw S3ApiError.couldNotDecodeCompletionXML
         }
         let parts = try parseMultipartCompleteXML(completionXML)
         
-        _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(tempPath)) { handle in
+        _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(filePath)) { handle in
             let fileSize = try await handle.getFileSize()
             guard fileSize > 0 else {
                 return
@@ -486,17 +413,23 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Date) async throws {
+    private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Timestamp) async throws {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        try await FileSystem.shared.replaceItem(at: FilePath(absolutePath), withItemAt: FilePath(tempPath))
-        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(absolutePath), options: .modifyFile(createIfNecessary: false)) { handle in
+        try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
             let ts = FileInfo.Timespec(seconds: Int(lastModified.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
         }
-                
+        try FileManager.default.moveFileOverwrite(from: tempPath, to: absolutePath)
+        
+        /// Full path `/somedir/object.ext`
+        let path = req.url.path
+        /// Object directory `somedir/`
+        let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
+        await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
+        
         for queue in await lazyReplicationQueues(req) {
             let session = queue.startMultiPartUploads()
-            await session.uploadMultipart(file: absolutePath, objectName: String(req.url.path.dropFirst(1)))
+            await session.uploadMultipart(file: absolutePath, objectName: String(path.dropFirst(1)), lastModified: lastModified)
             await queue.finishMultiPartUploads(session)
         }
     }
@@ -531,11 +464,25 @@ struct S3DataController: RouteCollection {
         }
         try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
     }
+
+    private func validateAllowedReferer(_ req: Request) throws {
+        guard let host = req.getRefererHost() else {
+            throw S3ApiError.forbidden
+        }
+        guard host == "localhost" || host == "open-meteo.com" || host.hasSuffix(".open-meteo.com") || host == "drizz.li" || host.hasSuffix(".maps-5aj.pages.dev") else {
+            throw S3ApiError.forbidden
+        }
+    }
     
     private func verifyRequestSignature(req: Request, body: ByteBuffer, isRead: Bool) throws {
         let credentials = isRead ? self.readCredentials : self.uploadCredentials
         guard !credentials.isEmpty else {
             throw isRead ? S3ApiError.missingReadCredentials : S3ApiError.missingUploadCredentials
+        }
+        if let contentLength = req.headers.first(name: .contentLength) {
+            guard let expectedBodySize = Int(contentLength), expectedBodySize == body.readableBytes else {
+                throw S3ApiError.incompleteBodyPayload(expected: Int(contentLength), actual: body.readableBytes)
+            }
         }
         let payloadHash = body.readableBytesView.sha256Hex
         let host = req.headers.first(name: .host) ?? req.headers.first(name: "Host")
@@ -544,7 +491,6 @@ struct S3DataController: RouteCollection {
         }
         let canonicalURL = "\(req.scheme)://\(host)\(req.url.string)"
         
-        var hasMatchingAccessKey = false
         for credentials in credentials {
             let signer = AWSSigner(accessKey: credentials.accessKey, secretKey: credentials.secretKey, region: "us-west-2", service: "s3")
             do {
@@ -552,13 +498,7 @@ struct S3DataController: RouteCollection {
                 return
             } catch AWSSigner.SigningError.invalidAccessKey {
                 continue
-            } catch {
-                hasMatchingAccessKey = true
             }
-        }
-        
-        if hasMatchingAccessKey {
-            throw S3ApiError.invalidRequestSignature
         }
         throw S3ApiError.unknownAccessKey
     }
@@ -589,7 +529,7 @@ struct S3DataController: RouteCollection {
         return await req.application.s3SyncManager.getQueues(buckets: servers)
     }
     
-    private func replicateSinglePut(req: Request, body: ByteBuffer, lastModified: Date) async throws {
+    private func replicateSinglePut(req: Request, body: ByteBuffer, lastModified: Timestamp) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
@@ -604,7 +544,7 @@ struct S3DataController: RouteCollection {
             if let contentType = req.headers.first(name: .contentType) {
                 request.headers.add(name: .contentType, value: contentType)
             }
-            request.headers.add(name: "x-last-modified", value: lastModified.lastModifiedHttpDateFormat)
+            request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
         }
     }
@@ -639,7 +579,7 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func replicateMultipartComplete(req: Request, uploadId: Int, body: ByteBuffer, lastModified: Date) async throws {
+    private func replicateMultipartComplete(req: Request, uploadId: Int, body: ByteBuffer, lastModified: Timestamp) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         guard let bodyHash = req.headers.first(name: "x-amz-content-sha256") else {
@@ -653,7 +593,7 @@ struct S3DataController: RouteCollection {
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentType, value: "application/xml")
-            request.headers.add(name: "x-last-modified", value: lastModified.lastModifiedHttpDateFormat)
+            request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
@@ -672,28 +612,6 @@ struct S3DataController: RouteCollection {
     
     private func tempUploadPath(finalPath: String, uploadId: Int) -> String {
         return "\(finalPath).\(uploadId)~"
-    }
-    
-    private func resolveListPath(_ path: String) -> String? {
-        guard !path.isEmpty,
-              path.last == "/",
-              !path.hasPrefix("/"),
-              !path.contains("//"),
-              !path.contains(".."),
-              path.onlyContainsAlphanumericDashSlashDot else {
-            return nil
-        }
-        let directory: Substring
-        if path.starts(with: "data/") {
-            directory = OpenMeteo.dataDirectory.dropLast("/data/".count)
-        } else if path.starts(with: "data_run/") {
-            directory = (OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_run")).dropLast("/data_run/".count)
-        } else if path.starts(with: "data_spatial/") {
-            directory = (OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory.replacingLastPathComponent(with: "data_spatial")).dropLast("/data_spatial/".count)
-        } else {
-            return nil
-        }
-        return "\(directory)/\(path)"
     }
     
     /// Get absolute object path for local storage
@@ -720,32 +638,73 @@ struct S3DataController: RouteCollection {
     }
 }
 
-fileprivate extension String {
-    func parseLastModifiedDate() -> Date? {
-        if let unix = Double(self) {
-            return Date(timeIntervalSince1970: unix)
+extension Request {
+    /// Get the `Referer` header and extract the hostname if available
+    func getRefererHost() -> Substring? {
+        guard let referer = headers.first(name: .referer) else {
+            return nil
         }
-        
-        let iso = ISO8601DateFormatter()
-        if let date = iso.date(from: self) {
-            return date
+        guard let schemeRange = referer.range(of: "http://") ?? referer.range(of: "https://") else {
+            return nil
         }
-        
-        let rfc1123 = DateFormatter()
-        rfc1123.locale = Locale(identifier: "en_US_POSIX")
-        rfc1123.timeZone = TimeZone(secondsFromGMT: 0)
-        rfc1123.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        return rfc1123.date(from: self)
+        let hostStart = schemeRange.upperBound
+        guard hostStart < referer.endIndex else {
+            return nil
+        }
+        let hostEnd = referer[hostStart...].firstIndex(where: { $0 == "/" || $0 == ":" }) ?? referer.endIndex
+        guard hostStart < hostEnd else {
+            return nil
+        }
+        return referer[hostStart..<hostEnd]
     }
 }
 
-fileprivate extension Date {
-    var lastModifiedHttpDateFormat: String {
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        fmt.timeZone = TimeZone(secondsFromGMT: 0)
-        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        return fmt.string(from: self)
+extension S3List.ListV2Query {
+    func makeResponse(client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> Response {
+        let path = self.prefix
+        guard self.list_type == 2, self.delimiter == "/", path.hasPrefix("/") == false, (path == "" || path.hasSuffix("/") == true), path.onlyContainsAlphanumericDashSlashDot else {
+            throw S3ApiError.forbidden
+        }
+        guard let directory = try await OmFileSystemManager.instance.getDirectoryContents(path: path, client: client, logger: logger, localOnly: localOnly) else {
+            throw S3ApiError.forbidden
+        }
+        // eTag uses "timestamp-filesize" for local files
+        let filesXml = directory.files.map { (name, attr) in
+            let eTag = "\(Int(attr.0.timeIntervalSince1970))-\(attr.1)"
+            return """
+            <Contents>
+                <Key>\(path)\(name)</Key>
+                <LastModified>\(attr.0.s3ListXmlDateFormat)</LastModified>
+                <Size>\(attr.1)</Size>
+                <ETag>&quot;\(eTag)&quot;</ETag>
+                <StorageClass>STANDARD</StorageClass>
+            </Contents>
+            """
+        }.joined(separator: "\n")
+        
+        let directoriesXml = directory.directories.map {
+            """
+            <CommonPrefixes>
+            <Prefix>\(path)\($0)/</Prefix>
+            </CommonPrefixes>
+            """
+        }.joined(separator: "\n")
+        
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/xml")
+        return Response(status: .ok, headers: headers, body: .init(string: """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <Name>openmeteo</Name>
+            <Prefix>\(path)</Prefix>
+            <KeyCount>\(directory.directories.count + directory.files.count)</KeyCount>
+            <MaxKeys>1000</MaxKeys>
+            <Delimiter>/</Delimiter>
+            <IsTruncated>false</IsTruncated>
+            \(directoriesXml)
+            \(filesXml)
+        </ListBucketResult>
+        """))
     }
 }
 
@@ -753,13 +712,13 @@ enum S3ApiError: AbortError, Equatable {
     case invalidApiKey
     case forbidden
     case expectedBodyPayload
+    case incompleteBodyPayload(expected: Int?, actual: Int)
     case invalidUploadId
     case invalidPartNumber
     case expectedCompletionXMLBody
     case unsupportedPostOperation
     case missingOrInvalidFileSizeHeader
     case chunkSizeExceeds8MB
-    case multipartUploadNotFound
     case partExceedsAllocatedFileSize
     case partSizeNotChunkSize
     case couldNotDecodeCompletionXML
@@ -774,6 +733,7 @@ enum S3ApiError: AbortError, Equatable {
     case missingSha256HashHeader
     case invalidRequestSignature
     case unknownAccessKey
+    case invalidXAmzMetaMtimeHeaderValue
     
     var status: NIOHTTP1.HTTPResponseStatus {
         switch self {
@@ -781,12 +741,12 @@ enum S3ApiError: AbortError, Equatable {
             return .unauthorized
         case .forbidden:
             return .forbidden
-        case .multipartUploadNotFound:
-            return .notFound
         case .missingReadCredentials, .missingUploadCredentials:
             return .serviceUnavailable
         case .missingHostHeader, .invalidRequestSignature, .unknownAccessKey:
             return .unauthorized
+        case .incompleteBodyPayload:
+            return .requestTimeout
         default:
             return .badRequest
         }
@@ -800,6 +760,9 @@ enum S3ApiError: AbortError, Equatable {
             return "Forbidden"
         case .expectedBodyPayload:
             return "Expected body payload"
+        case .incompleteBodyPayload(let expected, let actual):
+            let expectedDescription = expected.map(String.init) ?? "a valid Content-Length"
+            return "Incomplete body payload: expected \(expectedDescription) bytes, received \(actual)"
         case .invalidUploadId:
             return "Invalid uploadId"
         case .invalidPartNumber:
@@ -812,8 +775,6 @@ enum S3ApiError: AbortError, Equatable {
             return "Missing or invalid x-file-size header"
         case .chunkSizeExceeds8MB:
             return "Chunk size exceeds 8MB"
-        case .multipartUploadNotFound:
-            return "Multipart upload not found"
         case .partExceedsAllocatedFileSize:
             return "Part exceeds allocated file size"
         case .partSizeNotChunkSize:
@@ -842,6 +803,8 @@ enum S3ApiError: AbortError, Equatable {
             return "Invalid request signature"
         case .unknownAccessKey:
             return "Unknown access key"
+        case .invalidXAmzMetaMtimeHeaderValue:
+            return "Invalid x-amz-meta-mtime header value"
         }
     }
 }
@@ -924,27 +887,195 @@ extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }
-    
-    func dropPrefix(_ prefix: String) -> String {
+}
+
+extension StringProtocol {
+    func dropPrefix(_ prefix: String) -> some StringProtocol {
         if self.starts(with: prefix) {
-            return String(self.dropFirst(prefix.count))
+            return self.dropFirst(prefix.count)
         }
-        return self
+        return self[...]
     }
 }
 
-extension DateFormatter {
-    /// Format dates like `2023-11-14T04:32:17.123Z`
-    static let awsS3DateTime = {
-        let dateFormat = DateFormatter()
-        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.SSS'Z'"
-        return dateFormat
-    }()
+extension Request {
+    func asyncStreamFile(
+        file: OmFileSystemManager.FileType,
+        chunkSize: Int = NonBlockingFileIO.defaultChunkSize,
+        mediaType: HTTPMediaType,
+        onCompleted: @escaping @Sendable (Result<Void, Error>) async throws -> () = { _ in }
+    ) async throws -> Response {
+        let request = self
+        // Get file attributes for this file.
+//        guard let fileInfo = try await FileSystem.shared.info(forFileAt: .init(path)) else {
+//            throw Abort(.internalServerError)
+//        }
+
+        let contentRange: HTTPHeaders.Range?
+        if let rangeFromHeaders = request.headers.range {
+            if rangeFromHeaders.unit == .bytes && rangeFromHeaders.ranges.count == 1 {
+                contentRange = rangeFromHeaders
+            } else {
+                contentRange = nil
+            }
+        } else if request.headers.contains(name: .range) {
+            // Range header was supplied but could not be parsed i.e. it was invalid
+            request.logger.debug("Range header was provided in request but was invalid")
+            throw Abort(.badRequest)
+        } else {
+            contentRange = nil
+        }
+
+        // Generate ETag value, "last modified date in epoch time" + "-" + "file size"
+        let eTag = "\"\(file.modificationTimestamp.timeIntervalSince1970)-\(file.size)\""
+        
+        // Create empty headers array.
+        var headers: HTTPHeaders = [:]
+
+        // Respond with lastModified header
+        headers.replaceOrAdd(name: .lastModified, value: file.modificationTimestamp.lastModifiedHttpDateFormat)
+
+        headers.replaceOrAdd(name: .eTag, value: eTag)
+        headers.contentType = mediaType
+        
+        /// Disable response compression for HEAD requests, content range and non JSON request
+        if self.method == .HEAD || contentRange != nil || mediaType != .json {
+            headers.responseCompression = .disable
+        }
+
+        // Check if file has been cached already and return NotModified response if the etags match
+        if eTag == request.headers.first(name: .ifNoneMatch) {
+            // Per RFC 9110 here: https://www.rfc-editor.org/rfc/rfc9110.html#status.304
+            // and here: https://www.rfc-editor.org/rfc/rfc9110.html#name-content-encoding
+            // A 304 response MUST include the ETag header and a Content-Length header matching what the original resource's content length would have been were this a 200 response.
+            headers.replaceOrAdd(name: .contentLength, value: file.size.description)
+            return Response(status: .notModified, version: .http1_1, headersNoUpdate: headers, body: .empty)
+        }
+        
+        // Ensure that file has NOT been modified
+        if let ifMatch = request.headers.first(name: .ifMatch), eTag != ifMatch {
+            headers.replaceOrAdd(name: .contentLength, value: file.size.description)
+            headers.replaceOrAdd(name: .eTag, value: eTag)
+            return Response(status: .preconditionFailed, version: .http1_1, headersNoUpdate: headers, body: .empty)
+        }
+        
+        // Check `If-Unmodified-Since` header and return precondition failed if modified
+        if let ifUnmodifiedSince = try request.headers.first(name: .ifUnmodifiedSince)?.parseLastModifiedDate() {
+            guard ifUnmodifiedSince >= file.modificationTimestamp else {
+                return Response(status: .preconditionFailed, version: .http1_1, headersNoUpdate: headers, body: .empty)
+            }
+        }
+
+        // Create the HTTP response.
+        let response = Response(status: .ok, headers: headers)
+        let offset: Int64
+        let byteCount: Int
+        if let contentRange = contentRange {
+            response.status = .partialContent
+            response.headers.add(name: .accept, value: contentRange.unit.serialize())
+            if let firstRange = contentRange.ranges.first {
+                do {
+                    let range = try firstRange.asResponseContentRange(limit: Int(file.size))
+                    response.headers.contentRange = HTTPHeaders.ContentRange(unit: contentRange.unit, range: range)
+                    (offset, byteCount) = try firstRange.asByteBufferBounds(withMaxSize: Int(file.size), logger: request.logger)
+                } catch {
+                    throw Abort(.badRequest)
+                }
+            } else {
+                offset = 0
+                byteCount = Int(file.size)
+            }
+        } else {
+            offset = 0
+            byteCount = Int(file.size)
+        }
+                
+        switch file {
+        case .local(let fileEntry):
+            // Read file from disk using the open file handle and SwiftNIO async reader
+            response.body = .init(asyncStream: { stream in
+                // TODO: `SystemFileHandle(takingOwnershipOf:` is used from testing SPI. Maybe not ideal
+                let handle = SystemFileHandle(takingOwnershipOf: FileDescriptor(rawValue: fileEntry.fd.fileDescriptor), path: "", materialization: nil, threadPool: .singleton)
+                let chunks = handle.readChunks(in: offset..<(offset+Int64(byteCount)), chunkLength: .bytes(Int64(chunkSize)))
+                do {
+                    for try await chunk in chunks {
+                        try await stream.writeBuffer(chunk)
+                    }
+                    let _ = try handle.detachUnsafeFileDescriptor()
+                    try await stream.write(.end)
+                    try await onCompleted(.success(()))
+                } catch {
+                    let _ = try? handle.detachUnsafeFileDescriptor()
+                    try? await stream.write(.error(error))
+                    try await onCompleted(.failure(error))
+                }
+            }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
+        case .remote(let cached):
+            // Return cached data or stream from network
+            response.body = .init(asyncStream: { stream in
+                do {
+                    let end = offset + Int64(byteCount)
+                    for block in offset / Int64(chunkSize) ..< (offset + Int64(byteCount)).divideRoundedUp(divisor: Int64(chunkSize)) {
+                        let blockStart = block * Int64(chunkSize)
+                        let blockEnd = min(file.size, (block+1)*Int64(chunkSize))
+                        let readOffset = max(offset, blockStart)
+                        let readEnd = min(end, blockEnd)
+                        let chunk = try await cached.getByteBuffer(offset: Int(readOffset), count: Int(readEnd - readOffset))
+                        try await stream.writeBuffer(chunk)
+                    }
+                    try await stream.write(.end)
+                    try await onCompleted(.success(()))
+                } catch {
+                    try? await stream.write(.error(error))
+                    try await onCompleted(.failure(error))
+                }
+            }, count: byteCount, byteBufferAllocator: request.byteBufferAllocator)
+        }
+        return response
+    }
+}
+
+extension HTTPHeaders {
+    /// rclone encodes modification time in `x-amz-meta-mtime` as a floating point seconds past epoch
+    /// Nil is header is not set, throws is malformated
+    func  getXAmzMetaMtime() throws -> Timestamp? {
+        guard let seconds = self.first(name: "x-amz-meta-mtime") else {
+            return nil
+        }
+        guard let seconds = Double(seconds) else {
+            throw S3ApiError.invalidXAmzMetaMtimeHeaderValue
+        }
+        return Timestamp(Int(seconds))
+    }
+}
+
+extension HTTPHeaders.Range.Value {
     
-    /// Format dates like `2023-11-14T04:32:17.000Z`
-    static let awsS3DateTimeFloored = {
-        let dateFormat = DateFormatter()
-        dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.000'Z'"
-        return dateFormat
-    }()
+    fileprivate func asByteBufferBounds(withMaxSize size: Int, logger: Logger) throws -> (offset: Int64, byteCount: Int) {
+        switch self {
+            case .start(let value):
+                guard value <= size, value >= 0 else {
+                    logger.debug("Requested range start was invalid: \(value)")
+                    throw Abort(.badRequest)
+                }
+                return (offset: numericCast(value), byteCount: size - value)
+            case .tail(let value):
+                guard value <= size, value >= 0 else {
+                    logger.debug("Requested range end was invalid: \(value)")
+                    throw Abort(.badRequest)
+                }
+                return (offset: numericCast(size - value), byteCount: value)
+            case .within(let start, let end):
+                guard start >= 0, end >= 0, start <= end, start <= size, end <= size else {
+                    logger.debug("Requested range was invalid: \(start)-\(end)")
+                    throw Abort(.badRequest)
+                }
+                let (byteCount, overflow) =  (end - start).addingReportingOverflow(1)
+                guard !overflow else {
+                    logger.debug("Requested range was invalid: \(start)-\(end)")
+                    throw Abort(.badRequest)
+                }
+                return (offset: numericCast(start), byteCount: byteCount)
+        }
+    }
 }

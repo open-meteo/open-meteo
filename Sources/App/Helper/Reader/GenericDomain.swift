@@ -71,13 +71,13 @@ extension GenericDomain {
         }
         switch type {
         case .soilType:
-            return try? await RemoteFileManager.instance.get(
+            return try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
         case .elevation:
-            return try? await RemoteFileManager.instance.get(
+            return try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger
@@ -87,7 +87,7 @@ extension GenericDomain {
 
     /// Meta JSON for time-series data
     func getMetaJson(client: HTTPClient?, logger: Logger) async throws -> ModelUpdateMetaJson? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: ModelUpdateMetaFile(domain: self.domainRegistry),
             client: client,
             logger: logger
@@ -95,7 +95,7 @@ extension GenericDomain {
     }
     
     func getLatestFullRun(client: HTTPClient?, logger: Logger) async throws -> Timestamp? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: FullRunMetaFile.latest(self.domainRegistry),
             client: client,
             logger: logger

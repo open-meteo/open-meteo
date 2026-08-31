@@ -198,20 +198,6 @@ enum DomainRegistry: String, CaseIterable {
         return OpenMeteo.dataSpatialDirectory.map { "\($0)\(rawValue)/" }
     }
     
-    var remoteDataDirectory: String? {
-        guard let remote = OpenMeteo.remoteDataDirectory else {
-            return nil
-        }
-        return "\(remote)\(rawValue)/"
-    }
-    
-    var remoteDataRunDirectory: String? {
-        guard let remote = OpenMeteo.remoteDataDirectory else {
-            return nil
-        }
-        return "\(remote)\(rawValue)/".replacingOccurrences(of: "data/", with: "data_run/")
-    }
-    
     /// Instead of generating time chunks, use a single rolling files and retain a certain number of days inside
     var useRollingDays: Int? {
         switch self {
@@ -554,7 +540,7 @@ enum DomainRegistry: String, CaseIterable {
     
     /// Get meta information of a specific run
     func getFullRunMeta(client: HTTPClient?, logger: Logger, run: Timestamp) async throws -> FullRunMetaJson? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: FullRunMetaFile.run(self, run),
             client: client,
             logger: logger

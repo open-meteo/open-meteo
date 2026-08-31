@@ -2,6 +2,7 @@ import Foundation
 import AsyncHTTPClient
 @preconcurrency import SwiftEccodes
 import NIOCore
+import OmFileIO
 
 enum EcmwfApiError: Error {
     case jobAborted
@@ -131,11 +132,4 @@ extension HTTPClientResponse {
         return try a.readJSONDecodable(type, length: a.readableBytes)
     }
 
-    public func readStringImmutable(upTo: Int = 1024 * 1024) async throws -> String? {
-        var b = try await self.body.collect(upTo: upTo)
-        if b.readableBytes == upTo {
-            fatalError("Response size too large")
-        }
-        return b.readString(length: b.readableBytes)
-    }
 }

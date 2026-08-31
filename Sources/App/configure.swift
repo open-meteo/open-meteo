@@ -1,6 +1,8 @@
 import Vapor
 import OmFileFormat
 import Synchronization
+@_exported import OmTime
+import OmFileIO
 
 enum OpenMeteo {
     /// Data directory with trailing slash
@@ -14,18 +16,20 @@ enum OpenMeteo {
         return  "./data/"
     }()
     
-    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
-    static let remoteDataDirectory: String? = {
-        if let dir = Environment.get("REMOTE_DATA_DIRECTORY") {
-            guard dir.starts(with: "http") else {
+    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`. If multiple servers separated by coma are given, requests are hashed between them
+    static let remoteDataDirectory: [S3BucketEndpoint]? = {
+        return Environment.get("REMOTE_DATA_DIRECTORY")?.split(separator: ",").map { dir in
+            guard dir.starts(with: "http") || dir.starts(with: "s3://") else {
                 fatalError("REMOTE_DATA_DIRECTORY must start with 'http'")
             }
             guard dir.last == "/" else {
                 fatalError("REMOTE_DATA_DIRECTORY must end with a trailing slash")
             }
-            return dir
+            guard dir.hasSuffix("/data/") else {
+                fatalError("REMOTE_DATA_DIRECTORY must end with '/data/'")
+            }
+            return S3BucketEndpoint(rawEndpoint: String(dir.dropLast(5)), profile: nil)
         }
-        return nil
     }()
     
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
@@ -42,13 +46,13 @@ enum OpenMeteo {
     }()
     
     /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
-    static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
+    /*static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
         let cacheFile = Environment.get("CACHE_META_FILE") ?? "\(dataDirectory)/cache_file_meta.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_META_SIZE") ?? "1MB")
         let blockSize = MemoryLayout<HttpMetaCache.Entry>.stride
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
         return try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount)
-    }()
+    }()*/
     
     /// Data directory with trailing slash
     static let dataSpatialDirectory: String? = {
@@ -175,11 +179,11 @@ public func configure(_ app: Application) throws {
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
         allowedMethods: [.GET, .POST, /*.PUT,*/ .OPTIONS /*, .DELETE, .PATCH*/],
-        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin]
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin, .range, .ifMatch, .ifUnmodifiedSince]
     )
     app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
     app.middleware.use(ErrorMiddleware.custom(environment: app.environment))
-    app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    //app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
     app.commands.use(VersionCommand(), as: "version")
@@ -216,6 +220,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(SatelliteDownloadCommand(), as: "download-satellite")
     app.asyncCommands.use(MeteoSwissDownload(), as: "download-meteoswiss")
     app.asyncCommands.use(SyncCommand(), as: "sync")
+    app.asyncCommands.use(S3SyncCommand(), as: "s3-sync")
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
@@ -225,9 +230,6 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadWeatherNextCommand(), as: "download-weathernext")
 
     app.http.server.configuration.hostname = "0.0.0.0"
-
-    // https://github.com/vapor/vapor/pull/2677
-    app.http.server.configuration.supportPipelining = false
 
     app.http.server.configuration.responseCompression = .enabled(initialByteBufferCapacity: 4096)
 
@@ -255,8 +257,16 @@ public func configure(_ app: Application) throws {
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
+        delay: .seconds(1), { _ in
+            await OmFileSystemManager.instance.backgroundTaskRemote()
+        }
+    )
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(0),
         delay: .seconds(1),
-        RemoteFileManager.instance.backgroundTask
+        { _ in
+            await OmFileSystemManager.instance.backgroundTaskLocal()
+        }
     )
 
     app.lifecycle.repeatedTask(
@@ -305,7 +315,7 @@ extension ErrorMiddleware {
             switch error {
             case _ as RateLimitError:
                 fallthrough
-            case _ as ApiKeyManagerError:
+            case _ as ApiKeyManagerError, _ as TimeError, _ as ForecastApiError:
                 // Do not log errors
                 break
             default:

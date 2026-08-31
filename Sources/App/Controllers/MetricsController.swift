@@ -1,18 +1,10 @@
 import Vapor
 import NIO
 import Synchronization
+import OmFileIO
 
 /// Counters to hold metrics
 enum OmMetrics {
-    static let fileCacheInactivityEvictions = Atomic(0)
-    static let fileCacheLocalModified = Atomic(0)
-    static let fileCacheRemoteModified = Atomic(0)
-    static let fileCacheRemoteDeleted = Atomic(0)
-    static let fileCacheRemoteRevalidated = Atomic(0)
-    static let fileCacheRemoteCheckedExist = Atomic(0)
-    static let fileCacheCurrentlyOpeningFiles = Atomic(0)
-    static let fileCacheCurrentlyWaitingOnOpeningFiles = Atomic(0)
-    
     static let requestsQueued = Atomic(0)
     static let requestsRunning = Atomic(0)
     static let requestsTooManyLocationsTotal = Atomic(0)
@@ -48,30 +40,48 @@ struct MetricsController: RouteCollection {
         let monitored_ips = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
 
         let body = """
-# TYPE om_file_cache_inactive_evictions counter
-# HELP om_file_cache_inactive_evictions File cache entries evicted after inactivity
-om_file_cache_inactive_evictions_total \(OmMetrics.fileCacheInactivityEvictions.load(ordering: .relaxed))
-# TYPE om_file_cache_local_modified counter
-# HELP om_file_cache_local_modified Local files modified
-om_file_cache_local_modified_total \(OmMetrics.fileCacheLocalModified.load(ordering: .relaxed))
-# TYPE om_file_cache_remote_modified counter
-# HELP om_file_cache_remote_modified Remote files modified
-om_file_cache_remote_modified_total \(OmMetrics.fileCacheRemoteModified.load(ordering: .relaxed))
-# TYPE om_file_cache_remote_deleted counter
-# HELP om_file_cache_remote_deleted Remote files deleted
-om_file_cache_remote_deleted_total \(OmMetrics.fileCacheRemoteDeleted.load(ordering: .relaxed))
-# TYPE om_file_cache_remote_revalidated counter
-# HELP om_file_cache_remote_revalidated Remote file revalidations
-om_file_cache_remote_revalidated_total \(OmMetrics.fileCacheRemoteRevalidated.load(ordering: .relaxed))
-# TYPE om_file_cache_remote_checked_exist counter
-# HELP om_file_cache_remote_checked_exist Remote existence checks
-om_file_cache_remote_checked_exist_total \(OmMetrics.fileCacheRemoteCheckedExist.load(ordering: .relaxed))
-# TYPE om_file_cache_opening_files gauge
-# HELP om_file_cache_opening_files Currently opening files
-om_file_cache_opening_files \(OmMetrics.fileCacheCurrentlyOpeningFiles.load(ordering: .relaxed))
-# TYPE om_file_cache_waiting_on_opening gauge
-# HELP om_file_cache_waiting_on_opening Files queued waiting to open
-om_file_cache_waiting_on_opening \(OmMetrics.fileCacheCurrentlyWaitingOnOpeningFiles.load(ordering: .relaxed))
+# TYPE om_file_local_open gauge
+# HELP om_file_local_open Number of open local files
+om_file_local_open \(OmFileSystemMetrics.fileLocalOpen.load(ordering: .relaxed))
+# TYPE om_file_local_modified_total counter
+# HELP om_file_local_modified_total Number of local file metadata updates
+om_file_local_modified_total \(OmFileSystemMetrics.fileLocalModifiedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_modified_unexpectedly_total counter
+# HELP om_file_remote_modified_unexpectedly_total Number of remote file metadata updates thrown while reading data
+om_file_remote_modified_unexpectedly_total \(OmFileSystemMetrics.fileRemoteModifiedUnexpectedlyTotal.load(ordering: .relaxed))
+# TYPE om_file_local_directories_open gauge
+# HELP om_file_local_directories_open Number of open local directories
+om_file_local_directories_open \(OmFileSystemMetrics.fileLocalDirectoriesOpen.load(ordering: .relaxed))
+# TYPE om_file_local_directory_updated_total counter
+# HELP om_file_local_directory_updated_total Number of local directory refreshes
+om_file_local_directory_updated_total \(OmFileSystemMetrics.fileLocalDirectoryUpdatedTotal.load(ordering: .relaxed))
+# TYPE om_file_local_directory_modified_total counter
+# HELP om_file_local_directory_modified_total Number of local directory content changes
+om_file_local_directory_modified_total \(OmFileSystemMetrics.fileLocalDirectoryModifiedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_open gauge
+# HELP om_file_remote_open Number of open remote files
+om_file_remote_open \(OmFileSystemMetrics.fileRemoteOpen.load(ordering: .relaxed))
+# TYPE om_file_remote_modified_total counter
+# HELP om_file_remote_modified_total Number of remote file metadata updates
+om_file_remote_modified_total \(OmFileSystemMetrics.fileRemoteModifiedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_directories_open gauge
+# HELP om_file_remote_directories_open Number of open remote directories
+om_file_remote_directories_open \(OmFileSystemMetrics.fileRemoteDirectoriesOpen.load(ordering: .relaxed))
+# TYPE om_file_remote_directory_updated_total counter
+# HELP om_file_remote_directory_updated_total Number of remote directory refreshes
+om_file_remote_directory_updated_total \(OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_directory_update_waiting gauge
+# HELP om_file_remote_directory_update_waiting Number of callers waiting for a remote directory update
+om_file_remote_directory_update_waiting \(OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.load(ordering: .relaxed))
+# TYPE om_file_remote_directory_modified_total counter
+# HELP om_file_remote_directory_modified_total Number of remote directory content changes
+om_file_remote_directory_modified_total \(OmFileSystemMetrics.fileRemoteDirectoryModifiedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_payload_waiting gauge
+# HELP om_file_remote_payload_waiting Number of callers waiting for a remote payload to resolve
+om_file_remote_payload_waiting \(OmFileSystemMetrics.fileRemotePayloadWaiting.load(ordering: .relaxed))
+# TYPE om_file_remote_payload_update_waiting gauge
+# HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
+om_file_remote_payload_update_waiting \(OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes

@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OmFileIO
 
 /**
 Download the open-meteo weather database from a S3 server.
@@ -182,7 +183,7 @@ struct SyncCommand: AsyncCommand {
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
         /// Get a list of all variables from all models
-        let remoteDirectories = try await S3List.s3list(client: client, server: server, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
+        let remoteDirectories = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
         
         /// Filter variables to download
         let toDownload: [S3List.ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3List.ListV2File] in
@@ -201,7 +202,7 @@ struct SyncCommand: AsyncCommand {
                     variables.contains(where: { $0 == variable }) else {
                 return []
             }
-            let remote = try await S3List.s3list(client: client, server: server, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
+            let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
             let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
             return Array(filtered)
         }.flatMap({$0})
@@ -241,7 +242,7 @@ struct SyncCommand: AsyncCommand {
                         try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
                         await progress.add(try response.contentLength() ?? 0)
                         break
-                    } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+                    } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                         /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
                         try FileManager.default.removeItemIfExists(at: localFile)
                     }
@@ -313,10 +314,10 @@ fileprivate extension Array where Element == S3List.ListV2File {
             if remoteFile.name.contains("meta.json") {
                 /// meta.json is modified during sync to replace the `last_run_availability_time`.
                 /// Size might be different. Only check for modification time.
-                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
             }
             // Add one seconds delay due to inaccuracy in timestamps
-            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
         })
     }
 }

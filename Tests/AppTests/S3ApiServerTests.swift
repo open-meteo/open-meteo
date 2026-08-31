@@ -5,17 +5,44 @@ import Vapor
 import VaporTesting
 import AsyncHTTPClient
 import NIOCore
+import OmFileIO
 
 @Suite(.serialized)
 struct S3ApiServerTests {
+    @Test func rejectsIncompleteRequestBody() async throws {
+        try await withApp { app in
+            let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
+            let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
+            let body = ByteBuffer(string: "truncated")
+            let request = try makeSignedRequest(
+                app: app,
+                method: .PUT,
+                uri: "/data/s3-upload-tests/incomplete.bin",
+                body: body,
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            request.headers.replaceOrAdd(name: .contentLength, value: "100")
+
+            await #expect(throws: S3ApiError.incompleteBodyPayload(expected: 100, actual: body.readableBytes)) {
+                _ = try await controller.putObject(request)
+            }
+        }
+    }
+
     @Test func singlePutUpload() async throws {
         try await withApp { app in
             let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
             let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
-
-            let objectName = "s3-upload-tests/single-\(UUID().uuidString).bin"
+            let file = "single-\(UUID().uuidString).bin"
+            let objectName = "s3-upload-tests/\(file)"
             let path = "/data/\(objectName)"
             let absolutePath = OpenMeteo.dataDirectory + objectName
+            try? FileManager.default.removeItemIfExists(at: absolutePath)
+            try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)s3-upload-tests/", withIntermediateDirectories: true)
+            let dir = await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
+            #expect(dir != nil)
+            #expect(await dir?.getFile(name: file) == nil)
 
             let payload = Data("single-put-upload".utf8)
             var body = ByteBufferAllocator().buffer(capacity: payload.count)
@@ -36,8 +63,12 @@ struct S3ApiServerTests {
 
             let response = try await controller.putObject(request)
             #expect(response.status == .ok)
+            
+            /// Check that the cached local directory got updated and now contains the new file
+            let storedFile = await dir?.getFile(name: file)
+            #expect(storedFile != nil)
 
-            let stored = try Data(contentsOf: URL(fileURLWithPath: absolutePath))
+            let stored = try storedFile?.fd.readToEnd()
             #expect(stored == payload)
         }
     }
@@ -47,9 +78,17 @@ struct S3ApiServerTests {
             let credential = S3DataController.UploadCredential(accessKey: "AKIAIOSFODNN7EXAMPLE", secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
             let controller = S3DataController(readCredentials: [credential], uploadCredentials: [credential])
 
-            let objectName = "s3-upload-tests/multipart-\(UUID().uuidString).bin"
+            let file = "multipart-\(UUID().uuidString).bin"
+            let objectName = "s3-upload-tests/\(file)"
             let path = "/data/\(objectName)"
             let absolutePath = OpenMeteo.dataDirectory + objectName
+            
+            try? FileManager.default.removeItemIfExists(at: absolutePath)
+            try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)s3-upload-tests/", withIntermediateDirectories: true)
+            let dir = await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
+            
+            #expect(dir != nil)
+            #expect(await dir?.getFile(name: file) == nil)
 
             let uploadId = "1234567891"
             let payload = Data("multipart-upload-body".utf8)
@@ -123,7 +162,23 @@ struct S3ApiServerTests {
             let completeResponse = try await controller.postObject(completeRequest)
             #expect(completeResponse.status == .ok)
 
-            let stored = try Data(contentsOf: URL(fileURLWithPath: absolutePath))
+            // A retried completion validates the already-moved destination and returns successfully.
+            let duplicateCompleteRequest = try makeSignedRequest(
+                app: app,
+                method: .POST,
+                uri: "\(path)?uploadId=\(uploadId)",
+                body: ByteBuffer(string: completionXml),
+                credential: credential,
+                additionalHeaders: [:]
+            )
+            let duplicateCompleteResponse = try await controller.postObject(duplicateCompleteRequest)
+            #expect(duplicateCompleteResponse.status == .ok)
+            
+            /// Check that the cached local directory got updated and now contains the new file
+            let storedFile = await dir?.getFile(name: file)
+            #expect(storedFile != nil)
+
+            let stored = try storedFile?.fd.readToEnd()
             #expect(stored == payload)
             
             let listRequest = try makeSignedRequest(
@@ -149,7 +204,6 @@ struct S3ApiServerTests {
             let getResponse = try await controller.get(getRequest)
             #expect(getResponse.status == .ok)
             #expect(try await getResponse.body.collect(on: app.eventLoopGroup.next()).get()?.string == "multipart-upload-body")
-
         }
     }
 

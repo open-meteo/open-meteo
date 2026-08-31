@@ -1,8 +1,5 @@
-import Foundation
-@preconcurrency import OmFileFormat
-import NIOConcurrencyHelpers
-import Vapor
-import NIO
+import OmFileFormat
+import OmFileIO
 
 enum OmFileSeriesType: String {
     case chunk
@@ -12,7 +9,7 @@ enum OmFileSeriesType: String {
     case rolling
 }
 
-enum OmFileType: Hashable, RemoteFileManageable {
+enum OmFileType {
     /// Timestamps are set for "data_run" files, timerangeDt is set for ensemble "rolling" files
     typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?)
     
@@ -21,27 +18,6 @@ enum OmFileType: Hashable, RemoteFileManageable {
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
-    
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteOmReader {
-        let reader = try await OmFileReader(fn: file)
-        let arrayReader = try reader.expectArray(of: Float.self)
-        let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
-        let timerangeDt = try await reader.getTimeRangeDt()
-        return OmFileRemoteOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
-    }
-    
-    func makeLocalReader(file: MmapFile) async throws -> OmFileLocalOmReader {
-        let reader = try await OmFileReader(fn: file)
-        let arrayReader = try reader.expectArray(of: Float.self)
-        let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
-        let timerangeDt = try await reader.getTimeRangeDt()
-        return OmFileLocalOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
-    }
-
-    /// Assemble the full file system path
-    func getFilePath() -> String {
-        return "\(getDataDirectoryPath())\(getRelativeFilePath())"
-    }
     
     /// How often this file should be checked for modifications. Some files update every hour, some never update.
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
@@ -101,22 +77,6 @@ enum OmFileType: Hashable, RemoteFileManageable {
         }
     }
     
-    /// Get the remote URL. May replace "data" with "data_run"
-    func getRemoteUrl() -> String? {
-        guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
-            return nil
-        }
-        let file = getRelativeFilePath()
-        switch self {
-        case .run(_, _, _):
-            return "\(remoteDirectory.replacingLastPathComponent(with: "data_run"))\(file)"
-        case .domainChunk(_, _, _, _, _, _):
-            return "\(remoteDirectory)\(file)"
-        case .staticFile(domain: _, _, _):
-            return "\(remoteDirectory)\(file)"
-        }
-    }
-    
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePath() -> String {
         switch self {
@@ -149,51 +109,31 @@ enum OmFileType: Hashable, RemoteFileManageable {
             return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
         }
     }
-
 }
 
-extension RemoteFileManageable {
-    func createDirectory() throws {
-        let file = getFilePath()
-        guard let last = file.lastIndex(of: "/") else {
-            return
+extension OmFileType: OmFileManagable {
+    /// Relative file path like `data/dwd_icon/temperature_2m/chunk_1234.om`
+    func getRelativeFilePathWithData() -> String {
+        switch self {
+        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+            let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
+            let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
+            if let chunk {
+                return "data/\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
+            }
+            return "data/\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type).om"
+        case .staticFile(let domain, let variable, let chunk):
+            if let chunk {
+                // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'
+                return "data/\(domain.rawValue)/static/\(variable)_\(chunk).om"
+            }
+            return "data/\(domain.rawValue)/static/\(variable).om"
+        case .run(domain: let domain, variable: let variable, run: let run):
+            return "data_run/\(domain.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(variable).om"
         }
-        let path = "\(file[file.startIndex..<last])"
-        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
     
-    func exists() -> Bool {
-        let file = getFilePath()
-        return FileManager.default.fileExists(atPath: file)
-    }
-}
-
-struct OmFileRemoteOmReader: RemoteFileRepresentable {
-    let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
-    let timestamps: [Timestamp]?
-    let timeRangeDt: TimerangeDt?
-    
-    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-        reader.fn
-    }
-    
-    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
-        return (reader, timestamps, timeRangeDt)
-    }
-}
-
-struct OmFileLocalOmReader: LocalFileRepresentable {
-    let reader: OmFileReaderArray<MmapFile, Float>
-    let timestamps: [Timestamp]?
-    let timeRangeDt: TimerangeDt?
-    
-    var fn: MmapFile {
-        reader.fn
-    }
-    
-    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
-        return (reader, timestamps, timeRangeDt)
-    }
+    typealias Payload = OmFileLocalRemoteOmReader
 }
 
 extension OmFileReaderArrayProtocol where OmType == Float {
@@ -258,4 +198,22 @@ extension OmFileReaderArrayProtocol where OmType == Float {
             return weight > 0.001 ? value / weight : .nan
         }
     }*/
+}
+
+
+extension OmFileManagable {
+    /// Get the absolute file system path like `/var/lib/openmeteo-`
+    func getFilePath() -> String {
+        let path = getRelativeFilePathWithData()
+        if path.starts(with: "data/") {
+            return path.replacingOccurrences(of: "data/", with: OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_run/") {
+            return path.replacingOccurrences(of: "data_run/", with: OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_spatial/") {
+            return path.replacingOccurrences(of: "data_spatial/", with: OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory)
+        }
+        fatalError("Unexpected data path \(path)")
+    }
 }

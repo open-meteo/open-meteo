@@ -5,23 +5,7 @@ import CHelper
 import NIOCore
 import NIOFileSystem
 import Synchronization
-
-enum CurlError: Error {
-    // case noGribMessagesMatch
-    case didNotFindAllVariablesInGribIndex
-    case gribIndexMatchedTwice
-    case sizeTooSmall
-    case didNotGetAllGribMessages(got: Int, expected: Int)
-    case downloadFailed(code: HTTPStatus)
-    case fileNotFound
-    case timeoutReached
-    case timeoutPerChunkReached(httpRange: Range<Int>)
-    case futimes(error: String)
-    case contentLengthHeaderTooLarge(got: Int)
-    case couldNotGetContentLengthForConcurrentDownload
-    case invalidURL(String)
-}
-
+import OmFileIO
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
 final class Curl: Sendable {
@@ -138,6 +122,7 @@ final class Curl: Sendable {
                 }
                 if let range = range {
                     request.headers.add(name: "range", value: "bytes=\(range)")
+                    request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
                 }
                 request.headers.add(contentsOf: self.headers)
                 request.headers.add(contentsOf: headers)
@@ -408,18 +393,6 @@ extension AsyncSequence where Element == ByteBuffer {
 }
 
 extension HTTPClientResponse {
-    /// Content length in bytes forom the http header
-    func contentLength() throws -> Int? {
-        guard let length = headers["Content-Length"].first.flatMap(Int.init), length >= 0 else {
-            return nil
-        }
-        // Yes, we are downloading 250GB GRIB files....
-        if length > 512 * (1 << 30) {
-            throw CurlError.contentLengthHeaderTooLarge(got: length)
-        }
-        return length
-    }
-
     /// Optionally wait to stay delayed a fixed time amount after last modified header
     func waitAfterLastModified(logger: Logger, wait: TimeInterval?) async throws {
         guard let wait else {

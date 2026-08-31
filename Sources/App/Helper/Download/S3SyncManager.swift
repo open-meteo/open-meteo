@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import AsyncHTTPClient
+import OmFileIO
 
 /// Queues best-effort S3 sync operations per endpoint so slow endpoints do not block faster ones.
 actor S3SyncManager: LifecycleHandler {
@@ -24,9 +25,9 @@ actor S3SyncManager: LifecycleHandler {
         return queue
     }
 
-    func sync(endpoint: S3BucketEndpoint, localDirectory: String, basePath: String, exclude: [String] = [".*", "*~"]) async {
-        await getQueue(endpoint: endpoint).uploadSync(localDirectory: localDirectory, basePath: basePath, exclude: exclude)
-    }
+//    func sync(endpoint: S3BucketEndpoint, localDirectory: String, basePath: String, exclude: [String] = [".*", "*~"]) async {
+//        await getQueue(endpoint: endpoint).uploadSync(localDirectory: localDirectory, basePath: basePath, exclude: exclude)
+//    }
     
     /// Parse S3 bucket string and return queues
     func getQueues(buckets: String) -> [S3UploadQueue] {
