@@ -41,13 +41,13 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     }
 
     func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) async throws {
-        for member in 0..<51 {
+        for member in 0..<reader.domain.countEnsembleMember {
             try await reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
         }
     }
 
     func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        let data = try await (0..<51).asyncMap({
+        let data = try await (0..<reader.domain.countEnsembleMember).asyncMap({
             try await reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
         })
         if data[0].onlyNaN() {
@@ -68,15 +68,15 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }, .cubicMetrePerSecond)
         case .river_discharge_median:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.map({ $0[t] }).sorted().interpolateLinear(Int(Float(data.count) * 0.5), (Float(data.count) * 0.5).truncatingRemainder(dividingBy: 1) )
+                data.map({ $0[t] }).percentile(0.5)
             }, .cubicMetrePerSecond)
         case .river_discharge_p25:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.map({ $0[t] }).sorted().interpolateLinear(Int(Float(data.count) * 0.25), (Float(data.count) * 0.25).truncatingRemainder(dividingBy: 1) )
+                data.map({ $0[t] }).percentile(0.25)
             }, .cubicMetrePerSecond)
         case .river_discharge_p75:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.map({ $0[t] }).sorted().interpolateLinear(Int(Float(data.count) * 0.75), (Float(data.count) * 0.75).truncatingRemainder(dividingBy: 1) )
+                data.map({ $0[t] }).percentile(0.75)
             }, .cubicMetrePerSecond)
         }
     }
