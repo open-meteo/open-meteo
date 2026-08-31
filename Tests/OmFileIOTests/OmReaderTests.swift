@@ -41,7 +41,7 @@ import OmFileFormat
         #expect(value.first == 214)
         
         let activeBlocks = cacheFn.listOfActiveBlocks(maxAgeSeconds: 10)
-        #expect(activeBlocks == [3, 8])
+        #expect(activeBlocks == [3..<4, 8..<9])
         
         let value2 = try await read.read(range: [250..<251, 420..<421])
         #expect(value2.first == 214)
@@ -49,7 +49,7 @@ import OmFileFormat
         let value3 = try await read.read(range: [120..<121, 420..<421])
         #expect(value3.first == 743)
         let activeBlocks2 = cacheFn.listOfActiveBlocks(maxAgeSeconds: 10)
-        #expect(activeBlocks2 == [1, 3, 8])
+        #expect(activeBlocks2 == [1..<2, 3..<4, 8..<9])
     }
     
     /// Consecutive reads that are not cached should be merged

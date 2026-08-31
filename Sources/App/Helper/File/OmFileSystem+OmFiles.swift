@@ -43,10 +43,10 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         let logger = reader.fn.backend.server.logger
         let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
         
-        /// TODO: Consider that the new file might be significantly bigger and the block placement is not correct anymore. It could be possible to map the actual used array data ranges from old block addresses to new ones.
+        /// The new file might be significantly bigger and the block placement is not correct anymore. However, it is still a good guess
         try await file.preloadBlocks(blocks: activeBlocks)
         let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
-        logger.warning("OmFileRemoteOmReader: Blocks freed=\(deletedBlocks) preloaded=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
+        logger.warning("OmFileRemoteOmReader: Blocks freed=\(deletedBlocks) preloaded=\(activeBlocks.reduce(0) { $0 + $1.count }) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
         return try await OmFileLocalRemoteOmReader(remoteFile: file)
     }
     

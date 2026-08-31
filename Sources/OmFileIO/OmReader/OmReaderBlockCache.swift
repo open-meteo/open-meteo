@@ -165,15 +165,19 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
     
     /// Which blocks have been accessed recently. When a file is modified on the remote server, use a list of blocks to preload the new file.
-    public func listOfActiveBlocks(maxAgeSeconds: UInt) -> [Int] {
-        // TODO: return consecutive blocks as [Range]
-        
+    public func listOfActiveBlocks(maxAgeSeconds: UInt) -> [Range<Int>] {
         let totalCount = self.backend.count
         let blockSize = cache.cache.blockSize
         let blocks = 0..<totalCount.divideRoundedUp(divisor: blockSize)
-        return blocks.compactMap({ block in
-            return cache.cache.get(key: calculateCacheKey(block: block), maxAccessedAgeInSeconds: maxAgeSeconds).map{_ in block}
-        })
+        var activeRanges = [Range<Int>]()
+        for block in blocks where cache.cache.get(key: calculateCacheKey(block: block), maxAccessedAgeInSeconds: maxAgeSeconds) != nil {
+            if activeRanges.last?.upperBound == block {
+                activeRanges[activeRanges.count - 1] = activeRanges.last!.lowerBound..<(block + 1)
+            } else {
+                activeRanges.append(block..<(block + 1))
+            }
+        }
+        return activeRanges
     }
     
     /// Remove cached data blocks that are older then a couple of seconds. Return the number of deleted blocks
@@ -192,27 +196,35 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
     
     /// Load list of blocks into cache. This is used to prefetch data after rotating files.
-    public func preloadBlocks(blocks: [Int]) async throws {
-        // TODO: preload consecutive blocks as [Range<Int>]
-        
+    public func preloadBlocks(blocks: [Range<Int>]) async throws {
         let blockSize = cache.cache.blockSize
         let totalCount = self.backend.count
         let totalBlockCount = totalCount.divideRoundedUp(divisor: blockSize)
-        for block in blocks {
-            guard block < totalBlockCount else {
+        for range in blocks {
+            let range = range.clamped(to: 0..<totalBlockCount)
+            guard !range.isEmpty else {
                 /// The list of blocks is from an older file revision.
                 /// The new file could be smaller and contain fewer blocks.
                 continue
             }
-            let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
-            let _ = try await cache.get(
-                key: calculateCacheKey(block: block),
-                count: 1,
-                provider: ({ _,_ in
-                    return try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-                }),
-                dataCallback: { _,_ in }
-            )
+            var lowerBound = range.lowerBound
+            while lowerBound < range.upperBound {
+                // Cache keys are only consecutive within a super block.
+                let chunkLowerBound = lowerBound
+                let upperBound = min(range.upperBound, (chunkLowerBound / superBlockLength + 1) * superBlockLength)
+                let cacheKey = calculateCacheKey(block: chunkLowerBound)
+                let _ = try await cache.get(
+                    key: cacheKey,
+                    count: upperBound - chunkLowerBound,
+                    provider: ({ key, count in
+                        let firstBlock = chunkLowerBound + Int(key &- cacheKey)
+                        let dataRange = firstBlock * blockSize ..< min((firstBlock + count) * blockSize, totalCount)
+                        return try await backend.getData(offset: dataRange.lowerBound, count: dataRange.count)
+                    }),
+                    dataCallback: { _,_ in }
+                )
+                lowerBound = upperBound
+            }
         }
     }
 }
