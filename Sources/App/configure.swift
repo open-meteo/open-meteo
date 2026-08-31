@@ -255,13 +255,16 @@ public func configure(_ app: Application) throws {
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
-        delay: .seconds(1),
-        OmFileSystemManager.instance.backgroundTaskRemote
+        delay: .seconds(1), { _ in
+            await OmFileSystemManager.instance.backgroundTaskRemote()
+        }
     )
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(1),
-        OmFileSystemManager.instance.backgroundTaskLocal
+        { _ in
+            await OmFileSystemManager.instance.backgroundTaskLocal()
+        }
     )
 
     app.lifecycle.repeatedTask(

@@ -1,6 +1,5 @@
 import OmFileFormat
 import Foundation
-import Vapor
 
 protocol OmFileSystemFile {
     

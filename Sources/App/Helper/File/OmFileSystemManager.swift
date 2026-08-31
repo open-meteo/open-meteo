@@ -1,6 +1,6 @@
 import OmFileFormat
-import Vapor
-import Synchronization
+import AsyncHTTPClient
+import Logging
 
 /**
  Keep a file system tree in user-space memory. File and directory handles are kept open. Payloads can be associated which are also kept in memory.
@@ -112,12 +112,12 @@ final class OmFileSystemManager: Sendable {
     }
     
     /// Called every second from a life cycle handler on an available thread
-    func backgroundTaskRemote(application: Application) async throws {
-        await remoteFileSystem?.updateRecursivelyIfRequired(client: application.dedicatedHttpClient, logger: application.logger)
+    func backgroundTaskRemote() async {
+        await remoteFileSystem?.updateRecursivelyIfRequired(client: .shared, logger: Logger(label: "OmFileSystemManager backgroundTaskRemote"))
     }
     
     /// Called every second from a life cycle handler on an available thread
-    func backgroundTaskLocal(application: Application) async throws {
+    func backgroundTaskLocal() async {
         await localFileSystem.updateRecursivelyIfRequired(now: .now())
     }
 }

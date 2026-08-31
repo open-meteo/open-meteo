@@ -1,8 +1,4 @@
-import Foundation
-@preconcurrency import OmFileFormat
-import NIOConcurrencyHelpers
-import Vapor
-import NIO
+import OmFileFormat
 
 enum OmFileSeriesType: String {
     case chunk
