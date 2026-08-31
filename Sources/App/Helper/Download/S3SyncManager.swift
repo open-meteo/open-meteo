@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import AsyncHTTPClient
+import OmFileIO
 
 /// Queues best-effort S3 sync operations per endpoint so slow endpoints do not block faster ones.
 actor S3SyncManager: LifecycleHandler {

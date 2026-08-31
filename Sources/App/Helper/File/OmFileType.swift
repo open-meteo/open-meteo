@@ -1,4 +1,5 @@
 import OmFileFormat
+import OmFileIO
 
 enum OmFileSeriesType: String {
     case chunk
@@ -197,4 +198,22 @@ extension OmFileReaderArrayProtocol where OmType == Float {
             return weight > 0.001 ? value / weight : .nan
         }
     }*/
+}
+
+
+extension OmFileManagable {
+    /// Get the absolute file system path like `/var/lib/openmeteo-`
+    func getFilePath() -> String {
+        let path = getRelativeFilePathWithData()
+        if path.starts(with: "data/") {
+            return path.replacingOccurrences(of: "data/", with: OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_run/") {
+            return path.replacingOccurrences(of: "data_run/", with: OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory)
+        }
+        if path.starts(with: "data_spatial/") {
+            return path.replacingOccurrences(of: "data_spatial/", with: OpenMeteo.dataSpatialDirectory ?? OpenMeteo.dataDirectory)
+        }
+        fatalError("Unexpected data path \(path)")
+    }
 }

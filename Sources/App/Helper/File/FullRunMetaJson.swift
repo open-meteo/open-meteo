@@ -1,4 +1,5 @@
 import Foundation
+import OmFileIO
 
 struct FullRunMetaJson: Codable {
     let reference_time: Date

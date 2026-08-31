@@ -2,6 +2,7 @@ import Foundation
 import OmFileFormat
 import Vapor
 import SwiftNetCDF
+import OmFileIO
 
 #if ENABLE_PARQUET
 import SwiftArrowParquet

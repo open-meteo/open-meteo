@@ -1,6 +1,7 @@
 import Foundation
 import OmFileFormat
 import Vapor
+import OmFileIO
 
 /**
  Merge database chunks into a yearly file.

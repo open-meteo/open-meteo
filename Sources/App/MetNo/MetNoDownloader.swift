@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 import OmFileFormat
 import SwiftNetCDF
+import OmFileIO
 
 /// Download MetNo domains from OpenDAP server
 /// https://github.com/metno/NWPdocs/wiki

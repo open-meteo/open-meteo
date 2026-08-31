@@ -42,7 +42,8 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
+        //.package(url: "https://github.com/swift-server/async-http-client.git", from: "1.9.0")
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.3")
@@ -67,6 +68,8 @@ let package = Package(
                 .product(name: "curl-swift", package: "curl-swift"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 "CZlib",
+                "OmFileIO",
+                "OmTime",
             ] + (enableParquet ? [
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
@@ -77,6 +80,19 @@ let package = Package(
             ]
             //plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
+        .target(
+            name: "OmFileIO",
+            dependencies: [
+                //.product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
+                .product(name: "OmFileFormat", package: "om-file-format"),
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                "OmTime"
+            ]
+        ),
+        .target(name: "OmTime"),
         .target(
             name: "Lbzip2"
         ),
@@ -111,6 +127,20 @@ let package = Package(
                 .target(name: "App"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "VaporTesting", package: "vapor")
+            ]
+        ),
+        .testTarget(
+            name: "OmFileIOTests",
+            dependencies: [
+                .target(name: "OmFileIO"),
+                .product(name: "OmFileFormat", package: "om-file-format"),
+                .product(name: "Vapor", package: "vapor")
+            ]
+        ),
+        .testTarget(
+            name: "OmTime",
+            dependencies: [
+                .target(name: "OmTime")
             ]
         ),
     ]

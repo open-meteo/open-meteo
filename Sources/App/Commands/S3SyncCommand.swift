@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OmFileIO
 
 /// Synchronize a local directory to an S3-compatible server.
 struct S3SyncCommand: AsyncCommand {

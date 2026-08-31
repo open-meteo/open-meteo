@@ -1,6 +1,7 @@
 import OmFileFormat
 import Foundation
 import Vapor
+import OmFileIO
 
 protocol OmFilePayloadCodable: OmFilePayload, Codable {
     
@@ -20,14 +21,15 @@ extension OmFilePayloadCodable {
         self = try decoder.decode(Self.self, from: data)
     }
     
-    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
+    init(file: OmHttpReaderBackend) async throws {
+        let file = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
         let buffer = try await file.getData(offset: 0, count: file.count)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self = try decoder.decode(Self.self, from: buffer)
     }
     
-    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Self {
+    func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {
         return try await Self(file: file)
     }
     

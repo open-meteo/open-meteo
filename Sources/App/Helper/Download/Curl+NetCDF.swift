@@ -1,5 +1,6 @@
 import Foundation
 import SwiftNetCDF
+import OmFileIO
 
 fileprivate enum CurlNetCdfError: Error {
     case netcdfOpenFailed

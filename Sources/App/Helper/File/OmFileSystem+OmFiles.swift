@@ -2,6 +2,7 @@ import OmFileFormat
 import Foundation
 import AsyncHTTPClient
 import Logging
+import OmFileIO
 
 struct OmFileLocalRemoteOmReader {
     let reader: any OmFileReaderArrayProtocol<Float>
@@ -26,11 +27,13 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }
     
-    init(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
+    init(file: OmHttpReaderBackend) async throws {
+        let file = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
         try await self.init(remoteFile: file)
     }
     
-    func remoteUpdated(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileLocalRemoteOmReader {
+    func remoteUpdated(file: OmHttpReaderBackend) async throws -> OmFileLocalRemoteOmReader {
+        let file = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
         // Mark the old file as deleted/modified.
         // Cached queries still work, but new queries will immediately throw an error without unnecessarily doing HTTP requests.
         guard let reader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {

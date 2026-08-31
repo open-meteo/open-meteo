@@ -3,6 +3,7 @@ import OmFileFormat
 import Vapor
 @preconcurrency import SwiftEccodes
 import NIOConcurrencyHelpers
+import OmFileIO
 
 /**
  Downloader for CMA domains

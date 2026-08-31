@@ -5,6 +5,7 @@ import Vapor
 import VaporTesting
 import AsyncHTTPClient
 import NIOCore
+import OmFileIO
 
 @Suite(.serialized)
 struct S3ApiServerTests {
@@ -67,7 +68,7 @@ struct S3ApiServerTests {
             let storedFile = await dir?.getFile(name: file)
             #expect(storedFile != nil)
 
-            let stored = try await storedFile?.fd.readToEnd()
+            let stored = try storedFile?.fd.readToEnd()
             #expect(stored == payload)
         }
     }
@@ -177,7 +178,7 @@ struct S3ApiServerTests {
             let storedFile = await dir?.getFile(name: file)
             #expect(storedFile != nil)
 
-            let stored = try await storedFile?.fd.readToEnd()
+            let stored = try storedFile?.fd.readToEnd()
             #expect(stored == payload)
             
             let listRequest = try makeSignedRequest(

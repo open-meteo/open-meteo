@@ -4,6 +4,7 @@ import Foundation
 import AsyncHTTPClient
 import NIOCore
 import Vapor
+import OmFileIO
 
 /**
  multiple files

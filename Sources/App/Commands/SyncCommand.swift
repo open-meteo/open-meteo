@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OmFileIO
 
 /**
 Download the open-meteo weather database from a S3 server.

@@ -1,6 +1,7 @@
 import Foundation
 import OmFileFormat
 import Vapor
+import OmFileIO
 
 /// Read any time from multiple files
 struct OmFileSplitter {

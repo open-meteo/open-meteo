@@ -1,26 +1,10 @@
 import Vapor
 import NIO
 import Synchronization
+import OmFileIO
 
 /// Counters to hold metrics
 enum OmMetrics {
-    static let fileLocalOpen = Atomic(0)
-    static let fileLocalModifiedTotal = Atomic(0)
-    static let fileLocalDirectoriesOpen = Atomic(0)
-    static let fileLocalDirectoryUpdatedTotal = Atomic(0)
-    static let fileLocalDirectoryModifiedTotal = Atomic(0)
-    
-    static let fileRemoteOpen = Atomic(0)
-    static let fileRemoteModifiedTotal = Atomic(0)
-    static let fileRemoteModifiedUnexpectedlyTotal = Atomic(0)
-    static let fileRemoteDirectoriesOpen = Atomic(0)
-    static let fileRemoteDirectoryUpdatedTotal = Atomic(0)
-    static let fileRemoteDirectoryUpdateWaiting = Atomic(0)
-    static let fileRemoteDirectoryModifiedTotal = Atomic(0)
-    
-    static let fileRemotePayloadWaiting = Atomic(0)
-    static let fileRemotePayloadUpdateWaiting = Atomic(0)
-    
     static let requestsQueued = Atomic(0)
     static let requestsRunning = Atomic(0)
     static let requestsTooManyLocationsTotal = Atomic(0)
@@ -58,46 +42,46 @@ struct MetricsController: RouteCollection {
         let body = """
 # TYPE om_file_local_open gauge
 # HELP om_file_local_open Number of open local files
-om_file_local_open \(OmMetrics.fileLocalOpen.load(ordering: .relaxed))
+om_file_local_open \(OmFileSystemMetrics.fileLocalOpen.load(ordering: .relaxed))
 # TYPE om_file_local_modified_total counter
 # HELP om_file_local_modified_total Number of local file metadata updates
-om_file_local_modified_total \(OmMetrics.fileLocalModifiedTotal.load(ordering: .relaxed))
+om_file_local_modified_total \(OmFileSystemMetrics.fileLocalModifiedTotal.load(ordering: .relaxed))
 # TYPE om_file_remote_modified_unexpectedly_total counter
 # HELP om_file_remote_modified_unexpectedly_total Number of remote file metadata updates thrown while reading data
-om_file_remote_modified_unexpectedly_total \(OmMetrics.fileRemoteModifiedUnexpectedlyTotal.load(ordering: .relaxed))
+om_file_remote_modified_unexpectedly_total \(OmFileSystemMetrics.fileRemoteModifiedUnexpectedlyTotal.load(ordering: .relaxed))
 # TYPE om_file_local_directories_open gauge
 # HELP om_file_local_directories_open Number of open local directories
-om_file_local_directories_open \(OmMetrics.fileLocalDirectoriesOpen.load(ordering: .relaxed))
+om_file_local_directories_open \(OmFileSystemMetrics.fileLocalDirectoriesOpen.load(ordering: .relaxed))
 # TYPE om_file_local_directory_updated_total counter
 # HELP om_file_local_directory_updated_total Number of local directory refreshes
-om_file_local_directory_updated_total \(OmMetrics.fileLocalDirectoryUpdatedTotal.load(ordering: .relaxed))
+om_file_local_directory_updated_total \(OmFileSystemMetrics.fileLocalDirectoryUpdatedTotal.load(ordering: .relaxed))
 # TYPE om_file_local_directory_modified_total counter
 # HELP om_file_local_directory_modified_total Number of local directory content changes
-om_file_local_directory_modified_total \(OmMetrics.fileLocalDirectoryModifiedTotal.load(ordering: .relaxed))
+om_file_local_directory_modified_total \(OmFileSystemMetrics.fileLocalDirectoryModifiedTotal.load(ordering: .relaxed))
 # TYPE om_file_remote_open gauge
 # HELP om_file_remote_open Number of open remote files
-om_file_remote_open \(OmMetrics.fileRemoteOpen.load(ordering: .relaxed))
+om_file_remote_open \(OmFileSystemMetrics.fileRemoteOpen.load(ordering: .relaxed))
 # TYPE om_file_remote_modified_total counter
 # HELP om_file_remote_modified_total Number of remote file metadata updates
-om_file_remote_modified_total \(OmMetrics.fileRemoteModifiedTotal.load(ordering: .relaxed))
+om_file_remote_modified_total \(OmFileSystemMetrics.fileRemoteModifiedTotal.load(ordering: .relaxed))
 # TYPE om_file_remote_directories_open gauge
 # HELP om_file_remote_directories_open Number of open remote directories
-om_file_remote_directories_open \(OmMetrics.fileRemoteDirectoriesOpen.load(ordering: .relaxed))
+om_file_remote_directories_open \(OmFileSystemMetrics.fileRemoteDirectoriesOpen.load(ordering: .relaxed))
 # TYPE om_file_remote_directory_updated_total counter
 # HELP om_file_remote_directory_updated_total Number of remote directory refreshes
-om_file_remote_directory_updated_total \(OmMetrics.fileRemoteDirectoryUpdatedTotal.load(ordering: .relaxed))
+om_file_remote_directory_updated_total \(OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.load(ordering: .relaxed))
 # TYPE om_file_remote_directory_update_waiting gauge
 # HELP om_file_remote_directory_update_waiting Number of callers waiting for a remote directory update
-om_file_remote_directory_update_waiting \(OmMetrics.fileRemoteDirectoryUpdateWaiting.load(ordering: .relaxed))
+om_file_remote_directory_update_waiting \(OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.load(ordering: .relaxed))
 # TYPE om_file_remote_directory_modified_total counter
 # HELP om_file_remote_directory_modified_total Number of remote directory content changes
-om_file_remote_directory_modified_total \(OmMetrics.fileRemoteDirectoryModifiedTotal.load(ordering: .relaxed))
+om_file_remote_directory_modified_total \(OmFileSystemMetrics.fileRemoteDirectoryModifiedTotal.load(ordering: .relaxed))
 # TYPE om_file_remote_payload_waiting gauge
 # HELP om_file_remote_payload_waiting Number of callers waiting for a remote payload to resolve
-om_file_remote_payload_waiting \(OmMetrics.fileRemotePayloadWaiting.load(ordering: .relaxed))
+om_file_remote_payload_waiting \(OmFileSystemMetrics.fileRemotePayloadWaiting.load(ordering: .relaxed))
 # TYPE om_file_remote_payload_update_waiting gauge
 # HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
-om_file_remote_payload_update_waiting \(OmMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
+om_file_remote_payload_update_waiting \(OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes

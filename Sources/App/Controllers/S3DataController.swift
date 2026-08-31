@@ -4,6 +4,7 @@ import AsyncHTTPClient
 import NIOCore
 import NIOFileSystem
 @_spi(Testing) import NIOFileSystem
+import OmFileIO
 
 /**
  Expose database as S3 endpoint. This can be used to pull data from one server to another. It is used only internally to transfer data between Open-Meteo API nodes. Note: This is only a limited implementation and not fully compatible.

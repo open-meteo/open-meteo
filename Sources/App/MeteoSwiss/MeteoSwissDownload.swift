@@ -3,6 +3,7 @@ import Foundation
 import Vapor
 import AsyncHTTPClient
 import OmFileFormat
+import OmFileIO
 
 /**
  https://opendatadocs.meteoswiss.ch/e-forecast-data/e2-e3-numerical-weather-forecasting-model?download-options=restapi

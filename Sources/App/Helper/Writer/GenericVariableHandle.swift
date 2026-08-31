@@ -3,6 +3,7 @@ import Vapor
 import SwiftNetCDF
 import Foundation
 import Logging
+import OmFileIO
 
 
 /// Downloaders return FileHandles to keep files open while downloading

@@ -1,6 +1,7 @@
 import OmFileFormat
 import AsyncHTTPClient
 import Logging
+import OmFileIO
 
 /**
  Keep a file system tree in user-space memory. File and directory handles are kept open. Payloads can be associated which are also kept in memory.
@@ -15,7 +16,17 @@ final class OmFileSystemManager: Sendable {
     let remoteFileSystem: OmFileSystemS3?
     
     private init() {
-        self.localFileSystem = try! .makeOmRoot()
+        /// Make om root directory with data, data_run and data_spatial
+        var directories = [String: OmFileSystemLocal.Directory]()
+        directories["data"] = try! OmFileSystemLocal.Directory(path: OpenMeteo.dataDirectory)
+        if let dataRunDirectory = OpenMeteo.dataRunDirectory {
+            directories["data_run"] = try! OmFileSystemLocal.Directory(path: dataRunDirectory)
+        }
+        if let dataSpatialDirectory = OpenMeteo.dataSpatialDirectory {
+            directories["data_spatial"] = try! OmFileSystemLocal.Directory(path: dataSpatialDirectory)
+        }
+        
+        self.localFileSystem = OmFileSystemLocal.Directory(directories: directories)
         self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { OmFileSystemS3(server: S3ServerHealth(logger: .init(label: ""), servers: $0)) }
     }
     
@@ -80,7 +91,8 @@ final class OmFileSystemManager: Sendable {
         }
         if localOnly == false, let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
             let client = await file.file.makeCachedClient(context: file.context)
-            return .remote(client)
+            let file = OmReaderBlockCache(backend: client, cache: OpenMeteo.dataBlockCache, cacheKey: client.cacheKey)
+            return .remote(file)
         }
         return nil
     }
