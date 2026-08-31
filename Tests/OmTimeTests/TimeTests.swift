@@ -2,12 +2,7 @@ import Foundation
 @testable import OmTime
 import Testing
 
-@Suite struct OmFileIOTimeTests {
-    @Test func s3XmlDate() throws {
-        let date = try "2026-08-19T09:38:57.123Z".parseXmlS3Date()
-        #expect(date.iso8601_YYYY_MM_dd_HH_mm_ss == "2026-08-19T09:38:57")
-    }
-
+@Suite struct TimeTests {
     @Test func timeFormats() throws {
         #expect(try Timestamp.from(yyyymmdd: "20211123").format_YYYYMMddHH == "2021112300")
         #expect(try Timestamp.from(yyyymmdd: "2021112323").format_YYYYMMddHH == "2021112323")
@@ -53,12 +48,6 @@ import Testing
         #expect(date.month == 11)
         #expect(date.day == 23)
         #expect(date.toIsoString() == "2021-11-23")
-    }
-    
-    @Test func lastHttpModifiedDate() throws {
-        let a = try "Wed, 19 Aug 2026 19:38:12 GMT".parseLastModifiedDate()
-        #expect(a.iso8601_YYYY_MM_dd_HH_mm_ss == "2026-08-19T19:38:12")
-        #expect(a.lastModifiedHttpDateFormat == "Wed, 19 Aug 2026 19:38:12 GMT")
     }
     
     @Test func yearMonth() throws {

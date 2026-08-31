@@ -138,7 +138,7 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "OmTime",
+            name: "OmTimeTests",
             dependencies: [
                 .target(name: "OmTime")
             ]
