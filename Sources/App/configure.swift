@@ -297,6 +297,9 @@ extension ErrorMiddleware {
 
             // Inspect the error type and extract what data we can.
             switch error {
+            case let decodingError as DecodingError:
+                (reason, status, headers, source) = (decodingError.readableDescription, .badRequest, [:], .capture())
+
             case let debugAbort as (DebuggableError & AbortError):
                 (reason, status, headers, source) = (debugAbort.reason, debugAbort.status, debugAbort.headers, debugAbort.source ?? .capture())
                 
@@ -313,6 +316,11 @@ extension ErrorMiddleware {
             }
             
             switch error {
+            case _ as DecodingError:
+                req.logger.info("\(reason)",
+                                metadata: ["method" : "\(req.method.rawValue)",
+                                           "url" : "\(req.url.string)",
+                                           "userAgent" : .array(req.headers["User-Agent"].map { "\($0)" })])
             case _ as RateLimitError:
                 fallthrough
             case _ as ApiKeyManagerError, _ as TimeError, _ as ForecastApiError:
@@ -348,6 +356,47 @@ extension ErrorMiddleware {
             
             // create a Response with appropriate status
             return Response(status: status, headers: headers, body: body)
+        }
+    }
+}
+
+extension DecodingError {
+    /// A concise description suitable for API responses and request logs.
+    var readableDescription: String {
+        let context: Context
+        let summary: String
+
+        switch self {
+        case .dataCorrupted(let errorContext):
+            context = errorContext
+            summary = "Invalid value"
+        case .keyNotFound(let key, let errorContext):
+            context = errorContext
+            summary = "Missing required field '\(key.stringValue)'"
+        case .typeMismatch(let type, let errorContext):
+            context = errorContext
+            summary = "Expected \(type)"
+        case .valueNotFound(let type, let errorContext):
+            context = errorContext
+            summary = "Missing \(type) value"
+        @unknown default:
+            return "Could not decode the request."
+        }
+
+        let path = context.codingPath.readablePath
+        let location = path.isEmpty ? "" : " at '\(path)'"
+        return "\(summary)\(location): \(context.debugDescription)"
+    }
+}
+
+private extension Array where Element == any CodingKey {
+    var readablePath: String {
+        reduce(into: "") { path, key in
+            if let index = key.intValue {
+                path += "[\(index)]"
+            } else {
+                path += path.isEmpty ? key.stringValue : ".\(key.stringValue)"
+            }
         }
     }
 }
