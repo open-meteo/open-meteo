@@ -33,7 +33,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.28.0"),
-        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "71f422b2706d8a81f1cecf52ae3073990de1ddbe"), // Because unsafe C flags are set, tagged releases cannot be used
+        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "e6a735533902d43a3704c0af2f8dd632110083f1"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/curl-swift.git", from: "1.0.1"),
