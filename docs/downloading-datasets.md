@@ -1,3 +1,48 @@
+# Downloading Weather Models
+Open-Meteo fetches raw weather data from national weather services and transforms it into a highly optimized time-series database. The Open-Meteo database is distributed as open-data through an [AWS Open-Data Sponsorship](https://github.com/open-meteo/open-data). For details on downloading raw weather forecasts from national weather services, refer to the [downloading datasets documentation](./downloading-datasets.md).
+
+As illustrated earlier, the `sync` command enables the direct download of the Open-Meteo weather database from AWS S3. It requires two arguments:
+1. One or more weather model, such as `ecmwf_ifs025` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
+2. A list of weather variables, for example, `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
+
+Please refer to the [Weather API tutorial](https://github.com/open-meteo/open-data/tree/main/tutorial_weather_api) for more more information.
+
+
+### Automatic Data Synchronization  
+
+The prebuilt Ubuntu images automatically install a synchronization service. Modify the configuration in /etc/default/openmeteo-api.env:
+```
+[...]
+
+SYNC_ENABLED=true
+SYNC_APIKEY=
+SYNC_SERVER=
+SYNC_PAST_DAYS=3
+SYNC_DOMAINS=dwd_icon,ncep_gfs013,...
+SYNC_VARIABLES=temperature_2m,dew_point_2m,relative_humidity_2m,...
+SYNC_REPEAT_INTERVAL=5
+```
+
+Restart and monitor the sync service with:
+```bash
+sudo systemctl status openmeteo-sync
+sudo systemctl restart openmeteo-sync
+sudo journalctl -u openmeteo-sync.service
+```
+
+To automate the removal of older data, use the following cronjobs:
+
+```
+# Remove pressure level data after 10 days
+0 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -wholename "*hPa*" -mtime +10 -delete
+
+# Remove surface level data after 90 days
+5 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -mtime +90 -delete
+```
+
+
+
+
 ## Downloading datasets
 Because data is consumed from different national weather services with different open-data servers and update times, many different downloaders are available.
 

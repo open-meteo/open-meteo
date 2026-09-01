@@ -1,45 +1,46 @@
-# Getting started
+# Getting Started
 
-This tutorial provides instructions on setting up your weather API using either Docker or prebuilt packages for Ubuntu 22.04 Jammy. It assumes a good understanding of Linux server administration and familiarity with weather models.
+This guide explains how to self-host the Open-Meteo Weather API using either Docker or the prebuilt packages for Ubuntu 22.04 (Jammy Jellyfish). It assumes familiarity with Linux server administration and weather models.
 
 ## System Architecture
-Open-Meteo comprises three key components:
-1. An HTTP API server, which provide the same API as available on open-meteo.com. Developed using the Swift Vapor framework, this server compiles into a single binary.
-2. A file-based database for storing all downloaded weather datasets, stored in the `./data` directory. The weather database files use a custom binary format, optimizing time-series data compression for efficiency. See [OM-File-Format](https://github.com/open-meteo/om-file-format).
-3. Download commands for various weather models. Users have the option to retrieve weather model data either through the [open-data distribution on AWS S3](https://github.com/open-meteo/open-data) or by directly downloading the original weather models.
 
-Hardware Requirements:
-- A relatively modern CPU with SIMD (or Intel® AVX2) instructions. `x86-64` and `Arm®` are supported.
+Open-Meteo has three key components:
+
+1. An HTTP API server, which provides the same API as available on open-meteo.com. The server is developed in Swift and compiles into a single binary.
+2. A file-based database for storing weather data, stored in the `./data` directory. We use a custom, but open-source, binary format, optimized for time-series data compression. See [OM-File-Format](https://github.com/open-meteo/om-file-format).
+3. Download routines for various weather models. You can obtain model data from the [Open-Meteo data distribution on AWS S3](https://github.com/open-meteo/open-data) or download it directly from the original providers. The API server also supports cloud-native access to the database on AWS.
+
+### Hardware Requirements
+
+- A relatively modern CPU with SIMD (like Intel® AVX2) instructions. `x86-64` and `Arm®` are supported.
 - A minimum of 8 GB of memory, with 16 GB recommended for optimal performance.
-- For comprehensive forecast data access, it is advised to have at least 150 GB of disk space, preferably on NVMe SSDs with high IOPS for enhanced performance. If only a limited selection of weather variables is employed, a few gigabytes (32 - 48 GB) will suffice.
+- At least 100 GB of storage for small to medium deployments. Prefer an NVMe SSD with high IOPS because the storage is also used as a cache.
 
-## Running the API
-Different options exist for deploying Open-Meteo: either through Docker or by using prebuilt packages designed for Ubuntu 22.04 (Jammy Jellyfish).
+## Running with Docker
 
-### Running on Docker
-For a rapid deployment of Open-Meteo, Docker can be used. It launches a container that makes the Open-Meteo API accessible at `http://127.0.0.1:8080``. Subsequently, weather datasets can be downloaded from the AWS Open-Data distribution.
+Docker is the quickest way to run Open-Meteo. The container exposes the API at `http://127.0.0.1:8080`, fetches current forecasts from the [Open-Meteo data distribution on AWS S3](https://github.com/open-meteo/open-data), and caches downloaded data locally. Images are available from the [GitHub Container Registry](https://github.com/open-meteo/open-meteo/pkgs/container/open-meteo) and [AWS ECR Public Gallery](https://gallery.ecr.aws/w5w8t1y7/openmeteo).
 
 ```bash
-# Get the latest image
-docker pull ghcr.io/open-meteo/open-meteo
-
-# Create a Docker volume to store weather data
+# Create a Docker volume to store weather data and cache
 docker volume create --name open-meteo-data
 
 # Start the API service on http://127.0.0.1:8080
-docker run -d --rm -v open-meteo-data:/app/data -p 8080:8080 ghcr.io/open-meteo/open-meteo
+docker run -d --rm \
+  --name open-meteo \
+  -v open-meteo-data:/app/data \
+  -e REMOTE_DATA_DIRECTORY=https://openmeteo.s3.amazonaws.com/data/ \
+  -e CACHE_SIZE=8GB \
+  -p 127.0.0.1:8080:8080 \
+  ghcr.io/open-meteo/open-meteo
 
-# Download the latest ECMWF IFS 0.4° open-data forecast for temperature (150 MB)
-docker run -it --rm -v open-meteo-data:/app/data ghcr.io/open-meteo/open-meteo sync ecmwf_ifs025 temperature_2m
-
-# Get your forecast
+# Get your forecast. The first call will take a couple of seconds.
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
 ```
 
-Note: The Docker images are also hosted at AWS ECR: https://gallery.ecr.aws/w5w8t1y7/openmeteo
 
-### Using prebuilt Ubuntu Jammy Jellyfish packages
-If you're operating on Ubuntu 22.04 Jammy Jellyfish, you have the option to utilize prebuilt binaries, which can be installed through APT with the following command:
+## Installing the Ubuntu Package
+
+On Ubuntu 22.04 (Jammy Jellyfish), you can install the prebuilt package through APT:
 
 ```bash
 sudo gpg --keyserver hkps://keys.openpgp.org --no-default-keyring --keyring /usr/share/keyrings/openmeteo-archive-keyring.gpg  --recv-keys E6D9BD390F8226AE
@@ -48,65 +49,53 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/openm
 sudo apt update
 sudo apt install openmeteo-api
 
-# Download the latest ECMWF IFS 0.4° open-data forecast for temperature (50 MB)
-sudo chown -R $(id -u):$(id -g) /var/lib/openmeteo-api
-cd /var/lib/openmeteo-api
-openmeteo-api sync ecmwf_ifs025 temperature_2m
+# Edit /etc/default/openmeteo-api.env and set
+# REMOTE_DATA_DIRECTORY=https://openmeteo.s3.amazonaws.com/data/
+# CACHE_SIZE=8GB
+
+# Restart for the changes to take effect
+sudo systemctl restart openmeteo-api
 
 # Get your forecast
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
 ```
 
-This will automatically install and initiate an API instance at `http://127.0.0.1:8080`. You can verify this by using:
+The package installs and starts an API instance at `http://127.0.0.1:8080`. Use the following commands to inspect or restart it:
+
 ```bash
 sudo systemctl status openmeteo-api
 sudo systemctl restart openmeteo-api
 sudo journalctl -u openmeteo-api.service
 ```
 
-By default, port 8080 is bound to 127.0.0.1 and is **not** accessible from the network. To expose the service, you can configure `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service. Nevertheless, it is advisable to use a proxy, such as nginx.
+By default, port 8080 is bound to `127.0.0.1` and is **not** accessible from other hosts. To expose it directly, set `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service. For production deployments, use a reverse proxy such as nginx to provide TLS and access controls.
 
+> [!NOTE]
+> The Open-Meteo APT repository currently supports Ubuntu 22.04 only.
+
+## Performance
+
+Although the Docker image supports cloud-native data access and local caching, a self-hosted instance is generally slower than the free Open-Meteo API. Producing a forecast requires reading small portions of compressed data from hundreds of files. This can involve several megabytes of data and take a few seconds, especially while the cache is cold. Self-hosting is therefore most useful for workloads with enough repeated API calls to benefit from caching, rather than for a single user.
+
+Data fetched from the [Open-Meteo data distribution on AWS S3](https://github.com/open-meteo/open-data) is stored in a local least-recently-used (LRU) cache. Increase `CACHE_SIZE` when retrieving many variables or large amounts of historical data; caches of multiple terabytes are supported. The API checks S3 for forecast updates roughly every two minutes and preloads changes. Repeated requests and requests for nearby coordinates are typically faster.
+
+Storage latency is important. For AWS deployments, running EC2 or Fargate in the same `us-west-2` region as the public data provides reasonable self-hosting performance.
 
 ## Downloading Weather Models
-Open-Meteo fetches raw weather data from national weather services and transforms it into a highly optimized time-series database. The Open-Meteo database is distributed as open-data through an [AWS Open-Data Sponsorship](https://github.com/open-meteo/open-data). For details on downloading raw weather forecasts from national weather services, refer to the [downloading datasets documentation](./downloading-datasets.md).
 
-As illustrated earlier, the `sync` command enables the direct download of the Open-Meteo weather database from AWS S3. It requires two arguments:
-1. One or more weather model, such as `ecmwf_ifs025` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
-2. A list of weather variables, for example, `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
+To download datasets directly from national weather services, see [Downloading Weather Models](./downloading-datasets.md). For multi-node deployments that synchronize a prepared database, see [Running Open-Meteo on Multiple Nodes](./sync-command.md).
 
-Please refer to the [Weather API tutorial](https://github.com/open-meteo/open-data/tree/main/tutorial_weather_api) for more more information.
+## License
 
+Self-hosting is available for non-commercial and commercial use. Weather data is provided under `CC-BY-4.0`, which requires attribution. The Open-Meteo API source code and Docker image are provided under the `AGPL-3.0` license, with the following terms:
 
-### Automatic Data Synchronization  
+- Network Use is Distribution: If you modify AGPL-3.0 software and run it as a service over a network (like a cloud app or SaaS), you must provide the complete modified source code to the users of that service.
+- Same License (Share-Alike): Any derivative works or larger works incorporating the code must also be licensed under AGPL-3.0.
+- Notice Preservation: You must keep all original copyright and license notices intact, and document changes made to the code.
+- Patent Grant: Contributors provide an express grant of patent rights.
 
-The prebuilt Ubuntu images automatically install a synchronization service. Modify the configuration in /etc/default/openmeteo-api.env:
-```
-[...]
+## Support
 
-SYNC_ENABLED=true
-SYNC_APIKEY=
-SYNC_SERVER=
-SYNC_PAST_DAYS=3
-SYNC_DOMAINS=dwd_icon,ncep_gfs013,...
-SYNC_VARIABLES=temperature_2m,dew_point_2m,relative_humidity_2m,...
-SYNC_REPEAT_INTERVAL=5
-```
+For commercial support options, you can contact us via email. Please note that we do not support small deployments.
 
-Restart and monitor the sync service with:
-```bash
-sudo systemctl status openmeteo-sync
-sudo systemctl restart openmeteo-sync
-sudo journalctl -u openmeteo-sync.service
-```
-
-To automate the removal of older data, use the following cronjobs:
-
-```
-# Remove pressure level data after 10 days
-0 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -wholename "*hPa*" -mtime +10 -delete
-
-# Remove surface level data after 90 days
-5 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -mtime +90 -delete
-```
-
-For further questions, please use [GitHub Discussions](https://github.com/open-meteo/open-meteo/discussions).
+For further questions and community support, please use [GitHub Discussions](https://github.com/open-meteo/open-meteo/discussions).
