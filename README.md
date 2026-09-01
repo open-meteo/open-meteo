@@ -102,6 +102,7 @@ Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
 - [DIY Arduino esp8266 weather station](https://github.com/AlexeyMal/esp8266-weather-station) esp8266 weather station using Open-Meteo API, an embedded C++ implementation example
 - [Homepage](https://github.com/benphelps/homepage/) A highly customizable homepage (or startpage / application dashboard) with Docker and service API integrations.
+- [outdoor-embeds](https://github.com/Great-Outdoor-Hubs/outdoor-embeds) Dependency-free embeddable surf and marine forecast widget, no build step and no API key
 - [Spots Guru](https://www.spots.guru) Weather forecast for lazy, the best wind & wave spots around you.
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
