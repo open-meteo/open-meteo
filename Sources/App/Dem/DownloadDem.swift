@@ -53,7 +53,7 @@ struct Dem90: GenericDomain {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }
-        let lati = lat < 0 ? Int(lat) - 1 : Int(lat)
+        let lati = Int(lat.rounded(.down))
         let latrow = UInt64(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
         let lonrow = UInt64((lon + 180) * Float(px))
