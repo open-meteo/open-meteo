@@ -3,8 +3,12 @@ import Foundation
 public extension DispatchTime {
     /// Nicely format elapsed time
     func timeElapsedPretty() -> String {
-        let seconds = Double((DispatchTime.now().uptimeNanoseconds - uptimeNanoseconds)) / 1_000_000_000
-        return seconds.asSecondsPrettyPrint
+        return timeElapsedSeconds().asSecondsPrettyPrint
+    }
+    
+    /// Time elapsed in seconds
+    func timeElapsedSeconds() -> Double {
+        Double((DispatchTime.now().uptimeNanoseconds - uptimeNanoseconds)) / 1_000_000_000
     }
 }
 

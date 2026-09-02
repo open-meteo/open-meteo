@@ -1,4 +1,5 @@
 import OmFileFormat
+import Dispatch
 import AsyncHTTPClient
 import Logging
 import OmFileIO
@@ -125,12 +126,24 @@ final class OmFileSystemManager: Sendable {
     
     /// Called every second from a life cycle handler on an available thread
     func backgroundTaskRemote() async {
-        await remoteFileSystem?.updateRecursivelyIfRequired(client: .shared, logger: Logger(label: "OmFileSystemManager backgroundTaskRemote"))
+        let logger = Logger(label: "OmFileSystemManager backgroundTaskRemote")
+        let start = DispatchTime.now()
+        await remoteFileSystem?.updateRecursivelyIfRequired(client: .shared, logger: logger)
+        let duration = start.timeElapsedSeconds()
+        if duration > 5 {
+            logger.warning("Remote S3 file system background update took \(duration.asSecondsPrettyPrint)")
+        }
     }
     
     /// Called every second from a life cycle handler on an available thread
     func backgroundTaskLocal() async {
+        let logger = Logger(label: "OmFileSystemManager backgroundTaskLocal")
+        let start = DispatchTime.now()
         await localFileSystem.updateRecursivelyIfRequired(now: .now())
+        let duration = start.timeElapsedSeconds()
+        if duration > 5 {
+            logger.warning("Local file system background update took \(duration.asSecondsPrettyPrint)")
+        }
     }
 }
 

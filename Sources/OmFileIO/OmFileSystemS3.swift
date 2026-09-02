@@ -47,9 +47,7 @@ public struct OmFileSystemS3: Sendable {
     public func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
         await self.root.updateRecursivelyIfRequired(
             context: server,
-            now: .now(),
-            revalidateIntervalSeconds: 120,
-            inactiveSkipSeconds: 30 * 60
+            now: .now()
         )
     }
     
@@ -416,9 +414,7 @@ public struct OmFileSystemS3: Sendable {
         
         /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
         func update(context: S3ServerHealth) async throws {
-            OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             let logger = context.logger
-
             guard revalidationQueue == nil else {
                 OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
                 defer {
@@ -431,6 +427,7 @@ public struct OmFileSystemS3: Sendable {
             }
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
+            OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
                 let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: .shared, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
                 var listedFiles = Set<String>()
@@ -489,14 +486,12 @@ public struct OmFileSystemS3: Sendable {
         /// - Skips revalidation for directories that were not accessed for more than `inactiveSkipSeconds`.
         func updateRecursivelyIfRequired(
             context: S3ServerHealth,
-            now: Timestamp,
-            revalidateIntervalSeconds: Int,
-            inactiveSkipSeconds: Int
+            now: Timestamp
         ) async {
-            if lastAccessed.olderThan(seconds: inactiveSkipSeconds, now: now) {
+            if lastAccessed.olderThan(seconds: 30 * 60, now: now) {
                 return
             }
-            if lastValidated.olderThan(seconds: revalidateIntervalSeconds, now: now) {
+            if lastValidated.olderThan(seconds: 120, now: now) {
                 do {
                     try await update(context: context)
                 } catch {
@@ -507,9 +502,7 @@ public struct OmFileSystemS3: Sendable {
             for directory in directories.values {
                 await directory.updateRecursivelyIfRequired(
                     context: context,
-                    now: now,
-                    revalidateIntervalSeconds: revalidateIntervalSeconds,
-                    inactiveSkipSeconds: inactiveSkipSeconds
+                    now: now
                 )
             }
         }
