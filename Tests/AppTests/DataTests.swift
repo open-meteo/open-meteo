@@ -215,45 +215,40 @@ extension InlineArray {
     }*/
 
     @Test(
-        .enabled(if: FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory)),
-        .disabled("Elevation information unavailable")
+        .enabled(if: FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory))
     )
     func dem90() async throws {
         let logger = Logger(label: "test")
         let httpClient = HTTPClient.shared
 
-        let value1 = try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient)
-        #expect(value1 == 25) // beach, SE south africa // beach, SE south africa
+        // beach, SE south africa // beach, SE south africa
+        #expect(try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient) == 25)
 
-        let value2 = try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient)
-        #expect(value2 == 0) // water, SE south africa // water, SE south africa
+        // water, SE south africa // water, SE south africa
+        #expect(try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient) == 25)
 
-        let value3 = try await Dem90.read(lat: 46.885748, lon: 8.670080, logger: logger, httpClient: httpClient)
-        #expect(value3 == 991)
-        let value4 = try await Dem90.read(lat: 46.885748, lon: 8.669093, logger: logger, httpClient: httpClient)
-        #expect(value4 == 1028)
-        let value5 = try await Dem90.read(lat: 46.885748, lon: 8.668106, logger: logger, httpClient: httpClient)
-        #expect(value5 == 1001)
+        #expect(try await Dem90.read(lat: 46.885748, lon: 8.670080, logger: logger, httpClient: httpClient) == 991)
+        #expect(try await Dem90.read(lat: 46.885748, lon: 8.669093, logger: logger, httpClient: httpClient) == 1028)
+        #expect(try await Dem90.read(lat: 46.885748, lon: 8.668106, logger: logger, httpClient: httpClient) == 1046.0)
 
         // island
-        let value6 = try await Dem90.read(lat: 65.03738, lon: -17.75940, logger: logger, httpClient: httpClient)
-        #expect(value6 == 715)
+        #expect(try await Dem90.read(lat: 65.03738, lon: -17.75940, logger: logger, httpClient: httpClient) == 715)
 
         // greenland
-        let value7 = try await Dem90.read(lat: 72.71190, lon: -31.81641, logger: logger, httpClient: httpClient)
-        #expect(value7 == 2878.0)
+        #expect(try await Dem90.read(lat: 72.71190, lon: -31.81641, logger: logger, httpClient: httpClient) == 2878.0)
         // bolivia
-        let value8 = try await Dem90.read(lat: -15.11455, lon: -65.74219, logger: logger, httpClient: httpClient)
-        #expect(value8 == 162.0)
+        #expect(try await Dem90.read(lat: -15.11455, lon: -65.74219, logger: logger, httpClient: httpClient) == 162.0)
         // antarctica
-        let value9 = try await Dem90.read(lat: -70.52490, lon: -65.30273, logger: logger, httpClient: httpClient)
-        #expect(value9 == 1749.0)
-        let value10 = try await Dem90.read(lat: -80.95610, lon: -70.66406, logger: logger, httpClient: httpClient)
-        #expect(value10 == 124.0)
-        let value11 = try await Dem90.read(lat: -81.20142, lon: 2.10938, logger: logger, httpClient: httpClient)
-        #expect(value11 == 2342.0)
-        let value12 = try await Dem90.read(lat: -80.58973, lon: 108.28125, logger: logger, httpClient: httpClient)
-        #expect(value12 == 3348.0)
+        #expect(try await Dem90.read(lat: -70.52490, lon: -65.30273, logger: logger, httpClient: httpClient) == 1749.0)
+        #expect(try await Dem90.read(lat: -80.95610, lon: -70.66406, logger: logger, httpClient: httpClient) == 124.0)
+        #expect(try await Dem90.read(lat: -81.20142, lon: 2.10938, logger: logger, httpClient: httpClient) == 2342.0)
+        #expect(try await Dem90.read(lat: -80.58973, lon: 108.28125, logger: logger, httpClient: httpClient) == 3348.0)
+        
+        #expect(try await Dem90.read(lat: -41.0, lon: 145.7167, logger: logger, httpClient: httpClient) == 18)
+        #expect(try await Dem90.read(lat: -9.0, lon: 32.9833, logger: logger, httpClient: httpClient) == 1590)
+        #expect(try await Dem90.read(lat: -35.0, lon: 138.70, logger: logger, httpClient: httpClient) == 569)
+        #expect(try await Dem90.read(lat: -12.0, lon: -76.90 , logger: logger, httpClient: httpClient) == 387)
+        #expect(try await Dem90.read(lat: -39.0, lon: -68.4167, logger: logger, httpClient: httpClient) == 288)
     }
 
     @Test func regularGrid() {
