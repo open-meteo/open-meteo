@@ -37,6 +37,35 @@ docker run -d --rm \
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
 ```
 
+### Running with Docker Compose
+
+The same setup as a `docker-compose.yml` file:
+
+```yaml
+volumes:
+  open-meteo-data:
+
+services:
+  open-meteo:
+    image: ghcr.io/open-meteo/open-meteo
+    container_name: open-meteo
+    volumes:
+      - open-meteo-data:/app/data
+    environment:
+      REMOTE_DATA_DIRECTORY: https://openmeteo.s3.amazonaws.com/data/
+    ports:
+      - '127.0.0.1:8080:8080'
+    restart: always
+```
+
+```bash
+# Start the API service on http://127.0.0.1:8080
+docker compose up -d
+
+# Get your forecast. The first call will take a couple of seconds.
+curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
+```
+
 
 ## Installing the Ubuntu Package
 
@@ -49,7 +78,7 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/openm
 sudo apt update
 sudo apt install openmeteo-api
 
-# Edit /etc/default/openmeteo-api.env and set
+# Edit /etc/default/openmeteo-api.env and uncomment
 # REMOTE_DATA_DIRECTORY=https://openmeteo.s3.amazonaws.com/data/
 # CACHE_SIZE=8GB
 
