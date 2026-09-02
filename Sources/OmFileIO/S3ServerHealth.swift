@@ -46,7 +46,12 @@ public actor S3ServerHealth {
     
     /// Deterministically returns the same server for the same hash. Used to distribute load to different endpoints. Throws `S3ServerHealthError.allEndpointsUnavailable` if all servers are offline
     /// If a server is offline, the hash is distributed to other server endpoints evenly.
+    /// If only one server is configured, always return this server, ignoring any online checks
     public func getServerFor(hash: UInt64) async throws -> S3BucketEndpoint {
+        if states.count == 1 {
+            return states[0].server
+        }
+        
         await ensureChecks()
         
         var selected: S3BucketEndpoint?
