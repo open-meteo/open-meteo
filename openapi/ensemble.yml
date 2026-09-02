@@ -386,6 +386,7 @@ paths:
             items:
               type: string
               enum:
+                - best_match
                 - dwd_icon_seamless_eps
                 - dwd_icon_global_eps
                 - dwd_icon_eu_eps
