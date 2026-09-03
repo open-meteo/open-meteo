@@ -107,7 +107,7 @@ import OmFileFormat
         })
     }
 
-    @Test(.disabled("readConcurrent() is flaky and not used for now")) func blockCacheConcurrent() async throws {
+    @Test func blockCacheConcurrent() async throws {
         let object = "data/dwd_icon_d2_eps/static/HSURF.om"
         let context = S3ServerHealth(logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
         let readFn = try await OmHttpReaderBackend(context: context, object: object)
