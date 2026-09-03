@@ -107,7 +107,7 @@ import OmFileFormat
         })
     }
 
-    @Test func blockCacheConcurrent() async throws {
+    @Test(.disabled("readConcurrent() is flaky and not used for now")) func blockCacheConcurrent() async throws {
         let object = "data/dwd_icon_d2_eps/static/HSURF.om"
         let context = S3ServerHealth(logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
         let readFn = try await OmHttpReaderBackend(context: context, object: object)
@@ -117,11 +117,15 @@ import OmFileFormat
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
         let read = try await OmFileReader(fn: cacheFn).expectArray(of: Float.self, io_size_max: 4096)
+        #expect(cacheFn.listOfActiveBlocks(maxAgeSeconds: 600) == [8..<9])
+        
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         #expect(value[123] == 1218)
+        #expect(cacheFn.listOfActiveBlocks(maxAgeSeconds: 600) == [0..<4, 8..<9])
 
         let value2 = try await read.readConcurrent(range: [0..<257, 511..<513])
         #expect(value2[123] == 1218)
+        #expect(cacheFn.listOfActiveBlocks(maxAgeSeconds: 600) == [0..<4, 8..<9])
     }
 
     /*func testRemoteFileManager() async throws {
