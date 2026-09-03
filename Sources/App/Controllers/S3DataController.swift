@@ -211,7 +211,8 @@ struct S3DataController: RouteCollection {
         
         if req.url.query == "uploads" {
             let prepared = try await initiateMultipartUpload(req)
-            try await replicateMultipartInitiate(req: req, uploadId: prepared.uploadId, fileSize: prepared.fileSize)
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? .now()
+            try await replicateMultipartInitiate(req: req, uploadId: prepared.uploadId, fileSize: prepared.fileSize, lastModified: modifiedDate)
             return prepared.response
         }
         
@@ -244,7 +245,7 @@ struct S3DataController: RouteCollection {
             guard let body else {
                 throw S3ApiError.expectedCompletionXMLBody
             }
-            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? .now()
             let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
             if !FileManager.default.fileExists(atPath: tempPath) {
                 req.logger.warning("Multipart upload completion, but temp file is missing. Validating the destination file instead")
@@ -291,7 +292,7 @@ struct S3DataController: RouteCollection {
             try await handle.resize(to: .bytes(Int64(body.readableBytes)))
             try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
             
-            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? req.headers.first(name: "x-last-modified")?.parseLastModifiedDate() ?? .now()
+            let modifiedDate = try req.headers.getXAmzMetaMtime() ?? .now()
             let ts = FileInfo.Timespec(seconds: Int(modifiedDate.timeIntervalSince1970), nanoseconds: 0)
             try await handle.setLastDataModificationTime(to: ts)
             return modifiedDate
@@ -549,13 +550,14 @@ struct S3DataController: RouteCollection {
         }
     }
     
-    private func replicateMultipartInitiate(req: Request, uploadId: Int, fileSize: Int64) async throws {
+    private func replicateMultipartInitiate(req: Request, uploadId: Int, fileSize: Int64, lastModified: Timestamp) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
         try await servers.foreachConcurrent(nConcurrent: 4) { server in
             var request = HTTPClientRequest(url: server.uploadURL(remotePath: "\(req.url.path.dropFirst(1))?uploads"))
             request.method = .POST
             request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
+            request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
             request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: "x-upload-id", value: "\(uploadId)")
             request.headers.add(name: "x-file-size", value: "\(fileSize)")
@@ -593,7 +595,7 @@ struct S3DataController: RouteCollection {
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentType, value: "application/xml")
-            request.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
+            request.headers.add(name: "x-om-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
             _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
         }
     }
@@ -1037,9 +1039,10 @@ extension Request {
 
 extension HTTPHeaders {
     /// rclone encodes modification time in `x-amz-meta-mtime` as a floating point seconds past epoch
+    /// On custom implementation multipart upload complete `x-om-meta-mtime` is set
     /// Nil is header is not set, throws is malformated
     func  getXAmzMetaMtime() throws -> Timestamp? {
-        guard let seconds = self.first(name: "x-amz-meta-mtime") else {
+        guard let seconds = self.first(name: "x-amz-meta-mtime") ?? self.first(name: "x-om-meta-mtime") else {
             return nil
         }
         guard let seconds = Double(seconds) else {

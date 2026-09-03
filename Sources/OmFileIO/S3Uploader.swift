@@ -51,6 +51,7 @@ public enum S3Uploader {
         var initiateRequest = HTTPClientRequest(url: url + "?uploads")
         initiateRequest.method = .POST
         initiateRequest.headers.add(name: "Content-Type", value: contentType)
+        initiateRequest.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
         // custom header to set the total expected upload file size. Might be used by a custom upload implementation in the future
         initiateRequest.headers.add(name: "x-file-size", value: "\(try await data.getFileSize())")
         let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
@@ -312,7 +313,8 @@ public struct S3MultiPartUploadPrepared: Sendable {
         completeRequest.body = .bytes(ByteBuffer(data: completionData))
         completeRequest.headers.add(name: "Content-Type", value: "application/xml")
         completeRequest.headers.add(name: "x-amz-content-sha256", value: completionData.sha256Hex)
-        completeRequest.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
+        // `x-aws-meta-mtime` is not allowed on AWS. Set `x-om-meta-mtime` which is used in the custom implementation
+        completeRequest.headers.add(name: "x-om-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
         let completeResponse = try await client.executeRetry(completeRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
         _ = try await completeResponse.body.collect(upTo: 1024 * 1024)
         let timeCommitRequest = Double(DispatchTime.now().uptimeNanoseconds - timeCommitRequestStart) / 1_000_000_000
