@@ -97,7 +97,9 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
                         $0.copyBytes(to: destBuffer)
                     }
-                    guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
+                    // Publish the completed payload. Readers use acquire ordering before
+                    // accessing the corresponding data block.
+                    guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .releasing).exchanged else {
                         continue // another thread stole the slot
                     }
                     return UnsafeRawBufferPointer(start: dest, count: blockSize)
@@ -119,7 +121,9 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
                     $0.copyBytes(to: destBuffer)
                 }
-                guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
+                // Publish the completed payload. Readers use acquire ordering before
+                // accessing the corresponding data block.
+                guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .releasing).exchanged else {
                     continue // another thread stole the slot
                 }
                 return UnsafeRawBufferPointer(start: dest, count: blockSize)
@@ -136,7 +140,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
             for lookAhead in 0..<lookAheadCount {
                 let slot = (key &+ lookAhead) % UInt64(blockCount)
                 while true {
-                    let entry = entries[Int(slot)].load(ordering: .relaxed)
+                    let entry = entries[Int(slot)].load(ordering: .acquiring)
                     // check if keys match
                     // ignore any entries that are being modified right now
                     guard entry.first == key && entry.second & 0x1 == 1 else {
@@ -160,7 +164,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
             for lookAhead in 0..<lookAheadCount {
                 let slot = Int((key &+ lookAhead) % UInt64(blockCount))
                 while true {
-                    let entry = entries[slot].load(ordering: .relaxed)
+                    let entry = entries[slot].load(ordering: .acquiring)
                     // check if keys match
                     // ignore any entries that are being modified right now
                     guard entry.first == key && entry.second & 0x1 == 1 else {
@@ -174,7 +178,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     
                     // Update last modified timestamp
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
-                    let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
+                    let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .acquiring)
                     guard updated.exchanged || (updated.original.first == key && updated.original.second & 0x1 == 1 ) else {
                         // Another thread changed the key or started an update
                         continue
@@ -206,7 +210,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     let slot = Int((slot &+ i) % UInt64(blockCount))
                     let key = (key &+ UInt64(i))
                     while true {
-                        let entry = entries[slot].load(ordering: .relaxed)
+                        let entry = entries[slot].load(ordering: .acquiring)
                         // check if keys match
                         // ignore any entries that are being modified right now
                         guard entry.first == key && entry.second & 0x1 == 1 else {
@@ -214,7 +218,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         }
                         // Update last modified timestamp
                         let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
-                        let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
+                        let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .acquiring)
                         guard updated.exchanged || (updated.original.first == key && updated.original.second & 0x1 == 1 ) else {
                             // Another thread changed the key or started an update
                             continue
