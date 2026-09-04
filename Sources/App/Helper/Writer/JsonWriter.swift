@@ -70,18 +70,18 @@ extension ForecastapiResult {
 extension ForecastapiResult.PerLocation {
     fileprivate func streamJsonResponse(to b: inout BufferAndAsyncWriter, timeformat: Timeformat, variables: ForecastapiResult<Model>.RequestVariables, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
-        guard let first = results.first else {
+        guard let metadataModel else {
             throw ForecastApiError.noDataAvailableForThisLocation
         }
         let sections = try await runAllSections(variables: variables)
-        let current = try await first.current(variables: variables.currentVariables)
+        let current = try await metadataModel.current(variables: variables.currentVariables)
         
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 
         b.buffer.writeString("""
-        {"latitude":\(first.latitude),"longitude":\(first.longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
+        {"latitude":\(metadataModel.latitude),"longitude":\(metadataModel.longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
         """)
-        if let elevation = first.elevation, elevation.isFinite {
+        if let elevation = metadataModel.elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")
         }
         if locationId != 0 {
