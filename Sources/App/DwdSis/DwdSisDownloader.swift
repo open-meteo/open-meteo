@@ -34,7 +34,6 @@ struct DwdSisDownloader: AsyncCommand {
         /// Cronjob every 10 minutes. Make sure there is no overlap. Minus 5 seconds to prevent race conditions
         Process.alarm(seconds: 10*60 - 5)
         let timestampFile = "\(domain.downloadDirectory)last.txt"
-        let firstAvailableTimeStep = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds)
         let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient)
         async let sisListing = curl.downloadInMemoryAsync(url: Self.sisDirectory, minSize: nil)
@@ -47,7 +46,7 @@ struct DwdSisDownloader: AsyncCommand {
         let sisRuns = Self.availableRuns(in: sisHtml, filePrefix: "SISin")
         let sidRuns = Self.availableRuns(in: sidHtml, filePrefix: "SIDin")
         let availableRuns = sisRuns.intersection(sidRuns).filter {
-            $0 >= firstAvailableTimeStep && $0 > (lastDownloadedTimeStep ?? Timestamp(0))
+            $0 > (lastDownloadedTimeStep ?? Timestamp(0))
         }.sorted()
         guard !availableRuns.isEmpty else {
             logger.info("All steps already downloaded")
