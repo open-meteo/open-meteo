@@ -45,6 +45,9 @@ struct MeteoFranceDownload: AsyncCommand {
 
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -94,7 +97,7 @@ struct MeteoFranceDownload: AsyncCommand {
         try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, packages: gribPackages) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
 
         logger.info("Finished in \(start.timeElapsedPretty())")

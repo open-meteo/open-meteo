@@ -30,6 +30,9 @@ struct DownloadCmaCommand: AsyncCommand {
         
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
 
         /*@Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
@@ -67,7 +70,7 @@ struct DownloadCmaCommand: AsyncCommand {
 
         let nConcurrent = signature.concurrent ?? 1
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, maxForecastHour: signature.maxForecastHour)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// read each file in chunks, apply shortwave correction and write again
