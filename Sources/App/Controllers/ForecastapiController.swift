@@ -98,7 +98,7 @@ public struct ForecastapiController: RouteCollection {
             type: .marine
         ).query)
         categoriesRoute.getAndPost("ensemble", use: WeatherApiController(
-            defaultModel: .ncep_gefs_seamless,
+            defaultModel: .best_match,
             subdomain: "ensemble-api",
             type: .ensemble).query
         )
@@ -275,6 +275,9 @@ struct WeatherApiController {
             let allowedRange = historyStartDate ..< (historyEndDate ?? currentTimeHour0.add(days: forecastDaysMax))
 
             let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
+            if type == .ensemble, domainsParam.contains(.best_match) == true {
+                throw ForecastApiError.generic(message: "Model 'best_match' is not supported by the Ensemble API. Please select a specific ensemble model.")
+            }
             let domains: [MultiDomains]
             switch type {
             case .ensemble:

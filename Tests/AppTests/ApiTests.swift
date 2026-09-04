@@ -110,6 +110,29 @@ import VaporTesting
         }
     }
 
+    @Test func ensembleApiRejectsBestMatchModel() async throws {
+        try await withApp { app in
+            let request = Request(
+                application: app,
+                method: .GET,
+                url: URI(string: "/v1/ensemble?latitude=52.52&longitude=13.41&hourly=temperature_2m&models=best_match"),
+                on: app.eventLoopGroup.next()
+            )
+            let controller = WeatherApiController(
+                defaultModel: .best_match,
+                subdomain: "ensemble-api",
+                type: .ensemble
+            )
+
+            do {
+                _ = try await controller.query(request)
+                Issue.record("Expected the Ensemble API to reject models=best_match")
+            } catch let error as ForecastApiError {
+                #expect(error.reason == "Model 'best_match' is not supported by the Ensemble API. Please select a specific ensemble model.")
+            }
+        }
+    }
+
     @Test func parseApiParamsPOST() async throws {
         try await withApp { app in
             let body = """
