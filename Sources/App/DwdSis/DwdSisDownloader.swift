@@ -35,24 +35,67 @@ struct DwdSisDownloader: AsyncCommand {
         Process.alarm(seconds: 10*60 - 5)
         let timestampFile = "\(domain.downloadDirectory)last.txt"
         let firstAvailableTimeStep = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds)
-        let endTime = Timestamp.now().subtract(minutes: 10).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
         let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
-        let startTime = max(lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep, firstAvailableTimeStep)
-        guard startTime <= endTime else {
+        let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient)
+        async let sisListing = curl.downloadInMemoryAsync(url: Self.sisDirectory, minSize: nil)
+        async let sidListing = curl.downloadInMemoryAsync(url: Self.sidDirectory, minSize: nil)
+        guard let sisHtml = try await sisListing.readStringImmutable(),
+              let sidHtml = try await sidListing.readStringImmutable() else {
+            throw Abort(.badGateway, reason: "Could not decode DWD SIS directory listing")
+        }
+
+        let sisRuns = Self.availableRuns(in: sisHtml, filePrefix: "SISin")
+        let sidRuns = Self.availableRuns(in: sidHtml, filePrefix: "SIDin")
+        let availableRuns = sisRuns.intersection(sidRuns).filter {
+            $0 >= firstAvailableTimeStep && $0 > (lastDownloadedTimeStep ?? Timestamp(0))
+        }.sorted()
+        guard !availableRuns.isEmpty else {
             logger.info("All steps already downloaded")
             return
         }
-        let downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
         let lastTimestampFile = timestampFile
-        logger.info("Downloading range \(downloadRange.prettyString())")
-        let handles = try await downloadRange.enumerated().asyncFlatMap { i, run -> [GenericVariableHandle] in
+        logger.info("Downloading \(availableRuns.count) available steps from \(availableRuns.first!.iso8601_YYYY_MM_dd_HH_mm) to \(availableRuns.last!.iso8601_YYYY_MM_dd_HH_mm)")
+        let handles = try await availableRuns.asyncFlatMap { run -> [GenericVariableHandle] in
             return try await downloadRun(application: context.application, run: run, domain: domain)
         }
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let last = downloadRange.range.upperBound.subtract(seconds: domain.dtSeconds)
+        let last = availableRuns.last!
         try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         Process.alarm(seconds: 0)
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+    }
+
+    static let sisDirectory = "https://opendata.dwd.de/weather/satellite/radiation/sis/"
+    static let sidDirectory = "https://opendata.dwd.de/weather/satellite/radiation/sid/"
+
+    /// Extract compressed EA v4 products from the Apache directory listing. A set is
+    /// used because every filename occurs both in the link target and as link text.
+    static func availableRuns(in html: String, filePrefix: String) -> Set<Timestamp> {
+        let marker = "\(filePrefix)"
+        let suffix = "EAv4.nc.bz2"
+        var runs = Set<Timestamp>()
+        var searchStart = html.startIndex
+
+        while let markerRange = html.range(of: marker, range: searchStart..<html.endIndex) {
+            let timestampStart = markerRange.upperBound
+            guard let timestampEnd = html.index(timestampStart, offsetBy: 12, limitedBy: html.endIndex) else {
+                break
+            }
+            let timestampString = html[timestampStart..<timestampEnd]
+            let suffixEnd = html.index(timestampEnd, offsetBy: suffix.count, limitedBy: html.endIndex)
+            if timestampString.allSatisfy(\.isNumber),
+               let suffixEnd,
+               html[timestampEnd..<suffixEnd] == suffix,
+               let year = Int(timestampString[0..<4]),
+               let month = Int(timestampString[4..<6]),
+               let day = Int(timestampString[6..<8]),
+               let hour = Int(timestampString[8..<10]),
+               let minute = Int(timestampString[10..<12]) {
+                runs.insert(Timestamp(year, month, day, hour, minute))
+            }
+            searchStart = timestampEnd
+        }
+        return runs
     }
     
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: DwdSisDomain) async throws -> [GenericVariableHandle] {
@@ -82,8 +125,8 @@ struct DwdSisDownloader: AsyncCommand {
             return (-10*60 + 3*60 + lineFraction * sweepTimeOfLimitedLatitudeRangeSeconds) / 3600
         }
         
-        let sisFile = "https://opendata.dwd.de/weather/satellite/radiation/sis/SISin\(run.format_YYYYMMddHHmm)EAv4.nc.bz2"
-        let sidFile = "https://opendata.dwd.de/weather/satellite/radiation/sid/SIDin\(run.format_YYYYMMddHHmm)EAv4.nc.bz2"
+        let sisFile = "\(Self.sisDirectory)SISin\(run.format_YYYYMMddHHmm)EAv4.nc.bz2"
+        let sidFile = "\(Self.sidDirectory)SIDin\(run.format_YYYYMMddHHmm)EAv4.nc.bz2"
 
         var (sis, sisc) = try await curl.downloadInMemoryAsync(url: sisFile, minSize: nil, bzip2Decode: true).withUnsafeBytes({
             guard let nc = try NetCDF.open(memory: $0) else {
