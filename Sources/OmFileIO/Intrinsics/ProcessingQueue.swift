@@ -39,10 +39,12 @@ import Logging
 actor ProcessingSerialQueue {
     private var continuation: AsyncStream<() async -> ()>.Continuation
     private var processingTask: Task<Void, Never>
+    private let onError: @Sendable () -> Void
     
-    init() {
+    init(onError: @escaping @Sendable () -> Void = {}) {
         let (stream, continuation) = AsyncStream<() async -> ()>.makeStream()
         self.continuation = continuation
+        self.onError = onError
         self.processingTask = Task {
             for await taskBlock in stream {
                 await taskBlock()
@@ -56,11 +58,13 @@ actor ProcessingSerialQueue {
     }
     
     func enqueueIgnoreError(logger: Logger, _ work: @escaping @Sendable () async throws -> ()) {
+        let onError = onError
         continuation.yield({
             do {
                 try await work()
             } catch {
                 logger.error("Error during queued work: \(error)")
+                onError()
             }
         })
     }
@@ -80,10 +84,12 @@ actor ProcessingSerialQueue {
 actor ProcessingParallelQueue<T: Sendable> {
     private var continuation: AsyncStream<@Sendable () async -> T?>.Continuation
     private var processingTask: Task<[T], Never>
+    private let onError: @Sendable () -> Void
     
-    init(executor: LimitedConcurrencyExecutor) {
+    init(executor: LimitedConcurrencyExecutor, onError: @escaping @Sendable () -> Void = {}) {
         let (stream, continuation) = AsyncStream<@Sendable () async -> T?>.makeStream()
         self.continuation = continuation
+        self.onError = onError
         self.processingTask = Task {
             var results = [T]()
             await withTaskGroup(of: T?.self) { group in
@@ -125,11 +131,13 @@ actor ProcessingParallelQueue<T: Sendable> {
     
     /// Enqueues work into the parallel queue. Ignores errors
     func enqueueIgnoreError(logger: Logger, _ work: @escaping @Sendable () async throws -> T) {
+        let onError = onError
         continuation.yield({
             do {
                 return try await work()
             } catch {
                 logger.error("Error during queued work: \(error)")
+                onError()
             }
             return nil
         })

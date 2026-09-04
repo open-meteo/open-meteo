@@ -1,4 +1,6 @@
 @testable import OmFileIO
+import Logging
+import Synchronization
 import Testing
 
 @Suite struct LimitedConcurrencyExecutorTests {
@@ -87,6 +89,27 @@ import Testing
 
         let results = await collectTask.value
         #expect(results.sorted() == Array(0..<20))
+    }
+
+    @Test func processingParallelQueueReportsIgnoredErrorsAndContinues() async {
+        enum TestError: Error {
+            case failed
+        }
+
+        let failed = Atomic(false)
+        let queue = ProcessingParallelQueue<Int>(
+            executor: LimitedConcurrencyExecutor(maxConcurrency: 2),
+            onError: { failed.store(true, ordering: .relaxed) }
+        )
+        await queue.enqueueIgnoreError(logger: Logger(label: "ProcessingParallelQueueTests")) {
+            throw TestError.failed
+        }
+        await queue.enqueue { 42 }
+
+        let results = await queue.collect()
+        #expect(results == [42])
+        let hasFailed = failed.load(ordering: .relaxed)
+        #expect(hasFailed)
     }
 }
 
