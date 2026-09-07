@@ -2,6 +2,7 @@ import Foundation
 @testable import App
 @testable import SphericalCube
 import OmFileFormat
+import Synchronization
 import Testing
 
 private let oracleScoreTolerance = 1e-15
@@ -251,123 +252,27 @@ private struct IconNativeGridElevationFile {
     let reader: OmFileReaderArray<FileHandleWithCount, Float>
 }
 
-private final class RecordingElevationReader: OmFileReaderArrayProtocol, @unchecked Sendable {
+private final class RecordingElevationReader: OmFileReaderArrayForwarding, Sendable {
     typealias OmType = Float
 
-    private let reader: OmFileReaderArray<FileHandleWithCount, Float>
-    private let lock = NSLock()
-    private var recordedArrayReadRanges = [Range<UInt64>]()
+    let wrappedReader: any OmFileReaderArrayProtocol<Float>
+    private let recordedArrayReadRanges = Mutex<[Range<UInt64>]>([])
 
     init(reader: OmFileReaderArray<FileHandleWithCount, Float>) {
-        self.reader = reader
+        wrappedReader = reader
     }
 
     var arrayReadRanges: [Range<UInt64>] {
-        lock.lock()
-        defer { lock.unlock() }
-        return recordedArrayReadRanges
-    }
-
-    private func recordArrayReadRange(_ range: Range<UInt64>) {
-        lock.lock()
-        recordedArrayReadRanges.append(range)
-        lock.unlock()
-    }
-
-    var compression: OmCompressionType { reader.compression }
-    var scaleFactor: Float { reader.scaleFactor }
-    var addOffset: Float { reader.addOffset }
-
-    func withDimensions<R>(_ body: (_: UnsafeBufferPointer<UInt64>) -> R) -> R {
-        reader.withDimensions(body)
-    }
-
-    func withChunkDimensions<R>(_ body: (_: UnsafeBufferPointer<UInt64>) -> R) -> R {
-        reader.withChunkDimensions(body)
-    }
-
-    func getDimensionsCount() -> UInt64 { reader.getDimensionsCount() }
-    func getDimensions() -> [UInt64] { reader.getDimensions() }
-    func getChunkDimensions() -> [UInt64] { reader.getChunkDimensions() }
-
-    func getDimensionsInline<let nDimensions: Int>() -> InlineArray<nDimensions, UInt64> {
-        reader.getDimensionsInline()
-    }
-
-    func getChunkDimensionsInline<let nDimensions: Int>() -> InlineArray<nDimensions, UInt64> {
-        reader.getChunkDimensionsInline()
-    }
-
-    func willNeed<let nDimensions: Int>(
-        range: InlineArray<nDimensions, Range<UInt64>>
-    ) async throws {
-        try await reader.willNeed(range: range)
-    }
-
-    func willNeed<let nDimensions: Int>(
-        offset: InlineArray<nDimensions, UInt64>,
-        count: InlineArray<nDimensions, UInt64>
-    ) async throws {
-        try await reader.willNeed(offset: offset, count: count)
-    }
-
-    func read() async throws -> [Float] { try await reader.read() }
-
-    func read<let nDimensions: Int>(
-        offset: InlineArray<nDimensions, UInt64>,
-        count: InlineArray<nDimensions, UInt64>
-    ) async throws -> [Float] {
-        try await reader.read(offset: offset, count: count)
+        recordedArrayReadRanges.withLock { $0 }
     }
 
     func read<let nDimensions: Int>(
         range: InlineArray<nDimensions, Range<UInt64>>
     ) async throws -> [Float] {
         if nDimensions == 2 {
-            recordArrayReadRange(range[1])
+            recordedArrayReadRanges.withLock { $0.append(range[1]) }
         }
-        return try await reader.read(range: range)
-    }
-
-    func read<let nDimensions: Int>(
-        into: UnsafeMutablePointer<Float>,
-        range: InlineArray<nDimensions, Range<UInt64>>,
-        intoCubeOffset: InlineArray<nDimensions, UInt64>?,
-        intoCubeDimension: InlineArray<nDimensions, UInt64>?
-    ) async throws {
-        try await reader.read(
-            into: into,
-            range: range,
-            intoCubeOffset: intoCubeOffset,
-            intoCubeDimension: intoCubeDimension
-        )
-    }
-
-    func readConcurrent<let nDimensions: Int>(
-        offset: InlineArray<nDimensions, UInt64>,
-        count: InlineArray<nDimensions, UInt64>
-    ) async throws -> [Float] {
-        try await reader.readConcurrent(offset: offset, count: count)
-    }
-
-    func readConcurrent<let nDimensions: Int>(
-        range: InlineArray<nDimensions, Range<UInt64>>
-    ) async throws -> [Float] {
-        try await reader.readConcurrent(range: range)
-    }
-
-    func readConcurrent<let nDimensions: Int>(
-        into: UnsafeMutablePointer<Float>,
-        range: InlineArray<nDimensions, Range<UInt64>>,
-        intoCubeOffset: InlineArray<nDimensions, UInt64>?,
-        intoCubeDimension: InlineArray<nDimensions, UInt64>?
-    ) async throws {
-        try await reader.readConcurrent(
-            into: into,
-            range: range,
-            intoCubeOffset: intoCubeOffset,
-            intoCubeDimension: intoCubeDimension
-        )
+        return try await wrappedReader.read(range: range)
     }
 }
 
