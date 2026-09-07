@@ -1623,14 +1623,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    static func marineBestMatchUsesEcmwfFallback(lastRunAvailabilityTime: Timestamp?, now: Timestamp) -> Bool {
-        guard let lastRunAvailabilityTime else {
-            return false
-        }
-        return lastRunAvailabilityTime <= now.subtract(hours: 26)
-    }
-
-    
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
     var remappedToEnsembleApi: Self {
         switch self {
@@ -1706,7 +1698,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconWaveDomain.ewam, IconWaveVariable.self),
                 (MfWaveDomain.mfwave, MfWaveVariable.self),
             ]
-            if Self.marineBestMatchUsesEcmwfFallback(lastRunAvailabilityTime: lastRunAvailabilityTime, now: Timestamp.now()) {
+            if let lastRunAvailabilityTime, lastRunAvailabilityTime <= Timestamp.now().subtract(hours: 26) {
                 sources.append((EcmwfDomain.wam025, EcmwfWaveVariable.self))
             }
             return try await DomainReaderMapping.multiple(sources).getReaders(
