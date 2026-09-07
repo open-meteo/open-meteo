@@ -40,7 +40,7 @@ struct S3ApiServerTests {
             let absolutePath = OpenMeteo.dataDirectory + objectName
             try? FileManager.default.removeItemIfExists(at: absolutePath)
             try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)s3-upload-tests/", withIntermediateDirectories: true)
-            let dir = await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
+            let dir = try await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
             #expect(dir != nil)
             #expect(await dir?.getFile(name: file) == nil)
 
@@ -85,7 +85,7 @@ struct S3ApiServerTests {
             
             try? FileManager.default.removeItemIfExists(at: absolutePath)
             try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)s3-upload-tests/", withIntermediateDirectories: true)
-            let dir = await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
+            let dir = try await OmFileSystemManager.instance.localFileSystem.getDirectory(fullPath: "data/s3-upload-tests/")
             
             #expect(dir != nil)
             #expect(await dir?.getFile(name: file) == nil)

@@ -258,14 +258,16 @@ public func configure(_ app: Application) throws {
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(1), { _ in
-            await OmFileSystemManager.instance.backgroundTaskRemote()
+            guard OmFileSystemManager.isInitialized else { return }
+            try await OmFileSystemManager.instance.backgroundTaskRemote()
         }
     )
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(1),
         { _ in
-            await OmFileSystemManager.instance.backgroundTaskLocal()
+            guard OmFileSystemManager.isInitialized else { return }
+            try await OmFileSystemManager.instance.backgroundTaskLocal()
         }
     )
 

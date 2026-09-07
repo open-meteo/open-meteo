@@ -299,7 +299,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
         let client = reader.reader.httpClient
         let logger = reader.reader.logger
-        guard let file = await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger) else {
+        guard let file = try await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger) else {
             return nil
         }
         return try await referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition.gridpoint, file: file)
@@ -311,7 +311,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         }
         let client = reader.reader.httpClient
         let logger = reader.reader.logger
-        guard let elevationFile = await referenceDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        guard let elevationFile = try await referenceDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
             throw ForecastApiError.generic(message: "Elevation file for domain \(referenceDomain) is missing")
         }
         let referenceElevation = try await referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
@@ -419,7 +419,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
         let client = reader.reader.httpClient
         let logger = reader.reader.logger
-        guard let file = await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger) else {
+        guard let file = try await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger) else {
             return nil
         }
         return try await referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)

@@ -104,8 +104,8 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         }
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
-        let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
+        let domainElevation = try await {
+            guard let elevation = try await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

@@ -3,6 +3,7 @@ import Dispatch
 import AsyncHTTPClient
 import Logging
 import OmFileIO
+import Synchronization
 
 /**
  Keep a file system tree in user-space memory. File and directory handles are kept open. Payloads can be associated which are also kept in memory.
@@ -10,21 +11,40 @@ import OmFileIO
  Additionally files from a remote S3 server can be cached. The S3 directory tree is periodically updated.
  */
 final class OmFileSystemManager: Sendable {
-    public static let instance = OmFileSystemManager()
+    private static let initialized = Atomic(false)
+    private static let shared: Result<OmFileSystemManager, Error> = Result {
+        let manager = try OmFileSystemManager()
+        initialized.store(true, ordering: .releasing)
+        return manager
+    }
+
+    /// Initialization errors are retained until the process restarts.
+    static var instance: OmFileSystemManager {
+        get throws { try shared.get() }
+    }
+
+    /// Background refresh must not initialize storage for commands that do not use it.
+    static var isInitialized: Bool {
+        initialized.load(ordering: .acquiring)
+    }
     
     let localFileSystem: OmFileSystemLocal.Directory
     
     let remoteFileSystem: OmFileSystemS3?
     
-    private init() {
+    init(
+        dataDirectory: String = OpenMeteo.dataDirectory,
+        dataRunDirectory: String? = OpenMeteo.dataRunDirectory,
+        dataSpatialDirectory: String? = OpenMeteo.dataSpatialDirectory
+    ) throws {
         /// Make om root directory with data, data_run and data_spatial
         var directories = [String: OmFileSystemLocal.Directory]()
-        directories["data"] = try! OmFileSystemLocal.Directory(path: OpenMeteo.dataDirectory)
-        if let dataRunDirectory = OpenMeteo.dataRunDirectory {
-            directories["data_run"] = try! OmFileSystemLocal.Directory(path: dataRunDirectory)
+        directories["data"] = try OmFileSystemLocal.Directory(path: dataDirectory)
+        if let dataRunDirectory {
+            directories["data_run"] = try OmFileSystemLocal.Directory(path: dataRunDirectory)
         }
-        if let dataSpatialDirectory = OpenMeteo.dataSpatialDirectory {
-            directories["data_spatial"] = try! OmFileSystemLocal.Directory(path: dataSpatialDirectory)
+        if let dataSpatialDirectory {
+            directories["data_spatial"] = try OmFileSystemLocal.Directory(path: dataSpatialDirectory)
         }
         
         self.localFileSystem = OmFileSystemLocal.Directory(directories: directories)

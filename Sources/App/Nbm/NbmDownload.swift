@@ -129,8 +129,8 @@ struct NbmDownload: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         /// Domain elevation field. Used to correct snowfall amount
-        let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
+        let domainElevation = try await {
+            guard let elevation = try await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation
