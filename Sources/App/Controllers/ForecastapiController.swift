@@ -336,6 +336,9 @@ struct WeatherApiController {
                         guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
                             return nil
                         }
+                        if domains.count == 1 && r.hourly == nil && r.daily == nil && r.weekly == nil && r.monthly == nil {
+                            throw ForecastApiError.noDataAvailableForThisLocation
+                        }
                         /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
                         let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
                         return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
