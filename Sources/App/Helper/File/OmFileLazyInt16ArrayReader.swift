@@ -111,17 +111,9 @@ final class OmFileLazyInt16ArrayReader:
 }
 
 private actor OmFileLazyInt16ArrayCache {
-    private final class Load: Sendable {
-        let task: Task<[Int16], any Error>
-
-        init(task: Task<[Int16], any Error>) {
-            self.task = task
-        }
-    }
-
     private enum State: Sendable {
         case empty
-        case loading(Load)
+        case loading(Task<[Int16], any Error>)
         case ready([Int16])
     }
 
@@ -138,7 +130,7 @@ private actor OmFileLazyInt16ArrayCache {
     }
 
     func values() async throws -> [Int16] {
-        let load: Load
+        let load: Task<[Int16], any Error>
         switch state {
         case .ready(let values):
             return values
@@ -147,25 +139,23 @@ private actor OmFileLazyInt16ArrayCache {
         case .empty:
             let reader = self.reader
             let elementCount = self.elementCount
-            load = Load(
-                task: Task {
-                    let decoded = try await reader.read(
-                        range: [0..<1, 0..<UInt64(elementCount)]
-                    )
-                    return try OmFileLazyInt16ArrayReader.encode(decoded)
-                }
-            )
+            load = Task {
+                let decoded = try await reader.read(
+                    range: [0..<1, 0..<UInt64(elementCount)]
+                )
+                return try OmFileLazyInt16ArrayReader.encode(decoded)
+            }
             state = .loading(load)
         }
 
         do {
-            let values = try await load.task.value
-            if case .loading(let activeLoad) = state, activeLoad === load {
+            let values = try await load.value
+            if case .loading(let activeLoad) = state, activeLoad == load {
                 state = .ready(values)
             }
             return values
         } catch {
-            if case .loading(let activeLoad) = state, activeLoad === load {
+            if case .loading(let activeLoad) = state, activeLoad == load {
                 state = .empty
             }
             throw error
