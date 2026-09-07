@@ -88,15 +88,6 @@ struct DownloadIconCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
-        let remapper: CdoIconGlobal?
-        if let remappedDomain {
-            guard let mapping = try await CdoIconGlobal(curl: curl, domain: remappedDomain) else {
-                preconditionFailure("Remapped ICON output requires a grid mapping")
-            }
-            remapper = mapping
-        } else {
-            remapper = nil
-        }
         let gridType = domain.isNative || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
@@ -131,7 +122,7 @@ struct DownloadIconCommand: AsyncCommand {
             try hsurf.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
         }
         if let remappedDomain, missingDomains.contains(remappedDomain) {
-            guard let remapper else {
+            guard let remapper = try await CdoIconGlobal(curl: curl, domain: remappedDomain) else {
                 preconditionFailure("Remapped ICON elevation requires a grid mapping")
             }
             try remapper.remap(hsurf).writeOmFile2D(
