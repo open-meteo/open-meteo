@@ -339,6 +339,7 @@ struct S3DataController: RouteCollection {
         
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         try await ensureParentDirectoryExists(forFileAt: absolutePath)
+        // Validate all configured data roots before accepting parts, so initialization cannot first fail at completion.
         _ = try OmFileSystemManager.instance
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
             try await handle.resize(to: .bytes(fileSize))
