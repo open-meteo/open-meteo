@@ -144,20 +144,6 @@ package enum SphericalCubeArtifact {
                 + (localY & (tileSize - 1)) * tileWidth
                 + (localX & (tileSize - 1))
         }
-
-        @inline(__always)
-        func intersects(
-            minimumX otherMinimumX: Int,
-            maximumX otherMaximumX: Int,
-            minimumY otherMinimumY: Int,
-            maximumY otherMaximumY: Int
-        ) -> Bool {
-            columns > 0 && rows > 0
-                && otherMaximumX >= minimumX
-                && otherMinimumX < minimumX + columns
-                && otherMaximumY >= minimumY
-                && otherMinimumY < minimumY + rows
-        }
     }
 
     /// Derives every payload position from `pointCount` and the face-derived bucket count.
