@@ -204,6 +204,24 @@ private let oracleScoreTolerance = 1e-15
         #expect(recordingReader.arrayReadRanges == [0..<400])
     }
 
+    @Test func surfaceElevationCacheRetriesFailedLoad() async throws {
+        let elevationFile = try await makeElevationFile([0, 17], chunkWidth: 2)
+        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
+        let recordingReader = RecordingElevationReader(reader: elevationFile.reader, failFirstRead: true)
+        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
+
+        await #expect(throws: RecordingElevationReader.ReadError.injectedFailure) {
+            _ = try await cachedReader.read(pointID: 1)
+        }
+        #expect(recordingReader.arrayReadRanges == [0..<2])
+
+        #expect(try await cachedReader.read(pointID: 1) == 17)
+        #expect(recordingReader.arrayReadRanges == [0..<2, 0..<2])
+
+        #expect(try await cachedReader.read(pointID: 0) == 0)
+        #expect(recordingReader.arrayReadRanges == [0..<2, 0..<2])
+    }
+
     @Test func surfacePayloadOffersLazyNativeElevationReader() async throws {
         let elevationFile = try await makeElevationFile([0, 1], chunkWidth: 2)
         defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
@@ -255,11 +273,17 @@ private struct IconNativeGridElevationFile {
 private final class RecordingElevationReader: OmFileReaderArrayForwarding, Sendable {
     typealias OmType = Float
 
+    enum ReadError: Error, Equatable {
+        case injectedFailure
+    }
+
     let wrappedReader: any OmFileReaderArrayProtocol<Float>
+    private let failFirstRead: Bool
     private let recordedArrayReadRanges = Mutex<[Range<UInt64>]>([])
 
-    init(reader: OmFileReaderArray<FileHandleWithCount, Float>) {
+    init(reader: OmFileReaderArray<FileHandleWithCount, Float>, failFirstRead: Bool = false) {
         wrappedReader = reader
+        self.failFirstRead = failFirstRead
     }
 
     var arrayReadRanges: [Range<UInt64>] {
@@ -270,7 +294,11 @@ private final class RecordingElevationReader: OmFileReaderArrayForwarding, Senda
         range: InlineArray<nDimensions, Range<UInt64>>
     ) async throws -> [Float] {
         if nDimensions == 2 {
-            recordedArrayReadRanges.withLock { $0.append(range[1]) }
+            let shouldFail = recordedArrayReadRanges.withLock {
+                $0.append(range[1])
+                return failFirstRead && $0.count == 1
+            }
+            if shouldFail { throw ReadError.injectedFailure }
         }
         return try await wrappedReader.read(range: range)
     }
