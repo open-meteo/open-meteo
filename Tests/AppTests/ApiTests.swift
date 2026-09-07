@@ -134,17 +134,20 @@ import VaporTesting
     }
 
     @Test(arguments: [
-        ("metno_nordic", true),
-        ("satellite_radiation_seamless", true),
-        ("metno_nordic,satellite_radiation_seamless", false)
+        ("metno_nordic", "0", "-150", true),
+        ("satellite_radiation_seamless", "0", "-150", true),
+        ("metno_nordic,satellite_radiation_seamless", "0", "-150", false),
+        ("metno_nordic", "0,1", "-150,-151", false),
+        ("satellite_radiation_seamless", "0,1", "-150,-151", false)
     ])
-    func unavailableModelsOnlyRejectSingleSelection(models: String, shouldReject: Bool) async throws {
+    func unavailableModelsOnlyRejectSingleModelAndLocation(models: String, latitude: String, longitude: String, shouldReject: Bool) async throws {
         try await withApp { app in
             // Both models are outside their coverage here; explicit elevation avoids DEM access.
+            let elevation = latitude.split(separator: ",").map { _ in "0" }.joined(separator: ",")
             let request = Request(
                 application: app,
                 method: .GET,
-                url: URI(string: "/v1/forecast?latitude=0&longitude=-150&elevation=0&models=\(models)"),
+                url: URI(string: "/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&elevation=\(elevation)&models=\(models)"),
                 on: app.eventLoopGroup.next()
             )
             let controller = WeatherApiController(defaultModel: .best_match)

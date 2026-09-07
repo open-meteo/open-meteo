@@ -325,6 +325,7 @@ struct WeatherApiController {
                     throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                 }
                 OmMetrics.recordModelRequest(models: domains, locationCount: coordinates.count)
+                let isSingleLocation = coordinates.count == 1
                 locations = try await coordinates.asyncMap { prepared in
                     let coordinates = prepared.coordinate
                     let timezone = prepared.timezone
@@ -336,7 +337,7 @@ struct WeatherApiController {
                         guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
                             return nil
                         }
-                        if domains.count == 1 && r.hourly == nil && r.daily == nil && r.weekly == nil && r.monthly == nil {
+                        if isSingleLocation && domains.count == 1 && r.hourly == nil && r.daily == nil && r.weekly == nil && r.monthly == nil {
                             throw ForecastApiError.noDataAvailableForThisLocation
                         }
                         /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
