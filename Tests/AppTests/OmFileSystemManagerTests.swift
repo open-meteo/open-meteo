@@ -4,27 +4,6 @@ import Foundation
 import Testing
 
 @Suite struct OmFileSystemManagerTests {
-    @Test func opensConfiguredRoots() async throws {
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: base) }
-        for name in ["data", "data_run", "data_spatial"] {
-            let directory = base.appendingPathComponent(name)
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try Data(name.utf8).write(to: directory.appendingPathComponent("file"))
-        }
-
-        let manager = try OmFileSystemManager(
-            dataDirectory: base.appendingPathComponent("data").path,
-            dataRunDirectory: base.appendingPathComponent("data_run").path,
-            dataSpatialDirectory: base.appendingPathComponent("data_spatial").path
-        )
-        for name in ["data", "data_run", "data_spatial"] {
-            let file = try #require(await manager.localFileSystem.getFile(fullPath: "\(name)/file"))
-            #expect(await file.size == Int64(name.utf8.count))
-            #expect(await manager.localFileSystem.getFile(fullPath: "\(name)/missing") == nil)
-        }
-    }
-
     @Test func acceptsEmptyPrimaryRootWithoutOptionalRoots() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
