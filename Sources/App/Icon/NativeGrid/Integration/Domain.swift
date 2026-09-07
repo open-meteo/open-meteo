@@ -55,20 +55,12 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
     }
 }
 
-private final class IconNativeGridCacheEntry: Sendable {
-    let storage: SphericalCubeIndex
-
-    init(_ storage: SphericalCubeIndex) {
-        self.storage = storage
-    }
-}
-
 /// Pins a successfully resolved mapping for the synchronous lookup path. Local and remote file
 /// discovery belongs to `OmFileSystemManager`.
 final class IconNativeGridCache: Sendable {
     private let file: String
     private let identity: IconNativeGridIdentity
-    private let entry = AtomicLazyReference<IconNativeGridCacheEntry>()
+    private let entry = AtomicLazyReference<SphericalCubeIndex>()
 
     init(file: String, identity: IconNativeGridIdentity) {
         self.file = file
@@ -79,18 +71,18 @@ final class IconNativeGridCache: Sendable {
         guard let resolved = entry.load() else {
             throw IconNativeDomainError.missingGridArtifact(file)
         }
-        return IconNativeGrid(storage: resolved.storage)
+        return IconNativeGrid(storage: resolved)
     }
 
     /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
     func install(_ grid: IconNativeGrid) {
-        _ = entry.storeIfNil(IconNativeGridCacheEntry(grid.storage))
+        _ = entry.storeIfNil(grid.storage)
     }
 
     /// Downloader-only disk validation. Unlike `get()`, this always inspects the final artifact.
     func validateFileAndInstall() throws {
         let loaded = try loadStorage()
-        _ = entry.storeIfNil(IconNativeGridCacheEntry(loaded))
+        _ = entry.storeIfNil(loaded)
     }
 
     private func loadStorage() throws(IconNativeDomainError) -> SphericalCubeIndex {
