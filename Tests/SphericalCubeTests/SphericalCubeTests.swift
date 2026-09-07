@@ -30,6 +30,24 @@ private let oracleScoreTolerance = 1e-15
         }
     }
 
+    @Test func nearbyExpansionKeepsSuppliedNearestFirstOnTies() throws {
+        let fixture = try makeFixture(centers: Array(
+            repeating: SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0), count: 128
+        ))
+        defer { fixture.remove() }
+        let lookup = try #require(fixture.index.nearestLookup(latitude: 0, longitude: 0))
+        // Simulate a bounded lookup supplying a higher-ID tied point. Nearby expansion must
+        // preserve the supplied point because its elevation has already been read by the caller.
+        let supplied = SphericalCubeIndex.Lookup(
+            query: lookup.query, location: lookup.location,
+            pointID: 127, position: 127, distanceSquared: 0
+        )
+        let nearby = fixture.index.nearestCandidates(from: supplied)
+        #expect(nearby.count == 10)
+        #expect(nearby.pointIDs[0] == 127)
+        for index in 1..<nearby.count { #expect(nearby.pointIDs[index] == index - 1) }
+    }
+
     @Test func floatCandidateDistancesStayAccurateNearVoronoiBoundaries() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }

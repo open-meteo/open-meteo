@@ -84,6 +84,7 @@ enum IconNativeGridBenchmark {
         printResult("raw sea hit", elevationBenchmark.rawSea)
         printResult("cold-cache sea hit", elevationBenchmark.coldSea)
         printResult("warm-cache sea hit", elevationBenchmark.warmSea)
+        printResult("warm-cache terrain hit", elevationBenchmark.warmTerrainHit)
         printResult("raw land candidate search", elevationBenchmark.rawLand)
         printResult("cold-cache land candidate search", elevationBenchmark.coldLand)
         printResult("warm-cache land candidate search", elevationBenchmark.warmLand)
@@ -122,6 +123,7 @@ enum IconNativeGridBenchmark {
         let rawSea: (samples: [Double], checksum: Int)
         let coldSea: (samples: [Double], checksum: Int)
         let warmSea: (samples: [Double], checksum: Int)
+        let warmTerrainHit: (samples: [Double], checksum: Int)
         let rawLand: (samples: [Double], checksum: Int)
         let coldLand: (samples: [Double], checksum: Int)
         let warmLand: (samples: [Double], checksum: Int)
@@ -130,7 +132,7 @@ enum IconNativeGridBenchmark {
         let warmTerrain: (samples: [Double], checksum: Int)
 
         var checksum: Int {
-            coldGridLoad.checksum &+ rawSea.checksum &+ coldSea.checksum &+ warmSea.checksum
+            coldGridLoad.checksum &+ rawSea.checksum &+ coldSea.checksum &+ warmSea.checksum &+ warmTerrainHit.checksum
                 &+ rawLand.checksum &+ coldLand.checksum &+ warmLand.checksum
                 &+ rawTerrain.checksum &+ coldTerrain.checksum &+ warmTerrain.checksum
         }
@@ -226,6 +228,22 @@ enum IconNativeGridBenchmark {
             operation: terrainSelectionChecksum
         )
         let warmTerrainReader = try #require(OmFileLazyInt16ArrayReader(wrapping: reader))
+        let matchedElevations = landQueries.map { query in
+            elevations[grid.storage.nearestPointID(latitude: query.latitude, longitude: query.longitude)!]
+        }
+        let warmTerrainHit = try await measureAsync(executions: landQueries.count) {
+            var checksum = 0
+            for (index, query) in landQueries.enumerated() {
+                let result = try await grid.findPointTerrainOptimised(
+                    lat: query.latitude,
+                    lon: query.longitude,
+                    elevation: matchedElevations[index],
+                    elevationFile: warmTerrainReader
+                )
+                checksum &+= result?.gridpoint ?? -1
+            }
+            return checksum
+        }
         let warmTerrain = try await measureAsync(executions: landQueries.count) {
             try await terrainSelectionChecksum(
                 grid: grid,
@@ -239,6 +257,7 @@ enum IconNativeGridBenchmark {
             rawSea: rawSea,
             coldSea: coldSea,
             warmSea: warmSea,
+            warmTerrainHit: warmTerrainHit,
             rawLand: rawLand,
             coldLand: coldLand,
             warmLand: warmLand,
