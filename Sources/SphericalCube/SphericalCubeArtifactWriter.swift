@@ -116,6 +116,14 @@ extension SphericalCubeArtifact {
                 throw SphericalCubeArtifactError.invalidHeader
             }
 
+            let layout = SectionLayout(pointCount: points.count, bucketCount: bucketCount)
+            guard layout.fileBytes <= maximumFileSize else {
+                throw SphericalCubeArtifactError.artifactTooLarge(
+                    actual: layout.fileBytes,
+                    maximum: maximumFileSize
+                )
+            }
+
             // Second pass: build prefix offsets for the bucket-ordered point section.
             var counts = [Int](repeating: 0, count: bucketCount)
             for point in points {
@@ -151,14 +159,6 @@ extension SphericalCubeArtifact {
                 order[cursors[bucket]] = UInt32(pointID)
                 positionsByID[pointID] = UInt32(cursors[bucket])
                 cursors[bucket] += 1
-            }
-
-            let layout = SectionLayout(pointCount: points.count, bucketCount: bucketCount)
-            guard layout.fileBytes <= maximumFileSize else {
-                throw SphericalCubeArtifactError.artifactTooLarge(
-                    actual: layout.fileBytes,
-                    maximum: maximumFileSize
-                )
             }
 
             var data = Data(repeating: 0, count: layout.fileBytes)
