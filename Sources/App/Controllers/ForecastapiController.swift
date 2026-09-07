@@ -1116,7 +1116,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             gridpointPolicy: SupplementalGridpointPolicy
         )
 
-        static func makeDomainReaders(
+        private static func makeDomainReaders(
             sources: [(any GenericDomain, any GenericVariable.Type)],
             lat: Float,
             lon: Float,
@@ -1709,15 +1709,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if Self.marineBestMatchUsesEcmwfFallback(lastRunAvailabilityTime: lastRunAvailabilityTime, now: Timestamp.now()) {
                 sources.append((EcmwfDomain.wam025, EcmwfWaveVariable.self))
             }
-            let forecast = try await DomainReaderMapping.makeDomainReaders(
-                sources: sources,
+            return try await DomainReaderMapping.multiple(sources).getReaders(
                 lat: lat,
                 lon: lon,
                 elevation: elevation,
                 mode: mode,
                 options: options
             )
-            return MultiDomains.hourlyToMultiSameType(forecast.readers)
         case .best_match:
             guard let icon = try await IconDomains.icon.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
@@ -2065,15 +2063,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
         
-        switch self {
-        default:
-            guard let readers: any GenericReaderProtocol = try await getReader(gridpoint: gridpoint, options: options) else {
-                return (nil, nil, nil, nil)
-            }
-            let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: [readers])
-            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
-            return (hourlyReader, daily, nil, nil)
+        guard let readers: any GenericReaderProtocol = try await getReader(gridpoint: gridpoint, options: options) else {
+            return (nil, nil, nil, nil)
         }
+        let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: [readers])
+        let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
+        return (hourlyReader, daily, nil, nil)
     }
     
     
