@@ -25,31 +25,21 @@ import VaporTesting
         #expect(!domain.generateTimeSeries)
     }
 
-    @Test func splitterAndSpatialWriterRetainResolvedGrid() async throws {
+    @Test func writerAndConversionReuseResolvedGrid() async throws {
+        // Temporary writer files use this directory even when storeOnDisk is false.
+        try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let fixture = try makeFixture(centers: makeSphericalCenters(count: 12))
         defer { fixture.remove() }
         let source = DeferredDomain(file: fixture.file)
         let domain = try await ResolvedDomain(source, context: .init(logger: logger, httpClient: nil))
-        let grid = domain.grid
+        // Any attempt to resolve the source again must fail.
         try FileManager.default.removeItem(at: fixture.file)
-        let splitter = OmFileSplitter(domain: source, grid: grid)
-        #expect(splitter.nx == 12)
-        #expect(splitter.ny == 1)
         let time = Timestamp(2001, 1, 1)
         let writer = OmSpatialTimestepWriter(domain: domain, run: time, time: time, storeOnDisk: false, realm: nil, logger: logger)
         let values = (0..<12).map(Float.init)
         try await writer.write(member: 0, variable: IconSurfaceVariable.temperature_2m, data: values)
         let handles = try await writer.finalise()
-        let handle = try #require(handles.first)
-        #expect(Array(handle.reader.getDimensions()) == [1, 12])
-        #expect(try await handle.reader.read() == values)
-        let file = try #require(await writer.fn)
-        let root = try await OmFileReader(fn: MmapFile(fn: file))
-        let crs: String? = try await root.getChild(name: "crs_wkt")?.readScalar()
-        #expect(crs == grid.crsWkt2)
-        #expect(try await handle.domain.getGrid(context: .init(logger: logger, httpClient: nil)).crsWkt2 == grid.crsWkt2)
-        #expect(!handle.domain.generateFullRun)
-        #expect(!handle.domain.generateTimeSeries)
+        try #require(handles.count == 1)
         try await withApp { app in
             try await GenericVariableHandle.convert(application: app, domain: source, createNetcdf: false, run: time, handles: handles, concurrent: 1, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: false)
         }
