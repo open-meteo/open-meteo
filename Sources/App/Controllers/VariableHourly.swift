@@ -621,8 +621,14 @@ private typealias SurroundingPressureLevels = (lowerLevel: Int, upperLevel: Int)
 /// API pressure levels that must be interpolated because a domain does not store them directly.
 private let pressureLevelInterpolationTable: [DomainRegistry: [Int: SurroundingPressureLevels]] = [
     .dwd_icon: [975: (950, 1000)],
+    .dwd_icon_global_native: [975: (950, 1000)],
     .dwd_icon_eu: [975: (950, 1000)],
     .dwd_icon_d2: [
+        800: (700, 850),
+        900: (850, 950),
+        925: (850, 950),
+    ],
+    .dwd_icon_d2_native: [
         800: (700, 850),
         900: (850, 950),
         925: (850, 950),
