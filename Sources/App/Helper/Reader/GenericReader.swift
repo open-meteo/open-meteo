@@ -155,8 +155,14 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             context: DomainInitContext(logger: options.logger, httpClient: options.httpClient)
         )
         // check if coordinates are in domain, otherwise return nil
-        let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
-        guard let gridpoint = try await grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {
+        let payload = await domain.getStaticFilePayload(type: .elevation, httpClient: options.httpClient, logger: options.logger)
+        let selected: (gridpoint: Int, gridElevation: ElevationOrSea)?
+        if let native = grid as? IconNativeGrid {
+            selected = try await native.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: payload?.reader, mode: mode, elevationCache: payload?.elevationCache)
+        } else {
+            selected = try await grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: payload?.reader, mode: mode)
+        }
+        guard let gridpoint = selected else {
             return nil
         }
         self.domain = domain

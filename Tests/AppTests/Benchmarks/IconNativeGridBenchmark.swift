@@ -201,12 +201,13 @@ enum IconNativeGridBenchmark {
             try await elevationSelectionChecksum(grid: grid, reader: reader, queries: seaQueries)
         }
         let coldSea = try await measureColdCache(reader: reader, grid: grid, queries: seaQueries)
-        let warmSeaReader = try #require(OmFileLazyInt16ArrayReader(wrapping: reader))
+        let warmSeaCache = try #require(ElevationCache(reader: reader))
         let warmSea = try await measureAsync(executions: seaQueries.count) {
             try await elevationSelectionChecksum(
                 grid: grid,
-                reader: warmSeaReader,
-                queries: seaQueries
+                reader: reader,
+                queries: seaQueries,
+                cache: warmSeaCache
             )
         }
 
@@ -214,12 +215,13 @@ enum IconNativeGridBenchmark {
             try await elevationSelectionChecksum(grid: grid, reader: reader, queries: landQueries)
         }
         let coldLand = try await measureColdCache(reader: reader, grid: grid, queries: landQueries)
-        let warmLandReader = try #require(OmFileLazyInt16ArrayReader(wrapping: reader))
+        let warmLandCache = try #require(ElevationCache(reader: reader))
         let warmLand = try await measureAsync(executions: landQueries.count) {
             try await elevationSelectionChecksum(
                 grid: grid,
-                reader: warmLandReader,
-                queries: landQueries
+                reader: reader,
+                queries: landQueries,
+                cache: warmLandCache
             )
         }
 
@@ -232,7 +234,7 @@ enum IconNativeGridBenchmark {
             queries: landQueries,
             operation: terrainSelectionChecksum
         )
-        let warmTerrainReader = try #require(OmFileLazyInt16ArrayReader(wrapping: reader))
+        let warmTerrainCache = try #require(ElevationCache(reader: reader))
         let matchedElevations = landQueries.map { query in
             elevations[grid.storage.nearestPointID(latitude: query.latitude, longitude: query.longitude)!]
         }
@@ -243,7 +245,8 @@ enum IconNativeGridBenchmark {
                     lat: query.latitude,
                     lon: query.longitude,
                     elevation: matchedElevations[index],
-                    elevationFile: warmTerrainReader
+                    elevationFile: reader,
+                    elevationCache: warmTerrainCache
                 )
                 checksum &+= result?.gridpoint ?? -1
             }
@@ -252,10 +255,37 @@ enum IconNativeGridBenchmark {
         let warmTerrain = try await measureAsync(executions: landQueries.count) {
             try await terrainSelectionChecksum(
                 grid: grid,
-                reader: warmTerrainReader,
-                queries: landQueries
+                reader: reader,
+                queries: landQueries,
+                cache: warmTerrainCache
             )
         }
+
+        let concurrentQueries = seaQueries
+        let concurrent = try await measureAsync(executions: concurrentQueries.count) {
+            try await withThrowingTaskGroup(of: Int.self) { group in
+                for worker in 0..<16 {
+                    group.addTask {
+                        var checksum = 0
+                        for index in stride(from: worker, to: concurrentQueries.count, by: 16) {
+                            let query = concurrentQueries[index]
+                            let result = try await grid.findPointInSea(
+                                lat: query.latitude, lon: query.longitude,
+                                elevationFile: reader, elevationCache: warmSeaCache
+                            )
+                            checksum &+= result?.gridpoint ?? -1
+                        }
+                        return checksum
+                    }
+                }
+                var checksum = 0
+                for try await value in group { checksum &+= value }
+                return checksum
+            }
+        }
+        #expect(concurrent.checksum == warmSea.checksum)
+        printResult("warm-cache sea hit (16 workers)", concurrent)
+        print("  retained elevation storage: \(grid.nx * MemoryLayout<Int16>.stride) bytes/cache")
 
         return ElevationSelectionMeasurements(
             coldGridLoad: coldGridLoad,
@@ -296,16 +326,17 @@ enum IconNativeGridBenchmark {
         operation: (
             IconNativeGrid,
             any OmFileReaderArrayProtocol<Float>,
-            [(latitude: Float, longitude: Float)]
+            [(latitude: Float, longitude: Float)],
+            ElevationCache?
         ) async throws -> Int = elevationSelectionChecksum
     ) async throws -> (samples: [Double], checksum: Int) {
         var checksum = 0
         var samples = [Double]()
         samples.reserveCapacity(sampleCount)
         for _ in 0..<sampleCount {
-            let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: reader))
+            let cache = try #require(ElevationCache(reader: reader))
             let start = DispatchTime.now().uptimeNanoseconds
-            checksum &+= try await operation(grid, cachedReader, queries)
+            checksum &+= try await operation(grid, reader, queries, cache)
             let elapsed = DispatchTime.now().uptimeNanoseconds - start
             samples.append(Double(elapsed) / Double(queries.count))
         }
@@ -320,9 +351,9 @@ enum IconNativeGridBenchmark {
         var samples = [Double]()
         samples.reserveCapacity(sampleCount)
         for _ in 0..<sampleCount {
-            let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: reader))
+            let cache = try #require(ElevationCache(reader: reader))
             let start = DispatchTime.now().uptimeNanoseconds
-            checksum &+= Int(try await cachedReader.read(pointID: 0))
+            checksum &+= Int(try await cache.loadValues()[0])
             samples.append(Double(DispatchTime.now().uptimeNanoseconds - start))
         }
         samples.sort()
@@ -453,14 +484,16 @@ enum IconNativeGridBenchmark {
     private static func elevationSelectionChecksum(
         grid: IconNativeGrid,
         reader: any OmFileReaderArrayProtocol<Float>,
-        queries: [(latitude: Float, longitude: Float)]
+        queries: [(latitude: Float, longitude: Float)],
+        cache: ElevationCache? = nil
     ) async throws -> Int {
         var checksum = 0
         for query in queries {
             let result = try await grid.findPointInSea(
                 lat: query.latitude,
                 lon: query.longitude,
-                elevationFile: reader
+                elevationFile: reader,
+                elevationCache: cache
             )
             checksum &+= result?.gridpoint ?? -1
         }
@@ -471,7 +504,8 @@ enum IconNativeGridBenchmark {
     private static func terrainSelectionChecksum(
         grid: IconNativeGrid,
         reader: any OmFileReaderArrayProtocol<Float>,
-        queries: [(latitude: Float, longitude: Float)]
+        queries: [(latitude: Float, longitude: Float)],
+        cache: ElevationCache? = nil
     ) async throws -> Int {
         var checksum = 0
         for query in queries {
@@ -479,7 +513,8 @@ enum IconNativeGridBenchmark {
                 lat: query.latitude,
                 lon: query.longitude,
                 elevation: -10_000,
-                elevationFile: reader
+                elevationFile: reader,
+                elevationCache: cache
             )
             checksum &+= result?.gridpoint ?? -1
         }
