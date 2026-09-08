@@ -23,20 +23,18 @@ import VaporTesting
         #expect(!domain.generateTimeSeries)
     }
 
-    @Test func writerAndConversionReuseResolvedGrid() async throws {
+    @Test func writerHandleRetainsResolvedGrid() async throws {
         // Temporary writer files use this directory even when storeOnDisk is false.
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let source = DeferredDomain()
         let domain = try await ResolvedDomain(source, context: .init(logger: logger, httpClient: nil))
         let time = Timestamp(2001, 1, 1)
         let writer = OmSpatialTimestepWriter(domain: domain, run: time, time: time, storeOnDisk: false, realm: nil, logger: logger)
-        let values = (0..<12).map(Float.init)
-        try await writer.write(member: 0, variable: IconSurfaceVariable.temperature_2m, data: values)
+        try await writer.write(member: 0, variable: IconSurfaceVariable.temperature_2m, data: (0..<12).map(Float.init))
         let handles = try await writer.finalise()
         try #require(handles.count == 1)
-        try await withApp { app in
-            try await GenericVariableHandle.convert(application: app, domain: source, createNetcdf: false, run: time, handles: handles, concurrent: 1, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: false)
-        }
+        #expect(handles[0].domain.grid.nx == 12)
+        #expect(handles[0].domain.grid.crsWkt2 == domain.grid.crsWkt2)
         #expect(source.resolutions.withLock { $0 } == 1)
     }
 

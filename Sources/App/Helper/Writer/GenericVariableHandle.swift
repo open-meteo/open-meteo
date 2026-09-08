@@ -13,9 +13,9 @@ struct GenericVariableHandle: Sendable {
     let time: TimerangeDt
     let member: Int
     let reader: OmFileReaderArray<MmapFile, Float>
-    let domain: GenericDomain
+    let domain: any GridDomain
 
-    public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: GridDomain) async throws {
+    public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: any GridDomain) async throws {
         self.reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
         let dimensions = reader.getDimensions()
         let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
@@ -28,7 +28,7 @@ struct GenericVariableHandle: Sendable {
         self.domain = domain
     }
     
-    public init(variable: any GenericVariable, time: TimerangeDt, member: Int, reader: OmFileReaderArray<MmapFile, Float>, domain: GenericDomain) {
+    public init(variable: any GenericVariable, time: TimerangeDt, member: Int, reader: OmFileReaderArray<MmapFile, Float>, domain: any GridDomain) {
         self.variable = variable
         self.time = time
         self.member = member
@@ -41,9 +41,8 @@ struct GenericVariableHandle: Sendable {
     /// If `fullRunSkipMeta` do not generate meta.json for each run
     static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         let logger = application.logger
-        let groups = try await handles.groupedPreservedOrder(by: {"\($0.domain)"}).asyncMap { (_, handles) in
-            let domain = try await ResolvedDomain(handles[0].domain, context: .init(logger: logger, httpClient: nil))
-            return (domain: domain, handles: handles)
+        let groups = handles.groupedPreservedOrder(by: {"\($0.domain)"}).map { (_, handles) in
+            (domain: handles[0].domain, handles: handles)
         }
         let uploadQueues = await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket)
 
