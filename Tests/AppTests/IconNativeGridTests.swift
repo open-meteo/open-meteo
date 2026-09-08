@@ -27,18 +27,16 @@ import Testing
     @Test func installedGridSurvivesFailedRevalidation() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        let cache = IconNativeGridCache(file: fixture.file.path, identity: makeIdentity(fixture))
-        #expect(throws: IconNativeDomainError.missingGridArtifact(fixture.file.path)) {
-            _ = try cache.get()
-        }
-        try cache.validateFileAndInstall()
-        let installed = ObjectIdentifier(try cache.get().storage)
+        let file = IconNativeGridFile(localFile: fixture.file.path, identity: makeIdentity(fixture))
+        #expect(file.cache.get() == nil)
+        try file.validateFileAndInstall()
+        let installed = try #require(file.cache.get()).storage
 
         try truncateLastByte(of: fixture.file)
         #expect(throws: IconNativeDomainError.self) {
-            try cache.validateFileAndInstall()
+            try file.validateFileAndInstall()
         }
-        #expect(ObjectIdentifier(try cache.get().storage) == installed)
+        #expect(try #require(file.cache.get()).storage === installed)
     }
 
     @Test func materializeRejectsTruncatedArtifact() async throws {
