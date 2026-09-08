@@ -210,6 +210,8 @@ extension IconDomains {
             // Downloader preparation deliberately validates the on-disk artifact. API lookups use
             // the atomically pinned mapping and never enter this disk-maintenance path.
             try nativeGridCache.validateFileAndInstall()
+            // Valid existing artifacts are reused without uploading. Delete grid.bin locally to
+            // force regeneration, and supply --upload-s3-bucket to upload the regenerated artifact.
             return
         } catch IconNativeDomainError.missingGridArtifact {
             application.logger.info("Generating missing native ICON grid artifact for '\(rawValue)'")
