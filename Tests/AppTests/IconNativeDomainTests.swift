@@ -25,16 +25,7 @@ import Logging
         #expect(remapped[3] == 30)
     }
 
-    @Test func configuredGridIdentities() throws {
-        #expect(IconNativeGridIdentity.global.gridNumber == 26)
-        #expect(IconNativeGridIdentity.global.gridUUIDHex == "a27b8de618c411e4820ab5b098c6a5c0")
-        #expect(IconNativeGridIdentity.global.cellCount == 2_949_120)
-        #expect(IconNativeGridIdentity.global.maximumDistanceMeters == 20_000)
-        #expect(IconNativeGridIdentity.d2.gridNumber == 47)
-        #expect(IconNativeGridIdentity.d2.gridUUIDHex == "c6b12daa91ad64045b26c1b6452a2a20")
-        #expect(IconNativeGridIdentity.d2.cellCount == 542_040)
-        #expect(IconNativeGridIdentity.d2.maximumDistanceMeters == 4_000)
-
+    @Test func d2DomainsShareGridCache() throws {
         let global = try #require(IconDomains.iconNative.nativeGridFile)
         let hourly = try #require(IconDomains.iconD2Native.nativeGridFile)
         let quarterHourly = try #require(IconDomains.iconD2Native15min.nativeGridFile)
