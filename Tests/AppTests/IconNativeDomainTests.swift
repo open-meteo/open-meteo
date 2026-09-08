@@ -1,6 +1,7 @@
 import Foundation
 @testable import App
 import Testing
+import Logging
 
 @Suite struct IconNativeDomainTests {
     @Test func nativeDomainMappings() {
@@ -10,10 +11,21 @@ import Testing
         #expect(IconDomains.iconD2Native.sourceDomain == .iconD2)
         #expect(IconDomains.iconD2Native.fifteenMinuteDomain == .iconD2Native15min)
         #expect(IconDomains.iconD2Native15min.domainRegistryStatic == .dwd_icon_d2_native)
-        #expect(IconDomains.icon.downloadDomains == [.iconNative, .icon])
-        #expect(IconDomains.iconNative.downloadDomains == [.iconNative, .icon])
-        #expect(IconDomains.iconD2.downloadDomains == [.iconD2])
-        #expect(IconDomains.iconD2Native.downloadDomains == [.iconD2Native])
+        #expect(IconDomains.icon.downloadDomain == .iconNative)
+        #expect(IconDomains.iconNative.downloadDomain == .iconNative)
+        #expect(IconDomains.iconD2.downloadDomain == .iconD2)
+        #expect(IconDomains.iconD2Native.downloadDomain == .iconD2Native)
+    }
+
+    @Test func downloadOutputsMatchSourceCapabilities() async throws {
+        let context = DomainInitContext(logger: Logger(label: "IconDownloadDomains"), httpClient: nil)
+        let deterministic = try await IconDownloadDomains(.iconD2, context: context)
+        #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)
+        #expect(deterministic.ensembleMean == nil)
+
+        let ensemble = try await IconDownloadDomains(.iconD2Eps, context: context)
+        #expect(ensemble.ensembleMean?.domainRegistry == IconDomains.iconD2EpsEnsembleMean.domainRegistry)
+        #expect(ensemble.fifteenMinute == nil)
     }
 
     @Test func globalRemappingGathersNativeCellsAndPreservesMissingDestinations() {

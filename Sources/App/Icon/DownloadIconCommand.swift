@@ -66,19 +66,20 @@ struct DownloadIconCommand: AsyncCommand {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(application: Application, domains: [IconDomains], resolvedDomains: [IconDomains: ResolvedDomain], run: Timestamp) async throws {
+    func convertSurfaceElevation(application: Application, outputs: IconDownloadDomains, run: Timestamp) async throws {
         let logger = application.logger
-        let domain = domains[0]
-        let remappedDomain = domains.dropFirst().first
-        let missingDomains = domains.filter {
-            !FileManager.default.fileExists(atPath: $0.surfaceElevationFileOm.getFilePath())
+        let domain = outputs.source
+        let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
+        let missingRemapped = outputs.remapped.flatMap { domain in
+            FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) ? nil : domain
         }
-        if missingDomains.isEmpty {
+        guard needsPrimary || missingRemapped != nil else {
             return
         }
-        for outputDomain in missingDomains {
-            try outputDomain.surfaceElevationFileOm.createDirectory()
+        if needsPrimary {
+            try outputs.primary.surfaceElevationFileOm.createDirectory()
         }
+        try missingRemapped?.surfaceElevationFileOm.createDirectory()
 
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -87,7 +88,7 @@ struct DownloadIconCommand: AsyncCommand {
         let deadLineHours: Double = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
-        let cdo = try await CdoHelper(domain: domain, grid: resolvedDomains[domain]!.grid, logger: logger, curl: curl)
+        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, logger: logger, curl: curl)
         let gridType = domain.isNative || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
@@ -118,27 +119,27 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
 
-        if missingDomains.contains(domain) {
-            try hsurf.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: resolvedDomains[domain]!.grid, createNetCdf: false)
+        if needsPrimary {
+            try hsurf.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: outputs.primary.grid, createNetCdf: false)
         }
-        if let remappedDomain, missingDomains.contains(remappedDomain) {
-            guard let remapper = try await CdoIconGlobal(curl: curl, domain: remappedDomain) else {
+        if let remappedDomain = missingRemapped {
+            guard let remapper = try await CdoIconGlobal(curl: curl, domain: .icon) else {
                 preconditionFailure("Remapped ICON elevation requires a grid mapping")
             }
             try remapper.remap(hsurf).writeOmFile2D(
                 file: remappedDomain.surfaceElevationFileOm.getFilePath(),
-                grid: resolvedDomains[remappedDomain]!.grid,
+                grid: remappedDomain.grid,
                 createNetCdf: false
             )
         }
     }
 
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domains: [IconDomains], resolvedDomains: [IconDomains: ResolvedDomain], run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, outputs: IconDownloadDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
-        let domain = domains[0]
-        let remappedDomain = domains.dropFirst().first
+        let domain = outputs.source
+        let remappedDomain = outputs.remapped
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
@@ -149,10 +150,10 @@ struct DownloadIconCommand: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
-        let cdo = try await CdoHelper(domain: domain, grid: resolvedDomains[domain]!.grid, logger: logger, curl: curl)
+        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, logger: logger, curl: curl)
         let remapper: CdoIconGlobal?
-        if let remappedDomain {
-            guard let mapping = try await CdoIconGlobal(curl: curl, domain: remappedDomain) else {
+        if remappedDomain != nil {
+            guard let mapping = try await CdoIconGlobal(curl: curl, domain: .icon) else {
                 preconditionFailure("Remapped ICON output requires a grid mapping")
             }
             remapper = mapping
@@ -187,12 +188,14 @@ struct DownloadIconCommand: AsyncCommand {
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
-            let writer = OmSpatialTimestepWriter(domain: resolvedDomains[domain]!, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain.map { resolvedDomains[$0]! })
+            let writer = OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: outputs.ensembleMean)
             let remappedWriter = remappedDomain.map {
-                OmSpatialTimestepWriter(domain: resolvedDomains[$0]!, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
+                OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
             }
-            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: resolvedDomains[domain]!, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
-            let writer15Min = OmSpatialMultistepWriter(domain: resolvedDomains[domain.fifteenMinuteDomain ?? .iconD2_15min]!, run: run, storeOnDisk: true, realm: nil, logger: logger)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writer15Min = outputs.fifteenMinute.map {
+                OmSpatialMultistepWriter(domain: $0, run: run, storeOnDisk: true, realm: nil, logger: logger)
+            }
 
             @Sendable func write(member: Int, variable: any GenericVariable, data: [Float]) async throws {
                 try await writer.write(member: member, variable: variable, data: data)
@@ -218,7 +221,7 @@ struct DownloadIconCommand: AsyncCommand {
                 let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
 
                 var messages = try await cdo.downloadAndRemap(url)
-                if domain.isD2Deterministic && messages.count > 1 {
+                if let writer15Min, messages.count > 1 {
                     // Write 15min D2 icon data
                     for (i, (message, array2d)) in messages.enumerated() {
                         var array2d = array2d
@@ -405,6 +408,7 @@ struct DownloadIconCommand: AsyncCommand {
 
             /// Post process 15 minutes data. Note: There is no temperature in 15min data
             try await storage15min.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
+                guard let writer15Min else { return }
                 var data = data
                 /// Add snow to liquid rain if temperature is > 1.5°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain, let snowfallWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_water_equivalent)) {
@@ -467,7 +471,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 try await writer15Min.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data)
             }
-            
+
             let completed = i == timestamps.count - 1
             let validTimes = Array(timestamps[0...i])
             let handles = try await writer.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
@@ -475,7 +479,7 @@ struct DownloadIconCommand: AsyncCommand {
                 + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
             
             // TODO valid times and S3 upload for 15min data
-            let handles15min = try await writer15Min.finalise(application: application, completed: false, validTimes: [], uploadS3Bucket: nil)
+            let handles15min = try await writer15Min?.finalise(application: application, completed: false, validTimes: [], uploadS3Bucket: nil) ?? []
             return (handles, handles15min)
         }
         
@@ -486,8 +490,7 @@ struct DownloadIconCommand: AsyncCommand {
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let requestedDomain = try IconDomains.load(rawValue: signature.domain)
-        let domains = requestedDomain.downloadDomains
-        let domain = domains[0]
+        let domain = requestedDomain.downloadDomain
         let nConcurrent = signature.concurrent ?? 1
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? requestedDomain.lastRun
 
@@ -558,26 +561,20 @@ struct DownloadIconCommand: AsyncCommand {
 
         let logger = context.application.logger
         let generateFullRun = domain.countEnsembleMember == 1
-        let outputNames = domains.map(\.rawValue).joined(separator: "' and '")
-        logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         if domain.isNative {
             try await domain.prepareNativeGrid(
                 application: context.application,
                 uploadS3Bucket: signature.uploadS3Bucket
             )
         }
-        var resolved = [IconDomains: ResolvedDomain]()
-        for output in domains {
-            for target in [output, output.ensembleMeanDomain, output.fifteenMinuteDomain ?? .iconD2_15min].compactMap({ $0 }) where resolved[target] == nil {
-                resolved[target] = try await ResolvedDomain(target, context: .init(logger: logger, httpClient: nil))
-            }
-        }
-        let resolvedDomains = resolved
-        try await convertSurfaceElevation(application: context.application, domains: domains, resolvedDomains: resolvedDomains, run: run)
+        let outputs = try await IconDownloadDomains(requestedDomain, context: .init(logger: logger, httpClient: nil))
+        let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map(\.description).joined(separator: "' and '")
+        logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        try await convertSurfaceElevation(application: context.application, outputs: outputs, run: run)
 
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domains: domains, resolvedDomains: resolvedDomains, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, outputs: outputs, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
 
-        if let fifteenMinuteDomain = domain.fifteenMinuteDomain {
+        if let fifteenMinuteDomain = outputs.fifteenMinute {
             // ICON-D2 downloads 15min data as well
             try await GenericVariableHandle.convert(application: context.application, domain: fifteenMinuteDomain, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         }
@@ -587,14 +584,35 @@ struct DownloadIconCommand: AsyncCommand {
     }
 }
 
-extension IconDomains {
-    var downloadDomains: [Self] {
-        switch self {
-        case .icon, .iconNative:
-            return [.iconNative, .icon]
-        default:
-            return [self]
+/// Resolved output roles for one ICON download. Only native global also produces remapped ICON output.
+struct IconDownloadDomains: Sendable {
+    let source: IconDomains
+    let primary: ResolvedDomain
+    let remapped: ResolvedDomain?
+    let ensembleMean: ResolvedDomain?
+    let fifteenMinute: ResolvedDomain?
+
+    init(_ requestedDomain: IconDomains, context: DomainInitContext) async throws {
+        let source = requestedDomain.downloadDomain
+        self.source = source
+        self.primary = try await ResolvedDomain(source, context: context)
+        self.remapped = source == .iconNative ? try await ResolvedDomain(IconDomains.icon, context: context) : nil
+        if let domain = source.ensembleMeanDomain {
+            self.ensembleMean = try await ResolvedDomain(domain, context: context)
+        } else {
+            self.ensembleMean = nil
         }
+        if let domain = source.fifteenMinuteDomain {
+            self.fifteenMinute = try await ResolvedDomain(domain, context: context)
+        } else {
+            self.fifteenMinute = nil
+        }
+    }
+}
+
+extension IconDomains {
+    var downloadDomain: Self {
+        self == .icon ? .iconNative : self
     }
 
     /// Based on the current time , guess the current run that should be available soon on the open-data server

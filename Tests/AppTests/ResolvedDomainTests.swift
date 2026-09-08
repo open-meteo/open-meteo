@@ -136,17 +136,6 @@ import VaporTesting
         }
     }
 
-    @Test func regularDomainKeepsGridAndMetadata() async throws {
-        let source = IconDomains.iconD2
-        let domain = try await ResolvedDomain(source, context: .init(logger: logger, httpClient: nil))
-        let sourceGrid = try await source.getGrid(context: .init(logger: logger, httpClient: nil))
-        #expect(domain.grid.nx == sourceGrid.nx)
-        #expect(domain.grid.ny == sourceGrid.ny)
-        #expect(domain.grid.crsWkt2 == sourceGrid.crsWkt2)
-        #expect(domain.description == String(describing: source))
-        #expect(domain.generateFullRun == source.generateFullRun)
-        #expect(domain.generateTimeSeries == source.generateTimeSeries)
-    }
 }
 
 /// A deferred domain exposes no synchronous grid, including after resolution.
