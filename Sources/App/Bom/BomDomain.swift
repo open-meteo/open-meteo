@@ -6,7 +6,7 @@ import Foundation
  
  No mesoscale model yet, only global
  */
-enum BomDomain: String, GenericDomain, CaseIterable {
+enum BomDomain: String, GridDomain, CaseIterable {
     case access_global
     case access_global_ensemble
 

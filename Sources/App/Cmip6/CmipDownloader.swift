@@ -87,7 +87,7 @@ import SwiftNetCDF
  FGLOALS: Raw 1.2 TB, Compressed 120 GB
  
  */
-enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
+enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GridDomain {
     case CMCC_CM2_VHR4
     // case FGOALS_f3_H_highresSST
     case FGOALS_f3_H

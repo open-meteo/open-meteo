@@ -1,7 +1,7 @@
 import Foundation
 import OmFileFormat
 
-enum EcmwfDomain: String, GenericDomain {
+enum EcmwfDomain: String, GridDomain {
     case ifs04
     case ifs04_ensemble
 

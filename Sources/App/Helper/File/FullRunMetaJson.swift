@@ -16,7 +16,7 @@ struct FullRunMetaJson: Codable {
     // valid_times? Params like precipitation do not have the first step. Some MeteoFrance variables are also missing steps...
     
     /// Use directory listing to get all variables. Model or pressure levels might be downloaded at a different time
-    private init?(domain: GenericDomain, run: Timestamp, validTimes: [Timestamp]) throws {
+    private init?(domain: GridDomain, run: Timestamp, validTimes: [Timestamp]) throws {
         let path = "\(domain.dataRunDirectory!)\(run.format_directoriesYYYYMMddhhmm)/"
         guard FileManager.default.fileExists(atPath: path) else {
             print("Directory does not exist to generate FullRunMetaJson: \(path)")
@@ -31,7 +31,7 @@ struct FullRunMetaJson: Codable {
         self.valid_times = validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ)
     }
     
-    static func write(domain: GenericDomain, run: Timestamp, validTimes: [Timestamp]) throws -> [(file: FullRunMetaFile, data: Data)] {
+    static func write(domain: GridDomain, run: Timestamp, validTimes: [Timestamp]) throws -> [(file: FullRunMetaFile, data: Data)] {
         guard let meta = try FullRunMetaJson(domain: domain, run: run, validTimes: validTimes) else {
             return []
         }

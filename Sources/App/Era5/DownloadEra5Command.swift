@@ -275,7 +275,7 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
 
-    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool) throws {
+    static func processElevationLsmGrib(domain: GridDomain, files: [String], createNetCdf: Bool) throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }

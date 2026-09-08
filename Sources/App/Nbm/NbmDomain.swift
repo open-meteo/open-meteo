@@ -4,7 +4,7 @@ import OmFileFormat
 /**
 National Blend of Models domains
  */
-enum NbmDomain: String, GenericDomain, CaseIterable {
+enum NbmDomain: String, GridDomain, CaseIterable {
     case nbm_conus
     case nbm_alaska
 

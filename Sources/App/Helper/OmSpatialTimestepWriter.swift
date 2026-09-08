@@ -24,7 +24,7 @@ actor OmSpatialTimestepWriter {
     var variables: [VariableWithOffset] = .init()
     var filename: String?
     var writer: OmFileWriter<FileHandle>?
-    let domain: GenericDomain
+    let domain: GridDomain
     let run: Timestamp
     let time: Timestamp
     let realm: String?
@@ -48,7 +48,7 @@ actor OmSpatialTimestepWriter {
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GridDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GridDomain? = nil) {
         self.writer = nil
         self.domain = domain
         self.run = run
@@ -300,12 +300,12 @@ actor OmSpatialMultistepWriter {
     let storeOnDisk: Bool
     let realm: String?
     let run: Timestamp
-    let domain: GenericDomain
-    let ensembleMeanDomain: GenericDomain?
+    let domain: GridDomain
+    let ensembleMeanDomain: GridDomain?
     let logger: Logger
     
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GridDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GridDomain? = nil) {
         self.storeOnDisk = storeOnDisk
         self.realm = realm
         self.domain = domain

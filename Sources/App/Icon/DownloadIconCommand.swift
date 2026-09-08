@@ -66,7 +66,7 @@ struct DownloadIconCommand: AsyncCommand {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(application: Application, domains: [IconDomains], run: Timestamp) async throws {
+    func convertSurfaceElevation(application: Application, domains: [IconDomains], resolvedDomains: [IconDomains: ResolvedDomain], run: Timestamp) async throws {
         let logger = application.logger
         let domain = domains[0]
         let remappedDomain = domains.dropFirst().first
@@ -87,7 +87,7 @@ struct DownloadIconCommand: AsyncCommand {
         let deadLineHours: Double = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
+        let cdo = try await CdoHelper(domain: domain, grid: resolvedDomains[domain]!.grid, logger: logger, curl: curl)
         let gridType = domain.isNative || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
@@ -119,7 +119,7 @@ struct DownloadIconCommand: AsyncCommand {
         }
 
         if missingDomains.contains(domain) {
-            try hsurf.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+            try hsurf.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: resolvedDomains[domain]!.grid, createNetCdf: false)
         }
         if let remappedDomain, missingDomains.contains(remappedDomain) {
             guard let remapper = try await CdoIconGlobal(curl: curl, domain: remappedDomain) else {
@@ -127,14 +127,14 @@ struct DownloadIconCommand: AsyncCommand {
             }
             try remapper.remap(hsurf).writeOmFile2D(
                 file: remappedDomain.surfaceElevationFileOm.getFilePath(),
-                grid: remappedDomain.grid,
+                grid: resolvedDomains[remappedDomain]!.grid,
                 createNetCdf: false
             )
         }
     }
 
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domains: [IconDomains], run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, domains: [IconDomains], resolvedDomains: [IconDomains: ResolvedDomain], run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
         let domain = domains[0]
@@ -149,7 +149,7 @@ struct DownloadIconCommand: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
+        let cdo = try await CdoHelper(domain: domain, grid: resolvedDomains[domain]!.grid, logger: logger, curl: curl)
         let remapper: CdoIconGlobal?
         if let remappedDomain {
             guard let mapping = try await CdoIconGlobal(curl: curl, domain: remappedDomain) else {
@@ -187,12 +187,12 @@ struct DownloadIconCommand: AsyncCommand {
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialTimestepWriter(domain: resolvedDomains[domain]!, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain.map { resolvedDomains[$0]! })
             let remappedWriter = remappedDomain.map {
-                OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
+                OmSpatialTimestepWriter(domain: resolvedDomains[$0]!, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
             }
-            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
-            let writer15Min = OmSpatialMultistepWriter(domain: domain.fifteenMinuteDomain ?? .iconD2_15min, run: run, storeOnDisk: true, realm: nil, logger: logger)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: resolvedDomains[domain]!, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writer15Min = OmSpatialMultistepWriter(domain: resolvedDomains[domain.fifteenMinuteDomain ?? .iconD2_15min]!, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
             @Sendable func write(member: Int, variable: any GenericVariable, data: [Float]) async throws {
                 try await writer.write(member: member, variable: variable, data: data)
@@ -566,9 +566,16 @@ struct DownloadIconCommand: AsyncCommand {
                 uploadS3Bucket: signature.uploadS3Bucket
             )
         }
-        try await convertSurfaceElevation(application: context.application, domains: domains, run: run)
+        var resolved = [IconDomains: ResolvedDomain]()
+        for output in domains {
+            for target in [output, output.ensembleMeanDomain, output.fifteenMinuteDomain ?? .iconD2_15min].compactMap({ $0 }) where resolved[target] == nil {
+                resolved[target] = try await ResolvedDomain(target, context: .init(logger: logger, httpClient: nil))
+            }
+        }
+        let resolvedDomains = resolved
+        try await convertSurfaceElevation(application: context.application, domains: domains, resolvedDomains: resolvedDomains, run: run)
 
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domains: domains, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domains: domains, resolvedDomains: resolvedDomains, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
 
         if let fifteenMinuteDomain = domain.fifteenMinuteDomain {
             // ICON-D2 downloads 15min data as well

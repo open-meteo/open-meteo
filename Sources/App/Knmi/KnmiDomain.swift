@@ -4,7 +4,7 @@ import Foundation
  https://english.knmidata.nl/latest/newsletters/open-data-newsletter/2024/open-data-march-2024
  
  */
-enum KnmiDomain: String, GenericDomain, CaseIterable {
+enum KnmiDomain: String, GridDomain, CaseIterable {
     case harmonie_arome_europe
     case harmonie_arome_netherlands
 

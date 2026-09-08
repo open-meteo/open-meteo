@@ -4,7 +4,7 @@ import Foundation
  https://opendatadocs.dmi.govcloud.dk/Data/Forecast_Data_Weather_Model_HARMONIE_DINI_IG
  
  */
-enum DmiDomain: String, GenericDomain, CaseIterable {
+enum DmiDomain: String, GridDomain, CaseIterable {
     case harmonie_arome_europe
 
     var grid: any Gridable {

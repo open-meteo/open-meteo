@@ -1,4 +1,4 @@
-enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
+enum EumetsatLsaSafDomain: String, GridDomain, CaseIterable {
     case msg
     case iodc
 

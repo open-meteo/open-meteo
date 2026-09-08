@@ -173,13 +173,9 @@ extension IconDomains {
         }
     }
 
-    func requireNativeGrid() throws -> IconNativeGrid {
-        try nativeGridCache.get()
-    }
-
-    func getGrid(context: DomainInitContext) async throws -> any Gridable {
+    func resolveNativeGrid(context: DomainInitContext) async throws -> any Gridable {
         guard let identity = nativeGridIdentity, let registry = domainRegistryStatic else {
-            return grid
+            throw IconNativeDomainError.missingGridArtifact("No native grid for \(self)")
         }
         if let grid = try? nativeGridCache.get() {
             return grid
@@ -278,32 +274,4 @@ extension IconDomains {
             await queue.finishMultiPartUploads(uploads)
         }
     }
-}
-
-/// Safety net for code paths that access `GenericDomain.grid` without checking availability.
-/// Reader construction rejects this grid because every lookup returns `nil`.
-struct IconNativeUnavailableGrid: Gridable {
-    typealias SliceType = Range<Int>
-
-    let nx = 1
-    let ny = 1
-    let searchRadius = 0
-    func findPoint(lat: Float, lon: Float) -> Int? { nil }
-    func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> Range<Int>? { nil }
-    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
-    func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) { (.nan, .nan) }
-    func findPointTerrainOptimised(
-        lat: Float,
-        lon: Float,
-        elevation: Float,
-        elevationFile: any OmFileReaderArrayProtocol<Float>
-    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? { nil }
-    func findPointInSea(
-        lat: Float,
-        lon: Float,
-        elevationFile: any OmFileReaderArrayProtocol<Float>
-    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? { nil }
-
-    var crsWkt2: String { "" }
 }
