@@ -250,74 +250,6 @@ package final class SphericalCubeIndex: Sendable {
             bestDistanceSquared <= maximumDistanceSquared ? selected() : nil
         }
 
-        /// The complete-face layout is known analytically and avoids loading face-section fields in
-        /// the global hot path. Partial datasets use their occupied face rectangles.
-        @inline(__always)
-        func bucket(x: Int, y: Int) -> Int? {
-            if coversWholeSphere {
-                let tileShift = Artifact.tileShift
-                let tileSize = Artifact.tileSize
-                let tileX = x >> tileShift
-                let tileY = y >> tileShift
-                return queryLocation.face * resolution * resolution
-                    + tileY * tileSize * resolution
-                    + tileX * tileSize * tileSize
-                    + (y & (tileSize - 1)) * tileSize
-                    + (x & (tileSize - 1))
-            }
-            return faceSections[queryLocation.face].bucket(
-                x: x,
-                y: y
-            )
-        }
-
-        @inline(__always)
-        func scanBucket(x: Int, y: Int) {
-            guard let bucket = bucket(x: x, y: y) else { return }
-            let begin = directoryPosition(bucket, bytes: bytes)
-            let end = directoryPosition(bucket + 1, bytes: bytes)
-            scanRange(begin..<end)
-        }
-
-        @inline(__always)
-        func scanBucketInterval(firstBucket: Int, lastBucket: Int) {
-            let begin = directoryPosition(firstBucket, bytes: bytes)
-            let end = directoryPosition(lastBucket + 1, bytes: bytes)
-            scanRange(begin..<end)
-        }
-
-        /// Scans a logical row in contiguous tiled segments, minimizing directory decodes.
-        @inline(__always)
-        func scanBucketRow(y: Int, xRange: ClosedRange<Int>) {
-            let lowerX: Int
-            let upperX: Int
-            let section = faceSections[queryLocation.face]
-            if coversWholeSphere {
-                lowerX = xRange.lowerBound
-                upperX = xRange.upperBound
-            } else {
-                guard y >= section.minimumY, y < section.minimumY + section.rows else { return }
-                lowerX = max(xRange.lowerBound, section.minimumX)
-                upperX = min(xRange.upperBound, section.minimumX + section.columns - 1)
-                guard lowerX <= upperX else { return }
-            }
-            let tileShift = Artifact.tileShift
-            var segmentLowerX = lowerX
-            while segmentLowerX <= upperX {
-                let localX = segmentLowerX - section.minimumX
-                let tileUpperX =
-                    section.minimumX
-                    + (((localX >> tileShift) + 1) << tileShift) - 1
-                let segmentUpperX = min(upperX, tileUpperX)
-                let firstBucket = bucket(x: segmentLowerX, y: y)!
-                scanBucketInterval(
-                    firstBucket: firstBucket,
-                    lastBucket: firstBucket + segmentUpperX - segmentLowerX
-                )
-                segmentLowerX = segmentUpperX + 1
-            }
-        }
-
         @inline(__always)
         func certified(
             xRange: ClosedRange<Int>,
@@ -335,7 +267,9 @@ package final class SphericalCubeIndex: Sendable {
             )
         }
 
-        scanBucket(x: queryLocation.x, y: queryLocation.y)
+        if let bucket = bucket(face: queryLocation.face, x: queryLocation.x, y: queryLocation.y) {
+            scanRange(pointRange(in: bucket, bytes: bytes))
+        }
         let leafXRange = queryLocation.x...queryLocation.x
         let leafYRange = queryLocation.y...queryLocation.y
         if certified(xRange: leafXRange, yRange: leafYRange) {
@@ -348,7 +282,7 @@ package final class SphericalCubeIndex: Sendable {
         bestPosition = -1
         bestPointID = -1
         for y in yRange {
-            scanBucketRow(y: y, xRange: xRange)
+            forEachRowPointRange(face: queryLocation.face, y: y, xRange: xRange, bytes: bytes, scanRange)
         }
         if certified(xRange: xRange, yRange: yRange) {
             return selectedWithinMaximumDistance()
@@ -358,42 +292,10 @@ package final class SphericalCubeIndex: Sendable {
         bestDistanceSquared = .infinity
         bestPosition = -1
         bestPointID = -1
-        var scannedBuckets = InlineArray<289, Int>(repeating: -1)
-        var scannedBucketCount = 0
-
-        @inline(__always)
-        func scanProjectedOffset(dx: Int, dy: Int) {
-            guard let projectedBucket = projectedBucket(
-                around: queryLocation,
-                dx: dx,
-                dy: dy
-            ) else { return }
-            for position in 0..<scannedBucketCount
-            where scannedBuckets[position] == projectedBucket {
-                return
-            }
-            precondition(
-                scannedBucketCount < 289,
-                "spherical nearest-bucket bound exceeded"
-            )
-            scannedBuckets[scannedBucketCount] = projectedBucket
-            scannedBucketCount += 1
-            let begin = directoryPosition(projectedBucket, bytes: bytes)
-            let end = directoryPosition(projectedBucket + 1, bytes: bytes)
-            scanRange(begin..<end)
-        }
-
-        scanProjectedOffset(dx: 0, dy: 0)
-        if fallbackRadius > 0 {
-            for radius in 1...fallbackRadius {
-                for dx in -radius...radius {
-                    scanProjectedOffset(dx: dx, dy: -radius)
-                    scanProjectedOffset(dx: dx, dy: radius)
-                }
-                for dy in (-radius + 1)..<radius {
-                    scanProjectedOffset(dx: -radius, dy: dy)
-                    scanProjectedOffset(dx: radius, dy: dy)
-                }
+        var visited = VisitedBuckets()
+        for radius in 0...fallbackRadius {
+            forEachProjectedRing(around: queryLocation, radius: radius, visited: &visited) { bucket in
+                scanRange(pointRange(in: bucket, bytes: bytes))
             }
         }
         guard bestPosition >= 0 else { return nil }

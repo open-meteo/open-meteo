@@ -1,11 +1,10 @@
 import Foundation
 @testable import App
 @testable import SphericalCube
+@testable import SphericalCubeTests
 import OmFileFormat
 import Synchronization
 import Testing
-
-private let oracleScoreTolerance = 1e-15
 
 @Suite struct IconNativeGridTests {
     @Test func int16ElevationCacheEncodingIsLossless() throws {
@@ -255,14 +254,8 @@ private let oracleScoreTolerance = 1e-15
 
 }
 
-private struct IconNativeGridFixture {
-    let file: URL
-    let grid: IconNativeGrid
-    let centers: [SphericalPoint]
-
-    func remove() {
-        try? FileManager.default.removeItem(at: file)
-    }
+private extension SphericalCubeFixture {
+    var grid: IconNativeGrid { IconNativeGrid(storage: index) }
 }
 
 private struct IconNativeGridElevationFile {
@@ -304,165 +297,7 @@ private final class RecordingElevationReader: OmFileReaderArrayForwarding, Senda
     }
 }
 
-private let globalMetadata = SphericalCubeArtifact.Metadata(
-    identity: .init(number: 26, uuid: Array(0..<16)),
-    coversWholeSphere: true,
-    maximumChordDistanceSquared: maximumChordDistanceSquared(meters: 10_000_000)
-)
-
-private func makeGlobalFixture() throws -> IconNativeGridFixture {
-    let count = 257
-    let goldenAngle = Double.pi * (3 - sqrt(5.0))
-    let centers = (0..<count).map { cell in
-        let z = 1 - 2 * (Double(cell) + 0.5) / Double(count)
-        let radius = sqrt(max(0, 1 - z * z))
-        let longitude = Double(cell) * goldenAngle
-        return SphericalPoint(
-            x: radius * cos(longitude),
-            y: radius * sin(longitude),
-            z: z
-        )
-    }
-    return try makeFixture(centers: centers)
-}
-
-private func makeFixture(
-    centers: [SphericalPoint],
-    isGlobal: Bool = true,
-    maximumDistanceMeters: Float = 10_000_000
-) throws -> IconNativeGridFixture {
-    let file = temporaryArtifactFile()
-    let metadata = isGlobal ? globalMetadata : SphericalCubeArtifact.Metadata(
-        identity: .init(number: 47, uuid: Array(repeating: 47, count: 16)),
-        coversWholeSphere: false,
-        maximumChordDistanceSquared: maximumChordDistanceSquared(
-            meters: Double(maximumDistanceMeters)
-        )
-    )
-    do {
-        try SphericalCubeArtifact.Writer.write(
-            to: file,
-            metadata: metadata,
-            points: centers,
-            level: isGlobal ? 4 : 3
-        )
-        return IconNativeGridFixture(
-            file: file,
-            grid: try IconNativeGrid.load(file: file),
-            centers: centers
-        )
-    } catch {
-        try? FileManager.default.removeItem(at: file)
-        throw error
-    }
-}
-
-/// Expensive semantic verification belongs to artifact generation tests, not mmap startup.
-private func validateGeneratedArtifact(_ fixture: IconNativeGridFixture) throws {
-    typealias Artifact = SphericalCubeArtifact
-    let artifact = try Artifact.open(file: fixture.file)
-    let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(artifact.mapped.data))
-    let bucketCount = artifact.faceSections.reduce(0) { $0 + $1.columns * $1.rows }
-    var previous = 0
-    for bucket in 0...bucketCount {
-        let current = Artifact.directoryPosition(
-            bucket,
-            bytes: bytes,
-            basesOffset: artifact.directoryBasesOffset,
-            localsOffset: artifact.directoryLocalsOffset
-        )
-        #expect(current >= previous)
-        #expect(current <= artifact.pointCount)
-        previous = current
-    }
-    #expect(previous == artifact.pointCount)
-
-    var seen = [Bool](repeating: false, count: artifact.pointCount)
-    for position in 0..<artifact.pointCount {
-        let center = Artifact.point(
-            position: position,
-            bytes: bytes,
-            pointsOffset: artifact.pointsOffset
-        )
-        #expect(center.x.isFinite && center.y.isFinite && center.z.isFinite)
-        #expect(abs(center.dot(center) - 1) <= 4e-12)
-
-        let cell = Artifact.pointID(
-            position: position,
-            bytes: bytes,
-            pointsOffset: artifact.pointsOffset
-        )
-        guard cell >= 0, cell < artifact.pointCount else {
-            Issue.record("Invalid canonical cell \(cell) at artifact position \(position)")
-            continue
-        }
-        #expect(centerDirectionDistance(fixture.centers[cell], center) <= 2)
-        #expect(!seen[cell])
-        seen[cell] = true
-        #expect(
-            Artifact.readUInt32(bytes, at: artifact.positionsByIDOffset + cell * 4)
-                == UInt32(position)
-        )
-
-        let location = SphericalCubeGeometry.location(
-            for: center,
-            resolution: artifact.resolution
-        )
-        guard let bucket = artifact.faceSections[location.face].bucket(
-            x: location.x,
-            y: location.y
-        ) else {
-            Issue.record("Center \(cell) falls outside its face section")
-            continue
-        }
-        let begin = Artifact.directoryPosition(
-            bucket,
-            bytes: bytes,
-            basesOffset: artifact.directoryBasesOffset,
-            localsOffset: artifact.directoryLocalsOffset
-        )
-        let end = Artifact.directoryPosition(
-            bucket + 1,
-            bytes: bytes,
-            basesOffset: artifact.directoryBasesOffset,
-            localsOffset: artifact.directoryLocalsOffset
-        )
-        #expect(position >= begin && position < end)
-    }
-    #expect(seen.allSatisfy { $0 })
-
-}
-
-private func nearest(point: SphericalPoint, centers: [SphericalPoint]) -> Int {
-    var bestScore = -Double.infinity
-    for center in centers { bestScore = max(bestScore, point.dot(center)) }
-    return centers.indices.first {
-        point.dot(centers[$0]) >= bestScore - oracleScoreTolerance
-    }!
-}
-
-private func distanceRegret(
-    query: SphericalPoint,
-    expected: SphericalPoint,
-    actual: SphericalPoint
-) -> Double {
-    let expectedDistance = acos(max(-1, min(1, query.dot(expected))))
-    let actualDistance = acos(max(-1, min(1, query.dot(actual))))
-    return max(0, actualDistance - expectedDistance) * 6_371_229
-}
-
-private func centerDirectionDistance(_ lhs: SphericalPoint, _ rhs: SphericalPoint) -> Double {
-    let inverseNorms = 1 / sqrt(lhs.dot(lhs) * rhs.dot(rhs))
-    let dot = max(-1, min(1, lhs.dot(rhs) * inverseNorms))
-    return acos(dot) * 6_371_229
-}
-
-private func maximumChordDistanceSquared(meters: Double) -> Float {
-    let chord = 2 * sin(meters / 6_371_229 * 0.5)
-    return Float(chord * chord)
-}
-
-private func makeIdentity(_ fixture: IconNativeGridFixture) -> IconNativeGridIdentity {
+private func makeIdentity(_ fixture: SphericalCubeFixture) -> IconNativeGridIdentity {
     IconNativeGridIdentity(
         gridNumber: 26,
         gridUUID: Array(0..<16),
@@ -489,13 +324,7 @@ private func validateOfficialGrid(
         artifactFile: artifactFile.path
     )
     let source = try IconNativeGrid.Generator.readSource(file: sourceFile, identity: identity)
-    try validateGeneratedArtifact(
-        IconNativeGridFixture(
-            file: artifactFile,
-            grid: grid,
-            centers: source
-        )
-    )
+    try validateGeneratedArtifact(file: artifactFile, centers: source)
 
     #expect(grid.nx == identity.cellCount)
     let artifactBytes = try #require(
@@ -607,18 +436,6 @@ private func nearestCandidate(
         }
     }
     return bestPointID
-}
-
-private func temporaryArtifactFile() -> URL {
-    FileManager.default.temporaryDirectory
-        .appendingPathComponent("icon-native-cube-\(UUID().uuidString).bin")
-}
-
-private func truncateLastByte(of file: URL) throws {
-    let handle = try FileHandle(forWritingTo: file)
-    defer { try? handle.close() }
-    let size = try handle.seekToEnd()
-    try handle.truncate(atOffset: size - 1)
 }
 
 private func makeElevationFile(
