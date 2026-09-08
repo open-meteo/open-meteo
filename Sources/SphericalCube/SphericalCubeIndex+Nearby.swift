@@ -98,40 +98,9 @@ extension SphericalCubeIndex {
         }
 
         @inline(__always)
-        func scanBucket(_ bucket: Int) {
-            scanRange(
-                directoryPosition(bucket, bytes: bytes),
-                directoryPosition(bucket + 1, bytes: bytes)
-            )
-        }
-
-        @inline(__always)
-        func scanRow(face: Int, y: Int, lowerX requestedLowerX: Int, upperX requestedUpperX: Int) {
-            let section = faceSections[face]
-            guard y >= section.minimumY, y < section.minimumY + section.rows else { return }
-            let lowerX = max(requestedLowerX, section.minimumX)
-            let upperX = min(requestedUpperX, section.minimumX + section.columns - 1)
-            guard lowerX <= upperX else { return }
-            let tileShift = Artifact.tileShift
-            var segmentLowerX = lowerX
-            while segmentLowerX <= upperX {
-                let localX = segmentLowerX - section.minimumX
-                let tileUpperX =
-                    section.minimumX
-                    + (((localX >> tileShift) + 1) << tileShift) - 1
-                let segmentUpperX = min(upperX, tileUpperX)
-                let first = section.bucket(
-                    x: segmentLowerX,
-                    y: y
-                )!
-                scanRange(
-                    directoryPosition(first, bytes: bytes),
-                    directoryPosition(
-                        first + segmentUpperX - segmentLowerX + 1,
-                        bytes: bytes
-                    )
-                )
-                segmentLowerX = segmentUpperX + 1
+        func scanRow(face: Int, y: Int, lowerX: Int, upperX: Int) {
+            forEachRowPointRange(face: face, y: y, xRange: lowerX...upperX, bytes: bytes) { range in
+                scanRange(range.lowerBound, range.upperBound)
             }
         }
 
@@ -224,33 +193,11 @@ extension SphericalCubeIndex {
             // direction, project them to their actual faces, and deduplicate buckets where several
             // offsets map to the same destination. Earlier direct rings cannot overlap these
             // adjacent-face buckets.
-            // Radius 8 spans a 17-by-17 stencil, hence at most 289 projected buckets.
-            var scannedBuckets = InlineArray<289, Int>(repeating: -1)
-            var scannedBucketCount = 0
-            @inline(__always)
-            func scanOffset(dx: Int, dy: Int) {
-                guard let bucket = projectedBucket(
-                    around: queryLocation,
-                    dx: dx,
-                    dy: dy
-                ) else { return }
-                for position in 0..<scannedBucketCount where scannedBuckets[position] == bucket {
-                    return
-                }
-                precondition(scannedBucketCount < 289, "spherical nearby-bucket bound exceeded")
-                scannedBuckets[scannedBucketCount] = bucket
-                scannedBucketCount += 1
-                scanBucket(bucket)
-            }
-
+            var visited = VisitedBuckets()
             for radius in (maximumDirectRadius + 1)...maximumRadius {
-                for dx in -radius...radius {
-                    scanOffset(dx: dx, dy: -radius)
-                    scanOffset(dx: dx, dy: radius)
-                }
-                for dy in (-radius + 1)..<radius {
-                    scanOffset(dx: -radius, dy: dy)
-                    scanOffset(dx: radius, dy: dy)
+                forEachProjectedRing(around: queryLocation, radius: radius, visited: &visited) { bucket in
+                    let range = pointRange(in: bucket, bytes: bytes)
+                    scanRange(range.lowerBound, range.upperBound)
                 }
                 if searchIsComplete(
                     xRange: max(0, queryLocation.x - radius)...min(resolution - 1, queryLocation.x + radius),

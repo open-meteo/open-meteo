@@ -3,6 +3,7 @@ import OmFileFormat
 import Testing
 @testable import App
 @testable import SphericalCube
+@testable import SphericalCubeTests
 
 /// Opt-in because this generates an R3B7-scale artifact and performs several million lookups.
 /// Run with:
@@ -43,7 +44,7 @@ enum IconNativeGridBenchmark {
                     coversWholeSphere: true,
                     maximumChordDistanceSquared: maximumChordDistanceSquared(meters: 20_000)
                 ),
-                points: makeCenters(),
+                points: makeSphericalCenters(count: syntheticCellCount),
                 level: 9
             )
         }
@@ -146,8 +147,12 @@ enum IconNativeGridBenchmark {
         // int16-compressed land values instead of benchmarking a constant decoded chunk.
         var elevations = [Float](repeating: 0, count: grid.nx)
         for pointID in elevations.indices {
-            elevations[pointID] =
-                grid.storage.point(at: pointID).z >= 0
+            // Regional grids can lie entirely in one hemisphere. Split their canonical IDs so
+            // both selection paths have samples while preserving the global benchmark workload.
+            let isSea = grid.storage.coversWholeSphere
+                ? grid.storage.point(at: pointID).z >= 0
+                : pointID < grid.nx / 2
+            elevations[pointID] = isSea
                 ? -999
                 : Float(100 + (pointID * 37) % 2_000)
         }
@@ -337,25 +342,6 @@ enum IconNativeGridBenchmark {
         case insufficientElevationQueries
     }
 
-    private static func makeCenters() -> [SphericalPoint] {
-        let goldenAngle = Double.pi * (3 - sqrt(5.0))
-        var centers = [SphericalPoint]()
-        centers.reserveCapacity(syntheticCellCount)
-        for index in 0..<syntheticCellCount {
-            let z = 1 - 2 * (Double(index) + 0.5) / Double(syntheticCellCount)
-            let radius = sqrt(max(0, 1 - z * z))
-            let longitude = Double(index) * goldenAngle
-            centers.append(
-                SphericalPoint(
-                    x: radius * cos(longitude),
-                    y: radius * sin(longitude),
-                    z: z
-                )
-            )
-        }
-        return centers
-    }
-
     private static func makeQueries() -> [(latitude: Float, longitude: Float)] {
         var state: UInt64 = 0x6a09_e667_f3bc_c909
         var queries = [(latitude: Float, longitude: Float)]()
@@ -498,10 +484,5 @@ enum IconNativeGridBenchmark {
             checksum &+= result?.gridpoint ?? -1
         }
         return checksum
-    }
-
-    private static func maximumChordDistanceSquared(meters: Double) -> Float {
-        let chord = 2 * sin(meters / 6_371_229 * 0.5)
-        return Float(chord * chord)
     }
 }
