@@ -1,0 +1,29 @@
+name: OpenAPI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'openapi/**'
+      - 'Tests/OpenApiTests/**'
+      - '.github/workflows/openapi.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'openapi/**'
+      - 'Tests/OpenApiTests/**'
+      - '.github/workflows/openapi.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  response-contracts:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r Tests/OpenApiTests/requirements.txt
+      - run: python -B -m unittest discover -s Tests/OpenApiTests -v
