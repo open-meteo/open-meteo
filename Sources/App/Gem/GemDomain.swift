@@ -7,7 +7,7 @@ import OmFileFormat
  Mailing list https://comm.collab.science.gc.ca/mailman3/hyperkitty/list/geomet-info@comm.collab.science.gc.ca/2026/5/
  Docs: https://eccc-msc.github.io/open-data/readme_en/
  */
-enum GemDomain: String, GenericDomain, CaseIterable {
+enum GemDomain: String, GridDomain, CaseIterable {
     case gem_global
     case gem_gdps_15km
     /// pressure level data and some atmospheric variables use 3-hourly

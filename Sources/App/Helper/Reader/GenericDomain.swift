@@ -6,9 +6,6 @@ import Vapor
  Generic domain that is required for the reader
  */
 protocol GenericDomain: Sendable {
-    /// The grid definition. Could later be replaced with a more generic implementation
-    var grid: any Gridable { get }
-
     /// Domain name used as data directory
     var domainRegistry: DomainRegistry { get }
 
@@ -45,8 +42,17 @@ protocol GenericDomain: Sendable {
     func getGrid(context: DomainInitContext) async throws -> any Gridable
 }
 
-extension GenericDomain {
+/// A domain with an immediately available grid: fixed grids or explicitly resolved domains.
+/// Deferred domains must not conform until their grid has been resolved.
+protocol GridDomain: GenericDomain {
+    var grid: any Gridable { get }
+}
+
+extension GridDomain {
     func getGrid(context: DomainInitContext) async throws -> any Gridable { grid }
+}
+
+extension GenericDomain {
 
     var generateFullRun: Bool {
         return countEnsembleMember == 1

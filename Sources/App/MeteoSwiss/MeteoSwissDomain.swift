@@ -1,5 +1,5 @@
 
-enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
+enum MeteoSwissDomain: String, GridDomain, CaseIterable {
     case icon_ch1
     case icon_ch2
     

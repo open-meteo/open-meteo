@@ -182,7 +182,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    var grid: any Gridable {
+    func getGrid(context: DomainInitContext) async throws -> any Gridable {
         switch self {
         case .icon:
             return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
@@ -191,7 +191,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2_15min, .iconD2:
             return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         case .iconNative, .iconD2Native, .iconD2Native15min:
-            return (try? requireNativeGrid()) ?? IconNativeUnavailableGrid()
+            return try await resolveNativeGrid(context: context)
         case .iconEps, .iconEpsEnsembleMean:
             // R03B06 avg 26.5 km
             return RegularGrid(nx: 1439, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)

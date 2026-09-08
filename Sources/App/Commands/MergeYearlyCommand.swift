@@ -36,9 +36,11 @@ struct MergeYearlyCommand: AsyncCommand {
         let logger = context.application.logger
         let registry = try DomainRegistry.load(rawValue: signature.domain)
         let years = try signature.years.getYearsRange()
-        guard let domain = registry.getDomain() else {
+        guard let sourceDomain = registry.getDomain() else {
             fatalError("Did not get domain object")
         }
+
+        let domain = try await ResolvedDomain(sourceDomain, context: .init(logger: logger, httpClient: nil))
 
         let variables: [String] = try signature.variables.map({ $0.split(separator: ",").map(String.init) }) ?? FileManager.default.contentsOfDirectory(atPath: registry.directory).filter { !$0.contains(".") && $0 != "static" }
 
@@ -67,10 +69,11 @@ struct MergeYearlyCommand: AsyncCommand {
     }
 
     /// Generate a yearly file for a specified domain, variable and year
-    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool) async throws {
-        let registry = domain.domainRegistry
+    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool, domainDirectory: String? = nil) async throws {
+        let domain = try await ResolvedDomain(domain, context: .init(logger: logger, httpClient: nil))
+        let directory = domainDirectory ?? domain.domainRegistry.directory
         logger.info("Processing variable \(variable) for year \(year)")
-        let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
+        let yearlyFilePath = "\(directory)/\(variable)/year_\(year).om"
         let fileManager = FileManager.default
 
         guard !fileManager.fileExists(atPath: yearlyFilePath) || force else {
@@ -88,7 +91,7 @@ struct MergeYearlyCommand: AsyncCommand {
         let indexTime = yearTime.toIndexTime()
         let chunkRange = indexTime.divideRoundedUp(divisor: omFileLength)
         let chunkFiles = try await chunkRange.asyncCompactMap { chunkIndex -> (file: OmFileReaderArray<MmapFile, Float>, indexTime: Range<Int>)? in
-            let file = "\(registry.directory)/\(variable)/chunk_\(chunkIndex).om"
+            let file = "\(directory)/\(variable)/chunk_\(chunkIndex).om"
             guard fileManager.fileExists(atPath: file) else {
                 logger.info("Chunk file \(variable)/chunk_\(chunkIndex).om does not exist. Skipping.")
                 return nil

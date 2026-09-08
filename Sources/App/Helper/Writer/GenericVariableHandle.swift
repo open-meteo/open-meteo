@@ -15,7 +15,7 @@ struct GenericVariableHandle: Sendable {
     let reader: OmFileReaderArray<MmapFile, Float>
     let domain: GenericDomain
 
-    public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: GenericDomain) async throws {
+    public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: GridDomain) async throws {
         self.reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
         let dimensions = reader.getDimensions()
         let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
@@ -41,10 +41,13 @@ struct GenericVariableHandle: Sendable {
     /// If `fullRunSkipMeta` do not generate meta.json for each run
     static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         let logger = application.logger
+        let groups = try await handles.groupedPreservedOrder(by: {"\($0.domain)"}).asyncMap { (_, handles) in
+            let domain = try await ResolvedDomain(handles[0].domain, context: .init(logger: logger, httpClient: nil))
+            return (domain: domain, handles: handles)
+        }
         let uploadQueues = await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket)
 
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
+        for (domain, handles) in groups {
             let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
 
             if generateTimeSeries {
@@ -102,8 +105,7 @@ struct GenericVariableHandle: Sendable {
             }
         }
 
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
+        for (domain, handles) in groups {
             let generateFullRun = generateFullRun && domain.generateFullRun
             if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
@@ -114,8 +116,7 @@ struct GenericVariableHandle: Sendable {
         }
 
         if OpenMeteo.generatePreviousDay, generateTimeSeries, let run {
-            for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-                let domain = handles[0].domain
+            for (domain, handles) in groups {
 
                 // if run is nil, do not attempt to generate previous days files
                 logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
@@ -158,7 +159,7 @@ struct GenericVariableHandle: Sendable {
     }
 
     /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
-    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, uploadQueues: [S3UploadQueue]? = nil) async throws {
+    static func generateFullRunData(logger: Logger, domain: GridDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, uploadQueues: [S3UploadQueue]? = nil) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -271,7 +272,7 @@ struct GenericVariableHandle: Sendable {
         }
     }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool) async throws {
+    private static func convertConcurrent(logger: Logger, domain: GridDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
@@ -285,7 +286,7 @@ struct GenericVariableHandle: Sendable {
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool) async throws {
+    private static func convertSerial3D(logger: Logger, domain: GridDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny

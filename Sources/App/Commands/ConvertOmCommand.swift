@@ -49,9 +49,10 @@ struct ConvertOmCommand: AsyncCommand {
                 logger.warning("Transpose flag is currently not supported for OM3 conversion")
             }
             logger.info("Converting OM file to v3 with domain: \(domain). Outfile will be: \(outfile)")
-            guard let grid = domainObj.getDomain()?.grid else {
-                fatalError("Did not get domain grid")
+            guard let domain = domainObj.getDomain() else {
+                throw ConvertOmError("Domain has no grid")
             }
+            let grid = try await ResolvedDomain(domain, context: .init(logger: logger, httpClient: nil)).grid
             try await convertOmv3(src: signature.infile, dest: outfile, grid: grid)
             return
         } else if format == "netcdf" {
@@ -64,7 +65,16 @@ struct ConvertOmCommand: AsyncCommand {
             let data = try await om.read()
             let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".nc"
             logger.info("Converting to NetCDF: \(outfile)")
-            try convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, domain: signature.domain, logger: logger)
+            let grid: (any Gridable)?
+            if dimensions.count == 2, let name = signature.domain {
+                guard let domain = try DomainRegistry.load(rawValue: name).getDomain() else {
+                    throw ConvertOmError("Domain has no grid")
+                }
+                grid = try await ResolvedDomain(domain, context: .init(logger: logger, httpClient: nil)).grid
+            } else {
+                grid = nil
+            }
+            try convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, grid: grid, logger: logger)
             return
         } else {
             throw ConvertOmError("Unsupported conversion target: \(format)")
@@ -72,13 +82,24 @@ struct ConvertOmCommand: AsyncCommand {
     }
 
     /// Convert data to NetCDF format
-    private func convertToNetCDF(data: [Float], dimensions: [UInt64], outfile: String, transpose: Bool, domain: String?, logger: Logger) throws {
+    private func convertToNetCDF(data: [Float], dimensions: [UInt64], outfile: String, transpose: Bool, grid: (any Gridable)?, logger: Logger) throws {
+        guard dimensions.count == 2 || dimensions.count == 3 else {
+            throw ConvertOmError("Unsupported number of dimensions: \(dimensions.count)")
+        }
+        if dimensions.count == 2, let grid {
+            guard grid.nx > 1, grid.ny > 1 else {
+                throw ConvertOmError("Conversion requires a two-dimensional grid; one-row grids are unsupported")
+            }
+            guard dimensions[0] == grid.nx * grid.ny else {
+                throw ConvertOmError("Wrong grid! Expected \(grid.nx * grid.ny) locations, got \(dimensions[0])")
+            }
+        }
         let ncFile = try NetCDF.create(path: outfile, overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "open-meteo data")
 
         switch dimensions.count {
         case 2:
-            try convertToNetCDF2D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose, domain: domain, logger: logger)
+            try convertToNetCDF2D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose, grid: grid, logger: logger)
         case 3:
             try convertToNetCDF3D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose)
         default:
@@ -90,19 +111,11 @@ struct ConvertOmCommand: AsyncCommand {
     }
 
     /// Handle 2D data conversion to NetCDF
-    private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, domain: String?, logger: Logger) throws {
-        if let domain = domain {
-            let domainObj = try DomainRegistry.load(rawValue: domain)
-            guard let grid = domainObj.getDomain()?.grid else {
-                fatalError("Did not get domain grid")
-            }
+    private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, grid: (any Gridable)?, logger: Logger) throws {
+        if let grid {
             let ny = grid.ny
             let nx = grid.nx
             let nt = Int(dimensions[1])
-
-            guard dimensions[0] == nx * ny, ny > 1, nx > 1 else {
-                throw ConvertOmError("Wrong grid! Expected \(nx * ny) locations, got \(dimensions[0])")
-            }
 
             if transpose {
                 // Fast time dimension (locations, time) -> (time, locations)
@@ -176,11 +189,13 @@ struct ConvertOmCommand: AsyncCommand {
 
         let ny = UInt64(grid.ny)
         let nx = UInt64(grid.nx)
-        let nt = dimensions[1]
-
-        guard dimensions.count == 2, nx * ny == dimensions[0], ny > 1, nx > 1 else {
+        guard dimensions.count == 2, ny > 1, nx > 1 else {
+            throw ConvertOmError("OM3 conversion requires 2D input and a two-dimensional grid; one-row grids are unsupported")
+        }
+        guard nx * ny == dimensions[0] else {
             throw ConvertOmError("Wrong grid! Expected \(nx * ny) locations, got \(dimensions[0])")
         }
+        let nt = dimensions[1]
 
         let dimensionsOut = [ny, nx, nt]
         let chunksOut = [1, chunks[0], chunks[1]]

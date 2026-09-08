@@ -1,6 +1,6 @@
 import Foundation
 
-enum KmaDomain: String, GenericDomain, CaseIterable {
+enum KmaDomain: String, GridDomain, CaseIterable {
     case gdps
     case ldps
 

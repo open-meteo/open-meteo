@@ -235,7 +235,7 @@ struct GloFasDownloader: AsyncCommand {
     }
 }
 
-enum GloFasDomain: String, GenericDomain, CaseIterable {
+enum GloFasDomain: String, GridDomain, CaseIterable {
     case forecast
     case consolidated
     case seasonal

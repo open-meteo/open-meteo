@@ -16,6 +16,7 @@ struct OmFileSplitter {
 
     let ny: Int
     let nx: Int
+    private let grid: (any Gridable)?
 
     /// Number of ensemble members or levels
     let nMembers: Int
@@ -45,20 +46,23 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
 
-    init<Domain: GenericDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
+    init<Domain: GridDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
+        let grid = domain.grid
         self.init(
             domain: domain.domainRegistry,
             nMembers: max(nMembers ?? domain.countEnsembleMember, 1),
-            nx: domain.grid.nx,
-            ny: domain.grid.ny,
+            nx: grid.nx,
+            ny: grid.ny,
             nTimePerFile: domain.omFileLength,
             hasYearlyFiles: domain.hasYearlyFiles,
             masterTimeRange: domain.masterTimeRange,
-            chunknLocations: chunknLocations
+            chunknLocations: chunknLocations,
+            grid: grid
         )
     }
 
-    init(domain: DomainRegistry, nMembers: Int, nx: Int, ny: Int, nTimePerFile: Int, hasYearlyFiles: Bool, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil) {
+    init(domain: DomainRegistry, nMembers: Int, nx: Int, ny: Int, nTimePerFile: Int, hasYearlyFiles: Bool, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil, grid: (any Gridable)? = nil) {
+        self.grid = grid
         self.domain = domain
         self.nMembers = nMembers
         self.nx = nx
@@ -224,7 +228,12 @@ struct OmFileSplitter {
                         runData[l * timestamps.count + t.offset] = .nan
                     }
                 }
-                guard let grid = domain.getDomain()?.grid else {
+                let grid: any Gridable
+                if let resolved = self.grid {
+                    grid = resolved
+                } else if let domain = domain.getDomain() {
+                    grid = try await domain.getGrid(context: .init(logger: logger, httpClient: httpClient))
+                } else {
                     fatalError("Did not get domain grid for \(domain)")
                 }
                 
@@ -639,7 +648,7 @@ extension OmFileSplitter {
     /// Prepare a write to store individual time-steps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
     /// If `nTime` is set, the spatial file contains TIME SERIES oriented steps as well
-    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1, nTime: Int = 1) -> OmFileWriterHelper {
+    static func makeSpatialWriter(domain: GridDomain, nMembers: Int = 1, nTime: Int = 1) -> OmFileWriterHelper {
         let y = min(domain.grid.ny, 32)
         let x = min(domain.grid.nx, 1024 / y)
         

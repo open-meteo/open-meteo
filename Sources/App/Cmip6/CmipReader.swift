@@ -292,7 +292,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     /// imerg grid point
     let referencePosition: GridPoint2DFraction
 
-    let referenceDomain: GenericDomain
+    let referenceDomain: ResolvedDomain
 
     var _referenceElevation: ElevationOrSea?
 
@@ -374,6 +374,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     }
 
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        let referenceDomain = try await ResolvedDomain(referenceDomain, context: .init(logger: options.logger, httpClient: options.httpClient))
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
@@ -412,7 +413,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     /// imerg grid point
     let referencePosition: Int
 
-    let referenceDomain: GenericDomain
+    let referenceDomain: ResolvedDomain
 
     let referenceElevation: ElevationOrSea
 
@@ -489,6 +490,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     }
 
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        let referenceDomain = try await ResolvedDomain(referenceDomain, context: .init(logger: options.logger, httpClient: options.httpClient))
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
@@ -505,6 +507,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     }
 
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea, options: GenericReaderOptions) async throws {
+        let referenceDomain = try await ResolvedDomain(referenceDomain, context: .init(logger: options.logger, httpClient: options.httpClient))
         let (lat, lon) = referenceDomain.grid.getCoordinates(gridpoint: referencePosition)
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest, options: options) else {
             throw ForecastApiError.noDataAvailableForThisLocation

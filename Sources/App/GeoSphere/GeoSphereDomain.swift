@@ -4,7 +4,7 @@ import Vapor
 
 /// GeoSphere Austria AROME 2.5km regional model
 /// Data: https://data.hub.geosphere.at/dataset/nwp-v1-1h-2500m
-enum GeoSphereDomain: String, GenericDomain, CaseIterable {
+enum GeoSphereDomain: String, GridDomain, CaseIterable {
     case arome_austria
 
     var domainRegistry: DomainRegistry {

@@ -14,11 +14,11 @@ struct CdoHelper: Sendable {
         return cdo != nil
     }
 
-    init(domain: IconDomains, logger: Logger, curl: Curl) async throws {
+    init(domain: IconDomains, grid: any Gridable, logger: Logger, curl: Curl) async throws {
         // icon global needs resampling to plate carree
         self.curl = curl
         cdo = try await CdoIconGlobal(curl: curl, domain: domain)
-        grid = domain.grid
+        self.grid = grid
         self.domain = domain
     }
 
@@ -103,7 +103,8 @@ struct CdoIconGlobal: Sendable {
             fatalError("could not open weights file")
         }
 
-        var mapping = [Int32](repeating: -1, count: domain.grid.count)
+        let grid = try await domain.getGrid(context: .init(logger: curl.logger, httpClient: nil))
+        var mapping = [Int32](repeating: -1, count: grid.count)
         for (i, src) in src_address.enumerated() {
             mapping[Int(dst_address[i]) - 1] = src - 1
         }

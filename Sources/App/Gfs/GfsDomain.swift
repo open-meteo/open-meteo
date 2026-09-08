@@ -9,7 +9,7 @@ import OmFileFormat
  
  
  */
-enum GfsDomain: String, GenericDomain, CaseIterable {
+enum GfsDomain: String, GridDomain, CaseIterable {
     /// T1534 sflux grid
     case gfs013
 

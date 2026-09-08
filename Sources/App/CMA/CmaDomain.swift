@@ -6,7 +6,7 @@ import Foundation
  
  No mesoscale model yet, only global
  */
-enum CmaDomain: String, GenericDomain, CaseIterable {
+enum CmaDomain: String, GridDomain, CaseIterable {
     case grapes_global
 
     var grid: any Gridable {

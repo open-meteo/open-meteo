@@ -1,4 +1,4 @@
-enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
+enum EumetsatSarahDomain: String, GridDomain, CaseIterable {
     case sarah3_30min
 
     var domainRegistry: DomainRegistry {
