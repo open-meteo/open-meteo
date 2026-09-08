@@ -309,8 +309,7 @@ private actor GatedElevationLoader {
 private func makeIdentity(_ fixture: SphericalCubeFixture) -> IconNativeGridIdentity {
     IconNativeGridIdentity(
         gridNumber: 26,
-        gridUUID: Array(0..<16),
-        gridUUIDHex: Array(0..<16).map { String(format: "%02x", $0) }.joined(),
+        gridUUID: UUID(uuidString: "00010203-0405-0607-0809-0a0b0c0d0e0f")!,
         cellCount: fixture.centers.count,
         isGlobal: true,
         maximumDistanceMeters: 10_000_000,

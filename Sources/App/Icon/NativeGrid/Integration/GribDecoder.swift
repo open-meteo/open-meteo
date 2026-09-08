@@ -63,8 +63,8 @@ extension IconNativeGribMetadata {
         guard numberOfGridUsed == Int(identity.gridNumber) else {
             throw IconNativeGribError.invalidGridNumber(expected: identity.gridNumber, actual: numberOfGridUsed)
         }
-        guard uuidOfHGrid?.lowercased() == identity.gridUUIDHex else {
-            throw IconNativeGribError.invalidGridUUID(expected: identity.gridUUIDHex, actual: uuidOfHGrid)
+        guard uuidOfHGrid?.lowercased() == identity.gridUUID.hexString else {
+            throw IconNativeGribError.invalidGridUUID(expected: identity.gridUUID.hexString, actual: uuidOfHGrid)
         }
         guard numberOfDataPoints == identity.cellCount else {
             throw IconNativeGribError.invalidDataPointCount(expected: identity.cellCount, actual: numberOfDataPoints)

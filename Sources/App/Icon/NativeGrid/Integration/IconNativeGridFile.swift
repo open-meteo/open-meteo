@@ -23,10 +23,10 @@ extension IconNativeGridIdentity {
                 reason: "expected grid number \(gridNumber), got \(storage.identity.number)"
             )
         }
-        guard storage.identity.uuid == gridUUID else {
+        guard storage.identity.uuid == gridUUID.bytes else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: path,
-                reason: "grid UUID does not match \(gridUUIDHex)"
+                reason: "grid UUID does not match \(gridUUID.hexString)"
             )
         }
         guard storage.pointCount == cellCount else {
