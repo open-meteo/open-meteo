@@ -146,7 +146,7 @@ extension InlineArray {
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func iconD2GridFindPoint() async throws {
         try await withApp { app in
             let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
-            let grid = (try await IconDomains.iconD2.getGrid(context: .init(logger: Logger(label: "GridTests"), httpClient: nil)))
+            let grid = try await IconDomains.iconD2.getGrid(context: .init(logger: app.logger, httpClient: app.http.client.shared))
             // Longitude 0° wraps on x axis
             
             let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
@@ -261,8 +261,9 @@ extension InlineArray {
         #expect(lat.isApproximatelyEqual(to: 89.53125, absoluteTolerance: 0.001))
         #expect(lon.isApproximatelyEqual(to: 179.53125, absoluteTolerance: 0.001))
 
-        let pos2 = (try await IconDomains.icon.getGrid(context: .init(logger: Logger(label: "GridTests"), httpClient: nil))).findPoint(lat: -16.805414, lon: 179.990623)!
-        let (lat2, lon2) = (try await IconDomains.icon.getGrid(context: .init(logger: Logger(label: "GridTests"), httpClient: nil))).getCoordinates(gridpoint: pos2)
+        let iconGrid = try await IconDomains.icon.getGrid(context: .init(logger: Logger(label: "GridTests"), httpClient: nil))
+        let pos2 = iconGrid.findPoint(lat: -16.805414, lon: 179.990623)!
+        let (lat2, lon2) = iconGrid.getCoordinates(gridpoint: pos2)
         #expect(pos2 == 1689972)
         #expect(lat2.isApproximatelyEqual(to: -16.75, absoluteTolerance: 0.001))
         #expect(lon2.isApproximatelyEqual(to: 179.75, absoluteTolerance: 0.001))
@@ -275,11 +276,13 @@ extension InlineArray {
     func elevationMatching() async throws {
         let logger = Logger(label: "testElevationMatching")
         let client = HTTPClient.shared
-        let optimised = try await (try await IconDomains.iconD2.getGrid(context: .init(logger: Logger(label: "GridTests"), httpClient: nil))).findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
+        let grid = try await IconDomains.iconD2.getGrid(context: .init(logger: logger, httpClient: client))
+        let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger))
+        let optimised = try await grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: elevationFile)!
         #expect(optimised.gridpoint == 225405)
         #expect(optimised.gridElevation.numeric == 600)
 
-        let nearest = try await (try await IconDomains.iconD2.getGrid(context: .init(logger: Logger(label: "GridTests"), httpClient: nil))).findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
+        let nearest = try await grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: elevationFile)!
         #expect(nearest.gridpoint == 225406)
         #expect(nearest.gridElevation.numeric == 1006.0)
     }

@@ -8,20 +8,14 @@ import Testing
 /// ICON_NATIVE_GRID_BENCHMARK=1 ICON_NATIVE_GRID_ARTIFACT=/path/to/grid.bin \
 /// swift test -c release --jobs 16 -Xswiftc -num-threads -Xswiftc 16 --filter IconNativeGridBenchmarkTests
 @Suite struct IconNativeGridBenchmarkTests {
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_GRID_BENCHMARK"] == "1"))
-    func benchmark() async throws {
-        try await IconNativeGridBenchmark.run()
-    }
-}
-
-enum IconNativeGridBenchmark {
-    private static let queryCount = 65_536
-    private static let repeats = 8
-    private static let elevationQueryCount = 1_024
-    private static let sampleCount = 9
+    private let queryCount = 65_536
+    private let repeats = 8
+    private let elevationQueryCount = 1_024
+    private let sampleCount = 9
     private typealias Query = (latitude: Float, longitude: Float)
 
-    static func run() async throws {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_GRID_BENCHMARK"] == "1"))
+    func benchmark() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["ICON_NATIVE_GRID_ARTIFACT"],
             "Set ICON_NATIVE_GRID_ARTIFACT to an existing global or D2 grid.bin")
         let grid = try IconNativeGrid.load(file: URL(fileURLWithPath: path))
@@ -37,7 +31,7 @@ enum IconNativeGridBenchmark {
         try await measureElevationSelection(grid: grid, queries: queries)
     }
 
-    private static func measureElevationSelection(grid: IconNativeGrid, queries: [Query]) async throws {
+    private func measureElevationSelection(grid: IconNativeGrid, queries: [Query]) async throws {
         // Preserve the original synthetic elevation workload on operational grid coordinates.
         let elevations: [Float] = (0..<grid.nx).map { pointID in
             let isSea = grid.storage.coversWholeSphere
@@ -66,11 +60,10 @@ enum IconNativeGridBenchmark {
         let cache = try #require(ElevationCache(reader: reader))
         _ = try await cache.loadValues()
 
-        typealias Operation = (IconNativeGrid, any OmFileReaderArrayProtocol<Float>, [Query], ElevationCache?) async throws -> Int
-        let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode, operation: Operation)] = [
-            ("sea hit", seaQueries, .sea, seaSelectionChecksum),
-            ("sea search from land", landQueries, .sea, seaSelectionChecksum),
-            ("terrain search", landQueries, .land, terrainSelectionChecksum)
+        let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [
+            ("sea hit", seaQueries, .sea),
+            ("sea search from land", landQueries, .sea),
+            ("forced terrain search with fallback", landQueries, .land)
         ]
         for scenario in scenarios {
             // Compare complete selections outside the timed loops; checksums keep timed results observable.
@@ -83,31 +76,17 @@ enum IconNativeGridBenchmark {
                 #expect(raw?.gridElevation.numeric == warm?.gridElevation.numeric)
             }
             let raw = try await measureAsync(executions: elevationQueryCount) {
-                try await scenario.operation(grid, reader, scenario.queries, nil)
+                try await selectionChecksum(grid: grid, reader: reader, queries: scenario.queries, mode: scenario.mode, cache: nil)
             }
             let warm = try await measureAsync(executions: elevationQueryCount) {
-                try await scenario.operation(grid, reader, scenario.queries, cache)
+                try await selectionChecksum(grid: grid, reader: reader, queries: scenario.queries, mode: scenario.mode, cache: cache)
             }
-            #expect(raw.checksum == warm.checksum)
             printResult("raw \(scenario.name)", raw)
             printResult("warm \(scenario.name)", warm)
         }
-        let matchedElevations = landQueries.map { query in
-            elevations[grid.storage.nearestPointID(latitude: query.latitude, longitude: query.longitude)!]
-        }
-        printResult("warm terrain hit", try await measureAsync(executions: elevationQueryCount) {
-            var checksum = 0
-            for (index, query) in landQueries.enumerated() {
-                let result = try await grid.findPointTerrainOptimised(
-                    lat: query.latitude, lon: query.longitude, elevation: matchedElevations[index],
-                    elevationFile: reader, elevationCache: cache)
-                checksum &+= result?.gridpoint ?? -1
-            }
-            return checksum
-        })
     }
 
-    private static func measure(
+    private func measure(
         executions: Int,
         _ operation: () -> Int
     ) -> (samples: [Double], checksum: Int) {
@@ -124,7 +103,7 @@ enum IconNativeGridBenchmark {
         return (samples, checksum)
     }
 
-    private static func measureAsync(
+    private func measureAsync(
         executions: Int,
         _ operation: () async throws -> Int
     ) async throws -> (samples: [Double], checksum: Int) {
@@ -141,7 +120,7 @@ enum IconNativeGridBenchmark {
         return (samples, checksum)
     }
 
-    private static func measureFirstElevationLoad(
+    private func measureFirstElevationLoad(
         reader: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (samples: [Double], checksum: Int) {
         var checksum = 0
@@ -157,7 +136,7 @@ enum IconNativeGridBenchmark {
         return (samples, checksum)
     }
 
-    private static func printResult(
+    private func printResult(
         _ name: String,
         _ measurement: (samples: [Double], checksum: Int),
         unit: String = "ns/query"
@@ -167,7 +146,7 @@ enum IconNativeGridBenchmark {
         print("  \(name) checksum: \(measurement.checksum)")
     }
 
-    private static func makeQueries(grid: IconNativeGrid) -> [(latitude: Float, longitude: Float)] {
+    private func makeQueries(grid: IconNativeGrid) -> [(latitude: Float, longitude: Float)] {
         var state: UInt64 = 0xbb67_ae85_84ca_a73b
         var queries = [(latitude: Float, longitude: Float)]()
         queries.reserveCapacity(queryCount)
@@ -189,7 +168,7 @@ enum IconNativeGridBenchmark {
     }
 
     @inline(never)
-    private static func lookupChecksum(
+    private func lookupChecksum(
         grid: IconNativeGrid,
         queries: [(latitude: Float, longitude: Float)],
         repeats: Int
@@ -207,7 +186,7 @@ enum IconNativeGridBenchmark {
     }
 
     @inline(never)
-    private static func lookupWithCandidatesChecksum(
+    private func lookupWithCandidatesChecksum(
         grid: IconNativeGrid,
         queries: [(latitude: Float, longitude: Float)],
         repeats: Int
@@ -227,40 +206,18 @@ enum IconNativeGridBenchmark {
     }
 
     @inline(never)
-    private static func seaSelectionChecksum(
+    private func selectionChecksum(
         grid: IconNativeGrid,
         reader: any OmFileReaderArrayProtocol<Float>,
-        queries: [(latitude: Float, longitude: Float)],
-        cache: ElevationCache? = nil
+        queries: [Query],
+        mode: GridSelectionMode,
+        cache: ElevationCache?
     ) async throws -> Int {
         var checksum = 0
         for query in queries {
-            let result = try await grid.findPointInSea(
-                lat: query.latitude,
-                lon: query.longitude,
-                elevationFile: reader,
-                elevationCache: cache
-            )
-            checksum &+= result?.gridpoint ?? -1
-        }
-        return checksum
-    }
-
-    @inline(never)
-    private static func terrainSelectionChecksum(
-        grid: IconNativeGrid,
-        reader: any OmFileReaderArrayProtocol<Float>,
-        queries: [(latitude: Float, longitude: Float)],
-        cache: ElevationCache? = nil
-    ) async throws -> Int {
-        var checksum = 0
-        for query in queries {
-            let result = try await grid.findPointTerrainOptimised(
-                lat: query.latitude,
-                lon: query.longitude,
-                elevation: -10_000,
-                elevationFile: reader,
-                elevationCache: cache
+            let result = try await grid.findPoint(
+                lat: query.latitude, lon: query.longitude, elevation: -10_000,
+                elevationFile: reader, mode: mode, elevationCache: cache
             )
             checksum &+= result?.gridpoint ?? -1
         }
