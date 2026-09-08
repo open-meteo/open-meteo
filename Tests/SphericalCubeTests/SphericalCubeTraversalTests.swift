@@ -5,7 +5,7 @@ import Testing
 
 @Suite struct SphericalCubeTraversalTests {
     @Test(arguments: [true, false])
-    func rowTraversalMatchesIndividualBuckets(isGlobal: Bool) throws {
+    func rowRangesMatchBucketEnumeration(isGlobal: Bool) throws {
         // A rectangle starting inside a tile and ending in partial tiles on both axes.
         let resolution = 32
         let centers = (5...19).flatMap { y in
@@ -17,19 +17,9 @@ import Testing
                 )
             }
         }
-        let file = temporaryArtifactFile()
-        defer { try? FileManager.default.removeItem(at: file) }
-        try SphericalCubeArtifact.Writer.write(
-            to: file,
-            metadata: .init(
-                identity: globalMetadata.identity,
-                coversWholeSphere: isGlobal,
-                maximumChordDistanceSquared: globalMetadata.maximumChordDistanceSquared
-            ),
-            points: centers,
-            level: 5
-        )
-        let index = try SphericalCubeIndex(file: file)
+        let fixture = try makeFixture(centers: centers, isGlobal: isGlobal, level: 5)
+        defer { fixture.remove() }
+        let index = fixture.index
         index.withBytes { bytes in
             for face in 0..<6 {
                 for y in -1...resolution {
@@ -53,7 +43,7 @@ import Testing
     }
 
     @Test(arguments: [true, false])
-    func projectedRingsPreserveOrderAndDeduplicateAcrossSeams(isGlobal: Bool) throws {
+    func projectedRingsMatchSquareEnumeration(isGlobal: Bool) throws {
         let fixture = try makeFixture(
             centers: [SphericalPoint(latitudeDegrees: 52, longitudeDegrees: 13)],
             isGlobal: isGlobal

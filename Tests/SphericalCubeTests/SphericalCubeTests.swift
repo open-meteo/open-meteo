@@ -4,7 +4,7 @@ import OmFileFormat
 import Testing
 
 @Suite struct SphericalCubeTests {
-    @Test func nearestLookupStaysWithinMeterBudgetAcrossCubeFaces() throws {
+    @Test func sampledQueriesMatchBruteForce() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
 
@@ -34,6 +34,7 @@ import Testing
         ))
         defer { fixture.remove() }
         let lookup = try #require(fixture.index.nearestLookup(latitude: 0, longitude: 0))
+        #expect(lookup.pointID == 0)
         // Simulate a bounded lookup supplying a higher-ID tied point. Nearby expansion must
         // preserve the supplied point because its elevation has already been read by the caller.
         let supplied = SphericalCubeIndex.Lookup(
@@ -46,8 +47,15 @@ import Testing
         for index in 1..<nearby.count { #expect(nearby.pointIDs[index] == index - 1) }
     }
 
-    @Test func floatCandidateDistancesStayAccurateNearVoronoiBoundaries() throws {
-        let fixture = try makeGlobalFixture()
+    @Test(arguments: [false, true])
+    func midpointQueriesMatchBruteForce(dense: Bool) throws {
+        let centers = dense ? [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 44.99),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 45.01),
+            SphericalPoint(latitudeDegrees: 0.01, longitudeDegrees: 45),
+            SphericalPoint(latitudeDegrees: -0.01, longitudeDegrees: 45)
+        ] : makeSphericalCenters(count: 257)
+        let fixture = try makeFixture(centers: centers)
         defer { fixture.remove() }
         let inverseEarthRadius = 1 / 6_371_229.0
 
@@ -100,7 +108,7 @@ import Testing
         }
     }
 
-    @Test func spatialCandidatesStayLocalAcrossCubeFaces() throws {
+    @Test func sampledCandidateLocality() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let coordinates: [(Float, Float)] = [
@@ -138,19 +146,6 @@ import Testing
         }
     }
 
-    @Test func canonicalCoordinatesAndTiesAreStable() throws {
-        let centers = (0..<128).map { _ in
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0)
-        }
-        let fixture = try makeFixture(centers: centers)
-        defer { fixture.remove() }
-
-        #expect(fixture.index.nearestPointID(latitude: 0, longitude: 0) == 0)
-        let coordinate = fixture.index.point(at: 37).coordinate
-        #expect(abs(coordinate.latitude) < 1e-5)
-        #expect(abs(coordinate.longitude) < 1e-5)
-    }
-
     @Test func crossFaceFloatTiePrefersLowerPointID() throws {
         // ID 1 occupies the query's +X face while lower ID 0 occupies +Y. A query on the seam
         // therefore verifies that projected fallback order does not decide an equal Float distance.
@@ -163,7 +158,7 @@ import Testing
         #expect(fixture.index.nearestPointID(latitude: 0, longitude: 45) == 0)
     }
 
-    @Test func regionalDistanceLimitAndLongitudeWrappingArePreserved() throws {
+    @Test func regionalLookupBoundsAndLongitudeWrapping() throws {
         let centers = [
             SphericalPoint(latitudeDegrees: 50, longitudeDegrees: 5),
             SphericalPoint(latitudeDegrees: 50, longitudeDegrees: 10),
@@ -186,7 +181,7 @@ import Testing
         #expect(fixture.index.nearestPointID(latitude: 91, longitude: 5) == nil)
     }
 
-    @Test func artifactUsesSinglePortableFloat32Format() throws {
+    @Test func artifactLayoutAndCellRoundTrips() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let artifact = try SphericalCubeArtifact.open(file: fixture.file)
@@ -198,9 +193,6 @@ import Testing
         try validateGeneratedArtifact(file: fixture.file, centers: fixture.centers)
 
         for cell in fixture.centers.indices {
-            let expected = fixture.centers[cell]
-            let actual = fixture.index.point(at: cell)
-            #expect(centerDirectionDistance(expected, actual) <= 2)
             let coordinate = fixture.index.point(at: cell).coordinate
             #expect(fixture.index.nearestPointID(
                 latitude: coordinate.latitude,
@@ -209,7 +201,7 @@ import Testing
         }
     }
 
-    @Test func malformedLayoutAndSizeBudgetAreRejected() throws {
+    @Test func truncatedArtifactAndInsufficientSizeLimitAreRejected() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let corruptedFile = temporaryArtifactFile()

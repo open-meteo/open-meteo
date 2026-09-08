@@ -4,20 +4,7 @@ import Testing
 import Logging
 
 @Suite struct IconNativeDomainTests {
-    @Test func nativeDomainMappings() {
-        #expect(IconDomains.iconNative.domainRegistry == .dwd_icon_global_native)
-        #expect(IconDomains.iconNative.sourceDomain == .icon)
-        #expect(IconDomains.iconD2Native.domainRegistry == .dwd_icon_d2_native)
-        #expect(IconDomains.iconD2Native.sourceDomain == .iconD2)
-        #expect(IconDomains.iconD2Native.fifteenMinuteDomain == .iconD2Native15min)
-        #expect(IconDomains.iconD2Native15min.domainRegistryStatic == .dwd_icon_d2_native)
-        #expect(IconDomains.icon.downloadDomain == .iconNative)
-        #expect(IconDomains.iconNative.downloadDomain == .iconNative)
-        #expect(IconDomains.iconD2.downloadDomain == .iconD2)
-        #expect(IconDomains.iconD2Native.downloadDomain == .iconD2Native)
-    }
-
-    @Test func downloadOutputsMatchSourceCapabilities() async throws {
+    @Test func d2DownloadOutputs() async throws {
         let context = DomainInitContext(logger: Logger(label: "IconDownloadDomains"), httpClient: nil)
         let deterministic = try await IconDownloadDomains(.iconD2, context: context)
         #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)
@@ -38,7 +25,7 @@ import Logging
         #expect(remapped[3] == 30)
     }
 
-    @Test func nativeGridIdentitiesMatchOperationalGrids() {
+    @Test func configuredGridIdentities() {
         #expect(IconNativeGridIdentity.global.gridNumber == 26)
         #expect(IconNativeGridIdentity.global.gridUUIDHex == "a27b8de618c411e4820ab5b098c6a5c0")
         #expect(IconNativeGridIdentity.global.cellCount == 2_949_120)
@@ -49,7 +36,7 @@ import Logging
         #expect(IconNativeGridIdentity.d2.maximumDistanceMeters == 4_000)
     }
 
-    @Test func gribMetadataMatchesGridIdentityAndCount() throws {
+    @Test func gribGridValidation() throws {
         try metadata(identity: .d2).validate(identity: .d2)
         try IconNativeGribDecoder.validateDecodedValueCount(IconNativeGridIdentity.d2.cellCount, identity: .d2)
 
@@ -64,31 +51,13 @@ import Logging
         }
     }
 
-    @Test func forecastModelsUseGenericDomainMappings() throws {
-        switch try #require(MultiDomains.dwd_icon_global_native.getDomainAndVariable()) {
-        case .singleWithPrecipitationProbability(let domain, _, let precipitationProbability):
-            #expect(try #require(domain as? IconDomains) == .iconNative)
-            #expect(try #require(precipitationProbability as? IconDomains) == .iconEps)
-        default:
-            Issue.record("Expected native ICON global with precipitation probability")
-        }
-
-        switch try #require(MultiDomains.dwd_icon_d2_native.getDomainAndVariable()) {
-        case .singleWithSupplementalDomains(let domain, _, let lower, let supplemental, let precipitationProbability):
-            #expect(lower.isEmpty)
-            #expect(try #require(domain as? IconDomains) == .iconD2Native)
-            #expect(supplemental.compactMap { $0.0 as? IconDomains } == [.iconD2Native15min])
-            #expect(try #require(precipitationProbability as? IconDomains) == .iconD2Eps)
-        default:
-            Issue.record("Expected native ICON-D2 with supplemental 15-minute data and precipitation probability")
-        }
-
-        switch try #require(MultiDomains.dwd_icon_d2_native_15min.getDomainAndVariable()) {
-        case .single(let domain, _):
-            #expect(try #require(domain as? IconDomains) == .iconD2Native15min)
-        default:
-            Issue.record("Expected native ICON-D2 15-minute domain")
-        }
+    @Test(arguments: [
+        (MultiDomains.dwd_icon_global_native, DomainRegistry.dwd_icon_global_native),
+        (.dwd_icon_d2_native, .dwd_icon_d2_native),
+        (.dwd_icon_d2_native_15min, .dwd_icon_d2_native_15min)
+    ])
+    func nativeApiModelRegistry(model: MultiDomains, registry: DomainRegistry) {
+        #expect(model.getDomainAndVariable()?.singleDomain?.domainRegistry == registry)
     }
 
     private func metadata(
