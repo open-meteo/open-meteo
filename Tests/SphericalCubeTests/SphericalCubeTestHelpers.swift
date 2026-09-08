@@ -42,12 +42,13 @@ func makeSphericalCenters(count: Int) -> [SphericalPoint] {
 func makeFixture(
     centers: [SphericalPoint],
     isGlobal: Bool = true,
-    maximumDistanceMeters: Float = 10_000_000
+    maximumDistanceMeters: Float = 10_000_000,
+    level: Int? = nil
 ) throws -> SphericalCubeFixture {
     let file = temporaryArtifactFile()
-    let metadata = isGlobal ? globalMetadata : SphericalCubeArtifact.Metadata(
-        identity: .init(number: 47, uuid: Array(repeating: 47, count: 16)),
-        coversWholeSphere: false,
+    let metadata = SphericalCubeArtifact.Metadata(
+        identity: isGlobal ? globalMetadata.identity : .init(number: 47, uuid: Array(repeating: 47, count: 16)),
+        coversWholeSphere: isGlobal,
         maximumChordDistanceSquared: maximumChordDistanceSquared(
             meters: Double(maximumDistanceMeters)
         )
@@ -57,7 +58,7 @@ func makeFixture(
             to: file,
             metadata: metadata,
             points: centers,
-            level: isGlobal ? 4 : 3
+            level: level ?? (isGlobal ? 4 : 3)
         )
         return SphericalCubeFixture(
             file: file,

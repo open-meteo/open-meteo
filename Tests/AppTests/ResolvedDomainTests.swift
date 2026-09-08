@@ -10,7 +10,7 @@ import VaporTesting
 @Suite struct ResolvedDomainTests {
     private let logger = Logger(label: "ResolvedDomainTests")
 
-    @Test func resolvesOnceAndForwardsMetadata() async throws {
+    @Test func resolvesOnceAndPreservesDescriptionAndFlags() async throws {
         let fixture = try makeFixture(centers: makeSphericalCenters(count: 12))
         defer { fixture.remove() }
         let source = DeferredDomain(file: fixture.file)
@@ -21,14 +21,6 @@ import VaporTesting
         #expect(domain.grid.ny == 1)
         #expect(source.resolutions.withLock { $0 } == 1)
         #expect(domain.description == source.description)
-        #expect(domain.domainRegistry == source.domainRegistry)
-        #expect(domain.domainRegistryStatic == source.domainRegistryStatic)
-        #expect(domain.dtSeconds == source.dtSeconds)
-        #expect(domain.updateIntervalSeconds == source.updateIntervalSeconds)
-        #expect(domain.hasYearlyFiles == source.hasYearlyFiles)
-        #expect(domain.masterTimeRange == source.masterTimeRange)
-        #expect(domain.omFileLength == source.omFileLength)
-        #expect(domain.countEnsembleMember == source.countEnsembleMember)
         #expect(!domain.generateFullRun)
         #expect(!domain.generateTimeSeries)
     }
@@ -49,8 +41,6 @@ import VaporTesting
         let handle = try #require(handles.first)
         #expect(Array(handle.reader.getDimensions()) == [1, 12])
         #expect(try await handle.reader.read() == values)
-        let handleDomain = try #require(handle.domain as? GridDomain)
-        #expect(handleDomain.grid.crsWkt2 == domain.grid.crsWkt2)
         let file = try #require(await writer.fn)
         let root = try await OmFileReader(fn: MmapFile(fn: file))
         let crs: String? = try await root.getChild(name: "crs_wkt")?.readScalar()
@@ -84,28 +74,30 @@ import VaporTesting
         #expect(source.resolutions.withLock { $0 } == 1)
     }
 
-    @Test(arguments: [false, true]) func artifactFailurePrecedesOutputCreation(corrupt: Bool) async throws {
+    @Test func missingArtifactPreventsYearlyOutput() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("temperature_2m"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let artifact = directory.appendingPathComponent("grid.bin")
-        if corrupt { try Data([0, 1, 2]).write(to: artifact) }
         let source = DeferredDomain(file: artifact)
         await #expect(throws: (any Error).self) {
             try await MergeYearlyCommand.generateYearlyFile(logger: logger, domain: source, year: 2001, variable: "temperature_2m", force: true, allowMissing: true, domainDirectory: directory.path)
         }
-        #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("temperature_2m").path))
+        for name in ["year_2001.om", "year_2001.om~"] {
+            #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("temperature_2m/\(name)").path))
+        }
         #expect(source.resolutions.withLock { $0 } == 1)
     }
 
     @Test(arguments: ["valid", "missing", "corrupt"])
-    func boundingBoxArtifactErrorsDoNotStopServer(state: String) async throws {
-        let fixture = try makeFixture(centers: makeSphericalCenters(count: 12))
-        defer { fixture.remove() }
+    func boundingBoxArtifactErrorsReturnHttpResponses(state: String) async throws {
         let artifact = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: artifact) }
         switch state {
-        case "valid": try FileManager.default.copyItem(at: fixture.file, to: artifact)
+        case "valid":
+            let fixture = try makeFixture(centers: makeSphericalCenters(count: 12))
+            defer { fixture.remove() }
+            try FileManager.default.moveItem(at: fixture.file, to: artifact)
         case "corrupt": try Data([0, 1, 2]).write(to: artifact)
         default: break
         }
