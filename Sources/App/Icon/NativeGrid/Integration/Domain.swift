@@ -7,8 +7,7 @@ import Vapor
 /// GRIB message must match these values so data cannot silently be paired with another grid order.
 struct IconNativeGridIdentity: Sendable, Hashable {
     let gridNumber: UInt32
-    let gridUUID: [UInt8]
-    let gridUUIDHex: String
+    let gridUUID: UUID
     let cellCount: Int
     let isGlobal: Bool
     let maximumDistanceMeters: Float
@@ -16,8 +15,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
 
     static let global = Self(
         gridNumber: 26,
-        gridUUID: [0xa2, 0x7b, 0x8d, 0xe6, 0x18, 0xc4, 0x11, 0xe4, 0x82, 0x0a, 0xb5, 0xb0, 0x98, 0xc6, 0xa5, 0xc0],
-        gridUUIDHex: "a27b8de618c411e4820ab5b098c6a5c0",
+        gridUUID: UUID(uuidString: "a27b8de6-18c4-11e4-820a-b5b098c6a5c0")!,
         cellCount: 2_949_120,
         isGlobal: true,
         maximumDistanceMeters: 20_000,
@@ -26,8 +24,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
 
     static let d2 = Self(
         gridNumber: 47,
-        gridUUID: [0xc6, 0xb1, 0x2d, 0xaa, 0x91, 0xad, 0x64, 0x04, 0x5b, 0x26, 0xc1, 0xb6, 0x45, 0x2a, 0x2a, 0x20],
-        gridUUIDHex: "c6b12daa91ad64045b26c1b6452a2a20",
+        gridUUID: UUID(uuidString: "c6b12daa-91ad-6404-5b26-c1b6452a2a20")!,
         cellCount: 542_040,
         isGlobal: false,
         maximumDistanceMeters: 4_000,

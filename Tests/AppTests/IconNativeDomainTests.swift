@@ -67,7 +67,7 @@ import Logging
             gridType: "unstructured_grid",
             gridDefinitionTemplateNumber: 101,
             numberOfGridUsed: Int(identity.gridNumber),
-            uuidOfHGrid: identity.gridUUIDHex,
+            uuidOfHGrid: identity.gridUUID.hexString,
             numberOfDataPoints: dataPointCount ?? identity.cellCount
         )
     }

@@ -48,7 +48,7 @@ extension IconNativeGrid {
             let maximumAngle = Double(identity.maximumDistanceMeters) / 6_371_229
             let maximumChord = 2 * sin(maximumAngle * 0.5)
             let metadata = SphericalCubeArtifact.Metadata(
-                identity: .init(number: identity.gridNumber, uuid: identity.gridUUID),
+                identity: .init(number: identity.gridNumber, uuid: identity.gridUUID.bytes),
                 coversWholeSphere: identity.isGlobal,
                 maximumChordDistanceSquared: Float(maximumChord * maximumChord)
             )
@@ -107,7 +107,7 @@ extension IconNativeGrid {
                 throw IconNativeGridSourceError.missingAttribute("uuidOfHGrid")
             }
             let normalisedUUID = uuid.lowercased().filter { $0 != "-" }
-            guard normalisedUUID == identity.gridUUIDHex else {
+            guard normalisedUUID == identity.gridUUID.hexString else {
                 throw IconNativeGridSourceError.invalidAttribute(name: "uuidOfHGrid", actual: uuid)
             }
             // DWD's published grid files do not consistently carry ICON's optional `global_grid`
