@@ -324,6 +324,7 @@ struct WeatherApiController {
                     OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
                     throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
                 }
+                OmMetrics.recordModelRequest(models: domains, locationCount: coordinates.count)
                 locations = try await coordinates.asyncMap { prepared in
                     let coordinates = prepared.coordinate
                     let timezone = prepared.timezone
@@ -346,6 +347,7 @@ struct WeatherApiController {
                     return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
                 }
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
+                var countedModels = Set<MultiDomains>()
                 locations = try await domains.asyncFlatMap({ domain in
                     guard let grid = domain.genericDomain?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
@@ -359,6 +361,10 @@ struct WeatherApiController {
                     }
                     guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
+                    }
+                    if countedModels.insert(domain).inserted {
+                        let locationCount = gridpoionts.reduce(0) { count, _ in count + 1 } * max(dates.count, 1)
+                        OmMetrics.recordModelRequest(models: [domain], locationCount: locationCount)
                     }
                     /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
                     let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run

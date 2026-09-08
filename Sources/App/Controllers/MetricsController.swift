@@ -10,6 +10,20 @@ enum OmMetrics {
     static let requestsTooManyLocationsTotal = Atomic(0)
     static let requestsErrorThrownTotal = Atomic(0)
     static let requestsForecastApiTotal = Atomic(0)
+    /// Immutable lookup with one atomic counter per API model.
+    static let requestsPerModelTotal = Dictionary(uniqueKeysWithValues: MultiDomains.allCases.map { ($0, ModelRequestCounter()) })
+
+    final class ModelRequestCounter: Sendable {
+        let value = Atomic(0)
+    }
+
+    /// Count requested locations once for each distinct resolved model.
+    static func recordModelRequest(models: [MultiDomains], locationCount: Int) {
+        for model in Set(models) {
+            requestsPerModelTotal[model]?.value.add(locationCount, ordering: .relaxed)
+        }
+    }
+
     static let requestsS3ApiTotal = Atomic(0)
     static let requestsElevationApiTotal = Atomic(0)
     static let requestsCloudflareWorkersTotal = Atomic(0)
@@ -121,6 +135,11 @@ om_requests_cloudflare_workers_total \(OmMetrics.requestsCloudflareWorkersTotal.
 # TYPE om_requests_forecast_api_total counter
 # HELP om_requests_forecast_api_total Number of Forecast API calls
 om_requests_forecast_api_total \(OmMetrics.requestsForecastApiTotal.load(ordering: .relaxed))
+# TYPE om_requests_model_total counter
+# HELP om_requests_model_total Number of requested locations per resolved model, including calls that fail after locations are counted
+\(MultiDomains.allCases.map { model in
+    "om_requests_model_total{model=\"\(model.rawValue)\"} \(OmMetrics.requestsPerModelTotal[model]!.value.load(ordering: .relaxed))"
+}.joined(separator: "\n"))
 # TYPE om_requests_s3_api_total counter
 # HELP om_requests_s3_api_total Number of S3 API calls
 om_requests_s3_api_total \(OmMetrics.requestsS3ApiTotal.load(ordering: .relaxed))
