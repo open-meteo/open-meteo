@@ -73,29 +73,21 @@ extension GenericDomain {
 
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
-        guard let domainRegistryStatic else {
-            return nil
-        }
+        await getStaticFilePayload(type: type, httpClient: httpClient, logger: logger)?.reader
+    }
+
+    func getStaticFilePayload(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> OmFileLocalRemoteOmReader? {
+        guard let domainRegistryStatic else { return nil }
+        let variable: String
         switch type {
-        case .soilType:
-            return try? await OmFileSystemManager.instance.get(
-                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
-                client: httpClient,
-                logger: logger
-            )?.reader
-        case .elevation:
-            let payload = try? await OmFileSystemManager.instance.get(
-                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
-                client: httpClient,
-                logger: logger
-            )
-            switch domainRegistryStatic {
-            case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
-                return payload?.nativeElevationReader
-            default:
-                return payload?.reader
-            }
+        case .soilType: variable = "soil_type"
+        case .elevation: variable = "HSURF"
         }
+        return try? await OmFileSystemManager.instance.get(
+            file: OmFileType.staticFile(domain: domainRegistryStatic, variable: variable, chunk: nil),
+            client: httpClient,
+            logger: logger
+        )
     }
 
     /// Meta JSON for time-series data

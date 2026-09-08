@@ -9,18 +9,18 @@ import Testing
 @Suite struct IconNativeGridTests {
     @Test func int16ElevationCacheEncodingIsLossless() throws {
         let source: [Float] = [-999, 0, 2_048, 8_765, 9_999, .nan]
-        let encoded = try OmFileLazyInt16ArrayReader.encode(source)
+        let encoded = try ElevationValues.encode(source)
 
         #expect(encoded == [-999, 0, 2_048, 8_765, 9_999, .min])
-        let decoded = encoded.map(OmFileLazyInt16ArrayReader.decode)
+        let decoded = encoded.map(ElevationValues.decode)
         #expect(decoded.dropLast() == source.dropLast())
         #expect(decoded.last?.isNaN == true)
 
-        #expect(throws: OmFileLazyInt16ArrayReader.EncodingError.self) {
-            try OmFileLazyInt16ArrayReader.encode([1.5])
+        #expect(throws: ElevationValues.EncodingError.self) {
+            try ElevationValues.encode([1.5])
         }
-        #expect(throws: OmFileLazyInt16ArrayReader.EncodingError.self) {
-            try OmFileLazyInt16ArrayReader.encode([Float(Int16.min)])
+        #expect(throws: ElevationValues.EncodingError.self) {
+            try ElevationValues.encode([Float(Int16.min)])
         }
     }
 
@@ -140,96 +140,189 @@ import Testing
         elevations[40] = 500
         let elevationFile = try await makeElevationFile(elevations)
         defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
-        let recordingReader = RecordingElevationReader(reader: elevationFile.reader)
-        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
-
-        let terrain = try #require(try await fixture.grid.findPointTerrainOptimised(
-            lat: 0,
-            lon: 0,
-            elevation: 500,
-            elevationFile: cachedReader
-        ))
-
-        #expect(terrain.gridpoint == 40)
-        #expect(recordingReader.arrayReadRanges == [0..<400])
+        let loads = Mutex(0)
+        let count = elevations.count
+        let cache = ElevationCache(elementCount: count) {
+            loads.withLock { $0 += 1 }
+            return try await elevationFile.reader.read(range: [0..<1, 0..<UInt64(count)])
+        }
+        for _ in 0..<2 {
+            let terrain = try #require(try await fixture.grid.findPointTerrainOptimised(
+                lat: 0, lon: 0, elevation: 500,
+                elevationFile: elevationFile.reader, elevationCache: cache
+            ))
+            #expect(terrain.gridpoint == 40)
+        }
+        #expect(loads.withLock { $0 } == 1)
     }
 
     @Test func surfaceElevationCacheInitializesLazilyOnce() async throws {
-        let elevationFile = try await makeElevationFile(
-            (0..<800).map(Float.init),
-            chunkWidth: 400
-        )
-        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
-        let recordingReader = RecordingElevationReader(reader: elevationFile.reader)
-        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
+        let loads = Mutex(0)
+        let cache = ElevationCache(elementCount: 800) {
+            loads.withLock { $0 += 1 }
+            return (0..<800).map(Float.init)
+        }
         var pointIDs = InlineArray<10, Int>(repeating: -1)
         pointIDs[0] = 10
         pointIDs[1] = 20
         pointIDs[2] = 410
-
-        #expect(recordingReader.arrayReadRanges.isEmpty)
-        #expect(try await cachedReader.read(range: [0..<1, 10..<11]) == [10])
-        #expect(recordingReader.arrayReadRanges == [10..<11])
-
-        let first = try await cachedReader.read(pointIDs: pointIDs, count: 3)
+        #expect(cache.cachedValues == nil)
+        #expect(loads.withLock { $0 } == 0)
+        let values = try await cache.loadValues()
+        let first = values.read(pointIDs: pointIDs, count: 3)
         #expect(first[0] == 10)
         #expect(first[1] == 20)
         #expect(first[2] == 410)
-        #expect(recordingReader.arrayReadRanges == [10..<11, 0..<800])
-
-        _ = try await cachedReader.read(pointIDs: pointIDs, count: 3)
-        #expect(recordingReader.arrayReadRanges == [10..<11, 0..<800])
+        #expect(values.count == 800)
+        #expect(cache.cachedValues === values)
+        #expect(try await cache.loadValues() === values)
+        #expect(loads.withLock { $0 } == 1)
     }
 
     @Test func surfaceElevationCacheCoalescesConcurrentLoads() async throws {
-        let elevationFile = try await makeElevationFile(
-            (0..<400).map(Float.init),
-            chunkWidth: 400
-        )
-        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
-        let recordingReader = RecordingElevationReader(reader: elevationFile.reader)
-        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
-
-        let values = try await withThrowingTaskGroup(of: Float.self) { group in
+        let loader = GatedElevationLoader()
+        let cache = ElevationCache(elementCount: 2) { try await loader.load() }
+        let first = Task { try await cache.loadValues() }
+        await loader.waitUntilStarted()
+        first.cancel()
+        let identifiers = try await withThrowingTaskGroup(of: ObjectIdentifier.self) { group in
             for _ in 0..<16 {
-                group.addTask { try await cachedReader.read(pointID: 17) }
+                group.addTask {
+                    let values = try await cache.loadValues()
+                    #expect(values[1] == 17)
+                    return ObjectIdentifier(values)
+                }
             }
-            var values = [Float]()
-            for try await value in group { values.append(value) }
-            return values
+            await loader.release()
+            var identifiers = [ObjectIdentifier]()
+            for try await id in group { identifiers.append(id) }
+            return identifiers
         }
-
-        #expect(values == [Float](repeating: 17, count: 16))
-        #expect(recordingReader.arrayReadRanges == [0..<400])
+        #expect(Set(identifiers).count == 1)
+        #expect(try await ObjectIdentifier(first.value) == identifiers[0])
+        #expect(await loader.loads == 1)
     }
 
-    @Test func surfaceElevationCacheRetriesFailedLoad() async throws {
-        let elevationFile = try await makeElevationFile([0, 17], chunkWidth: 2)
-        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
-        let recordingReader = RecordingElevationReader(reader: elevationFile.reader, failFirstRead: true)
-        let cachedReader = try #require(OmFileLazyInt16ArrayReader(wrapping: recordingReader))
-
-        await #expect(throws: RecordingElevationReader.ReadError.injectedFailure) {
-            _ = try await cachedReader.read(pointID: 1)
+    @Test func surfaceElevationCacheRetriesFailedConcurrentLoad() async throws {
+        let loads = Mutex(0)
+        let cache = ElevationCache(elementCount: 2) {
+            let attempt = loads.withLock { $0 += 1; return $0 }
+            await Task.yield()
+            if attempt == 1 { throw ElevationTestError.injectedFailure }
+            return [0, 17]
         }
-        #expect(recordingReader.arrayReadRanges == [0..<2])
-
-        #expect(try await cachedReader.read(pointID: 1) == 17)
-        #expect(recordingReader.arrayReadRanges == [0..<2, 0..<2])
-
-        #expect(try await cachedReader.read(pointID: 0) == 0)
-        #expect(recordingReader.arrayReadRanges == [0..<2, 0..<2])
+        let failures = await withTaskGroup(of: Bool.self) { group in
+            for _ in 0..<16 {
+                group.addTask {
+                    do {
+                        #expect(try await cache.loadValues()[1] == 17)
+                        return false
+                    } catch {
+                        #expect(error as? ElevationTestError == .injectedFailure)
+                        return true
+                    }
+                }
+            }
+            var failures = 0
+            for await failed in group { if failed { failures += 1 } }
+            return failures
+        }
+        #expect(failures > 0)
+        #expect(try await cache.loadValues()[1] == 17)
+        #expect(try await cache.loadValues()[0] == 0)
+        #expect(loads.withLock { $0 } == 2)
     }
 
-    @Test func surfacePayloadOffersLazyNativeElevationReader() async throws {
-        let elevationFile = try await makeElevationFile([0, 1], chunkWidth: 2)
-        defer { try? FileManager.default.removeItem(atPath: elevationFile.path) }
+    @Test func invalidElevationLoadIsNotPublished() async throws {
+        let loads = Mutex(0)
+        let cache = ElevationCache(elementCount: 2) {
+            let attempt = loads.withLock { $0 += 1; return $0 }
+            return attempt == 1 ? [0] : [0, 17]
+        }
+        await #expect(throws: ElevationCacheError.unexpectedCount(expected: 2, actual: 1)) {
+            _ = try await cache.loadValues()
+        }
+        #expect(cache.cachedValues == nil)
+        #expect(try await cache.loadValues()[1] == 17)
+        let invalid = ElevationCache(elementCount: 1) { [1.5] }
+        await #expect(throws: ElevationValues.EncodingError.self) {
+            _ = try await invalid.loadValues()
+        }
+        #expect(invalid.cachedValues == nil)
+    }
 
-        let handle = try FileHandle.openFileReading(file: elevationFile.path)
-        let size = Int64(try handle.seekToEnd())
-        let payload = try await OmFileLocalRemoteOmReader(fd: handle, size: size)
-        #expect(payload.nativeElevationReader is OmFileLazyInt16ArrayReader)
-        #expect(!(payload.reader is OmFileLazyInt16ArrayReader))
+    @Test func payloadReplacementOwnsIndependentElevationCache() async throws {
+        let file = try await makeElevationFile([0, 17])
+        let replacement = try await makeElevationFile([0, 23])
+        defer {
+            try? FileManager.default.removeItem(atPath: file.path)
+            try? FileManager.default.removeItem(atPath: replacement.path)
+        }
+        func payload(_ path: String) async throws -> OmFileLocalRemoteOmReader {
+            let handle = try FileHandle.openFileReading(file: path)
+            return try await OmFileLocalRemoteOmReader(fd: handle, size: Int64(handle.seekToEnd()))
+        }
+        let old = try await payload(file.path)
+        let oldCache = try #require(old.elevationCache)
+        #expect(try await old.reader.read(range: [0..<1, 1..<2]) == [17])
+        #expect(oldCache.cachedValues == nil)
+        let oldValues = try await oldCache.loadValues()
+        try FileManager.default.removeItem(atPath: file.path)
+        try FileManager.default.moveItem(atPath: replacement.path, toPath: file.path)
+        let new = try await payload(file.path)
+        let newCache = try #require(new.elevationCache)
+        #expect(newCache !== oldCache)
+        #expect(newCache.cachedValues == nil)
+        #expect(try await newCache.loadValues()[1] == 23)
+        #expect(oldValues[1] == 17)
+    }
+
+    @Test func nativeSelectionPreservesRawResultsAndLazyPaths() async throws {
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+        ], maximumDistanceMeters: 20_000)
+        defer { fixture.remove() }
+        let file = try await makeElevationFile([100, -999])
+        defer { try? FileManager.default.removeItem(atPath: file.path) }
+        let cache = try #require(ElevationCache(reader: file.reader))
+        for (mode, elevation) in [(GridSelectionMode.nearest, Float(500)), (.land, .nan)] {
+            _ = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: elevation,
+                elevationFile: file.reader, mode: mode, elevationCache: cache)
+            #expect(cache.cachedValues == nil)
+        }
+        _ = try await fixture.grid.readElevation(gridpoint: 0, elevationFile: file.reader)
+        #expect(cache.cachedValues == nil)
+        for latitude in [Float.nan, 50] {
+            let outside = try await fixture.grid.findPoint(lat: latitude, lon: 0, elevation: 500,
+                elevationFile: file.reader, mode: .sea, elevationCache: cache)
+            #expect(outside == nil)
+            #expect(cache.cachedValues == nil)
+        }
+        for mode in [GridSelectionMode.sea, .land] {
+            let raw = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
+                elevationFile: file.reader, mode: mode)
+            let cached = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
+                elevationFile: file.reader, mode: mode, elevationCache: cache)
+            #expect(raw?.gridpoint == cached?.gridpoint)
+            #expect(raw?.gridElevation.numeric == cached?.gridElevation.numeric)
+            #expect(raw?.gridElevation.isSea == cached?.gridElevation.isSea)
+        }
+        #expect(cache.cachedValues != nil)
+    }
+
+    @Test func unsupportedElevationFormatUsesDirectReads() async throws {
+        let file = try await makeElevationFile([100, -999], scaleFactor: 10)
+        defer { try? FileManager.default.removeItem(atPath: file.path) }
+        #expect(ElevationCache(reader: file.reader) == nil)
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+        ])
+        defer { fixture.remove() }
+        let result = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
+            elevationFile: file.reader, mode: .sea, elevationCache: nil)
+        #expect(result?.gridpoint == 1)
     }
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_GLOBAL_GRID_TEST_FILE"] != nil))
@@ -263,37 +356,39 @@ private struct IconNativeGridElevationFile {
     let reader: OmFileReaderArray<FileHandleWithCount, Float>
 }
 
-private final class RecordingElevationReader: OmFileReaderArrayForwarding, Sendable {
-    typealias OmType = Float
+private enum ElevationTestError: Error, Equatable {
+    case injectedFailure
+}
 
-    enum ReadError: Error, Equatable {
-        case injectedFailure
-    }
+/// Holds the shared load until the test cancels a waiter and starts concurrent readers.
+private actor GatedElevationLoader {
+    private var started: CheckedContinuation<Void, Never>?
+    private var gates = [CheckedContinuation<Void, Never>]()
+    private var released = false
+    private(set) var loads = 0
 
-    let wrappedReader: any OmFileReaderArrayProtocol<Float>
-    private let failFirstRead: Bool
-    private let recordedArrayReadRanges = Mutex<[Range<UInt64>]>([])
-
-    init(reader: OmFileReaderArray<FileHandleWithCount, Float>, failFirstRead: Bool = false) {
-        wrappedReader = reader
-        self.failFirstRead = failFirstRead
-    }
-
-    var arrayReadRanges: [Range<UInt64>] {
-        recordedArrayReadRanges.withLock { $0 }
-    }
-
-    func read<let nDimensions: Int>(
-        range: InlineArray<nDimensions, Range<UInt64>>
-    ) async throws -> [Float] {
-        if nDimensions == 2 {
-            let shouldFail = recordedArrayReadRanges.withLock {
-                $0.append(range[1])
-                return failFirstRead && $0.count == 1
+    func load() async throws -> [Float] {
+        loads += 1
+        if !released {
+            await withCheckedContinuation {
+                gates.append($0)
+                started?.resume()
+                started = nil
             }
-            if shouldFail { throw ReadError.injectedFailure }
         }
-        return try await wrappedReader.read(range: range)
+        try Task.checkCancellation()
+        return [0, 17]
+    }
+
+    func waitUntilStarted() async {
+        if loads > 0 { return }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func release() {
+        released = true
+        gates.forEach { $0.resume() }
+        gates.removeAll()
     }
 }
 
@@ -440,7 +535,8 @@ private func nearestCandidate(
 
 private func makeElevationFile(
     _ elevations: [Float],
-    chunkWidth: Int? = nil
+    chunkWidth: Int? = nil,
+    scaleFactor: Float = 1
 ) async throws -> IconNativeGridElevationFile {
     let path = FileManager.default.temporaryDirectory
         .appendingPathComponent("icon-native-elevation-\(UUID().uuidString).om").path
@@ -450,7 +546,7 @@ private func makeElevationFile(
         dimensions: [1, elevations.count],
         chunks: [1, min(chunkWidth ?? elevations.count, elevations.count)],
         compression: .pfor_delta2d_int16,
-        scalefactor: 1
+        scalefactor: scaleFactor
     )
     try handle.close()
     return IconNativeGridElevationFile(
