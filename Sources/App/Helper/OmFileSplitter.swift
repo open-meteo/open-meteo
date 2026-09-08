@@ -47,7 +47,10 @@ struct OmFileSplitter {
     }
 
     init<Domain: GridDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
-        let grid = domain.grid
+        self.init(domain: domain, grid: domain.grid, nMembers: nMembers, chunknLocations: chunknLocations)
+    }
+
+    init(domain: any GenericDomain, grid: any Gridable, nMembers: Int? = nil, chunknLocations: Int? = nil) {
         self.init(
             domain: domain.domainRegistry,
             nMembers: max(nMembers ?? domain.countEnsembleMember, 1),

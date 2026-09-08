@@ -1,8 +1,6 @@
 import Foundation
 import OmFileFormat
 import OmFileIO
-import SphericalCube
-import Synchronization
 import Vapor
 
 /// Immutable identity of an operational DWD grid. Both the NetCDF definition and every native
@@ -55,65 +53,6 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
     }
 }
 
-/// Pins a successfully resolved mapping for the synchronous lookup path. Local and remote file
-/// discovery belongs to `OmFileSystemManager`.
-final class IconNativeGridCache: Sendable {
-    private let file: String
-    private let identity: IconNativeGridIdentity
-    private let entry = AtomicLazyReference<SphericalCubeIndex>()
-
-    init(file: String, identity: IconNativeGridIdentity) {
-        self.file = file
-        self.identity = identity
-    }
-
-    func get() throws -> IconNativeGrid {
-        guard let resolved = entry.load() else {
-            throw IconNativeDomainError.missingGridArtifact(file)
-        }
-        return IconNativeGrid(storage: resolved)
-    }
-
-    /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
-    func install(_ grid: IconNativeGrid) {
-        _ = entry.storeIfNil(grid.storage)
-    }
-
-    /// Downloader-only disk validation. Unlike `get()`, this always inspects the final artifact.
-    func validateFileAndInstall() throws {
-        let loaded = try loadStorage()
-        _ = entry.storeIfNil(loaded)
-    }
-
-    private func loadStorage() throws(IconNativeDomainError) -> SphericalCubeIndex {
-        guard FileManager.default.fileExists(atPath: file) else {
-            throw IconNativeDomainError.missingGridArtifact(file)
-        }
-        do {
-            let handle = try FileHandle.openFileReading(file: file)
-            return try identity.loadGrid(mapped: MmapFile(fn: handle), path: file).storage
-        } catch let error as IconNativeDomainError {
-            throw error
-        } catch {
-            throw IconNativeDomainError.invalidGridArtifact(
-                path: file,
-                reason: String(describing: error)
-            )
-        }
-    }
-}
-
-private enum IconNativeGridCaches {
-    static let global = IconNativeGridCache(
-        file: "\(DomainRegistry.dwd_icon_global_native.directory)static/grid.bin",
-        identity: .global
-    )
-    static let d2 = IconNativeGridCache(
-        file: "\(DomainRegistry.dwd_icon_d2_native.directory)static/grid.bin",
-        identity: .d2
-    )
-}
-
 extension IconDomains {
     var isNative: Bool {
         nativeGridIdentity != nil
@@ -151,61 +90,29 @@ extension IconDomains {
         }
     }
 
-    var nativeGridIdentity: IconNativeGridIdentity? {
+    var nativeGridIdentity: IconNativeGridIdentity? { nativeGridFile?.identity }
+
+    var nativeGridFile: IconNativeGridFile? {
         switch self {
-        case .iconNative:
-            return .global
-        case .iconD2Native, .iconD2Native15min:
-            return .d2
-        default:
-            return nil
+        case .iconNative: return Self.globalGridFile
+        case .iconD2Native, .iconD2Native15min: return Self.d2GridFile
+        default: return nil
         }
     }
 
-    private var nativeGridCache: IconNativeGridCache {
-        switch self {
-        case .iconNative:
-            return IconNativeGridCaches.global
-        case .iconD2Native, .iconD2Native15min:
-            return IconNativeGridCaches.d2
-        default:
-            preconditionFailure("\(self) is not a native ICON domain")
-        }
-    }
-
-    func resolveNativeGrid(context: DomainInitContext) async throws -> any Gridable {
-        guard let identity = nativeGridIdentity, let registry = domainRegistryStatic else {
-            throw IconNativeDomainError.missingGridArtifact("No native grid for \(self)")
-        }
-        if let grid = try? nativeGridCache.get() {
-            return grid
-        }
-        let file = IconNativeGridFile(registry: registry, identity: identity)
-        guard
-            let payload = try await OmFileSystemManager.instance.get(
-                file: file,
-                client: context.httpClient,
-                logger: context.logger
-            )
-        else {
-            throw IconNativeDomainError.missingGridArtifact(file.getFilePath())
-        }
-        let grid = try identity.validate(grid: payload.grid, path: file.getFilePath())
-        nativeGridCache.install(grid)
-        return grid
-    }
+    static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
+    static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
 
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
-        guard let identity = nativeGridIdentity else {
+        guard let artifact = nativeGridFile else {
             return
         }
-        guard let registry = domainRegistryStatic else {
-            preconditionFailure("Native ICON domain has no static registry")
-        }
+        let identity = artifact.identity
+        let registry = artifact.registry
         do {
             // Downloader preparation deliberately validates the on-disk artifact. API lookups use
             // the atomically pinned mapping and never enter this disk-maintenance path.
-            try nativeGridCache.validateFileAndInstall()
+            try artifact.cache.validateFileAndInstall()
             // Valid existing artifacts are reused without uploading. Delete grid.bin locally to
             // force regeneration, and supply --upload-s3-bucket to upload the regenerated artifact.
             return
@@ -262,7 +169,7 @@ extension IconDomains {
             )
         }
 
-        nativeGridCache.install(grid)
+        artifact.cache.install(grid)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
         for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
             let uploads = queue.startMultiPartUploads()

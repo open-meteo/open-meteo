@@ -25,7 +25,7 @@ import Logging
         #expect(remapped[3] == 30)
     }
 
-    @Test func configuredGridIdentities() {
+    @Test func configuredGridIdentities() throws {
         #expect(IconNativeGridIdentity.global.gridNumber == 26)
         #expect(IconNativeGridIdentity.global.gridUUIDHex == "a27b8de618c411e4820ab5b098c6a5c0")
         #expect(IconNativeGridIdentity.global.cellCount == 2_949_120)
@@ -34,6 +34,13 @@ import Logging
         #expect(IconNativeGridIdentity.d2.gridUUIDHex == "c6b12daa91ad64045b26c1b6452a2a20")
         #expect(IconNativeGridIdentity.d2.cellCount == 542_040)
         #expect(IconNativeGridIdentity.d2.maximumDistanceMeters == 4_000)
+
+        let global = try #require(IconDomains.iconNative.nativeGridFile)
+        let hourly = try #require(IconDomains.iconD2Native.nativeGridFile)
+        let quarterHourly = try #require(IconDomains.iconD2Native15min.nativeGridFile)
+        #expect(hourly.cache === quarterHourly.cache)
+        #expect(global.cache !== hourly.cache)
+        #expect(hourly.registry == .dwd_icon_d2_native)
     }
 
     @Test func gribGridValidation() throws {

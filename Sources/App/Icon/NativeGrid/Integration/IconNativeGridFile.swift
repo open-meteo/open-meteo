@@ -2,6 +2,7 @@ import Foundation
 import OmFileFormat
 import OmFileIO
 import SphericalCube
+import Synchronization
 
 extension IconNativeGridIdentity {
     func loadGrid(mapped: MmapFile, path: String) throws -> IconNativeGrid {
@@ -45,23 +46,26 @@ extension IconNativeGridIdentity {
 
 }
 
-struct IconNativeGridFile: OmFileManagable {
+struct IconNativeGridFile: OmFileManagable, Sendable {
     typealias Payload = IconNativeGridPayload
 
     let localFile: String
     let registry: DomainRegistry
     let identity: IconNativeGridIdentity
+    let cache: IconNativeGridCache
 
     init(registry: DomainRegistry, identity: IconNativeGridIdentity) {
         localFile = "\(registry.directory)static/grid.bin"
         self.registry = registry
         self.identity = identity
+        self.cache = IconNativeGridCache(file: localFile, identity: identity)
     }
 
     init(localFile: String, identity: IconNativeGridIdentity) {
         self.localFile = localFile
         registry = identity.isGlobal ? .dwd_icon_global_native : .dwd_icon_d2_native
         self.identity = identity
+        self.cache = IconNativeGridCache(file: localFile, identity: identity)
     }
 
     func materialize<Backend: OmFileReaderBackend>(file: Backend) async throws -> IconNativeGrid
@@ -119,4 +123,69 @@ struct IconNativeGridPayload: OmFilePayload {
 
     // The complete artifact is already local, and active readers deliberately pin its mapping.
     func remoteDeleted() async throws {}
+}
+
+extension IconNativeGridFile {
+    func load(context: DomainInitContext) async throws -> any Gridable {
+        if let grid = try? cache.get() {
+            return grid
+        }
+        guard let payload = try await OmFileSystemManager.instance.get(
+            file: self, client: context.httpClient, logger: context.logger
+        ) else {
+            throw IconNativeDomainError.missingGridArtifact(getFilePath())
+        }
+        let grid = try identity.validate(grid: payload.grid, path: getFilePath())
+        cache.install(grid)
+        return grid
+    }
+}
+
+
+/// Pins a successfully loaded mapping for this artifact. Local and remote file
+/// discovery belongs to `OmFileSystemManager`.
+final class IconNativeGridCache: Sendable {
+    private let file: String
+    private let identity: IconNativeGridIdentity
+    private let entry = AtomicLazyReference<SphericalCubeIndex>()
+
+    init(file: String, identity: IconNativeGridIdentity) {
+        self.file = file
+        self.identity = identity
+    }
+
+    func get() throws -> IconNativeGrid {
+        guard let resolved = entry.load() else {
+            throw IconNativeDomainError.missingGridArtifact(file)
+        }
+        return IconNativeGrid(storage: resolved)
+    }
+
+    /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
+    func install(_ grid: IconNativeGrid) {
+        _ = entry.storeIfNil(grid.storage)
+    }
+
+    /// Downloader-only disk validation. Unlike `get()`, this always inspects the final artifact.
+    func validateFileAndInstall() throws {
+        let loaded = try loadStorage()
+        _ = entry.storeIfNil(loaded)
+    }
+
+    private func loadStorage() throws(IconNativeDomainError) -> SphericalCubeIndex {
+        guard FileManager.default.fileExists(atPath: file) else {
+            throw IconNativeDomainError.missingGridArtifact(file)
+        }
+        do {
+            let handle = try FileHandle.openFileReading(file: file)
+            return try identity.loadGrid(mapped: MmapFile(fn: handle), path: file).storage
+        } catch let error as IconNativeDomainError {
+            throw error
+        } catch {
+            throw IconNativeDomainError.invalidGridArtifact(
+                path: file,
+                reason: String(describing: error)
+            )
+        }
+    }
 }

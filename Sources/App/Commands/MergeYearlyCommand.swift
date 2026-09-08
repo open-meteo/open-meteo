@@ -36,17 +36,17 @@ struct MergeYearlyCommand: AsyncCommand {
         let logger = context.application.logger
         let registry = try DomainRegistry.load(rawValue: signature.domain)
         let years = try signature.years.getYearsRange()
-        guard let sourceDomain = registry.getDomain() else {
+        guard let domain = registry.getDomain() else {
             fatalError("Did not get domain object")
         }
 
-        let domain = try await ResolvedDomain(sourceDomain, context: .init(logger: logger, httpClient: nil))
+        let grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
 
         let variables: [String] = try signature.variables.map({ $0.split(separator: ",").map(String.init) }) ?? FileManager.default.contentsOfDirectory(atPath: registry.directory).filter { !$0.contains(".") && $0 != "static" }
 
         for year in years {
             for variable in variables {
-                try await Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force, allowMissing: signature.allowMissing)
+                try await Self.generateYearlyFile(logger: logger, domain: domain, grid: grid, year: year, variable: variable, force: signature.force, allowMissing: signature.allowMissing)
             }
         }
 
@@ -70,7 +70,11 @@ struct MergeYearlyCommand: AsyncCommand {
 
     /// Generate a yearly file for a specified domain, variable and year
     static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool, domainDirectory: String? = nil) async throws {
-        let domain = try await ResolvedDomain(domain, context: .init(logger: logger, httpClient: nil))
+        let grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
+        try await generateYearlyFile(logger: logger, domain: domain, grid: grid, year: year, variable: variable, force: force, allowMissing: allowMissing, domainDirectory: domainDirectory)
+    }
+
+    private static func generateYearlyFile(logger: Logger, domain: any GenericDomain, grid: any Gridable, year: Int, variable: String, force: Bool, allowMissing: Bool, domainDirectory: String? = nil) async throws {
         let directory = domainDirectory ?? domain.domainRegistry.directory
         logger.info("Processing variable \(variable) for year \(year)")
         let yearlyFilePath = "\(directory)/\(variable)/year_\(year).om"
@@ -84,7 +88,6 @@ struct MergeYearlyCommand: AsyncCommand {
         let omFileLength = domain.omFileLength
         let dtSeconds = domain.dtSeconds
         let yearTime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year + 1, 1, 1), dtSeconds: dtSeconds)
-        let grid = domain.grid
         let ny = UInt64(grid.ny)
         let nx = UInt64(grid.nx)
         let nt = UInt64(yearTime.count)
