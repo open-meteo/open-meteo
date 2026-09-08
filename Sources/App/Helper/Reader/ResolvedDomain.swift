@@ -1,4 +1,4 @@
-/// A domain whose grid prerequisites have completed before synchronous processing.
+/// Internal adapter for passing an initialized grid through the existing writer interfaces.
 struct ResolvedDomain: GridDomain, CustomStringConvertible {
     private let original: any GenericDomain
     let grid: any Gridable

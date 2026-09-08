@@ -30,7 +30,9 @@ import VaporTesting
         defer { fixture.remove() }
         let source = DeferredDomain(file: fixture.file)
         let domain = try await ResolvedDomain(source, context: .init(logger: logger, httpClient: nil))
-        let splitter = OmFileSplitter(domain)
+        let grid = domain.grid
+        try FileManager.default.removeItem(at: fixture.file)
+        let splitter = OmFileSplitter(domain: source, grid: grid)
         #expect(splitter.nx == 12)
         #expect(splitter.ny == 1)
         let time = Timestamp(2001, 1, 1)
@@ -44,7 +46,13 @@ import VaporTesting
         let file = try #require(await writer.fn)
         let root = try await OmFileReader(fn: MmapFile(fn: file))
         let crs: String? = try await root.getChild(name: "crs_wkt")?.readScalar()
-        #expect(crs == domain.grid.crsWkt2)
+        #expect(crs == grid.crsWkt2)
+        #expect(try await handle.domain.getGrid(context: .init(logger: logger, httpClient: nil)).crsWkt2 == grid.crsWkt2)
+        #expect(!handle.domain.generateFullRun)
+        #expect(!handle.domain.generateTimeSeries)
+        try await withApp { app in
+            try await GenericVariableHandle.convert(application: app, domain: source, createNetcdf: false, run: time, handles: handles, concurrent: 1, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: false)
+        }
         #expect(source.resolutions.withLock { $0 } == 1)
     }
 

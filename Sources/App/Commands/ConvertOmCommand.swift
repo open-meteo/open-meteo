@@ -52,7 +52,7 @@ struct ConvertOmCommand: AsyncCommand {
             guard let domain = domainObj.getDomain() else {
                 throw ConvertOmError("Domain has no grid")
             }
-            let grid = try await ResolvedDomain(domain, context: .init(logger: logger, httpClient: nil)).grid
+            let grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
             try await convertOmv3(src: signature.infile, dest: outfile, grid: grid)
             return
         } else if format == "netcdf" {
@@ -70,7 +70,7 @@ struct ConvertOmCommand: AsyncCommand {
                 guard let domain = try DomainRegistry.load(rawValue: name).getDomain() else {
                     throw ConvertOmError("Domain has no grid")
                 }
-                grid = try await ResolvedDomain(domain, context: .init(logger: logger, httpClient: nil)).grid
+                grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
             } else {
                 grid = nil
             }

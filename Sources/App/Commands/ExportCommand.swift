@@ -292,7 +292,7 @@ struct ExportCommand: AsyncCommand {
             fatalError("Export not supported for domain \(domain)")
         }
 
-        let grid = try await ResolvedDomain(genericDomain, context: .init(logger: application.logger, httpClient: nil)).grid
+        let grid = try await genericDomain.getGrid(context: .init(logger: application.logger, httpClient: nil))
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
@@ -510,7 +510,7 @@ struct ExportCommand: AsyncCommand {
         guard let genericDomain = domain.genericDomain else {
             fatalError("Export not supported for domain \(domain)")
         }
-        let grid = try await ResolvedDomain(genericDomain, context: .init(logger: application.logger, httpClient: nil)).grid
+        let grid = try await genericDomain.getGrid(context: .init(logger: application.logger, httpClient: nil))
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
