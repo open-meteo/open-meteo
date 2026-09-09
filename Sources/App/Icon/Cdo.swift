@@ -71,10 +71,6 @@ extension IconDomains {
 struct CdoIconGlobal: Sendable {
     let mapping: [Int32]
 
-    init(mapping: [Int32]) {
-        self.mapping = mapping
-    }
-
     func remap<T: BinaryFloatingPoint>(_ source: [T]) -> [Float] {
         mapping.map { index in
             guard index >= 0 else {
@@ -84,6 +80,9 @@ struct CdoIconGlobal: Sendable {
         }
     }
 
+}
+
+extension CdoIconGlobal {
     /// Download and prepare weights for icon global remapping
     public init?(curl: Curl, domain: IconDomains) async throws {
         guard domain.iconGridName != nil else {

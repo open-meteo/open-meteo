@@ -365,3 +365,13 @@ func makeElevationFile(_ elevations: [Float], scaleFactor: Float = 1) async thro
         throw error
     }
 }
+
+extension IconNativeGridFile {
+    init(localFile: String, identity: IconNativeGridIdentity) {
+        self.init(
+            localFile: localFile,
+            registry: identity.isGlobal ? .dwd_icon_global_native : .dwd_icon_d2_native,
+            identity: identity
+        )
+    }
+}
