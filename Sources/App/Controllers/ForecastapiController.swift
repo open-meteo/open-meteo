@@ -347,10 +347,9 @@ struct WeatherApiController {
                 }
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
                 locations = try await domains.asyncFlatMap({ domain in
-                    guard let genericDomain = domain.genericDomain else {
+                    guard let grid = try? await domain.genericDomain?.getGrid(context: .init(logger: options.logger, httpClient: options.httpClient)) else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
-                    let grid = try await genericDomain.getGrid(context: .init(logger: options.logger, httpClient: options.httpClient))
                     guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                     }
@@ -1157,8 +1156,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard let reader = forecast.readers.first else {
                     return nil
                 }
-                let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
-                return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + [reader])
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
+                return MultiDomains.hourlyToMultiSameType([prob].compactMap { $0 } + [reader])
             case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
