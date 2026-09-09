@@ -5,7 +5,7 @@ import OmFileFormat
 /**
  ICON Domains including ensemble
  */
-enum IconDomains: String, CaseIterable, GridDomain {
+enum IconDomains: String, CaseIterable, GenericDomain {
     /// hourly data until forecast hour 78, then 3 h until 180
     case icon
     case iconEu = "icon-eu"

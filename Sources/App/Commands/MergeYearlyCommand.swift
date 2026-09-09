@@ -36,11 +36,11 @@ struct MergeYearlyCommand: AsyncCommand {
         let logger = context.application.logger
         let registry = try DomainRegistry.load(rawValue: signature.domain)
         let years = try signature.years.getYearsRange()
-        guard let domain = registry.getDomain() else {
+        guard let domain = try await registry.getDomain(context: .init(logger: logger, httpClient: nil)) else {
             fatalError("Did not get domain object")
         }
 
-        let grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
+        let grid = domain.grid
 
         let variables: [String] = try signature.variables.map({ $0.split(separator: ",").map(String.init) }) ?? FileManager.default.contentsOfDirectory(atPath: registry.directory).filter { !$0.contains(".") && $0 != "static" }
 

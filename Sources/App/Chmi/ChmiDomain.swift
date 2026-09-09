@@ -5,7 +5,7 @@ import Vapor
 /// ČHMÚ (Czech Hydrometeorological Institute) ALADIN models
 /// Data: https://opendata.chmi.cz/meteorology/weather/nwp_aladin/
 /// 72h hourly forecast, 4 runs/day (00/06/12/18 UTC)
-enum ChmiDomain: String, GridDomain, CaseIterable {
+enum ChmiDomain: String, GenericDomain, CaseIterable {
     case aladin_cz_1km
     case aladin_central_europe_2km
 

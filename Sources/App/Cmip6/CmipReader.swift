@@ -292,7 +292,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     /// imerg grid point
     let referencePosition: GridPoint2DFraction
 
-    let referenceDomain: GridDomain
+    let referenceDomain: GenericDomain
 
     var _referenceElevation: ElevationOrSea?
 
@@ -373,7 +373,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         try await reader.prefetchData(variable: variable, time: time)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
@@ -412,7 +412,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     /// imerg grid point
     let referencePosition: Int
 
-    let referenceDomain: GridDomain
+    let referenceDomain: GenericDomain
 
     let referenceElevation: ElevationOrSea
 
@@ -488,7 +488,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         try await reader.prefetchData(variable: variable, time: time)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
@@ -504,7 +504,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GridDomain, referencePosition: Int, referenceElevation: ElevationOrSea, options: GenericReaderOptions) async throws {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea, options: GenericReaderOptions) async throws {
         let (lat, lon) = referenceDomain.grid.getCoordinates(gridpoint: referencePosition)
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest, options: options) else {
             throw ForecastApiError.noDataAvailableForThisLocation

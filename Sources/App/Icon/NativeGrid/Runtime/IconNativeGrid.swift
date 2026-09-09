@@ -12,6 +12,12 @@ struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
     let storage: SphericalCubeIndex
+    let elevationPayload: OmFileLocalRemoteOmReader?
+
+    init(storage: SphericalCubeIndex, elevationPayload: OmFileLocalRemoteOmReader? = nil) {
+        self.storage = storage
+        self.elevationPayload = elevationPayload
+    }
 
     static func load(file: URL) throws -> Self {
         Self(storage: try SphericalCubeIndex(file: file))
@@ -48,43 +54,18 @@ struct IconNativeGrid: Gridable {
         return storage.point(at: gridpoint).coordinate
     }
 
-    func findPoint(
-        lat: Float, lon: Float, elevation: Float,
-        elevationFile: (any OmFileReaderArrayProtocol<Float>)?,
-        mode: GridSelectionMode, elevationCache: ElevationCache?
-    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        if let elevationFile {
-            switch mode {
-            case .sea:
-                return try await findPointInSea(lat: lat, lon: lon, elevationFile: elevationFile, elevationCache: elevationCache)
-            case .land where !elevation.isNaN:
-                return try await findPointTerrainOptimised(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, elevationCache: elevationCache)
-            default: break
-            }
-        }
-        return try await findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode)
-    }
-
     func findPointInSea(
         lat: Float,
         lon: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        try await findPointInSea(lat: lat, lon: lon, elevationFile: elevationFile, elevationCache: nil)
-    }
-
-    func findPointInSea(
-        lat: Float,
-        lon: Float,
-        elevationFile: any OmFileReaderArrayProtocol<Float>,
-        elevationCache: ElevationCache?
-    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        let elevationFile = elevationPayload?.reader ?? elevationFile
         guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon) else {
             return nil
         }
         let nearest = lookup.pointID
         let (nearestElevation, values) = try await readNearestElevation(
-            pointID: nearest, elevationFile: elevationFile, cache: elevationCache
+            pointID: nearest, elevationFile: elevationFile, cache: elevationPayload?.elevationCache
         )
         if nearestElevation <= -999 {
             return (nearest, .sea)
@@ -109,22 +90,13 @@ struct IconNativeGrid: Gridable {
         elevation: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        try await findPointTerrainOptimised(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, elevationCache: nil)
-    }
-
-    func findPointTerrainOptimised(
-        lat: Float,
-        lon: Float,
-        elevation: Float,
-        elevationFile: any OmFileReaderArrayProtocol<Float>,
-        elevationCache: ElevationCache?
-    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        let elevationFile = elevationPayload?.reader ?? elevationFile
         guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon) else {
             return nil
         }
         let nearest = lookup.pointID
         let (nearestElevation, values) = try await readNearestElevation(
-            pointID: nearest, elevationFile: elevationFile, cache: elevationCache
+            pointID: nearest, elevationFile: elevationFile, cache: elevationPayload?.elevationCache
         )
         if nearestElevation.isFinite, nearestElevation > -999, abs(nearestElevation - elevation) <= 100 {
             return elevationResult(gridpoint: nearest, value: nearestElevation)

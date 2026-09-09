@@ -1,5 +1,5 @@
 /// ECMWF weather models directly retrieved via ECPDS delivery
-enum EcmwfEcpdsDomain: String, GridDomain {
+enum EcmwfEcpdsDomain: String, GenericDomain {
     case ifs
     case wam
     

@@ -1,6 +1,6 @@
 import Foundation
 
-enum ItaliaMeteoArpaeDomain: String, GridDomain, CaseIterable {
+enum ItaliaMeteoArpaeDomain: String, GenericDomain, CaseIterable {
     case icon_2i
 
     var grid: any Gridable {

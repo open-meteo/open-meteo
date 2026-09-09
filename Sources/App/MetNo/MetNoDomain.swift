@@ -1,7 +1,7 @@
 import Foundation
 import OmFileFormat
 
-enum MetNoDomain: String, GridDomain, CaseIterable {
+enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp
 
     var domainRegistry: DomainRegistry {

@@ -1,4 +1,4 @@
-enum IconNativeDomains: String, CaseIterable, GenericDomain {
+enum IconNativeDomains: String, CaseIterable {
     case iconNative = "icon-native"
     case iconD2Native = "icon-d2-native"
     case iconD2Native15min = "icon-d2-native-15min"
@@ -43,7 +43,9 @@ enum IconNativeDomains: String, CaseIterable, GenericDomain {
     private static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
     private static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
 
-    func getGrid(context: DomainInitContext) async throws -> any Gridable {
-        try await nativeGridFile.load(context: context)
+    func load(context: DomainInitContext) async throws -> IconNativeDomain {
+        try await Self.domains.load(self, context: context)
     }
+
+    private static let domains = IconNativeDomainCache()
 }

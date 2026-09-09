@@ -54,6 +54,7 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let identity: IconNativeGridIdentity
     let cache = IconNativeGridCache()
 
+    // TODO: make generic on the filesystem
     func materialize<Backend: OmFileReaderBackend>(file: Backend) async throws -> IconNativeGrid
     where Backend.DataType: DataProtocol {
         try createDirectory()
@@ -137,7 +138,7 @@ extension IconNativeGridFile {
         }
     }
 
-    func load(context: DomainInitContext) async throws -> any Gridable {
+    func load(context: DomainInitContext) async throws -> IconNativeGrid {
         if let grid = cache.get() {
             return grid
         }

@@ -100,7 +100,7 @@ extension CdoIconGlobal {
             fatalError("could not open weights file")
         }
 
-        let grid = try await domain.getGrid(context: .init(logger: curl.logger, httpClient: nil))
+        let grid = domain.grid
         var mapping = [Int32](repeating: -1, count: grid.count)
         for (i, src) in src_address.enumerated() {
             mapping[Int(dst_address[i]) - 1] = src - 1

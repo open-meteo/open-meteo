@@ -3,7 +3,7 @@ actor ElevationLsmGenerator {
     var elevation: Array2D? = nil
     var lsm: Array2D? = nil
     
-    func ingest(elevation: Array2D, domain: GridDomain) async throws {
+    func ingest(elevation: Array2D, domain: GenericDomain) async throws {
         if domain.surfaceElevationFileOm.exists() {
             return
         }
@@ -11,7 +11,7 @@ actor ElevationLsmGenerator {
         try await generate(domain: domain)
     }
     
-    func ingest(lsm: Array2D, domain: GridDomain) async throws {
+    func ingest(lsm: Array2D, domain: GenericDomain) async throws {
         if domain.surfaceElevationFileOm.exists() {
             return
         }
@@ -19,7 +19,7 @@ actor ElevationLsmGenerator {
         try await generate(domain: domain)
     }
     
-    func generate(domain: GridDomain) async throws {
+    func generate(domain: GenericDomain) async throws {
         guard let lsm, var elevation else {
             return
         }

@@ -2,7 +2,7 @@ import Foundation
 import OmFileFormat
 
 /// CAMS Air quality domain definitions for Europe and global domains
-enum CamsDomain: String, GridDomain, CaseIterable {
+enum CamsDomain: String, GenericDomain, CaseIterable {
     case cams_global
     case cams_global_greenhouse_gases
     case cams_europe

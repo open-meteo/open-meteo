@@ -1,6 +1,6 @@
 import Foundation
 
-enum GfsGraphCastDomain: String, GridDomain, CaseIterable {
+enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     case graphcast025
     case aigfs025
     case aigefs025

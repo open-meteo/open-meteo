@@ -1,7 +1,6 @@
 import Foundation
 @testable import App
 import Testing
-import Logging
 // import Vapor
 
 @Suite struct DomainTests {
@@ -124,12 +123,12 @@ import Logging
         #expect(sliceELonBorder.xRange == 0..<1)
     }
 
-    @Test func ogcWkt2StringForKnownDomains() async throws {
+    @Test func ogcWkt2StringForKnownDomains() {
         // Following OGC WKT2 v2 https://www.ogc.org/standards/wkt-crs/
         // Different projections are used for different weather models
         // BBOX always contains the WGS84 coordinate of the south-wast and north-east coordinate
         // Note: dump proj4 string from GRIB files: `grib_ls -p short_name,projString <grib_file>`
-        let iconProj4 = (try await IconDomains.icon.getGrid(context: .init(logger: Logger(label: "DomainTests"), httpClient: nil))).crsWkt2
+        let iconProj4 = IconDomains.icon.grid.crsWkt2
         #expect(iconProj4 == """
             GEOGCRS["WGS 84",
                 DATUM["World Geodetic System 1984",
@@ -257,11 +256,11 @@ import Logging
             """)
     }
 
-    @Test func gridBoundsForKnownDomains() async throws {
-        let iconGridBounds = (try await IconDomains.icon.getGrid(context: .init(logger: Logger(label: "DomainTests"), httpClient: nil))).gridBounds
+    @Test func gridBoundsForKnownDomains() {
+        let iconGridBounds = IconDomains.icon.grid.gridBounds
         #expect(iconGridBounds == GridBounds(lat_bounds: -90.0...90.0, lon_bounds: -180.0...179.75))
 
-        let icondD2GridBounds = (try await IconDomains.iconD2_15min.getGrid(context: .init(logger: Logger(label: "DomainTests"), httpClient: nil))).gridBounds
+        let icondD2GridBounds = IconDomains.iconD2_15min.grid.gridBounds
         #expect(icondD2GridBounds == GridBounds(lat_bounds: 43.18...58.08, lon_bounds: -3.94...20.339998))
 
         let aromeGridBounds = MeteoFranceDomain.arome_france.grid.gridBounds

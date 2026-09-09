@@ -57,7 +57,9 @@ import Testing
         print("  elevation queries/sample: \(elevationQueryCount)")
         // A fresh decoded cache each sample, with the OM reader already open; not cold disk I/O.
         printResult("first elevation-cache load", try await measureFirstElevationLoad(reader: reader), unit: "ns/load")
-        let cache = try #require(ElevationCache(reader: reader))
+        let payload = try await file.payload()
+        let cache = try #require(payload.elevationCache)
+        let cachedGrid = IconNativeGrid(storage: grid.storage, elevationPayload: payload)
         _ = try await cache.loadValues()
 
         let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [
@@ -69,17 +71,17 @@ import Testing
             // Compare complete selections outside the timed loops; checksums keep timed results observable.
             for query in scenario.queries {
                 let raw = try await grid.findPoint(lat: query.latitude, lon: query.longitude, elevation: -10_000,
-                    elevationFile: reader, mode: scenario.mode, elevationCache: nil)
-                let warm = try await grid.findPoint(lat: query.latitude, lon: query.longitude, elevation: -10_000,
-                    elevationFile: reader, mode: scenario.mode, elevationCache: cache)
+                    elevationFile: reader, mode: scenario.mode)
+                let warm = try await cachedGrid.findPoint(lat: query.latitude, lon: query.longitude, elevation: -10_000,
+                    elevationFile: reader, mode: scenario.mode)
                 #expect(raw?.gridpoint == warm?.gridpoint)
                 #expect(raw?.gridElevation.numeric == warm?.gridElevation.numeric)
             }
             let raw = try await measureAsync(executions: elevationQueryCount) {
-                try await selectionChecksum(grid: grid, reader: reader, queries: scenario.queries, mode: scenario.mode, cache: nil)
+                try await selectionChecksum(grid: grid, reader: reader, queries: scenario.queries, mode: scenario.mode)
             }
             let warm = try await measureAsync(executions: elevationQueryCount) {
-                try await selectionChecksum(grid: grid, reader: reader, queries: scenario.queries, mode: scenario.mode, cache: cache)
+                try await selectionChecksum(grid: cachedGrid, reader: reader, queries: scenario.queries, mode: scenario.mode)
             }
             printResult("raw \(scenario.name)", raw)
             printResult("warm \(scenario.name)", warm)
@@ -210,14 +212,13 @@ import Testing
         grid: IconNativeGrid,
         reader: any OmFileReaderArrayProtocol<Float>,
         queries: [Query],
-        mode: GridSelectionMode,
-        cache: ElevationCache?
+        mode: GridSelectionMode
     ) async throws -> Int {
         var checksum = 0
         for query in queries {
             let result = try await grid.findPoint(
                 lat: query.latitude, lon: query.longitude, elevation: -10_000,
-                elevationFile: reader, mode: mode, elevationCache: cache
+                elevationFile: reader, mode: mode
             )
             checksum &+= result?.gridpoint ?? -1
         }

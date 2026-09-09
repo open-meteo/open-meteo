@@ -43,10 +43,10 @@ struct ConvertOmCommand: AsyncCommand {
             guard let domainName = signature.domain else {
                 throw ConvertOmError("Domain parameter is required for OM3 conversion")
             }
-            guard let domain = try DomainRegistry.load(rawValue: domainName).getDomain() else {
+            guard let domain = try await DomainRegistry.load(rawValue: domainName).getDomain(context: .init(logger: logger, httpClient: nil)) else {
                 throw ConvertOmError("Domain has no grid")
             }
-            let grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
+            let grid = domain.grid
             
             let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".om3"
             if signature.transpose {
@@ -67,10 +67,10 @@ struct ConvertOmCommand: AsyncCommand {
             logger.info("Converting to NetCDF: \(outfile)")
             let grid: (any Gridable)?
             if dimensions.count == 2, let domainName = signature.domain {
-                guard let domain = try DomainRegistry.load(rawValue: domainName).getDomain() else {
+                guard let domain = try await DomainRegistry.load(rawValue: domainName).getDomain(context: .init(logger: logger, httpClient: nil)) else {
                     throw ConvertOmError("Domain has no grid")
                 }
-                grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
+                grid = domain.grid
             } else {
                 grid = nil
             }

@@ -213,7 +213,7 @@ struct DwdSisDownloader: AsyncCommand {
     }
 }
 
-enum DwdSisDomain: String, CaseIterable, GridDomain {
+enum DwdSisDomain: String, CaseIterable, GenericDomain {
     case europe_africa_v4
     
     var grid: any Gridable {

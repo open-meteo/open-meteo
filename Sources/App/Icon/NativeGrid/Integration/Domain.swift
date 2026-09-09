@@ -52,6 +52,7 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
 
 extension IconNativeDomains {
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
+        let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
         let artifact = nativeGridFile
         let identity = artifact.identity
         let registry = artifact.registry
