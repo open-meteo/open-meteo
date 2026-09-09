@@ -6,16 +6,12 @@ import OmFileIO
 
 struct OmFileLocalRemoteOmReader {
     let reader: any OmFileReaderArrayProtocol<Float>
-    /// Keep decoded elevations tied to file replacement and eviction. Ordinary OM reads use
-    /// the original reader; the filesystem supports only one payload per file.
-    let elevationCache: ElevationCache?
     let timestamps: [Timestamp]?
     let timeRangeDt: TimerangeDt?
     
     init(remoteFile: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
         let readerRaw = try await OmFileReader(fn: remoteFile)
         self.reader = try readerRaw.expectArray(of: Float.self)
-        self.elevationCache = ElevationCache(reader: self.reader)
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }
@@ -27,7 +23,6 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         let file = try MmapFile(fn: fd)
         let readerRaw = try await OmFileReader(fn: file)
         self.reader = try readerRaw.expectArray(of: Float.self)
-        self.elevationCache = ElevationCache(reader: self.reader)
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
     }

@@ -58,8 +58,8 @@ import Testing
         // A fresh decoded cache each sample, with the OM reader already open; not cold disk I/O.
         printResult("first elevation-cache load", try await measureFirstElevationLoad(reader: reader), unit: "ns/load")
         let payload = try await file.payload()
-        let cache = try #require(payload.elevationCache)
         let cachedGrid = IconNativeGrid(storage: grid.storage, elevationPayload: payload)
+        let cache = try #require(cachedGrid.elevationCache)
         _ = try await cache.loadValues()
 
         let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [

@@ -19,15 +19,15 @@ import Logging
             return domains
         }
         let first = try #require(domains.first)
-        let elevationCache = try #require(first.nativeGrid.elevationPayload?.elevationCache)
+        let elevationCache = try #require(first.nativeGrid.elevationCache)
         for domain in domains {
             #expect(domain.nativeGrid.storage === first.nativeGrid.storage)
-            #expect(domain.nativeGrid.elevationPayload?.elevationCache === elevationCache)
+            #expect(domain.nativeGrid.elevationCache === elevationCache)
             #expect(domain.dtSeconds == (domain.definition == .iconD2Native ? 3600 : 900))
         }
         let reused = try await cache.load(.iconD2Native, context: context)
         #expect(reused.nativeGrid.storage === first.nativeGrid.storage)
-        #expect(reused.nativeGrid.elevationPayload?.elevationCache === elevationCache)
+        #expect(reused.nativeGrid.elevationCache === elevationCache)
         #expect(elevationCache.cachedValues == nil)
     }
 
