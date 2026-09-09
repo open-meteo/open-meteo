@@ -2,7 +2,7 @@ import Foundation
 import OmFileFormat
 
 
-public protocol Gridable: Sendable {
+protocol Gridable: Sendable {
     var nx: Int { get }
     var ny: Int { get }
 
@@ -10,6 +10,7 @@ public protocol Gridable: Sendable {
     var searchRadius: Int { get }
 
     func findPoint(lat: Float, lon: Float) -> Int?
+    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: (any OmFileReaderArrayProtocol<Float>)?, mode: GridSelectionMode, elevationCache: ElevationCache?) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction?
     associatedtype SliceType: Sequence<Int>
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
@@ -84,6 +85,10 @@ extension Gridable {
     /// number of grid cells
     var count: Int {
         return nx * ny
+    }
+
+    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: (any OmFileReaderArrayProtocol<Float>)?, mode: GridSelectionMode, elevationCache: ElevationCache?) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        try await findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode)
     }
 
     func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: (any OmFileReaderArrayProtocol<Float>)?, mode: GridSelectionMode) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
