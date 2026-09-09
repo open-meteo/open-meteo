@@ -133,7 +133,7 @@ let package = Package(
             name: "AppTests",
             dependencies: [
                 .target(name: "App"),
-                .target(name: "SphericalCubeTests"),
+                .target(name: "SphericalCubeTestSupport"),
                 .target(name: "SphericalCube"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "VaporTesting", package: "vapor")
@@ -157,8 +157,17 @@ let package = Package(
             name: "SphericalCubeTests",
             dependencies: [
                 .target(name: "SphericalCube"),
+                .target(name: "SphericalCubeTestSupport"),
                 .product(name: "OmFileFormat", package: "om-file-format"),
             ]
+        ),
+        .target(
+            name: "SphericalCubeTestSupport",
+            dependencies: [
+                .target(name: "SphericalCube"),
+                .product(name: "OmFileFormat", package: "om-file-format"),
+            ],
+            path: "Tests/SphericalCubeTestSupport"
         ),
     ]
 )
