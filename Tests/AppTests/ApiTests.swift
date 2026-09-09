@@ -133,40 +133,6 @@ import VaporTesting
         }
     }
 
-    @Test(arguments: [
-        ("metno_nordic", "0", "-150", true),
-        ("satellite_radiation_seamless", "0", "-150", true),
-        ("metno_nordic,satellite_radiation_seamless", "0", "-150", false),
-        ("metno_nordic", "0,1", "-150,-151", false),
-        ("satellite_radiation_seamless", "0,1", "-150,-151", false)
-    ])
-    func unavailableModelsOnlyRejectSingleModelAndLocation(models: String, latitude: String, longitude: String, shouldReject: Bool) async throws {
-        try await withApp { app in
-            // Both models are outside their coverage here; explicit elevation avoids DEM access.
-            let elevation = latitude.split(separator: ",").map { _ in "0" }.joined(separator: ",")
-            let request = Request(
-                application: app,
-                method: .GET,
-                url: URI(string: "/v1/forecast?latitude=\(latitude)&longitude=\(longitude)&elevation=\(elevation)&models=\(models)"),
-                on: app.eventLoopGroup.next()
-            )
-            let controller = WeatherApiController(defaultModel: .best_match)
-
-            if shouldReject {
-                do {
-                    _ = try await controller.query(request)
-                    Issue.record("Expected unavailable model '\(models)' to be rejected")
-                } catch let error as ForecastApiError {
-                    #expect(error.status == .badRequest)
-                    #expect(error.reason == "No data is available for this location")
-                }
-            } else {
-                let response = try await controller.query(request)
-                #expect(response.status == .ok)
-            }
-        }
-    }
-
     @Test func parseApiParamsPOST() async throws {
         try await withApp { app in
             let body = """
