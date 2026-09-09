@@ -1,6 +1,7 @@
 import Foundation
 import OmFileFormat
 @testable import SphericalCube
+@testable import SphericalCubeTestSupport
 import Testing
 
 @Suite struct SphericalCubeTraversalTests {

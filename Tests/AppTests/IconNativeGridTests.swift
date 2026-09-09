@@ -1,7 +1,7 @@
 import Foundation
 @testable import App
 @testable import SphericalCube
-@testable import SphericalCubeTests
+@testable import SphericalCubeTestSupport
 import OmFileFormat
 import Synchronization
 import Testing
