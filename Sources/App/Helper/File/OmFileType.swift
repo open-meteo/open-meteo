@@ -20,7 +20,7 @@ enum OmFileType {
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
     
     /// How often this file should be checked for modifications. Some files update every hour, some never update.
-    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+    /*func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         switch self {
         case .domainChunk(let domain, _, let type, let chunk, _, _):
             switch type {
@@ -75,7 +75,7 @@ enum OmFileType {
             }
             return 24*3600
         }
-    }
+    }*/
     
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePath() -> String {
