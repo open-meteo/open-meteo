@@ -99,9 +99,7 @@ struct DomainInitContext {
  Corrects elevation
  */
 struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericReaderProtocol {
-    private let grid: any Gridable
-
-    /// Typed domain metadata used by provider readers.
+    /// Reference to the domain object
     let domain: Domain
 
     /// Grid index in data files
@@ -132,37 +130,29 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Initialise reader to read a single grid-point
     public init(domain: Domain, position: Int, options: GenericReaderOptions) async throws {
-        let grid = try await domain.getGrid(
-            context: DomainInitContext(logger: options.logger, httpClient: options.httpClient)
-        )
-        self.grid = grid
         self.domain = domain
         self.position = position
         if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger) {
-            self.modelElevation = try await grid.readElevation(gridpoint: position, elevationFile: elevationFile)
+            self.modelElevation = try await domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
         } else {
             self.modelElevation = .noData
         }
         self.targetElevation = .nan
-        let coords = grid.getCoordinates(gridpoint: position)
+        let coords = domain.grid.getCoordinates(gridpoint: position)
         self.modelLat = coords.latitude
         self.modelLon = coords.longitude
-        self.omFileSplitter = OmFileSplitter(domain: domain, grid: grid)
+        self.omFileSplitter = OmFileSplitter(domain)
         self.logger = options.logger
         self.httpClient = options.httpClient
     }
 
     /// Return nil, if the coordinates are outside the domain grid
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        let grid = try await domain.getGrid(
-            context: DomainInitContext(logger: options.logger, httpClient: options.httpClient)
-        )
         // check if coordinates are in domain, otherwise return nil
-        let payload = await domain.getStaticFilePayload(type: .elevation, httpClient: options.httpClient, logger: options.logger)
-        guard let gridpoint = try await grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: payload?.reader, mode: mode, elevationCache: payload?.elevationCache) else {
+        let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
+        guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {
             return nil
         }
-        self.grid = grid
         self.domain = domain
         self.position = gridpoint.gridpoint
         self.modelElevation = gridpoint.gridElevation
@@ -170,9 +160,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.logger = options.logger
         self.httpClient = options.httpClient
 
-        omFileSplitter = OmFileSplitter(domain: domain, grid: grid)
+        omFileSplitter = OmFileSplitter(domain)
 
-        (modelLat, modelLon) = grid.getCoordinates(gridpoint: gridpoint.gridpoint)
+        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
@@ -241,7 +231,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         guard let file = await domain.getStaticFile(type: type, httpClient: httpClient, logger: logger) else {
             return nil
         }
-        return try await grid.readFromStaticFile(gridpoint: position, file: file)
+        return try await domain.grid.readFromStaticFile(gridpoint: position, file: file)
     }
 }
 

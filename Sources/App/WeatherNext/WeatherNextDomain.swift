@@ -37,7 +37,7 @@ import Foundation
  - The grid is 0.25° regular lat/lon from 0 to 360 degrees, -90 to 90 degrees -> We remap to -180 to 180 longitude.
  - Static files come from ecmwf_ifs025, which weathernext is based on. The grids of both outputs have to be the same.
  */
-enum WeatherNextDomain: String, GridDomain, CaseIterable {
+enum WeatherNextDomain: String, GenericDomain, CaseIterable {
     /// Native 64-member WeatherNext-2 ensemble
     case weathernext_global
 

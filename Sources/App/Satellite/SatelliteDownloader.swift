@@ -187,7 +187,7 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
     }
 }
 
-enum SatelliteDomain: String, CaseIterable, GridDomain {
+enum SatelliteDomain: String, CaseIterable, GenericDomain {
     case imerg_daily
 
     var dtSeconds: Int {

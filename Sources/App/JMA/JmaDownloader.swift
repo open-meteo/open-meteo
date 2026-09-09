@@ -482,7 +482,7 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
  */
 typealias JmaVariable = SurfaceAndPressureVariable<JmaSurfaceVariable, JmaPressureVariable>
 
-enum JmaDomain: String, GridDomain, CaseIterable {
+enum JmaDomain: String, GenericDomain, CaseIterable {
     case gsm
     case msm
     case msm_upper_level

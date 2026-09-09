@@ -6,6 +6,9 @@ import Vapor
  Generic domain that is required for the reader
  */
 protocol GenericDomain: Sendable {
+    /// The grid definition. Could later be replaced with a more generic implementation
+    var grid: any Gridable { get }
+
     /// Domain name used as data directory
     var domainRegistry: DomainRegistry { get }
 
@@ -36,23 +39,10 @@ protocol GenericDomain: Sendable {
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
 
-    /// Returns the domain grid after resolving any asynchronous prerequisite such as a remotely
-    /// stored grid artifact. GridDomain returns its synchronous grid; other domains load
-    /// their grid here. Readers and processing code retain the returned grid.
-    func getGrid(context: DomainInitContext) async throws -> any Gridable
-}
-
-/// A domain whose grid is available synchronously.
-protocol GridDomain: GenericDomain {
-    var grid: any Gridable { get }
-}
-
-extension GridDomain {
-    func getGrid(context: DomainInitContext) async throws -> any Gridable { grid }
+    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)?
 }
 
 extension GenericDomain {
-
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }
@@ -78,21 +68,23 @@ extension GenericDomain {
 
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
-        await getStaticFilePayload(type: type, httpClient: httpClient, logger: logger)?.reader
-    }
-
-    func getStaticFilePayload(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> OmFileLocalRemoteOmReader? {
-        guard let domainRegistryStatic else { return nil }
-        let variable: String
-        switch type {
-        case .soilType: variable = "soil_type"
-        case .elevation: variable = "HSURF"
+        guard let domainRegistryStatic else {
+            return nil
         }
-        return try? await OmFileSystemManager.instance.get(
-            file: OmFileType.staticFile(domain: domainRegistryStatic, variable: variable, chunk: nil),
-            client: httpClient,
-            logger: logger
-        )
+        switch type {
+        case .soilType:
+            return try? await OmFileSystemManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
+                client: httpClient,
+                logger: logger
+            )?.reader
+        case .elevation:
+            return try? await OmFileSystemManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
+                client: httpClient,
+                logger: logger
+            )?.reader
+        }
     }
 
     /// Meta JSON for time-series data

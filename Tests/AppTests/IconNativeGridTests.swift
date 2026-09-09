@@ -7,6 +7,41 @@ import Synchronization
 import Testing
 
 @Suite struct IconNativeGridTests {
+    @Test func initializedDomainPinsElevationForGenericReaders() async throws {
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+        ])
+        defer { fixture.remove() }
+        let file = try await makeElevationFile([100, 500])
+        let replacement = try await makeElevationFile([900, 700])
+        defer { file.remove(); replacement.remove() }
+        let payload = try await file.payload()
+        let grid = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
+        let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
+        let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
+        #expect(domain.nativeGrid.storage === quarterHourly.nativeGrid.storage)
+        #expect(domain.nativeGrid.elevationPayload?.elevationCache === quarterHourly.nativeGrid.elevationPayload?.elevationCache)
+        #expect(domain.dtSeconds == 3600)
+        #expect(quarterHourly.dtSeconds == 900)
+
+        try FileManager.default.removeItem(atPath: file.path)
+        try FileManager.default.moveItem(atPath: replacement.path, toPath: file.path)
+        let options = try GenericReaderOptions(logger: .init(label: "NativeDomainTests"), httpClient: nil)
+        let reader = try await GenericReader<IconNativeDomain, IconSurfaceVariable>(domain: domain, position: 0, options: options)
+        #expect(reader.modelElevation.numeric == 100)
+        #expect(try await reader.getStatic(type: .elevation) == 100)
+        #expect(try await file.payload().reader.read(range: [0..<1, 0..<1]) == [900])
+        #expect(payload.elevationCache?.cachedValues == nil)
+
+        let selected = try #require(await GenericReader<IconNativeDomain, IconSurfaceVariable>(
+            domain: domain, lat: 0, lon: 0.04, elevation: 500, mode: .land, options: options
+        ))
+        #expect(selected.position == 1)
+        #expect(selected.modelElevation.numeric == 500)
+        #expect(payload.elevationCache?.cachedValues != nil)
+    }
+
     @Test func elevationEncodingRoundTripsSamples() throws {
         let source: [Float] = [-999, 0, 2_048, 8_765, 9_999, .nan]
         let encoded = try ElevationValues.encode(source)
@@ -80,21 +115,19 @@ import Testing
         for (mode, elevations) in [(GridSelectionMode.land, [Float(0), 500]), (.sea, [100, -999])] {
             let file = try await makeElevationFile(elevations)
             defer { file.remove() }
-            let loads = Mutex(0)
-            let cache = ElevationCache(elementCount: 2) {
-                loads.withLock { $0 += 1 }
-                return try await file.reader.read()
-            }
+            let payload = try await file.payload()
+            let cache = try #require(payload.elevationCache)
+            let grid: any Gridable = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
             let raw = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
-                elevationFile: file.reader, mode: mode, elevationCache: nil)
+                elevationFile: file.reader, mode: mode)
             #expect(raw?.gridpoint == 1)
             for _ in 0..<2 {
-                let cached = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
-                    elevationFile: file.reader, mode: mode, elevationCache: cache)
+                let cached = try await grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
+                    elevationFile: file.reader, mode: mode)
                 #expect(cached?.gridpoint == 1)
                 #expect(cached?.gridElevation.numeric == raw?.gridElevation.numeric)
             }
-            #expect(loads.withLock { $0 } == 1)
+            #expect(cache.cachedValues != nil)
         }
     }
 
@@ -212,17 +245,19 @@ import Testing
         defer { fixture.remove() }
         let file = try await makeElevationFile([100, -999])
         defer { file.remove() }
-        let cache = try #require(ElevationCache(reader: file.reader))
+        let payload = try await file.payload()
+        let cache = try #require(payload.elevationCache)
+        let grid: any Gridable = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
         for (mode, elevation) in [(GridSelectionMode.nearest, Float(500)), (.land, .nan)] {
-            _ = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: elevation,
-                elevationFile: file.reader, mode: mode, elevationCache: cache)
+            _ = try await grid.findPoint(lat: 0, lon: 0.04, elevation: elevation,
+                elevationFile: file.reader, mode: mode)
             #expect(cache.cachedValues == nil)
         }
-        _ = try await fixture.grid.readElevation(gridpoint: 0, elevationFile: file.reader)
+        _ = try await grid.readElevation(gridpoint: 0, elevationFile: file.reader)
         #expect(cache.cachedValues == nil)
         for latitude in [Float.nan, 50] {
-            let outside = try await fixture.grid.findPoint(lat: latitude, lon: 0, elevation: 500,
-                elevationFile: file.reader, mode: .sea, elevationCache: cache)
+            let outside = try await grid.findPoint(lat: latitude, lon: 0, elevation: 500,
+                elevationFile: file.reader, mode: .sea)
             #expect(outside == nil)
             #expect(cache.cachedValues == nil)
         }
@@ -238,7 +273,7 @@ import Testing
         ])
         defer { fixture.remove() }
         let result = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
-            elevationFile: file.reader, mode: .sea, elevationCache: nil)
+            elevationFile: file.reader, mode: .sea)
         #expect(result?.gridpoint == 1)
     }
 
@@ -347,6 +382,11 @@ private func checkSourceRoundTrips(
 struct ElevationFileFixture {
     let path: String
     let reader: OmFileReaderArray<FileHandleWithCount, Float>
+
+    func payload() async throws -> OmFileLocalRemoteOmReader {
+        let handle = try FileHandle.openFileReading(file: path)
+        return try await OmFileLocalRemoteOmReader(fd: handle, size: Int64(handle.seekToEnd()))
+    }
 
     func remove() { try? FileManager.default.removeItem(atPath: path) }
 }

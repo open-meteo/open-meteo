@@ -1,4 +1,4 @@
-enum EcmwfSeasDomain: String, GridDomain, CaseIterable {
+enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     /// O320 single level, 6 hourly data, 51 members
     case seas5
     case seas5_ensemble_mean

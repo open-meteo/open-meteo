@@ -5,7 +5,7 @@ import Foundation
  https://registry.opendata.aws/met-office-global-deterministic/
  https://registry.opendata.aws/met-office-uk-deterministic/
  */
-enum UkmoDomain: String, GridDomain, CaseIterable {
+enum UkmoDomain: String, GenericDomain, CaseIterable {
     case global_deterministic_10km
     case global_ensemble_20km
     case global_ensemble_mean_20km

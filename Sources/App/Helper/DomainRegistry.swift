@@ -229,7 +229,31 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 
-    func getDomain() -> GenericDomain? {
+    var nativeDefinition: IconNativeDomains? {
+        switch self {
+        case .dwd_icon_global_native: return .iconNative
+        case .dwd_icon_d2_native: return .iconD2Native
+        case .dwd_icon_d2_native_15min: return .iconD2Native15min
+        default: return nil
+        }
+    }
+
+    func getDomain(context: DomainInitContext) async throws -> (any GenericDomain)? {
+        if let nativeDefinition {
+            return try await nativeDefinition.load(context: context)
+        }
+        return regularDomain
+    }
+
+    /// Used by file scheduling and synchronization without opening grid or elevation files.
+    var timeSeriesMetadata: DomainTimeSeriesMetadata? {
+        if let nativeDefinition {
+            return DomainTimeSeriesMetadata(nativeDefinition.sourceDomain)
+        }
+        return regularDomain.map { DomainTimeSeriesMetadata($0) }
+    }
+
+    private var regularDomain: (any GenericDomain)? {
         switch self {
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
@@ -346,11 +370,11 @@ enum DomainRegistry: String, CaseIterable {
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
         case .dwd_icon_global_native:
-            return IconNativeDomains.iconNative
+            return nil
         case .dwd_icon_d2_native:
-            return IconNativeDomains.iconD2Native
+            return nil
         case .dwd_icon_d2_native_15min:
-            return IconNativeDomains.iconD2Native15min
+            return nil
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
         case .dwd_icon_eps:
@@ -579,3 +603,16 @@ enum DomainRegistry: String, CaseIterable {
 //        try spawnRetriedNoFail(cmd: "aws", args: args)
 //    }
 //}
+
+
+struct DomainTimeSeriesMetadata {
+    let dtSeconds: Int
+    let omFileLength: Int
+    let updateIntervalSeconds: Int
+
+    init(_ domain: any GenericDomain) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
+    }
+}

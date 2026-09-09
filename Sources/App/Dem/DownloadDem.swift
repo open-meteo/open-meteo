@@ -11,7 +11,7 @@ import OmFileFormat
 
  Total size after conversion `10.48 GB`
  */
-struct Dem90: GridDomain {
+struct Dem90: GenericDomain {
     var grid: any Gridable {
         fatalError("Dem90 does not offer a grid")
     }

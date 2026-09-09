@@ -1,7 +1,7 @@
 import OmFileFormat
 
 ///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
-enum CdsDomain: String, GridDomain, CaseIterable {
+enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5
     case era5_daily
     case era5_ocean

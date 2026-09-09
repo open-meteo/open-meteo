@@ -46,11 +46,8 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
 
-    init<Domain: GridDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
-        self.init(domain: domain, grid: domain.grid, nMembers: nMembers, chunknLocations: chunknLocations)
-    }
-
-    init(domain: any GenericDomain, grid: any Gridable, nMembers: Int? = nil, chunknLocations: Int? = nil) {
+    init<Domain: GenericDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
+        let grid = domain.grid
         self.init(
             domain: domain.domainRegistry,
             nMembers: max(nMembers ?? domain.countEnsembleMember, 1),
@@ -234,8 +231,8 @@ struct OmFileSplitter {
                 let grid: any Gridable
                 if let resolved = self.grid {
                     grid = resolved
-                } else if let domain = domain.getDomain() {
-                    grid = try await domain.getGrid(context: .init(logger: logger, httpClient: httpClient))
+                } else if let domain = try await domain.getDomain(context: .init(logger: logger, httpClient: httpClient)) {
+                    grid = domain.grid
                 } else {
                     fatalError("Did not get domain grid for \(domain)")
                 }
@@ -651,7 +648,7 @@ extension OmFileSplitter {
     /// Prepare a write to store individual time-steps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
     /// If `nTime` is set, the spatial file contains TIME SERIES oriented steps as well
-    static func makeSpatialWriter(domain: GridDomain, nMembers: Int = 1, nTime: Int = 1) -> OmFileWriterHelper {
+    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1, nTime: Int = 1) -> OmFileWriterHelper {
         let y = min(domain.grid.ny, 32)
         let x = min(domain.grid.nx, 1024 / y)
         

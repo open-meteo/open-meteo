@@ -3,7 +3,7 @@ import Foundation
 /**
  Domain definition for MeteoFrance Wave models
  */
-enum MfWaveDomain: String, CaseIterable, GridDomain {
+enum MfWaveDomain: String, CaseIterable, GenericDomain {
     case mfwave
     case mfcurrents
     case mfsst

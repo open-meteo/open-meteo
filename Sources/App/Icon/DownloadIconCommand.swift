@@ -573,7 +573,7 @@ struct DownloadIconCommand: AsyncCommand {
         } else {
             outputs = try await IconDownloadDomains(domain, context: domainContext)
         }
-        let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map(\.description).joined(separator: "' and '")
+        let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, outputs: outputs, run: run)
 
@@ -592,10 +592,10 @@ struct DownloadIconCommand: AsyncCommand {
 /// Resolved output roles for one ICON download. Only native global also produces remapped ICON output.
 struct IconDownloadDomains: Sendable {
     let source: IconDomains
-    let primary: ResolvedDomain
-    let remapped: ResolvedDomain?
-    let ensembleMean: ResolvedDomain?
-    let fifteenMinute: ResolvedDomain?
+    let primary: any GenericDomain
+    let remapped: (any GenericDomain)?
+    let ensembleMean: (any GenericDomain)?
+    let fifteenMinute: (any GenericDomain)?
 
     let nativeDomain: IconNativeDomains?
 
@@ -606,23 +606,20 @@ struct IconDownloadDomains: Sendable {
         }
         self.source = domain
         self.nativeDomain = nil
-        self.primary = try await ResolvedDomain(domain, context: context)
+        self.primary = domain
         self.remapped = nil
-        if let mean = domain.ensembleMeanDomain {
-            self.ensembleMean = try await ResolvedDomain(mean, context: context)
-        } else {
-            self.ensembleMean = nil
-        }
-        self.fifteenMinute = domain == .iconD2 ? try await ResolvedDomain(IconDomains.iconD2_15min, context: context) : nil
+        self.ensembleMean = domain.ensembleMeanDomain
+        self.fifteenMinute = domain == .iconD2 ? IconDomains.iconD2_15min : nil
     }
 
     init(_ domain: IconNativeDomains, context: DomainInitContext) async throws {
         self.source = domain.sourceDomain
         self.nativeDomain = domain
-        self.primary = try await ResolvedDomain(domain, context: context)
-        self.remapped = domain == .iconNative ? try await ResolvedDomain(IconDomains.icon, context: context) : nil
+        let grid = try await domain.nativeGridFile.load(context: context)
+        self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
+        self.remapped = domain == .iconNative ? IconDomains.icon : nil
         self.ensembleMean = nil
-        self.fifteenMinute = domain == .iconD2Native ? try await ResolvedDomain(IconNativeDomains.iconD2Native15min, context: context) : nil
+        self.fifteenMinute = domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
     }
 }
 

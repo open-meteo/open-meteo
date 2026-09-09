@@ -336,7 +336,7 @@ struct WeatherApiController {
                             return nil
                         }
                         /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
-                        let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
+                        let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable(context: .init(logger: options.logger, httpClient: options.httpClient))?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
                         return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                     }
                     guard !readers.isEmpty else {
@@ -347,7 +347,7 @@ struct WeatherApiController {
                 }
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
                 locations = try await domains.asyncFlatMap({ domain in
-                    guard let grid = try? await domain.genericDomain?.getGrid(context: .init(logger: options.logger, httpClient: options.httpClient)) else {
+                    guard let grid = try? await domain.genericDomain(context: .init(logger: options.logger, httpClient: options.httpClient))?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
                     guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
@@ -361,7 +361,7 @@ struct WeatherApiController {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                     }
                     /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
-                    let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
+                    let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable(context: .init(logger: options.logger, httpClient: options.httpClient))?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
 
                     if dates.count == 0 {
                         if params.run != nil {
@@ -1237,7 +1237,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     /// Generic domains with hourly data that can use the generic deriver controller
-    func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
+    func getDomainAndVariable(context: DomainInitContext, include15Min: Bool = false) async throws -> DomainReaderMapping? {
         switch self {
         case .gfs025, .ncep_gfs025:
             return .single(GfsDomain.gfs025, Gfs025Variable.self)
@@ -1285,20 +1285,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
         case .dwd_icon_global_native:
             return .singleWithPrecipitationProbability(
-                IconNativeDomains.iconNative,
+                try await IconNativeDomains.iconNative.load(context: context),
                 IconVariable.self,
                 precipitationProb: IconDomains.iconEps
             )
         case .dwd_icon_d2_native:
             return .singleWithSupplementalDomains(
-                IconNativeDomains.iconD2Native,
+                try await IconNativeDomains.iconD2Native.load(context: context),
                 IconVariable.self,
                 lowerPriority: [],
-                higherPriority: [(IconNativeDomains.iconD2Native15min, IconVariable.self)],
+                higherPriority: [(try await IconNativeDomains.iconD2Native15min.load(context: context), IconVariable.self)],
                 precipitationProb: IconDomains.iconD2Eps
             )
         case .dwd_icon_d2_native_15min:
-            return .single(IconNativeDomains.iconD2Native15min, IconVariable.self)
+            return .single(try await IconNativeDomains.iconD2Native15min.load(context: context), IconVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
@@ -1666,7 +1666,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        if let d = getDomainAndVariable(include15Min: include15Min) {
+        if let d = try await getDomainAndVariable(context: .init(logger: options.logger, httpClient: options.httpClient), include15Min: include15Min) {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         
@@ -1708,7 +1708,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // Scandinavian region, combine MetNo Nordic with IFS HRES
             if lat >= 54.9, let _ = try await MetNoDomain.nordic_pp.makeHourlyReader(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                guard let mapping = Self.metno_seamless.getDomainAndVariable() else {
+                guard let mapping = try await Self.metno_seamless.getDomainAndVariable(context: .init(logger: options.logger, httpClient: options.httpClient)) else {
                     throw ModelError.domainInitFailed(domain: Self.metno_seamless.rawValue)
                 }
                 return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1991,7 +1991,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
-        if let mapping = getDomainAndVariable() {
+        if let mapping = try await getDomainAndVariable(context: .init(logger: options.logger, httpClient: options.httpClient)) {
             switch mapping {
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _),
@@ -2310,8 +2310,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    var genericDomain: (any GenericDomain)? {
-        if let d = getDomainAndVariable() {
+    func genericDomain(context: DomainInitContext) async throws -> (any GenericDomain)? {
+        if let d = try await getDomainAndVariable(context: context) {
             return d.singleDomain
         }
         

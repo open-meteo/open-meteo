@@ -90,7 +90,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
 
     /// Write a new meta data JSON
     @discardableResult
-    static func update(domain: GridDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws -> Data {
+    static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws -> Data {
         let meta = ModelUpdateMetaJson(
             last_run_initialisation_time: run.timeIntervalSince1970,
             last_run_modification_time: now.timeIntervalSince1970,

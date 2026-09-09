@@ -44,8 +44,8 @@ struct MigrationCommand: AsyncCommand {
                 continue
             }
             let grid: (any Gridable)?
-            if domain != .copernicus_dem90, let genericDomain = domain.getDomain() {
-                grid = try await genericDomain.getGrid(context: .init(logger: logger, httpClient: nil))
+            if domain != .copernicus_dem90, let genericDomain = try await domain.getDomain(context: .init(logger: logger, httpClient: nil)) {
+                grid = genericDomain.grid
             } else {
                 grid = nil
             }

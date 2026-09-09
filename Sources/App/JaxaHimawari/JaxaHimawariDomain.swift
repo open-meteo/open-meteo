@@ -1,4 +1,4 @@
-enum JaxaHimawariDomain: String, GridDomain, CaseIterable {
+enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
     case himawari_10min
     /// Extented domain area to 70E
     case himawari_70e_10min

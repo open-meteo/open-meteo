@@ -4,7 +4,7 @@ import OmFileFormat
 /**
  Domain definition for ICON wave models
  */
-enum IconWaveDomain: String, CaseIterable, GridDomain {
+enum IconWaveDomain: String, CaseIterable, GenericDomain {
     case gwam
     case ewam
 

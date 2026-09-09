@@ -140,7 +140,7 @@ extension VariablePerMemberStorage {
     /// Generate elevation file
     /// - `elevation`: in metres
     /// - `landMask` 0 = sea, 1 = land. Fractions below 0.5 are considered sea.
-    func generateElevationFile(elevation: V, landmask: V, domain: GridDomain) throws {
+    func generateElevationFile(elevation: V, landmask: V, domain: GenericDomain) throws {
         let elevationFile = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: elevationFile.getFilePath()) {
             return

@@ -25,7 +25,7 @@ enum OmFileType {
         case .domainChunk(let domain, _, let type, let chunk, _, _):
             switch type {
             case .chunk:
-                guard let domain = domain.getDomain(), let chunk else {
+                guard let domain = domain.timeSeriesMetadata, let chunk else {
                     return 24*3600
                 }
                 let chunkTime = Timestamp(chunk * domain.omFileLength * domain.dtSeconds) ..< Timestamp((chunk + 1) * domain.omFileLength * domain.dtSeconds)
@@ -53,7 +53,7 @@ enum OmFileType {
             case .linear_bias_seasonal:
                 return 24*3600
             case .rolling:
-                guard let domain = domain.getDomain() else {
+                guard let domain = domain.timeSeriesMetadata else {
                     return 24*3600
                 }
                 if let modificationTime {
