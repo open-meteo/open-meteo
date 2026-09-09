@@ -5,6 +5,9 @@ on:
 
 name: Upload Release Asset
 
+permissions:
+  contents: write
+
 env:
   swift_package_resolve: swift package resolve
   swift_build: MARCH_SKYLAKE=TRUE swift build -c release -Xswiftc -g -Xswiftc -static-stdlib
@@ -58,6 +61,11 @@ jobs:
     - name: Release
       uses: ncipollo/release-action@v1
       with:
+        allowUpdates: true
+        omitBodyDuringUpdate: true
+        omitNameDuringUpdate: true
+        omitDraftDuringUpdate: true
+        omitPrereleaseDuringUpdate: true
         generateReleaseNotes: true
         artifacts: 'openmeteo-api_${{github.ref_name}}_jammy_amd64.deb'
         draft: true

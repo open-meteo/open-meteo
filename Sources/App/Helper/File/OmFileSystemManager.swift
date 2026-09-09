@@ -3,6 +3,7 @@ import Dispatch
 import AsyncHTTPClient
 import Logging
 import OmFileIO
+import Synchronization
 
 /**
  Keep a file system tree in user-space memory. File and directory handles are kept open. Payloads can be associated which are also kept in memory.
@@ -10,7 +11,17 @@ import OmFileIO
  Additionally files from a remote S3 server can be cached. The S3 directory tree is periodically updated.
  */
 final class OmFileSystemManager: Sendable {
-    public static let instance = OmFileSystemManager()
+    private static let initialized = Atomic(false)
+    public static let instance: OmFileSystemManager = {
+        let manager = OmFileSystemManager()
+        initialized.store(true, ordering: .releasing)
+        return manager
+    }()
+
+    /// Background refresh must not initialize storage for commands that do not use it.
+    static var isInitialized: Bool {
+        initialized.load(ordering: .acquiring)
+    }
     
     let localFileSystem: OmFileSystemLocal.Directory
     
