@@ -35,13 +35,31 @@ import Testing
     }
 
     @Test func usAirQuality() {
+        // https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html
+        #expect(UnitedStatesAirQuality.indexPm2_5(pm2_5_24h_mean: 125.5) == 200)
+        #expect(UnitedStatesAirQuality.indexPm2_5(pm2_5_24h_mean: 175.5) == 250)
+        #expect(UnitedStatesAirQuality.indexPm2_5(pm2_5_24h_mean: 225.5) == 300)
+        #expect(UnitedStatesAirQuality.indexPm2_5(pm2_5_24h_mean: 325.5) == 500)
+        
+        #expect(UnitedStatesAirQuality.indexCo(co_8h_mean: 30.5) == 300)
+        #expect(UnitedStatesAirQuality.indexCo(co_8h_mean: 50.5) == 500)
+        
+        #expect(UnitedStatesAirQuality.indexNo2(no2: 1250.0) == 300)
+        #expect(UnitedStatesAirQuality.indexNo2(no2: 2050.0) == 500)
+        
+        #expect(UnitedStatesAirQuality.indexO3(o3: 125, o3_8h_mean: 200) == 300)
+        #expect(UnitedStatesAirQuality.indexO3(o3: 125, o3_8h_mean: 500) == 300)
+        
+        #expect(UnitedStatesAirQuality.indexSo2(so2: 305, so2_24h_mean: 0) == 200)
+        #expect(UnitedStatesAirQuality.indexSo2(so2: 355, so2_24h_mean: 0) == 200)
+        
         #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 40).isApproximatelyEqual(to: 36.363636, absoluteTolerance: 0.001))
         #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 100).isApproximatelyEqual(to: 72.5, absoluteTolerance: 0.001))
         #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 170).isApproximatelyEqual(to: 107.50001, absoluteTolerance: 0.001))
         #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 260).isApproximatelyEqual(to: 152.5, absoluteTolerance: 0.001))
         #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 356).isApproximatelyEqual(to: 201.42856, absoluteTolerance: 0.001))
         #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 424).isApproximatelyEqual(to: 298.57144, absoluteTolerance: 0.001))
-        #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 600).isApproximatelyEqual(to: 495.0, absoluteTolerance: 0.001))
+        #expect(UnitedStatesAirQuality.indexPm10(pm10_24h_mean: 600).isApproximatelyEqual(to: 494.44446, absoluteTolerance: 0.001))
 
         #expect(UnitedStatesAirQuality.indexO3(o3: 30, o3_8h_mean: 10).isApproximatelyEqual(to: 9.090909, absoluteTolerance: 0.001))
         #expect(UnitedStatesAirQuality.indexO3(o3: 90, o3_8h_mean: 50).isApproximatelyEqual(to: 45.454548, absoluteTolerance: 0.001))
