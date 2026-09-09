@@ -224,7 +224,7 @@ struct OmFileSplitter {
                         runData[l * timestamps.count + t.offset] = .nan
                     }
                 }
-                guard let grid = try await domain.getDomain(context: .init(logger: logger, httpClient: httpClient))?.grid else {
+                guard let grid = try await domain.getDomain()?.grid else {
                     fatalError("Did not get domain grid for \(domain)")
                 }
                 

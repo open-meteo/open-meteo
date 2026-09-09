@@ -7,11 +7,10 @@ import Logging
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_DOMAIN_TESTS"] == "1"))
     func concurrentNativeLoadsShareResources() async throws {
         let cache = IconNativeDomainCache()
-        let context = DomainInitContext(logger: Logger(label: "NativeDomainCacheTests"), httpClient: nil)
         let domains = try await withThrowingTaskGroup(of: IconNativeDomain.self) { group in
             for index in 0..<20 {
                 group.addTask {
-                    try await cache.load(index.isMultiple(of: 2) ? .iconD2Native : .iconD2Native15min, context: context)
+                    try await cache.load(index.isMultiple(of: 2) ? .iconD2Native : .iconD2Native15min)
                 }
             }
             var domains = [IconNativeDomain]()
@@ -25,7 +24,7 @@ import Logging
             #expect(domain.nativeGrid.elevationCache === elevationCache)
             #expect(domain.dtSeconds == (domain.definition == .iconD2Native ? 3600 : 900))
         }
-        let reused = try await cache.load(.iconD2Native, context: context)
+        let reused = try await cache.load(.iconD2Native)
         #expect(reused.nativeGrid.storage === first.nativeGrid.storage)
         #expect(reused.nativeGrid.elevationCache === elevationCache)
         #expect(elevationCache.cachedValues == nil)
@@ -39,12 +38,11 @@ import Logging
     }
 
     @Test func d2DownloadOutputs() async throws {
-        let context = DomainInitContext(logger: Logger(label: "IconDownloadDomains"), httpClient: nil)
-        let deterministic = try await IconDownloadDomains(.iconD2, context: context)
+        let deterministic = try await IconDownloadDomains(.iconD2)
         #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)
         #expect(deterministic.ensembleMean == nil)
 
-        let ensemble = try await IconDownloadDomains(.iconD2Eps, context: context)
+        let ensemble = try await IconDownloadDomains(.iconD2Eps)
         #expect(ensemble.ensembleMean?.domainRegistry == IconDomains.iconD2EpsEnsembleMean.domainRegistry)
         #expect(ensemble.fifteenMinute == nil)
     }

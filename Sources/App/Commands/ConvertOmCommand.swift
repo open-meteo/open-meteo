@@ -49,7 +49,7 @@ struct ConvertOmCommand: AsyncCommand {
                 logger.warning("Transpose flag is currently not supported for OM3 conversion")
             }
             logger.info("Converting OM file to v3 with domain: \(domain). Outfile will be: \(outfile)")
-            guard let grid = try await domainObj.getDomain(context: .init(logger: logger, httpClient: nil))?.grid else {
+            guard let grid = try await domainObj.getDomain()?.grid else {
                 fatalError("Did not get domain grid")
             }
             try await convertOmv3(src: signature.infile, dest: outfile, grid: grid)
@@ -93,7 +93,7 @@ struct ConvertOmCommand: AsyncCommand {
     private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, domain: String?, logger: Logger) async throws {
         if let domain = domain {
             let domainObj = try DomainRegistry.load(rawValue: domain)
-            guard let grid = try await domainObj.getDomain(context: .init(logger: logger, httpClient: nil))?.grid else {
+            guard let grid = try await domainObj.getDomain()?.grid else {
                 fatalError("Did not get domain grid")
             }
             let ny = grid.ny

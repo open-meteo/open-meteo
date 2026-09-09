@@ -138,12 +138,12 @@ extension IconNativeGridFile {
         }
     }
 
-    func load(context: DomainInitContext) async throws -> IconNativeGrid {
+    func load() async throws -> IconNativeGrid {
         if let grid = cache.get() {
             return grid
         }
         guard let payload = try await OmFileSystemManager.instance.get(
-            file: self, client: context.httpClient, logger: context.logger
+            file: self, client: .shared, logger: IconNativeDomains.logger
         ) else {
             throw IconNativeDomainError.missingGridArtifact(getFilePath())
         }

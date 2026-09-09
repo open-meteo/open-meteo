@@ -43,11 +43,11 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
 }
 
 extension IconNativeDomain {
-    init(definition: IconNativeDomains, context: DomainInitContext) async throws {
-        let grid = try await definition.nativeGridFile.load(context: context)
+    init(definition: IconNativeDomains) async throws {
+        let grid = try await definition.nativeGridFile.load()
         let payload = try? await OmFileSystemManager.instance.get(
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
-            client: context.httpClient, logger: context.logger
+            client: .shared, logger: IconNativeDomains.logger
         )
         self.init(definition: definition, nativeGrid: IconNativeGrid(storage: grid.storage, elevationFile: payload?.reader), elevationFile: payload?.reader)
     }
@@ -62,7 +62,7 @@ actor IconNativeDomainCache {
 
     private var cache = [IconNativeDomains: State]()
 
-    func load(_ definition: IconNativeDomains, context: DomainInitContext) async throws -> IconNativeDomain {
+    func load(_ definition: IconNativeDomains) async throws -> IconNativeDomain {
         // D2's hourly and quarter-hourly domains use exactly the same static resources.
         let resourceDefinition: IconNativeDomains = definition == .iconD2Native15min ? .iconD2Native : definition
         switch cache[resourceDefinition] {
@@ -80,7 +80,7 @@ actor IconNativeDomainCache {
             cache[resourceDefinition] = .loading([])
         }
         do {
-            let domain = try await IconNativeDomain(definition: resourceDefinition, context: context)
+            let domain = try await IconNativeDomain(definition: resourceDefinition)
             guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
                 fatalError("Expected loading state")
             }
