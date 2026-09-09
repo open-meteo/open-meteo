@@ -45,9 +45,7 @@ struct DwdSisDownloader: AsyncCommand {
 
         let sisRuns = Self.availableRuns(in: sisHtml, filePrefix: "SISin")
         let sidRuns = Self.availableRuns(in: sidHtml, filePrefix: "SIDin")
-        let availableRuns = sisRuns.intersection(sidRuns).filter {
-            $0 > (lastDownloadedTimeStep ?? Timestamp(0))
-        }.sorted()
+        let availableRuns = Self.runsToDownload(availableRuns: sisRuns.intersection(sidRuns), lastDownloadedTimeStep: lastDownloadedTimeStep, dtSeconds: domain.dtSeconds)
         guard !availableRuns.isEmpty else {
             logger.info("All steps already downloaded")
             return
@@ -66,6 +64,20 @@ struct DwdSisDownloader: AsyncCommand {
 
     static let sisDirectory = "https://opendata.dwd.de/weather/satellite/radiation/sis/"
     static let sidDirectory = "https://opendata.dwd.de/weather/satellite/radiation/sid/"
+
+    static func runsToDownload(availableRuns: Set<Timestamp>, lastDownloadedTimeStep: Timestamp?, dtSeconds: Int) -> [Timestamp] {
+        let sortedRuns = availableRuns.sorted()
+        guard let firstNewIndex = sortedRuns.firstIndex(where: { $0 > (lastDownloadedTimeStep ?? Timestamp(0)) }) else {
+            return []
+        }
+        var startIndex = firstNewIndex
+        // Gap filling needs a value before the gap in the same conversion batch,
+        // even if that timestep was already downloaded by an earlier invocation.
+        if firstNewIndex > 0, sortedRuns[firstNewIndex] > sortedRuns[firstNewIndex - 1].add(dtSeconds) {
+            startIndex -= 1
+        }
+        return Array(sortedRuns[startIndex...])
+    }
 
     /// Extract compressed EA v4 products from the Apache directory listing. A set is
     /// used because every filename occurs both in the link target and as link text.
