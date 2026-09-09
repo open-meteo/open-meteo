@@ -1307,7 +1307,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 IconVariable.self,
                 lowerPriority: [],
                 higherPriority: [(try await IconNativeDomains.iconD2Native15min.load(context: context), IconVariable.self)],
-                precipitationProb: IconDomains.iconD2Eps
+                precipitationProb: IconDomains.iconD2Eps,
+                gridpointPolicy: .primaryOnly
             )
         case .dwd_icon_d2_native_15min:
             return .single(try await IconNativeDomains.iconD2Native15min.load(context: context), IconVariable.self)
