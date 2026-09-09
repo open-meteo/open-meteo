@@ -47,27 +47,48 @@ extension IconNativeDomain {
 }
 
 actor IconNativeDomainCache {
-    private var loading = [IconNativeDomains: Task<IconNativeDomain, any Error>]()
+    private enum State {
+        case loading([CheckedContinuation<IconNativeDomain, any Error>])
+        case loaded(IconNativeDomain)
+        case error(any Error)
+    }
+
+    private var cache = [IconNativeDomains: State]()
 
     func load(_ definition: IconNativeDomains, context: DomainInitContext) async throws -> IconNativeDomain {
         // D2's hourly and quarter-hourly domains use exactly the same static resources.
         let resourceDefinition: IconNativeDomains = definition == .iconD2Native15min ? .iconD2Native : definition
-        let task: Task<IconNativeDomain, any Error>
-        if let existing = loading[resourceDefinition] {
-            task = existing
-        } else {
-            task = Task { try await IconNativeDomain(definition: resourceDefinition, context: context) }
-            loading[resourceDefinition] = task
+        switch cache[resourceDefinition] {
+        case .loaded(let domain):
+            return domain
+        case .loading(var continuations):
+            let domain = try await withCheckedThrowingContinuation { continuation in
+                continuations.append(continuation)
+                cache[resourceDefinition] = .loading(continuations)
+            }
+            return domain
+        case .error(let error):
+            throw error
+        case nil:
+            cache[resourceDefinition] = .loading([])
         }
         do {
-            let domain = try await task.value
-            // Do not pin an absent elevation file. A subsequent load may find it available.
-            if domain.nativeGrid.elevationPayload == nil, loading[resourceDefinition] == task {
-                loading[resourceDefinition] = nil
+            let domain = try await IconNativeDomain(definition: resourceDefinition, context: context)
+            guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
+                fatalError("Expected loading state")
             }
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
+            for continuation in continuations {
+                continuation.resume(returning: domain)
+            }
+            return domain
         } catch {
-            if loading[resourceDefinition] == task { loading[resourceDefinition] = nil }
+            guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
+                fatalError("Expected loading state")
+            }
+            for continuation in continuations {
+                continuation.resume(throwing: error)
+            }
+            cache[resourceDefinition] = .error(error)
             throw error
         }
     }
