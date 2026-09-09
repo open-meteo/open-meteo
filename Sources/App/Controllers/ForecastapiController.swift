@@ -112,16 +112,14 @@ struct WeatherApiController {
     let subdomain: String
     let alias: [String]
     let type: ApiType?
-    private let boundingBoxDomain: @Sendable (MultiDomains) -> (any GenericDomain)?
 
-    init(has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = [], type: ApiType? = nil, boundingBoxDomain: @escaping @Sendable (MultiDomains) -> (any GenericDomain)? = { $0.genericDomain }) {
+    init(has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = [], type: ApiType? = nil) {
         self.has15minutely = has15minutely
         self.hasCurrentWeather = hasCurrentWeather
         self.defaultModel = defaultModel
         self.subdomain = subdomain
         self.alias = alias
         self.type = type
-        self.boundingBoxDomain = boundingBoxDomain
     }
     
     enum ApiType {
@@ -349,7 +347,7 @@ struct WeatherApiController {
                 }
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
                 locations = try await domains.asyncFlatMap({ domain in
-                    guard let genericDomain = boundingBoxDomain(domain) else {
+                    guard let genericDomain = domain.genericDomain else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
                     let grid = try await genericDomain.getGrid(context: .init(logger: options.logger, httpClient: options.httpClient))
