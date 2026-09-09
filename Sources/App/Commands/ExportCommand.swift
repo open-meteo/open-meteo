@@ -296,7 +296,7 @@ struct ExportCommand: AsyncCommand {
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
-        guard let elevationFile = try await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
             fatalError("Could not read elevation file for domain \(domain)")
         }
         
@@ -533,7 +533,7 @@ struct ExportCommand: AsyncCommand {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
             let targetDomain = /*targetGridDomain?.genericDomain ??*/ domain.genericDomain!
-            guard let elevationFile = try await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
             try await ncElevation.write(elevationFile.read())

@@ -65,19 +65,19 @@ extension GenericDomain {
     }
 
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async throws -> (any OmFileReaderArrayProtocol<Float>)? {
+    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
         guard let domainRegistryStatic else {
             return nil
         }
         switch type {
         case .soilType:
-            return try await OmFileSystemManager.instance.get(
+            return try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
         case .elevation:
-            return try await OmFileSystemManager.instance.get(
+            return try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger

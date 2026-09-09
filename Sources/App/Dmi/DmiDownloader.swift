@@ -94,8 +94,8 @@ struct DmiDownload: AsyncCommand {
         let timestamps = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600).map{$0}
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
-        let domainElevation = try await {
-            guard let elevation = try await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

@@ -12,16 +12,11 @@ import Synchronization
  */
 final class OmFileSystemManager: Sendable {
     private static let initialized = Atomic(false)
-    private static let shared: Result<OmFileSystemManager, Error> = Result {
-        let manager = try OmFileSystemManager()
+    public static let instance: OmFileSystemManager = {
+        let manager = OmFileSystemManager()
         initialized.store(true, ordering: .releasing)
         return manager
-    }
-
-    /// Initialization errors are retained until the process restarts.
-    static var instance: OmFileSystemManager {
-        get throws { try shared.get() }
-    }
+    }()
 
     /// Background refresh must not initialize storage for commands that do not use it.
     static var isInitialized: Bool {
@@ -32,19 +27,15 @@ final class OmFileSystemManager: Sendable {
     
     let remoteFileSystem: OmFileSystemS3?
     
-    init(
-        dataDirectory: String = OpenMeteo.dataDirectory,
-        dataRunDirectory: String? = OpenMeteo.dataRunDirectory,
-        dataSpatialDirectory: String? = OpenMeteo.dataSpatialDirectory
-    ) throws {
+    private init() {
         /// Make om root directory with data, data_run and data_spatial
         var directories = [String: OmFileSystemLocal.Directory]()
-        directories["data"] = try OmFileSystemLocal.Directory(path: dataDirectory)
-        if let dataRunDirectory {
-            directories["data_run"] = try OmFileSystemLocal.Directory(path: dataRunDirectory)
+        directories["data"] = try! OmFileSystemLocal.Directory(path: OpenMeteo.dataDirectory)
+        if let dataRunDirectory = OpenMeteo.dataRunDirectory {
+            directories["data_run"] = try! OmFileSystemLocal.Directory(path: dataRunDirectory)
         }
-        if let dataSpatialDirectory {
-            directories["data_spatial"] = try OmFileSystemLocal.Directory(path: dataSpatialDirectory)
+        if let dataSpatialDirectory = OpenMeteo.dataSpatialDirectory {
+            directories["data_spatial"] = try! OmFileSystemLocal.Directory(path: dataSpatialDirectory)
         }
         
         self.localFileSystem = OmFileSystemLocal.Directory(directories: directories)

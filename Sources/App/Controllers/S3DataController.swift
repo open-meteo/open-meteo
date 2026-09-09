@@ -288,7 +288,6 @@ struct S3DataController: RouteCollection {
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         
         try await ensureParentDirectoryExists(forFileAt: absolutePath)
-        let fileSystem = try OmFileSystemManager.instance
         let modifiedDate = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
             try await handle.resize(to: .bytes(Int64(body.readableBytes)))
             try await handle.write(contentsOf: body, toAbsoluteOffset: 0)
@@ -305,7 +304,7 @@ struct S3DataController: RouteCollection {
         let path = req.url.path
         /// Object directory `somedir/`
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
-        await fileSystem.updateLocalDirectory(path: objectDirectory)
+        await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
         
         for queue in await lazyReplicationQueues(req) {
             await queue.upload(buffer: body, objectName: String(path.dropFirst(1)), contentType: req.headers.first(name: "content-type") ?? "application/octet-stream", lastModified: modifiedDate)
@@ -339,8 +338,6 @@ struct S3DataController: RouteCollection {
         
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         try await ensureParentDirectoryExists(forFileAt: absolutePath)
-        // Validate all configured data roots before accepting parts, so initialization cannot first fail at completion.
-        _ = try OmFileSystemManager.instance
         _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .newFile(replaceExisting: true)) { handle in
             try await handle.resize(to: .bytes(fileSize))
         }
@@ -418,7 +415,6 @@ struct S3DataController: RouteCollection {
     }
     
     private func finalizeMultipartUpload(req: Request, absolutePath: String, uploadId: Int, lastModified: Timestamp) async throws {
-        let fileSystem = try OmFileSystemManager.instance
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
         try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
             let ts = FileInfo.Timespec(seconds: Int(lastModified.timeIntervalSince1970), nanoseconds: 0)
@@ -430,7 +426,7 @@ struct S3DataController: RouteCollection {
         let path = req.url.path
         /// Object directory `somedir/`
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
-        await fileSystem.updateLocalDirectory(path: objectDirectory)
+        await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
         
         for queue in await lazyReplicationQueues(req) {
             let session = queue.startMultiPartUploads()
