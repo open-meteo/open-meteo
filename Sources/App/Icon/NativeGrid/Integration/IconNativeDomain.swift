@@ -5,6 +5,13 @@ import Vapor
 struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     let definition: IconNativeDomains
     let nativeGrid: IconNativeGrid
+    let elevationFile: (any OmFileReaderArrayProtocol<Float>)?
+
+    init(definition: IconNativeDomains, nativeGrid: IconNativeGrid, elevationFile: (any OmFileReaderArrayProtocol<Float>)? = nil) {
+        self.definition = definition
+        self.nativeGrid = nativeGrid
+        self.elevationFile = elevationFile
+    }
 
     var grid: any Gridable { nativeGrid }
     var description: String { definition.rawValue }
@@ -20,8 +27,8 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     var generateTimeSeries: Bool { definition.generateTimeSeries }
 
     func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
-        if case .elevation = type, let payload = nativeGrid.elevationPayload {
-            return payload.reader
+        if case .elevation = type, let elevationFile {
+            return elevationFile
         }
         let variable: String
         switch type {
@@ -42,7 +49,7 @@ extension IconNativeDomain {
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
             client: context.httpClient, logger: context.logger
         )
-        self.init(definition: definition, nativeGrid: IconNativeGrid(storage: grid.storage, elevationPayload: payload))
+        self.init(definition: definition, nativeGrid: IconNativeGrid(storage: grid.storage, elevationFile: payload?.reader), elevationFile: payload?.reader)
     }
 }
 
@@ -60,13 +67,13 @@ actor IconNativeDomainCache {
         let resourceDefinition: IconNativeDomains = definition == .iconD2Native15min ? .iconD2Native : definition
         switch cache[resourceDefinition] {
         case .loaded(let domain):
-            return domain
+            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid, elevationFile: domain.elevationFile)
         case .loading(var continuations):
             let domain = try await withCheckedThrowingContinuation { continuation in
                 continuations.append(continuation)
                 cache[resourceDefinition] = .loading(continuations)
             }
-            return domain
+            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid, elevationFile: domain.elevationFile)
         case .error(let error):
             throw error
         case nil:
@@ -77,10 +84,13 @@ actor IconNativeDomainCache {
             guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
                 fatalError("Expected loading state")
             }
+
+            cache[resourceDefinition] = .loaded(domain)
+           
             for continuation in continuations {
                 continuation.resume(returning: domain)
             }
-            return domain
+            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid, elevationFile: domain.elevationFile)
         } catch {
             guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
                 fatalError("Expected loading state")
