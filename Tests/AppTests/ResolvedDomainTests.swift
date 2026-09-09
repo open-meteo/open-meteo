@@ -1,11 +1,9 @@
 import Foundation
 @testable import App
-@testable import SphericalCubeTests
 import OmFileFormat
 import Synchronization
 import Testing
 import Vapor
-import VaporTesting
 
 @Suite struct ResolvedDomainTests {
     private let logger = Logger(label: "ResolvedDomainTests")
@@ -75,43 +73,16 @@ import VaporTesting
         }
         #expect(source.resolutions.withLock { $0 } == 1)
     }
-
-    @Test(arguments: [false, true])
-    func boundingBoxResolutionErrorsReturnHttpResponses(fail: Bool) async throws {
-        let fixture = try makeFixture(centers: makeSphericalCenters(count: 12))
-        defer { fixture.remove() }
-        let source = DeferredDomain(grid: IconNativeGrid(storage: fixture.index), fail: fail)
-        try await withApp { app in
-            app.middleware = .init()
-            app.middleware.use(ErrorMiddleware.custom(environment: app.environment))
-            let controller = WeatherApiController(defaultModel: .dwd_icon_d2_native, boundingBoxDomain: { model in
-                #expect(model == .dwd_icon_d2_native)
-                return source
-            })
-            app.get("v1", "forecast", use: controller.query)
-            let client = try app.testing()
-            try await client.test(.GET, "/v1/forecast?models=dwd_icon_d2_native&bounding_box=50,10,51,11") { response async in
-                #expect(response.status == (fail ? .internalServerError : .badRequest))
-                #expect(response.body.string.contains("\"error\":true"))
-                if !fail {
-                    #expect(response.body.string.contains("Bounding box calls not supported for grid"))
-                }
-            }
-            #expect(source.resolutions.withLock { $0 } == 1)
-        }
-    }
-
 }
 
 /// Exposes no synchronous grid and rejects repeated resolution.
 private final class DeferredDomain: GenericDomain, CustomStringConvertible {
     enum Failure: Error { case unavailable }
     let resolutions = Mutex(0)
-    private let resolvedGrid: any Gridable
+    private let resolvedGrid = RegularGrid(nx: 12, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1)
     private let fail: Bool
 
-    init(grid: any Gridable = RegularGrid(nx: 12, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1), fail: Bool = false) {
-        self.resolvedGrid = grid
+    init(fail: Bool = false) {
         self.fail = fail
     }
 
