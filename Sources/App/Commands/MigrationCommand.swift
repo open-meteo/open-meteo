@@ -43,12 +43,7 @@ struct MigrationCommand: AsyncCommand {
                 logger.warning("Skipping \(name)")
                 continue
             }
-            let grid: (any Gridable)?
-            if domain != .copernicus_dem90, let genericDomain = try await domain.getDomain() {
-                grid = genericDomain.grid
-            } else {
-                grid = nil
-            }
+            let grid = domain == .copernicus_dem90 ? nil : try await domain.getDomain()?.grid
             guard let directoryEnumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: "\(OpenMeteo.dataDirectory)\(name)", isDirectory: true), includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
                 logger.warning("No files at \(OpenMeteo.dataDirectory)\(name)")
                 continue
