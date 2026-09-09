@@ -36,23 +36,25 @@ enum EuropeanAirQuality {
 }
 
 /// https://en.wikipedia.org/wiki/Air_quality_index#United_States
+/// See https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html
+/// Steps are AQI thresholds for:  0-50, 50-100, 100-150, 150-200, 200-300, 300-500
 enum UnitedStatesAirQuality {
-    static let o3_HourlyThresholds: [Float] = [.nan, .nan, 125, 165, 205, 405, 505, 605]
-    static let o3_8HourlyThresholds: [Float] = [0, 55, 70, 85, 105, 200, .nan, .nan]
+    static let o3_HourlyThresholds: [Float] = [.nan, .nan, 125, 165, 205, 405, 605]
+    static let o3_8HourlyThresholds: [Float] = [0, 55, 70, 85, 105, 200, .nan]
 
-    static let pm2_5_24HourlyMeanThresholds: [Float] = [0, 9, 35.5, 55.5, 125.5, 225.5, 325.5, 500]
-    static let pm10_24HourlyMeanThresholds: [Float] = [0, 55, 155, 255, 355, 425, 505, 605]
+    static let pm2_5_24HourlyMeanThresholds: [Float] = [0, 9, 35.5, 55.5, 125.5, 225.5, 325.5]
+    static let pm10_24HourlyMeanThresholds: [Float] = [0, 55, 155, 255, 355, 425, 605]
 
-    static let co_8HourlyThresholds: [Float] = [0, 4.5, 9.5, 12.5, 15.5, 30.5, 40.5, 50.5]
+    static let co_8HourlyThresholds: [Float] = [0, 4.5, 9.5, 12.5, 15.5, 30.5, 50.5]
 
-    static let so2_HourlyThresholds: [Float] = [0, 35, 75, 185, 305, .nan, .nan, .nan]
-    static let so2_24HourlyThresholds: [Float] = [.nan, .nan, .nan, .nan, 305, 605, 805, 1005]
+    static let so2_HourlyThresholds: [Float] = [0, 35, 75, 185, 305, .nan, .nan]
+    static let so2_24HourlyThresholds: [Float] = [.nan, .nan, .nan, .nan, 305, 605, 1005]
 
-    static let no2_HourlyThresholds: [Float] = [0, 54, 100, 360, 650, 1250, 1650, 2050]
+    static let no2_HourlyThresholds: [Float] = [0, 54, 100, 360, 650, 1250, 2050]
 
-    /// Scale class value 0...7 to AQI index 0...500
+    /// Scale class value 0...4 to AQI index 0...300, 5...6 to 300...500
     @inlinable static func scale(_ val: Float) -> Float {
-        return val <= 4 ? (val * 50) : (val * 100 - 200)
+        return val <= 4 ? (val * 50) : val <= 5 ? (val*100 - 200) : (val * 200 - 700)
     }
 
     /// Accept hourly values
@@ -71,7 +73,7 @@ enum UnitedStatesAirQuality {
     /// IMPORTANT: input unit is PPM
     @inlinable static func indexO3(o3: Float, o3_8h_mean: Float) -> Float {
         let x1 = o3_HourlyThresholds.positionExtrapolated(of: o3)
-        let x2 = o3_8HourlyThresholds.positionExtrapolated(of: o3_8h_mean)
+        let x2 = o3_8h_mean >= 200 ? 5 : o3_8HourlyThresholds.positionExtrapolated(of: o3_8h_mean)
         if x1.isNaN {
             return scale(x2)
         }
@@ -84,7 +86,7 @@ enum UnitedStatesAirQuality {
     /// Accept hourly values and 24h avg
     /// IMPORTANT: input unit is PPM
     @inlinable static func indexSo2(so2: Float, so2_24h_mean: Float) -> Float {
-        let x1 = so2_HourlyThresholds.positionExtrapolated(of: so2)
+        let x1 = so2 >= 305 ? 4 : so2_HourlyThresholds.positionExtrapolated(of: so2)
         let x2 = so2_24HourlyThresholds.positionExtrapolated(of: so2_24h_mean)
         return x1.isNaN ? scale(x2) : scale(x1)
     }

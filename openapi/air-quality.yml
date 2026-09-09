@@ -201,7 +201,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       pm10:
                         type: array
                         items:
@@ -505,7 +505,7 @@ paths:
                     type: object
                     properties:
                       time:
-                        type: string
+                        type: [string, integer]
                       interval:
                         type: integer
                       european_aqi:

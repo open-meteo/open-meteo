@@ -20,14 +20,23 @@ public extension Float {
 private let _pow10: [Int] = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000]
 
 public extension Double {
-    /// Format to a fixed number of decimal places without Foundation/printf overhead.
+    /// Format to a fixed number of decimal places, using Foundation only outside the integer fast path.
     func formatted(decimals: Int) -> String {
         guard decimals > 0 else {
-            return String(Int(self.rounded()))
+            guard let rounded = Int(exactly: self.rounded()) else {
+                return String(format: "%.0f", self)
+            }
+            return String(rounded)
+        }
+        guard decimals < _pow10.count else {
+            return String(format: "%.*f", decimals, self)
         }
         let factor = _pow10[decimals]
         let abs_val = self < 0 ? -self : self
-        let scaled = Int((abs_val * Double(factor)).rounded())
+        // Scaling can overflow even when the input is finite.
+        guard let scaled = Int(exactly: (abs_val * Double(factor)).rounded()) else {
+            return String(format: "%.*f", decimals, self)
+        }
         let intPart = scaled / factor
         let fracPart = scaled % factor
         return self < 0 ? "-\(intPart).\(fracPart.zeroPadded(len: decimals))" : "\(intPart).\(fracPart.zeroPadded(len: decimals))"
@@ -35,14 +44,23 @@ public extension Double {
 }
 
 public extension Float {
-    /// Format to a fixed number of decimal places without Foundation/printf overhead.
+    /// Format to a fixed number of decimal places, using Foundation only outside the integer fast path.
     func formatted(decimals: Int) -> String {
         guard decimals > 0 else {
-            return String(Int(self.rounded()))
+            guard let rounded = Int(exactly: self.rounded()) else {
+                return String(format: "%.0f", Double(self))
+            }
+            return String(rounded)
+        }
+        guard decimals < _pow10.count else {
+            return String(format: "%.*f", decimals, Double(self))
         }
         let factor = _pow10[decimals]
         let abs_val = self < 0 ? -self : self
-        let scaled = Int((abs_val * Float(factor)).rounded())
+        // Scaling can overflow even when the input is finite.
+        guard let scaled = Int(exactly: (abs_val * Float(factor)).rounded()) else {
+            return String(format: "%.*f", decimals, Double(self))
+        }
         let intPart = scaled / factor
         let fracPart = scaled % factor
         return self < 0 ? "-\(intPart).\(fracPart.zeroPadded(len: decimals))" : "\(intPart).\(fracPart.zeroPadded(len: decimals))"

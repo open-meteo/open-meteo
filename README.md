@@ -81,6 +81,7 @@ Apps:
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
 - [Rapid Update Wind Map](https://wind.zink.tv) Hourly updated short term wind forecasts. Based on rapid update models. Also for wind sports.
 - [Road Vagabond](https://roadvagabond.com) A camping destination discovery app showing zones within your drive time with weather-based filtering.
+- [Seantral](https://seantral.com) Sea conditions hour by hour along the Italian coast, with a 0-10 score per activity (swimming, snorkelling, diving, SUP, kayak, boat, sailing, fishing) from Open-Meteo wind and wave data and measured coast shelter. Free web app.
 - [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
