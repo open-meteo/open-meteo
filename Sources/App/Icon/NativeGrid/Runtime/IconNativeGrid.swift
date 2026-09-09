@@ -12,13 +12,11 @@ struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
     let storage: SphericalCubeIndex
-    let elevationPayload: OmFileLocalRemoteOmReader?
     let elevationCache: ElevationCache?
 
-    init(storage: SphericalCubeIndex, elevationPayload: OmFileLocalRemoteOmReader? = nil) {
+    init(storage: SphericalCubeIndex, elevationFile: (any OmFileReaderArrayProtocol<Float>)? = nil) {
         self.storage = storage
-        self.elevationPayload = elevationPayload
-        self.elevationCache = elevationPayload.flatMap { ElevationCache(reader: $0.reader) }
+        self.elevationCache = elevationFile.flatMap { ElevationCache(reader: $0) }
     }
 
     static func load(file: URL) throws -> Self {
@@ -145,7 +143,7 @@ struct IconNativeGrid: Gridable {
             }
             return values[pointID]
         }
-        return try await readFromStaticFile(gridpoint: pointID, file: elevationPayload?.reader ?? elevationFile)
+        return try await readFromStaticFile(gridpoint: pointID, file: elevationFile)
     }
 
     private func readElevations(
@@ -160,7 +158,6 @@ struct IconNativeGrid: Gridable {
             )
         }
 
-        let elevationFile = elevationPayload?.reader ?? elevationFile
         var sortedCells = InlineArray<10, Int>(repeating: -1)
         var sortedPositions = InlineArray<10, Int>(repeating: -1)
         var sortedCount = 0
