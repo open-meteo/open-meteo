@@ -68,7 +68,7 @@ enum ElevationCacheError: Error, Equatable {
     case unexpectedCount(expected: Int, actual: Int)
 }
 
-/// A payload-owned, lazy snapshot. Successful loads are immutable; failed loads can be retried.
+/// A lazy snapshot owned by the native grid. Successful loads are immutable; failed loads can be retried.
 actor ElevationCache {
     private nonisolated let values = AtomicLazyReference<ElevationValues>()
     private let elementCount: Int

@@ -21,7 +21,7 @@ import Testing
         let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
         let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
         #expect(domain.nativeGrid.storage === quarterHourly.nativeGrid.storage)
-        #expect(domain.nativeGrid.elevationPayload?.elevationCache === quarterHourly.nativeGrid.elevationPayload?.elevationCache)
+        #expect(domain.nativeGrid.elevationCache === quarterHourly.nativeGrid.elevationCache)
         #expect(domain.dtSeconds == 3600)
         #expect(quarterHourly.dtSeconds == 900)
 
@@ -32,14 +32,14 @@ import Testing
         #expect(reader.modelElevation.numeric == 100)
         #expect(try await reader.getStatic(type: .elevation) == 100)
         #expect(try await file.payload().reader.read(range: [0..<1, 0..<1]) == [900])
-        #expect(payload.elevationCache?.cachedValues == nil)
+        #expect(grid.elevationCache?.cachedValues == nil)
 
         let selected = try #require(await GenericReader<IconNativeDomain, IconSurfaceVariable>(
             domain: domain, lat: 0, lon: 0.04, elevation: 500, mode: .land, options: options
         ))
         #expect(selected.position == 1)
         #expect(selected.modelElevation.numeric == 500)
-        #expect(payload.elevationCache?.cachedValues != nil)
+        #expect(grid.elevationCache?.cachedValues != nil)
     }
 
     @Test func elevationEncodingRoundTripsSamples() throws {
@@ -116,8 +116,9 @@ import Testing
             let file = try await makeElevationFile(elevations)
             defer { file.remove() }
             let payload = try await file.payload()
-            let cache = try #require(payload.elevationCache)
-            let grid: any Gridable = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
+            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
+            let cache = try #require(nativeGrid.elevationCache)
+            let grid: any Gridable = nativeGrid
             let raw = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
                 elevationFile: file.reader, mode: mode)
             #expect(raw?.gridpoint == 1)
@@ -211,7 +212,12 @@ import Testing
         #expect(invalid.cachedValues == nil)
     }
 
-    @Test func payloadReplacementOwnsIndependentElevationCache() async throws {
+    @Test func replacementGridOwnsIndependentElevationCache() async throws {
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+        ])
+        defer { fixture.remove() }
         let file = try await makeElevationFile([0, 17])
         let replacement = try await makeElevationFile([0, 23])
         defer {
@@ -223,14 +229,16 @@ import Testing
             return try await OmFileLocalRemoteOmReader(fd: handle, size: Int64(handle.seekToEnd()))
         }
         let old = try await payload(file.path)
-        let oldCache = try #require(old.elevationCache)
+        let oldGrid = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: old)
+        let oldCache = try #require(oldGrid.elevationCache)
         #expect(try await old.reader.read(range: [0..<1, 1..<2]) == [17])
         #expect(oldCache.cachedValues == nil)
         let oldValues = try await oldCache.loadValues()
         try FileManager.default.removeItem(atPath: file.path)
         try FileManager.default.moveItem(atPath: replacement.path, toPath: file.path)
         let new = try await payload(file.path)
-        let newCache = try #require(new.elevationCache)
+        let newGrid = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: new)
+        let newCache = try #require(newGrid.elevationCache)
         #expect(newCache !== oldCache)
         #expect(newCache.cachedValues == nil)
         #expect(try await newCache.loadValues()[1] == 23)
@@ -246,8 +254,9 @@ import Testing
         let file = try await makeElevationFile([100, -999])
         defer { file.remove() }
         let payload = try await file.payload()
-        let cache = try #require(payload.elevationCache)
-        let grid: any Gridable = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
+        let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, elevationPayload: payload)
+        let cache = try #require(nativeGrid.elevationCache)
+        let grid: any Gridable = nativeGrid
         for (mode, elevation) in [(GridSelectionMode.nearest, Float(500)), (.land, .nan)] {
             _ = try await grid.findPoint(lat: 0, lon: 0.04, elevation: elevation,
                 elevationFile: file.reader, mode: mode)
