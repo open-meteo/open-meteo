@@ -16,7 +16,6 @@ struct OmFileSplitter {
 
     let ny: Int
     let nx: Int
-    private let grid: (any Gridable)?
 
     /// Number of ensemble members or levels
     let nMembers: Int
@@ -47,22 +46,19 @@ struct OmFileSplitter {
     }
 
     init<Domain: GenericDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
-        let grid = domain.grid
         self.init(
             domain: domain.domainRegistry,
             nMembers: max(nMembers ?? domain.countEnsembleMember, 1),
-            nx: grid.nx,
-            ny: grid.ny,
+            nx: domain.grid.nx,
+            ny: domain.grid.ny,
             nTimePerFile: domain.omFileLength,
             hasYearlyFiles: domain.hasYearlyFiles,
             masterTimeRange: domain.masterTimeRange,
-            chunknLocations: chunknLocations,
-            grid: grid
+            chunknLocations: chunknLocations
         )
     }
 
-    init(domain: DomainRegistry, nMembers: Int, nx: Int, ny: Int, nTimePerFile: Int, hasYearlyFiles: Bool, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil, grid: (any Gridable)? = nil) {
-        self.grid = grid
+    init(domain: DomainRegistry, nMembers: Int, nx: Int, ny: Int, nTimePerFile: Int, hasYearlyFiles: Bool, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil) {
         self.domain = domain
         self.nMembers = nMembers
         self.nx = nx
@@ -228,12 +224,7 @@ struct OmFileSplitter {
                         runData[l * timestamps.count + t.offset] = .nan
                     }
                 }
-                let grid: any Gridable
-                if let resolved = self.grid {
-                    grid = resolved
-                } else if let domain = try await domain.getDomain(context: .init(logger: logger, httpClient: httpClient)) {
-                    grid = domain.grid
-                } else {
+                guard let grid = try await domain.getDomain(context: .init(logger: logger, httpClient: httpClient))?.grid else {
                     fatalError("Did not get domain grid for \(domain)")
                 }
                 
