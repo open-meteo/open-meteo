@@ -50,60 +50,9 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
     }
 }
 
-extension IconDomains {
-    var isNative: Bool {
-        nativeGridIdentity != nil
-    }
-
-    var isD2Deterministic: Bool {
-        self == .iconD2 || self == .iconD2Native
-    }
-
-    var isD2FifteenMinute: Bool {
-        self == .iconD2_15min || self == .iconD2Native15min
-    }
-
-    var fifteenMinuteDomain: Self? {
-        switch self {
-        case .iconD2:
-            return .iconD2_15min
-        case .iconD2Native:
-            return .iconD2Native15min
-        default:
-            return nil
-        }
-    }
-
-    var sourceDomain: Self {
-        // Native domains have independent storage registries, but DWD still publishes them below
-        // the existing `icon` and `icon-d2` source paths.
-        switch self {
-        case .iconNative:
-            return .icon
-        case .iconD2Native, .iconD2Native15min:
-            return .iconD2
-        default:
-            return self
-        }
-    }
-
-    var nativeGridIdentity: IconNativeGridIdentity? { nativeGridFile?.identity }
-
-    var nativeGridFile: IconNativeGridFile? {
-        switch self {
-        case .iconNative: return Self.globalGridFile
-        case .iconD2Native, .iconD2Native15min: return Self.d2GridFile
-        default: return nil
-        }
-    }
-
-    static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
-    static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
-
+extension IconNativeDomains {
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
-        guard let artifact = nativeGridFile else {
-            return
-        }
+        let artifact = nativeGridFile
         let identity = artifact.identity
         let registry = artifact.registry
         do {

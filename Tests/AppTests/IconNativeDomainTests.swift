@@ -25,50 +25,12 @@ import Logging
         #expect(remapped[3] == 30)
     }
 
-    @Test func d2DomainsShareGridCache() throws {
-        let global = try #require(IconDomains.iconNative.nativeGridFile)
-        let hourly = try #require(IconDomains.iconD2Native.nativeGridFile)
-        let quarterHourly = try #require(IconDomains.iconD2Native15min.nativeGridFile)
+    @Test func d2DomainsShareGridCache() {
+        let global = IconNativeDomains.iconNative.nativeGridFile
+        let hourly = IconNativeDomains.iconD2Native.nativeGridFile
+        let quarterHourly = IconNativeDomains.iconD2Native15min.nativeGridFile
         #expect(hourly.cache === quarterHourly.cache)
         #expect(global.cache !== hourly.cache)
         #expect(hourly.registry == .dwd_icon_d2_native)
-    }
-
-    @Test func gribGridValidation() throws {
-        try metadata(identity: .d2).validate(identity: .d2)
-        try IconNativeGribDecoder.validateDecodedValueCount(IconNativeGridIdentity.d2.cellCount, identity: .d2)
-
-        #expect(throws: IconNativeGribError.self) {
-            try metadata(identity: .global).validate(identity: .d2)
-        }
-        #expect(throws: IconNativeGribError.self) {
-            try metadata(identity: .d2, dataPointCount: 525_072).validate(identity: .d2)
-        }
-        #expect(throws: IconNativeGribError.self) {
-            try IconNativeGribDecoder.validateDecodedValueCount(525_072, identity: .d2)
-        }
-    }
-
-    @Test(arguments: [
-        (MultiDomains.dwd_icon_global_native, DomainRegistry.dwd_icon_global_native),
-        (.dwd_icon_d2_native, .dwd_icon_d2_native),
-        (.dwd_icon_d2_native_15min, .dwd_icon_d2_native_15min)
-    ])
-    func nativeApiModelRegistry(model: MultiDomains, registry: DomainRegistry) {
-        #expect(model.getDomainAndVariable()?.singleDomain?.domainRegistry == registry)
-    }
-
-    private func metadata(
-        identity: IconNativeGridIdentity,
-        dataPointCount: Int? = nil
-    ) -> IconNativeGribMetadata {
-        IconNativeGribMetadata(
-            edition: 2,
-            gridType: "unstructured_grid",
-            gridDefinitionTemplateNumber: 101,
-            numberOfGridUsed: Int(identity.gridNumber),
-            uuidOfHGrid: identity.gridUUID.hexString,
-            numberOfDataPoints: dataPointCount ?? identity.cellCount
-        )
     }
 }

@@ -5,15 +5,12 @@ import OmFileFormat
 /**
  ICON Domains including ensemble
  */
-enum IconDomains: String, CaseIterable, GenericDomain {
+enum IconDomains: String, CaseIterable, GridDomain {
     /// hourly data until forecast hour 78, then 3 h until 180
     case icon
     case iconEu = "icon-eu"
     case iconD2 = "icon-d2"
     case iconD2_15min = "icon-d2-15min"
-    case iconNative = "icon-native"
-    case iconD2Native = "icon-d2-native"
-    case iconD2Native15min = "icon-d2-native-15min"
     case iconEps = "icon-eps"
     case iconEuEps = "icon-eu-eps"
     case iconD2Eps = "icon-d2-eps"
@@ -36,7 +33,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     }
     
     var dtSeconds: Int {
-        if isD2FifteenMinute {
+        if self == .iconD2_15min {
             return 3600 / 4
         }
         return 3600
@@ -52,12 +49,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return .dwd_icon_d2
         case .iconD2_15min:
             return .dwd_icon_d2_15min
-        case .iconNative:
-            return .dwd_icon_global_native
-        case .iconD2Native:
-            return .dwd_icon_d2_native
-        case .iconD2Native15min:
-            return .dwd_icon_d2_native_15min
         case .iconEps:
             return .dwd_icon_eps
         case .iconEuEps:
@@ -77,8 +68,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .iconD2_15min:
             return .dwd_icon_d2
-        case .iconD2Native15min:
-            return .dwd_icon_d2_native
         case .iconEpsEnsembleMean:
             return .dwd_icon_eps_ensemble_mean
         case .iconEuEpsEnsembleMean:
@@ -101,13 +90,13 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// How many hourly timesteps to keep in each compressed chunk
     var omFileLength: Int {
         switch self {
-        case .icon, .iconNative, .iconEps, .iconEpsEnsembleMean:
+        case .icon, .iconEps, .iconEpsEnsembleMean:
             return 180 + 1 + 3 * 24
         case .iconEu, .iconEuEps, .iconEuEpsEnsembleMean:
             return 120 + 1 + 3 * 24
-        case .iconD2, .iconD2Native, .iconD2Eps, .iconD2EpsEnsembleMean:
+        case .iconD2, .iconD2Eps, .iconD2EpsEnsembleMean:
             return 48 + 1 + 3 * 24
-        case .iconD2_15min, .iconD2Native15min:
+        case .iconD2_15min:
             return 48 * 4 + 3 * 24
         }
     }
@@ -115,13 +104,13 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// All available pressure levels for the current domain
     var levels: [Int] {
         switch self {
-        case .icon, .iconNative:
+        case .icon:
             return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
         case .iconEu:
             return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000] // disabled: 775, 825, 875
-        case .iconD2, .iconD2Native:
+        case .iconD2:
             return [                      200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
-        case .iconD2_15min, .iconD2Native15min:
+        case .iconD2_15min:
             return []
         case .iconEps, .iconEpsEnsembleMean:
             return []
@@ -134,9 +123,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .icon, .iconNative:
+        case .icon:
             return 6 * 3600
-        case .iconEu, .iconD2, .iconD2_15min, .iconD2Native, .iconD2Native15min:
+        case .iconEu, .iconD2, .iconD2_15min:
             return 3 * 3600
         case .iconEps, .iconEpsEnsembleMean:
             return 12 * 3600
@@ -155,7 +144,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             // Note ICON-EPS has only 6 hourly data for 6/18z runs, not used here
             // Hourly data until 48h, 3 hourly until 72, 6 hourly until 120h (same as ICON-EU-EPS) and 12 hourly until 180h
             return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6)) + Array(stride(from: 132, through: 180, by: 12))
-        case .icon, .iconNative:
+        case .icon:
             if  run == 6 || run == 18 {
                 // only up to 120
                 return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
@@ -173,16 +162,16 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             }
             // side runs
             return Array(0...30)
-        case .iconD2_15min, .iconD2Native15min:
+        case .iconD2_15min:
             return Array(0...48 * 4 - 1)
-        case .iconD2Eps, .iconD2, .iconD2Native:
+        case .iconD2Eps, .iconD2:
             return Array(0...48)
         case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
             fatalError()
         }
     }
 
-    func getGrid(context: DomainInitContext) async throws -> any Gridable {
+    var grid: any Gridable {
         switch self {
         case .icon:
             return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
@@ -190,10 +179,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
         case .iconD2_15min, .iconD2:
             return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
-        case .iconNative:
-            return try await Self.globalGridFile.load(context: context)
-        case .iconD2Native, .iconD2Native15min:
-            return try await Self.d2GridFile.load(context: context)
         case .iconEps, .iconEpsEnsembleMean:
             // R03B06 avg 26.5 km
             return RegularGrid(nx: 1439, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
@@ -210,9 +195,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// name in the filenames
     var region: String {
         switch self {
-        case .iconEps, .icon, .iconNative, .iconEpsEnsembleMean: return "global"
+        case .iconEps, .icon, .iconEpsEnsembleMean: return "global"
         case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean: return "europe"
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2Native, .iconD2Native15min, .iconD2EpsEnsembleMean: return "germany"
+        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean: return "germany"
         }
     }
 
@@ -222,11 +207,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// icon-d2 1-65.... 63=78m, 62=126m
     var numberOfModelFullLevels: Int {
         switch self {
-        case .iconEps, .icon, .iconNative, .iconEpsEnsembleMean:
+        case .iconEps, .icon, .iconEpsEnsembleMean:
             return 120 // was 90
         case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean:
             return 74 // was 60
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2Native, .iconD2Native15min, .iconD2EpsEnsembleMean:
+        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
             return 65
         }
     }

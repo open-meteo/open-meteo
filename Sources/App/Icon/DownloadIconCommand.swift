@@ -81,30 +81,29 @@ struct DownloadIconCommand: AsyncCommand {
         }
         try missingRemapped?.surfaceElevationFileOm.createDirectory()
 
-        let downloadDirectory = domain.downloadDirectory
+        let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
-        let sourceDomain = domain.sourceDomain
-        let deadLineHours: Double = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps) ? 2 : 5
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
-        let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
-        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, logger: logger, curl: curl)
-        let gridType = domain.isNative || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
+        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
+        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, nativeGridIdentity: outputs.nativeDomain?.nativeGridFile.identity, logger: logger, curl: curl)
+        let gridType = outputs.nativeDomain != nil || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
-        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(sourceDomain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
 
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
 
-        let additionalTimeString = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps) ? "_000_0" : ""
-        let variableName = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps || sourceDomain == .iconEuEps || sourceDomain == .iconEps) ? "hsurf" : "HSURF"
+        let additionalTimeString = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_0" : ""
+        let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "hsurf" : "HSURF"
         let file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName).grib2.bz2"
         var hsurf = try await cdo.downloadAndRemap(file)[0].data.data
 
-        let variableName2 = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps || sourceDomain == .iconEuEps || sourceDomain == .iconEps) ? "fr_land" : "FR_LAND"
+        let variableName2 = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "fr_land" : "FR_LAND"
         let file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName2).grib2.bz2"
         let landFraction = try await cdo.downloadAndRemap(file2)[0].data.data
 
@@ -120,7 +119,7 @@ struct DownloadIconCommand: AsyncCommand {
         }
 
         if needsPrimary {
-            try hsurf.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: outputs.primary.grid, createNetCdf: false)
+            try hsurf.writeOmFile2D(file: outputs.primary.surfaceElevationFileOm.getFilePath(), grid: outputs.primary.grid, createNetCdf: false)
         }
         if let remappedDomain = missingRemapped {
             guard let remapper = try await CdoIconGlobal(curl: curl, domain: .icon) else {
@@ -140,17 +139,16 @@ struct DownloadIconCommand: AsyncCommand {
         let client = application.http.client.shared
         let domain = outputs.source
         let remappedDomain = outputs.remapped
-        let downloadDirectory = domain.downloadDirectory
+        let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
-        let sourceDomain = domain.sourceDomain
-        let deadLineHours: Double = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps) ? 2 : 5
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: 120)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let domainPrefix = "\(sourceDomain.rawValue)_\(sourceDomain.region)"
-        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, logger: logger, curl: curl)
+        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
+        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, nativeGridIdentity: outputs.nativeDomain?.nativeGridFile.identity, logger: logger, curl: curl)
         let remapper: CdoIconGlobal?
         if remappedDomain != nil {
             guard let mapping = try await CdoIconGlobal(curl: curl, domain: .icon) else {
@@ -160,12 +158,12 @@ struct DownloadIconCommand: AsyncCommand {
         } else {
             remapper = nil
         }
-        let gridType = domain.isNative || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
+        let gridType = outputs.nativeDomain != nil || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
         let isEnsemble = domain.countEnsembleMember > 1
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
-        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(sourceDomain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
 
         let deaverager = GribDeaverager()
@@ -173,7 +171,7 @@ struct DownloadIconCommand: AsyncCommand {
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
+            guard let elevation = try? await outputs.primary.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation
@@ -214,8 +212,8 @@ struct DownloadIconCommand: AsyncCommand {
                 guard let v = variable.getVarAndLevel(domain: domain) else {
                     return
                 }
-                let level = v.level.map({ "_\($0)" }) ?? (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps ? "_2d" : "")
-                let variableName = (sourceDomain == .iconD2 || sourceDomain == .iconD2Eps || sourceDomain == .iconEuEps || sourceDomain == .iconEps) ? v.variable : v.variable.uppercased()
+                let level = v.level.map({ "_\($0)" }) ?? (domain == .iconD2 || domain == .iconD2Eps ? "_2d" : "")
+                let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? v.variable : v.variable.uppercased()
                 let filenameFrom = "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(variableName).grib2.bz2"
 
                 let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
@@ -489,10 +487,11 @@ struct DownloadIconCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
-        let requestedDomain = try IconDomains.load(rawValue: signature.domain)
-        let domain = requestedDomain.downloadDomain
+        let nativeDomain = IconNativeDomains(rawValue: signature.domain)
+            ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
+        let domain = try nativeDomain?.sourceDomain ?? IconDomains.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? requestedDomain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
         if signature.onlyVariables != nil && signature.group != nil {
             fatalError("Parameter 'onlyVariables' and 'groups' must not be used simultaneously")
@@ -561,13 +560,19 @@ struct DownloadIconCommand: AsyncCommand {
 
         let logger = context.application.logger
         let generateFullRun = domain.countEnsembleMember == 1
-        if domain.isNative {
-            try await domain.prepareNativeGrid(
+        if let nativeDomain {
+            try await nativeDomain.prepareNativeGrid(
                 application: context.application,
                 uploadS3Bucket: signature.uploadS3Bucket
             )
         }
-        let outputs = try await IconDownloadDomains(requestedDomain, context: .init(logger: logger, httpClient: nil))
+        let domainContext = DomainInitContext(logger: logger, httpClient: nil)
+        let outputs: IconDownloadDomains
+        if let nativeDomain {
+            outputs = try await IconDownloadDomains(nativeDomain, context: domainContext)
+        } else {
+            outputs = try await IconDownloadDomains(domain, context: domainContext)
+        }
         let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map(\.description).joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, outputs: outputs, run: run)
@@ -578,7 +583,7 @@ struct DownloadIconCommand: AsyncCommand {
             // ICON-D2 downloads 15min data as well
             try await GenericVariableHandle.convert(application: context.application, domain: fifteenMinuteDomain, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: outputs.primary, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -592,43 +597,50 @@ struct IconDownloadDomains: Sendable {
     let ensembleMean: ResolvedDomain?
     let fifteenMinute: ResolvedDomain?
 
-    init(_ requestedDomain: IconDomains, context: DomainInitContext) async throws {
-        let source = requestedDomain.downloadDomain
-        self.source = source
-        self.primary = try await ResolvedDomain(source, context: context)
-        self.remapped = source == .iconNative ? try await ResolvedDomain(IconDomains.icon, context: context) : nil
-        if let domain = source.ensembleMeanDomain {
-            self.ensembleMean = try await ResolvedDomain(domain, context: context)
+    let nativeDomain: IconNativeDomains?
+
+    init(_ domain: IconDomains, context: DomainInitContext) async throws {
+        if domain == .icon {
+            self = try await Self(IconNativeDomains.iconNative, context: context)
+            return
+        }
+        self.source = domain
+        self.nativeDomain = nil
+        self.primary = try await ResolvedDomain(domain, context: context)
+        self.remapped = nil
+        if let mean = domain.ensembleMeanDomain {
+            self.ensembleMean = try await ResolvedDomain(mean, context: context)
         } else {
             self.ensembleMean = nil
         }
-        if let domain = source.fifteenMinuteDomain {
-            self.fifteenMinute = try await ResolvedDomain(domain, context: context)
-        } else {
-            self.fifteenMinute = nil
-        }
+        self.fifteenMinute = domain == .iconD2 ? try await ResolvedDomain(IconDomains.iconD2_15min, context: context) : nil
+    }
+
+    init(_ domain: IconNativeDomains, context: DomainInitContext) async throws {
+        self.source = domain.sourceDomain
+        self.nativeDomain = domain
+        self.primary = try await ResolvedDomain(domain, context: context)
+        self.remapped = domain == .iconNative ? try await ResolvedDomain(IconDomains.icon, context: context) : nil
+        self.ensembleMean = nil
+        self.fifteenMinute = domain == .iconD2Native ? try await ResolvedDomain(IconNativeDomains.iconD2Native15min, context: context) : nil
     }
 }
 
 extension IconDomains {
-    var downloadDomain: Self {
-        self == .icon ? .iconNative : self
-    }
-
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .iconEps, .icon, .iconNative:
+        case .iconEps, .icon:
             // Icon has a delay of 2-3 hours after initialisation  with 4 runs a day
             return t.subtract(hours: 2).floor(toNearestHour: 6)
         case .iconEuEps, .iconEu:
             // Icon-eu has a delay of 2:40 hours after initialisation with 8 runs a day
             return t.subtract(hours: 2).floor(toNearestHour: 3)
-        case .iconD2Eps, .iconD2, .iconD2Native:
+        case .iconD2Eps, .iconD2:
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
             return t.floor(toNearestHour: 3)
-        case .iconD2_15min, .iconD2Native15min:
+        case .iconD2_15min:
             fatalError("ICON-D2 15minute data can not be downloaded individually")
         case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
             fatalError()

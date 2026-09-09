@@ -114,12 +114,7 @@ extension IconNativeGrid {
             // attribute. Grid number, UUID, and the validated cell count uniquely identify the mesh.
         }
 
-        private static func readDouble(
-            group: Group,
-            name: String
-        ) throws
-            -> [Double]
-        {
+        private static func readDouble(group: Group, name: String) throws -> [Double] {
             guard let variable = group.getVariable(name: name), let typed = variable.asType(Double.self)
             else {
                 throw IconNativeGridSourceError.missingVariable(name)
@@ -131,10 +126,7 @@ extension IconNativeGrid {
             return try typed.read()
         }
 
-        private static func makePoints(
-            longitudes: [Double],
-            latitudes: [Double]
-        ) throws -> [SphericalPoint] {
+        private static func makePoints(longitudes: [Double], latitudes: [Double] ) throws -> [SphericalPoint] {
             var points = [SphericalPoint]()
             points.reserveCapacity(longitudes.count)
             for index in longitudes.indices {
