@@ -1,6 +1,5 @@
 import Foundation
 @testable import App
-import OmFileFormat
 import Synchronization
 import Testing
 import Vapor
@@ -36,43 +35,6 @@ import Vapor
         #expect(source.resolutions.withLock { $0 } == 1)
     }
 
-    @Test func yearlyMergeResolvesGridBeforeUsingDimensions() async throws {
-        let source = DeferredDomain()
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory.appendingPathComponent("temperature_2m"), withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let year = TimerangeDt(start: Timestamp(2001, 1, 1), to: Timestamp(2002, 1, 1), dtSeconds: source.dtSeconds)
-        let start = year.toIndexTime().lowerBound
-        let chunk = start / source.omFileLength
-        let input = directory.appendingPathComponent("temperature_2m/chunk_\(chunk).om").path
-        let file = try FileHandle.createNewFile(file: input)
-        let values = (0..<12).flatMap { cell in (0..<source.omFileLength).map { Float(cell * 100 + $0) } }
-        try values.writeOmFile(fn: file, dimensions: [1, 12, source.omFileLength], chunks: [1, 6, 24], compression: .pfor_delta2d_int16, scalefactor: 1)
-        try file.close()
-        try await MergeYearlyCommand.generateYearlyFile(logger: logger, domain: source, year: 2001, variable: "temperature_2m", force: false, allowMissing: true, domainDirectory: directory.path)
-        let output = try await OmFileReader(file: directory.appendingPathComponent("temperature_2m/year_2001.om").path).expectArray(of: Float.self)
-        #expect(Array(output.getDimensions()) == [1, 12, UInt64(year.count)])
-        let data = try await output.read()
-        for cell in 0..<12 {
-            #expect(data[cell * year.count] == Float(cell * 100 + start % source.omFileLength))
-            #expect(data[(cell + 1) * year.count - 1].isNaN)
-        }
-        #expect(source.resolutions.withLock { $0 } == 1)
-    }
-
-    @Test func failedResolutionPreventsYearlyOutput() async throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory.appendingPathComponent("temperature_2m"), withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let source = DeferredDomain(fail: true)
-        await #expect(throws: DeferredDomain.Failure.self) {
-            try await MergeYearlyCommand.generateYearlyFile(logger: logger, domain: source, year: 2001, variable: "temperature_2m", force: true, allowMissing: true, domainDirectory: directory.path)
-        }
-        for name in ["year_2001.om", "year_2001.om~"] {
-            #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("temperature_2m/\(name)").path))
-        }
-        #expect(source.resolutions.withLock { $0 } == 1)
-    }
 }
 
 /// Exposes no synchronous grid and rejects repeated resolution.
@@ -80,15 +42,9 @@ private final class DeferredDomain: GenericDomain, CustomStringConvertible {
     enum Failure: Error { case unavailable }
     let resolutions = Mutex(0)
     private let resolvedGrid = RegularGrid(nx: 12, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1)
-    private let fail: Bool
-
-    init(fail: Bool = false) {
-        self.fail = fail
-    }
-
     func getGrid(context: DomainInitContext) async throws -> any Gridable {
         let attempt = resolutions.withLock { $0 += 1; return $0 }
-        guard !fail, attempt == 1 else { throw Failure.unavailable }
+        guard attempt == 1 else { throw Failure.unavailable }
         return resolvedGrid
     }
     let description = "deferred-native-test"

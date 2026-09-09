@@ -54,18 +54,6 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let identity: IconNativeGridIdentity
     let cache = IconNativeGridCache()
 
-    init(registry: DomainRegistry, identity: IconNativeGridIdentity) {
-        localFile = "\(registry.directory)static/grid.bin"
-        self.registry = registry
-        self.identity = identity
-    }
-
-    init(localFile: String, identity: IconNativeGridIdentity) {
-        self.localFile = localFile
-        registry = identity.isGlobal ? .dwd_icon_global_native : .dwd_icon_d2_native
-        self.identity = identity
-    }
-
     func materialize<Backend: OmFileReaderBackend>(file: Backend) async throws -> IconNativeGrid
     where Backend.DataType: DataProtocol {
         try createDirectory()
@@ -124,6 +112,12 @@ struct IconNativeGridPayload: OmFilePayload {
 }
 
 extension IconNativeGridFile {
+    init(registry: DomainRegistry, identity: IconNativeGridIdentity) {
+        localFile = "\(registry.directory)static/grid.bin"
+        self.registry = registry
+        self.identity = identity
+    }
+
     /// Downloader preparation always validates the on-disk artifact before installing it.
     func validateFileAndInstall() throws(IconNativeDomainError) {
         guard FileManager.default.fileExists(atPath: localFile) else {

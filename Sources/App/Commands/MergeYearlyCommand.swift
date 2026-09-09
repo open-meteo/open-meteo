@@ -69,15 +69,10 @@ struct MergeYearlyCommand: AsyncCommand {
     }
 
     /// Generate a yearly file for a specified domain, variable and year
-    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool, domainDirectory: String? = nil) async throws {
-        let grid = try await domain.getGrid(context: .init(logger: logger, httpClient: nil))
-        try await generateYearlyFile(logger: logger, domain: domain, grid: grid, year: year, variable: variable, force: force, allowMissing: allowMissing, domainDirectory: domainDirectory)
-    }
-
-    private static func generateYearlyFile(logger: Logger, domain: any GenericDomain, grid: any Gridable, year: Int, variable: String, force: Bool, allowMissing: Bool, domainDirectory: String? = nil) async throws {
-        let directory = domainDirectory ?? domain.domainRegistry.directory
+    private static func generateYearlyFile(logger: Logger, domain: any GenericDomain, grid: any Gridable, year: Int, variable: String, force: Bool, allowMissing: Bool) async throws {
+        let registry = domain.domainRegistry
         logger.info("Processing variable \(variable) for year \(year)")
-        let yearlyFilePath = "\(directory)/\(variable)/year_\(year).om"
+        let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
         let fileManager = FileManager.default
 
         guard !fileManager.fileExists(atPath: yearlyFilePath) || force else {
@@ -94,7 +89,7 @@ struct MergeYearlyCommand: AsyncCommand {
         let indexTime = yearTime.toIndexTime()
         let chunkRange = indexTime.divideRoundedUp(divisor: omFileLength)
         let chunkFiles = try await chunkRange.asyncCompactMap { chunkIndex -> (file: OmFileReaderArray<MmapFile, Float>, indexTime: Range<Int>)? in
-            let file = "\(directory)/\(variable)/chunk_\(chunkIndex).om"
+            let file = "\(registry.directory)/\(variable)/chunk_\(chunkIndex).om"
             guard fileManager.fileExists(atPath: file) else {
                 logger.info("Chunk file \(variable)/chunk_\(chunkIndex).om does not exist. Skipping.")
                 return nil
