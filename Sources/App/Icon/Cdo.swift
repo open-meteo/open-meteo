@@ -7,26 +7,26 @@ import SwiftNetCDF
 struct CdoHelper: Sendable {
     let cdo: CdoIconGlobal?
     let grid: any Gridable
-    let domain: IconDomains
+    let nativeGridIdentity: IconNativeGridIdentity?
     let curl: Curl
 
     var needsRemapping: Bool {
         return cdo != nil
     }
 
-    init(domain: IconDomains, grid: any Gridable, logger: Logger, curl: Curl) async throws {
+    init(domain: IconDomains, grid: any Gridable, nativeGridIdentity: IconNativeGridIdentity?, logger: Logger, curl: Curl) async throws {
         // icon global needs resampling to plate carree
         self.curl = curl
-        cdo = try await CdoIconGlobal(curl: curl, domain: domain)
+        cdo = nativeGridIdentity == nil ? try await CdoIconGlobal(curl: curl, domain: domain) : nil
         self.grid = grid
-        self.domain = domain
+        self.nativeGridIdentity = nativeGridIdentity
     }
 
     // Uncompress bz2, reproject to regular grid and read into memory
     func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
         guard let cdo else {
             return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
-                if let identity = domain.nativeGridIdentity {
+                if let identity = nativeGridIdentity {
                     return (message, try IconNativeGribDecoder.decode(message: message, identity: identity))
                 }
                 return (message, Array2D(data: try message.getDouble().map(Float.init), nx: grid.nx, ny: grid.ny))
@@ -53,8 +53,6 @@ extension IconDomains {
         case .iconD2:
             return nil
         case .iconD2_15min:
-            return nil
-        case .iconNative, .iconD2Native, .iconD2Native15min:
             return nil
         case .iconEps:
             return "0036_R03B06_G"

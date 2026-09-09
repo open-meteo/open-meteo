@@ -1285,20 +1285,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
         case .dwd_icon_global_native:
             return .singleWithPrecipitationProbability(
-                IconDomains.iconNative,
+                IconNativeDomains.iconNative,
                 IconVariable.self,
                 precipitationProb: IconDomains.iconEps
             )
         case .dwd_icon_d2_native:
             return .singleWithSupplementalDomains(
-                IconDomains.iconD2Native,
+                IconNativeDomains.iconD2Native,
                 IconVariable.self,
                 lowerPriority: [],
-                higherPriority: [(IconDomains.iconD2Native15min, IconVariable.self)],
+                higherPriority: [(IconNativeDomains.iconD2Native15min, IconVariable.self)],
                 precipitationProb: IconDomains.iconD2Eps
             )
         case .dwd_icon_d2_native_15min:
-            return .single(IconDomains.iconD2Native15min, IconVariable.self)
+            return .single(IconNativeDomains.iconD2Native15min, IconVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:

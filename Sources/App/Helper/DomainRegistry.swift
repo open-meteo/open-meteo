@@ -346,11 +346,11 @@ enum DomainRegistry: String, CaseIterable {
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
         case .dwd_icon_global_native:
-            return IconDomains.iconNative
+            return IconNativeDomains.iconNative
         case .dwd_icon_d2_native:
-            return IconDomains.iconD2Native
+            return IconNativeDomains.iconD2Native
         case .dwd_icon_d2_native_15min:
-            return IconDomains.iconD2Native15min
+            return IconNativeDomains.iconD2Native15min
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
         case .dwd_icon_eps:
