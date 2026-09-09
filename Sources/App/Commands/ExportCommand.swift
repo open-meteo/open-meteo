@@ -227,7 +227,7 @@ struct ExportCommand: AsyncCommand {
         try ncVariable.write(data)
         return*/
 
-        guard let genericDomain = try await domain.genericDomain(context: .init(logger: logger, httpClient: nil)) else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
         
@@ -288,7 +288,7 @@ struct ExportCommand: AsyncCommand {
             return variable
         }
         
-        guard let genericDomain = try await domain.genericDomain(context: .init(logger: logger, httpClient: nil)) else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
 
@@ -507,7 +507,7 @@ struct ExportCommand: AsyncCommand {
             }
             return variable
         }
-        guard let genericDomain = try await domain.genericDomain(context: .init(logger: application.logger, httpClient: nil)) else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
         let grid = genericDomain.grid

@@ -238,9 +238,9 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 
-    func getDomain(context: DomainInitContext) async throws -> (any GenericDomain)? {
+    func getDomain() async throws -> (any GenericDomain)? {
         if let nativeDefinition {
-            return try await nativeDefinition.load(context: context)
+            return try await nativeDefinition.load()
         }
         return regularDomain
     }

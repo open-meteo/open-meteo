@@ -566,12 +566,11 @@ struct DownloadIconCommand: AsyncCommand {
                 uploadS3Bucket: signature.uploadS3Bucket
             )
         }
-        let domainContext = DomainInitContext(logger: logger, httpClient: nil)
         let outputs: IconDownloadDomains
         if let nativeDomain {
-            outputs = try await IconDownloadDomains(nativeDomain, context: domainContext)
+            outputs = try await IconDownloadDomains(nativeDomain)
         } else {
-            outputs = try await IconDownloadDomains(domain, context: domainContext)
+            outputs = try await IconDownloadDomains(domain)
         }
         let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
@@ -599,9 +598,9 @@ struct IconDownloadDomains: Sendable {
 
     let nativeDomain: IconNativeDomains?
 
-    init(_ domain: IconDomains, context: DomainInitContext) async throws {
+    init(_ domain: IconDomains) async throws {
         if domain == .icon {
-            self = try await Self(IconNativeDomains.iconNative, context: context)
+            self = try await Self(IconNativeDomains.iconNative)
             return
         }
         self.source = domain
@@ -612,10 +611,10 @@ struct IconDownloadDomains: Sendable {
         self.fifteenMinute = domain == .iconD2 ? IconDomains.iconD2_15min : nil
     }
 
-    init(_ domain: IconNativeDomains, context: DomainInitContext) async throws {
+    init(_ domain: IconNativeDomains) async throws {
         self.source = domain.sourceDomain
         self.nativeDomain = domain
-        let grid = try await domain.nativeGridFile.load(context: context)
+        let grid = try await domain.nativeGridFile.load()
         self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
         self.remapped = domain == .iconNative ? IconDomains.icon : nil
         self.ensembleMean = nil

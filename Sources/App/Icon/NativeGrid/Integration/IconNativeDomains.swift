@@ -1,3 +1,5 @@
+import Logging
+
 enum IconNativeDomains: String, CaseIterable {
     case iconNative = "icon-native"
     case iconD2Native = "icon-d2-native"
@@ -43,9 +45,10 @@ enum IconNativeDomains: String, CaseIterable {
     private static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
     private static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
 
-    func load(context: DomainInitContext) async throws -> IconNativeDomain {
-        try await Self.domains.load(self, context: context)
+    func load() async throws -> IconNativeDomain {
+        try await Self.domains.load(self)
     }
 
+    static let logger = Logger(label: "IconNativeDomain")
     private static let domains = IconNativeDomainCache()
 }

@@ -89,11 +89,6 @@ enum ReaderStaticVariable {
     case elevation
 }
 
-struct DomainInitContext {
-    let logger: Logger
-    let httpClient: HTTPClient?
-}
-
 /**
  Generic reader implementation that resolves a grid point and interpolates data.
  Corrects elevation
