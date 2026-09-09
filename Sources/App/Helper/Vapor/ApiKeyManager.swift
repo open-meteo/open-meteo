@@ -44,12 +44,6 @@ public final actor ApiKeyManager {
         }
         self.apiKeys = keys
     }
-
-    /// Return current API key usage
-    func getUsage() -> String {
-        let usage = self.usage.sorted { $0.1.weight > $1.1.weight }
-        return usage[0..<min(10, usage.count)].map { "\($0.0)=\($0.1.calls) (w\($0.1.weight))" }.joined(separator: ", ")
-    }
     
     /// Return current usage and reset counter to 0
     func flushUsage() -> [String: (calls: Int32, weight: Float)] {
@@ -85,12 +79,6 @@ public final actor ApiKeyManager {
         }
 
         let logger = application.logger
-        if (0..<10).contains(Timestamp.now().second) {
-            let usage = await ApiKeyManager.instance.getUsage()
-            if !usage.isEmpty {
-                logger.error("API key usage: \(usage)")
-            }
-        }
         let keys = KeyAndLimit.readApiKeys(path: apiKeysPath)
         guard keys.count > 0 else {
             logger.error("Could not read content from API_APIKEYS_PATH \(apiKeysPath)")
@@ -110,6 +98,10 @@ public final actor ApiKeyManager {
         guard events.count > 0 else {
             return
         }
+        let sorted = events.sorted { $0.1.weight > $1.1.weight }
+        let top10 = sorted[0..<min(10, sorted.count)].map { "\($0.0)=\($0.1.calls) (w\($0.1.weight))" }.joined(separator: ", ")
+        logger.error("API key usage: \(top10)")
+        
         logger.error("API Key Metrics: Getting session to upload \(events.count) events")
         let meter = StripeMeterEvents(apiKey: apiKey, client: application.http.client.shared, logger: logger)
         do {
