@@ -1,6 +1,7 @@
 import Foundation
 import OmFileFormat
 import OmFileIO
+import SphericalCube
 import Vapor
 
 /// Immutable identity of an operational DWD grid. Both the NetCDF definition and every native
@@ -10,6 +11,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
     let gridUUID: UUID
     let cellCount: Int
     let isGlobal: Bool
+    let level: Int
     let maximumDistanceMeters: Float
     let sourceFile: String
 
@@ -18,6 +20,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         gridUUID: UUID(uuidString: "a27b8de6-18c4-11e4-820a-b5b098c6a5c0")!,
         cellCount: 2_949_120,
         isGlobal: true,
+        level: 9,
         maximumDistanceMeters: 20_000,
         sourceFile: "icon_grid_0026_R03B07_G.nc.bz2"
     )
@@ -27,9 +30,14 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         gridUUID: UUID(uuidString: "c6b12daa-91ad-6404-5b26-c1b6452a2a20")!,
         cellCount: 542_040,
         isGlobal: false,
+        level: 11,
         maximumDistanceMeters: 4_000,
         sourceFile: "icon_grid_0047_R19B07_L.nc.bz2"
     )
+
+    var maximumChordDistanceSquared: Float {
+        SphericalPoint.squaredChordDistance(meters: Double(maximumDistanceMeters))
+    }
 
     var sourceUrl: String {
         "https://opendata.dwd.de/weather/lib/cdo/\(sourceFile)"
@@ -116,7 +124,7 @@ extension IconNativeDomains {
             )
         }
 
-        artifact.cache.install(grid)
+        artifact.cache.install(grid.storage)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
         for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
             let uploads = queue.startMultiPartUploads()

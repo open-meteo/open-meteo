@@ -19,6 +19,15 @@ struct SphericalLookupVector: Sendable {
 /// Generation uses Double. Artifacts and runtime candidate comparisons use Float32; coordinate
 /// access promotes and normalizes stored values before converting them back to latitude/longitude.
 package struct SphericalPoint: Sendable, Equatable {
+    /// ICON's spherical Earth radius in metres.
+    package static let earthRadiusMeters: Double = 6_371_229
+
+    /// Converts a surface distance using ICON's Earth radius to squared chord distance on the unit sphere.
+    package static func squaredChordDistance(meters: Double) -> Float {
+        let chord = 2 * sin(meters / earthRadiusMeters * 0.5)
+        return Float(chord * chord)
+    }
+
     private static let degreesToRadians = Double.pi / 180
     private static let degreesToRadiansFloat = Float.pi / 180
 

@@ -27,7 +27,7 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
 
 extension IconNativeDomain {
     init(definition: IconNativeDomains) async throws {
-        let grid = try await definition.nativeGridFile.load()
+        var grid = try await definition.nativeGridFile.load()
         let payload = try? await OmFileSystemManager.instance.get(
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
             client: .shared, logger: IconNativeDomains.logger
@@ -38,7 +38,8 @@ extension IconNativeDomain {
         } else {
             elevations = nil
         }
-        self.init(definition: definition, nativeGrid: IconNativeGrid(storage: grid.storage, elevations: elevations))
+        grid.elevations = elevations
+        self.init(definition: definition, nativeGrid: grid)
     }
 }
 

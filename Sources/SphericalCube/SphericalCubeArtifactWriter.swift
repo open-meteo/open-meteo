@@ -45,10 +45,7 @@ extension SphericalCubeArtifact {
         ) throws {
             guard !points.isEmpty, points.count <= Int(UInt32.max),
                 level >= SphericalCubeArtifact.tileShift, level <= 15,
-                metadata.identity.uuid.count == 16,
-                metadata.maximumChordDistanceSquared.isFinite,
-                metadata.maximumChordDistanceSquared > 0,
-                metadata.maximumChordDistanceSquared <= 4
+                metadata.identity.uuid.count == 16
             else {
                 throw SphericalCubeArtifactError.invalidHeader
             }
@@ -166,9 +163,8 @@ extension SphericalCubeArtifact {
             data.writeSphericalCubeInteger(version, at: 8)
             data.writeSphericalCubeInteger(UInt32(points.count), at: 12)
             data.writeSphericalCubeInteger(UInt32(level), at: 16)
-            data.writeSphericalCubeFloat(metadata.maximumChordDistanceSquared, at: 20)
-            data.writeSphericalCubeInteger(metadata.identity.number, at: 24)
-            data.replaceSubrange(28..<44, with: metadata.identity.uuid)
+            data.writeSphericalCubeInteger(metadata.identity.number, at: 20)
+            data.replaceSubrange(24..<40, with: metadata.identity.uuid)
 
             for (face, section) in faceSections.enumerated() {
                 let offset = faceSectionsOffset + face * faceSectionStride

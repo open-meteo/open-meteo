@@ -8,6 +8,7 @@ struct SphericalCubeFixture {
     let file: URL
     let index: SphericalCubeIndex
     let centers: [SphericalPoint]
+    let maximumChordDistanceSquared: Float
 
     func remove() {
         try? FileManager.default.removeItem(at: file)
@@ -16,8 +17,7 @@ struct SphericalCubeFixture {
 
 let globalMetadata = SphericalCubeArtifact.Metadata(
     identity: .init(number: 26, uuid: Array(0..<16)),
-    coversWholeSphere: true,
-    maximumChordDistanceSquared: maximumChordDistanceSquared(meters: 10_000_000)
+    coversWholeSphere: true
 )
 
 func makeGlobalFixture() throws -> SphericalCubeFixture {
@@ -47,10 +47,7 @@ func makeFixture(
     let file = temporaryArtifactFile()
     let metadata = SphericalCubeArtifact.Metadata(
         identity: isGlobal ? globalMetadata.identity : .init(number: 47, uuid: Array(repeating: 47, count: 16)),
-        coversWholeSphere: isGlobal,
-        maximumChordDistanceSquared: maximumChordDistanceSquared(
-            meters: Double(maximumDistanceMeters)
-        )
+        coversWholeSphere: isGlobal
     )
     do {
         try SphericalCubeArtifact.Writer.write(
@@ -62,7 +59,8 @@ func makeFixture(
         return SphericalCubeFixture(
             file: file,
             index: try SphericalCubeIndex(file: file),
-            centers: centers
+            centers: centers,
+            maximumChordDistanceSquared: SphericalPoint.squaredChordDistance(meters: Double(maximumDistanceMeters))
         )
     } catch {
         try? FileManager.default.removeItem(at: file)
@@ -85,18 +83,13 @@ func distanceRegret(
 ) -> Double {
     let expectedDistance = acos(max(-1, min(1, query.dot(expected))))
     let actualDistance = acos(max(-1, min(1, query.dot(actual))))
-    return max(0, actualDistance - expectedDistance) * 6_371_229
+    return max(0, actualDistance - expectedDistance) * SphericalPoint.earthRadiusMeters
 }
 
 func centerDirectionDistance(_ lhs: SphericalPoint, _ rhs: SphericalPoint) -> Double {
     let inverseNorms = 1 / sqrt(lhs.dot(lhs) * rhs.dot(rhs))
     let dot = max(-1, min(1, lhs.dot(rhs) * inverseNorms))
-    return acos(dot) * 6_371_229
-}
-
-func maximumChordDistanceSquared(meters: Double) -> Float {
-    let chord = 2 * sin(meters / 6_371_229 * 0.5)
-    return Float(chord * chord)
+    return acos(dot) * SphericalPoint.earthRadiusMeters
 }
 
 func temporaryArtifactFile() -> URL {

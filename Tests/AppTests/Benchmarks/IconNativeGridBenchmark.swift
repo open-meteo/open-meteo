@@ -18,7 +18,10 @@ import Testing
     func benchmark() async throws {
         let path = try #require(ProcessInfo.processInfo.environment["ICON_NATIVE_GRID_ARTIFACT"],
             "Set ICON_NATIVE_GRID_ARTIFACT to an existing global or D2 grid.bin")
-        let grid = try IconNativeGrid.load(file: URL(fileURLWithPath: path))
+        let storage = try SphericalCubeIndex(file: URL(fileURLWithPath: path))
+        let identity = try #require([IconNativeGridIdentity.global, .d2].first { $0.gridNumber == storage.identity.number })
+        try identity.validate(storage: storage, path: path)
+        let grid = IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared)
         let queries = makeQueries(grid: grid)
         let workloads = [(name: "ordinary", queries: queries, repeats: repeats)]
             + [(name: "seam/corner", queries: makeBoundaryQueries(grid: grid), repeats: 4)]
@@ -69,7 +72,7 @@ import Testing
         var seaQueries = [Query]()
         var landQueries = [Query]()
         for query in queries {
-            guard let pointID = grid.storage.nearestPointID(latitude: query.latitude, longitude: query.longitude) else { continue }
+            guard let pointID = grid.findPoint(lat: query.latitude, lon: query.longitude) else { continue }
             if elevations[pointID] <= -999, seaQueries.count < elevationQueryCount {
                 seaQueries.append(query)
             } else if elevations[pointID] > -999, landQueries.count < elevationQueryCount {
@@ -84,7 +87,8 @@ import Testing
         let reader = file.reader
         print("  elevation queries/sample: \(elevationQueryCount)")
         let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
-        let cachedGrid = IconNativeGrid(storage: grid.storage, elevations: decoded)
+        let cachedGrid = IconNativeGrid(storage: grid.storage,
+            maximumChordDistanceSquared: grid.maximumChordDistanceSquared, elevations: decoded)
 
         let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [
             ("sea hit", seaQueries, .sea),
@@ -178,7 +182,8 @@ import Testing
             for query in queries {
                 checksum &+= grid.storage.nearestPointID(
                     latitude: query.latitude,
-                    longitude: query.longitude
+                    longitude: query.longitude,
+                    maximumChordDistanceSquared: grid.maximumChordDistanceSquared
                 ) ?? -1
             }
         }
@@ -196,7 +201,8 @@ import Testing
             for query in queries {
                 guard let lookup = grid.storage.nearestLookup(
                     latitude: query.latitude,
-                    longitude: query.longitude
+                    longitude: query.longitude,
+                    maximumChordDistanceSquared: grid.maximumChordDistanceSquared
                 ) else {
                     checksum &+= -1
                     continue
