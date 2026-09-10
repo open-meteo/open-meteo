@@ -84,11 +84,7 @@ extension IconNativeDomains {
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         let sourceFile = "\(downloadDirectory)\(identity.sourceFile.dropLast(4))"
         let sourceExisted = FileManager.default.fileExists(atPath: sourceFile)
-        let curl = Curl(
-            logger: application.logger,
-            client: application.dedicatedHttpClient,
-            deadLineHours: identity.isGlobal ? 5 : 2
-        )
+        let curl = Curl(logger: application.logger, client: application.dedicatedHttpClient)
 
         func downloadSource() async throws {
             application.logger.info("Downloading native ICON grid definition '\(identity.sourceFile)'")
