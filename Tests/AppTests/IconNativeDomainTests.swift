@@ -18,16 +18,16 @@ import Logging
             return domains
         }
         let first = try #require(domains.first)
-        let elevationCache = try #require(first.nativeGrid.elevationCache)
+        let elevations = try #require(first.nativeGrid.elevations)
         for domain in domains {
             #expect(domain.nativeGrid.storage === first.nativeGrid.storage)
-            #expect(domain.nativeGrid.elevationCache === elevationCache)
+            #expect(domain.nativeGrid.elevations === elevations)
             #expect(domain.dtSeconds == (domain.definition == .iconD2Native ? 3600 : 900))
         }
         let reused = try await cache.load(.iconD2Native)
         #expect(reused.nativeGrid.storage === first.nativeGrid.storage)
-        #expect(reused.nativeGrid.elevationCache === elevationCache)
-        #expect(elevationCache.cachedValues == nil)
+        #expect(reused.nativeGrid.elevations === elevations)
+        #expect(elevations.count == first.nativeGrid.nx)
     }
 
     @Test func nativeMetadataDoesNotRequireStaticFiles() throws {

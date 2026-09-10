@@ -39,7 +39,6 @@ protocol GenericDomain: Sendable {
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
 
-    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)?
 }
 
 extension GenericDomain {

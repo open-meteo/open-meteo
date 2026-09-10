@@ -83,10 +83,8 @@ import Testing
         defer { file.remove() }
         let reader = file.reader
         print("  elevation queries/sample: \(elevationQueryCount)")
-        let payload = try await file.payload()
-        let cachedGrid = IconNativeGrid(storage: grid.storage, elevationFile: payload.reader)
-        let cache = try #require(cachedGrid.elevationCache)
-        _ = try await cache.loadValues()
+        let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
+        let cachedGrid = IconNativeGrid(storage: grid.storage, elevations: decoded)
 
         let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [
             ("sea hit", seaQueries, .sea),

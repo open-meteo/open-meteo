@@ -1,16 +1,14 @@
 import OmFileFormat
 import Vapor
 
-/// An initialized native domain. Successful API loads retain static resources until restart.
+/// An initialized native domain retaining its grid mapping and decoded elevations until restart.
 struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     let definition: IconNativeDomains
     let nativeGrid: IconNativeGrid
-    let elevationFile: (any OmFileReaderArrayProtocol<Float>)?
 
-    init(definition: IconNativeDomains, nativeGrid: IconNativeGrid, elevationFile: (any OmFileReaderArrayProtocol<Float>)? = nil) {
+    init(definition: IconNativeDomains, nativeGrid: IconNativeGrid) {
         self.definition = definition
         self.nativeGrid = nativeGrid
-        self.elevationFile = elevationFile
     }
 
     var grid: any Gridable { nativeGrid }
@@ -25,21 +23,6 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     var countEnsembleMember: Int { definition.countEnsembleMember }
     var generateFullRun: Bool { definition.generateFullRun }
     var generateTimeSeries: Bool { definition.generateTimeSeries }
-
-    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
-        if case .elevation = type, let elevationFile {
-            return elevationFile
-        }
-        let variable: String
-        switch type {
-        case .elevation: variable = "HSURF"
-        case .soilType: variable = "soil_type"
-        }
-        return try? await OmFileSystemManager.instance.get(
-            file: OmFileType.staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: variable),
-            client: httpClient, logger: logger
-        )?.reader
-    }
 }
 
 extension IconNativeDomain {
@@ -49,7 +32,13 @@ extension IconNativeDomain {
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
             client: .shared, logger: IconNativeDomains.logger
         )
-        self.init(definition: definition, nativeGrid: IconNativeGrid(storage: grid.storage, elevationFile: payload?.reader), elevationFile: payload?.reader)
+        let elevations: ElevationValues?
+        if let payload {
+            elevations = try await ElevationValues(decoded: payload.reader.read(), expectedCount: grid.nx)
+        } else {
+            elevations = nil
+        }
+        self.init(definition: definition, nativeGrid: IconNativeGrid(storage: grid.storage, elevations: elevations))
     }
 }
 
@@ -67,13 +56,13 @@ actor IconNativeDomainCache {
         let resourceDefinition: IconNativeDomains = definition == .iconD2Native15min ? .iconD2Native : definition
         switch cache[resourceDefinition] {
         case .loaded(let domain):
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid, elevationFile: domain.elevationFile)
+            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
         case .loading(var continuations):
             let domain = try await withCheckedThrowingContinuation { continuation in
                 continuations.append(continuation)
                 cache[resourceDefinition] = .loading(continuations)
             }
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid, elevationFile: domain.elevationFile)
+            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
         case .error(let error):
             throw error
         case nil:
@@ -90,7 +79,7 @@ actor IconNativeDomainCache {
             for continuation in continuations {
                 continuation.resume(returning: domain)
             }
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid, elevationFile: domain.elevationFile)
+            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
         } catch {
             guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
                 fatalError("Expected loading state")
