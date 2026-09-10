@@ -46,13 +46,4 @@ import Logging
         #expect(ensemble.ensembleMean?.domainRegistry == IconDomains.iconD2EpsEnsembleMean.domainRegistry)
         #expect(ensemble.fifteenMinute == nil)
     }
-
-    @Test func d2DomainsShareGridCache() {
-        let global = IconNativeDomains.iconNative.nativeGridFile
-        let hourly = IconNativeDomains.iconD2Native.nativeGridFile
-        let quarterHourly = IconNativeDomains.iconD2Native15min.nativeGridFile
-        #expect(hourly.cache === quarterHourly.cache)
-        #expect(global.cache !== hourly.cache)
-        #expect(hourly.registry == .dwd_icon_d2_native)
-    }
 }

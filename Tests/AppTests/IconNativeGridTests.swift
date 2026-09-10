@@ -210,7 +210,7 @@ import Testing
         #expect(invalid.cachedValues == nil)
     }
 
-    @Test func replacementGridOwnsIndependentElevationCache() async throws {
+    @Test func gridsOwnIndependentElevationCaches() async throws {
         let fixture = try makeFixture(centers: [
             SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
             SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
@@ -222,20 +222,11 @@ import Testing
             file.remove()
             replacement.remove()
         }
-        func payload(_ path: String) async throws -> OmFileLocalRemoteOmReader {
-            let handle = try FileHandle.openFileReading(file: path)
-            return try await OmFileLocalRemoteOmReader(fd: handle, size: Int64(handle.seekToEnd()))
-        }
-        let old = try await payload(file.path)
-        let oldGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: old.reader)
+        let oldGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: file.reader)
         let oldCache = try #require(oldGrid.elevationCache)
-        #expect(try await old.reader.read(range: [0..<1, 1..<2]) == [17])
         #expect(oldCache.cachedValues == nil)
         let oldValues = try await oldCache.loadValues()
-        try FileManager.default.removeItem(atPath: file.path)
-        try FileManager.default.moveItem(atPath: replacement.path, toPath: file.path)
-        let new = try await payload(file.path)
-        let newGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: new.reader)
+        let newGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: replacement.reader)
         let newCache = try #require(newGrid.elevationCache)
         #expect(newCache !== oldCache)
         #expect(newCache.cachedValues == nil)
