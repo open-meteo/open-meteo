@@ -12,11 +12,11 @@ struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
     let storage: SphericalCubeIndex
-    let elevationCache: ElevationCache?
+    let elevations: ElevationValues?
 
-    init(storage: SphericalCubeIndex, elevationFile: (any OmFileReaderArrayProtocol<Float>)? = nil) {
+    init(storage: SphericalCubeIndex, elevations: ElevationValues? = nil) {
         self.storage = storage
-        self.elevationCache = elevationFile.flatMap { ElevationCache(reader: $0) }
+        self.elevations = elevations
     }
 
     static func load(file: URL) throws -> Self {
@@ -63,14 +63,14 @@ struct IconNativeGrid: Gridable {
             return nil
         }
         let nearest = lookup.pointID
-        let nearestElevation = try await readNearestElevation(
+        let nearestElevation = try await getPointElevation(
             pointID: nearest, elevationFile: elevationFile
         )
         if nearestElevation <= -999 {
             return (nearest, .sea)
         }
         let candidates = storage.nearestCandidates(from: lookup)
-        let elevations = try await readElevations(
+        let elevations = try await getCandidateElevations(
             candidates: candidates,
             knownValue: nearestElevation,
             elevationFile: elevationFile
@@ -92,14 +92,14 @@ struct IconNativeGrid: Gridable {
             return nil
         }
         let nearest = lookup.pointID
-        let nearestElevation = try await readNearestElevation(
+        let nearestElevation = try await getPointElevation(
             pointID: nearest, elevationFile: elevationFile
         )
         if nearestElevation.isFinite, nearestElevation > -999, abs(nearestElevation - elevation) <= 100 {
             return elevationResult(gridpoint: nearest, value: nearestElevation)
         }
         let candidates = storage.nearestCandidates(from: lookup)
-        let elevations = try await readElevations(
+        let elevations = try await getCandidateElevations(
             candidates: candidates,
             knownValue: nearestElevation,
             elevationFile: elevationFile
@@ -130,29 +130,23 @@ struct IconNativeGrid: Gridable {
         return elevationResult(gridpoint: candidates.pointIDs[bestPosition], value: elevations[bestPosition])
     }
 
-    private func readNearestElevation(
+    private func getPointElevation(
         pointID: Int,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> Float {
-        if let cache = elevationCache {
-            let values: ElevationValues
-            if let cached = cache.cachedValues {
-                values = cached
-            } else {
-                values = try await cache.loadValues()
-            }
-            return values[pointID]
+        if let elevations {
+            return elevations[pointID]
         }
         return try await readFromStaticFile(gridpoint: pointID, file: elevationFile)
     }
 
-    private func readElevations(
+    private func getCandidateElevations(
         candidates: SphericalCubeIndex.NearbyPoints,
         knownValue: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> InlineArray<10, Float> {
-        if let values = elevationCache?.cachedValues {
-            return values.read(
+        if let elevations {
+            return elevations.read(
                 pointIDs: candidates.pointIDs,
                 count: candidates.count
             )

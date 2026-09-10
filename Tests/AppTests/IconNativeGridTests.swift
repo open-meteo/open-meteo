@@ -3,11 +3,10 @@ import Foundation
 @testable import SphericalCube
 @testable import SphericalCubeTestSupport
 import OmFileFormat
-import Synchronization
 import Testing
 
 @Suite struct IconNativeGridTests {
-    @Test func initializedDomainPinsElevationForGenericReaders() async throws {
+    @Test func initializedDomainsShareDecodedElevations() async throws {
         let fixture = try makeFixture(centers: [
             SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
             SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
@@ -16,30 +15,25 @@ import Testing
         let file = try await makeElevationFile([100, 500])
         let replacement = try await makeElevationFile([900, 700])
         defer { file.remove(); replacement.remove() }
-        let payload = try await file.payload()
-        let grid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: payload.reader)
-        let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid, elevationFile: payload.reader)
-        let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid, elevationFile: payload.reader)
+        let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
+        let grid = IconNativeGrid(storage: fixture.grid.storage, elevations: elevations)
+        let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
+        let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
         #expect(domain.nativeGrid.storage === quarterHourly.nativeGrid.storage)
-        #expect(domain.nativeGrid.elevationCache === quarterHourly.nativeGrid.elevationCache)
+        #expect(domain.nativeGrid.elevations === quarterHourly.nativeGrid.elevations)
         #expect(domain.dtSeconds == 3600)
         #expect(quarterHourly.dtSeconds == 900)
 
         try FileManager.default.removeItem(atPath: file.path)
         try FileManager.default.moveItem(atPath: replacement.path, toPath: file.path)
-        let options = try GenericReaderOptions(logger: .init(label: "NativeDomainTests"), httpClient: nil)
-        let reader = try await GenericReader<IconNativeDomain, IconSurfaceVariable>(domain: domain, position: 0, options: options)
-        #expect(reader.modelElevation.numeric == 100)
-        #expect(try await reader.getStatic(type: .elevation) == 100)
-        #expect(try await file.payload().reader.read(range: [0..<1, 0..<1]) == [900])
-        #expect(grid.elevationCache?.cachedValues == nil)
-
-        let selected = try #require(await GenericReader<IconNativeDomain, IconSurfaceVariable>(
-            domain: domain, lat: 0, lon: 0.04, elevation: 500, mode: .land, options: options
+        let current = try await file.payload()
+        #expect(try await current.reader.read(range: [0..<1, 0..<1]) == [900])
+        #expect(elevations[0] == 100)
+        let selected = try #require(await domain.grid.findPoint(
+            lat: 0, lon: 0.04, elevation: 500, elevationFile: current.reader, mode: .land
         ))
-        #expect(selected.position == 1)
-        #expect(selected.modelElevation.numeric == 500)
-        #expect(grid.elevationCache?.cachedValues != nil)
+        #expect(selected.gridpoint == 1)
+        #expect(selected.gridElevation.numeric == 500)
     }
 
     @Test func elevationEncodingRoundTripsSamples() throws {
@@ -113,9 +107,8 @@ import Testing
         for (mode, elevations) in [(GridSelectionMode.land, [Float(0), 500]), (.sea, [100, -999])] {
             let file = try await makeElevationFile(elevations)
             defer { file.remove() }
-            let payload = try await file.payload()
-            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: payload.reader)
-            let cache = try #require(nativeGrid.elevationCache)
+            let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
+            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, elevations: elevations)
             let grid: any Gridable = nativeGrid
             let raw = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
                 elevationFile: file.reader, mode: mode)
@@ -126,144 +119,28 @@ import Testing
                 #expect(cached?.gridpoint == 1)
                 #expect(cached?.gridElevation.numeric == raw?.gridElevation.numeric)
             }
-            #expect(cache.cachedValues != nil)
         }
     }
 
-    @Test func surfaceElevationCacheInitializesLazilyOnce() async throws {
-        let loads = Mutex(0)
-        let cache = ElevationCache(elementCount: 800) {
-            loads.withLock { $0 += 1 }
-            return (0..<800).map(Float.init)
-        }
+    @Test func decodedElevationsSupportIndexedReads() throws {
+        let values = try ElevationValues(decoded: (0..<800).map(Float.init), expectedCount: 800)
         var pointIDs = InlineArray<10, Int>(repeating: -1)
         pointIDs[0] = 10
         pointIDs[1] = 20
         pointIDs[2] = 410
-        #expect(cache.cachedValues == nil)
-        #expect(loads.withLock { $0 } == 0)
-        let values = try await cache.loadValues()
-        let first = values.read(pointIDs: pointIDs, count: 3)
-        #expect(first[0] == 10)
-        #expect(first[1] == 20)
-        #expect(first[2] == 410)
+        let selected = values.read(pointIDs: pointIDs, count: 3)
+        #expect(selected[0] == 10)
+        #expect(selected[1] == 20)
+        #expect(selected[2] == 410)
         #expect(values.count == 800)
-        #expect(cache.cachedValues === values)
-        #expect(try await cache.loadValues() === values)
-        #expect(loads.withLock { $0 } == 1)
-    }
-
-    @Test func cancelledWaiterDoesNotCancelSharedElevationLoad() async throws {
-        let loader = GatedElevationLoader()
-        let cache = ElevationCache(elementCount: 2) { try await loader.load() }
-        let first = Task { try await cache.loadValues() }
-        await loader.waitUntilStarted()
-        first.cancel()
-        let identifiers = try await withThrowingTaskGroup(of: ObjectIdentifier.self) { group in
-            for _ in 0..<16 {
-                group.addTask {
-                    let values = try await cache.loadValues()
-                    #expect(values[1] == 17)
-                    return ObjectIdentifier(values)
-                }
-            }
-            await loader.release()
-            var identifiers = [ObjectIdentifier]()
-            for try await id in group { identifiers.append(id) }
-            return identifiers
-        }
-        #expect(Set(identifiers).count == 1)
-        #expect(try await ObjectIdentifier(first.value) == identifiers[0])
-        #expect(await loader.loads == 1)
-    }
-
-    @Test func failedElevationLoadCanRetry() async throws {
-        let loads = Mutex(0)
-        let cache = ElevationCache(elementCount: 2) {
-            let attempt = loads.withLock { $0 += 1; return $0 }
-            if attempt == 1 { throw ElevationTestError.injectedFailure }
-            return [0, 17]
-        }
-        await #expect(throws: ElevationTestError.injectedFailure) {
-            _ = try await cache.loadValues()
-        }
-        #expect(cache.cachedValues == nil)
-        #expect(try await cache.loadValues()[1] == 17)
-        #expect(loads.withLock { $0 } == 2)
-    }
-
-    @Test func invalidElevationLoadIsNotPublished() async throws {
-        let loads = Mutex(0)
-        let cache = ElevationCache(elementCount: 2) {
-            let attempt = loads.withLock { $0 += 1; return $0 }
-            return attempt == 1 ? [0] : [0, 17]
-        }
-        await #expect(throws: ElevationCacheError.unexpectedCount(expected: 2, actual: 1)) {
-            _ = try await cache.loadValues()
-        }
-        #expect(cache.cachedValues == nil)
-        #expect(try await cache.loadValues()[1] == 17)
-        let invalid = ElevationCache(elementCount: 1) { [1.5] }
-        await #expect(throws: ElevationValues.EncodingError.self) {
-            _ = try await invalid.loadValues()
-        }
-        #expect(invalid.cachedValues == nil)
-    }
-
-    @Test func gridsOwnIndependentElevationCaches() async throws {
-        let fixture = try makeFixture(centers: [
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
-        ])
-        defer { fixture.remove() }
-        let file = try await makeElevationFile([0, 17])
-        let replacement = try await makeElevationFile([0, 23])
-        defer {
-            file.remove()
-            replacement.remove()
-        }
-        let oldGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: file.reader)
-        let oldCache = try #require(oldGrid.elevationCache)
-        #expect(oldCache.cachedValues == nil)
-        let oldValues = try await oldCache.loadValues()
-        let newGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: replacement.reader)
-        let newCache = try #require(newGrid.elevationCache)
-        #expect(newCache !== oldCache)
-        #expect(newCache.cachedValues == nil)
-        #expect(try await newCache.loadValues()[1] == 23)
-        #expect(oldValues[1] == 17)
-    }
-
-    @Test func selectionWithoutElevationSearchLeavesCacheUnloaded() async throws {
-        let fixture = try makeFixture(centers: [
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
-        ], maximumDistanceMeters: 20_000)
-        defer { fixture.remove() }
-        let file = try await makeElevationFile([100, -999])
-        defer { file.remove() }
-        let payload = try await file.payload()
-        let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, elevationFile: payload.reader)
-        let cache = try #require(nativeGrid.elevationCache)
-        let grid: any Gridable = nativeGrid
-        for (mode, elevation) in [(GridSelectionMode.nearest, Float(500)), (.land, .nan)] {
-            _ = try await grid.findPoint(lat: 0, lon: 0.04, elevation: elevation,
-                elevationFile: file.reader, mode: mode)
-            #expect(cache.cachedValues == nil)
-        }
-        _ = try await grid.readElevation(gridpoint: 0, elevationFile: file.reader)
-        #expect(cache.cachedValues == nil)
-        for latitude in [Float.nan, 50] {
-            _ = try await grid.findPoint(lat: latitude, lon: 0, elevation: 500,
-                elevationFile: file.reader, mode: .sea)
-            #expect(cache.cachedValues == nil)
+        #expect(throws: ElevationValuesError.unexpectedCount(expected: 2, actual: 1)) {
+            try ElevationValues(decoded: [0], expectedCount: 2)
         }
     }
 
-    @Test func scaledElevationReaderWorksWithoutCache() async throws {
+    @Test func scaledElevationReaderWorksWithoutDecodedValues() async throws {
         let file = try await makeElevationFile([100, -999], scaleFactor: 10)
         defer { file.remove() }
-        #expect(ElevationCache(reader: file.reader) == nil)
         let fixture = try makeFixture(centers: [
             SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
             SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
@@ -298,42 +175,6 @@ import Testing
 
 private extension SphericalCubeFixture {
     var grid: IconNativeGrid { IconNativeGrid(storage: index) }
-}
-
-private enum ElevationTestError: Error, Equatable {
-    case injectedFailure
-}
-
-/// Holds the shared load until the test cancels a waiter and starts concurrent readers.
-private actor GatedElevationLoader {
-    private var started: CheckedContinuation<Void, Never>?
-    private var gates = [CheckedContinuation<Void, Never>]()
-    private var released = false
-    private(set) var loads = 0
-
-    func load() async throws -> [Float] {
-        loads += 1
-        if !released {
-            await withCheckedContinuation {
-                gates.append($0)
-                started?.resume()
-                started = nil
-            }
-        }
-        try Task.checkCancellation()
-        return [0, 17]
-    }
-
-    func waitUntilStarted() async {
-        if loads > 0 { return }
-        await withCheckedContinuation { started = $0 }
-    }
-
-    func release() {
-        released = true
-        gates.forEach { $0.resume() }
-        gates.removeAll()
-    }
 }
 
 private func truncateLastByte(of file: URL) throws {
