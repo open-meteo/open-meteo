@@ -23,6 +23,7 @@ struct IconNativeGrid: Gridable {
 
     var nx: Int { storage.pointCount }
     var ny: Int { 1 }
+    /// Unused: native sea and terrain searches use the spherical index.
     var searchRadius: Int { 2 }
 
     var crsWkt2: String {
