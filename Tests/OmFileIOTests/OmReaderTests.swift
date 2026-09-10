@@ -4,6 +4,51 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test(arguments: ["read", "preload", "prefetch"])
+    func blockCacheAcrossSuperBlockBoundary(path: String) async throws {
+        let blockSize = 64 * 1024
+        let blocks = 127..<130 // Straddles the 8 MB boundary at block 128.
+        var contents = Data()
+        for block in 0..<130 {
+            contents.append(Data(repeating: UInt8(block), count: blockSize))
+        }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("block-cache-\(UUID().uuidString).bin").path
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        let cache = try AtomicBlockCache(file: file, blockSize: blockSize, blockCount: 256)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: contents), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        let offset = blocks.lowerBound * blockSize + 17
+        let count = blocks.count * blockSize - 34
+        let expected = contents.subdata(in: offset..<offset + count)
+
+        switch path {
+        case "read":
+            #expect(try await reader.getData(offset: offset, count: count) == expected)
+        case "preload":
+            try await reader.preloadBlocks(blocks: [blocks])
+        default:
+            try await reader.prefetchData(offset: offset, count: count)
+            // Prefetch returns before its background task commits the blocks.
+            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+            while reader.listOfActiveBlocks(maxAgeSeconds: 60) != [blocks], ContinuousClock.now < deadline {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        }
+
+        #expect(reader.listOfActiveBlocks(maxAgeSeconds: 60) == [blocks])
+        for block in blocks {
+            let cached = try #require(cache.get(key: reader.calculateCacheKey(block: block), count: 1))
+            let cachedAddress = UInt(bitPattern: cached.baseAddress!)
+            // A single-block hit must borrow the cache buffer, including after 8 MB.
+            try await reader.withData(offset: block * blockSize + 17, count: 31) { data in
+                #expect(UInt(bitPattern: data.baseAddress!) == cachedAddress + 17)
+                #expect(Data(data) == Data(repeating: UInt8(block), count: 31))
+            }
+        }
+        #expect(try await reader.getData(offset: offset, count: count) == expected)
+        #expect(reader.deleteCachedBlocks(olderThanSeconds: 0) == blocks.count)
+        #expect(reader.listOfActiveBlocks(maxAgeSeconds: 60).isEmpty)
+    }
+
     /*@Test func metaCache() throws {
         #expect(MemoryLayout<HttpMetaCache.Entry>.stride == 72)
         
