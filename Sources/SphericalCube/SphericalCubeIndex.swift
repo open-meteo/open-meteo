@@ -7,11 +7,11 @@ import OmFileFormat
 /// stored spatial structure is a leaf-bucket prefix directory; cube-face adjacency is derived from
 /// `(face, level, x, y)` when the bounded fallback crosses a seam.
 ///
-/// A normal lookup follows three progressively more expensive paths:
+/// A normal lookup starts locally and expands only when necessary:
 ///
 /// 1. compare the query bucket's Float32 point records;
-/// 2. if the result cannot be certified, compare the surrounding 3×3 buckets;
-/// 3. if that region still cannot be certified, scan a bounded cross-face Float32 stencil.
+/// 2. scan new rings, projecting offsets only when they cross a cube face;
+/// 3. stop after a certified 3×3 region, or finish the bounded stencil without rescanning.
 ///
 /// Certification proves that a sphere around the current candidate cannot cross the searched
 /// cube-region boundary. Thus the common path remains small without assuming mesh connectivity.
@@ -40,7 +40,7 @@ import OmFileFormat
 ///         no
 ///         |
 ///         v
-/// scan the same-face 3 x 3 leaves
+/// scan the surrounding ring, including adjacent faces at seams
 ///         |
 /// can that region be certified?
 ///         +-- yes --> apply limit --> ID / nil
@@ -48,7 +48,7 @@ import OmFileFormat
 ///         no
 ///         |
 ///         v
-/// bounded cross-face Float32 stencil --> apply limit --> canonical ID / nil
+/// continue through remaining rings --> apply limit --> canonical ID / nil
 /// ```
 package final class SphericalCubeIndex: Sendable {
     typealias Artifact = SphericalCubeArtifact
@@ -196,35 +196,11 @@ package final class SphericalCubeIndex: Sendable {
         location queryLocation: SphericalCubeGeometry.Location,
         bytes: borrowing RawSpan
     ) -> (pointID: Int, position: Int, distanceSquared: Float)? {
-        var bestDistanceSquared = Float.infinity
-        var bestPosition = -1
-        var bestPointID = -1
+        typealias Match = (pointID: Int, position: Int, distanceSquared: Float)
+        var best: Match = (-1, -1, .infinity)
 
         @inline(__always)
-        func consider(distanceSquared: Float, position: Int) {
-            if distanceSquared < bestDistanceSquared {
-                bestDistanceSquared = distanceSquared
-                bestPosition = position
-                bestPointID = Artifact.pointID(
-                    position: position,
-                    bytes: bytes,
-                    pointsOffset: pointsOffset
-                )
-            } else if distanceSquared == bestDistanceSquared {
-                let pointID = Artifact.pointID(
-                    position: position,
-                    bytes: bytes,
-                    pointsOffset: pointsOffset
-                )
-                if bestPointID < 0 || pointID < bestPointID {
-                    bestPosition = position
-                    bestPointID = pointID
-                }
-            }
-        }
-
-        @inline(__always)
-        func scanRange(_ range: Range<Int>) {
+        func scanRange(_ range: Range<Int>, best: inout Match) {
             for position in range {
                 let distanceSquared = Artifact.squaredDistance(
                     position: position,
@@ -232,22 +208,22 @@ package final class SphericalCubeIndex: Sendable {
                     bytes: bytes,
                     pointsOffset: pointsOffset
                 )
-                consider(distanceSquared: distanceSquared, position: position)
+                if distanceSquared < best.distanceSquared {
+                    best = (Artifact.pointID(position: position, bytes: bytes, pointsOffset: pointsOffset),
+                            position, distanceSquared)
+                } else if distanceSquared == best.distanceSquared {
+                    let pointID = Artifact.pointID(position: position, bytes: bytes, pointsOffset: pointsOffset)
+                    if best.pointID < 0 || pointID < best.pointID {
+                        best.pointID = pointID
+                        best.position = position
+                    }
+                }
             }
         }
 
         @inline(__always)
-        func selected() -> (pointID: Int, position: Int, distanceSquared: Float) {
-            (
-                bestPointID,
-                bestPosition,
-                bestDistanceSquared
-            )
-        }
-
-        @inline(__always)
         func selectedWithinMaximumDistance() -> (pointID: Int, position: Int, distanceSquared: Float)? {
-            bestDistanceSquared <= maximumDistanceSquared ? selected() : nil
+            best.distanceSquared <= maximumDistanceSquared ? best : nil
         }
 
         @inline(__always)
@@ -255,9 +231,9 @@ package final class SphericalCubeIndex: Sendable {
             xRange: ClosedRange<Int>,
             yRange: ClosedRange<Int>
         ) -> Bool {
-            guard bestPosition >= 0 else { return false }
+            guard best.position >= 0 else { return false }
             let maximumCandidateDistance =
-                sqrt(Double(max(0, bestDistanceSquared))) + Self.floatChordError
+                sqrt(Double(max(0, best.distanceSquared))) + Self.floatChordError
             return regionIsCertified(
                 location: queryLocation,
                 xRange: xRange,
@@ -268,7 +244,7 @@ package final class SphericalCubeIndex: Sendable {
         }
 
         if let bucket = bucket(face: queryLocation.face, x: queryLocation.x, y: queryLocation.y) {
-            scanRange(pointRange(in: bucket, bytes: bytes))
+            scanRange(pointRange(in: bucket, bytes: bytes), best: &best)
         }
         let leafXRange = queryLocation.x...queryLocation.x
         let leafYRange = queryLocation.y...queryLocation.y
@@ -276,29 +252,20 @@ package final class SphericalCubeIndex: Sendable {
             return selectedWithinMaximumDistance()
         }
 
-        let xRange = max(0, queryLocation.x - 1)...min(resolution - 1, queryLocation.x + 1)
-        let yRange = max(0, queryLocation.y - 1)...min(resolution - 1, queryLocation.y + 1)
-        bestDistanceSquared = .infinity
-        bestPosition = -1
-        bestPointID = -1
-        for y in yRange {
-            forEachRowPointRange(face: queryLocation.face, y: y, xRange: xRange, bytes: bytes, scanRange)
-        }
-        if certified(xRange: xRange, yRange: yRange) {
-            return selectedWithinMaximumDistance()
-        }
-        // The same-face rectangle cannot be certified near cube seams. Re-scan a bounded stencil
-        // through spherical projection so offsets crossing an edge land on the adjacent face.
-        bestDistanceSquared = .infinity
-        bestPosition = -1
-        bestPointID = -1
-        var visited = VisitedBuckets()
-        for radius in 0...fallbackRadius {
-            forEachProjectedRing(around: queryLocation, radius: radius, visited: &visited) { bucket in
-                scanRange(pointRange(in: bucket, bytes: bytes))
+        var visited: VisitedBuckets?
+        for radius in 1...fallbackRadius {
+            forEachNeighborhoodRing(around: queryLocation, radius: radius, visited: &visited,
+                bytes: bytes, state: &best, scanRange)
+            // Keep the original stopping rule. A larger cross-face region is not certified
+            // by these four same-face boundary planes, so finish the existing bounded stencil.
+            if radius == 1, certified(
+                xRange: max(0, queryLocation.x - 1)...min(resolution - 1, queryLocation.x + 1),
+                yRange: max(0, queryLocation.y - 1)...min(resolution - 1, queryLocation.y + 1)
+            ) {
+                return selectedWithinMaximumDistance()
             }
         }
-        guard bestPosition >= 0 else { return nil }
+        guard best.position >= 0 else { return nil }
         return selectedWithinMaximumDistance()
     }
 

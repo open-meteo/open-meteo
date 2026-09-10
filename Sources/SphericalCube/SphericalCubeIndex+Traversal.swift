@@ -75,25 +75,73 @@ extension SphericalCubeIndex {
         visited: inout VisitedBuckets,
         _ body: (Int) -> Void
     ) {
-        precondition(radius >= 0 && radius <= 8, "spherical projected-ring radius out of range")
-        @inline(__always)
-        func visit(dx: Int, dy: Int) {
+        forEachRingOffset(radius: radius) { dx, dy in
             guard let bucket = projectedBucket(around: location, dx: dx, dy: dy),
                 visited.insert(bucket)
             else { return }
             body(bucket)
         }
+    }
+
+    /// Scan only the new ring. In-face rows are contiguous; only cross-face offsets need
+    /// projection and deduplication. Projected offsets cannot return to the query face.
+    /// Explicit inout state avoids heap boxes for mutable values captured by the callback.
+    @inline(__always)
+    func forEachNeighborhoodRing<State>(
+        around location: SphericalCubeGeometry.Location,
+        radius: Int,
+        visited: inout VisitedBuckets?,
+        bytes: borrowing RawSpan,
+        state: inout State,
+        _ body: (Range<Int>, inout State) -> Void
+    ) {
+        @inline(__always)
+        func scanRow(y: Int, xRange: ClosedRange<Int>) {
+            forEachRowPointRange(face: location.face, y: y, xRange: xRange, bytes: bytes) {
+                body($0, &state)
+            }
+        }
         if radius == 0 {
-            visit(dx: 0, dy: 0)
+            scanRow(y: location.y, xRange: location.x...location.x)
+            return
+        }
+        let lowerX = location.x - radius
+        let upperX = location.x + radius
+        let lowerY = location.y - radius
+        let upperY = location.y + radius
+        scanRow(y: lowerY, xRange: lowerX...upperX)
+        scanRow(y: upperY, xRange: lowerX...upperX)
+        for y in (lowerY + 1)..<upperY {
+            scanRow(y: y, xRange: lowerX...lowerX)
+            scanRow(y: y, xRange: upperX...upperX)
+        }
+        guard lowerX < 0 || lowerY < 0 || upperX >= resolution || upperY >= resolution else { return }
+        if visited == nil { visited = VisitedBuckets() }
+        forEachRingOffset(radius: radius) { dx, dy in
+            let x = location.x + dx
+            let y = location.y + dy
+            guard x < 0 || y < 0 || x >= resolution || y >= resolution,
+                let bucket = projectedBucket(around: location, dx: dx, dy: dy),
+                visited!.insert(bucket)
+            else { return }
+            body(pointRange(in: bucket, bytes: bytes), &state)
+        }
+    }
+
+    @inline(__always)
+    private func forEachRingOffset(radius: Int, _ visit: (Int, Int) -> Void) {
+        precondition(radius >= 0 && radius <= 8, "spherical projected-ring radius out of range")
+        if radius == 0 {
+            visit(0, 0)
             return
         }
         for dx in -radius...radius {
-            visit(dx: dx, dy: -radius)
-            visit(dx: dx, dy: radius)
+            visit(dx, -radius)
+            visit(dx, radius)
         }
         for dy in (-radius + 1)..<radius {
-            visit(dx: -radius, dy: dy)
-            visit(dx: radius, dy: dy)
+            visit(-radius, dy)
+            visit(radius, dy)
         }
     }
 }
