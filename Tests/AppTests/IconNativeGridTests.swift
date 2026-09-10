@@ -74,7 +74,7 @@ import Testing
         #expect(try #require(file.cache.get()).storage === installed)
     }
 
-    @Test func materializeRejectsTruncatedArtifact() async throws {
+    @Test func loadRejectsTruncatedArtifactBeforePublication() async throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let published = temporaryArtifactFile()
@@ -84,11 +84,10 @@ import Testing
             identity: makeIdentity(fixture)
         )
 
-        let grid = try await file.materialize(
-            file: DataAsClass(data: try Data(contentsOf: fixture.file))
-        )
+        let original = try Data(contentsOf: fixture.file)
+        let grid = try await file.load(file: DataAsClass(data: original))
         #expect(grid.nx == fixture.centers.count)
-        #expect(FileManager.default.fileExists(atPath: published.path))
+        #expect(try Data(contentsOf: published) == original)
 
         let handle = try FileHandle.openFileReading(file: published.path)
         let payload = try IconNativeGridPayload(fd: handle, size: Int64(try handle.seekToEnd()))
@@ -97,13 +96,12 @@ import Testing
             try IconNativeGridIdentity.d2.validate(grid: payload.grid, path: published.path)
         }
 
-        try FileManager.default.removeItem(at: published)
-        var invalid = try Data(contentsOf: fixture.file)
+        var invalid = original
         invalid.removeLast()
         await #expect(throws: IconNativeDomainError.self) {
-            _ = try await file.materialize(file: DataAsClass(data: invalid))
+            _ = try await file.load(file: DataAsClass(data: invalid))
         }
-        #expect(!FileManager.default.fileExists(atPath: published.path))
+        #expect(try Data(contentsOf: published) == original)
     }
 
     @Test func seaAndTerrainSelectionReuseElevations() async throws {

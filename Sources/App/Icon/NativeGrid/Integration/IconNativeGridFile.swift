@@ -54,23 +54,11 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let identity: IconNativeGridIdentity
     let cache = IconNativeGridCache()
 
-    // TODO: make generic on the filesystem
-    func materialize<Backend: OmFileReaderBackend>(file: Backend) async throws -> IconNativeGrid
+    func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> IconNativeGrid
     where Backend.DataType: DataProtocol {
-        try createDirectory()
-        let handle = try FileHandle.createNewFile(
-            file: localFile,
-            size: file.count,
-            overwrite: true,
-            temporary: true
-        )
-        for offset in stride(from: 0, to: file.count, by: 8 * 1_024 * 1_024) {
-            let count = min(8 * 1_024 * 1_024, file.count - offset)
-            try handle.write(contentsOf: await file.getData(offset: offset, count: count))
+        try await materialize(file: file) { handle in
+            try identity.loadGrid(mapped: MmapFile(fn: handle), path: localFile)
         }
-        let grid = try identity.loadGrid(mapped: MmapFile(fn: handle), path: localFile)
-        try handle.linkTemporary(file: localFile)
-        return grid
     }
 
     func getFilePath() -> String { localFile }
@@ -80,7 +68,7 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     }
 }
 
-/// Local files remain mapped; remote files are validated and atomically materialized before use.
+/// Local files remain mapped; remote files are validated before atomic publication.
 struct IconNativeGridPayload: OmFilePayload {
     let grid: IconNativeGrid
 
@@ -101,7 +89,7 @@ struct IconNativeGridPayload: OmFilePayload {
             )
         }
         let cached = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
-        grid = try await artifact.materialize(file: cached)
+        grid = try await artifact.load(file: cached)
     }
 
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {
