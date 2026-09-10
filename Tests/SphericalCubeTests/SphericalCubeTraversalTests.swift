@@ -5,6 +5,67 @@ import OmFileFormat
 import Testing
 
 @Suite struct SphericalCubeTraversalTests {
+    @Test(arguments: [3, 4], [true, false])
+    func ringsMatchIndependentProjection(level: Int, isGlobal: Bool) throws {
+        let resolution = 1 << level
+        var centers = [SphericalPoint]()
+        for face in 0..<6 {
+            for y in 0..<resolution {
+                for x in 0..<resolution {
+                    if !isGlobal {
+                        let firstRectangle = face == 0 && (2..<(resolution - 1)).contains(x) && (1..<(resolution - 2)).contains(y)
+                        let secondRectangle = face == 2 && x < 3 && y >= resolution / 2
+                        guard firstRectangle || secondRectangle else { continue }
+                    }
+                    centers.append(SphericalCubeGeometry.faceVector(face: face,
+                        u: -1 + (Double(x) + 0.5) * 2 / Double(resolution),
+                        v: -1 + (Double(y) + 0.5) * 2 / Double(resolution)))
+                }
+            }
+        }
+        let fixture = try makeFixture(centers: centers, isGlobal: isGlobal, level: level)
+        defer { fixture.remove() }
+        let index = fixture.index
+        let coordinates = Set([0, 1, 3, 7, resolution / 2, resolution - 2, resolution - 1]).sorted()
+        for face in 0..<6 {
+            for x in coordinates {
+                for y in coordinates {
+                    let location = SphericalCubeGeometry.location(for: SphericalCubeGeometry.faceVector(
+                        face: face, u: -1 + (Double(x) + 0.5) * 2 / Double(resolution),
+                        v: -1 + (Double(y) + 0.5) * 2 / Double(resolution)), resolution: resolution)
+                    index.withBytes { bytes in
+                        var visited: SphericalCubeIndex.VisitedBuckets?
+                        var actual = [Int]()
+                        for radius in 0...8 {
+                            index.forEachNeighborhoodRing(around: location, radius: radius, visited: &visited,
+                                bytes: bytes, state: &actual) { range, positions in
+                                positions.append(contentsOf: range)
+                            }
+                            var expected = Set<Int>()
+                            // Deliberately project every offset, including those inside the face.
+                            for dy in -radius...radius {
+                                for dx in -radius...radius {
+                                    let point = SphericalCubeGeometry.faceVector(face: face,
+                                        u: -1 + (Double(x + dx) + 0.5) * 2 / Double(resolution),
+                                        v: -1 + (Double(y + dy) + 0.5) * 2 / Double(resolution))
+                                    let projected = SphericalCubeGeometry.location(for: point, resolution: resolution)
+                                    if let bucket = index.faceSections[projected.face].bucket(x: projected.x, y: projected.y) {
+                                        expected.formUnion(index.pointRange(in: bucket, bytes: bytes))
+                                    }
+                                }
+                            }
+                            #expect(Set(actual) == expected)
+                            #expect(actual.count == expected.count)
+                            if radius <= min(x, y, resolution - 1 - x, resolution - 1 - y) {
+                                #expect(visited == nil)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test(arguments: [true, false])
     func rowRangesMatchBucketEnumeration(isGlobal: Bool) throws {
         // A rectangle starting inside a tile and ending in partial tiles on both axes.

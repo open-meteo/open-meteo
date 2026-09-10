@@ -20,15 +20,80 @@ import Testing
             "Set ICON_NATIVE_GRID_ARTIFACT to an existing global or D2 grid.bin")
         let grid = try IconNativeGrid.load(file: URL(fileURLWithPath: path))
         let queries = makeQueries(grid: grid)
+        let workloads = [(name: "ordinary", queries: queries, repeats: repeats)]
+            + makeBoundaryWorkloads(grid: grid)
         print("ICON native grid benchmark: \(path)")
         print("  cells: \(grid.nx), queries/sample: \(queryCount * repeats), samples: \(sampleCount)")
-        printResult("nearest lookup", measure(executions: queryCount * repeats) {
-            lookupChecksum(grid: grid, queries: queries, repeats: repeats)
-        })
-        printResult("lookup with candidates", measure(executions: queryCount * repeats) {
-            lookupWithCandidatesChecksum(grid: grid, queries: queries, repeats: repeats)
-        })
+        for workload in workloads {
+            printResult("\(workload.name) nearest lookup", measure(executions: workload.queries.count * workload.repeats) {
+                lookupChecksum(grid: grid, queries: workload.queries, repeats: workload.repeats)
+            })
+            printResult("\(workload.name) lookup with candidates", measure(executions: workload.queries.count * workload.repeats) {
+                lookupWithCandidatesChecksum(grid: grid, queries: workload.queries, repeats: workload.repeats)
+            })
+        }
         try await measureElevationSelection(grid: grid, queries: queries)
+    }
+
+    /// Fixed query sets shared by baseline and candidate; generation is outside measured regions.
+    private func makeBoundaryWorkloads(grid: IconNativeGrid) -> [(name: String, queries: [Query], repeats: Int)] {
+        let index = grid.storage
+        let resolution = index.resolution
+        let width = 2 / Double(resolution)
+        var minLat: Float = 90, maxLat: Float = -90
+        var minLon: Float = 180, maxLon: Float = -180
+        if !index.coversWholeSphere {
+            for pointID in 0..<grid.nx {
+                let coordinate = grid.getCoordinates(gridpoint: pointID)
+                minLat = min(minLat, coordinate.latitude)
+                maxLat = max(maxLat, coordinate.latitude)
+                minLon = min(minLon, coordinate.longitude)
+                maxLon = max(maxLon, coordinate.longitude)
+            }
+        }
+        let sections = index.faceSections.enumerated().filter { $0.element.columns > 0 && $0.element.rows > 0 }
+        var geographic = [Query](), buckets = [Query](), seams = [Query](), corners = [Query](), regional = [Query]()
+        var state: UInt64 = 0x3c6e_f372_fe94_f82b
+        func random() -> Double {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Double(state >> 11) / Double(UInt64(1) << 53)
+        }
+        for i in 0..<65_536 {
+            let a = random(), b = random()
+            geographic.append(index.coversWholeSphere
+                ? (Float(asin(2 * a - 1) * 180 / .pi), Float(360 * b - 180))
+                : (minLat + Float(a) * (maxLat - minLat), minLon + Float(b) * (maxLon - minLon)))
+            guard i < 16_384 else { continue }
+            let (face, section) = sections[i % sections.count]
+            let x = section.minimumX + Int(a * Double(section.columns))
+            let y = section.minimumY + Int(b * Double(section.rows))
+            let epsilon = [-0.0001, 0, 0.0001][(i / 24) % 3] * width
+            // Every eighth bucket boundary is also a storage-tile boundary.
+            buckets.append(SphericalCubeGeometry.faceVector(face: face,
+                u: -1 + (Double(x) + (i.isMultiple(of: 2) ? 0 : 0.5)) * width + epsilon,
+                v: -1 + (Double(y) + (i.isMultiple(of: 2) ? 0.5 : 0)) * width + epsilon).coordinate)
+            let edge = (i / 6) % 4
+            let boundary = (edge < 2 ? -1.0 : 1.0) + epsilon
+            seams.append(SphericalCubeGeometry.faceVector(face: i % 6,
+                u: edge.isMultiple(of: 2) ? boundary : 2 * a - 1,
+                v: edge.isMultiple(of: 2) ? 2 * a - 1 : boundary).coordinate)
+            corners.append(SphericalCubeGeometry.faceVector(face: i % 6,
+                u: ((i / 6).isMultiple(of: 2) ? -1.0 : 1.0) + epsilon,
+                v: ((i / 12).isMultiple(of: 2) ? -1.0 : 1.0) + epsilon).coordinate)
+            if !index.coversWholeSphere {
+                let offset = Float([-2.0, -0.1, 0, 0.1, 2.0][i % 5])
+                switch (i / 5) % 4 {
+                case 0: regional.append((minLat + offset, minLon + Float(a) * (maxLon - minLon)))
+                case 1: regional.append((maxLat + offset, minLon + Float(a) * (maxLon - minLon)))
+                case 2: regional.append((minLat + Float(a) * (maxLat - minLat), minLon + offset))
+                default: regional.append((minLat + Float(a) * (maxLat - minLat), maxLon + offset))
+                }
+            }
+        }
+        var result = [("geographic", geographic, 8), ("bucket-boundary", buckets, 4),
+                      ("seam", seams, 4), ("corner", corners, 4)]
+        if !regional.isEmpty { result.append(("regional-boundary", regional, 4)) }
+        return result
     }
 
     private func measureElevationSelection(grid: IconNativeGrid, queries: [Query]) async throws {
@@ -181,7 +246,7 @@ import Testing
                 checksum &+= grid.storage.nearestPointID(
                     latitude: query.latitude,
                     longitude: query.longitude
-                )!
+                ) ?? -1
             }
         }
         return checksum
@@ -196,10 +261,13 @@ import Testing
         var checksum = 0
         for _ in 0..<repeats {
             for query in queries {
-                let lookup = grid.storage.nearestLookup(
+                guard let lookup = grid.storage.nearestLookup(
                     latitude: query.latitude,
                     longitude: query.longitude
-                )!
+                ) else {
+                    checksum &+= -1
+                    continue
+                }
                 let candidates = grid.storage.nearestCandidates(from: lookup)
                 checksum &+= candidates.pointIDs[0] &+ candidates.count
             }
