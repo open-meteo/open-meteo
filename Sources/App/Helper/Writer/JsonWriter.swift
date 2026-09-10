@@ -79,7 +79,7 @@ extension ForecastapiResult.PerLocation {
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 
         b.buffer.writeString("""
-        {"latitude":\(first.latitude),"longitude":\(first.longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
+        {"latitude":\(first.latitude.isFinite ? "\(first.latitude)" : "null"),"longitude":\(first.longitude.isFinite ? "\(first.longitude)" : "null"),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
         """)
         if let elevation = first.elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")
