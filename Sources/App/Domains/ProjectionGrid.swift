@@ -65,17 +65,18 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
 
     func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
         let pos = projection.forward(latitude: lat, longitude: lon)
-        let x = Int(round((pos.x - origin.x) / dx))
-        let y = Int(round((pos.y - origin.y) / dy))
-        if y < 0 || x < 0 || y >= ny || x >= nx {
+        let x = round((pos.x - origin.x) / dx)
+        let y = round((pos.y - origin.y) / dy)
+        // Projection singularities must be rejected before converting to integers.
+        guard x.isFinite, y.isFinite, x >= 0, y >= 0, x < Float(nx), y < Float(ny) else {
             return nil
         }
-        return (x, y)
+        return (Int(x), Int(y))
     }
 
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
         let (x, y) = projection.forward(latitude: lat, longitude: lon)
-        if y < 0 || x < 0 || y >= Float(ny) || x >= Float(nx) {
+        guard x.isFinite, y.isFinite, x >= 0, y >= 0, x < Float(nx), y < Float(ny) else {
             return nil
         }
         let xFraction = x.truncatingRemainder(dividingBy: 1)
