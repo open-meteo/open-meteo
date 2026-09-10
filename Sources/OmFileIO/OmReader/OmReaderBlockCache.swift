@@ -47,7 +47,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         let sameSuperBlock = superBlocks.count == 1
         if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
             let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                data.distance(from: data.startIndex, to: ptr.startIndex)
+                UnsafeRawPointer(data.baseAddress!).distance(to: ptr.baseAddress!)
             }
             cache.cache.data.prefetchData(offset: offset, count: ptr.count)
             return
@@ -64,7 +64,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
                 }), dataCallback: {(_, value) in
                     let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                        data.distance(from: data.startIndex, to: value.startIndex)
+                        UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
                     }
                     cache.cache.data.prefetchData(offset: offset, count: value.count)
                 })
