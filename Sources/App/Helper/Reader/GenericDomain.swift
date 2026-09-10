@@ -38,7 +38,6 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
-
 }
 
 extension GenericDomain {
