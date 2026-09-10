@@ -384,7 +384,7 @@ extension InlineArray {
         #expect(nam.getCoordinates(gridpoint: 40000).longitude.isApproximatelyEqual(to: 248.77817290935954 - 360, absoluteTolerance: 0.001))
     }
 
-    @Test func lambertAzimuthalEqualAreaProjection() {
+    @Test func lambertAzimuthalEqualAreaProjection() throws {
         let proj = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
         let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigin: -1036000, longitudeProjectionOrigin: -1158000, dx: 2000, dy: 2000, projection: proj)
         // peak north denmark 57.745566, 10.620785
@@ -403,6 +403,17 @@ extension InlineArray {
         let r2 = grid.getCoordinates(gridpoint: 966 + 713 * grid.nx)
         #expect(r2.longitude.isApproximatelyEqual(to: 10.6271515, absoluteTolerance: 0.0001))
         #expect(r2.latitude.isApproximatelyEqual(to: 57.746563, absoluteTolerance: 0.0001))
+
+        let origin = proj.inverse(x: 0, y: 0)
+        #expect(origin.latitude.isApproximatelyEqual(to: 54.9, absoluteTolerance: 0.0001))
+        #expect(origin.longitude.isApproximatelyEqual(to: -2.5, absoluteTolerance: 0.0001))
+
+        // Issue #2108: this nearby coordinate snaps to the projection origin.
+        let point = try #require(grid.findPoint(lat: 54.8945, lon: -2.503))
+        #expect(point == 518 * grid.nx + 579)
+        let snappedOrigin = grid.getCoordinates(gridpoint: point)
+        #expect(snappedOrigin.latitude.isApproximatelyEqual(to: 54.9, absoluteTolerance: 0.0001))
+        #expect(snappedOrigin.longitude.isApproximatelyEqual(to: -2.5, absoluteTolerance: 0.0001))
     }
 
     @Test func lambertCC() {
