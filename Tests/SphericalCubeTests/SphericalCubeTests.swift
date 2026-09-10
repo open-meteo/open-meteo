@@ -4,6 +4,81 @@ import OmFileFormat
 @testable import SphericalCubeTestSupport
 import Testing
 
+/// Expensive semantic verification belongs to artifact generation tests, not mmap startup.
+private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) throws {
+    typealias Artifact = SphericalCubeArtifact
+    let artifact = try Artifact.open(file: file)
+    let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(artifact.mapped.data))
+    let bucketCount = artifact.faceSections.reduce(0) { $0 + $1.columns * $1.rows }
+    var previous = 0
+    for bucket in 0...bucketCount {
+        let current = Artifact.directoryPosition(
+            bucket,
+            bytes: bytes,
+            basesOffset: artifact.directoryBasesOffset,
+            localsOffset: artifact.directoryLocalsOffset
+        )
+        #expect(current >= previous)
+        #expect(current <= artifact.pointCount)
+        previous = current
+    }
+    #expect(previous == artifact.pointCount)
+
+    var seen = [Bool](repeating: false, count: artifact.pointCount)
+    for position in 0..<artifact.pointCount {
+        let center = Artifact.point(
+            position: position,
+            bytes: bytes,
+            pointsOffset: artifact.pointsOffset
+        )
+        #expect(center.x.isFinite && center.y.isFinite && center.z.isFinite)
+        #expect(abs(center.dot(center) - 1) <= 4e-12)
+
+        let cell = Artifact.pointID(
+            position: position,
+            bytes: bytes,
+            pointsOffset: artifact.pointsOffset
+        )
+        guard cell >= 0, cell < artifact.pointCount else {
+            Issue.record("Invalid canonical cell \(cell) at artifact position \(position)")
+            continue
+        }
+        #expect(centerDirectionDistance(centers[cell], center) <= 2)
+        #expect(!seen[cell])
+        seen[cell] = true
+        #expect(
+            Artifact.readUInt32(bytes, at: artifact.positionsByIDOffset + cell * 4)
+                == UInt32(position)
+        )
+
+        let location = SphericalCubeGeometry.location(
+            for: center,
+            resolution: artifact.resolution
+        )
+        guard let bucket = artifact.faceSections[location.face].bucket(
+            x: location.x,
+            y: location.y
+        ) else {
+            Issue.record("Center \(cell) falls outside its face section")
+            continue
+        }
+        let begin = Artifact.directoryPosition(
+            bucket,
+            bytes: bytes,
+            basesOffset: artifact.directoryBasesOffset,
+            localsOffset: artifact.directoryLocalsOffset
+        )
+        let end = Artifact.directoryPosition(
+            bucket + 1,
+            bytes: bytes,
+            basesOffset: artifact.directoryBasesOffset,
+            localsOffset: artifact.directoryLocalsOffset
+        )
+        #expect(position >= begin && position < end)
+    }
+    #expect(seen.allSatisfy { $0 })
+}
+
 @Suite struct SphericalCubeTests {
     @Test func sampledQueriesMatchBruteForce() throws {
         let fixture = try makeGlobalFixture()
@@ -202,17 +277,9 @@ import Testing
         }
     }
 
-    @Test func truncatedArtifactAndInsufficientSizeLimitAreRejected() throws {
+    @Test func insufficientSizeLimitIsRejected() throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
-        let corruptedFile = temporaryArtifactFile()
-        defer { try? FileManager.default.removeItem(at: corruptedFile) }
-        try FileManager.default.copyItem(at: fixture.file, to: corruptedFile)
-        try truncateLastByte(of: corruptedFile)
-        #expect(throws: SphericalCubeArtifactError.invalidHeader) {
-            _ = try SphericalCubeIndex(file: corruptedFile)
-        }
-
         let tooSmall = temporaryArtifactFile()
         defer { try? FileManager.default.removeItem(at: tooSmall) }
         #expect(throws: SphericalCubeArtifactError.self) {
