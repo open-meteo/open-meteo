@@ -261,9 +261,8 @@ extension InlineArray {
         #expect(lat.isApproximatelyEqual(to: 89.53125, absoluteTolerance: 0.001))
         #expect(lon.isApproximatelyEqual(to: 179.53125, absoluteTolerance: 0.001))
 
-        let iconGrid = IconDomains.icon.grid
-        let pos2 = iconGrid.findPoint(lat: -16.805414, lon: 179.990623)!
-        let (lat2, lon2) = iconGrid.getCoordinates(gridpoint: pos2)
+        let pos2 = IconDomains.icon.grid.findPoint(lat: -16.805414, lon: 179.990623)!
+        let (lat2, lon2) = IconDomains.icon.grid.getCoordinates(gridpoint: pos2)
         #expect(pos2 == 1689972)
         #expect(lat2.isApproximatelyEqual(to: -16.75, absoluteTolerance: 0.001))
         #expect(lon2.isApproximatelyEqual(to: 179.75, absoluteTolerance: 0.001))
@@ -276,13 +275,11 @@ extension InlineArray {
     func elevationMatching() async throws {
         let logger = Logger(label: "testElevationMatching")
         let client = HTTPClient.shared
-        let grid = IconDomains.iconD2.grid
-        let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger))
-        let optimised = try await grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: elevationFile)!
+        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
         #expect(optimised.gridpoint == 225405)
         #expect(optimised.gridElevation.numeric == 600)
 
-        let nearest = try await grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: elevationFile)!
+        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
         #expect(nearest.gridpoint == 225406)
         #expect(nearest.gridElevation.numeric == 1006.0)
     }
