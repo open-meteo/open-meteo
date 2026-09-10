@@ -15,25 +15,12 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
     typealias WeeklyVariable = ForecastVariableDaily
     typealias MonthlyVariable = ForecastVariableDaily
 
-    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
-        .bestMatch
-    }
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model = .bestMatch
+    var modelName: String = "beest_match"
 
-    var modelName: String {
-        "beest_match"
-    }
-
-    var latitude: Float {
-        41
-    }
-
-    var longitude: Float {
-        2
-    }
-
-    var elevation: Float? {
-        nil
-    }
+    var latitude: Float = 41
+    var longitude: Float = 2
+    var elevation: Float? = nil
 
     func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [App.ForecastVariableDaily]?) async throws {
         
@@ -74,10 +61,9 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         return nil
     }
 
-    static func makeData(timeformat: Timeformat, locationCount: Int) -> ForecastapiResult<Self>  {
-        let res = DummyDataProvider()
+    static func makeData(timeformat: Timeformat, locationCount: Int, firstLocation: Self = .init()) -> ForecastapiResult<Self>  {
         let locations = (0..<locationCount).map {
-            ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: $0, results: [res])
+            ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: $0, results: [$0 == 0 ? firstLocation : .init()])
         }
         let data = ForecastapiResult<DummyDataProvider>(
             timeformat: timeformat,
@@ -199,6 +185,16 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
                 fatalError("could not convert to data")
             }
             return data
+        }
+    }
+
+    @Test(arguments: [Float.nan, -Float.nan, Float.infinity, -Float.infinity], [1, 2])
+    func jsonNonfiniteCoordinates(value: Float, locationCount: Int) async throws {
+        let data = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: locationCount, firstLocation: .init(latitude: value, longitude: value))
+        let json = await drainString(try data.response(format: .json(fixedGenerationTime: 12), logger: Logger(label: "OutputformatTests")))
+        #expect(json.contains("\"latitude\":null,\"longitude\":null,\"generationtime_ms\":12.0,"))
+        if locationCount == 2 {
+            #expect(json.contains("},{\"latitude\":41.0,\"longitude\":2.0,\"generationtime_ms\":12.0,"))
         }
     }
 
