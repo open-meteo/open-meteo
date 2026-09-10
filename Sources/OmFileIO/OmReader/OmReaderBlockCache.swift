@@ -31,9 +31,10 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         return 8*1024*1024 / cache.cache.blockSize
     }
     
-    /// Calculate cache key for block. 100 blocks are stored consecutive in cache.
+    /// Calculate a cache key with consecutive keys within each 8 MB super block.
+    /// Keep the absolute block index for compatibility with existing fetch/prefetch entries.
     func calculateCacheKey(block: Int) -> UInt64 {
-        return cacheKey.addFnv1aHash(UInt64(block / superBlockLength)) &+ UInt64(block % superBlockLength)
+        return cacheKey.addFnv1aHash(UInt64(block / superBlockLength)) &+ UInt64(block)
     }
     
     public func prefetchData(offset: Int, count: Int) async throws {
@@ -47,7 +48,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         let sameSuperBlock = superBlocks.count == 1
         if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
             let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                data.distance(from: data.startIndex, to: ptr.startIndex)
+                UnsafeRawPointer(data.baseAddress!).distance(to: ptr.baseAddress!)
             }
             cache.cache.data.prefetchData(offset: offset, count: ptr.count)
             return
@@ -55,9 +56,8 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         /// Prefetch data from the HTTP backend in a detached task
         Task {
             for superBlock in superBlocks {
-                let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
                 let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
-                let keyStart = superKey &+ UInt64(blocks.lowerBound)
+                let keyStart = calculateCacheKey(block: blocks.lowerBound)
                 //print("withData blocks \(blocks)")
                 try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
                     let block = blocks.lowerBound + Int(key &- keyStart)
@@ -65,7 +65,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
                 }), dataCallback: {(_, value) in
                     let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                        data.distance(from: data.startIndex, to: value.startIndex)
+                        UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
                     }
                     cache.cache.data.prefetchData(offset: offset, count: value.count)
                 })
@@ -105,9 +105,8 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
         do {
             for superBlock in superBlocks {
-                let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
                 let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
-                let keyStart = superKey &+ UInt64(blocks.lowerBound)
+                let keyStart = calculateCacheKey(block: blocks.lowerBound)
                 //print("withData blocks \(blocks)")
                 try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
                     let block = blocks.lowerBound + Int(key &- keyStart)
@@ -188,9 +187,8 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         let superBlocks = dataRange.divideRoundedUp(divisor: blockSize * superBlockLength)
         var deletedCount = 0
         for superBlock in superBlocks {
-            let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
             let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
-            deletedCount += cache.cache.delete(key: superKey, count: UInt64(blocks.count), olderThanSeconds: olderThanSeconds)
+            deletedCount += cache.cache.delete(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count), olderThanSeconds: olderThanSeconds)
         }
         return deletedCount
     }
