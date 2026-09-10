@@ -87,7 +87,7 @@ struct DownloadIconCommand: AsyncCommand {
         let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, nativeGridIdentity: outputs.nativeDomain?.nativeGridFile.identity, logger: logger, curl: curl)
+        let cdo = try await CdoHelper(domain: domain, nativeGridIdentity: outputs.nativeDomain?.nativeGridFile.identity, logger: logger, curl: curl)
         let gridType = outputs.nativeDomain != nil || cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
@@ -148,7 +148,7 @@ struct DownloadIconCommand: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, grid: outputs.primary.grid, nativeGridIdentity: outputs.nativeDomain?.nativeGridFile.identity, logger: logger, curl: curl)
+        let cdo = try await CdoHelper(domain: domain, nativeGridIdentity: outputs.nativeDomain?.nativeGridFile.identity, logger: logger, curl: curl)
         let remapper: CdoIconGlobal?
         if remappedDomain != nil {
             guard let mapping = try await CdoIconGlobal(curl: curl, domain: .icon) else {
