@@ -4,7 +4,7 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
-    @Test(arguments: ["read", "preload", "prefetch"])
+    @Test(arguments: ["read", "preload", "prefetch", "existing"])
     func blockCacheAcrossSuperBlockBoundary(path: String) async throws {
         let blockSize = 64 * 1024
         let blocks = 127..<130 // Straddles the 8 MB boundary at block 128.
@@ -25,6 +25,12 @@ import OmFileFormat
             #expect(try await reader.getData(offset: offset, count: count) == expected)
         case "preload":
             try await reader.preloadBlocks(blocks: [blocks])
+        case "existing":
+            // Seed entries using main's original fetch/prefetch placement.
+            for block in blocks {
+                let key = UInt64(123).addFnv1aHash(UInt64(block / 128)) &+ UInt64(block)
+                cache.set(key: key, value: Data(repeating: UInt8(block), count: blockSize))
+            }
         default:
             try await reader.prefetchData(offset: offset, count: count)
             // Prefetch returns before its background task commits the blocks.

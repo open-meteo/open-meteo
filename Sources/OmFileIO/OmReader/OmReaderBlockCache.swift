@@ -32,8 +32,9 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
     
     /// Calculate a cache key with consecutive keys within each 8 MB super block.
+    /// Keep the absolute block index for compatibility with existing fetch/prefetch entries.
     func calculateCacheKey(block: Int) -> UInt64 {
-        return cacheKey.addFnv1aHash(UInt64(block / superBlockLength)) &+ UInt64(block % superBlockLength)
+        return cacheKey.addFnv1aHash(UInt64(block / superBlockLength)) &+ UInt64(block)
     }
     
     public func prefetchData(offset: Int, count: Int) async throws {
