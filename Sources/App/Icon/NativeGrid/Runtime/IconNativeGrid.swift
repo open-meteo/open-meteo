@@ -12,15 +12,13 @@ struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
     let storage: SphericalCubeIndex
-    let elevations: ElevationValues?
+    let maximumChordDistanceSquared: Float
+    var elevations: ElevationValues?
 
-    init(storage: SphericalCubeIndex, elevations: ElevationValues? = nil) {
+    init(storage: SphericalCubeIndex, maximumChordDistanceSquared: Float, elevations: ElevationValues? = nil) {
         self.storage = storage
+        self.maximumChordDistanceSquared = maximumChordDistanceSquared
         self.elevations = elevations
-    }
-
-    static func load(file: URL) throws -> Self {
-        Self(storage: try SphericalCubeIndex(file: file))
     }
 
     var nx: Int { storage.pointCount }
@@ -31,7 +29,7 @@ struct IconNativeGrid: Gridable {
         """
         GEOGCRS["ICON Native Grid",
             DATUM["Sphere",
-                ELLIPSOID["Sphere",6371229,0]],
+                ELLIPSOID["Sphere",\(Int(SphericalPoint.earthRadiusMeters)),0]],
             CS[ellipsoidal,2],
                 AXIS["latitude",north],
                 AXIS["longitude",east],
@@ -40,7 +38,7 @@ struct IconNativeGrid: Gridable {
     }
 
     func findPoint(lat: Float, lon: Float) -> Int? {
-        storage.nearestPointID(latitude: lat, longitude: lon)
+        storage.nearestPointID(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared)
     }
 
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
@@ -59,7 +57,7 @@ struct IconNativeGrid: Gridable {
         lon: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon) else {
+        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared) else {
             return nil
         }
         let nearest = lookup.pointID
@@ -88,7 +86,7 @@ struct IconNativeGrid: Gridable {
         elevation: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
-        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon) else {
+        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared) else {
             return nil
         }
         let nearest = lookup.pointID
@@ -112,7 +110,7 @@ struct IconNativeGrid: Gridable {
             if !candidateElevation.isFinite || candidateElevation <= -999 {
                 continue
             }
-            let distanceKilometres = sqrt(max(0, candidates.distancesSquared[position])) * 6371.229
+            let distanceKilometres = sqrt(max(0, candidates.distancesSquared[position])) * Float(SphericalPoint.earthRadiusMeters / 1_000)
             if distanceKilometres >= 50 {
                 continue
             }

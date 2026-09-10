@@ -45,12 +45,9 @@ extension IconNativeGrid {
         {
             let points = try readSource(file: sourceFile, identity: identity)
             let maximumFileSize = identity.isGlobal ? 128 * 1_024 * 1_024 : 32 * 1_024 * 1_024
-            let maximumAngle = Double(identity.maximumDistanceMeters) / 6_371_229
-            let maximumChord = 2 * sin(maximumAngle * 0.5)
             let metadata = SphericalCubeArtifact.Metadata(
                 identity: .init(number: identity.gridNumber, uuid: identity.gridUUID.bytes),
-                coversWholeSphere: identity.isGlobal,
-                maximumChordDistanceSquared: Float(maximumChord * maximumChord)
+                coversWholeSphere: identity.isGlobal
             )
             let artifactHandle = try FileHandle.createNewFile(
                 file: artifactFile,
@@ -61,10 +58,11 @@ extension IconNativeGrid {
                 to: artifactHandle,
                 metadata: metadata,
                 points: points,
-                level: identity.isGlobal ? 9 : 11,
+                level: identity.level,
                 maximumFileSize: maximumFileSize
             )
-            let grid = IconNativeGrid(storage: try SphericalCubeIndex(mapped: MmapFile(fn: artifactHandle)))
+            let grid = IconNativeGrid(storage: try SphericalCubeIndex(mapped: MmapFile(fn: artifactHandle)),
+                maximumChordDistanceSquared: identity.maximumChordDistanceSquared)
             try artifactHandle.linkTemporary(file: artifactFile)
             return grid
         }

@@ -93,7 +93,8 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
                 let expected = nearest(point: query, centers: fixture.centers)
                 let actual = try #require(fixture.index.nearestPointID(
                     latitude: latitude,
-                    longitude: longitude
+                    longitude: longitude,
+                    maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
                 ))
                 #expect(distanceRegret(
                     query: query,
@@ -109,7 +110,8 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
             repeating: SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0), count: 128
         ))
         defer { fixture.remove() }
-        let lookup = try #require(fixture.index.nearestLookup(latitude: 0, longitude: 0))
+        let lookup = try #require(fixture.index.nearestLookup(latitude: 0, longitude: 0,
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared))
         #expect(lookup.pointID == 0)
         // Simulate a bounded lookup supplying a higher-ID tied point. Nearby expansion must
         // preserve the supplied point because its elevation has already been read by the caller.
@@ -133,7 +135,7 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
         ] : makeSphericalCenters(count: 257)
         let fixture = try makeFixture(centers: centers)
         defer { fixture.remove() }
-        let inverseEarthRadius = 1 / 6_371_229.0
+        let inverseEarthRadius = 1 / SphericalPoint.earthRadiusMeters
 
         for cell in fixture.centers.indices {
             let center = fixture.centers[cell]
@@ -173,7 +175,8 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
                 let expected = nearest(point: query, centers: fixture.centers)
                 let actual = try #require(fixture.index.nearestPointID(
                     latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
+                    longitude: coordinate.longitude,
+                    maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
                 ))
                 #expect(distanceRegret(
                     query: query,
@@ -207,7 +210,8 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
             }
             let lookup = try #require(fixture.index.nearestLookup(
                 latitude: latitude,
-                longitude: longitude
+                longitude: longitude,
+                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
             ))
             let actual = fixture.index.nearestCandidates(from: lookup)
             let actualCells = (0..<actual.count).map { actual.pointIDs[$0] }
@@ -231,7 +235,8 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
         ])
         defer { fixture.remove() }
 
-        #expect(fixture.index.nearestPointID(latitude: 0, longitude: 45) == 0)
+        #expect(fixture.index.nearestPointID(latitude: 0, longitude: 45,
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared) == 0)
     }
 
     @Test func regionalLookupBoundsAndLongitudeWrapping() throws {
@@ -248,13 +253,16 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
         )
         defer { fixture.remove() }
 
-        #expect(fixture.index.nearestPointID(latitude: 50, longitude: 5) == 0)
-        #expect(fixture.index.nearestPointID(latitude: 50, longitude: 365) == 0)
-        #expect(fixture.index.nearestPointID(latitude: 50.05, longitude: 5) == 0)
-        #expect(fixture.index.nearestPointID(latitude: 50.2, longitude: 5) == nil)
-        #expect(fixture.index.nearestPointID(latitude: 48, longitude: 5) == nil)
-        #expect(fixture.index.nearestPointID(latitude: .nan, longitude: 5) == nil)
-        #expect(fixture.index.nearestPointID(latitude: 91, longitude: 5) == nil)
+        let limit = fixture.maximumChordDistanceSquared
+        #expect(fixture.index.nearestPointID(latitude: 50, longitude: 5, maximumChordDistanceSquared: limit) == 0)
+        #expect(fixture.index.nearestPointID(latitude: 50, longitude: 365, maximumChordDistanceSquared: limit) == 0)
+        #expect(fixture.index.nearestPointID(latitude: 50.05, longitude: 5, maximumChordDistanceSquared: limit) == 0)
+        #expect(fixture.index.nearestPointID(latitude: 50.2, longitude: 5, maximumChordDistanceSquared: limit) == nil)
+        #expect(fixture.index.nearestPointID(latitude: 50.2, longitude: 5,
+            maximumChordDistanceSquared: SphericalPoint.squaredChordDistance(meters: 100_000)) == 0)
+        #expect(fixture.index.nearestPointID(latitude: 48, longitude: 5, maximumChordDistanceSquared: limit) == nil)
+        #expect(fixture.index.nearestPointID(latitude: .nan, longitude: 5, maximumChordDistanceSquared: limit) == nil)
+        #expect(fixture.index.nearestPointID(latitude: 91, longitude: 5, maximumChordDistanceSquared: limit) == nil)
     }
 
     @Test func artifactLayoutAndCellRoundTrips() throws {
@@ -272,7 +280,8 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
             let coordinate = fixture.index.point(at: cell).coordinate
             #expect(fixture.index.nearestPointID(
                 latitude: coordinate.latitude,
-                longitude: coordinate.longitude
+                longitude: coordinate.longitude,
+                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
             ) == cell)
         }
     }

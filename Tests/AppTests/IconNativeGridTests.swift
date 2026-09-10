@@ -16,7 +16,8 @@ import Testing
         let replacement = try await makeElevationFile([900, 700])
         defer { file.remove(); replacement.remove() }
         let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
-        let grid = IconNativeGrid(storage: fixture.grid.storage, elevations: elevations)
+        let grid = IconNativeGrid(storage: fixture.grid.storage,
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared, elevations: elevations)
         let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
         let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
         #expect(domain.nativeGrid.storage === quarterHourly.nativeGrid.storage)
@@ -59,13 +60,13 @@ import Testing
         let file = IconNativeGridFile(localFile: fixture.file.path, identity: makeIdentity(fixture))
         #expect(file.cache.get() == nil)
         try file.validateFileAndInstall()
-        let installed = try #require(file.cache.get()).storage
+        let installed = try #require(file.cache.get())
 
         try truncateLastByte(of: fixture.file)
         #expect(throws: IconNativeDomainError.self) {
             try file.validateFileAndInstall()
         }
-        #expect(try #require(file.cache.get()).storage === installed)
+        #expect(try #require(file.cache.get()) === installed)
     }
 
     @Test func loadRejectsTruncatedArtifactBeforePublication() async throws {
@@ -79,15 +80,16 @@ import Testing
         )
 
         let original = try Data(contentsOf: fixture.file)
-        let grid = try await file.load(file: DataAsClass(data: original))
-        #expect(grid.nx == fixture.centers.count)
+        let storage = try await file.load(file: DataAsClass(data: original))
+        #expect(storage.pointCount == fixture.centers.count)
         #expect(try Data(contentsOf: published) == original)
 
         let handle = try FileHandle.openFileReading(file: published.path)
         let payload = try IconNativeGridPayload(fd: handle, size: Int64(try handle.seekToEnd()))
-        #expect(try makeIdentity(fixture).validate(grid: payload.grid, path: published.path).nx == grid.nx)
+        try makeIdentity(fixture).validate(storage: payload.storage, path: published.path)
+        #expect(payload.storage.pointCount == storage.pointCount)
         #expect(throws: IconNativeDomainError.self) {
-            try IconNativeGridIdentity.d2.validate(grid: payload.grid, path: published.path)
+            try IconNativeGridIdentity.d2.validate(storage: payload.storage, path: published.path)
         }
 
         var invalid = original
@@ -108,7 +110,8 @@ import Testing
             let file = try await makeElevationFile(elevations)
             defer { file.remove() }
             let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
-            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, elevations: elevations)
+            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage,
+                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared, elevations: elevations)
             let grid: any Gridable = nativeGrid
             let raw = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
                 elevationFile: file.reader, mode: mode)
@@ -174,7 +177,7 @@ import Testing
 }
 
 private extension SphericalCubeFixture {
-    var grid: IconNativeGrid { IconNativeGrid(storage: index) }
+    var grid: IconNativeGrid { IconNativeGrid(storage: index, maximumChordDistanceSquared: maximumChordDistanceSquared) }
 }
 
 private func truncateLastByte(of file: URL) throws {
@@ -190,6 +193,7 @@ private func makeIdentity(_ fixture: SphericalCubeFixture) -> IconNativeGridIden
         gridUUID: UUID(uuidString: "00010203-0405-0607-0809-0a0b0c0d0e0f")!,
         cellCount: fixture.centers.count,
         isGlobal: true,
+        level: fixture.index.level,
         maximumDistanceMeters: 10_000_000,
         sourceFile: "synthetic.nc.bz2"
     )

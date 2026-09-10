@@ -78,8 +78,6 @@ package final class SphericalCubeIndex: Sendable {
     private let directoryLocalsOffset: Int
     let pointsOffset: Int
     private let positionsByIDOffset: Int
-    private let maximumDistanceSquared: Float
-    private let fallbackRadius: Int
     let resolutionScale: Double
     private let boundaries: [Boundary]
     package let coversWholeSphere: Bool
@@ -95,7 +93,7 @@ package final class SphericalCubeIndex: Sendable {
         try self.init(mapped: MmapFile(fn: handle))
     }
 
-    /// Validates an existing mapping, including an unpublished temporary artifact.
+    /// Validates an existing mapping and precomputes search geometry.
     package init(mapped: MmapFile) throws {
         let artifact = try Artifact.open(mapped: mapped)
         self.mapped = artifact.mapped
@@ -104,21 +102,6 @@ package final class SphericalCubeIndex: Sendable {
         directoryLocalsOffset = artifact.directoryLocalsOffset
         pointsOffset = artifact.pointsOffset
         positionsByIDOffset = artifact.positionsByIDOffset
-        maximumDistanceSquared = artifact.maximumChordDistanceSquared
-        // Cube projection can expand angular distances near face corners. A factor of three plus
-        // two guard buckets conservatively covers the operational ICON distance limits, while the
-        // fixed cap keeps the approximate fallback bounded for arbitrary producer metadata.
-        fallbackRadius = min(
-            Self.maximumFallbackRadius,
-            max(
-                2,
-                Int(ceil(
-                    sqrt(Double(artifact.maximumChordDistanceSquared))
-                        * (Double(artifact.resolution) * 0.5)
-                        * 3
-                )) + 2
-            )
-        )
         coversWholeSphere = artifact.coversWholeSphere
         pointCount = artifact.pointCount
         level = artifact.level
@@ -133,15 +116,16 @@ package final class SphericalCubeIndex: Sendable {
     }
 
     /// Returns the closest stored Float32 direction found by the bounded cube-bucket search, or
-    /// `nil` for invalid input or when the selected point exceeds the artifact's distance limit.
+    /// `nil` for invalid input or when the selected point exceeds the configured distance limit.
     @inline(__always)
-    package func nearestPointID(latitude: Float, longitude: Float) -> Int? {
-        nearestLookup(latitude: latitude, longitude: longitude)?.pointID
+    package func nearestPointID(latitude: Float, longitude: Float, maximumChordDistanceSquared: Float) -> Int? {
+        nearestLookup(latitude: latitude, longitude: longitude, maximumChordDistanceSquared: maximumChordDistanceSquared)?.pointID
     }
 
     /// Performs nearest lookup and retains the intermediate state used by nearby-point search.
     @inline(__always)
-    package func nearestLookup(latitude: Float, longitude: Float) -> Lookup? {
+    package func nearestLookup(latitude: Float, longitude: Float, maximumChordDistanceSquared: Float) -> Lookup? {
+        assert(maximumChordDistanceSquared.isFinite && maximumChordDistanceSquared > 0 && maximumChordDistanceSquared <= 4)
         guard latitude.isFinite, longitude.isFinite, latitude >= -90, latitude <= 90 else {
             return nil
         }
@@ -156,7 +140,7 @@ package final class SphericalCubeIndex: Sendable {
                 resolution: resolution,
                 resolutionScale: resolutionScale
             )
-            guard let nearest = nearestHot(to: query, location: location, bytes: bytes) else {
+            guard let nearest = nearestHot(to: query, location: location, maximumChordDistanceSquared: maximumChordDistanceSquared, bytes: bytes) else {
                 return nil
             }
             return Lookup(
@@ -194,6 +178,7 @@ package final class SphericalCubeIndex: Sendable {
     private func nearestHot(
         to query: SphericalLookupVector,
         location queryLocation: SphericalCubeGeometry.Location,
+        maximumChordDistanceSquared: Float,
         bytes: borrowing RawSpan
     ) -> (pointID: Int, position: Int, distanceSquared: Float)? {
         typealias Match = (pointID: Int, position: Int, distanceSquared: Float)
@@ -223,7 +208,7 @@ package final class SphericalCubeIndex: Sendable {
 
         @inline(__always)
         func selectedWithinMaximumDistance() -> (pointID: Int, position: Int, distanceSquared: Float)? {
-            best.distanceSquared <= maximumDistanceSquared ? best : nil
+            best.distanceSquared <= maximumChordDistanceSquared ? best : nil
         }
 
         @inline(__always)
@@ -252,6 +237,10 @@ package final class SphericalCubeIndex: Sendable {
             return selectedWithinMaximumDistance()
         }
 
+        // Cube projection expands angular distances near face corners. Keep the existing bounded
+        // stencil, computing its radius only when the initial bucket cannot certify the result.
+        let fallbackRadius = min(Self.maximumFallbackRadius,
+            max(2, Int(ceil(sqrt(Double(maximumChordDistanceSquared)) * resolutionScale * 3)) + 2))
         var visited: VisitedBuckets?
         for radius in 1...fallbackRadius {
             forEachNeighborhoodRing(around: queryLocation, radius: radius, visited: &visited,

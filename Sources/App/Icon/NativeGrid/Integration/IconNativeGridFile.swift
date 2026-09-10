@@ -5,9 +5,11 @@ import SphericalCube
 import Synchronization
 
 extension IconNativeGridIdentity {
-    func loadGrid(mapped: MmapFile, path: String) throws -> IconNativeGrid {
+    func loadStorage(mapped: MmapFile, path: String) throws -> SphericalCubeIndex {
         do {
-            return try validate(grid: IconNativeGrid(storage: SphericalCubeIndex(mapped: mapped)), path: path)
+            let storage = try SphericalCubeIndex(mapped: mapped)
+            try validate(storage: storage, path: path)
+            return storage
         } catch let error as IconNativeDomainError {
             throw error
         } catch {
@@ -15,8 +17,7 @@ extension IconNativeGridIdentity {
         }
     }
 
-    func validate(grid: IconNativeGrid, path: String) throws(IconNativeDomainError) -> IconNativeGrid {
-        let storage = grid.storage
+    func validate(storage: SphericalCubeIndex, path: String) throws(IconNativeDomainError) {
         guard storage.identity.number == gridNumber else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: path,
@@ -41,7 +42,12 @@ extension IconNativeGridIdentity {
                 reason: "global/regional grid kind does not match"
             )
         }
-        return grid
+        guard storage.level == level else {
+            throw IconNativeDomainError.invalidGridArtifact(
+                path: path,
+                reason: "expected grid level \(level), got \(storage.level)"
+            )
+        }
     }
 
 }
@@ -54,10 +60,10 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let identity: IconNativeGridIdentity
     let cache = IconNativeGridCache()
 
-    func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> IconNativeGrid
+    func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> SphericalCubeIndex
     where Backend.DataType: DataProtocol {
         try await materialize(file: file) { handle in
-            try identity.loadGrid(mapped: MmapFile(fn: handle), path: localFile)
+            try identity.loadStorage(mapped: MmapFile(fn: handle), path: localFile)
         }
     }
 
@@ -70,10 +76,10 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
 
 /// Local files remain mapped; remote files are validated before atomic publication.
 struct IconNativeGridPayload: OmFilePayload {
-    let grid: IconNativeGrid
+    let storage: SphericalCubeIndex
 
     init(fd: FileHandle, size: Int64) throws {
-        grid = IconNativeGrid(storage: try SphericalCubeIndex(mapped: MmapFile(fn: fd)))
+        storage = try SphericalCubeIndex(mapped: MmapFile(fn: fd))
     }
 
     init(file: OmHttpReaderBackend) async throws {
@@ -89,7 +95,7 @@ struct IconNativeGridPayload: OmFilePayload {
             )
         }
         let cached = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
-        grid = try await artifact.load(file: cached)
+        storage = try await artifact.load(file: cached)
     }
 
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {
@@ -114,8 +120,8 @@ extension IconNativeGridFile {
         }
         do {
             let handle = try FileHandle.openFileReading(file: localFile)
-            let grid = try identity.loadGrid(mapped: MmapFile(fn: handle), path: localFile)
-            cache.install(grid)
+            let storage = try identity.loadStorage(mapped: MmapFile(fn: handle), path: localFile)
+            cache.install(storage)
         } catch let error as IconNativeDomainError {
             throw error
         } catch {
@@ -127,17 +133,20 @@ extension IconNativeGridFile {
     }
 
     func load() async throws -> IconNativeGrid {
-        if let grid = cache.get() {
-            return grid
+        let storage: SphericalCubeIndex
+        if let cached = cache.get() {
+            storage = cached
+        } else {
+            guard let payload = try await OmFileSystemManager.instance.get(
+                file: self, client: .shared, logger: IconNativeDomains.logger
+            ) else {
+                throw IconNativeDomainError.missingGridArtifact(getFilePath())
+            }
+            try identity.validate(storage: payload.storage, path: getFilePath())
+            storage = payload.storage
+            cache.install(storage)
         }
-        guard let payload = try await OmFileSystemManager.instance.get(
-            file: self, client: .shared, logger: IconNativeDomains.logger
-        ) else {
-            throw IconNativeDomainError.missingGridArtifact(getFilePath())
-        }
-        let grid = try identity.validate(grid: payload.grid, path: getFilePath())
-        cache.install(grid)
-        return grid
+        return IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared)
     }
 }
 
@@ -147,13 +156,13 @@ extension IconNativeGridFile {
 final class IconNativeGridCache: Sendable {
     private let entry = AtomicLazyReference<SphericalCubeIndex>()
 
-    func get() -> IconNativeGrid? {
-        entry.load().map { IconNativeGrid(storage: $0) }
+    func get() -> SphericalCubeIndex? {
+        entry.load()
     }
 
     /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
-    func install(_ grid: IconNativeGrid) {
-        _ = entry.storeIfNil(grid.storage)
+    func install(_ storage: SphericalCubeIndex) {
+        _ = entry.storeIfNil(storage)
     }
 
 }

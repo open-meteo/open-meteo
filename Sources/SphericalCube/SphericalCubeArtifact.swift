@@ -23,8 +23,8 @@ package enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertib
 
 /// Portable `SPHCUBE1` binary-format definitions shared by offline writers and mmap-backed readers.
 ///
-/// All integers and IEEE-754 values are little-endian. The 144-byte header contains only counts,
-/// lookup policy, an opaque dataset identity, and six occupied cube-face rectangles. Section
+/// All integers and IEEE-754 values are little-endian. The 136-byte header contains only counts,
+/// resolution, an opaque dataset identity, and six occupied cube-face rectangles. Section
 /// offsets are derived from those values; no native pointers or Swift layouts are serialized.
 /// The payload contains, in order:
 ///
@@ -39,13 +39,13 @@ package enum SphericalCubeArtifactError: Error, Equatable, CustomStringConvertib
 ///   |                                                                    |
 ///   v                                                                    v
 ///   +-----------------------------+--------------------------------------+
-///   | Header (144 bytes)          | Bucket directory                     |
+///   | Header (136 bytes)          | Bucket directory                     |
 ///   +-----------------------------+-------------------+------------------+
 ///   |  0 magic[8]                 | UInt32 base per   | UInt16 delta per |
 ///   |  8 version, point count     | 256 directory     | bucket boundary  |
-///   | 16 level, distance limit    | entries           |                  |
-///   | 24 identity number + UUID   |                   |                  |
-///   | 48 FaceSection[6], 16 B each|                   |                  |
+///   | 16 level, identity number   | entries           |                  |
+///   | 24 identity UUID[16]        |                   |                  |
+///   | 40 FaceSection[6], 16 B each|                   |                  |
 ///   +-----------------------------+-------------------+------------------+
 ///                                 directory[i] = base[i / 256] + delta[i]
 ///
@@ -90,7 +90,6 @@ package enum SphericalCubeArtifact {
         let pointsOffset: Int
         let positionsByIDOffset: Int
         let coversWholeSphere: Bool
-        let maximumChordDistanceSquared: Float
         let pointCount: Int
         let level: Int
         let resolution: Int
@@ -101,16 +100,13 @@ package enum SphericalCubeArtifact {
     package struct Metadata: Sendable {
         package let identity: DatasetIdentity
         package let coversWholeSphere: Bool
-        package let maximumChordDistanceSquared: Float
 
         package init(
             identity: DatasetIdentity,
-            coversWholeSphere: Bool,
-            maximumChordDistanceSquared: Float
+            coversWholeSphere: Bool
         ) {
             self.identity = identity
             self.coversWholeSphere = coversWholeSphere
-            self.maximumChordDistanceSquared = maximumChordDistanceSquared
         }
     }
 
@@ -175,12 +171,12 @@ package enum SphericalCubeArtifact {
 
     // Header layout:
     //   0: magic[8], 8: version, 12: pointCount, 16: level,
-    //   20: maximumChordDistanceSquared, 24: identity number, 28: identity UUID[16],
-    //   44: padding[4], 48: six face rectangles of four UInt32 values each.
+    //   20: identity number, 24: identity UUID[16],
+    //   40: six face rectangles of four UInt32 values each.
     static let magic = Array("SPHCUBE1".utf8)
     static let version: UInt32 = 1
-    static let headerBytes = 144
-    static let faceSectionsOffset = 48
+    static let headerBytes = 136
+    static let faceSectionsOffset = 40
     static let faceSectionStride = 16
     static let pointStride = 16
     static let tileShift = 3
@@ -301,15 +297,12 @@ extension SphericalCubeArtifact {
 
         let pointCount = Int(readUInt32(bytes, at: 12))
         let level = Int(readUInt32(bytes, at: 16))
-        let maximumChordDistanceSquared = readFloat(bytes, at: 20)
         let identity = DatasetIdentity(
-            number: readUInt32(bytes, at: 24),
-            uuid: readBytes(bytes, range: 28..<44)
+            number: readUInt32(bytes, at: 20),
+            uuid: readBytes(bytes, range: 24..<40)
         )
 
-        guard pointCount > 0, level >= tileShift, level <= 15,
-            maximumChordDistanceSquared.isFinite, maximumChordDistanceSquared > 0,
-            maximumChordDistanceSquared <= 4
+        guard pointCount > 0, level >= tileShift, level <= 15
         else {
             throw SphericalCubeArtifactError.invalidHeader
         }
@@ -376,7 +369,6 @@ extension SphericalCubeArtifact {
             pointsOffset: layout.pointsOffset,
             positionsByIDOffset: layout.positionsByIDOffset,
             coversWholeSphere: coversWholeSphere,
-            maximumChordDistanceSquared: maximumChordDistanceSquared,
             pointCount: pointCount,
             level: level,
             resolution: resolution,
