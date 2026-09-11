@@ -8,12 +8,15 @@ extension SphericalCubeIndex {
         static let empty = Self(pointID: -1, distanceSquared: .infinity)
     }
 
+    private struct CandidateSearchState {
+        var candidates = InlineArray<10, DistanceCandidate>(repeating: .empty)
+        var count = 0
+    }
+
     /// Fixed-capacity candidates for terrain and sea selection.
     ///
-    /// Entry zero is always the result of the main nearest-point lookup. Remaining entries are
-    /// distance-ordered local candidates; unlike nearest lookup, they are not promised to be the
-    /// globally exact k-nearest points because the search may stop after collecting a sufficiently
-    /// useful local set.
+    /// Entry zero is always the result of the main nearest-point lookup. Remaining entries are the
+    /// exact distance-ordered nearest points within the caller's distance limit.
     package struct NearbyPoints: Sendable {
         package var pointIDs = InlineArray<10, Int>(repeating: -1)
         package var distancesSquared = InlineArray<10, Float>(repeating: .infinity)
@@ -23,10 +26,18 @@ extension SphericalCubeIndex {
     private static let nearbyPointLimit = 10
 
     /// Reuses a completed nearest lookup, avoiding duplicate coordinate conversion and search.
-    package func nearestCandidates(from lookup: Lookup) -> NearbyPoints {
-        withBytes {
+    /// Returns up to ten nearest points within the supplied inclusive distance limit.
+    package func nearestCandidates(
+        from lookup: Lookup,
+        maximumChordDistanceSquared: Float = 4
+    ) -> NearbyPoints {
+        assert(maximumChordDistanceSquared.isFinite && maximumChordDistanceSquared > 0
+            && maximumChordDistanceSquared <= 4
+            && lookup.distanceSquared <= maximumChordDistanceSquared)
+        return withBytes {
             nearestCandidates(
                 from: lookup,
+                maximumChordDistanceSquared: maximumChordDistanceSquared,
                 bytes: $0
             )
         }
@@ -35,13 +46,12 @@ extension SphericalCubeIndex {
     @inline(never)
     private func nearestCandidates(
         from lookup: Lookup,
+        maximumChordDistanceSquared: Float,
         bytes: borrowing RawSpan
     ) -> NearbyPoints {
         let query = lookup.query
         let queryLocation = lookup.location
-        var candidates = InlineArray<10, DistanceCandidate>(repeating: .empty)
-        var candidateCount = 0
-        var scannedPointCount = 0
+        var state = CandidateSearchState()
 
         @inline(__always)
         func precedes(_ lhs: DistanceCandidate, _ rhs: DistanceCandidate) -> Bool {
@@ -51,11 +61,15 @@ extension SphericalCubeIndex {
         }
 
         @inline(__always)
-        func consider(position: Int, distanceSquared: Float) {
-            if position == lookup.position { return }
+        func consider(
+            position: Int,
+            distanceSquared: Float,
+            state: inout CandidateSearchState
+        ) {
+            if position == lookup.position || distanceSquared > maximumChordDistanceSquared { return }
             let last = Self.nearbyPointLimit - 2
-            if candidateCount == Self.nearbyPointLimit - 1,
-                distanceSquared > candidates[last].distanceSquared
+            if state.count == Self.nearbyPointLimit - 1,
+                distanceSquared > state.candidates[last].distanceSquared
             {
                 return
             }
@@ -67,24 +81,23 @@ extension SphericalCubeIndex {
                 ),
                 distanceSquared: distanceSquared
             )
-            if candidateCount == Self.nearbyPointLimit - 1,
-                !precedes(candidate, candidates[last])
+            if state.count == Self.nearbyPointLimit - 1,
+                !precedes(candidate, state.candidates[last])
             {
                 return
             }
-            var destination = min(candidateCount, last)
-            if candidateCount < Self.nearbyPointLimit - 1 { candidateCount += 1 }
-            while destination > 0, precedes(candidate, candidates[destination - 1]) {
-                candidates[destination] = candidates[destination - 1]
+            var destination = min(state.count, last)
+            if state.count < Self.nearbyPointLimit - 1 { state.count += 1 }
+            while destination > 0, precedes(candidate, state.candidates[destination - 1]) {
+                state.candidates[destination] = state.candidates[destination - 1]
                 destination -= 1
             }
-            candidates[destination] = candidate
+            state.candidates[destination] = candidate
         }
 
         @inline(__always)
-        func scanRange(_ begin: Int, _ end: Int) {
-            scannedPointCount += end - begin
-            for position in begin..<end {
+        func scanRange(_ range: Range<Int>, state: inout CandidateSearchState) {
+            for position in range {
                 consider(
                     position: position,
                     distanceSquared: Artifact.squaredDistance(
@@ -92,120 +105,74 @@ extension SphericalCubeIndex {
                         query: query,
                         bytes: bytes,
                         pointsOffset: pointsOffset
-                    )
+                    ),
+                    state: &state
                 )
             }
         }
 
         @inline(__always)
-        func scanRow(face: Int, y: Int, lowerX: Int, upperX: Int) {
-            forEachRowPointRange(face: face, y: y, xRange: lowerX...upperX, bytes: bytes) { range in
-                scanRange(range.lowerBound, range.upperBound)
-            }
+        func searchLimit(_ state: borrowing CandidateSearchState) -> Float {
+            state.count == Self.nearbyPointLimit - 1
+                ? min(maximumChordDistanceSquared, state.candidates[state.count - 1].distanceSquared)
+                : maximumChordDistanceSquared
         }
 
         @inline(__always)
-        func searchIsComplete(
-            xRange: ClosedRange<Int>,
-            yRange: ClosedRange<Int>,
-            canCertify: Bool
-        ) -> Bool {
-            guard candidateCount == Self.nearbyPointLimit - 1 else { return false }
-            if canCertify {
-                let farthestDistance =
-                    sqrt(Double(max(0, candidates[candidateCount - 1].distanceSquared)))
-                    + Self.floatChordError
-                if regionIsCertified(
-                    location: queryLocation,
-                    xRange: xRange,
-                    yRange: yRange,
-                    maximumCandidateDistanceSquared: farthestDistance * farthestDistance
-                ) {
-                    return true
-                }
+        func scanRow(y: Int, xRange: ClosedRange<Int>, state: inout CandidateSearchState) {
+            forEachRowPointRange(face: queryLocation.face, y: y, xRange: xRange, bytes: bytes) {
+                scanRange($0, state: &state)
             }
-            return scannedPointCount >= Self.nearbyPointLimit * 4
         }
 
-        // Expand directly on the query face for every ring that fits. Only rings that actually
-        // cross a cube edge need the more expensive spherical projection and bucket deduplication.
-        // Certification can stop as soon as the retained candidates are provably closer than every
-        // unscanned bucket in the current face rectangle.
-        let maximumRadius = 8
+        // Each completed square establishes a lower bound on every unsearched point, including
+        // other faces. Once full, only points nearer than the tenth candidate can change the set.
+        var searchedRadius = 0
+        scanRow(y: queryLocation.y, xRange: queryLocation.x...queryLocation.x, state: &state)
         let maximumDirectRadius = min(
-            maximumRadius,
-            queryLocation.x,
-            resolution - queryLocation.x - 1,
-            queryLocation.y,
-            resolution - queryLocation.y - 1
+            queryLocation.x, resolution - queryLocation.x - 1,
+            queryLocation.y, resolution - queryLocation.y - 1
         )
-        scanRow(
-            face: queryLocation.face,
-            y: queryLocation.y,
-            lowerX: queryLocation.x,
-            upperX: queryLocation.x
-        )
-        var searchComplete = searchIsComplete(
-            xRange: queryLocation.x...queryLocation.x,
-            yRange: queryLocation.y...queryLocation.y,
-            canCertify: true
-        )
-        if !searchComplete, maximumDirectRadius > 0 {
-            for radius in 1...maximumDirectRadius {
-                let lowerX = queryLocation.x - radius
-                let upperX = queryLocation.x + radius
-                scanRow(
-                    face: queryLocation.face,
-                    y: queryLocation.y - radius,
-                    lowerX: lowerX,
-                    upperX: upperX
-                )
-                scanRow(
-                    face: queryLocation.face,
-                    y: queryLocation.y + radius,
-                    lowerX: lowerX,
-                    upperX: upperX
-                )
-                for y in (queryLocation.y - radius + 1)..<(queryLocation.y + radius) {
-                    scanRow(
-                        face: queryLocation.face,
-                        y: y,
-                        lowerX: lowerX,
-                        upperX: lowerX
-                    )
-                    scanRow(
-                        face: queryLocation.face,
-                        y: y,
-                        lowerX: upperX,
-                        upperX: upperX
-                    )
-                }
-                searchComplete = searchIsComplete(
-                    xRange: (queryLocation.x - radius)...(queryLocation.x + radius),
-                    yRange: (queryLocation.y - radius)...(queryLocation.y + radius),
-                    canCertify: true
-                )
-                if searchComplete { break }
+        while true {
+            let limit = searchLimit(state)
+            let distance = sqrt(Double(limit)) + Self.floatChordError
+            let xRange = (queryLocation.x - searchedRadius)...(queryLocation.x + searchedRadius)
+            let yRange = (queryLocation.y - searchedRadius)...(queryLocation.y + searchedRadius)
+            // The sine-based certificate is monotonic only up to a hemisphere. Strict
+            // certification and rounding inflation also preserve equal-distance ID ordering.
+            if distance * distance < 2, regionIsCertified(
+                location: queryLocation,
+                xRange: xRange,
+                yRange: yRange,
+                maximumCandidateDistanceSquared: distance * distance
+            ) {
+                break
             }
-        }
-        if !searchComplete, maximumDirectRadius < maximumRadius {
-            // The next ring crosses an edge or corner. Convert its offsets through a spherical
-            // direction, project them to their actual faces, and deduplicate buckets where several
-            // offsets map to the same destination. Earlier direct rings cannot overlap these
-            // adjacent-face buckets.
-            var visited = VisitedBuckets()
-            for radius in (maximumDirectRadius + 1)...maximumRadius {
-                forEachProjectedRing(around: queryLocation, radius: radius, visited: &visited) { bucket in
-                    let range = pointRange(in: bucket, bytes: bytes)
-                    scanRange(range.lowerBound, range.upperBound)
-                }
-                if searchIsComplete(
-                    xRange: max(0, queryLocation.x - radius)...min(resolution - 1, queryLocation.x + radius),
-                    yRange: max(0, queryLocation.y - radius)...min(resolution - 1, queryLocation.y + radius),
-                    canCertify: false
-                ) {
-                    break
-                }
+            if searchedRadius >= maximumDirectRadius
+                || searchedRadius >= requiredSearchRadius(maximumChordDistanceSquared: limit) {
+                // Cross-face searches enumerate destination rectangles directly, bounded by the
+                // current tenth distance, and skip the square already scanned on the query face.
+                forEachSearchRange(
+                    around: query.point,
+                    location: queryLocation,
+                    searchedRadius: searchedRadius,
+                    maximumChordDistanceSquared: limit,
+                    bytes: bytes,
+                    state: &state,
+                    scanRange
+                )
+                break
+            }
+            searchedRadius += 1
+            let lowerX = queryLocation.x - searchedRadius
+            let upperX = queryLocation.x + searchedRadius
+            let lowerY = queryLocation.y - searchedRadius
+            let upperY = queryLocation.y + searchedRadius
+            scanRow(y: lowerY, xRange: lowerX...upperX, state: &state)
+            scanRow(y: upperY, xRange: lowerX...upperX, state: &state)
+            for y in (lowerY + 1)..<upperY {
+                scanRow(y: y, xRange: lowerX...lowerX, state: &state)
+                scanRow(y: y, xRange: upperX...upperX, state: &state)
             }
         }
 
@@ -213,10 +180,10 @@ extension SphericalCubeIndex {
         result.pointIDs[0] = lookup.pointID
         result.distancesSquared[0] = lookup.distanceSquared
         result.count = 1
-        for position in 0..<candidateCount {
+        for position in 0..<state.count {
             let destination = position + 1
-            result.pointIDs[destination] = candidates[position].pointID
-            result.distancesSquared[destination] = candidates[position].distanceSquared
+            result.pointIDs[destination] = state.candidates[position].pointID
+            result.distancesSquared[destination] = state.candidates[position].distanceSquared
             result.count += 1
         }
         return result

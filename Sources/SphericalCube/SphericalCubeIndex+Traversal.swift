@@ -1,24 +1,6 @@
 import Foundation
 
 extension SphericalCubeIndex {
-    /// Fixed storage is needed only when traversal crosses cube faces. A radius-eight stencil
-    /// contains at most 17 × 17 projected buckets, including its center.
-    struct VisitedBuckets {
-        private var buckets = InlineArray<289, Int>(repeating: -1)
-        private var count = 0
-
-        @inline(__always)
-        mutating func insert(_ bucket: Int) -> Bool {
-            for position in 0..<count where buckets[position] == bucket {
-                return false
-            }
-            precondition(count < 289, "spherical projected-bucket bound exceeded")
-            buckets[count] = bucket
-            count += 1
-            return true
-        }
-    }
-
     /// Coordinates must be within the cube face; regional rectangles may still exclude them.
     @inline(__always)
     func bucket(face: Int, x: Int, y: Int) -> Int? {
@@ -66,82 +48,4 @@ extension SphericalCubeIndex {
         }
     }
 
-    /// Visits one projected ring in top/bottom, then left/right order. Retain `visited` across
-    /// successive rings; callers decide when to stop and whether earlier direct scans are included.
-    @inline(__always)
-    func forEachProjectedRing(
-        around location: SphericalCubeGeometry.Location,
-        radius: Int,
-        visited: inout VisitedBuckets,
-        _ body: (Int) -> Void
-    ) {
-        forEachRingOffset(radius: radius) { dx, dy in
-            guard let bucket = projectedBucket(around: location, dx: dx, dy: dy),
-                visited.insert(bucket)
-            else { return }
-            body(bucket)
-        }
-    }
-
-    /// Scan only the new ring. In-face rows are contiguous; only cross-face offsets need
-    /// projection and deduplication. Projected offsets cannot return to the query face.
-    /// Explicit inout state avoids heap boxes for mutable values captured by the callback.
-    @inline(__always)
-    func forEachNeighborhoodRing<State>(
-        around location: SphericalCubeGeometry.Location,
-        radius: Int,
-        visited: inout VisitedBuckets?,
-        bytes: borrowing RawSpan,
-        state: inout State,
-        _ body: (Range<Int>, inout State) -> Void
-    ) {
-        @inline(__always)
-        func scanRow(y: Int, xRange: ClosedRange<Int>) {
-            forEachRowPointRange(face: location.face, y: y, xRange: xRange, bytes: bytes) {
-                body($0, &state)
-            }
-        }
-        if radius == 0 {
-            scanRow(y: location.y, xRange: location.x...location.x)
-            return
-        }
-        let lowerX = location.x - radius
-        let upperX = location.x + radius
-        let lowerY = location.y - radius
-        let upperY = location.y + radius
-        scanRow(y: lowerY, xRange: lowerX...upperX)
-        scanRow(y: upperY, xRange: lowerX...upperX)
-        for y in (lowerY + 1)..<upperY {
-            scanRow(y: y, xRange: lowerX...lowerX)
-            scanRow(y: y, xRange: upperX...upperX)
-        }
-        guard lowerX < 0 || lowerY < 0 || upperX >= resolution || upperY >= resolution else { return }
-        if visited == nil { visited = VisitedBuckets() }
-        forEachRingOffset(radius: radius) { dx, dy in
-            let x = location.x + dx
-            let y = location.y + dy
-            guard x < 0 || y < 0 || x >= resolution || y >= resolution,
-                let bucket = projectedBucket(around: location, dx: dx, dy: dy),
-                visited!.insert(bucket)
-            else { return }
-            body(pointRange(in: bucket, bytes: bytes), &state)
-        }
-    }
-
-    @inline(__always)
-    private func forEachRingOffset(radius: Int, _ visit: (Int, Int) -> Void) {
-        precondition(radius >= 0 && radius <= 8, "spherical projected-ring radius out of range")
-        if radius == 0 {
-            visit(0, 0)
-            return
-        }
-        for dx in -radius...radius {
-            visit(dx, -radius)
-            visit(dx, radius)
-        }
-        for dy in (-radius + 1)..<radius {
-            visit(-radius, dy)
-            visit(radius, dy)
-        }
-    }
 }

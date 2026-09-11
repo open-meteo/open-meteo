@@ -119,7 +119,10 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
             query: lookup.query, location: lookup.location,
             pointID: 127, position: 127, distanceSquared: 0
         )
-        let nearby = fixture.index.nearestCandidates(from: supplied)
+        let nearby = fixture.index.nearestCandidates(
+            from: supplied,
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
+        )
         #expect(nearby.count == 10)
         #expect(nearby.pointIDs[0] == 127)
         for index in 1..<nearby.count { #expect(nearby.pointIDs[index] == index - 1) }
@@ -213,17 +216,71 @@ private func validateGeneratedArtifact(file: URL, centers: [SphericalPoint]) thr
                 longitude: longitude,
                 maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
             ))
-            let actual = fixture.index.nearestCandidates(from: lookup)
+            let actual = fixture.index.nearestCandidates(
+                from: lookup,
+                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
+            )
             let actualCells = (0..<actual.count).map { actual.pointIDs[$0] }
-            let nearestTen = Set(ranked.prefix(10))
-            let nearestTwenty = Set(ranked.prefix(20))
+            let expected = Array(ranked.prefix(10))
 
-            #expect(actual.count == 10)
-            #expect(actualCells.first == ranked[0])
+            #expect(actual.count == expected.count)
+            #expect(actualCells == expected)
             #expect(Set(actualCells).count == actual.count)
-            #expect(actualCells.filter { nearestTen.contains($0) }.count >= 8)
-            #expect(actualCells.allSatisfy { nearestTwenty.contains($0) })
         }
+    }
+
+    @Test func nearbySearchChecksBeyondPopulatedFirstRing() throws {
+        let query = SphericalCubeGeometry.faceVector(face: 0, u: 0.12, v: 0.06)
+        let centers = [query] + (0..<9).map {
+            SphericalCubeGeometry.faceVector(face: 0, u: -0.10, v: 0.02 + Double($0) * 0.005)
+        } + [SphericalCubeGeometry.faceVector(face: 0, u: 0.251, v: 0.06)]
+        let fixture = try makeFixture(centers: centers, level: 4)
+        defer { fixture.remove() }
+        let coordinate = query.coordinate
+        let lookup = try #require(fixture.index.nearestLookup(
+            latitude: coordinate.latitude, longitude: coordinate.longitude,
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
+        ))
+        let candidates = fixture.index.nearestCandidates(
+            from: lookup, maximumChordDistanceSquared: fixture.maximumChordDistanceSquared
+        )
+        // Ten points occupy the central bucket and first ring, but the second ring contains
+        // a closer point. Merely counting ten must not terminate the search.
+        #expect(candidates.count == 10)
+        #expect(candidates.pointIDs[0] == 0)
+        #expect(candidates.pointIDs[1] == 10)
+        for position in 1..<candidates.count {
+            #expect(candidates.distancesSquared[position - 1] <= candidates.distancesSquared[position])
+        }
+    }
+
+    @Test func nearbySearchDoesNotExpandToDistantCells() throws {
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.5),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 1)
+        ], level: 9)
+        defer { fixture.remove() }
+        let lookup = try #require(fixture.index.nearestLookup(latitude: 0, longitude: 0,
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared))
+        let nearby = fixture.index.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: SphericalPoint.squaredChordDistance(meters: 75_000)
+        )
+        #expect(nearby.count == 2)
+        #expect(nearby.pointIDs[0] == 0)
+        #expect(nearby.pointIDs[1] == 1)
+        let boundary = nearby.distancesSquared[1]
+        let atBoundary = fixture.index.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: boundary
+        )
+        let belowBoundary = fixture.index.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: boundary.nextDown
+        )
+        #expect(atBoundary.count == 2)
+        #expect(belowBoundary.count == 1)
     }
 
     @Test func crossFaceFloatTiePrefersLowerPointID() throws {

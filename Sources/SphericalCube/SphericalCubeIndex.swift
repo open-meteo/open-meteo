@@ -5,13 +5,14 @@ import OmFileFormat
 ///
 /// The index is independent of ICON and accepts any set of canonical point directions. Its only
 /// stored spatial structure is a leaf-bucket prefix directory; cube-face adjacency is derived from
-/// `(face, level, x, y)` when the bounded fallback crosses a seam.
+/// `(face, level, x, y)` when the distance-bounded fallback crosses a seam.
 ///
 /// A normal lookup starts locally and expands only when necessary:
 ///
 /// 1. compare the query bucket's Float32 point records;
-/// 2. scan new rings, projecting offsets only when they cross a cube face;
-/// 3. stop after a certified 3×3 region, or finish the bounded stencil without rescanning.
+/// 2. stop if the query bucket certifies the result;
+/// 3. scan and certify the surrounding 3×3 neighborhood if it fits inside the face;
+/// 4. otherwise scan distance-bounded rectangles directly on each intersecting cube face.
 ///
 /// Certification proves that a sphere around the current candidate cannot cross the searched
 /// cube-region boundary. Thus the common path remains small without assuming mesh connectivity.
@@ -40,15 +41,11 @@ import OmFileFormat
 ///         no
 ///         |
 ///         v
-/// scan the surrounding ring, including adjacent faces at seams
-///         |
-/// can that region be certified?
-///         +-- yes --> apply limit --> ID / nil
-///         |
-///         no
+/// if the 3×3 neighborhood fits inside the face, scan its ring and try certification
+///         +-- certified --> apply limit --> ID / nil
 ///         |
 ///         v
-/// continue through remaining rings --> apply limit --> canonical ID / nil
+/// scan intersecting face rectangles --> apply limit --> canonical ID / nil
 /// ```
 package final class SphericalCubeIndex: Sendable {
     typealias Artifact = SphericalCubeArtifact
@@ -70,7 +67,16 @@ package final class SphericalCubeIndex: Sendable {
     }
 
     static let floatChordError = 8 * Double(Float.ulpOfOne)
-    private static let maximumFallbackRadius = 8
+    /// For a point on a cube face, its normal component is at least 1/sqrt(3).
+    /// At chord distance d, the query's normal is at least 1/sqrt(3)-d. Since
+    /// |u(point)-u(query)| <= sqrt(2)*d/queryNormal, this bounds both bucket axes,
+    /// including queries on another face. Inflate d for Float32 coordinate/distance rounding.
+    package func requiredSearchRadius(maximumChordDistanceSquared: Float) -> Int {
+        let distance = sqrt(Double(maximumChordDistanceSquared)) + Self.floatChordError
+        let minimumNormal = 1 / sqrt(3.0) - distance
+        guard minimumNormal > 0 else { return resolution }
+        return Int(ceil(min(Double(resolution), sqrt(2.0) * distance / minimumNormal * resolutionScale)))
+    }
 
     private let mapped: MmapFile
     let faceSections: [FaceSection]
@@ -237,25 +243,102 @@ package final class SphericalCubeIndex: Sendable {
             return selectedWithinMaximumDistance()
         }
 
-        // Cube projection expands angular distances near face corners. Keep the existing bounded
-        // stencil, computing its radius only when the initial bucket cannot certify the result.
-        let fallbackRadius = min(Self.maximumFallbackRadius,
-            max(2, Int(ceil(sqrt(Double(maximumChordDistanceSquared)) * resolutionScale * 3)) + 2))
-        var visited: VisitedBuckets?
-        for radius in 1...fallbackRadius {
-            forEachNeighborhoodRing(around: queryLocation, radius: radius, visited: &visited,
-                bytes: bytes, state: &best, scanRange)
-            // Keep the original stopping rule. A larger cross-face region is not certified
-            // by these four same-face boundary planes, so finish the existing bounded stencil.
-            if radius == 1, certified(
-                xRange: max(0, queryLocation.x - 1)...min(resolution - 1, queryLocation.x + 1),
-                yRange: max(0, queryLocation.y - 1)...min(resolution - 1, queryLocation.y + 1)
-            ) {
+        var searchedRadius = 0
+        if queryLocation.x > 0, queryLocation.x < resolution - 1,
+            queryLocation.y > 0, queryLocation.y < resolution - 1 {
+            let xRange = (queryLocation.x - 1)...(queryLocation.x + 1)
+            let yRange = (queryLocation.y - 1)...(queryLocation.y + 1)
+            for y in [yRange.lowerBound, yRange.upperBound] {
+                forEachRowPointRange(face: queryLocation.face, y: y, xRange: xRange, bytes: bytes) {
+                    scanRange($0, best: &best)
+                }
+            }
+            for x in [xRange.lowerBound, xRange.upperBound] {
+                if let bucket = bucket(face: queryLocation.face, x: x, y: queryLocation.y) {
+                    scanRange(pointRange(in: bucket, bytes: bytes), best: &best)
+                }
+            }
+            if certified(xRange: xRange, yRange: yRange) {
                 return selectedWithinMaximumDistance()
             }
+            searchedRadius = 1
         }
+
+        let limit = min(maximumChordDistanceSquared, best.distanceSquared)
+        forEachSearchRange(around: query.point, location: queryLocation, searchedRadius: searchedRadius,
+            maximumChordDistanceSquared: limit, bytes: bytes, state: &best, scanRange)
         guard best.position >= 0 else { return nil }
         return selectedWithinMaximumDistance()
+    }
+
+    /// Scan each destination face directly: projected source-bucket centres alone can miss
+    /// destination buckets. Skip the already searched square on the query face; other faces
+    /// have disjoint storage and need no deduplication. Explicit inout state avoids heap boxes.
+    func forEachSearchRange<State>(
+        around point: SphericalPoint,
+        location: SphericalCubeGeometry.Location,
+        searchedRadius: Int,
+        maximumChordDistanceSquared: Float,
+        bytes: borrowing RawSpan,
+        state: inout State,
+        _ body: (Range<Int>, inout State) -> Void
+    ) {
+        let inverseLength = 1 / sqrt(point.dot(point))
+        let x = point.x * inverseLength
+        let y = point.y * inverseLength
+        let z = point.z * inverseLength
+        let distance = sqrt(Double(maximumChordDistanceSquared)) + Self.floatChordError
+        let radius = requiredSearchRadius(maximumChordDistanceSquared: maximumChordDistanceSquared)
+        for face in 0..<6 {
+            let normal: Double
+            let u: Double
+            let v: Double
+            switch face {
+            case 0: (normal, u, v) = (x, y, z)
+            case 1: (normal, u, v) = (-x, -y, z)
+            case 2: (normal, u, v) = (y, -x, z)
+            case 3: (normal, u, v) = (-y, x, z)
+            case 4: (normal, u, v) = (z, y, -x)
+            default: (normal, u, v) = (-z, y, x)
+            }
+            guard normal + distance >= 1 / sqrt(3.0) else { continue }
+            let section = faceSections[face]
+            guard section.columns > 0, section.rows > 0 else { continue }
+            var lowerX = section.minimumX
+            var upperX = lowerX + section.columns - 1
+            var lowerY = section.minimumY
+            var upperY = lowerY + section.rows - 1
+            if radius < resolution {
+                let centerX = face == location.face ? location.x : Int(floor((u / normal + 1) * resolutionScale))
+                let centerY = face == location.face ? location.y : Int(floor((v / normal + 1) * resolutionScale))
+                lowerX = max(lowerX, centerX - radius)
+                upperX = min(upperX, centerX + radius)
+                lowerY = max(lowerY, centerY - radius)
+                upperY = min(upperY, centerY + radius)
+            }
+            guard lowerX <= upperX, lowerY <= upperY else { continue }
+            for row in lowerY...upperY {
+                if face == location.face, searchedRadius >= 0,
+                    abs(row - location.y) <= searchedRadius {
+                    let leftEnd = min(upperX, location.x - searchedRadius - 1)
+                    if lowerX <= leftEnd {
+                        forEachRowPointRange(face: face, y: row, xRange: lowerX...leftEnd, bytes: bytes) {
+                            body($0, &state)
+                        }
+                    }
+                    let rightStart = max(lowerX, location.x + searchedRadius + 1)
+                    if rightStart <= upperX {
+                        forEachRowPointRange(face: face, y: row, xRange: rightStart...upperX, bytes: bytes) {
+                            body($0, &state)
+                        }
+                    }
+                } else {
+                    forEachRowPointRange(face: face, y: row, xRange: lowerX...upperX, bytes: bytes) {
+                        body($0, &state)
+                    }
+                }
+            }
+        }
     }
 
     @inline(__always)
@@ -306,28 +389,6 @@ package final class SphericalCubeIndex: Sendable {
             maximumCandidateDistanceSquared
             * max(0, 1 - maximumCandidateDistanceSquared * 0.25)
         return candidateSineSquared + 64 * Double.ulpOfOne < boundarySineSquared
-    }
-
-    /// Projects a logical offset around a query bucket through the sphere, allowing a bounded
-    /// stencil to cross cube-face edges without storing an adjacency table.
-    @inline(__always)
-    func projectedBucket(
-        around location: SphericalCubeGeometry.Location,
-        dx: Int,
-        dy: Int
-    ) -> Int? {
-        let scale = 2 / Double(resolution)
-        let point = SphericalCubeGeometry.faceVector(
-            face: location.face,
-            u: -1 + (Double(location.x + dx) + 0.5) * scale,
-            v: -1 + (Double(location.y + dy) + 0.5) * scale
-        )
-        let projected = SphericalCubeGeometry.location(
-            for: point,
-            resolution: resolution,
-            resolutionScale: resolutionScale
-        )
-        return faceSections[projected.face].bucket(x: projected.x, y: projected.y)
     }
 
     @inline(__always)
