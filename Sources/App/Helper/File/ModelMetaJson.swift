@@ -137,9 +137,9 @@ struct ModelUpdateMetaFile/*: RemoteFileManageableJson*/ {
     typealias Value = ModelUpdateMetaJson
     let domain: DomainRegistry
     
-    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+    /*func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         return 30
-    }
+    }*/
 }
 
 extension ModelUpdateMetaFile: OmFileManagable {

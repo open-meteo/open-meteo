@@ -227,7 +227,7 @@ struct ExportCommand: AsyncCommand {
         try ncVariable.write(data)
         return*/
 
-        guard let genericDomain = domain.genericDomain else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
         
@@ -288,11 +288,11 @@ struct ExportCommand: AsyncCommand {
             return variable
         }
         
-        guard let genericDomain = domain.genericDomain else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
 
-        let grid = /*targetGridDomain?.genericDomain.grid ??*/ genericDomain.grid
+        let grid = genericDomain.grid
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
@@ -507,10 +507,10 @@ struct ExportCommand: AsyncCommand {
             }
             return variable
         }
-        guard let genericDomain = domain.genericDomain else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
-        let grid = genericDomain.grid //targetGridDomain?.genericDomain.grid ?? domain.grid
+        let grid = genericDomain.grid
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
@@ -532,7 +532,7 @@ struct ExportCommand: AsyncCommand {
         if outputElevation {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
-            let targetDomain = /*targetGridDomain?.genericDomain ??*/ domain.genericDomain!
+            let targetDomain = /*targetGridDomain?.genericDomain ??*/ genericDomain
             guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }

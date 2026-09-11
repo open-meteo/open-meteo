@@ -7,25 +7,28 @@ import SwiftNetCDF
 struct CdoHelper: Sendable {
     let cdo: CdoIconGlobal?
     let grid: any Gridable
-    let domain: IconDomains
+    let nativeGridIdentity: IconNativeGridIdentity?
     let curl: Curl
 
     var needsRemapping: Bool {
         return cdo != nil
     }
 
-    init(domain: IconDomains, logger: Logger, curl: Curl) async throws {
+    init(domain: IconDomains, nativeGridIdentity: IconNativeGridIdentity?, logger: Logger, curl: Curl) async throws {
         // icon global needs resampling to plate carree
         self.curl = curl
-        cdo = try await CdoIconGlobal(curl: curl, domain: domain)
+        cdo = nativeGridIdentity == nil ? try await CdoIconGlobal(curl: curl, domain: domain) : nil
         grid = domain.grid
-        self.domain = domain
+        self.nativeGridIdentity = nativeGridIdentity
     }
 
     // Uncompress bz2, reproject to regular grid and read into memory
     func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
         guard let cdo else {
             return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
+                if let identity = nativeGridIdentity {
+                    return (message, try IconNativeGribDecoder.decode(message: message, identity: identity))
+                }
                 return (message, Array2D(data: try message.getDouble().map(Float.init), nx: grid.nx, ny: grid.ny))
             }
         }
@@ -33,12 +36,7 @@ struct CdoHelper: Sendable {
         let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
         return try messages.map { message in
             let source = try message.getDouble()
-            let destination = cdo.mapping.map { src in
-                guard src >= 0 else {
-                    return Float.nan
-                }
-                return Float(source[Int(src)])
-            }
+            let destination = cdo.remap(source)
             let grid2d = Array2D(data: destination, nx: grid.nx, ny: grid.ny)
             return (message, grid2d)
         }
@@ -68,8 +66,17 @@ extension IconDomains {
     }
 }
 
-struct CdoIconGlobal {
+struct CdoIconGlobal: Sendable {
     let mapping: [Int32]
+
+    func remap<T: BinaryFloatingPoint>(_ source: [T]) -> [Float] {
+        mapping.map { index in
+            guard index >= 0 else {
+                return .nan
+            }
+            return Float(source[Int(index)])
+        }
+    }
 
     /// Download and prepare weights for icon global remapping
     public init?(curl: Curl, domain: IconDomains) async throws {
