@@ -509,6 +509,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let subsetGrid = domain.mfSubsetGrid
 
         let timestamps = domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true).map { run.add($0) }
+        var precipitationDeaggregator = MeteoFrancePrecipitationDeaggregator()
+        var snowfallDeaggregator = MeteoFrancePrecipitationDeaggregator()
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let seconds = timestamp.timeIntervalSince1970 - run.timeIntervalSince1970
@@ -521,13 +523,20 @@ struct MeteoFranceDownload: AsyncCommand {
                 if seconds == 0 && variable.skipHour0(domain: domain) {
                     continue
                 }
+                // Temporary workaround (2026-09-11): PT15M precipitation and snowfall are missing at +75, +135, +195, ... minutes.
+                // Use rolling hourly totals from +75 minutes and subtract the preceding three 15-minute amounts.
+                // The MF API incorrectly lists 15minutes periods as available.
+                // Hopefully this workaround can be removed at some point
+                let deaggregatePrecipitation = domain == .arome_france_hd_15min && (variable as? MeteoFranceSurfaceVariable) == .precipitation
+                let deaggregateSnowfall = domain == .arome_france_hd_15min && (variable as? MeteoFranceSurfaceVariable) == .snowfall_water_equivalent
                 let coverage = variable.getCoverageId(domain: domain)
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
                 let subsetPressure = coverage.pressure.map { "&subset=pressure(\($0))" } ?? ""
                 let subsetTime = "&subset=time(\(seconds))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
                 // let is3H = domain == .arpege_world && (seconds/3600) >= 51
-                let period = coverage.periodMinutes.map { $0 >= 60 ? "_PT\($0 / 60)H" : "_PT\($0)M" } ?? ""
+                let periodMinutes = (deaggregatePrecipitation || deaggregateSnowfall) && seconds >= 4500 ? 60 : coverage.periodMinutes
+                let period = periodMinutes.map { $0 >= 60 ? "_PT\($0 / 60)H" : "_PT\($0)M" } ?? ""
 
                 let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetPressure)\(subsetTime)&format=application%2Fwmo-grib"
 
@@ -550,6 +559,12 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+                if deaggregatePrecipitation {
+                    precipitationDeaggregator.process(data: &grib2d.array.data, forecastSecond: seconds)
+                }
+                if deaggregateSnowfall {
+                    snowfallDeaggregator.process(data: &grib2d.array.data, forecastSecond: seconds)
+                }
                 try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
@@ -558,5 +573,28 @@ struct MeteoFranceDownload: AsyncCommand {
         }
         // await curl.printStatistics()
         return handles
+    }
+}
+
+/// Retains uncompressed 15-minute amounts for recovering each interval from a rolling one-hour total.
+struct MeteoFrancePrecipitationDeaggregator {
+    private var previous: [[Float]] = []
+    private var lastForecastSecond = 0
+
+    mutating func process(data: inout [Float], forecastSecond: Int) {
+        precondition(forecastSecond == lastForecastSecond + 900, "Precipitation must be processed in consecutive 15-minute steps")
+        if forecastSecond >= 4500 {
+            precondition(previous.count == 3 && previous.allSatisfy { $0.count == data.count })
+            for index in data.indices {
+                let precedingSum = previous[0][index] + previous[1][index] + previous[2][index]
+                // Independent GRIB packing can produce small negative differences. Preserve NaNs.
+                data[index] = max(data[index] - precedingSum, 0)
+            }
+        }
+        if previous.count == 3 {
+            previous.removeFirst()
+        }
+        previous.append(data)
+        lastForecastSecond = forecastSecond
     }
 }
