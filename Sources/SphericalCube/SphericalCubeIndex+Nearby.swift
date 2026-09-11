@@ -29,7 +29,7 @@ extension SphericalCubeIndex {
     /// Returns up to ten nearest points within the supplied inclusive distance limit.
     package func nearestCandidates(
         from lookup: Lookup,
-        maximumChordDistanceSquared: Float = 4
+        maximumChordDistanceSquared: Float
     ) -> NearbyPoints {
         assert(maximumChordDistanceSquared.isFinite && maximumChordDistanceSquared > 0
             && maximumChordDistanceSquared <= 4
