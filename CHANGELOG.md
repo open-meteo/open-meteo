@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/open-meteo/open-meteo/compare/1.6.0...1.6.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **Meteofrance HD 15min:** 15min precipitation and snow is not available anymore ([#2120](https://github.com/open-meteo/open-meteo/issues/2120)) ([9701689](https://github.com/open-meteo/open-meteo/commit/9701689dd81ebef2d478800366c586c8a02c0c19))
+
 ## [1.6.0](https://github.com/open-meteo/open-meteo/compare/1.5.7...1.6.0) (2026-09-10)
 
 
