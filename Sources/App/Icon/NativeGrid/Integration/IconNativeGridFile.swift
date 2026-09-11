@@ -146,7 +146,11 @@ extension IconNativeGridFile {
             storage = payload.storage
             cache.install(storage)
         }
-        return IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared)
+        return IconNativeGrid(
+            storage: storage,
+            maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared
+        )
     }
 }
 

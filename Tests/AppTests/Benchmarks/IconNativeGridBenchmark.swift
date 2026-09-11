@@ -21,7 +21,11 @@ import Testing
         let storage = try SphericalCubeIndex(file: URL(fileURLWithPath: path))
         let identity = try #require([IconNativeGridIdentity.global, .d2].first { $0.gridNumber == storage.identity.number })
         try identity.validate(storage: storage, path: path)
-        let grid = IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared)
+        let grid = IconNativeGrid(
+            storage: storage,
+            maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared
+        )
         let queries = makeQueries(grid: grid)
         let workloads = [(name: "ordinary", queries: queries, repeats: repeats)]
             + [(name: "seam/corner", queries: makeBoundaryQueries(grid: grid), repeats: 4)]
@@ -88,7 +92,9 @@ import Testing
         print("  elevation queries/sample: \(elevationQueryCount)")
         let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
         let cachedGrid = IconNativeGrid(storage: grid.storage,
-            maximumChordDistanceSquared: grid.maximumChordDistanceSquared, elevations: decoded)
+            maximumChordDistanceSquared: grid.maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared,
+            elevations: decoded)
 
         let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [
             ("sea hit", seaQueries, .sea),
@@ -207,7 +213,10 @@ import Testing
                     checksum &+= -1
                     continue
                 }
-                let candidates = grid.storage.nearestCandidates(from: lookup)
+                let candidates = grid.storage.nearestCandidates(
+                    from: lookup,
+                    maximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared
+                )
                 checksum &+= candidates.pointIDs[0] &+ candidates.count
             }
         }

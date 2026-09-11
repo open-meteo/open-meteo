@@ -62,7 +62,8 @@ extension IconNativeGrid {
                 maximumFileSize: maximumFileSize
             )
             let grid = IconNativeGrid(storage: try SphericalCubeIndex(mapped: MmapFile(fn: artifactHandle)),
-                maximumChordDistanceSquared: identity.maximumChordDistanceSquared)
+                maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
+                nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
             try artifactHandle.linkTemporary(file: artifactFile)
             return grid
         }

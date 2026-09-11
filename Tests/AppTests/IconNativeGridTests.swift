@@ -17,7 +17,9 @@ import Testing
         defer { file.remove(); replacement.remove() }
         let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
         let grid = IconNativeGrid(storage: fixture.grid.storage,
-            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared, elevations: elevations)
+            maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
+            elevations: elevations)
         let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
         let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
         #expect(domain.nativeGrid.storage === quarterHourly.nativeGrid.storage)
@@ -111,7 +113,9 @@ import Testing
             defer { file.remove() }
             let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
             let nativeGrid = IconNativeGrid(storage: fixture.grid.storage,
-                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared, elevations: elevations)
+                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
+                nearbyMaximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
+                elevations: elevations)
             let grid: any Gridable = nativeGrid
             let raw = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
                 elevationFile: file.reader, mode: mode)
@@ -122,6 +126,38 @@ import Testing
                 #expect(cached?.gridpoint == 1)
                 #expect(cached?.gridElevation.numeric == raw?.gridElevation.numeric)
             }
+        }
+    }
+
+    @Test func seaAndTerrainSelectionStayWithinNearbyDistance() async throws {
+        let fixture = try makeFixture(centers: [
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1),
+            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.4)
+        ])
+        defer { fixture.remove() }
+        let nearbyDistance = SphericalPoint.squaredChordDistance(meters: 30_000)
+        for (mode, elevations) in [
+            (GridSelectionMode.land, [Float(0), 0, 2_000]),
+            (.sea, [100, 100, -999])
+        ] {
+            let file = try await makeElevationFile(elevations)
+            defer { file.remove() }
+            let decoded = try await ElevationValues(decoded: file.reader.read(), expectedCount: 3)
+            let grid = IconNativeGrid(
+                storage: fixture.index,
+                maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
+                nearbyMaximumChordDistanceSquared: nearbyDistance,
+                elevations: decoded
+            )
+            let selected = try #require(await grid.findPoint(
+                lat: 0,
+                lon: 0,
+                elevation: 2_000,
+                elevationFile: file.reader,
+                mode: mode
+            ))
+            #expect(selected.gridpoint == 0)
         }
     }
 
@@ -177,7 +213,13 @@ import Testing
 }
 
 private extension SphericalCubeFixture {
-    var grid: IconNativeGrid { IconNativeGrid(storage: index, maximumChordDistanceSquared: maximumChordDistanceSquared) }
+    var grid: IconNativeGrid {
+        IconNativeGrid(
+            storage: index,
+            maximumChordDistanceSquared: maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: maximumChordDistanceSquared
+        )
+    }
 }
 
 private func truncateLastByte(of file: URL) throws {

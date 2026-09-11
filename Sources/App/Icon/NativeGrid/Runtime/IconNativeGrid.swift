@@ -13,11 +13,18 @@ struct IconNativeGrid: Gridable {
 
     let storage: SphericalCubeIndex
     let maximumChordDistanceSquared: Float
+    let nearbyMaximumChordDistanceSquared: Float
     var elevations: ElevationValues?
 
-    init(storage: SphericalCubeIndex, maximumChordDistanceSquared: Float, elevations: ElevationValues? = nil) {
+    init(
+        storage: SphericalCubeIndex,
+        maximumChordDistanceSquared: Float,
+        nearbyMaximumChordDistanceSquared: Float,
+        elevations: ElevationValues? = nil
+    ) {
         self.storage = storage
         self.maximumChordDistanceSquared = maximumChordDistanceSquared
+        self.nearbyMaximumChordDistanceSquared = nearbyMaximumChordDistanceSquared
         self.elevations = elevations
     }
 
@@ -68,7 +75,10 @@ struct IconNativeGrid: Gridable {
         if nearestElevation <= -999 {
             return (nearest, .sea)
         }
-        let candidates = storage.nearestCandidates(from: lookup)
+        let candidates = storage.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: nearbyMaximumChordDistanceSquared
+        )
         let elevations = try await getCandidateElevations(
             candidates: candidates,
             knownValue: nearestElevation,
@@ -97,7 +107,10 @@ struct IconNativeGrid: Gridable {
         if nearestElevation.isFinite, nearestElevation > -999, abs(nearestElevation - elevation) <= 100 {
             return elevationResult(gridpoint: nearest, value: nearestElevation)
         }
-        let candidates = storage.nearestCandidates(from: lookup)
+        let candidates = storage.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: nearbyMaximumChordDistanceSquared
+        )
         let elevations = try await getCandidateElevations(
             candidates: candidates,
             knownValue: nearestElevation,
@@ -112,9 +125,6 @@ struct IconNativeGrid: Gridable {
                 continue
             }
             let distanceKilometres = sqrt(max(0, candidates.distancesSquared[position])) * Float(SphericalPoint.earthRadiusMeters / 1_000)
-            if distanceKilometres >= 50 {
-                continue
-            }
             let elevationDelta = candidateElevation >= 9999 ? 0 : abs(candidateElevation - elevation)
             let score = elevationDelta + distanceKilometres * 30
             if score < bestScore || (score == bestScore && (bestPosition < 0 || candidates.pointIDs[position] < candidates.pointIDs[bestPosition])) {

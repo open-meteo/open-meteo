@@ -39,6 +39,12 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         SphericalPoint.squaredChordDistance(meters: Double(maximumDistanceMeters))
     }
 
+    /// Terrain and sea selection inspect a slightly wider, resolution-scaled neighbourhood than
+    /// the distance used to accept the initial nearest-cell lookup.
+    var nearbyMaximumChordDistanceSquared: Float {
+        SphericalPoint.squaredChordDistance(meters: Double(maximumDistanceMeters) * 1.5)
+    }
+
     var sourceUrl: String {
         "https://opendata.dwd.de/weather/lib/cdo/\(sourceFile)"
     }
