@@ -294,6 +294,15 @@ paths:
             type: string
             default: mm
             enum: [mm, inch]
+        - name: snow_depth_unit
+          in: query
+          description: >-
+            Unit for snow depth and its aggregates. If omitted, existing unit
+            preferences apply: metres by default, or feet with imperial units.
+            This setting overrides other unit preferences for snow depth only.
+          schema:
+            type: string
+            enum: [m, cm]
         - name: timeformat
           in: query
           description: >-
