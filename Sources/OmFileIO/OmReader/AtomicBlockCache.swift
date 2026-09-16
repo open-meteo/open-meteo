@@ -248,17 +248,20 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
             var deleted = 0
             for lookAhead in 0..<count + lookAheadCount {
                 let slot = Int((key &+ lookAhead) % UInt64(blockCount))
-                let entry = entries[slot].load(ordering: .relaxed)
-                // check if key matches from key..<key+count
-                let keyDistance = entry.first &- UInt(key)
-                guard keyDistance >= 0 && keyDistance < count else {
-                    continue
+                while true {
+                    let entry = entries[slot].load(ordering: .relaxed)
+                    let keyDistance = entry.first &- UInt(key)
+                    // Leave in-flight writers alone; never clear a slot that was
+                    // replaced between examining its key and deleting it.
+                    guard keyDistance < count, entry.second & 1 == 1, entry.second <= olderThan else {
+                        break
+                    }
+                    guard entries[slot].compareExchange(expected: entry, desired: .init(first: 0, second: 0), ordering: .relaxed).exchanged else {
+                        continue
+                    }
+                    deleted += 1
+                    break
                 }
-                guard entry.second <= olderThan else {
-                    continue
-                }
-                entries[slot].store(.init(first: 0, second: 0), ordering: .relaxed)
-                deleted += 1
             }
             return deleted
         }
