@@ -39,12 +39,12 @@ extension AtomicBlockCache where Backend == MmapFile {
         if FileManager.default.fileExists(atPath: file) {
             let fn = try FileHandle.openFileReadWrite(file: file)
             if try fn.seekToEnd() == size {
-                self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
+                self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize, cacheFile: file)
                 return
             }
         }
         let fn = try FileHandle.createNewFile(file: file, size: size, overwrite: true)
-        self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
+        self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize, cacheFile: file)
     }
 }
 
@@ -65,6 +65,15 @@ extension AtomicBlockCache where Backend == MmapFile {
 public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     let data: Backend
     let blockSize: Int
+    private let cacheFile: String
+    private let diagnostics: AtomicBlockCacheDiagnostics
+
+    init(data: Backend, blockSize: Int, cacheFile: String = "<memory>", diagnostics: AtomicBlockCacheDiagnostics = .shared) {
+        self.data = data
+        self.blockSize = blockSize
+        self.cacheFile = cacheFile
+        self.diagnostics = diagnostics
+    }
     
     var blockCount: Int {
         return data.count / (blockSize + MemoryLayout<WordPair>.size)
@@ -75,7 +84,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         /// For in-flight requests set bit 0 to zero
         let inFlightKey = WordPair(first: UInt(key), second: time & ~0x1)
-        /// For committed requests set bit 0 to zero
+        /// For committed requests set bit 0 to one
         let committedKey = WordPair(first: UInt(key), second: time | 0x1)
         /// The maximum number of slots to check for an empty space. Afterwards overwrite LRU value
         let lookAheadCount: UInt64 = 1024
@@ -92,6 +101,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
                         continue // another thread stole the slot
                     }
+                    let claimedAt = entry.second == 0 ? 0 : UInt(Date().timeIntervalSince1970 * 1_000_000_000)
                     let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                     value.withUnsafeBytes {
                         let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
@@ -99,7 +109,9 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     }
                     // Publish the completed payload. Readers use acquire ordering before
                     // accessing the corresponding data block.
-                    guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .releasing).exchanged else {
+                    let publication = entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .releasing)
+                    diagnostics.recordWrite(previous: entry, claim: inFlightKey, slot: slot, path: .sameKey, claimedAt: claimedAt, published: publication.exchanged, observed: publication.original, cacheFile: cacheFile)
+                    guard publication.exchanged else {
                         continue // another thread stole the slot
                     }
                     return UnsafeRawBufferPointer(start: dest, count: blockSize)
@@ -116,6 +128,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
                     continue // another thread stole the slot
                 }
+                let claimedAt = entry.second == 0 ? 0 : UInt(Date().timeIntervalSince1970 * 1_000_000_000)
                 let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                 value.withUnsafeBytes {
                     let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
@@ -123,7 +136,9 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 }
                 // Publish the completed payload. Readers use acquire ordering before
                 // accessing the corresponding data block.
-                guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .releasing).exchanged else {
+                let publication = entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .releasing)
+                diagnostics.recordWrite(previous: entry, claim: inFlightKey, slot: slot, path: .lru, claimedAt: claimedAt, published: publication.exchanged, observed: publication.original, cacheFile: cacheFile)
+                guard publication.exchanged else {
                     continue // another thread stole the slot
                 }
                 return UnsafeRawBufferPointer(start: dest, count: blockSize)
@@ -260,6 +275,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         continue
                     }
                     deleted += 1
+                    diagnostics.recordDelete(previous: entry, slot: slot, deletedAt: UInt(Date().timeIntervalSince1970 * 1_000_000_000), olderThanSeconds: olderThanSeconds, cacheFile: cacheFile)
                     break
                 }
             }
