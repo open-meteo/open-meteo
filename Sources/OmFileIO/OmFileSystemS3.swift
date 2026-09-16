@@ -51,31 +51,79 @@ public struct OmFileSystemS3: Sendable {
         )
     }
     
-    public struct FileWithContext: OmFileSystemFile {
+    public struct FileWithContext: OmFileSystemFile, Sendable {
         public let file: File
         public let context: S3ServerHealth
         
         /// Execute a closure with the resolved payload. May retries if file modified errors occur
         public func with<R, Payload: OmRemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
+            try await withDecoderLogging(fn: fn)
+        }
+
+        func withDecoderLogging<R, Payload: OmRemotePayload>(reload: @escaping File.RemoteReaderLoader = { try await OmHttpReaderBackend(context: $0, object: $1) }, fn: (_ value: Payload) async throws -> R) async throws -> R? {
             do {
-                guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: false) else {
+                do {
+                    return try await readAttempt(modified: false, reload: reload, fn: fn)
+                } catch CurlError.fileNotFound {
+                    await file.receivedObjectDeletedError()
                     return nil
+                } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                    return try await readAttempt(modified: true, reload: reload, fn: fn)
                 }
-                return try await fn(payload)
-            } catch CurlError.fileNotFound {
-                await file.receivedObjectDeletedError()
+            } catch let failure as RevisionDecoderError {
+                let message = failure.message
+                let identity = failure.identity
+                context.logger.error("OM file decode failed", metadata: [
+                    "file": .string(identity.object), "etag": .string(identity.eTag),
+                    "file_size": .stringConvertible(identity.count),
+                    "cache_key": .stringConvertible(identity.cacheKey),
+                    "error": .string(message)
+                ])
+                throw OmFileFormatSwiftError.omDecoder(error: "\(message) [file=\(identity.object) source=remote etag=\(identity.eTag)]")
+            }
+        }
+
+        private func readAttempt<R, Payload: OmRemotePayload>(modified: Bool, reload: File.RemoteReaderLoader, fn: (Payload) async throws -> R) async throws -> R? {
+            guard let resolved = try await file.getResolvedPayload(ofType: Payload.self, context: context, receivedFileModifiedError: modified, reload: reload) else {
                 return nil
-            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
-                guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true) else {
-                    return nil
-                }
-                /// Catch error again? If there would a file modified error again, this could indicate some remote server issues
+            }
+            guard let payload = resolved.value as? Payload else {
+                fatalError("Payload was not of correct type \(Payload.self)")
+            }
+            do {
                 return try await fn(payload)
+            } catch OmFileFormatSwiftError.omDecoder(let message) {
+                throw RevisionDecoderError(message: message, identity: resolved.identity)
             }
         }
     }
 
+    private struct RevisionDecoderError: Error {
+        let message: String
+        let identity: OmHttpReaderBackend
+    }
+
+    /// Keep the revision with its payload across actor suspension and directory updates.
+    struct ResolvedPayload: Sendable {
+        let value: any OmRemotePayload
+        let identity: OmHttpReaderBackend
+
+        init(identity: OmHttpReaderBackend, create: () async throws -> any OmRemotePayload) async throws {
+            self.identity = identity
+            do {
+                value = try await create()
+            } catch OmFileFormatSwiftError.omDecoder(let message) {
+                throw RevisionDecoderError(message: message, identity: identity)
+            }
+        }
+
+        func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {
+            try await Self(identity: file) { try await value.remoteUpdated(file: file) }
+        }
+    }
+
     public actor File {
+        typealias RemoteReaderLoader = @Sendable (S3ServerHealth, String) async throws -> OmHttpReaderBackend
         /// Full object name e.g. `data/dwd_icon/temperature_2m/chunk_1234.om`
         let objectName: String
         var contentLength: Int
@@ -92,13 +140,13 @@ public struct OmFileSystemS3: Sendable {
             case none
             
             /// Payload is currently initialising. Consecutive requets are queued
-            case initialising([CheckedContinuation<any OmRemotePayload, Error>])
+            case initialising([CheckedContinuation<ResolvedPayload, Error>])
             
             /// Payload got initialised and should be in sync with remote server
-            case ready(any OmRemotePayload)
+            case ready(ResolvedPayload)
             
             /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload, but keep the old payload
-            case updating(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
+            case updating(old: ResolvedPayload, [CheckedContinuation<ResolvedPayload, Error>])
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
             case deleted
@@ -204,9 +252,9 @@ public struct OmFileSystemS3: Sendable {
                 break // do not modify queued requests
             }
         }
-        
+
         /// Resolve payload
-        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool) async throws -> T? {
+        func getResolvedPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool, reload: RemoteReaderLoader = { try await OmHttpReaderBackend(context: $0, object: $1) }) async throws -> ResolvedPayload? {
             // Reset errors if they are older than one minute
             if case .error(_, let issueDate) = payload, issueDate.olderThan(seconds: 60, now: .now()) {
                 payload = .none
@@ -215,17 +263,18 @@ public struct OmFileSystemS3: Sendable {
             case .none:
                 self.payload = .initialising([])
                 do {
-                    let p: T
+                    let p: ResolvedPayload
                     if receivedFileModifiedError {
-                        // File modified errors can happen if the S3 listing is already outdated the first time the file is retrieved
-                        let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
-                        context.logger.warning("Initial s3 file open but received file modified error for \(objectName) [Old size: \(self.contentLength), new size: \(newReader.count), old etag: \(self.eTag), new etag: \(newReader.eTag), old lastModified: \(self.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), new lastModified: \(newReader.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), delta: \(Double(newReader.lastModified.timeIntervalSince1970 - lastModified.timeIntervalSince1970).asSecondsPrettyPrint)]")
+                        // Refresh stale listing metadata after a file-modified response.
+                        let newReader = try await reload(context, objectName)
+                        context.logger.warning("Refreshing remote file metadata for \(objectName) [Old size: \(self.contentLength), new size: \(newReader.count), old etag: \(self.eTag), new etag: \(newReader.eTag), old lastModified: \(self.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), new lastModified: \(newReader.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), delta: \(Double(newReader.lastModified.timeIntervalSince1970 - lastModified.timeIntervalSince1970).asSecondsPrettyPrint)]")
                         self.contentLength = newReader.count
                         self.lastModified = newReader.lastModified
                         self.eTag = newReader.eTag
-                        p = try await T(file: newReader)
+                        p = try await ResolvedPayload(identity: newReader) { try await T(file: newReader) }
                     } else {
-                        p = try await T(file: makeCachedClient(context: context))
+                        let reader = makeCachedClient(context: context)
+                        p = try await ResolvedPayload(identity: reader) { try await T(file: reader) }
                     }
                     guard case .initialising(let queued) = payload else {
                         fatalError("State was not .initialising()")
@@ -255,7 +304,7 @@ public struct OmFileSystemS3: Sendable {
                 defer { OmFileSystemMetrics.fileRemotePayloadWaiting.add(-1, ordering: .relaxed) }
                 return try await withCheckedThrowingContinuation { continuation in
                     payload = .initialising(queue + [continuation])
-                } as? T
+                }
             case .updating(let old, let queue):
                 // If the file is actively being updated, allow access to the old file, because cached responses still work
                 if receivedFileModifiedError {
@@ -265,19 +314,10 @@ public struct OmFileSystemS3: Sendable {
                     let payload = try await withCheckedThrowingContinuation { continuation in
                         self.payload = .updating(old: old, queue + [continuation])
                     }
-                    guard let payload = payload as? T else {
-                        fatalError("Payload was not of correct type \(T.self)")
-                    }
                     return payload
-                }
-                guard let old = old as? T else {
-                    fatalError("Payload was not of correct type \(T.self)")
                 }
                 return old
             case .ready(let payload):
-                guard let payload = payload as? T else {
-                    fatalError("Payload was not of correct type \(T.self)")
-                }
                 guard receivedFileModifiedError else {
                     return payload
                 }
@@ -285,7 +325,7 @@ public struct OmFileSystemS3: Sendable {
                 // At this stage there could be dozens of failing calls coming in
                 self.payload = .updating(old: payload, [])
                 do {
-                    let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
+                    let newReader = try await reload(context, objectName)
                     self.contentLength = newReader.count
                     self.lastModified = newReader.lastModified
                     self.eTag = newReader.eTag
