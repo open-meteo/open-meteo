@@ -22,6 +22,33 @@ extension AtomicBlockCache {
 }
 
 @Suite struct AtomicBlockCacheDiagnosticsTests {
+    @Test func borrowedBufferBounds() throws {
+        try withCache { cache, _, _ in
+            cache.data.withMutableUnsafeBytes { bytes in
+                let mapping = UnsafeRawBufferPointer(bytes)
+                let base = UInt(bitPattern: mapping.baseAddress!)
+                let metadataSize = MemoryLayout<WordPair>.size
+                let cases: [(UInt, Int, Bool)] = [
+                    (base + UInt(metadataSize), 64, true),
+                    (base + UInt(mapping.count) - 1, 1, true),
+                    (base + UInt(mapping.count), 0, true),
+                    (base - 1, 1, false),
+                    (base, 1, false),
+                    (base + UInt(metadataSize) - 1, 1, false),
+                    (base + UInt(metadataSize), 65, false),
+                    (base + UInt(mapping.count), 1, false),
+                    (UInt.max - 16, 1, false)
+                ]
+                for (address, count, expected) in cases {
+                    let buffer = UnsafeRawBufferPointer(start: UnsafeRawPointer(bitPattern: address), count: count)
+                    #expect(AtomicBlockCache<MmapFile>.payloadContains(buffer, mapping: mapping, metadataSize: metadataSize) == expected)
+                }
+                #expect(!AtomicBlockCache<MmapFile>.payloadContains(.init(start: nil, count: 0), mapping: mapping, metadataSize: metadataSize))
+            }
+            #expect(cache.get(key: 10, count: UInt64.max) == nil)
+        }
+    }
+
     @Test func invalidationPreservesBytesAndDoesNotRenewGracePeriod() throws {
         try withCache { cache, _, _ in
             let original = Data(repeating: 1, count: 64)

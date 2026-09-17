@@ -4,6 +4,34 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test func rejectsInvalidReadRanges() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("cache-bounds-\(UUID()).bin").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 2)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 42, count: 65)), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        cache.set(key: reader.calculateCacheKey(block: 0), value: Data(repeating: 42, count: 64))
+        let invalid = [(-1, 1), (0, -1), (66, 0), (65, 1), (64, 2), (Int.max, 1), (1, Int.max), (Int.min, Int.max)]
+        for (offset, count) in invalid {
+            await #expect(throws: OmFileFormatSwiftError.self) { try await reader.getData(offset: offset, count: count) }
+            await #expect(throws: OmFileFormatSwiftError.self) { try await reader.getByteBuffer(offset: offset, count: count) }
+            await #expect(throws: OmFileFormatSwiftError.self) { try await reader.prefetchData(offset: offset, count: count) }
+            await #expect(throws: OmFileFormatSwiftError.self) {
+                try await reader.withData(offset: offset, count: count) { _ in
+                    Issue.record("Invalid request reached the callback")
+                }
+            }
+        }
+        // Invalid requests must not invalidate unrelated cached bytes.
+        #expect(cache.get(key: reader.calculateCacheKey(block: 0), count: 1) != nil)
+        #expect(try await reader.getData(offset: 64, count: 1) == Data([42]))
+        for offset in [0, 1, 65] {
+            #expect(try await reader.getData(offset: offset, count: 0).isEmpty)
+            #expect(try await reader.getByteBuffer(offset: offset, count: 0).readableBytes == 0)
+            #expect(try await reader.withData(offset: offset, count: 0) { $0.count } == 0)
+            try await reader.prefetchData(offset: offset, count: 0)
+        }
+    }
+
     @Test(arguments: [false, true], [0, 127])
     func decodeFailureInvalidatesRequestedBlocks(cached: Bool, firstBlock: Int) async throws {
         let path = FileManager.default.temporaryDirectory.appendingPathComponent("decode-failure-\(UUID()).bin").path

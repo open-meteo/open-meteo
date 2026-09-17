@@ -78,6 +78,18 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     var blockCount: Int {
         return data.count / (blockSize + MemoryLayout<WordPair>.size)
     }
+
+    /// Check addresses without dereferencing them or adding length to an address.
+    static func payloadContains(_ buffer: UnsafeRawBufferPointer, mapping: UnsafeRawBufferPointer, metadataSize: Int) -> Bool {
+        guard let start = buffer.baseAddress, let base = mapping.baseAddress,
+              metadataSize >= 0, metadataSize <= mapping.count else { return false }
+        let address = UInt(bitPattern: start)
+        let baseAddress = UInt(bitPattern: base)
+        guard address >= baseAddress else { return false }
+        let offset = address - baseAddress
+        guard offset >= UInt(metadataSize), offset <= UInt(mapping.count) else { return false }
+        return UInt(buffer.count) <= UInt(mapping.count) - offset
+    }
     
     /// A 60-second grace period mitigates reuse during borrowed reads and short writer pauses.
     /// Older claims can be recovered after a process exits during writing.
@@ -215,7 +227,9 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     // Get data pointer and execute closure on data
                     // There is a slight chance, that data is modified while reading, but it should practically never happen
                     let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
-                    return UnsafeRawBufferPointer(start: dest, count: blockSize)
+                    let buffer = UnsafeRawBufferPointer(start: dest, count: blockSize)
+                    guard Self.payloadContains(buffer, mapping: UnsafeRawBufferPointer(bytes), metadataSize: blockCount * MemoryLayout<WordPair>.size) else { return nil }
+                    return buffer
                 }
             }
             return nil
@@ -227,6 +241,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
+        guard count > 0, count <= UInt64(blockCount) else { return nil }
         return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
             outer: for lookAhead in 0..<lookAheadCount {
@@ -258,7 +273,9 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 // Get data pointer and execute closure on data
                 // There is a slight chance, that data is modified while reading, but it should practically never happen
                 let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
-                return UnsafeRawBufferPointer(start: dest, count: blockSize * Int(count))
+                let buffer = UnsafeRawBufferPointer(start: dest, count: blockSize * Int(count))
+                guard Self.payloadContains(buffer, mapping: UnsafeRawBufferPointer(bytes), metadataSize: blockCount * MemoryLayout<WordPair>.size) else { return nil }
+                return buffer
             }
             return nil
         }
