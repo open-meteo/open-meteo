@@ -4,6 +4,45 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test(arguments: [false, true], [0, 127])
+    func decodeFailureInvalidatesRequestedBlocks(cached: Bool, firstBlock: Int) async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("decode-failure-\(UUID()).bin").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 4)
+        let contents = Data(repeating: 42, count: (firstBlock + 3) * 64)
+        let offset = firstBlock * 64 + 48
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: contents), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        if cached {
+            for block in firstBlock..<firstBlock + 2 {
+                cache.set(key: reader.calculateCacheKey(block: block), value: Data(repeating: 42, count: 64))
+            }
+        }
+        let untouched = reader.calculateCacheKey(block: firstBlock + 2)
+        cache.set(key: untouched, value: Data(repeating: 42, count: 64))
+
+        await #expect(throws: OmFileFormatSwiftError.self) {
+            try await reader.withData(offset: offset, count: 48) { _ -> Void in
+                throw OmFileFormatSwiftError.omDecoder(error: "test decode failure")
+            }
+        }
+        for block in firstBlock..<firstBlock + 2 {
+            #expect(cache.get(key: reader.calculateCacheKey(block: block), count: 1) == nil)
+        }
+        #expect(cache.get(key: untouched, count: 1) != nil)
+
+        // Later requests can fetch normally, but cannot overwrite protected bytes.
+        let recovered = try await reader.getData(offset: offset, count: 48)
+        #expect(recovered == Data(repeating: 42, count: 48))
+        for block in firstBlock..<firstBlock + 2 {
+            #expect(cache.get(key: reader.calculateCacheKey(block: block), count: 1) == nil)
+        }
+        cache.ageEntriesForReplacement()
+        _ = try await reader.getData(offset: offset, count: 48)
+        for block in firstBlock..<firstBlock + 2 {
+            #expect(cache.get(key: reader.calculateCacheKey(block: block), count: 1) != nil)
+        }
+    }
+
     @Test(arguments: ["read", "preload", "prefetch", "existing"])
     func blockCacheAcrossSuperBlockBoundary(path: String) async throws {
         let blockSize = 64 * 1024

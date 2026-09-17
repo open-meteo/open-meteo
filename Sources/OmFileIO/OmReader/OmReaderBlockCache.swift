@@ -127,12 +127,23 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     
     /// Execute a closure with retrieved data. If data is cached, the underlaying data is used to call be closure (zero-copy).
     public func withData<T: Sendable>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
-        switch try await fetch(offset: offset, count: count) {
-        case .borrowed(let data):
-            return try fn(data)
-        case .owned(let data):
-            defer { data.deallocate() }
-            return try fn(data)
+        do {
+            switch try await fetch(offset: offset, count: count) {
+            case .borrowed(let data):
+                return try fn(data)
+            case .owned(let data):
+                defer { data.deallocate() }
+                return try fn(data)
+            }
+        } catch let error as OmFileFormatSwiftError {
+            guard case .omDecoder = error else { throw error }
+            let blocks = (offset..<offset + count).divideRoundedUp(divisor: cache.cache.blockSize)
+            let superBlocks = blocks.divideRoundedUp(divisor: superBlockLength)
+            for superBlock in superBlocks {
+                let range = (superBlock * superBlockLength..<(superBlock + 1) * superBlockLength).clamped(to: blocks)
+                cache.cache.invalidate(key: calculateCacheKey(block: range.lowerBound), count: UInt64(range.count))
+            }
+            throw error
         }
     }
     

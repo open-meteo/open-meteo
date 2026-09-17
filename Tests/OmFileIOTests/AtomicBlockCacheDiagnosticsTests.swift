@@ -22,6 +22,27 @@ extension AtomicBlockCache {
 }
 
 @Suite struct AtomicBlockCacheDiagnosticsTests {
+    @Test func invalidationPreservesBytesAndDoesNotRenewGracePeriod() throws {
+        try withCache { cache, _, _ in
+            let original = Data(repeating: 1, count: 64)
+            let replacement = Data(repeating: 2, count: 64)
+            let borrowed = try #require(cache.set(key: 10, value: original))
+            cache.invalidate(key: 10, count: 1)
+            #expect(cache.get(key: 10, count: 1) == nil)
+            #expect(cache.get(key: 10, maxAccessedAgeInSeconds: 600) == nil)
+            #expect(cache.delete(key: 10, count: 1, olderThanSeconds: 0) == 0)
+            #expect(cache.set(key: 10, value: replacement) == nil)
+            #expect(cache.set(key: 11, value: replacement) == nil)
+            #expect(Data(borrowed) == original)
+
+            cache.ageEntriesForReplacement()
+            cache.invalidate(key: 10, count: 1)
+            #expect(cache.get(key: 10, count: 1) == nil)
+            #expect(cache.set(key: 10, value: replacement) != nil)
+            #expect(cache.get(key: 10, count: 1)?.data == replacement)
+        }
+    }
+
     @Test(arguments: [false, true], [false, true])
     func gracePeriodAndAbandonedWriterRecovery(committed: Bool, sameKey: Bool) throws {
         try withCache { cache, _, _ in

@@ -264,6 +264,30 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
+    /// Hide suspect blocks without making their storage immediately reusable.
+    /// Reuse the unreadable writer state: replacement already respects its 60-second
+    /// grace period. Repeated invalidations leave that timestamp unchanged.
+    func invalidate(key: UInt64, count: UInt64) {
+        let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000) & ~UInt(1)
+        let blockCount = blockCount
+        data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            for lookAhead in 0..<min(count + 1024, UInt64(blockCount)) {
+                let slot = Int((key &+ lookAhead) % UInt64(blockCount))
+                while true {
+                    let entry = entries[slot].load(ordering: .relaxed)
+                    guard entry.first &- UInt(key) < count, entry.second & 1 == 1 else {
+                        break
+                    }
+                    let invalid = WordPair(first: entry.first, second: time)
+                    if entries[slot].compareExchange(expected: entry, desired: invalid, ordering: .relaxed).exchanged {
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     /// Delete a key (or range) if it older than a specified number of seconds
     @discardableResult
     func delete(key: UInt64, count: UInt64, olderThanSeconds: UInt) -> Int {
