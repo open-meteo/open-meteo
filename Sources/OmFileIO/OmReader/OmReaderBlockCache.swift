@@ -63,11 +63,9 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                     let block = blocks.lowerBound + Int(key &- keyStart)
                     let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
-                }), dataCallback: {(_, value) in
-                    let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                        UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
-                    }
-                    cache.cache.data.prefetchData(offset: offset, count: value.count)
+                }), dataCallback: {(key, _) in
+                    // Callbacks may contain uncached upstream bytes.
+                    cache.cache.prefetch(key: key)
                 })
             }
         }

@@ -1,9 +1,33 @@
 import Foundation
 import OmFileFormat
 @testable import OmFileIO
+import Synchronization
 import Testing
 
 @Suite struct AtomicCacheCoordinatorTests {
+    /// A protected full cache must still deliver missing upstream data correctly.
+    @Test func preservesCachedBlockWhileFetchingEarlierBlock() async throws {
+        let fixture = try CacheFixture(limit: 1, blockCount: 1)
+        let first = Data(repeating: 0x11, count: 64)
+        let second = Data(repeating: 0x22, count: 64)
+        fixture.cache.set(key: 11, value: second)
+        try #require(fixture.cache.get(key: 11, count: 1).map { Data($0) } == second)
+        let results = Mutex<[(UInt64, Data)]>([])
+
+        try await fixture.coordinator.get(key: 10, count: 2, provider: { key, count in
+            try #require(key == 10)
+            try #require(count == 1)
+            return first
+        }, dataCallback: { key, bytes in
+            results.withLock { $0.append((key, Data(bytes))) }
+        })
+
+        let delivered = results.withLock { $0 }
+        try #require(delivered.map { $0.0 } == [10, 11])
+        try #require(delivered[0].1 == first)
+        #expect(delivered[1].1 == second, "Fetching key 10 changed the retained cached bytes delivered for key 11")
+    }
+
     @Test func limitsUniqueFetchesAndSharesQueuedRanges() async throws {
         let fixture = try CacheFixture(limit: 2)
         let coordinator = fixture.coordinator
@@ -117,9 +141,9 @@ private final class CacheFixture {
     let cache: AtomicBlockCache<MmapFile>
     let coordinator: AtomicCacheCoordinator<MmapFile>
 
-    init(limit: Int) throws {
+    init(limit: Int, blockCount: Int = 256) throws {
         path = FileManager.default.temporaryDirectory.appendingPathComponent("fetch-limit-\(UUID()).bin").path
-        cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 256)
+        cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: blockCount)
         coordinator = AtomicCacheCoordinator(cache: cache, maxConcurrentUpstreamFetches: limit)
     }
 

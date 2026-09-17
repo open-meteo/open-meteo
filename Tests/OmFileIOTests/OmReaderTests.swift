@@ -196,10 +196,11 @@ import OmFileFormat
         #expect(cache.blockCount == 50)
 
         for i in 0..<50 {
+            cache.ageEntriesForReplacement()
             cache.set(key: UInt64(1000+i), value: Data(repeating: UInt8(123+i), count: 64))
         }
         for i in 0..<50 {
-            #expect(cache.get(key: UInt64(1000+i), maxAccessedAgeInSeconds: 10)!.data == Data(repeating: UInt8(123+i), count: 64))
+            #expect(cache.get(key: UInt64(1000+i), count: 1)?.data == Data(repeating: UInt8(123+i), count: 64))
         }
         // Cache got overwritten
         #expect(cache.get(key: 234923, maxAccessedAgeInSeconds: 10) == nil)

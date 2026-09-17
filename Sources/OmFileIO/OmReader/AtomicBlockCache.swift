@@ -79,9 +79,13 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         return data.count / (blockSize + MemoryLayout<WordPair>.size)
     }
     
+    /// A 60-second grace period mitigates reuse during borrowed reads and short writer pauses.
+    /// Older claims can be recovered after a process exits during writing.
+    /// Returns nil when a matching key or all replacement candidates are protected.
     @discardableResult
-    func set<DataIn: ContiguousBytes>(key: UInt64, value: DataIn) -> UnsafeRawBufferPointer {
+    func set<DataIn: ContiguousBytes>(key: UInt64, value: DataIn) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
+        let replaceBefore = time - 60_000_000_000
         /// For in-flight requests set bit 0 to zero
         let inFlightKey = WordPair(first: UInt(key), second: time & ~0x1)
         /// For committed requests set bit 0 to one
@@ -97,6 +101,10 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     let entry = entries[slot].load(ordering: .relaxed)
                     guard entry.second == 0 || entry.first == key else {
                         break
+                    }
+                    // The same-key path must respect the grace period too.
+                    if entry.second != 0 && (entry.second & ~1) >= replaceBefore {
+                        return nil
                     }
                     guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
                         continue // another thread stole the slot
@@ -125,6 +133,11 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     let entry = entries[slot].load(ordering: .relaxed)
                     return entry.second < compare.1.second ? (slot,entry) : compare
                 })
+                // Both committed and in-flight entries use their timestamp as a
+                // lease. Empty slots remain immediately usable.
+                guard entry.second == 0 || (entry.second & ~1) < replaceBefore else {
+                    return nil
+                }
                 guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
                     continue // another thread stole the slot
                 }

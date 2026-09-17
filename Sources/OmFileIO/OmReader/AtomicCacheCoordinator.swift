@@ -8,8 +8,23 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     typealias Key = UInt64
     public nonisolated let cache: AtomicBlockCache<Backend>
     private let upstreamFetchExecutor: LimitedConcurrencyExecutor
-    private var queue: [Key: [CheckedContinuation<UnsafeRawBufferPointer, any Error>]] = [:]
+    private var queue: [Key: [CheckedContinuation<FetchedBlock, any Error>]] = [:]
     
+    /// Retain upstream storage only when the grace period prevented insertion.
+    private enum FetchedBlock {
+        case cached(UnsafeRawBufferPointer)
+        case uncached(any ContiguousBytes & Sendable, Range<Int>)
+
+        func withUnsafeBytes(_ body: (UnsafeRawBufferPointer) -> Void) {
+            switch self {
+            case .cached(let bytes):
+                body(bytes)
+            case .uncached(let storage, let range):
+                storage.withUnsafeBytes { body(UnsafeRawBufferPointer(rebasing: $0[range])) }
+            }
+        }
+    }
+
     public init(cache: AtomicBlockCache<Backend>, maxConcurrentUpstreamFetches: Int = 60) {
         self.cache = cache
         self.upstreamFetchExecutor = LimitedConcurrencyExecutor(maxConcurrency: maxConcurrentUpstreamFetches)
@@ -65,7 +80,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             let cachedValue = cache.get(key: key, count: 1)
             let cached = cachedValue != nil
             let queued = queue[key] != nil
-            var queuedValue: UnsafeRawBufferPointer? = nil
+            var queuedValue: FetchedBlock? = nil
             let isLast = i == count-1
             let cachedOrQueued = cached || queued
             
@@ -117,18 +132,18 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         try Task.checkCancellation()
                         return try await provider(fetchStart, count)
                     }
-                    fetched.withUnsafeBytes({fetched in
-                        let nBlocks = fetched.count.divideRoundedUp(divisor: blockSize)
+                    fetched.withUnsafeBytes({bytes in
+                        let nBlocks = bytes.count.divideRoundedUp(divisor: blockSize)
                         assert(count == nBlocks)
                         for block in 0..<count {
                             let key = fetchStart &+ UInt64(block)
-                            let blockRange = block * blockSize ..< min((block + 1) * blockSize, fetched.count)
-                            let blockData = UnsafeRawBufferPointer(rebasing: fetched[blockRange])
+                            let blockRange = block * blockSize ..< min((block + 1) * blockSize, bytes.count)
+                            let blockData = UnsafeRawBufferPointer(rebasing: bytes[blockRange])
                             let cachedBlock = cache.set(key: key, value: blockData)
-                            queue.removeValue(forKey: key)?.forEach({
-                                $0.resume(with: .success(cachedBlock))
-                            })
-                            dataCallback(key, cachedBlock)
+                            queue.removeValue(forKey: key)?.forEach {
+                                $0.resume(returning: cachedBlock.map { .cached($0) } ?? .uncached(fetched, blockRange))
+                            }
+                            dataCallback(key, cachedBlock ?? blockData)
                         }
                     })
                 } catch {
@@ -146,9 +161,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             if let cachedValue {
                 dataCallback(key, cachedValue)
             }
-            
+
             if let queuedValue {
-                dataCallback(key, queuedValue)
+                queuedValue.withUnsafeBytes { dataCallback(key, $0) }
             }
         }
     }

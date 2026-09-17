@@ -5,7 +5,53 @@ import OmFileFormat
 import Synchronization
 import Testing
 
+// Age timestamps directly so expiry tests do not sleep for a minute.
+extension AtomicBlockCache {
+    func ageEntriesForReplacement() {
+        let count = blockCount
+        data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            for slot in 0..<count {
+                let entry = entries[slot].load(ordering: .relaxed)
+                if entry.second != 0 {
+                    entries[slot].store(.init(first: entry.first, second: entry.second - 61_000_000_000), ordering: .relaxed)
+                }
+            }
+        }
+    }
+}
+
 @Suite struct AtomicBlockCacheDiagnosticsTests {
+    @Test(arguments: [false, true], [false, true])
+    func gracePeriodAndAbandonedWriterRecovery(committed: Bool, sameKey: Bool) throws {
+        try withCache { cache, _, _ in
+            let original = Data(repeating: 0x11, count: 64)
+            let replacement = Data(repeating: 0x22, count: 64)
+            cache.set(key: 10, value: original)
+            if !committed {
+                cache.data.withMutableUnsafeBytes { bytes in
+                    let entry = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+                    let previous = entry[0].load(ordering: .relaxed)
+                    entry[0].store(.init(first: previous.first, second: previous.second & ~1), ordering: .relaxed)
+                }
+            }
+            let key: UInt64 = sameKey ? 10 : 11
+            #expect(cache.set(key: key, value: replacement) == nil)
+            cache.ageEntriesForReplacement()
+            #expect(cache.set(key: key, value: replacement) != nil)
+            #expect(cache.get(key: key, count: 1).map { Data($0) } == replacement)
+        }
+    }
+
+    @Test func readRenewsGracePeriod() throws {
+        try withCache { cache, _, _ in
+            cache.set(key: 10, value: Data(repeating: 1, count: 64))
+            cache.ageEntriesForReplacement()
+            #expect(cache.get(key: 10, count: 1) != nil)
+            #expect(cache.set(key: 11, value: Data(repeating: 2, count: 64)) == nil)
+        }
+    }
+
     private final class Logs: Sendable {
         let entries = Mutex<[Logger.Metadata]>([])
 
@@ -47,8 +93,10 @@ import Testing
     @Test func insertReplaceAndEvict() throws {
         try withCache { cache, diagnostics, logs in
             cache.set(key: 11, value: Data(repeating: 1, count: 64))
+            cache.ageEntriesForReplacement()
             cache.set(key: 11, value: Data(repeating: 2, count: 64))
             // A different key with a one-slot cache must take the LRU path.
+            cache.ageEntriesForReplacement()
             cache.set(key: 12, value: Data(repeating: 3, count: 64))
             #expect(cache.get(key: 12, count: 1)?.data == Data(repeating: 3, count: 64))
             #expect(cache.get(key: 11, count: 1) == nil)
@@ -66,15 +114,7 @@ import Testing
             #expect(value(metrics, "om_block_cache_publication_conflicts_total") == 0)
             #expect(metrics.contains("# TYPE om_block_cache_replacements_total counter"))
             let events = logs.entries.withLock { $0 }
-            #expect(events.count == 2)
-            #expect(events.allSatisfy { $0["reason"]?.description == "replaced_recent_entry" && $0["previous_state"]?.description == "committed" })
-            #expect(events[0]["path"]?.description == "same_key")
-            #expect(events[0]["previous_key"]?.description == "11")
-            #expect(events[0]["new_key"]?.description == "11")
-            #expect(events[1]["path"]?.description == "lru")
-            #expect(events[1]["new_key"]?.description == "12")
-            #expect(events[0]["pid"]?.description == String(ProcessInfo.processInfo.processIdentifier))
-            #expect(events[0]["cache_file"]?.description.hasSuffix(".bin") == true)
+            #expect(events.isEmpty) // Old committed replacements do not warn.
         }
     }
 
@@ -123,6 +163,7 @@ import Testing
     func publicationConflictPreservesRetry(lru: Bool) throws {
         try withCache { cache, diagnostics, logs in
             if lru { cache.set(key: 10, value: Data(repeating: 1, count: 64)) }
+            cache.ageEntriesForReplacement()
             cache.set(key: 11, value: InterferingBytes(cache: cache))
             #expect(cache.get(key: 11, count: 1)?.data == Data(repeating: 5, count: 64))
             let metrics = diagnostics.prometheusMetrics()
