@@ -4,6 +4,73 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test func rejectsInvalidReadRanges() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("cache-bounds-\(UUID()).bin").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 2)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 42, count: 65)), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        cache.set(key: reader.calculateCacheKey(block: 0), value: Data(repeating: 42, count: 64))
+        let invalid = [(-1, 1), (0, -1), (66, 0), (65, 1), (64, 2), (Int.max, 1), (1, Int.max), (Int.min, Int.max)]
+        for (offset, count) in invalid {
+            await #expect(throws: OmFileFormatSwiftError.self) { try await reader.getData(offset: offset, count: count) }
+            await #expect(throws: OmFileFormatSwiftError.self) { try await reader.getByteBuffer(offset: offset, count: count) }
+            await #expect(throws: OmFileFormatSwiftError.self) { try await reader.prefetchData(offset: offset, count: count) }
+            await #expect(throws: OmFileFormatSwiftError.self) {
+                try await reader.withData(offset: offset, count: count) { _ in
+                    Issue.record("Invalid request reached the callback")
+                }
+            }
+        }
+        // Invalid requests must not invalidate unrelated cached bytes.
+        #expect(cache.get(key: reader.calculateCacheKey(block: 0), count: 1) != nil)
+        #expect(try await reader.getData(offset: 64, count: 1) == Data([42]))
+        for offset in [0, 1, 65] {
+            #expect(try await reader.getData(offset: offset, count: 0).isEmpty)
+            #expect(try await reader.getByteBuffer(offset: offset, count: 0).readableBytes == 0)
+            #expect(try await reader.withData(offset: offset, count: 0) { $0.count } == 0)
+            try await reader.prefetchData(offset: offset, count: 0)
+        }
+    }
+
+    @Test(arguments: [false, true], [0, 127])
+    func decodeFailureInvalidatesRequestedBlocks(cached: Bool, firstBlock: Int) async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent("decode-failure-\(UUID()).bin").path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 4)
+        let contents = Data(repeating: 42, count: (firstBlock + 3) * 64)
+        let offset = firstBlock * 64 + 48
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: contents), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        if cached {
+            for block in firstBlock..<firstBlock + 2 {
+                cache.set(key: reader.calculateCacheKey(block: block), value: Data(repeating: 42, count: 64))
+            }
+        }
+        let untouched = reader.calculateCacheKey(block: firstBlock + 2)
+        cache.set(key: untouched, value: Data(repeating: 42, count: 64))
+
+        await #expect(throws: OmFileFormatSwiftError.self) {
+            try await reader.withData(offset: offset, count: 48) { _ -> Void in
+                throw OmFileFormatSwiftError.omDecoder(error: "test decode failure")
+            }
+        }
+        for block in firstBlock..<firstBlock + 2 {
+            #expect(cache.get(key: reader.calculateCacheKey(block: block), count: 1) == nil)
+        }
+        #expect(cache.get(key: untouched, count: 1) != nil)
+
+        // Later requests can fetch normally, but cannot overwrite protected bytes.
+        let recovered = try await reader.getData(offset: offset, count: 48)
+        #expect(recovered == Data(repeating: 42, count: 48))
+        for block in firstBlock..<firstBlock + 2 {
+            #expect(cache.get(key: reader.calculateCacheKey(block: block), count: 1) == nil)
+        }
+        cache.ageEntriesForReplacement()
+        _ = try await reader.getData(offset: offset, count: 48)
+        for block in firstBlock..<firstBlock + 2 {
+            #expect(cache.get(key: reader.calculateCacheKey(block: block), count: 1) != nil)
+        }
+    }
+
     @Test(arguments: ["read", "preload", "prefetch", "existing"])
     func blockCacheAcrossSuperBlockBoundary(path: String) async throws {
         let blockSize = 64 * 1024
@@ -196,10 +263,11 @@ import OmFileFormat
         #expect(cache.blockCount == 50)
 
         for i in 0..<50 {
+            cache.ageEntriesForReplacement()
             cache.set(key: UInt64(1000+i), value: Data(repeating: UInt8(123+i), count: 64))
         }
         for i in 0..<50 {
-            #expect(cache.get(key: UInt64(1000+i), maxAccessedAgeInSeconds: 10)!.data == Data(repeating: UInt8(123+i), count: 64))
+            #expect(cache.get(key: UInt64(1000+i), count: 1)?.data == Data(repeating: UInt8(123+i), count: 64))
         }
         // Cache got overwritten
         #expect(cache.get(key: 234923, maxAccessedAgeInSeconds: 10) == nil)

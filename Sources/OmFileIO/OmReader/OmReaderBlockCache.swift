@@ -38,9 +38,11 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
     
     public func prefetchData(offset: Int, count: Int) async throws {
+        let fileSize = backend.count
+        try validateReadRange(offset: offset, count: count, fileSize: fileSize)
+        guard count > 0 else { return }
         let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
-        let fileSize = self.backend.count
         let blocks = dataRange.divideRoundedUp(divisor: blockSize)
         let superBlocks = dataRange.divideRoundedUp(divisor: blockSize * superBlockLength)
         
@@ -63,11 +65,9 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                     let block = blocks.lowerBound + Int(key &- keyStart)
                     let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
-                }), dataCallback: {(_, value) in
-                    let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                        UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
-                    }
-                    cache.cache.data.prefetchData(offset: offset, count: value.count)
+                }), dataCallback: {(key, _) in
+                    // Callbacks may contain uncached upstream bytes.
+                    cache.cache.prefetch(key: key)
                 })
             }
         }
@@ -84,12 +84,22 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         /// Must be freed after use
         case owned(UnsafeRawBufferPointer)
     }
+
+    private func validateReadRange(offset: Int, count: Int, fileSize: Int) throws {
+        guard offset >= 0, count >= 0, offset <= fileSize, count <= fileSize - offset else {
+            throw OmFileFormatSwiftError.omDecoder(error: "Read outside file bounds: offset=\(offset) count=\(count) fileSize=\(fileSize)")
+        }
+    }
     
     /// Fetch data from cache or backend. If data is cached, return a temporary pointer. Otherwise allocate a new buffer which must be freed afterwards
     fileprivate func fetch(offset: Int, count: Int) async throws -> DataOwnership {
+        let fileSize = backend.count
+        try validateReadRange(offset: offset, count: count, fileSize: fileSize)
+        if count == 0 {
+            return .owned(UnsafeRawBufferPointer(UnsafeMutableRawBufferPointer.allocate(byteCount: 0, alignment: 1)))
+        }
         let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
-        let fileSize = self.backend.count
         let blocks = dataRange.divideRoundedUp(divisor: blockSize)
         let superBlocks = dataRange.divideRoundedUp(divisor: blockSize * superBlockLength)
         //print("withData superBlocks \(superBlocks), \(blocks.count) blocks \(blocks), offset \(offset), count \(count)")
@@ -129,12 +139,25 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     
     /// Execute a closure with retrieved data. If data is cached, the underlaying data is used to call be closure (zero-copy).
     public func withData<T: Sendable>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
-        switch try await fetch(offset: offset, count: count) {
-        case .borrowed(let data):
-            return try fn(data)
-        case .owned(let data):
-            defer { data.deallocate() }
-            return try fn(data)
+        // Range validation must happen outside the decoder-error invalidation handler.
+        let fetched = try await fetch(offset: offset, count: count)
+        do {
+            switch fetched {
+            case .borrowed(let data):
+                return try fn(data)
+            case .owned(let data):
+                defer { data.deallocate() }
+                return try fn(data)
+            }
+        } catch let error as OmFileFormatSwiftError {
+            guard case .omDecoder = error else { throw error }
+            let blocks = (offset..<offset + count).divideRoundedUp(divisor: cache.cache.blockSize)
+            let superBlocks = blocks.divideRoundedUp(divisor: superBlockLength)
+            for superBlock in superBlocks {
+                let range = (superBlock * superBlockLength..<(superBlock + 1) * superBlockLength).clamped(to: blocks)
+                cache.cache.invalidate(key: calculateCacheKey(block: range.lowerBound), count: UInt64(range.count))
+            }
+            throw error
         }
     }
     

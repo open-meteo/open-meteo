@@ -105,6 +105,7 @@ om_block_cache_upstream_fetches_active \(upstreamFetchStats.active)
 # TYPE om_block_cache_upstream_fetches_queued gauge
 # HELP om_block_cache_upstream_fetches_queued Unique upstream fetches waiting for a permit, excluding duplicate callers
 om_block_cache_upstream_fetches_queued \(upstreamFetchStats.queued)
+\(AtomicBlockCacheDiagnostics.shared.prometheusMetrics())
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes

@@ -113,8 +113,15 @@ final class OmFileSystemManager: Sendable {
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getFile(fullPath: path) {
-            let payload = try await object.getPayload(ofType: Key.Payload.self)
-            return try await fn(payload)
+            do {
+                let payload = try await object.getPayload(ofType: Key.Payload.self)
+                return try await fn(payload)
+            } catch OmFileFormatSwiftError.omDecoder(let message) {
+                logger.error("OM file decode failed", metadata: [
+                    "file": .string(file.getFilePath()), "source": "local", "error": .string(message)
+                ])
+                throw OmFileFormatSwiftError.omDecoder(error: "\(message) [file=\(file.getFilePath()) source=local]")
+            }
         }
         guard let remoteFileSystem else {
             return nil
