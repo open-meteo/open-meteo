@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.1](https://github.com/open-meteo/open-meteo/compare/1.6.0...1.6.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* bump github.com/apple/swift-log from 1.15.0 to 1.15.1 in the swift-dependencies group ([#2128](https://github.com/open-meteo/open-meteo/issues/2128)) ([e669e62](https://github.com/open-meteo/open-meteo/commit/e669e6293ce2f0c70646fd61af8fe0c529fc0c53))
+* bump googleapis/release-please-action from 4 to 5 ([#2127](https://github.com/open-meteo/open-meteo/issues/2127)) ([c085b34](https://github.com/open-meteo/open-meteo/commit/c085b347f599ba7d0809b321c01b8aa9fcc90eec))
+* **Meteofrance HD 15min:** 15min precipitation and snow is not available anymore ([#2120](https://github.com/open-meteo/open-meteo/issues/2120)) ([9701689](https://github.com/open-meteo/open-meteo/commit/9701689dd81ebef2d478800366c586c8a02c0c19))
+
 ## [1.6.0](https://github.com/open-meteo/open-meteo/compare/1.5.7...1.6.0) (2026-09-10)
 
 
