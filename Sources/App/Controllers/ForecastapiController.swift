@@ -757,6 +757,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     
     case ncep_seamless
     case ncep_gfs_seamless
+    case ncep_rrfs_seamless
+    case ncep_rrfs_conus
+    case ncep_rrfs_conus_15min
+    case ncep_rrfs_conus_ensemble
     case ncep_gfs_global
     case ncep_nbm_conus
     case ncep_gfs025
@@ -1252,6 +1256,23 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Generic domains with hourly data that can use the generic deriver controller
     func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
         switch self {
+        case .ncep_rrfs_conus:
+            return .singleWithPrecipitationProbability(NcepRrfsDomain.ncep_rrfs_conus, NcepRrfsVariable.self, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
+        case .ncep_rrfs_conus_15min:
+            return .singleWithPrecipitationProbability(NcepRrfsDomain.ncep_rrfs_conus_15min, NcepRrfs15MinVariable.self, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
+        case .ncep_rrfs_conus_ensemble:
+            return .singleWithPrecipitationProbability(NcepRrfsDomain.ncep_rrfs_conus_ensemble, NcepRrfsEnsembleVariable.self, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
+        case .ncep_rrfs_seamless:
+            // Readers are ordered from lowest to highest priority.
+            var domains: [(any GenericDomain, any GenericVariable.Type)] = [
+                (GfsDomain.gfs05_ens, Gefs05Variable.self),
+                (GfsDomain.gfs025, Gfs025Variable.self),
+                (NcepRrfsDomain.ncep_rrfs_conus, NcepRrfsVariable.self)
+            ]
+            if include15Min {
+                domains.append((NcepRrfsDomain.ncep_rrfs_conus_15min, NcepRrfs15MinVariable.self))
+            }
+            return .multipleWithPrecipitationProbability(domains, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
         case .gfs025, .ncep_gfs025:
             return .single(GfsDomain.gfs025, Gfs025Variable.self)
         case .gfs013, .ncep_gfs013:
@@ -2078,7 +2099,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, include15Min: Bool) async throws -> [any GenericReaderProtocol] {
         switch self {
-        case .best_match:
+        case .best_match, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
             return [] // migrated
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless,
              .gfs_global, .ncep_gfs_global,
@@ -2396,7 +2417,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return WeatherNextDomain.weathernext_global_ensemble_mean
         case .best_match:
             return nil
-        case .gfs_seamless, .gfs_mix, .ncep_seamless, .ncep_gfs_seamless:
+        case .gfs_seamless, .gfs_mix, .ncep_seamless, .ncep_gfs_seamless, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
             return nil
         case .gfs_global, .ncep_gfs_global:
             return nil
@@ -2640,7 +2661,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
             return nil
-        case .gfs_seamless, .ncep_seamless, .gfs_mix, .ncep_gfs_seamless:
+        case .gfs_seamless, .ncep_seamless, .gfs_mix, .ncep_gfs_seamless, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
             return nil
         case .gfs_global, .ncep_gfs_global:
             return nil
@@ -2797,6 +2818,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     var countEnsembleMember: Int {
         switch self {
+        case .ncep_rrfs_conus_ensemble:
+            return NcepRrfsDomain.ncep_rrfs_conus_ensemble.countEnsembleMember
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return IconDomains.iconEps.countEnsembleMember
         case .icon_global_eps, .dwd_icon_global_eps:

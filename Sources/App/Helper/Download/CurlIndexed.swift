@@ -10,6 +10,18 @@ protocol CurlIndexedVariable {
 
     /// If true, the exact string needs to match at the end
     var exactMatch: Bool { get }
+
+    /// Alternative selected only when the preferred entry is absent from the inventory.
+    var gribIndexFallback: Self? { get }
+}
+
+extension CurlIndexedVariable {
+    var gribIndexFallback: Self? { nil }
+
+    func matches(indexLine: Substring) -> Bool {
+        guard let gribIndexName else { return false }
+        return exactMatch ? indexLine.hasSuffix(gribIndexName) : indexLine.contains(gribIndexName)
+    }
 }
 
 extension Curl {
@@ -71,22 +83,28 @@ extension Curl {
             indices.append(index)
         }
 
+        return try Self.decodeGribIndices(indices: indices, variables: variables, errorOnMissing: errorOnMissing, logger: logger)
+    }
+
+    /// Match already fetched inventories without making HTTP requests.
+    static func decodeGribIndices<Variable: CurlIndexedVariable>(indices: [String], variables: [Variable], errorOnMissing: Bool, logger: Logger) throws -> [(matches: [Variable], range: String, minSize: Int)] {
+        let count = variables.reduce(0, { $0 + ($1.gribIndexName == nil ? 0 : 1) })
+        guard count > 0 else { return [] }
         var result = [(matches: [Variable], range: String, minSize: Int)]()
-        result.reserveCapacity(url.count)
+        result.reserveCapacity(indices.count)
 
         for index in indices {
+            let lines = index.split(separator: "\n")
+            // Resolve preferences before building ranges, independently of file order.
+            let selectedVariables = variables.map { variable in
+                guard let fallback = variable.gribIndexFallback,
+                      !lines.contains(where: { variable.matches(indexLine: $0) }) else { return variable }
+                return fallback
+            }
             var matches = [Variable]()
             matches.reserveCapacity(count)
-            guard let range = index.split(separator: "\n").indexToRange(include: { idx in
-                guard let match = variables.first(where: {
-                    guard let gribIndexName = $0.gribIndexName else {
-                        return false
-                    }
-                    if $0.exactMatch {
-                        return idx.hasSuffix(gribIndexName)
-                    }
-                    return idx.contains(gribIndexName)
-                }) else {
+            guard let range = lines.indexToRange(include: { idx in
+                guard let match = selectedVariables.first(where: { $0.matches(indexLine: idx) }) else {
                     return false
                 }
                 guard !matches.contains(where: { $0.gribIndexName == match.gribIndexName }) else {
@@ -108,7 +126,8 @@ extension Curl {
             guard let gribIndexName = variable.gribIndexName else {
                 continue
             }
-            if !result.contains(where: { $0.matches.contains(where: { $0.gribIndexName == gribIndexName }) }) {
+            let fallbackName = variable.gribIndexFallback?.gribIndexName
+            if !result.contains(where: { $0.matches.contains(where: { $0.gribIndexName == gribIndexName || (fallbackName != nil && $0.gribIndexName == fallbackName) }) }) {
                 logger.error("Variable \(variable) '\(gribIndexName)' missing")
                 missing = true
             }

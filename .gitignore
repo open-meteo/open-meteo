@@ -14,3 +14,4 @@ data_spatial
 .cache
 .venv
 .vscode/
+*.idx
