@@ -1,3 +1,5 @@
+// See docs/ncep-rrfs/README.md for RRFS products, GRIB inputs and processing details.
+
 import Foundation
 
 enum NcepRrfsDomain: String, CaseIterable, GenericDomain {

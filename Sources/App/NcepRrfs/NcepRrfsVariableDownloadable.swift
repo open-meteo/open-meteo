@@ -1,115 +1,106 @@
+// See docs/ncep-rrfs/README.md for RRFS products, GRIB inputs and processing details.
+
 import Foundation
 
-/// A required input field and its exact forecast interval. The shared downloader
-/// fetches the inventory and selects these fields through CurlIndexedVariable.
-struct NcepRrfsIndexedVariable: CurlIndexedVariable, Sendable {
-    let record: NcepRrfsRecord
-    let gribIndexName: String?
-    private let level: String
-    private let fallbackToInstant: Bool
+/// GRIB attributes belong to the variable catalog of each RRFS product.
+protocol NcepRrfsVariableDownloadable: GenericVariable {
+    var gribInput: (parameter: String, level: String) { get }
+    var gribStep: NcepRrfsGribStep { get }
+    var skipHour0: Bool { get }
+    func gribIndexName(minute: Int) -> String?
+}
 
-    var gribIndexFallback: Self? {
-        if record.parameter == "TSNOWP" {
-            return Self(variable: "frozen_precipitation_percent", parameter: "CPOFP", level: "surface",
-                        startMinute: record.endMinute, endMinute: record.endMinute, stepType: "instant")
-        }
-        guard fallbackToInstant else { return nil }
-        return Self(variable: record.variable, parameter: record.parameter, level: level,
-                    startMinute: record.endMinute, endMinute: record.endMinute, stepType: "instant")
-    }
-    // Ensemble inventories append ENS=+n after the forecast interval.
-    var exactMatch: Bool { false }
+enum NcepRrfsGribStep {
+    case instant, accumulation, hourlyAccumulation, hourlyAverage
 
-    init(variable: String, parameter: String, level: String, startMinute: Int, endMinute: Int, stepType: String, fallbackToInstant: Bool = false) {
-        self.level = level
-        self.fallbackToInstant = fallbackToInstant
-        record = NcepRrfsRecord(variable: variable, parameter: parameter, startMinute: startMinute, endMinute: endMinute, stepType: stepType)
-        let step: String
-        if endMinute == 0 {
-            step = "anl"
-        } else {
-            let hourly = startMinute % 60 == 0 && endMinute % 60 == 0
-            let unit = hourly ? "hour" : "min"
-            let divisor = hourly ? 60 : 1
-            switch stepType {
-            case "accum": step = "\(startMinute / divisor)-\(endMinute / divisor) \(unit) acc fcst"
-            case "avg": step = "\(startMinute / divisor)-\(endMinute / divisor) \(unit) ave fcst"
-            default: step = "\(endMinute / divisor) \(unit) fcst"
-            }
-        }
-        gribIndexName = ":\(parameter):\(level):\(step):"
-    }
-
-    static func variables(domain: NcepRrfsDomain, forecastHour: Int, pressureFile: Bool) -> [Self] {
-        if pressureFile {
-            let fields = domain == .ncep_rrfs_conus_ensemble
-                ? NcepRrfsEnsemblePressureVariable.allVariables.map { NcepRrfsPressureField(variable: $0.variable, level: $0.level) }
-                : NcepRrfsConusPressureVariable.allVariables.map { NcepRrfsPressureField(variable: $0.variable, level: $0.level) }
-            return fields.flatMap { field -> [Self] in
-                let parameters: [String]
-                switch field.variable {
-                case .temperature: parameters = ["TMP"]
-                case .relative_humidity: parameters = ["RH"]
-                case .geopotential_height: parameters = ["HGT"]
-                case .wind_speed: parameters = ["UGRD", "VGRD"]
-                case .wind_direction: return []
-                case .vertical_velocity: parameters = ["DZDT"]
-                }
-                return parameters.map { Self(variable: field.rawValue, parameter: $0, level: "\(field.level) mb",
-                                             startMinute: forecastHour * 60, endMinute: forecastHour * 60, stepType: "instant") }
-            }
-        }
-        let fields: [NcepRrfsSurfaceVariable]
-        switch domain {
-        case .ncep_rrfs_conus: fields = NcepRrfsSurfaceVariable.allCases
-        case .ncep_rrfs_conus_15min: fields = NcepRrfs15MinVariable.allCases.compactMap { NcepRrfsSurfaceVariable(rawValue: $0.rawValue) }
-        case .ncep_rrfs_conus_ensemble: fields = NcepRrfsEnsembleSurfaceVariable.allCases.compactMap { NcepRrfsSurfaceVariable(rawValue: $0.rawValue) }
-        }
-        let subhourly = domain == .ncep_rrfs_conus_15min
-        let minutes = subhourly ? Array(stride(from: forecastHour * 60 - 45, through: forecastHour * 60, by: 15)) : [forecastHour * 60]
-        return minutes.flatMap { minute in
-            var inputs = fields.flatMap { field -> [Self] in
-                if subhourly && field == .relative_humidity_2m { return [] }
-                guard let (parameter, level) = field.gribInput else { return [] }
-                let stepType: String
-                let start: Int
-                switch field {
-                case .precipitation:
-                    stepType = "accum"; start = subhourly ? 0 : minute - 60
-                case .snowfall, .snowfall_water_equivalent:
-                    stepType = "accum"; start = 0
-                case .shortwave_radiation, .diffuse_radiation:
-                    stepType = minute >= 60 ? "avg" : "instant"
-                    start = minute >= 60 ? minute - 60 : minute
-                case .sensible_heat_flux, .latent_heat_flux:
-                    stepType = "avg"; start = minute - 60
-                default:
-                    stepType = "instant"; start = minute
-                }
-                guard minute > 0 || stepType == "instant" else { return [] }
-                return (parameter == "UGRD" ? ["UGRD", "VGRD"] : [parameter]).map {
-                    Self(variable: field.rawValue, parameter: $0, level: level, startMinute: start, endMinute: minute, stepType: stepType,
-                         fallbackToInstant: stepType == "avg" && (field == .shortwave_radiation || field == .diffuse_radiation))
-                }
-            }
-            if subhourly {
-                inputs.append(Self(variable: "dewpoint_2m", parameter: "DPT", level: "2 m above ground", startMinute: minute, endMinute: minute, stepType: "instant"))
-            }
-            return inputs
+    func interval(minute: Int) -> (start: Int, type: String) {
+        switch self {
+        case .instant: return (minute, "instant")
+        case .accumulation: return (0, "accum")
+        case .hourlyAccumulation: return (minute - 60, "accum")
+        case .hourlyAverage: return minute == 0 ? (0, "instant") : (minute - 60, "avg")
         }
     }
 }
 
-private extension NcepRrfsSurfaceVariable {
-    var gribInput: (parameter: String, level: String)? {
+extension NcepRrfsVariableDownloadable {
+    func gribIndexName(minute: Int) -> String? {
+        guard minute > 0 || !skipHour0 else { return nil }
+        let interval = gribStep.interval(minute: minute)
+        let step: String
+        if minute == 0 {
+            step = "anl"
+        } else {
+            let hourly = interval.start % 60 == 0 && minute % 60 == 0
+            let unit = hourly ? "hour" : "min"
+            let divisor = hourly ? 60 : 1
+            switch interval.type {
+            case "accum": step = "\(interval.start / divisor)-\(minute / divisor) \(unit) acc fcst"
+            case "avg": step = "\(interval.start / divisor)-\(minute / divisor) \(unit) ave fcst"
+            default: step = "\(minute / divisor) \(unit) fcst"
+            }
+        }
+        return ":\(gribInput.parameter):\(gribInput.level):\(step):"
+    }
+
+    func gribRecord(minute: Int) -> NcepRrfsRecord {
+        let name: String
+        switch gribInput.parameter {
+        case "VGRD": name = rawValue.replacingOccurrences(of: "wind_direction", with: "wind_speed")
+        case "DPT": name = "dewpoint_2m"
+        case "CPOFP": name = "frozen_precipitation_percent"
+        default: name = rawValue
+        }
+        let interval = gribStep.interval(minute: minute)
+        return NcepRrfsRecord(variable: name, parameter: gribInput.parameter,
+                             startMinute: interval.start, endMinute: minute, stepType: interval.type)
+    }
+}
+
+/// Adds the forecast minute to the variable, like GfsDownloadVariable.
+struct NcepRrfsDownloadVariable: CurlIndexedVariable, Sendable {
+    let variable: any NcepRrfsVariableDownloadable
+    let minute: Int
+
+    var gribIndexName: String? { variable.gribIndexName(minute: minute) }
+    // Ensemble inventories append ENS=+n after the forecast interval.
+    var exactMatch: Bool { false }
+    var record: NcepRrfsRecord { variable.gribRecord(minute: minute) }
+}
+
+extension NcepRrfsDomain {
+    func downloadVariables(forecastHour: Int, pressureFile: Bool) -> [NcepRrfsDownloadVariable] {
+        let fields: [any NcepRrfsVariableDownloadable]
+        if pressureFile {
+            switch self {
+            case .ncep_rrfs_conus, .ncep_rrfs_conus_15min: fields = NcepRrfsConusPressureVariable.allVariables
+            case .ncep_rrfs_conus_ensemble: fields = NcepRrfsEnsemblePressureVariable.allVariables
+            }
+        } else {
+            switch self {
+            case .ncep_rrfs_conus: fields = NcepRrfsSurfaceVariable.allCases
+            case .ncep_rrfs_conus_15min: fields = NcepRrfs15MinVariable.allCases
+            case .ncep_rrfs_conus_ensemble: fields = NcepRrfsEnsembleSurfaceVariable.allCases
+            }
+        }
+        let minutes = self == .ncep_rrfs_conus_15min
+            ? Array(stride(from: forecastHour * 60 - 45, through: forecastHour * 60, by: 15)) : [forecastHour * 60]
+        return minutes.flatMap { minute in
+            fields.filter { minute > 0 || !$0.skipHour0 }.map { NcepRrfsDownloadVariable(variable: $0, minute: minute) }
+        }
+    }
+}
+
+extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
+    var gribInput: (parameter: String, level: String) {
         switch self {
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
         case .surface_pressure: return ("PRES", "surface")
         case .precipitation: return ("APCP", "surface")
-        case .snowfall: return ("ASNOW", "surface")
         case .snowfall_water_equivalent: return ("TSNOWP", "surface")
+        case .snowfall: return ("ASNOW", "surface")
         case .wind_gusts_10m: return ("GUST", "surface")
         case .visibility: return ("VIS", "surface")
         case .shortwave_radiation: return ("DSWRF", "surface")
@@ -130,22 +121,39 @@ private extension NcepRrfsSurfaceVariable {
         case .latent_heat_flux: return ("LHTFL", "surface")
         case .lifted_index: return ("LFTX", "500-1000 mb")
         case .wind_speed_10m: return ("UGRD", "10 m above ground")
+        case .wind_direction_10m: return ("VGRD", "10 m above ground")
         case .wind_speed_30m: return ("UGRD", "30 m above ground")
+        case .wind_direction_30m: return ("VGRD", "30 m above ground")
         case .wind_speed_50m: return ("UGRD", "50 m above ground")
+        case .wind_direction_50m: return ("VGRD", "50 m above ground")
         case .wind_speed_80m: return ("UGRD", "80 m above ground")
+        case .wind_direction_80m: return ("VGRD", "80 m above ground")
         case .wind_speed_100m: return ("UGRD", "100 m above ground")
+        case .wind_direction_100m: return ("VGRD", "100 m above ground")
         case .wind_speed_160m: return ("UGRD", "160 m above ground")
+        case .wind_direction_160m: return ("VGRD", "160 m above ground")
         case .wind_speed_320m: return ("UGRD", "320 m above ground")
+        case .wind_direction_320m: return ("VGRD", "320 m above ground")
         case .wind_speed_305m: return ("UGRD", "305 m above mean sea level")
+        case .wind_direction_305m: return ("VGRD", "305 m above mean sea level")
         case .wind_speed_457m: return ("UGRD", "457 m above mean sea level")
+        case .wind_direction_457m: return ("VGRD", "457 m above mean sea level")
         case .wind_speed_610m: return ("UGRD", "610 m above mean sea level")
+        case .wind_direction_610m: return ("VGRD", "610 m above mean sea level")
         case .wind_speed_914m: return ("UGRD", "914 m above mean sea level")
+        case .wind_direction_914m: return ("VGRD", "914 m above mean sea level")
         case .wind_speed_1524m: return ("UGRD", "1524 m above mean sea level")
+        case .wind_direction_1524m: return ("VGRD", "1524 m above mean sea level")
         case .wind_speed_1829m: return ("UGRD", "1829 m above mean sea level")
+        case .wind_direction_1829m: return ("VGRD", "1829 m above mean sea level")
         case .wind_speed_2134m: return ("UGRD", "2134 m above mean sea level")
+        case .wind_direction_2134m: return ("VGRD", "2134 m above mean sea level")
         case .wind_speed_2743m: return ("UGRD", "2743 m above mean sea level")
+        case .wind_direction_2743m: return ("VGRD", "2743 m above mean sea level")
         case .wind_speed_3658m: return ("UGRD", "3658 m above mean sea level")
+        case .wind_direction_3658m: return ("VGRD", "3658 m above mean sea level")
         case .wind_speed_4572m: return ("UGRD", "4572 m above mean sea level")
+        case .wind_direction_4572m: return ("VGRD", "4572 m above mean sea level")
         case .temperature_30m: return ("TMP", "30 m above ground")
         case .temperature_50m: return ("TMP", "50 m above ground")
         case .temperature_80m: return ("TMP", "80 m above ground")
@@ -180,24 +188,161 @@ private extension NcepRrfsSurfaceVariable {
         case .soil_moisture_160cm: return ("SOILW", "1.6-1.6 m below ground")
         case .soil_temperature_300cm: return ("TSOIL", "3-3 m below ground")
         case .soil_moisture_300cm: return ("SOILW", "3-3 m below ground")
-        case .wind_direction_10m,
-             .wind_direction_30m,
-             .wind_direction_50m,
-             .wind_direction_80m,
-             .wind_direction_100m,
-             .wind_direction_160m,
-             .wind_direction_320m,
-             .wind_direction_305m,
-             .wind_direction_457m,
-             .wind_direction_610m,
-             .wind_direction_914m,
-             .wind_direction_1524m,
-             .wind_direction_1829m,
-             .wind_direction_2134m,
-             .wind_direction_2743m,
-             .wind_direction_3658m,
-             .wind_direction_4572m:
-            return nil
+        }
+    }
+
+    var gribStep: NcepRrfsGribStep {
+        switch self {
+        case .precipitation:
+            return .hourlyAccumulation
+        case .snowfall_water_equivalent,
+             .snowfall:
+            return .accumulation
+        case .shortwave_radiation,
+             .sensible_heat_flux,
+             .latent_heat_flux:
+            return .hourlyAverage
+        default:
+            return .instant
+        }
+    }
+
+    var skipHour0: Bool {
+        switch self {
+        case .precipitation, .snowfall_water_equivalent, .snowfall, .sensible_heat_flux, .latent_heat_flux: return true
+        default: return false
+        }
+    }
+}
+
+extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
+    var gribInput: (parameter: String, level: String) {
+        switch self {
+        case .temperature_2m: return ("TMP", "2 m above ground")
+        case .relative_humidity_2m: return ("DPT", "2 m above ground")
+        case .pressure_msl: return ("MSLET", "mean sea level")
+        case .surface_pressure: return ("PRES", "surface")
+        case .precipitation: return ("APCP", "surface")
+        case .snowfall_water_equivalent: return ("TSNOWP", "surface")
+        case .snowfall: return ("ASNOW", "surface")
+        case .wind_gusts_10m: return ("GUST", "surface")
+        case .visibility: return ("VIS", "surface")
+        case .shortwave_radiation: return ("DSWRF", "surface")
+        case .diffuse_radiation: return ("VDDSF", "surface")
+        case .categorical_freezing_rain: return ("CFRZR", "surface")
+        case .wind_speed_10m: return ("UGRD", "10 m above ground")
+        case .wind_direction_10m: return ("VGRD", "10 m above ground")
+        case .wind_speed_80m: return ("UGRD", "80 m above ground")
+        case .wind_direction_80m: return ("VGRD", "80 m above ground")
+        }
+    }
+
+    var gribStep: NcepRrfsGribStep {
+        switch self {
+        case .precipitation,
+             .snowfall_water_equivalent,
+             .snowfall:
+            return .accumulation
+        default:
+            return .instant
+        }
+    }
+
+    var skipHour0: Bool {
+        switch self {
+        case .precipitation, .snowfall_water_equivalent, .snowfall: return true
+        default: return false
+        }
+    }
+}
+
+extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
+    var gribInput: (parameter: String, level: String) {
+        switch self {
+        case .temperature_2m: return ("TMP", "2 m above ground")
+        case .relative_humidity_2m: return ("RH", "2 m above ground")
+        case .pressure_msl: return ("MSLET", "mean sea level")
+        case .surface_pressure: return ("PRES", "surface")
+        case .precipitation: return ("APCP", "surface")
+        case .snowfall_water_equivalent: return ("CPOFP", "surface")
+        case .snowfall: return ("ASNOW", "surface")
+        case .wind_gusts_10m: return ("GUST", "surface")
+        case .visibility: return ("VIS", "surface")
+        case .shortwave_radiation: return ("DSWRF", "surface")
+        case .categorical_freezing_rain: return ("CFRZR", "surface")
+        case .cloud_cover: return ("TCDC", "entire atmosphere (considered as a single layer)")
+        case .cloud_cover_low: return ("LCDC", "low cloud layer")
+        case .cloud_cover_mid: return ("MCDC", "middle cloud layer")
+        case .cloud_cover_high: return ("HCDC", "high cloud layer")
+        case .cape: return ("CAPE", "surface")
+        case .convective_inhibition: return ("CIN", "surface")
+        case .total_column_integrated_water_vapour: return ("PWAT", "entire atmosphere (considered as a single layer)")
+        case .wind_speed_10m: return ("UGRD", "10 m above ground")
+        case .wind_direction_10m: return ("VGRD", "10 m above ground")
+        case .wind_speed_80m: return ("UGRD", "80 m above ground")
+        case .wind_direction_80m: return ("VGRD", "80 m above ground")
+        case .wind_speed_160m: return ("UGRD", "160 m above ground")
+        case .wind_direction_160m: return ("VGRD", "160 m above ground")
+        case .wind_speed_320m: return ("UGRD", "320 m above ground")
+        case .wind_direction_320m: return ("VGRD", "320 m above ground")
+        }
+    }
+
+    var gribStep: NcepRrfsGribStep {
+        switch self {
+        case .precipitation:
+            return .hourlyAccumulation
+        case .snowfall:
+            return .accumulation
+        case .shortwave_radiation:
+            return .hourlyAverage
+        default:
+            return .instant
+        }
+    }
+
+    var skipHour0: Bool {
+        switch self {
+        case .precipitation, .snowfall_water_equivalent, .snowfall: return true
+        default: return false
+        }
+    }
+}
+
+extension NcepRrfsPressureVariable: NcepRrfsVariableDownloadable {
+    var gribInput: (parameter: String, level: String) {
+        let parameter: String
+        switch variable {
+        case .temperature: parameter = "TMP"
+        case .relative_humidity: parameter = "RH"
+        case .geopotential_height: parameter = "HGT"
+        case .wind_speed: parameter = "UGRD"
+        case .wind_direction: parameter = "VGRD"
+        case .vertical_velocity: parameter = "DZDT"
+        }
+        return (parameter, "\(level) mb")
+    }
+    var gribStep: NcepRrfsGribStep { .instant }
+    var skipHour0: Bool { false }
+}
+
+extension SurfaceAndPressureVariable: NcepRrfsVariableDownloadable where Surface: NcepRrfsVariableDownloadable, Pressure: NcepRrfsVariableDownloadable {
+    var gribInput: (parameter: String, level: String) {
+        switch self {
+        case .surface(let variable): return variable.gribInput
+        case .pressure(let variable): return variable.gribInput
+        }
+    }
+    var gribStep: NcepRrfsGribStep {
+        switch self {
+        case .surface(let variable): return variable.gribStep
+        case .pressure(let variable): return variable.gribStep
+        }
+    }
+    var skipHour0: Bool {
+        switch self {
+        case .surface(let variable): return variable.skipHour0
+        case .pressure(let variable): return variable.skipHour0
         }
     }
 }

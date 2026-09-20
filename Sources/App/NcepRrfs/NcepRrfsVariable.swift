@@ -1,3 +1,5 @@
+// See docs/ncep-rrfs/README.md for RRFS products, GRIB inputs and processing details.
+
 import Foundation
 
 enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
@@ -638,6 +640,3 @@ typealias NcepRrfsConusPressureVariable = NcepRrfsPressureVariable<NcepRrfsDeter
 typealias NcepRrfsEnsemblePressureVariable = NcepRrfsPressureVariable<NcepRrfsEnsemblePressureSchema>
 typealias NcepRrfsVariable = SurfaceAndPressureVariable<NcepRrfsSurfaceVariable, NcepRrfsConusPressureVariable>
 typealias NcepRrfsEnsembleVariable = SurfaceAndPressureVariable<NcepRrfsEnsembleSurfaceVariable, NcepRrfsEnsemblePressureVariable>
-
-/// Downloaded fields use the typed surface/pressure union and its metadata switches.
-typealias NcepRrfsField = NcepRrfsVariable

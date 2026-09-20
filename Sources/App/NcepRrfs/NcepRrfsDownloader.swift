@@ -1,3 +1,5 @@
+// See docs/ncep-rrfs/README.md for RRFS products, GRIB inputs and processing details.
+
 import Foundation
 import OmFileFormat
 import Vapor
@@ -71,11 +73,12 @@ struct NcepRrfsDownloader: AsyncCommand {
             // Create writers in chronological order even when fields finish concurrently.
             for minute in minutes { _ = try await writer.getWriter(time: run.add(minute * 60)) }
             for member in 0..<domain.countEnsembleMember {
-                let wind = WindSpeedCalculator<NcepRrfsField>(trueNorth: trueNorth)
+                let wind = WindSpeedCalculator<NcepRrfsVariable>(trueNorth: trueNorth)
                 let rh = RelativeHumidityCalculator(outVariable: NcepRrfs15MinVariable.relative_humidity_2m)
                 for url in domain.gribUrls(run: run, forecastHour: hour, member: member, server: server) {
-                    let variables = NcepRrfsIndexedVariable.variables(domain: domain, forecastHour: hour, pressureFile: url.contains("prslev"))
-                    let snow = VariablePerMemberStorage<NcepRrfsSnowInput>()
+                    let variables = domain.downloadVariables(forecastHour: hour, pressureFile: url.contains("prslev"))
+                    let snow = domain == .ncep_rrfs_conus_ensemble && !url.contains("prslev") && hour > 0
+                        ? VariablePerMemberStorage<NcepRrfsSnowInput>() : nil
                     let accumulated = NcepRrfsAccumulatedFields()
                     let messages = try await curl.downloadIndexedGrib(url: [url], variables: variables)
                     try await messages.foreachConcurrent(nConcurrent: concurrent) { variable, message in
@@ -98,17 +101,17 @@ struct NcepRrfsDownloader: AsyncCommand {
                             }
                         }
                         if record.variable == "frozen_precipitation_percent" {
-                            await snow.set(variable: .fraction, timestamp: time, member: member, data: array)
+                            await snow?.set(variable: .fraction, timestamp: time, member: member, data: array)
                             return
                         }
                         guard let field = record.field else { return }
                         if record.isWind {
-                            let direction = NcepRrfsField(rawValue: record.variable.replacingOccurrences(of: "wind_speed", with: "wind_direction"))!
+                            let direction = NcepRrfsVariable(rawValue: record.variable.replacingOccurrences(of: "wind_speed", with: "wind_direction"))!
                             try await wind.ingest(record.parameter == "UGRD" ? .u(array) : .v(array), member: member,
                                                   outSpeed: field, outDirection: direction, writer: timestepWriter)
                             return
                         }
-                        // Radiation inputs are already averages of the last hour, never running means.
+                        // Averaged solar inputs cover the last hour and need no deaveraging.
                         if record.stepType == "accum" || (record.stepType == "avg" && !record.isSolarRadiation) {
                             await accumulated.append(record: record, array: array)
                             return
@@ -128,18 +131,18 @@ struct NcepRrfsDownloader: AsyncCommand {
                             guard await deaverager.deaccumulateIfRequired(variable: record.variable, member: member,
                                 stepType: record.stepType, stepRange: "\(record.startMinute)-\(record.endMinute)", array2d: &array) else { continue }
                             if record.variable == "precipitation" {
-                                await snow.set(variable: .precipitation, timestamp: run.add(record.endMinute * 60), member: member, data: array)
+                                await snow?.set(variable: .precipitation, timestamp: run.add(record.endMinute * 60), member: member, data: array)
                                 await precipitationMembers?.set(variable: .precipitation, timestamp: run.add(record.endMinute * 60), member: member, data: array)
                             }
                             try await writer.write(time: run.add(record.endMinute * 60), member: member, variable: record.field!, data: array.data)
                         }
                     }
-                    for minute in minutes {
-                        let timestep = try await writer.getWriter(time: run.add(minute * 60))
-                        // Only the CPOFP fallback supplies a fraction. Native TSNOWP is
-                        // deaccumulated and written above without this approximation.
+                    if let snow {
+                        let timestep = try await writer.getWriter(time: run.add(hours: hour))
+                        // The reduced ensemble supplies CPOFP; deterministic products
+                        // write native TSNOWP through the accumulation path above.
                         try await snow.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .fraction,
-                            outVariable: NcepRrfsField(rawValue: "snowfall_water_equivalent")!, writer: timestep)
+                            outVariable: NcepRrfsEnsembleSurfaceVariable.snowfall_water_equivalent, writer: timestep)
                     }
                 }
             }
@@ -181,3 +184,8 @@ private actor NcepRrfsAccumulatedFields {
 }
 
 private enum NcepRrfsSnowInput: Hashable, Sendable { case precipitation, fraction }
+
+private enum NcepRrfsError: Error {
+    case invalidTimestamp
+    case missingElevation
+}

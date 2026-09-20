@@ -6,12 +6,20 @@ import OmFileIO
 @testable import App
 
 @Suite struct NcepRrfsTests {
+    private var fixtureDirectory: URL {
+        URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("docs/ncep-rrfs")
+    }
+
+    private func forecastHour(filename: String) throws -> Int {
+        try #require(filename.split(separator: ".").first(where: { $0.hasPrefix("f") && Int($0.dropFirst()) != nil }).flatMap { Int($0.dropFirst()) })
+    }
+
     private func records(_ filename: String, domain: NcepRrfsDomain, pressure: Bool = false) throws -> [NcepRrfsRecord] {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let url = root.appendingPathComponent("Sources/App/NcepRrfs/\(filename)")
-        return try String(contentsOf: url, encoding: .utf8).split(separator: "\n").compactMap {
-            try NcepRrfsRecord.parse(String($0), domain: domain, pressureFile: pressure)
-        }
+        let index = try String(contentsOf: fixtureDirectory.appendingPathComponent(filename), encoding: .utf8)
+        let variables = domain.downloadVariables(forecastHour: try forecastHour(filename: filename), pressureFile: pressure)
+        let decoded = try Curl.decodeGribIndices(indices: [index], variables: variables, errorOnMissing: true, logger: Logger(label: filename))
+        return try #require(decoded.first).matches.map(\.record)
     }
 
     @Test func seamlessForecastMapping() throws {
@@ -161,20 +169,20 @@ import OmFileIO
         #expect(NcepRrfsConusPressureVariable(rawValue: "temperature_500hPa_extra") == nil)
     }
 
-    @Test func analysisInventoriesAndInvalidInput() async throws {
+    @Test func analysisInventoriesAndMissingWindComponent() throws {
         for file in ["rrfs.t00z.2dfld.3km.f000.conus.grib2.idx", "rrfs.t00z.prslev.3km.f000.conus.grib2.idx", "rrfs.t00z.m001.prslevnomads.3km.f000.conus.grib2.idx"] {
             let domain: NcepRrfsDomain = file.contains("m001") ? .ncep_rrfs_conus_ensemble : .ncep_rrfs_conus
             let selected = try records(file, domain: domain, pressure: file.contains("prslev"))
             #expect(!selected.isEmpty)
             #expect(selected.allSatisfy { $0.endMinute == 0 && $0.stepType == "instant" })
         }
-        #expect(throws: NcepRrfsError.self) { try NcepRrfsRecord.parse("broken", domain: .ncep_rrfs_conus, pressureFile: false) }
-        #expect(throws: NcepRrfsError.self) { try NcepRrfsInventory(text: "", domain: .ncep_rrfs_conus, pressureFile: false) }
-        #expect(throws: NcepRrfsError.self) {
-            try NcepRrfsInventory(text: "1:0:d=2026092000:UGRD:10 m above ground:anl:", domain: .ncep_rrfs_conus, pressureFile: false)
+        let wind = [NcepRrfsSurfaceVariable.wind_speed_10m, .wind_direction_10m]
+            .map { NcepRrfsDownloadVariable(variable: $0, minute: 0) }
+        for index in ["", "1:0:d=2026092000:UGRD:10 m above ground:anl:"] {
+            #expect(throws: CurlError.self) {
+                try Curl.decodeGribIndices(indices: [index], variables: wind, errorOnMissing: true, logger: Logger(label: "missing-wind-test"))
+            }
         }
-        let inventory = try NcepRrfsInventory(text: "1:0:d=2026092000:TMP:2 m above ground:anl:", domain: .ncep_rrfs_conus, pressureFile: false)
-        await #expect(throws: NcepRrfsError.self) { try await inventory.validateComplete() }
     }
 
     @Test func indexedSelectionPreservesTimesAndExcludesUnusedFields() throws {
@@ -187,7 +195,7 @@ import OmFileIO
             "6:500:d=2026092000:REFC:entire atmosphere (considered as a single layer):15 min fcst:",
             "7:600:d=2026092000:TMP:2 m above ground:15 min fcst:"
         ]
-        let variables = NcepRrfsIndexedVariable.variables(domain: .ncep_rrfs_conus_15min, forecastHour: 1, pressureFile: false)
+        let variables = NcepRrfsDomain.ncep_rrfs_conus_15min.downloadVariables(forecastHour: 1, pressureFile: false)
             .filter { $0.record.variable == "temperature_2m" }
         #expect(variables.map { $0.record.endMinute } == [15, 30, 45, 60])
         #expect(Set(variables.compactMap(\.gribIndexName)).count == 4)
@@ -208,69 +216,66 @@ import OmFileIO
     }
 
     @Test func protocolSelectorsMatchAvailableInventories() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let directory = root.appendingPathComponent("Sources/App/NcepRrfs")
-        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).filter { $0.pathExtension == "idx" }
+        let files = try FileManager.default.contentsOfDirectory(at: fixtureDirectory, includingPropertiesForKeys: nil).filter { $0.pathExtension == "idx" }
+        #expect(files.count == 9)
         for file in files {
             let name = file.lastPathComponent
             let domain: NcepRrfsDomain = name.contains("m001") ? .ncep_rrfs_conus_ensemble : name.contains("subh") ? .ncep_rrfs_conus_15min : .ncep_rrfs_conus
-            let hour = name.contains("f000") ? 0 : name.contains("f001") ? 1 : 2
-            let variables = NcepRrfsIndexedVariable.variables(domain: domain, forecastHour: hour, pressureFile: name.contains("prslev"))
+            let hour = try forecastHour(filename: name)
+            let variables = domain.downloadVariables(forecastHour: hour, pressureFile: name.contains("prslev"))
             let index = try String(contentsOf: file, encoding: .utf8)
             let decoded = try Curl.decodeGribIndices(indices: [index], variables: variables, errorOnMissing: true, logger: Logger(label: name))
             #expect(decoded[0].matches.count == variables.count)
         }
     }
 
-    @Test func snowfallPrefersNativeWaterEquivalentAndFallsBackToFrozenFraction() throws {
+    @Test func productSpecificSnowfallInputs() throws {
         for domain in NcepRrfsDomain.allCases {
-            let inputs = NcepRrfsIndexedVariable.variables(domain: domain, forecastHour: 3, pressureFile: false)
-                .filter { $0.record.variable == "snowfall_water_equivalent" }
+            let inputs = domain.downloadVariables(forecastHour: 3, pressureFile: false)
+                .filter { $0.variable.rawValue == "snowfall_water_equivalent" }
             #expect(inputs.count == (domain == .ncep_rrfs_conus_15min ? 4 : 1))
             for input in inputs {
-                let fallback = try #require(input.gribIndexFallback)
-                let fraction = "1:0:d=2026092000\(try #require(fallback.gribIndexName))"
-                let snow = "2:100:d=2026092000\(try #require(input.gribIndexName))"
-                let selected = try Curl.decodeGribIndices(indices: [fraction + "\n" + snow], variables: [input], errorOnMissing: true, logger: Logger(label: "snow-test"))
-                let record = try #require(selected[0].matches.first).record
-                #expect(selected[0].matches.count == 1)
-                #expect(selected[0].range == "100-")
-                #expect(record.parameter == "TSNOWP")
-                #expect(record.startMinute == 0 && record.stepType == "accum")
-                var data: [Float] = [2.5]
-                record.convertUnits(data: &data)
-                #expect(data == [2.5]) // kg/m² is already mm water equivalent.
-
-                let missingSnow = try Curl.decodeGribIndices(indices: [fraction], variables: [input], errorOnMissing: true, logger: Logger(label: "snow-test"))
-                #expect(missingSnow[0].matches.first?.record.variable == "frozen_precipitation_percent")
-                #expect(missingSnow[0].matches.first?.record.parameter == "CPOFP")
+                let record = input.record
+                if domain == .ncep_rrfs_conus_ensemble {
+                    #expect(record.parameter == "CPOFP")
+                    #expect(record.variable == "frozen_precipitation_percent")
+                    #expect(record.stepType == "instant")
+                } else {
+                    #expect(record.parameter == "TSNOWP")
+                    #expect(record.variable == "snowfall_water_equivalent")
+                    #expect(record.startMinute == 0 && record.stepType == "accum")
+                    var data: [Float] = [2.5]
+                    record.convertUnits(data: &data)
+                    #expect(data == [2.5]) // kg/m² is already mm water equivalent.
+                }
             }
         }
     }
 
-    @Test func solarRadiationPrefersLastHourAverageAndFallsBackToInstant() throws {
-        let inputs = NcepRrfsIndexedVariable.variables(domain: .ncep_rrfs_conus, forecastHour: 3, pressureFile: false)
-            .filter { $0.record.isSolarRadiation }
-        #expect(inputs.count == 2)
-        for input in inputs {
-            let parameter = input.record.parameter
-            let instant = "1:0:d=2026092000:\(parameter):surface:3 hour fcst:"
-            let runningAverage = "2:100:d=2026092000:\(parameter):surface:0-3 hour ave fcst:"
-            let lastHour = "3:200:d=2026092000:\(parameter):surface:2-3 hour ave fcst:"
-            // Instant comes first: preference must not depend on inventory order.
-            let both = try Curl.decodeGribIndices(indices: [[instant, runningAverage, lastHour].joined(separator: "\n")], variables: [input], errorOnMissing: true, logger: Logger(label: "solar-test"))
-            let average = try #require(both[0].matches.first)
-            #expect(both[0].matches.count == 1)
-            #expect(average.record.stepType == "avg")
-            #expect(average.record.startMinute == 120)
-            #expect(!average.record.requiresSolarBackwardsConversion)
-            #expect(both[0].range == "200-")
-
-            let fallback = try Curl.decodeGribIndices(indices: [[instant, runningAverage].joined(separator: "\n")], variables: [input], errorOnMissing: true, logger: Logger(label: "solar-test"))
-            let instantaneous = try #require(fallback[0].matches.first)
-            #expect(instantaneous.record.stepType == "instant")
-            #expect(instantaneous.record.requiresSolarBackwardsConversion)
-            #expect(fallback[0].range == "0-99")
+    @Test func productSpecificSolarIntervals() throws {
+        for domain in NcepRrfsDomain.allCases {
+            let inputs = domain.downloadVariables(forecastHour: 3, pressureFile: false)
+                .filter { $0.record.isSolarRadiation }
+            #expect(!inputs.isEmpty)
+            for input in inputs {
+                let record = input.record
+                let usesAverage = domain != .ncep_rrfs_conus_15min && record.parameter == "DSWRF"
+                #expect(record.stepType == (usesAverage ? "avg" : "instant"))
+                #expect(record.requiresSolarBackwardsConversion == !usesAverage)
+                #expect(record.startMinute == record.endMinute - (usesAverage ? 60 : 0))
+            }
+        }
+        for domain in [NcepRrfsDomain.ncep_rrfs_conus, .ncep_rrfs_conus_ensemble] {
+            let input = NcepRrfsDownloadVariable(variable: domain == .ncep_rrfs_conus
+                ? NcepRrfsSurfaceVariable.shortwave_radiation as any NcepRrfsVariableDownloadable
+                : NcepRrfsEnsembleSurfaceVariable.shortwave_radiation, minute: 180)
+            let instant = "1:0:d=2026092000:DSWRF:surface:3 hour fcst:"
+            let runningAverage = "2:100:d=2026092000:DSWRF:surface:0-3 hour ave fcst:"
+            let lastHour = "3:200:d=2026092000:DSWRF:surface:2-3 hour ave fcst:"
+            let selected = try Curl.decodeGribIndices(indices: [[instant, runningAverage, lastHour].joined(separator: "\n")], variables: [input], errorOnMissing: true, logger: Logger(label: "solar-test"))
+            #expect(selected[0].matches.count == 1)
+            #expect(selected[0].range == "200-")
+            // An absent required hourly mean must not silently use a running mean.
             #expect(throws: CurlError.self) {
                 try Curl.decodeGribIndices(indices: [runningAverage], variables: [input], errorOnMissing: true, logger: Logger(label: "solar-test"))
             }
@@ -301,12 +306,8 @@ import OmFileIO
     }
 
     @Test func chronologicalDeaccumulationAcrossHourAndMemberBoundaries() async throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let records = try (1...2).flatMap { hour in
-            let file = root.appendingPathComponent("Sources/App/NcepRrfs/rrfs.t00z.2dfld.3km.subh.f00\(hour).conus.grib2.idx")
-            let index = try String(contentsOf: file, encoding: .utf8)
-            let inputs = NcepRrfsIndexedVariable.variables(domain: .ncep_rrfs_conus_15min, forecastHour: hour, pressureFile: false)
-            return try Curl.decodeGribIndices(indices: [index], variables: inputs, errorOnMissing: true, logger: Logger(label: "snow-deaccumulation-test"))[0].matches.map(\.record)
+            try self.records("rrfs.t00z.2dfld.3km.subh.f00\(hour).conus.grib2.idx", domain: .ncep_rrfs_conus_15min)
         }
         let deaverager = GribDeaverager()
         for variable in ["precipitation", "snowfall_water_equivalent"] {
@@ -330,10 +331,25 @@ import OmFileIO
         let path = try #require(ProcessInfo.processInfo.environment["RRFS_TEST_GRIB"])
         let domain = try #require(NcepRrfsDomain(rawValue: ProcessInfo.processInfo.environment["RRFS_TEST_DOMAIN"] ?? "ncep_rrfs_conus_ensemble"))
         let index = try String(contentsOfFile: path + ".idx", encoding: .utf8)
-        let inventory = try NcepRrfsInventory(text: index, domain: domain, pressureFile: path.contains("prslev"))
+        let inputs = domain.downloadVariables(forecastHour: try forecastHour(filename: URL(fileURLWithPath: path).lastPathComponent), pressureFile: path.contains("prslev"))
+        let selection = try Curl.decodeGribIndices(indices: [index], variables: inputs, errorOnMissing: true, logger: Logger(label: "local-grib-test"))
+        let selected = try #require(selection.first).matches
+        // Match selected records to positions in the complete local file. Keep only
+        // the first occurrence, just as the production index decoder does.
+        let lines = index.split(separator: "\n")
+        var seen = Set<String>()
+        let records = lines.map { line -> NcepRrfsRecord? in
+            guard let input = selected.first(where: { $0.matches(indexLine: line) }),
+                  let name = input.gribIndexName, seen.insert(name).inserted else { return nil }
+            return input.record
+        }
+        var offset = 0
         var decoded = 0
         for try await message in try GribFileAsyncSequence(fileName: path, multiSupport: true) {
-            guard let record = try await inventory.next(message).0, !record.isStatic else { continue }
+            try #require(offset < records.count)
+            let record = records[offset]
+            offset += 1
+            guard let record else { continue }
             let date = try #require(message.get(attribute: "validityDate"))
             let time = try #require(message.getLong(attribute: "validityTime"))
             let timestamp = try Timestamp.from(yyyymmdd: "\(date)\(time.zeroPadded(len: 4))")
@@ -348,7 +364,8 @@ import OmFileIO
             if record.variable == "convective_inhibition" { #expect(array.data.allSatisfy { $0.isNaN || $0 >= 0 }) }
             decoded += 1
         }
-        try await inventory.validateComplete()
+        #expect(offset == lines.count)
+        #expect(decoded == selected.count)
         #expect(decoded > 10)
     }
 

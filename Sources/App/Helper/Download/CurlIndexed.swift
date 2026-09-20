@@ -10,14 +10,9 @@ protocol CurlIndexedVariable {
 
     /// If true, the exact string needs to match at the end
     var exactMatch: Bool { get }
-
-    /// Alternative selected only when the preferred entry is absent from the inventory.
-    var gribIndexFallback: Self? { get }
 }
 
 extension CurlIndexedVariable {
-    var gribIndexFallback: Self? { nil }
-
     func matches(indexLine: Substring) -> Bool {
         guard let gribIndexName else { return false }
         return exactMatch ? indexLine.hasSuffix(gribIndexName) : indexLine.contains(gribIndexName)
@@ -95,16 +90,10 @@ extension Curl {
 
         for index in indices {
             let lines = index.split(separator: "\n")
-            // Resolve preferences before building ranges, independently of file order.
-            let selectedVariables = variables.map { variable in
-                guard let fallback = variable.gribIndexFallback,
-                      !lines.contains(where: { variable.matches(indexLine: $0) }) else { return variable }
-                return fallback
-            }
             var matches = [Variable]()
             matches.reserveCapacity(count)
             guard let range = lines.indexToRange(include: { idx in
-                guard let match = selectedVariables.first(where: { $0.matches(indexLine: idx) }) else {
+                guard let match = variables.first(where: { $0.matches(indexLine: idx) }) else {
                     return false
                 }
                 guard !matches.contains(where: { $0.gribIndexName == match.gribIndexName }) else {
@@ -126,8 +115,7 @@ extension Curl {
             guard let gribIndexName = variable.gribIndexName else {
                 continue
             }
-            let fallbackName = variable.gribIndexFallback?.gribIndexName
-            if !result.contains(where: { $0.matches.contains(where: { $0.gribIndexName == gribIndexName || (fallbackName != nil && $0.gribIndexName == fallbackName) }) }) {
+            if !result.contains(where: { $0.matches.contains(where: { $0.gribIndexName == gribIndexName }) }) {
                 logger.error("Variable \(variable) '\(gribIndexName)' missing")
                 missing = true
             }
