@@ -7,6 +7,11 @@ protocol NcepRrfsVariableDownloadable: GenericVariable {
     var gribInput: (parameter: String, level: String) { get }
     var gribStep: NcepRrfsGribStep { get }
     var skipHour0: Bool { get }
+    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    var isSolarRadiation: Bool { get }
+    var isDewpoint: Bool { get }
+    var isFrozenPrecipitationPercent: Bool { get }
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? { get }
     func gribIndexName(minute: Int) -> String?
 }
 
@@ -43,18 +48,15 @@ extension NcepRrfsVariableDownloadable {
         return ":\(gribInput.parameter):\(gribInput.level):\(step):"
     }
 
-    func gribRecord(minute: Int) -> NcepRrfsRecord {
-        let name: String
-        switch gribInput.parameter {
-        case "VGRD": name = rawValue.replacingOccurrences(of: "wind_direction", with: "wind_speed")
-        case "DPT": name = "dewpoint_2m"
-        case "CPOFP": name = "frozen_precipitation_percent"
-        default: name = rawValue
+    var isDewpoint: Bool { false }
+    var isFrozenPrecipitationPercent: Bool { false }
+
+    func convertUnits(data: inout [Float]) {
+        if let multiplyAdd {
+            data.multiplyAdd(multiply: multiplyAdd.multiply, add: multiplyAdd.add)
         }
-        let interval = gribStep.interval(minute: minute)
-        return NcepRrfsRecord(variable: name, parameter: gribInput.parameter,
-                             startMinute: interval.start, endMinute: minute, stepType: interval.type)
     }
+
 }
 
 /// Adds the forecast minute to the variable, like GfsDownloadVariable.
@@ -65,7 +67,8 @@ struct NcepRrfsDownloadVariable: CurlIndexedVariable, Sendable {
     var gribIndexName: String? { variable.gribIndexName(minute: minute) }
     // Ensemble inventories append ENS=+n after the forecast interval.
     var exactMatch: Bool { false }
-    var record: NcepRrfsRecord { variable.gribRecord(minute: minute) }
+    var interval: (start: Int, type: String) { variable.gribStep.interval(minute: minute) }
+    var requiresSolarBackwardsConversion: Bool { variable.isSolarRadiation && interval.type == "instant" }
 }
 
 extension NcepRrfsDomain {
@@ -213,6 +216,72 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
         default: return false
         }
     }
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m,
+             .surface_temperature,
+             .temperature_30m,
+             .temperature_50m,
+             .temperature_80m,
+             .temperature_100m,
+             .temperature_160m,
+             .temperature_320m,
+             .temperature_305m,
+             .temperature_457m,
+             .temperature_610m,
+             .temperature_914m,
+             .temperature_1524m,
+             .temperature_1829m,
+             .temperature_2134m,
+             .temperature_2743m,
+             .temperature_3658m,
+             .temperature_4572m,
+             .soil_temperature_0cm,
+             .soil_temperature_1cm,
+             .soil_temperature_4cm,
+             .soil_temperature_10cm,
+             .soil_temperature_30cm,
+             .soil_temperature_60cm,
+             .soil_temperature_100cm,
+             .soil_temperature_160cm,
+             .soil_temperature_300cm: return (1, -273.15)
+        case .pressure_msl, .surface_pressure: return (0.01, 0)
+        case .snowfall: return (100, 0)
+        case .convective_inhibition: return (-1, 0)
+        default: return nil
+        }
+    }
+
+    var isSolarRadiation: Bool {
+        switch self {
+        case .shortwave_radiation, .diffuse_radiation: return true
+        default: return false
+        }
+    }
+
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? {
+        switch self {
+        case .wind_speed_10m, .wind_direction_10m: return (.surface(.wind_speed_10m), .surface(.wind_direction_10m))
+        case .wind_speed_30m, .wind_direction_30m: return (.surface(.wind_speed_30m), .surface(.wind_direction_30m))
+        case .wind_speed_50m, .wind_direction_50m: return (.surface(.wind_speed_50m), .surface(.wind_direction_50m))
+        case .wind_speed_80m, .wind_direction_80m: return (.surface(.wind_speed_80m), .surface(.wind_direction_80m))
+        case .wind_speed_100m, .wind_direction_100m: return (.surface(.wind_speed_100m), .surface(.wind_direction_100m))
+        case .wind_speed_160m, .wind_direction_160m: return (.surface(.wind_speed_160m), .surface(.wind_direction_160m))
+        case .wind_speed_320m, .wind_direction_320m: return (.surface(.wind_speed_320m), .surface(.wind_direction_320m))
+        case .wind_speed_305m, .wind_direction_305m: return (.surface(.wind_speed_305m), .surface(.wind_direction_305m))
+        case .wind_speed_457m, .wind_direction_457m: return (.surface(.wind_speed_457m), .surface(.wind_direction_457m))
+        case .wind_speed_610m, .wind_direction_610m: return (.surface(.wind_speed_610m), .surface(.wind_direction_610m))
+        case .wind_speed_914m, .wind_direction_914m: return (.surface(.wind_speed_914m), .surface(.wind_direction_914m))
+        case .wind_speed_1524m, .wind_direction_1524m: return (.surface(.wind_speed_1524m), .surface(.wind_direction_1524m))
+        case .wind_speed_1829m, .wind_direction_1829m: return (.surface(.wind_speed_1829m), .surface(.wind_direction_1829m))
+        case .wind_speed_2134m, .wind_direction_2134m: return (.surface(.wind_speed_2134m), .surface(.wind_direction_2134m))
+        case .wind_speed_2743m, .wind_direction_2743m: return (.surface(.wind_speed_2743m), .surface(.wind_direction_2743m))
+        case .wind_speed_3658m, .wind_direction_3658m: return (.surface(.wind_speed_3658m), .surface(.wind_direction_3658m))
+        case .wind_speed_4572m, .wind_direction_4572m: return (.surface(.wind_speed_4572m), .surface(.wind_direction_4572m))
+        default: return nil
+        }
+    }
+
 }
 
 extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
@@ -254,6 +323,33 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
         default: return false
         }
     }
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m,
+             .relative_humidity_2m: return (1, -273.15)
+        case .pressure_msl, .surface_pressure: return (0.01, 0)
+        case .snowfall: return (100, 0)
+        default: return nil
+        }
+    }
+
+    var isSolarRadiation: Bool {
+        switch self {
+        case .shortwave_radiation, .diffuse_radiation: return true
+        default: return false
+        }
+    }
+
+    var isDewpoint: Bool { self == .relative_humidity_2m }
+
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? {
+        switch self {
+        case .wind_speed_10m, .wind_direction_10m: return (.surface(.wind_speed_10m), .surface(.wind_direction_10m))
+        case .wind_speed_80m, .wind_direction_80m: return (.surface(.wind_speed_80m), .surface(.wind_direction_80m))
+        default: return nil
+        }
+    }
+
 }
 
 extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
@@ -307,6 +403,35 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
         default: return false
         }
     }
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m: return (1, -273.15)
+        case .pressure_msl, .surface_pressure: return (0.01, 0)
+        case .snowfall: return (100, 0)
+        case .convective_inhibition: return (-1, 0)
+        default: return nil
+        }
+    }
+
+    var isSolarRadiation: Bool {
+        switch self {
+        case .shortwave_radiation: return true
+        default: return false
+        }
+    }
+
+    var isFrozenPrecipitationPercent: Bool { self == .snowfall_water_equivalent }
+
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? {
+        switch self {
+        case .wind_speed_10m, .wind_direction_10m: return (.surface(.wind_speed_10m), .surface(.wind_direction_10m))
+        case .wind_speed_80m, .wind_direction_80m: return (.surface(.wind_speed_80m), .surface(.wind_direction_80m))
+        case .wind_speed_160m, .wind_direction_160m: return (.surface(.wind_speed_160m), .surface(.wind_direction_160m))
+        case .wind_speed_320m, .wind_direction_320m: return (.surface(.wind_speed_320m), .surface(.wind_direction_320m))
+        default: return nil
+        }
+    }
+
 }
 
 extension NcepRrfsPressureVariable: NcepRrfsVariableDownloadable {
@@ -324,6 +449,21 @@ extension NcepRrfsPressureVariable: NcepRrfsVariableDownloadable {
     }
     var gribStep: NcepRrfsGribStep { .instant }
     var skipHour0: Bool { false }
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch variable {
+        case .temperature: return (1, -273.15)
+        default: return nil
+        }
+    }
+    var isSolarRadiation: Bool { false }
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? {
+        switch variable {
+        case .wind_speed, .wind_direction:
+            return (.pressure(.init(variable: .wind_speed, level: level)), .pressure(.init(variable: .wind_direction, level: level)))
+        default: return nil
+        }
+    }
+
 }
 
 extension SurfaceAndPressureVariable: NcepRrfsVariableDownloadable where Surface: NcepRrfsVariableDownloadable, Pressure: NcepRrfsVariableDownloadable {
@@ -345,4 +485,39 @@ extension SurfaceAndPressureVariable: NcepRrfsVariableDownloadable where Surface
         case .pressure(let variable): return variable.skipHour0
         }
     }
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .surface(let variable): return variable.multiplyAdd
+        case .pressure(let variable): return variable.multiplyAdd
+        }
+    }
+
+    var isSolarRadiation: Bool {
+        switch self {
+        case .surface(let variable): return variable.isSolarRadiation
+        case .pressure(let variable): return variable.isSolarRadiation
+        }
+    }
+
+    var isDewpoint: Bool {
+        switch self {
+        case .surface(let variable): return variable.isDewpoint
+        case .pressure(let variable): return variable.isDewpoint
+        }
+    }
+
+    var isFrozenPrecipitationPercent: Bool {
+        switch self {
+        case .surface(let variable): return variable.isFrozenPrecipitationPercent
+        case .pressure(let variable): return variable.isFrozenPrecipitationPercent
+        }
+    }
+
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? {
+        switch self {
+        case .surface(let variable): return variable.windComponents
+        case .pressure(let variable): return variable.windComponents
+        }
+    }
+
 }

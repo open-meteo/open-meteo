@@ -15,11 +15,11 @@ import OmFileIO
         try #require(filename.split(separator: ".").first(where: { $0.hasPrefix("f") && Int($0.dropFirst()) != nil }).flatMap { Int($0.dropFirst()) })
     }
 
-    private func records(_ filename: String, domain: NcepRrfsDomain, pressure: Bool = false) throws -> [NcepRrfsRecord] {
+    private func records(_ filename: String, domain: NcepRrfsDomain, pressure: Bool = false) throws -> [NcepRrfsDownloadVariable] {
         let index = try String(contentsOf: fixtureDirectory.appendingPathComponent(filename), encoding: .utf8)
         let variables = domain.downloadVariables(forecastHour: try forecastHour(filename: filename), pressureFile: pressure)
         let decoded = try Curl.decodeGribIndices(indices: [index], variables: variables, errorOnMissing: true, logger: Logger(label: filename))
-        return try #require(decoded.first).matches.map(\.record)
+        return try #require(decoded.first).matches
     }
 
     @Test func seamlessForecastMapping() throws {
@@ -120,14 +120,14 @@ import OmFileIO
 
     @Test func hourlyInventorySelectionAndCatalogCoverage() throws {
         let fields = try records("rrfs.t00z.2dfld.3km.f001.conus.grib2.idx", domain: .ncep_rrfs_conus)
-        #expect(fields.filter { $0.variable == "shortwave_radiation" }.map(\.stepType) == ["avg"])
-        #expect(fields.filter { $0.variable == "cloud_cover" }.map(\.stepType) == ["instant"])
-        let names = Set(fields.map(\.variable))
+        #expect(fields.filter { $0.variable.rawValue == "shortwave_radiation" }.map { $0.interval.type } == ["avg"])
+        #expect(fields.filter { $0.variable.rawValue == "cloud_cover" }.map { $0.interval.type } == ["instant"])
+        let names = Set(fields.map { $0.variable.rawValue })
         for required in ["cape", "convective_inhibition", "boundary_layer_height", "wind_speed_4572m", "wind_speed_320m", "soil_temperature_0cm", "soil_moisture_300cm"] {
             #expect(names.contains(required))
         }
         for variable in NcepRrfsSurfaceVariable.allCases {
-            let input = variable.rawValue.replacingOccurrences(of: "wind_direction", with: "wind_speed")
+            let input = variable.rawValue
             #expect(names.contains(input), "Missing inventory field for \(variable)")
         }
     }
@@ -135,19 +135,19 @@ import OmFileIO
     @Test func subhourlyMinutesAndAccumulationRanges() throws {
         let first = try records("rrfs.t00z.2dfld.3km.subh.f001.conus.grib2.idx", domain: .ncep_rrfs_conus_15min)
         let second = try records("rrfs.t00z.2dfld.3km.subh.f002.conus.grib2.idx", domain: .ncep_rrfs_conus_15min)
-        let precipitation = (first + second).filter { $0.variable == "precipitation" }
-        #expect(precipitation.map(\.endMinute) == [15, 30, 45, 60, 75, 90, 105, 120])
-        #expect(precipitation.allSatisfy { $0.startMinute == 0 && $0.stepType == "accum" })
-        #expect(first.filter { $0.variable == "dewpoint_2m" }.count == 4)
-        #expect(first.filter { $0.variable == "shortwave_radiation" }.allSatisfy { $0.stepType == "instant" })
-        #expect(first.allSatisfy { !$0.variable.contains("hPa") })
+        let precipitation = (first + second).filter { $0.variable.rawValue == "precipitation" }
+        #expect(precipitation.map(\.minute) == [15, 30, 45, 60, 75, 90, 105, 120])
+        #expect(precipitation.allSatisfy { $0.interval.start == 0 && $0.interval.type == "accum" })
+        #expect(first.filter { $0.variable.isDewpoint }.count == 4)
+        #expect(first.filter { $0.variable.rawValue == "shortwave_radiation" }.allSatisfy { $0.interval.type == "instant" })
+        #expect(first.allSatisfy { !$0.variable.rawValue.contains("hPa") })
     }
 
     @Test func ensembleCatalogMatchesReducedInventory() throws {
         let fields = try records("rrfs.t00z.m001.2dfldnomads.3km.f001.conus.grib2.idx", domain: .ncep_rrfs_conus_ensemble)
-        let names = Set(fields.map(\.variable))
-        for variable in NcepRrfsEnsembleSurfaceVariable.allCases where variable != .snowfall_water_equivalent {
-            #expect(names.contains(variable.rawValue.replacingOccurrences(of: "wind_direction", with: "wind_speed")))
+        let names = Set(fields.map { $0.variable.rawValue })
+        for variable in NcepRrfsEnsembleSurfaceVariable.allCases {
+            #expect(names.contains(variable.rawValue))
         }
         #expect(NcepRrfsEnsembleSurfaceVariable(rawValue: "boundary_layer_height") == nil)
         #expect(NcepRrfsEnsembleSurfaceVariable(rawValue: "wind_speed_4572m") == nil)
@@ -159,11 +159,11 @@ import OmFileIO
             ("rrfs.t00z.m001.prslevnomads.3km.f001.conus.grib2.idx", NcepRrfsDomain.ncep_rrfs_conus_ensemble, NcepRrfsEnsemblePressureVariable.allVariables.map(\.rawValue))
         ] {
             let fields = try records(filename, domain: domain, pressure: true)
-            let names = Set(fields.map(\.variable))
+            let names = Set(fields.map { $0.variable.rawValue })
             for variable in variables {
-                #expect(names.contains(variable.replacingOccurrences(of: "wind_direction", with: "wind_speed")))
+                #expect(names.contains(variable))
             }
-            #expect(fields.allSatisfy { $0.variable.hasSuffix("hPa") })
+            #expect(fields.allSatisfy { $0.variable.rawValue.hasSuffix("hPa") })
         }
         #expect(NcepRrfsEnsemblePressureVariable(rawValue: "temperature_50hPa") == nil)
         #expect(NcepRrfsConusPressureVariable(rawValue: "temperature_500hPa_extra") == nil)
@@ -174,7 +174,7 @@ import OmFileIO
             let domain: NcepRrfsDomain = file.contains("m001") ? .ncep_rrfs_conus_ensemble : .ncep_rrfs_conus
             let selected = try records(file, domain: domain, pressure: file.contains("prslev"))
             #expect(!selected.isEmpty)
-            #expect(selected.allSatisfy { $0.endMinute == 0 && $0.stepType == "instant" })
+            #expect(selected.allSatisfy { $0.minute == 0 && $0.interval.type == "instant" })
         }
         let wind = [NcepRrfsSurfaceVariable.wind_speed_10m, .wind_direction_10m]
             .map { NcepRrfsDownloadVariable(variable: $0, minute: 0) }
@@ -196,8 +196,8 @@ import OmFileIO
             "7:600:d=2026092000:TMP:2 m above ground:15 min fcst:"
         ]
         let variables = NcepRrfsDomain.ncep_rrfs_conus_15min.downloadVariables(forecastHour: 1, pressureFile: false)
-            .filter { $0.record.variable == "temperature_2m" }
-        #expect(variables.map { $0.record.endMinute } == [15, 30, 45, 60])
+            .filter { $0.variable.rawValue == "temperature_2m" }
+        #expect(variables.map { $0.minute } == [15, 30, 45, 60])
         #expect(Set(variables.compactMap(\.gribIndexName)).count == 4)
         for (i, line) in lines.enumerated() {
             let matches = variables.filter { line.hasSuffix($0.gribIndexName!) }
@@ -208,7 +208,7 @@ import OmFileIO
         #expect(decoded.count == 1)
         #expect(decoded[0].range == "0-399")
         #expect(decoded[0].minSize == 400)
-        #expect(decoded[0].matches.map { $0.record.endMinute } == [15, 30, 45, 60])
+        #expect(decoded[0].matches.map { $0.minute } == [15, 30, 45, 60])
         #expect(throws: CurlError.self) {
             try Curl.decodeGribIndices(indices: [lines[0]], variables: variables,
                                        errorOnMissing: true, logger: Logger(label: "rrfs-index-test"))
@@ -235,17 +235,17 @@ import OmFileIO
                 .filter { $0.variable.rawValue == "snowfall_water_equivalent" }
             #expect(inputs.count == (domain == .ncep_rrfs_conus_15min ? 4 : 1))
             for input in inputs {
-                let record = input.record
+                let record = input
                 if domain == .ncep_rrfs_conus_ensemble {
-                    #expect(record.parameter == "CPOFP")
-                    #expect(record.variable == "frozen_precipitation_percent")
-                    #expect(record.stepType == "instant")
+                    #expect(record.variable.gribInput.parameter == "CPOFP")
+                    #expect(record.variable.isFrozenPrecipitationPercent)
+                    #expect(record.interval.type == "instant")
                 } else {
-                    #expect(record.parameter == "TSNOWP")
-                    #expect(record.variable == "snowfall_water_equivalent")
-                    #expect(record.startMinute == 0 && record.stepType == "accum")
+                    #expect(record.variable.gribInput.parameter == "TSNOWP")
+                    #expect(record.variable.rawValue == "snowfall_water_equivalent")
+                    #expect(record.interval.start == 0 && record.interval.type == "accum")
                     var data: [Float] = [2.5]
-                    record.convertUnits(data: &data)
+                    record.variable.convertUnits(data: &data)
                     #expect(data == [2.5]) // kg/m² is already mm water equivalent.
                 }
             }
@@ -255,14 +255,14 @@ import OmFileIO
     @Test func productSpecificSolarIntervals() throws {
         for domain in NcepRrfsDomain.allCases {
             let inputs = domain.downloadVariables(forecastHour: 3, pressureFile: false)
-                .filter { $0.record.isSolarRadiation }
+                .filter { $0.variable.isSolarRadiation }
             #expect(!inputs.isEmpty)
             for input in inputs {
-                let record = input.record
-                let usesAverage = domain != .ncep_rrfs_conus_15min && record.parameter == "DSWRF"
-                #expect(record.stepType == (usesAverage ? "avg" : "instant"))
+                let record = input
+                let usesAverage = domain != .ncep_rrfs_conus_15min && record.variable.gribInput.parameter == "DSWRF"
+                #expect(record.interval.type == (usesAverage ? "avg" : "instant"))
                 #expect(record.requiresSolarBackwardsConversion == !usesAverage)
-                #expect(record.startMinute == record.endMinute - (usesAverage ? 60 : 0))
+                #expect(record.interval.start == record.minute - (usesAverage ? 60 : 0))
             }
         }
         for domain in [NcepRrfsDomain.ncep_rrfs_conus, .ncep_rrfs_conus_ensemble] {
@@ -283,14 +283,18 @@ import OmFileIO
     }
 
     @Test func conversionsAndMetadata() {
-        for (name, parameter, raw, expected) in [
-            ("temperature_2m", "TMP", Float(273.15), Float(0)),
-            ("pressure_msl", "MSLET", 101325, 1013.25),
-            ("snowfall", "ASNOW", 0.02, 2),
-            ("convective_inhibition", "CIN", -150, 150)
-        ] {
+        let conversions: [(any NcepRrfsVariableDownloadable, Float, Float)] = [
+            (NcepRrfsSurfaceVariable.temperature_2m, 273.15, 0),
+            (NcepRrfsSurfaceVariable.pressure_msl, 101325, 1013.25),
+            (NcepRrfsSurfaceVariable.snowfall, 0.02, 2),
+            (NcepRrfsSurfaceVariable.convective_inhibition, -150, 150),
+            (NcepRrfs15MinVariable.relative_humidity_2m, 273.15, 0), // DPT input
+            (NcepRrfsEnsembleSurfaceVariable.relative_humidity_2m, 75, 75),
+            (NcepRrfsConusPressureVariable(variable: .temperature, level: 500), 273.15, 0)
+        ]
+        for (variable, raw, expected) in conversions {
             var values = [raw]
-            NcepRrfsRecord(variable: name, parameter: parameter, startMinute: 0, endMinute: 60, stepType: "instant").convertUnits(data: &values)
+            variable.convertUnits(data: &values)
             #expect(abs(values[0] - expected) < 0.001)
         }
         let variables: [any GenericVariable] = NcepRrfsSurfaceVariable.allCases.map { $0 as any GenericVariable }
@@ -311,14 +315,14 @@ import OmFileIO
         }
         let deaverager = GribDeaverager()
         for variable in ["precipitation", "snowfall_water_equivalent"] {
-            let accumulated = records.filter { $0.variable == variable }
+            let accumulated = records.filter { $0.variable.rawValue == variable }
             #expect(accumulated.count == 8)
             for (i, record) in accumulated.enumerated() {
                 for member in 0..<2 {
                     let amount = Float(member + 1)
                     var array = Array2D(data: [Float(i + 1) * amount], nx: 1, ny: 1)
-                    let keep = await deaverager.deaccumulateIfRequired(variable: record.variable, member: member, stepType: record.stepType,
-                        stepRange: "\(record.startMinute)-\(record.endMinute)", array2d: &array)
+                    let keep = await deaverager.deaccumulateIfRequired(variable: record.variable.rawValue, member: member, stepType: record.interval.type,
+                        stepRange: "\(record.interval.start)-\(record.minute)", array2d: &array)
                     #expect(keep)
                     #expect(array.data == [amount])
                 }
@@ -338,10 +342,10 @@ import OmFileIO
         // the first occurrence, just as the production index decoder does.
         let lines = index.split(separator: "\n")
         var seen = Set<String>()
-        let records = lines.map { line -> NcepRrfsRecord? in
+        let records = lines.map { line -> NcepRrfsDownloadVariable? in
             guard let input = selected.first(where: { $0.matches(indexLine: line) }),
                   let name = input.gribIndexName, seen.insert(name).inserted else { return nil }
-            return input.record
+            return input
         }
         var offset = 0
         var decoded = 0
@@ -356,12 +360,12 @@ import OmFileIO
             let runDate = try #require(message.get(attribute: "dataDate"))
             let runTime = try #require(message.getLong(attribute: "dataTime"))
             let run = try Timestamp.from(yyyymmdd: "\(runDate)\(runTime.zeroPadded(len: 4))")
-            #expect(timestamp == run.add(record.endMinute * 60))
+            #expect(timestamp == run.add(record.minute * 60))
             var array = try message.to2D(nx: 1799, ny: 1059, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-            record.convertUnits(data: &array.data)
+            record.variable.convertUnits(data: &array.data)
             #expect(array.data.contains { $0.isFinite })
-            if record.variable == "temperature_2m" { #expect(array.data.allSatisfy { $0.isNaN || (-100...70).contains($0) }) }
-            if record.variable == "convective_inhibition" { #expect(array.data.allSatisfy { $0.isNaN || $0 >= 0 }) }
+            if record.variable.rawValue == "temperature_2m" { #expect(array.data.allSatisfy { $0.isNaN || (-100...70).contains($0) }) }
+            if record.variable.rawValue == "convective_inhibition" { #expect(array.data.allSatisfy { $0.isNaN || $0 >= 0 }) }
             decoded += 1
         }
         #expect(offset == lines.count)

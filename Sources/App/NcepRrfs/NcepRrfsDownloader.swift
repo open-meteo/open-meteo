@@ -81,60 +81,59 @@ struct NcepRrfsDownloader: AsyncCommand {
                         ? VariablePerMemberStorage<NcepRrfsSnowInput>() : nil
                     let accumulated = NcepRrfsAccumulatedFields()
                     let messages = try await curl.downloadIndexedGrib(url: [url], variables: variables)
-                    try await messages.foreachConcurrent(nConcurrent: concurrent) { variable, message in
-                        let record = variable.record
-                        let time = run.add(record.endMinute * 60)
-                        guard minutes.contains(record.endMinute),
+                    try await messages.foreachConcurrent(nConcurrent: concurrent) { input, message in
+                        let variable = input.variable
+                        let time = run.add(input.minute * 60)
+                        guard minutes.contains(input.minute),
                               let date = message.get(attribute: "validityDate"),
                               let validity = message.getLong(attribute: "validityTime"),
                               try Timestamp.from(yyyymmdd: "\(date)\(validity.zeroPadded(len: 4))") == time else {
                             throw NcepRrfsError.invalidTimestamp
                         }
                         var array = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                        record.convertUnits(data: &array.data)
+                        variable.convertUnits(data: &array.data)
                         let timestepWriter = try await writer.getWriter(time: time)
                         if domain == .ncep_rrfs_conus_15min {
-                            if record.variable == "temperature_2m" { try await rh.ingest(.temperature(array), member: member, writer: timestepWriter) }
-                            if record.variable == "dewpoint_2m" {
+                            if variable.rawValue == "temperature_2m" { try await rh.ingest(.temperature(array), member: member, writer: timestepWriter) }
+                            if variable.isDewpoint {
                                 try await rh.ingest(.dewpoint(array), member: member, writer: timestepWriter)
                                 return
                             }
                         }
-                        if record.variable == "frozen_precipitation_percent" {
+                        if variable.isFrozenPrecipitationPercent {
                             await snow?.set(variable: .fraction, timestamp: time, member: member, data: array)
                             return
                         }
-                        guard let field = record.field else { return }
-                        if record.isWind {
-                            let direction = NcepRrfsVariable(rawValue: record.variable.replacingOccurrences(of: "wind_speed", with: "wind_direction"))!
-                            try await wind.ingest(record.parameter == "UGRD" ? .u(array) : .v(array), member: member,
-                                                  outSpeed: field, outDirection: direction, writer: timestepWriter)
+                        if let components = variable.windComponents {
+                            try await wind.ingest(variable.gribInput.parameter == "UGRD" ? .u(array) : .v(array), member: member,
+                                                  outSpeed: components.speed, outDirection: components.direction, writer: timestepWriter)
                             return
                         }
                         // Averaged solar inputs cover the last hour and need no deaveraging.
-                        if record.stepType == "accum" || (record.stepType == "avg" && !record.isSolarRadiation) {
-                            await accumulated.append(record: record, array: array)
+                        if input.interval.type == "accum" || (input.interval.type == "avg" && !variable.isSolarRadiation) {
+                            await accumulated.append(input: input, array: array)
                             return
                         }
-                        if record.requiresSolarBackwardsConversion {
+                        if input.requiresSolarBackwardsConversion {
                             let factor = Zensun.backwardsAveragedToInstantFactor(grid: grid, locationRange: 0..<grid.count,
                                 timerange: TimerangeDt(start: time, nTime: 1, dtSeconds: domain.dtSeconds))
                             for i in array.data.indices where factor.data[i] >= 0.05 { array.data[i] /= factor.data[i] }
                         }
-                        try await timestepWriter.write(member: member, variable: field, data: array.data)
+                        try await timestepWriter.write(member: member, variable: variable, data: array.data)
                     }
                     // Parallelize across variables, while preserving every variable's time order.
                     let groups = await accumulated.grouped()
                     try await groups.foreachConcurrent(nConcurrent: concurrent) { fields in
-                        for (record, raw) in fields.sorted(by: { $0.0.endMinute < $1.0.endMinute }) {
+                        for (input, raw) in fields.sorted(by: { $0.0.minute < $1.0.minute }) {
+                            let variable = input.variable
                             var array = raw
-                            guard await deaverager.deaccumulateIfRequired(variable: record.variable, member: member,
-                                stepType: record.stepType, stepRange: "\(record.startMinute)-\(record.endMinute)", array2d: &array) else { continue }
-                            if record.variable == "precipitation" {
-                                await snow?.set(variable: .precipitation, timestamp: run.add(record.endMinute * 60), member: member, data: array)
-                                await precipitationMembers?.set(variable: .precipitation, timestamp: run.add(record.endMinute * 60), member: member, data: array)
+                            guard await deaverager.deaccumulateIfRequired(variable: variable.rawValue, member: member,
+                                stepType: input.interval.type, stepRange: "\(input.interval.start)-\(input.minute)", array2d: &array) else { continue }
+                            if variable.rawValue == "precipitation" {
+                                await snow?.set(variable: .precipitation, timestamp: run.add(input.minute * 60), member: member, data: array)
+                                await precipitationMembers?.set(variable: .precipitation, timestamp: run.add(input.minute * 60), member: member, data: array)
                             }
-                            try await writer.write(time: run.add(record.endMinute * 60), member: member, variable: record.field!, data: array.data)
+                            try await writer.write(time: run.add(input.minute * 60), member: member, variable: variable, data: array.data)
                         }
                     }
                     if let snow {
@@ -178,9 +177,9 @@ private enum NcepRrfsStaticVariable: String, CaseIterable, CurlIndexedVariable {
 }
 
 private actor NcepRrfsAccumulatedFields {
-    var fields = [(NcepRrfsRecord, Array2D)]()
-    func append(record: NcepRrfsRecord, array: Array2D) { fields.append((record, array)) }
-    func grouped() -> [[(NcepRrfsRecord, Array2D)]] { Array(Dictionary(grouping: fields, by: { $0.0.variable }).values) }
+    var fields = [(NcepRrfsDownloadVariable, Array2D)]()
+    func append(input: NcepRrfsDownloadVariable, array: Array2D) { fields.append((input, array)) }
+    func grouped() -> [[(NcepRrfsDownloadVariable, Array2D)]] { Array(Dictionary(grouping: fields, by: { $0.0.variable.rawValue }).values) }
 }
 
 private enum NcepRrfsSnowInput: Hashable, Sendable { case precipitation, fraction }
