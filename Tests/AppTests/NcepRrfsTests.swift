@@ -67,6 +67,9 @@ import OmFileIO
     }
 
     @Test func ensemblePrecipitationProbabilityOutput() async throws {
+        // The temporary OM writer uses the configured data directory even with
+        // storeOnDisk disabled. A clean CI checkout has not created it yet.
+        try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let domain = ProbabilityTestDomain()
         let run = Timestamp(2026, 9, 20)
         let storage = VariablePerMemberStorage<NcepRrfsEnsembleSurfaceVariable>()
