@@ -7,9 +7,8 @@ import OmFileFormat
 /// Opening validates structure, not every point's norm, ID permutation, or bucket membership:
 /// artifacts must come from a trusted writer and their mapped inodes must remain immutable.
 package final class ReducedLatLonIndex: Sendable {
-    typealias Artifact = ReducedLatLonArtifact
     private let mapped: MmapFile
-    let bands: [Artifact.Band]
+    let bands: [ReducedLatLonArtifact.Band]
     let firstBand: Int
     let directoryOffset: Int
     let pointsOffset: Int
@@ -64,7 +63,7 @@ package final class ReducedLatLonIndex: Sendable {
         // The pointer bridge cannot infer mmap ownership; pin it even on validation errors.
         defer { withExtendedLifetime(mapped) {} }
         let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
-        let parsed = try Artifact.parse(bytes)
+        let parsed = try ReducedLatLonArtifact.parse(bytes)
         self.mapped = mapped
         bands = parsed.bands
         firstBand = parsed.firstBand
@@ -83,7 +82,7 @@ package final class ReducedLatLonIndex: Sendable {
     package func point(at pointID: Int) -> ReducedLatLonPoint {
         precondition(pointID >= 0 && pointID < pointCount)
         return withBytes { bytes in
-            Artifact.point(bytes, pointsOffset + Int(Artifact.uint(bytes, reverseOffset + pointID * 4)) * 16)
+            ReducedLatLonArtifact.point(bytes, pointsOffset + Int(ReducedLatLonArtifact.uint(bytes, reverseOffset + pointID * 4)) * 16)
         }
     }
 
@@ -97,7 +96,7 @@ package final class ReducedLatLonIndex: Sendable {
     }
 
     @inline(__always) func pointRange(_ buckets: Range<Int>, bytes: borrowing RawSpan) -> Range<Int> {
-        Int(Artifact.uint(bytes, directoryOffset + buckets.lowerBound * 4))..<Int(Artifact.uint(bytes, directoryOffset + buckets.upperBound * 4))
+        Int(ReducedLatLonArtifact.uint(bytes, directoryOffset + buckets.lowerBound * 4))..<Int(ReducedLatLonArtifact.uint(bytes, directoryOffset + buckets.upperBound * 4))
     }
 
     @inline(__always)
@@ -165,12 +164,12 @@ package final class ReducedLatLonIndex: Sendable {
         let range = pointRange(buckets, bytes: bytes)
         for position in range {
             let offset = pointsOffset + position * 16
-            let distance = query.squaredDistance(to: Artifact.point(bytes, offset))
+            let distance = query.squaredDistance(to: ReducedLatLonArtifact.point(bytes, offset))
             // Avoid loading IDs for losing points.
             if distance < best.distance {
-                best = Match(id: Int(Artifact.uint(bytes, offset + 12)), position: position, distance: distance)
+                best = Match(id: Int(ReducedLatLonArtifact.uint(bytes, offset + 12)), position: position, distance: distance)
             } else if distance == best.distance {
-                let id = Int(Artifact.uint(bytes, offset + 12))
+                let id = Int(ReducedLatLonArtifact.uint(bytes, offset + 12))
                 if best.id < 0 || id < best.id {
                     best.id = id
                     best.position = position
@@ -233,10 +232,10 @@ package final class ReducedLatLonIndex: Sendable {
         let range = pointRange(buckets, bytes: bytes)
         for position in range where position != lookup.position {
             let offset = pointsOffset + position * 16
-            let distance = lookup.query.squaredDistance(to: Artifact.point(bytes, offset))
+            let distance = lookup.query.squaredDistance(to: ReducedLatLonArtifact.point(bytes, offset))
             guard distance <= limit else { continue }
             if state.count == 9, distance > state.values[8].distance { continue }
-            let id = Int(Artifact.uint(bytes, offset + 12))
+            let id = Int(ReducedLatLonArtifact.uint(bytes, offset + 12))
             if state.count == 9, distance == state.values[8].distance, id >= state.values[8].id { continue }
             var destination = min(state.count, 8)
             while destination > 0 {
