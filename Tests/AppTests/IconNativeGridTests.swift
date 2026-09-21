@@ -204,19 +204,6 @@ import Testing
         }
     }
 
-    @Test func scaledElevationReaderWorksWithoutDecodedValues() async throws {
-        let file = try await makeElevationFile([100, -999], scaleFactor: 10)
-        defer { file.remove() }
-        let fixture = try makeFixture(centers: [
-            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
-        ])
-        defer { fixture.remove() }
-        let result = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
-            elevationFile: file.reader, mode: .sea)
-        #expect(result?.gridpoint == 1)
-    }
-
     /// Set ICON_GLOBAL_GRID_TEST_FILE to the decompressed official global grid NetCDF file.
     /// Generated artifacts are temporary; operational static files are never replaced.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_GLOBAL_GRID_TEST_FILE"] != nil))

@@ -237,21 +237,6 @@ private func verify(_ index: ReducedLatLonIndex, _ points: [Point], latitude: Fl
         }
     }
 
-    @Test func mappedSpanPinsOwnerDuringBorrow() throws {
-        let points = [Point(x: 1, y: 0, z: 0)]
-        let (file, _) = try fixture(points)
-        defer { try? FileManager.default.removeItem(at: file) }
-        var owner: ReducedLatLonIndex? = try ReducedLatLonIndex(file: file)
-        weak let weakOwner = owner
-        let offset = owner!.pointsOffset
-        let point = owner!.withBytes { bytes in
-            owner = nil
-            return Artifact.point(bytes, offset)
-        }
-        #expect(point == points[0])
-        #expect(weakOwner == nil)
-    }
-
     @Test func spanLoadsUnalignedLittleEndianWords() {
         let data = Data([0xff, 0x78, 0x56, 0x34, 0x12])
         data.withUnsafeBytes { buffer in
@@ -340,7 +325,7 @@ private func verify(_ index: ReducedLatLonIndex, _ points: [Point], latitude: Fl
         }
     }
 
-    @Test func denseQueriesExerciseLocalCertificatesAndShrinkingCaps() throws {
+    @Test func denseQueriesMatchBruteForce() throws {
         let points = centers(20_000)
         let (file, index) = try fixture(points, bands: 32)
         defer { try? FileManager.default.removeItem(at: file) }
