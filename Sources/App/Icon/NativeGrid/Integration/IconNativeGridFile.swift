@@ -55,6 +55,10 @@ extension IconNativeGridIdentity {
 }
 
 /// Static artifact location and lifetime-pinned cache shared by domains using the same ICON mesh.
+/// Publish replacements atomically; never modify or truncate a mapped inode. Initialized domains
+/// retain their mapping and decoded elevations, so restart readers to load replacement resources.
+/// API readers validate artifacts but do not regenerate them: generation belongs to downloader
+/// preparation. Coordinate artifact publication with deployment of readers supporting its format.
 struct IconNativeGridFile: OmFileManagable, Sendable {
     typealias Payload = IconNativeGridPayload
 

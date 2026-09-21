@@ -7,7 +7,7 @@ import ReducedLatLon
 /// Canonical point IDs are official ICON mass-point offsets, so a lookup result indexes native
 /// GRIB and static-variable arrays directly. Terrain and sea modes reuse the index's local candidate
 /// search; ICON's Earth radius and elevation scoring remain integration policy rather than artifact
-/// format concerns.
+/// format concerns. Regional acceptance is distance-based, not polygon containment.
 struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
@@ -96,6 +96,11 @@ struct IconNativeGrid: Gridable {
     }
 
     /// Applies ICON's elevation/distance score to bounded land candidates, retaining nearest fallback.
+    /// Accepts the nearest land point immediately when elevation differs by at most 100 metres.
+    /// Otherwise minimizes elevation difference plus chord-distance kilometres times 30 among
+    /// at most ten candidates, breaking score ties by canonical ID. Elevations >= 9999 denote
+    /// land without elevation and contribute zero elevation difference; nonfinite and sea values
+    /// (<= -999) are excluded. No eligible candidate, or a score above 1500, falls back to nearest.
     func findPointTerrainOptimised(
         lat: Float,
         lon: Float,

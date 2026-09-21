@@ -217,6 +217,8 @@ import Testing
         #expect(result?.gridpoint == 1)
     }
 
+    /// Set ICON_GLOBAL_GRID_TEST_FILE to the decompressed official global grid NetCDF file.
+    /// Generated artifacts are temporary; operational static files are never replaced.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_GLOBAL_GRID_TEST_FILE"] != nil))
     func sampledGlobalSourceCoordinatesArePreserved() throws {
         try checkSourceCoordinates(
@@ -227,6 +229,8 @@ import Testing
         )
     }
 
+    /// Set ICON_D2_GRID_TEST_FILE to the decompressed official D2 grid NetCDF file.
+    /// Generated artifacts are temporary; operational static files are never replaced.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_D2_GRID_TEST_FILE"] != nil))
     func d2SourceCoordinatesArePreserved() throws {
         try checkSourceCoordinates(

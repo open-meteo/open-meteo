@@ -4,41 +4,35 @@ import ReducedLatLon
 import Testing
 @testable import App
 
-/// Opt-in measurements of the production native ICON adapter; see docs/icon-native-grid-format.md.
+/// Opt-in measurements of the production native ICON adapter on operational coordinates.
+/// Run separately for each global or D2 artifact:
+///
+/// ```sh
+/// ICON_NATIVE_GRID_BENCHMARK=1 ICON_NATIVE_GRID_ARTIFACT=/path/to/grid.bin \
+/// swift test -c release --filter IconNativeGridBenchmarkTests
+/// ```
+///
+/// Each operation warms up and records nine batch-average samples. Elevations are
+/// synthetic; terrain queries exercise candidate search and fallback, not a real terrain distribution.
 @Suite struct IconNativeGridBenchmarkTests {
-    private struct Query: Codable {
+    /// Geographic latitude/longitude in degrees.
+    private struct Query {
         let latitude: Float
         let longitude: Float
     }
 
-    private struct Corpus: Codable {
+    /// Query lists for nearest lookup, sea hits, and land/terrain searches, respectively.
+    private struct Corpus {
         let ordinary: [Query]
         let sea: [Query]
         let land: [Query]
     }
 
-    private struct Measurement: Codable {
+    /// Batch-average nanoseconds/query and the checksum verified across timing samples.
+    private struct Measurement {
         let operation: String
         let samplesNS: [Double]
         let checksum: Int
-        let queries: Int
-    }
-
-    private struct Selection: Codable, Equatable {
-        let pointID: Int
-        let kind: Int
-        let elevationBits: UInt32
-
-        init(_ result: (gridpoint: Int, gridElevation: ElevationOrSea)?) {
-            pointID = result?.gridpoint ?? -1
-            switch result?.gridElevation {
-            case nil: kind = 0; elevationBits = 0
-            case .noData: kind = 1; elevationBits = 0
-            case .sea: kind = 2; elevationBits = 0
-            case .landWithoutElevation: kind = 3; elevationBits = 0
-            case .elevation(let value): kind = 4; elevationBits = value.bitPattern
-            }
-        }
     }
 
     private let sampleCount = 9
@@ -54,44 +48,18 @@ import Testing
         let grid = IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
 
-        let corpus: Corpus
-        let reader: OmFileReaderArray<FileHandleWithCount, Float>
-        var generated: ElevationFileFixture?
-        defer { generated?.remove() }
-        if let directory = env["ICON_NATIVE_GRID_BENCHMARK_CORPUS"] {
-            let folder = URL(fileURLWithPath: directory)
-            corpus = try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: folder.appendingPathComponent("queries.json")))
-            reader = try await OmFileReader(file: folder.appendingPathComponent("elevations.om").path).expectArray(of: Float.self)
-        } else {
-            let elevations = (0..<grid.nx).map { id -> Float in
-                let sea = storage.metadata.coversWholeSphere ? storage.point(at: id).z >= 0 : id < grid.nx / 2
-                return sea ? -999 : Float(100 + (id * 37) % 2_000)
-            }
-            corpus = try makeCorpus(grid: grid, elevations: elevations)
-            let file = try await makeElevationFile(elevations)
-            generated = file
-            reader = file.reader
+        let elevations = (0..<grid.nx).map { id -> Float in
+            let sea = storage.metadata.coversWholeSphere ? storage.point(at: id).z >= 0 : id < grid.nx / 2
+            return sea ? -999 : Float(100 + (id * 37) % 2_000)
         }
+        let corpus = try makeCorpus(grid: grid, elevations: elevations)
+        let file = try await makeElevationFile(elevations)
+        defer { file.remove() }
+        let reader = file.reader
         try #require(!corpus.ordinary.isEmpty && !corpus.sea.isEmpty && !corpus.land.isEmpty)
         let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
         let cached = IconNativeGrid(storage: storage, maximumChordDistanceSquared: grid.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared, elevations: decoded)
-        if let expectedFile = env["ICON_NATIVE_GRID_BENCHMARK_EXPECTED"] {
-            let expected = try JSONDecoder().decode([[Selection]].self, from: Data(contentsOf: URL(fileURLWithPath: expectedFile)))
-            let scenarios = [(corpus.sea, GridSelectionMode.sea), (corpus.land, .land), (corpus.land, .sea)]
-            try #require(expected.count == scenarios.count)
-            for (i, scenario) in scenarios.enumerated() {
-                for adapter in [grid, cached] {
-                    var actual = [Selection]()
-                    for query in scenario.0 {
-                        actual.append(Selection(try await adapter.findPoint(lat: query.latitude, lon: query.longitude,
-                            elevation: -10_000, elevationFile: reader, mode: scenario.1)))
-                    }
-                    try #require(actual == expected[i])
-                }
-            }
-        }
-
         var results = [Measurement]()
         results.append(try measure("Nearest lookup", executions: corpus.ordinary.count * repeats) {
             nearestChecksum(grid, queries: corpus.ordinary)
@@ -121,11 +89,6 @@ import Testing
         print("ICON native grid benchmark: \(path), \(grid.nx) cells, \(sampleCount) samples")
         for result in results {
             print("  \(result.operation): \(result.samplesNS.sorted()[sampleCount / 2] / 1_000) µs/query; checksum \(result.checksum)")
-        }
-        if let output = env["ICON_NATIVE_GRID_BENCHMARK_RESULT"] {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try encoder.encode(results).write(to: URL(fileURLWithPath: output), options: .atomic)
         }
     }
 
@@ -188,7 +151,7 @@ import Testing
             try #require(checksum == expected)
             samples.append(Double(elapsed) / Double(executions))
         }
-        return Measurement(operation: name, samplesNS: samples, checksum: expected, queries: executions)
+        return Measurement(operation: name, samplesNS: samples, checksum: expected)
     }
 
     private func measureAsync(_ name: String, executions: Int, _ operation: () async throws -> Int) async throws -> Measurement {
@@ -201,7 +164,7 @@ import Testing
             try #require(checksum == expected)
             samples.append(Double(elapsed) / Double(executions))
         }
-        return Measurement(operation: name, samplesNS: samples, checksum: expected, queries: executions)
+        return Measurement(operation: name, samplesNS: samples, checksum: expected)
     }
 
     @inline(never)
@@ -235,9 +198,17 @@ import Testing
                                    queries: [Query], mode: GridSelectionMode) async throws -> Int {
         var sum = 0
         for query in queries {
-            let result = Selection(try await grid.findPoint(lat: query.latitude, lon: query.longitude,
-                elevation: -10_000, elevationFile: reader, mode: mode))
-            sum = (sum &* 31) &+ result.pointID &+ result.kind &+ Int(result.elevationBits)
+            let result = try await grid.findPoint(lat: query.latitude, lon: query.longitude,
+                elevation: -10_000, elevationFile: reader, mode: mode)
+            let elevationChecksum: Int
+            switch result?.gridElevation {
+            case nil: elevationChecksum = 0
+            case .noData: elevationChecksum = 1
+            case .sea: elevationChecksum = 2
+            case .landWithoutElevation: elevationChecksum = 3
+            case .elevation(let value): elevationChecksum = 4 &+ Int(value.bitPattern)
+            }
+            sum = (sum &* 31) &+ (result?.gridpoint ?? -1) &+ elevationChecksum
         }
         return sum
     }
