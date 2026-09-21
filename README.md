@@ -21,6 +21,7 @@ curl "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&hour
 - Lightning fast APIs with response times below 10 ms
 - Servers located in Europe and North America, with GeoDNS for low latency and high availability
 - No API key required, CORS supported, no ads, no tracking, not even cookies
+- [MCP endpoint](docs/mcp.md) so AI assistants and agents can call the API as tools
 - Free for non-commercial use with data under Attribution 4.0 International (CC BY 4.0)
 - Source code available under AGPLv3
 
@@ -154,6 +155,7 @@ You can self-host Open-Meteo with Docker or the prebuilt package for Ubuntu 22.0
 - Follow the [Getting Started guide](docs/getting-started.md) to launch an API instance.
 - See [Downloading Weather Models](docs/downloading-datasets.md) to maintain a local weather database.
 - See [Running Open-Meteo on Multiple Nodes](docs/sync-command.md) for distributed deployments.
+- See [MCP endpoint](docs/mcp.md) for connecting AI assistants to a hosted or self-hosted instance.
 
 ## Terms & Privacy
 
