@@ -89,19 +89,15 @@ struct IconNativeGridPayload: OmFilePayload {
 
     /// Loads a supported remote registry path through validated local materialization.
     init(file: OmHttpReaderBackend) async throws {
-        let artifact: IconNativeGridFile
-        switch file.object {
-        case "data/dwd_icon_global_native/static/grid.bin":
-            artifact = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
-        case "data/dwd_icon_d2_native/static/grid.bin":
-            artifact = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
-        default:
+        guard let domain = IconNativeDomains.allCases.first(where: {
+            $0.nativeGridFile.getRelativeFilePathWithData() == file.object
+        }) else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: file.object, reason: "Unknown native grid path"
             )
         }
         let cached = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
-        storage = try await artifact.load(file: cached)
+        storage = try await domain.nativeGridFile.load(file: cached)
     }
 
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {
