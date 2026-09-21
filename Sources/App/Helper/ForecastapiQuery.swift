@@ -225,8 +225,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
     }
 
-    func readerOptions(for request: Request, allowRemoteArchive: Bool) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil)
+    func readerOptions(logger: Logger, httpClient: HTTPClient, allowRemoteArchive: Bool) throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: allowRemoteArchive ? httpClient : nil)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps

@@ -177,236 +177,241 @@ struct WeatherApiController {
             OmMetrics.requestsServiceOverloadedTotal.add(1, ordering: .relaxed)
             throw RateLimitError.serviceOverloaded
         }
-        return try await req.withApiParameter(subdomain, alias: alias) { info, params -> ForecastapiResult<MultiDomainsReader> in
-            let type = type ?? ApiType.detect(host: info.host)
-            let currentTime = Timestamp.now()
-            let currentTimeHour0 = currentTime.with(hour: 0)
-            
-            let forecastDaysMax: Int
-            let forecastDayDefault: Int
-            let historyStartDate: Timestamp
-            let historyEndDate: Timestamp? = type == .climate ? Timestamp(2051, 1, 1) : nil
-            let temporalResolutionDefault: ApiTemporalResolution
-            let allowRemoteArchive = !(OpenMeteo.remoteDataDirectoryMinimumAge ?? 0 >= 24*3600 && type == .forecast)
-            switch type {
-            case .none:
-                forecastDaysMax = 217
-                forecastDayDefault = 7
-                historyStartDate = Timestamp(1940, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .forecast:
-                forecastDaysMax = 16
-                forecastDayDefault = 7
-                historyStartDate = currentTimeHour0.subtract(days: 93)
-                temporalResolutionDefault = .hourly
-            case .archive:
-                forecastDaysMax = 1
-                forecastDayDefault = 1
-                historyStartDate = Timestamp(1940, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .historicalForecast:
-                forecastDaysMax = 16
-                forecastDayDefault = 1
-                historyStartDate = Timestamp(2016, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .previousRuns:
-                forecastDaysMax = 16
-                forecastDayDefault = 7
-                historyStartDate = Timestamp(2016, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .satellite:
-                forecastDaysMax = 1
-                forecastDayDefault = 1
-                historyStartDate = Timestamp(1983, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .singleRunsApi:
-                forecastDaysMax = 16
-                forecastDayDefault = 7
-                historyStartDate = Timestamp(2023, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .seasonal:
-                forecastDaysMax = 217
-                forecastDayDefault = 183
-                historyStartDate = Timestamp(2025, 9, 1)
-                temporalResolutionDefault = .hourly_6
-            case .ensemble:
-                forecastDaysMax = 36
-                forecastDayDefault = 7
-                historyStartDate = currentTimeHour0.subtract(days: 93)
-                temporalResolutionDefault = .hourly
-            case .marine:
-                forecastDaysMax = 16
-                forecastDayDefault = 7
-                historyStartDate = Timestamp(1940, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .airQuality:
-                forecastDaysMax = 7
-                forecastDayDefault = 5
-                historyStartDate = Timestamp(2013, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .climate:
-                forecastDaysMax = 14
-                forecastDayDefault = 7
-                historyStartDate = Timestamp(1950, 1, 1)
-                temporalResolutionDefault = .hourly
-            case .flood:
-                forecastDaysMax = 366
-                forecastDayDefault = 92
-                historyStartDate = Timestamp(1984, 1, 1)
-                temporalResolutionDefault = .hourly
-            }
-            let run = params.run
-            switch type {
-            case .none, .seasonal, .ensemble:
-                break
-            case .singleRunsApi:
-                guard run != nil else {
-                    throw ForecastApiError.parameterIsRequired(name: "run")
-                }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .marine, .airQuality, .climate, .flood:
-                guard run == nil else {
-                    throw ForecastApiError.parameterMustNotBeSet(name: "run")
-                }
-            }
-            let cellSelection = params.cell_selection ?? (type == .marine ? .sea : .land)
-            let biasCorrection = !(params.disable_bias_correction ?? false)
-            
-            let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
-            let allowedRange = historyStartDate ..< (historyEndDate ?? currentTimeHour0.add(days: forecastDaysMax))
+        return try await req.withApiParameter(subdomain, alias: alias) { info, params in
+            try await run(params: params, info: info, type: type ?? ApiType.detect(host: info.host), logger: req.logger, httpClient: req.application.http.client.shared)
+        }
+    }
 
-            let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
-            if type == .ensemble, domainsParam.contains(.best_match) == true {
-                throw ForecastApiError.generic(message: "Model 'best_match' is not supported by the Ensemble API. Please select a specific ensemble model.")
-            }
-            let domains: [MultiDomains]
-            switch type {
-            case .ensemble:
-                // Translate domain names from Ensemble API for compatibility
-                domains = domainsParam.map{$0.remappedToEnsembleApi}
-            case .airQuality:
-                // Air quality API used domains=auto, global or europe
-                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsApiDomain.load(commaSeparatedOptional: params.models) ?? [.auto])
-                domains = camsDomains.map(\.multiDomain)
-            default:
-                domains = domainsParam
-            }
-            
-            let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
-            let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
-            let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
-            let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
-            let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
-            let paramsWeekly = try ForecastVariableWeekly.load(commaSeparatedOptional: params.weekly)
-            let paramsMonthly = try ForecastVariableMonthly.load(commaSeparatedOptional: params.monthly)
-            
-            let nParamsHourly = paramsHourly?.count ?? 0
-            let nParamsMinutely = paramsMinutely?.count ?? 0
-            let nParamsCurrent = paramsCurrent?.count ?? 0
-            let nParamsDaily = paramsDaily?.count ?? 0
-            let nParamsWeekly = paramsWeekly?.count ?? 0
-            let nParamsMonthly = paramsMonthly?.count ?? 0
-            let nVariableNonEnsemble = (nParamsWeekly + nParamsMonthly) * domains.count
-            let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember }) + nVariableNonEnsemble
-            // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
-            let nVariablesAdjusted = type == .seasonal ? nVariables / 24 / 5 : nVariables
-            let options = try params.readerOptions(for: req, allowRemoteArchive: allowRemoteArchive)
-            let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
-            
-            /// Only read 15 minutely data if actually necessary
-            let include15Min = params.current?.isEmpty == false || params.minutely_15?.isEmpty == false || params.current_weather == true || (params.temporal_resolution?.dtSeconds ?? 3600) <= 30*60
-            
-            let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
+    /// Resolve decoded query parameters into a result set. Takes no `Request`, so entry points other
+    /// than the REST route can reuse the exact same validation and data access.
+    func run(params: ApiQueryParameter, info: Request.ApiRequestInfo, type: ApiType, logger: Logger, httpClient: HTTPClient) async throws -> ForecastapiResult<MultiDomainsReader> {
+        let currentTime = Timestamp.now()
+        let currentTimeHour0 = currentTime.with(hour: 0)
 
-            let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation]
-            switch prepared {
-            case .coordinates(let coordinates):
-                if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, coordinates.count > numberOfLocationsMaximum {
-                    OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
-                    throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+        let forecastDaysMax: Int
+        let forecastDayDefault: Int
+        let historyStartDate: Timestamp
+        let historyEndDate: Timestamp? = type == .climate ? Timestamp(2051, 1, 1) : nil
+        let temporalResolutionDefault: ApiTemporalResolution
+        let allowRemoteArchive = !(OpenMeteo.remoteDataDirectoryMinimumAge ?? 0 >= 24*3600 && type == .forecast)
+        switch type {
+        case .none:
+            forecastDaysMax = 217
+            forecastDayDefault = 7
+            historyStartDate = Timestamp(1940, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .forecast:
+            forecastDaysMax = 16
+            forecastDayDefault = 7
+            historyStartDate = currentTimeHour0.subtract(days: 93)
+            temporalResolutionDefault = .hourly
+        case .archive:
+            forecastDaysMax = 1
+            forecastDayDefault = 1
+            historyStartDate = Timestamp(1940, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .historicalForecast:
+            forecastDaysMax = 16
+            forecastDayDefault = 1
+            historyStartDate = Timestamp(2016, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .previousRuns:
+            forecastDaysMax = 16
+            forecastDayDefault = 7
+            historyStartDate = Timestamp(2016, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .satellite:
+            forecastDaysMax = 1
+            forecastDayDefault = 1
+            historyStartDate = Timestamp(1983, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .singleRunsApi:
+            forecastDaysMax = 16
+            forecastDayDefault = 7
+            historyStartDate = Timestamp(2023, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .seasonal:
+            forecastDaysMax = 217
+            forecastDayDefault = 183
+            historyStartDate = Timestamp(2025, 9, 1)
+            temporalResolutionDefault = .hourly_6
+        case .ensemble:
+            forecastDaysMax = 36
+            forecastDayDefault = 7
+            historyStartDate = currentTimeHour0.subtract(days: 93)
+            temporalResolutionDefault = .hourly
+        case .marine:
+            forecastDaysMax = 16
+            forecastDayDefault = 7
+            historyStartDate = Timestamp(1940, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .airQuality:
+            forecastDaysMax = 7
+            forecastDayDefault = 5
+            historyStartDate = Timestamp(2013, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .climate:
+            forecastDaysMax = 14
+            forecastDayDefault = 7
+            historyStartDate = Timestamp(1950, 1, 1)
+            temporalResolutionDefault = .hourly
+        case .flood:
+            forecastDaysMax = 366
+            forecastDayDefault = 92
+            historyStartDate = Timestamp(1984, 1, 1)
+            temporalResolutionDefault = .hourly
+        }
+        let run = params.run
+        switch type {
+        case .none, .seasonal, .ensemble:
+            break
+        case .singleRunsApi:
+            guard run != nil else {
+                throw ForecastApiError.parameterIsRequired(name: "run")
+            }
+        case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .marine, .airQuality, .climate, .flood:
+            guard run == nil else {
+                throw ForecastApiError.parameterMustNotBeSet(name: "run")
+            }
+        }
+        let cellSelection = params.cell_selection ?? (type == .marine ? .sea : .land)
+        let biasCorrection = !(params.disable_bias_correction ?? false)
+
+        let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
+        let allowedRange = historyStartDate ..< (historyEndDate ?? currentTimeHour0.add(days: forecastDaysMax))
+
+        let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
+        if type == .ensemble, domainsParam.contains(.best_match) == true {
+            throw ForecastApiError.generic(message: "Model 'best_match' is not supported by the Ensemble API. Please select a specific ensemble model.")
+        }
+        let domains: [MultiDomains]
+        switch type {
+        case .ensemble:
+            // Translate domain names from Ensemble API for compatibility
+            domains = domainsParam.map{$0.remappedToEnsembleApi}
+        case .airQuality:
+            // Air quality API used domains=auto, global or europe
+            let camsDomains = try (params.domains.map({ [$0] }) ?? CamsApiDomain.load(commaSeparatedOptional: params.models) ?? [.auto])
+            domains = camsDomains.map(\.multiDomain)
+        default:
+            domains = domainsParam
+        }
+
+        let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
+        let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
+        let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
+        let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
+        let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
+        let paramsWeekly = try ForecastVariableWeekly.load(commaSeparatedOptional: params.weekly)
+        let paramsMonthly = try ForecastVariableMonthly.load(commaSeparatedOptional: params.monthly)
+
+        let nParamsHourly = paramsHourly?.count ?? 0
+        let nParamsMinutely = paramsMinutely?.count ?? 0
+        let nParamsCurrent = paramsCurrent?.count ?? 0
+        let nParamsDaily = paramsDaily?.count ?? 0
+        let nParamsWeekly = paramsWeekly?.count ?? 0
+        let nParamsMonthly = paramsMonthly?.count ?? 0
+        let nVariableNonEnsemble = (nParamsWeekly + nParamsMonthly) * domains.count
+        let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember }) + nVariableNonEnsemble
+        // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
+        let nVariablesAdjusted = type == .seasonal ? nVariables / 24 / 5 : nVariables
+        let options = try params.readerOptions(logger: logger, httpClient: httpClient, allowRemoteArchive: allowRemoteArchive)
+        let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
+
+        /// Only read 15 minutely data if actually necessary
+        let include15Min = params.current?.isEmpty == false || params.minutely_15?.isEmpty == false || params.current_weather == true || (params.temporal_resolution?.dtSeconds ?? 3600) <= 30*60
+
+        let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
+
+        let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation]
+        switch prepared {
+        case .coordinates(let coordinates):
+            if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, coordinates.count > numberOfLocationsMaximum {
+                OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
+                throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+            }
+            OmMetrics.recordModelRequest(models: domains, locationCount: coordinates.count)
+            let isSingleLocation = coordinates.count == 1
+            locations = try await coordinates.asyncMap { prepared in
+                let coordinates = prepared.coordinate
+                let timezone = prepared.timezone
+                if params.run != nil {
+                    try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
                 }
-                OmMetrics.recordModelRequest(models: domains, locationCount: coordinates.count)
-                let isSingleLocation = coordinates.count == 1
-                locations = try await coordinates.asyncMap { prepared in
-                    let coordinates = prepared.coordinate
-                    let timezone = prepared.timezone
-                    if params.run != nil {
-                        try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
+                    guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
+                        return nil
                     }
-                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                    let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
-                        guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
-                            return nil
-                        }
-                        if isSingleLocation && domains.count == 1 && r.hourly == nil && r.daily == nil && r.weekly == nil && r.monthly == nil {
-                            throw ForecastApiError.noDataAvailableForThisLocation
-                        }
-                        /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
-                        let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
-                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
-                    }
-                    guard !readers.isEmpty else {
+                    if isSingleLocation && domains.count == 1 && r.hourly == nil && r.daily == nil && r.weekly == nil && r.monthly == nil {
                         throw ForecastApiError.noDataAvailableForThisLocation
-                    }
-                    let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                    return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
-                }
-            case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
-                var countedModels = Set<MultiDomains>()
-                locations = try await domains.asyncFlatMap({ domain in
-                    guard let grid = domain.genericDomain?.grid else {
-                        throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
-                    }
-                    guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
-                        throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
-                    }
-                    if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, numberOfGridCells > numberOfLocationsMaximum {
-                        OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
-                        throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
-                    }
-                    guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
-                        throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
-                    }
-                    if countedModels.insert(domain).inserted {
-                        let locationCount = gridpoionts.reduce(0) { count, _ in count + 1 } * max(dates.count, 1)
-                        OmMetrics.recordModelRequest(models: [domain], locationCount: locationCount)
                     }
                     /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
                     let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
+                    return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                }
+                guard !readers.isEmpty else {
+                    throw ForecastApiError.noDataAvailableForThisLocation
+                }
+                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+            }
+        case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
+            var countedModels = Set<MultiDomains>()
+            locations = try await domains.asyncFlatMap({ domain in
+                guard let grid = domain.genericDomain?.grid else {
+                    throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
+                }
+                guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
+                    throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
+                }
+                if let numberOfLocationsMaximum = info.numberOfLocationsMaximum, numberOfGridCells > numberOfLocationsMaximum {
+                    OmMetrics.requestsTooManyLocationsTotal.add(1, ordering: .relaxed)
+                    throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+                }
+                guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
+                    throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
+                }
+                if countedModels.insert(domain).inserted {
+                    let locationCount = gridpoionts.reduce(0) { count, _ in count + 1 } * max(dates.count, 1)
+                    OmMetrics.recordModelRequest(models: [domain], locationCount: locationCount)
+                }
+                /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
+                let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
 
-                    if dates.count == 0 {
-                        if params.run != nil {
-                            try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
-                        }
-                        let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                        let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                        var locationId = -1
-                        return try await gridpoionts.asyncMap( { gridpoint in
-                            locationId += 1
-                            let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
-                            return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
-                        })
+                if dates.count == 0 {
+                    if params.run != nil {
+                        try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
                     }
-                    
-                    return try await dates.asyncFlatMap({ date -> [ForecastapiResult<MultiDomainsReader>.PerLocation] in
-                        if params.run != nil {
-                            try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
-                        }
-                        let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                        let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                        var locationId = -1
-                        return try await gridpoionts.asyncMap( { gridpoint in
-                            locationId += 1
-                            let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
-                            return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
-                        })
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                    var locationId = -1
+                    return try await gridpoionts.asyncMap( { gridpoint in
+                        locationId += 1
+                        let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
+                        let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                        return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
+                    })
+                }
+
+                return try await dates.asyncFlatMap({ date -> [ForecastapiResult<MultiDomainsReader>.PerLocation] in
+                    if params.run != nil {
+                        try params.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+                    }
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                    var locationId = -1
+                    return try await gridpoionts.asyncMap( { gridpoint in
+                        locationId += 1
+                        let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
+                        let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                        return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                     })
                 })
-            }
-            
-            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariablesAdjusted)
+            })
         }
+
+        return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariablesAdjusted)
     }
 }
 

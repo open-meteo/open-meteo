@@ -9,32 +9,38 @@ struct DemController {
             throw RateLimitError.serviceOverloaded
         }
         return try await req.withApiParameter("api") { _, params in
-            let latitude = params.latitude
-            let longitude = params.longitude
-
-            guard latitude.count == longitude.count else {
-                throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
-            }
-            guard !latitude.isEmpty else {
-                throw ForecastApiError.latitudeAndLongitudeNotEmpty
-            }
-            guard latitude.count <= 100 else {
-                throw ForecastApiError.latitudeAndLongitudeMaximum(max: 100)
-            }
-            try zip(latitude, longitude).forEach { latitude, longitude in
-                if latitude > 90 || latitude < -90 || latitude.isNaN {
-                    throw ForecastApiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
-                }
-                if longitude > 180 || longitude < -180 || longitude.isNaN {
-                    throw ForecastApiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
-                }
-            }
-            return DemResponder(latitude: latitude, longitude: longitude, logger: req.logger, httpClient: req.application.http.client.shared)
+            try run(params: params, logger: req.logger, httpClient: req.application.http.client.shared)
         }
+    }
+
+    /// Validate coordinates and build the responder. Takes no `Request`, so entry points other than
+    /// the REST route can reuse it.
+    func run(params: ApiQueryParameter, logger: Logger, httpClient: HTTPClient) throws -> DemResponder {
+        let latitude = params.latitude
+        let longitude = params.longitude
+
+        guard latitude.count == longitude.count else {
+            throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
+        }
+        guard !latitude.isEmpty else {
+            throw ForecastApiError.latitudeAndLongitudeNotEmpty
+        }
+        guard latitude.count <= 100 else {
+            throw ForecastApiError.latitudeAndLongitudeMaximum(max: 100)
+        }
+        try zip(latitude, longitude).forEach { latitude, longitude in
+            if latitude > 90 || latitude < -90 || latitude.isNaN {
+                throw ForecastApiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
+            }
+            if longitude > 180 || longitude < -180 || longitude.isNaN {
+                throw ForecastApiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
+            }
+        }
+        return DemResponder(latitude: latitude, longitude: longitude, logger: logger, httpClient: httpClient)
     }
 }
 
-fileprivate struct DemResponder: ForecastapiResponder {
+struct DemResponder: ForecastapiResponder {
     let latitude: [Float]
     let longitude: [Float]
     let logger: Logger
