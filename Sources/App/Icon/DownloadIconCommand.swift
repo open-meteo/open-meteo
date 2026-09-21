@@ -57,6 +57,9 @@ struct DownloadIconCommand: AsyncCommand {
         
         @Flag(name: "skip-timeseries")
         var skipTimeseries: Bool
+
+        @Flag(name: "skip-regridding", help: "For icon or icon-native, write only native global output; skip regridded forecasts and elevation")
+        var skipRegridding: Bool
     }
 
     var help: String {
@@ -490,6 +493,9 @@ struct DownloadIconCommand: AsyncCommand {
         let nativeDomain = IconNativeDomains(rawValue: signature.domain)
             ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
         let domain = try nativeDomain?.sourceDomain ?? IconDomains.load(rawValue: signature.domain)
+        guard !signature.skipRegridding || nativeDomain == .iconNative else {
+            throw Abort(.badRequest, reason: "--skip-regridding is only supported for icon or icon-native.")
+        }
         let nConcurrent = signature.concurrent ?? 1
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
@@ -568,7 +574,7 @@ struct DownloadIconCommand: AsyncCommand {
         }
         let outputs: IconDownloadDomains
         if let nativeDomain {
-            outputs = try await IconDownloadDomains(nativeDomain)
+            outputs = try await IconDownloadDomains(nativeDomain, skipRegridding: signature.skipRegridding)
         } else {
             outputs = try await IconDownloadDomains(domain)
         }
@@ -588,7 +594,8 @@ struct DownloadIconCommand: AsyncCommand {
     }
 }
 
-/// Resolved output roles for one ICON download. Only native global also produces remapped ICON output.
+/// Resolved output roles for one ICON download. Native global also produces remapped output
+/// unless regridding is explicitly disabled.
 struct IconDownloadDomains: Sendable {
     let source: IconDomains
     let primary: any GenericDomain
@@ -611,12 +618,12 @@ struct IconDownloadDomains: Sendable {
         self.fifteenMinute = domain == .iconD2 ? IconDomains.iconD2_15min : nil
     }
 
-    init(_ domain: IconNativeDomains) async throws {
+    init(_ domain: IconNativeDomains, skipRegridding: Bool = false) async throws {
         self.source = domain.sourceDomain
         self.nativeDomain = domain
         let grid = try await domain.nativeGridFile.load()
         self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
-        self.remapped = domain == .iconNative ? IconDomains.icon : nil
+        self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
         self.ensembleMean = nil
         self.fifteenMinute = domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
     }
