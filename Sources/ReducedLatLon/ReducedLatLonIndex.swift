@@ -248,28 +248,26 @@ package final class ReducedLatLonIndex: Sendable {
         let mapped = self.mapped
         defer { withExtendedLifetime(mapped) {} }
         let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
-        do {
-            var best = Match()
-            if let bucket = seed.bucket {
-                scanNearest(bucket..<bucket + 1, bytes: bytes, query: query.point, best: &best)
-            }
-            let chord = Double(min(limit, best.distance)).squareRoot() + Self.chordMargin
-            if chord >= seed.boundary {
-                let cap = searchCap(latitude: latitudeRadians, cosine: query.cosine, chord: chord)
-                if cap.lower <= cap.upper {
-                    for row in cap.lower...cap.upper {
-                        forEachRowRange(row: row, longitude: longitudeRadians, cap: cap, excluding: seed.bucket,
-                                        state: &best) { buckets, best in
-                            scanNearest(buckets, bytes: bytes, query: query.point, best: &best)
-                        }
+        var best = Match()
+        if let bucket = seed.bucket {
+            scanNearest(bucket..<bucket + 1, bytes: bytes, query: query.point, best: &best)
+        }
+        let chord = Double(min(limit, best.distance)).squareRoot() + Self.chordMargin
+        if chord >= seed.boundary {
+            let cap = searchCap(latitude: latitudeRadians, cosine: query.cosine, chord: chord)
+            if cap.lower <= cap.upper {
+                for row in cap.lower...cap.upper {
+                    forEachRowRange(row: row, longitude: longitudeRadians, cap: cap, excluding: seed.bucket,
+                                    state: &best) { buckets, best in
+                        scanNearest(buckets, bytes: bytes, query: query.point, best: &best)
                     }
                 }
             }
-            guard best.id >= 0, best.distance <= limit else { return nil }
-            return Lookup(query: query.point, latitude: latitudeRadians, longitude: longitudeRadians,
-                          cosineLatitude: query.cosine, seedBoundary: seed.boundary,
-                          bucket: seed.bucket, position: best.position, pointID: best.id, distanceSquared: best.distance)
         }
+        guard best.id >= 0, best.distance <= limit else { return nil }
+        return Lookup(query: query.point, latitude: latitudeRadians, longitude: longitudeRadians,
+                      cosineLatitude: query.cosine, seedBoundary: seed.boundary,
+                      bucket: seed.bucket, position: best.position, pointID: best.id, distanceSquared: best.distance)
     }
 
     /// Returns the supplied nearest plus up to nine other closest points within the inclusive limit.
@@ -317,48 +315,46 @@ package final class ReducedLatLonIndex: Sendable {
         let mapped = self.mapped
         defer { withExtendedLifetime(mapped) {} }
         let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
-        do {
-            var state = CandidateState()
-            if let seed = lookup.bucket {
-                scanCandidates(seed..<seed + 1, bytes: bytes, lookup: lookup, limit: limit, state: &state)
-            }
-            var bound = searchLimit(state, limit: limit)
-            let chord = Double(bound).squareRoot() + Self.chordMargin
-            if chord >= lookup.seedBoundary {
-                var cap = searchCap(latitude: lookup.latitude, cosine: lookup.cosineLatitude, chord: chord)
-                if cap.lower <= cap.upper {
-                    let center = min(cap.upper, max(cap.lower, Int((lookup.latitude + .pi / 2) * latitudeScale)))
-                    let maximumOffset = max(center - cap.lower, cap.upper - center)
-                    // Visit the query row first, then alternating rows away from it. Once full,
-                    // the ninth additional distance shrinks the remaining cap. Each row is
-                    // visited once, so shrinking needs no visited set or duplicate point scans.
-                    for step in 0...(maximumOffset * 2) {
-                        let row = step == 0 ? center : (step & 1 == 1 ? center - (step + 1) / 2 : center + step / 2)
-                        let nextBound = searchLimit(state, limit: limit)
-                        if nextBound < bound {
-                            bound = nextBound
-                            cap = searchCap(latitude: lookup.latitude, cosine: lookup.cosineLatitude,
-                                            chord: Double(bound).squareRoot() + Self.chordMargin)
-                        }
-                        if step > 2 * max(center - cap.lower, cap.upper - center) { break }
-                        guard row >= cap.lower, row <= cap.upper else { continue }
-                        forEachRowRange(row: row, longitude: lookup.longitude, cap: cap, excluding: lookup.bucket,
-                                        state: &state) { buckets, state in
-                            scanCandidates(buckets, bytes: bytes, lookup: lookup, limit: limit, state: &state)
-                        }
+        var state = CandidateState()
+        if let seed = lookup.bucket {
+            scanCandidates(seed..<seed + 1, bytes: bytes, lookup: lookup, limit: limit, state: &state)
+        }
+        var bound = searchLimit(state, limit: limit)
+        let chord = Double(bound).squareRoot() + Self.chordMargin
+        if chord >= lookup.seedBoundary {
+            var cap = searchCap(latitude: lookup.latitude, cosine: lookup.cosineLatitude, chord: chord)
+            if cap.lower <= cap.upper {
+                let center = min(cap.upper, max(cap.lower, Int((lookup.latitude + .pi / 2) * latitudeScale)))
+                let maximumOffset = max(center - cap.lower, cap.upper - center)
+                // Visit the query row first, then alternating rows away from it. Once full,
+                // the ninth additional distance shrinks the remaining cap. Each row is
+                // visited once, so shrinking needs no visited set or duplicate point scans.
+                for step in 0...(maximumOffset * 2) {
+                    let row = step == 0 ? center : (step & 1 == 1 ? center - (step + 1) / 2 : center + step / 2)
+                    let nextBound = searchLimit(state, limit: limit)
+                    if nextBound < bound {
+                        bound = nextBound
+                        cap = searchCap(latitude: lookup.latitude, cosine: lookup.cosineLatitude,
+                                        chord: Double(bound).squareRoot() + Self.chordMargin)
+                    }
+                    if step > 2 * max(center - cap.lower, cap.upper - center) { break }
+                    guard row >= cap.lower, row <= cap.upper else { continue }
+                    forEachRowRange(row: row, longitude: lookup.longitude, cap: cap, excluding: lookup.bucket,
+                                    state: &state) { buckets, state in
+                        scanCandidates(buckets, bytes: bytes, lookup: lookup, limit: limit, state: &state)
                     }
                 }
             }
-            var result = NearbyPoints()
-            result.pointIDs[0] = lookup.pointID
-            result.distancesSquared[0] = lookup.distanceSquared
-            result.count = state.count + 1
-            for i in 0..<state.count {
-                result.pointIDs[i + 1] = state.values[i].id
-                result.distancesSquared[i + 1] = state.values[i].distance
-            }
-            return result
         }
+        var result = NearbyPoints()
+        result.pointIDs[0] = lookup.pointID
+        result.distancesSquared[0] = lookup.distanceSquared
+        result.count = state.count + 1
+        for i in 0..<state.count {
+            result.pointIDs[i + 1] = state.values[i].id
+            result.distancesSquared[i + 1] = state.values[i].distance
+        }
+        return result
     }
 
     private struct Cap {
