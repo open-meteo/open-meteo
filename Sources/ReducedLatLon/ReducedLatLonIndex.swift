@@ -18,8 +18,6 @@ package final class ReducedLatLonIndex: Sendable {
     package let pointCount: Int
     /// Number of equal-height bands over the whole sphere, including omitted regional bands.
     package let latitudeBandCount: Int
-    /// Number of stored buckets, including empty buckets inside stored spans.
-    package let bucketCount: Int
     /// Dataset identity and global/regional storage policy supplied by the writer.
     package let metadata: ReducedLatLonArtifact.Metadata
     private let latitudeScale: Double
@@ -75,7 +73,6 @@ package final class ReducedLatLonIndex: Sendable {
         reverseOffset = parsed.layout.reverseOffset
         pointCount = parsed.pointCount
         latitudeBandCount = parsed.latitudeBandCount
-        bucketCount = parsed.bucketCount
         metadata = parsed.metadata
         latitudeScale = Double(parsed.latitudeBandCount) / .pi
         latitudeHeight = .pi / Double(parsed.latitudeBandCount)

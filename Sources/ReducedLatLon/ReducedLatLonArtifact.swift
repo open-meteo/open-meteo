@@ -92,7 +92,6 @@ package enum ReducedLatLonArtifact {
         let firstBand: Int
         let pointCount: Int
         let latitudeBandCount: Int
-        let bucketCount: Int
     }
 
     /// Decodes and validates the header, bands, directory, reverse offsets, and exact file size.
@@ -153,7 +152,7 @@ package enum ReducedLatLonArtifact {
                                 uuid: (40..<56).map { bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) },
                                 coversWholeSphere: global == 1)
         return Parsed(metadata: metadata, bands: bands, layout: layout, firstBand: first,
-                      pointCount: count, latitudeBandCount: bandCount, bucketCount: buckets)
+                      pointCount: count, latitudeBandCount: bandCount)
     }
 
     static func columns(band: Int, bandCount: Int) -> Int {
