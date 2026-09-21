@@ -84,6 +84,78 @@ package enum ReducedLatLonArtifact {
         }
     }
 
+    /// Owned structural description decoded from an artifact; retains no borrowed bytes.
+    struct Parsed {
+        let metadata: Metadata
+        let bands: [Band]
+        let layout: Layout
+        let firstBand: Int
+        let pointCount: Int
+        let latitudeBandCount: Int
+        let bucketCount: Int
+    }
+
+    /// Decodes and validates the header, bands, directory, reverse offsets, and exact file size.
+    /// Does not validate point norms, ID permutation, or bucket membership; input must come
+    /// from a trusted writer. The caller keeps the backing storage alive during this borrow.
+    static func parse(_ bytes: borrowing RawSpan) throws -> Parsed {
+        guard bytes.byteCount >= headerBytes else { throw ReducedLatLonArtifactError.invalidHeader }
+        guard magic.indices.allSatisfy({ bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) == magic[$0] }) else {
+            throw ReducedLatLonArtifactError.invalidMagic
+        }
+        let storedVersion = uint(bytes, 8)
+        guard storedVersion == version else { throw ReducedLatLonArtifactError.unsupportedVersion(storedVersion) }
+        let count = Int(uint(bytes, 12))
+        let bandCount = Int(uint(bytes, 16))
+        let first = Int(uint(bytes, 20))
+        let stored = Int(uint(bytes, 24))
+        let buckets = Int(uint(bytes, 28))
+        let global = uint(bytes, 36)
+        guard count > 0, bandCount > 0, bandCount <= 65_536,
+              stored > 0, first + stored <= bandCount, buckets > 0, global <= 1,
+              (56..<64).allSatisfy({ bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) == 0 }) else { throw ReducedLatLonArtifactError.invalidHeader }
+        // Counts are UInt32, bandCount is bounded, and the platform is 64-bit: these
+        // sums/products cannot overflow Int before the exact file-size check.
+        let layout = Layout(storedBandCount: stored, bucketCount: buckets, pointCount: count)
+        let directory = layout.directoryOffset
+        let reverse = layout.reverseOffset
+        guard layout.fileBytes == bytes.byteCount else { throw ReducedLatLonArtifactError.invalidHeader }
+        var bands = [Band]()
+        var expectedBucket = 0
+        for i in 0..<stored {
+            let offset = headerBytes + i * 16
+            let row = Band(longitudeColumnCount: Int(uint(bytes, offset)),
+                           startColumn: Int(uint(bytes, offset + 4)),
+                           storedColumnCount: Int(uint(bytes, offset + 8)),
+                           firstBucket: Int(uint(bytes, offset + 12)))
+            guard row.longitudeColumnCount == columns(band: first + i, bandCount: bandCount),
+                  row.startColumn < row.longitudeColumnCount, row.storedColumnCount <= row.longitudeColumnCount,
+                  row.firstBucket == expectedBucket,
+                  global == 0 || (row.startColumn == 0 && row.storedColumnCount == row.longitudeColumnCount) else {
+                throw ReducedLatLonArtifactError.invalidHeader
+            }
+            expectedBucket += row.storedColumnCount
+            bands.append(row)
+        }
+        guard expectedBucket == buckets, global == 0 || (first == 0 && stored == bandCount),
+              uint(bytes, directory) == 0 else { throw ReducedLatLonArtifactError.invalidHeader }
+        var previous: UInt32 = 0
+        for i in 0...buckets {
+            let current = uint(bytes, directory + i * 4)
+            guard current >= previous, current <= count else { throw ReducedLatLonArtifactError.invalidHeader }
+            previous = current
+        }
+        guard previous == count else { throw ReducedLatLonArtifactError.invalidHeader }
+        for id in 0..<count {
+            guard uint(bytes, reverse + id * 4) < count else { throw ReducedLatLonArtifactError.invalidHeader }
+        }
+        let metadata = Metadata(number: uint(bytes, 32),
+                                uuid: (40..<56).map { bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) },
+                                coversWholeSphere: global == 1)
+        return Parsed(metadata: metadata, bands: bands, layout: layout, firstBand: first,
+                      pointCount: count, latitudeBandCount: bandCount, bucketCount: buckets)
+    }
+
     static func columns(band: Int, bandCount: Int) -> Int {
         let h = Double.pi / Double(bandCount)
         return max(1, Int((2 * .pi * cos(-.pi / 2 + (Double(band) + 0.5) * h) / h).rounded()))

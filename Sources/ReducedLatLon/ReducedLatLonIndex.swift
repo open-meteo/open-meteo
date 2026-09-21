@@ -66,69 +66,19 @@ package final class ReducedLatLonIndex: Sendable {
         // The pointer bridge cannot infer mmap ownership; pin it even on validation errors.
         defer { withExtendedLifetime(mapped) {} }
         let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
-        guard bytes.byteCount >= Artifact.headerBytes else { throw ReducedLatLonArtifactError.invalidHeader }
-        guard Artifact.magic.indices.allSatisfy({ bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) == Artifact.magic[$0] }) else {
-            throw ReducedLatLonArtifactError.invalidMagic
-        }
-        let version = Artifact.uint(bytes, 8)
-        guard version == Artifact.version else { throw ReducedLatLonArtifactError.unsupportedVersion(version) }
-        let count = Int(Artifact.uint(bytes, 12))
-        let bandCount = Int(Artifact.uint(bytes, 16))
-        let first = Int(Artifact.uint(bytes, 20))
-        let stored = Int(Artifact.uint(bytes, 24))
-        let buckets = Int(Artifact.uint(bytes, 28))
-        let global = Artifact.uint(bytes, 36)
-        guard count > 0, bandCount > 0, bandCount <= 65_536,
-              stored > 0, first + stored <= bandCount, buckets > 0, global <= 1,
-              (56..<64).allSatisfy({ bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) == 0 }) else { throw ReducedLatLonArtifactError.invalidHeader }
-        // Counts are UInt32, bandCount is bounded, and the platform is 64-bit: these
-        // sums/products cannot overflow Int before the exact file-size check.
-        let layout = Artifact.Layout(storedBandCount: stored, bucketCount: buckets, pointCount: count)
-        let directory = layout.directoryOffset
-        let points = layout.pointsOffset
-        let reverse = layout.reverseOffset
-        guard layout.fileBytes == bytes.byteCount else { throw ReducedLatLonArtifactError.invalidHeader }
-        var bands = [Artifact.Band]()
-        var expectedBucket = 0
-        for i in 0..<stored {
-            let offset = Artifact.headerBytes + i * 16
-            let row = Artifact.Band(longitudeColumnCount: Int(Artifact.uint(bytes, offset)),
-                                    startColumn: Int(Artifact.uint(bytes, offset + 4)),
-                                    storedColumnCount: Int(Artifact.uint(bytes, offset + 8)),
-                                    firstBucket: Int(Artifact.uint(bytes, offset + 12)))
-            guard row.longitudeColumnCount == Artifact.columns(band: first + i, bandCount: bandCount),
-                  row.startColumn < row.longitudeColumnCount, row.storedColumnCount <= row.longitudeColumnCount,
-                  row.firstBucket == expectedBucket,
-                  global == 0 || (row.startColumn == 0 && row.storedColumnCount == row.longitudeColumnCount) else {
-                throw ReducedLatLonArtifactError.invalidHeader
-            }
-            expectedBucket += row.storedColumnCount
-            bands.append(row)
-        }
-        guard expectedBucket == buckets, global == 0 || (first == 0 && stored == bandCount),
-              Artifact.uint(bytes, directory) == 0 else { throw ReducedLatLonArtifactError.invalidHeader }
-        var previous: UInt32 = 0
-        for i in 0...buckets {
-            let current = Artifact.uint(bytes, directory + i * 4)
-            guard current >= previous, current <= count else { throw ReducedLatLonArtifactError.invalidHeader }
-            previous = current
-        }
-        guard previous == count else { throw ReducedLatLonArtifactError.invalidHeader }
-        for id in 0..<count {
-            guard Artifact.uint(bytes, reverse + id * 4) < count else { throw ReducedLatLonArtifactError.invalidHeader }
-        }
+        let parsed = try Artifact.parse(bytes)
         self.mapped = mapped
-        self.bands = bands
-        firstBand = first
-        directoryOffset = directory
-        pointsOffset = points
-        reverseOffset = reverse
-        pointCount = count
-        latitudeBandCount = bandCount
-        bucketCount = buckets
-        metadata = Artifact.Metadata(number: Artifact.uint(bytes, 32), uuid: (40..<56).map { bytes.unsafeLoad(fromByteOffset: $0, as: UInt8.self) }, coversWholeSphere: global == 1)
-        latitudeScale = Double(bandCount) / .pi
-        latitudeHeight = .pi / Double(bandCount)
+        bands = parsed.bands
+        firstBand = parsed.firstBand
+        directoryOffset = parsed.layout.directoryOffset
+        pointsOffset = parsed.layout.pointsOffset
+        reverseOffset = parsed.layout.reverseOffset
+        pointCount = parsed.pointCount
+        latitudeBandCount = parsed.latitudeBandCount
+        bucketCount = parsed.bucketCount
+        metadata = parsed.metadata
+        latitudeScale = Double(parsed.latitudeBandCount) / .pi
+        latitudeHeight = .pi / Double(parsed.latitudeBandCount)
     }
 
     /// Returns the stored direction for a canonical ID, preserving its component bits.
