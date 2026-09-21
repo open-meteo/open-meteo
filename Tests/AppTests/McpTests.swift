@@ -76,14 +76,26 @@ import VaporTesting
                 #expect(res.status == .ok)
                 let result = try #require(try json(res)["result"] as? [String: Any])
                 let tools = try #require(result["tools"] as? [[String: Any]])
-                #expect(tools.map { $0["name"] as? String } == ["elevation"])
+                #expect(tools.map { $0["name"] as? String } == ["weather_forecast", "historical_weather", "air_quality", "marine_weather", "seasonal_forecast", "flood_forecast", "climate_projection", "ensemble_forecast", "elevation"])
                 for tool in tools {
                     let schema = try #require(tool["inputSchema"] as? [String: Any])
                     let properties = try #require(schema["properties"] as? [String: Any])
-                    #expect(!properties.isEmpty)
+                    #expect(properties["latitude"] != nil && properties["longitude"] != nil)
+                    let required = try #require(schema["required"] as? [String])
+                    #expect(required.contains("latitude") && required.contains("longitude"))
                     let annotations = try #require(tool["annotations"] as? [String: Any])
                     #expect(annotations["readOnlyHint"] as? Bool == true)
                 }
+                let byName = Dictionary(uniqueKeysWithValues: tools.map { ($0["name"] as! String, $0) })
+                for name in ["historical_weather", "climate_projection"] {
+                    let schema = try #require(byName[name]?["inputSchema"] as? [String: Any])
+                    #expect((schema["required"] as? [String])?.contains("start_date") == true)
+                }
+                let forecastProperties = try #require((byName["weather_forecast"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])
+                #expect(forecastProperties.keys.contains("hourly") && forecastProperties.keys.contains("minutely_15"))
+                #expect((forecastProperties["start_date"] as? [String: Any])?["pattern"] as? String == "^\\d{4}-\\d{2}-\\d{2}$")
+                let floodProperties = try #require((byName["flood_forecast"]?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any])
+                #expect(floodProperties["hourly"] == nil && floodProperties["ensemble"] != nil)
             }
         }
     }
@@ -109,6 +121,35 @@ import VaporTesting
                 #expect(text == "Unknown parameter: altitude")
             }
         }
+    }
+
+    @Test func forecastRejectsUnknownVariableAsToolError() async throws {
+        try await withMcpApp { app in
+            let params = #"{"name":"weather_forecast","arguments":{"latitude":48.85,"longitude":2.35,"hourly":["foo_bar"]}}"#
+            try await app.test(.POST, "mcp", headers: Self.headers, body: rpc("tools/call", params: params)) { res in
+                let (text, isError) = try toolText(try json(res))
+                #expect(isError)
+                #expect(text.contains("foo_bar"))
+            }
+        }
+    }
+
+    @Test func forecastRejectsUnknownArguments() async throws {
+        try await withMcpApp { app in
+            let params = #"{"name":"weather_forecast","arguments":{"latitude":48.85,"longitude":2.35,"hourly":["temperature_2m"],"format":"csv"}}"#
+            try await app.test(.POST, "mcp", headers: Self.headers, body: rpc("tools/call", params: params)) { res in
+                let (text, isError) = try toolText(try json(res))
+                #expect(isError)
+                #expect(text == "Unknown parameter: format")
+            }
+        }
+    }
+
+    @Test func perCallCeilings() {
+        #expect(throws: Never.self) { try McpTools.check(weight: McpTools.maximumWeight) }
+        #expect(throws: ForecastApiError.self) { try McpTools.check(weight: McpTools.maximumWeight + 1) }
+        #expect(throws: Never.self) { try McpTools.check(characters: McpTools.maximumCharacters) }
+        #expect(throws: ForecastApiError.self) { try McpTools.check(characters: McpTools.maximumCharacters + 1) }
     }
 
     @Test func unknownToolIsAProtocolError() async throws {

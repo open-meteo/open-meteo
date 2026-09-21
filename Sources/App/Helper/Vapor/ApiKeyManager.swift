@@ -200,8 +200,9 @@ extension Request {
 
     /// Host classification, API key checks, rate limiting and usage accounting shared by every entry
     /// point. `parse` supplies the query parameters: the REST routes read them from the URL or the
-    /// body, an MCP tool call carries them inside a JSON-RPC message.
-    func withApiAccess<T: ForecastapiResponder>(_ subdomain: String, alias: [String] = [], parse: () throws -> ApiQueryParameter, fn: (ApiRequestInfo, ApiQueryParameter) async throws -> T) async throws -> Response {
+    /// body, an MCP tool call carries them inside a JSON-RPC message. `requiresProfessional` names
+    /// the data tier when it cannot be read off the host, as for tools that all share one host.
+    func withApiAccess<T: ForecastapiResponder>(_ subdomain: String, alias: [String] = [], requiresProfessional: Bool? = nil, parse: () throws -> ApiQueryParameter, fn: (ApiRequestInfo, ApiQueryParameter) async throws -> T) async throws -> Response {
         // let host = "api.open-meteo.com"
         guard let host = headers[.host].first(where: { $0.contains("open-meteo.com") }) else {
             // localhost or not an openmeteo host
@@ -250,7 +251,8 @@ extension Request {
         }
         let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api.", "seasonal-api."]
         let resNode = host.starts(with: "customer-res1-api.")
-        if limit > 0 && limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
+        let professional = requiresProfessional ?? apiProfessionalApis.contains(where: { host.contains($0) })
+        if limit > 0 && limit < 5_000_000 && professional {
             throw ApiKeyManagerError.apiProfessionalRequired
         }
         if limit > 0 && limit < 50_000_000 && resNode {

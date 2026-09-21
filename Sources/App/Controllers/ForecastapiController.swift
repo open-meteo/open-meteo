@@ -5,20 +5,9 @@ import Vapor
 public struct ForecastapiController: RouteCollection {
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
-        let era5 = WeatherApiController(
-            has15minutely: false,
-            hasCurrentWeather: false,
-            defaultModel: .archive_best_match,
-            subdomain: "archive-api",
-            alias: ["satellite-api"]
-        )
-        categoriesRoute.getAndPost("era5", use: era5.query)
-        categoriesRoute.getAndPost("archive", use: era5.query)
-
-        categoriesRoute.getAndPost("forecast", use: WeatherApiController(
-            defaultModel: .best_match,
-            alias: ["historical-forecast-api", "previous-runs-api", "single-runs-api", "seasonal-api", "res1-api"]).query
-        )
+        categoriesRoute.getAndPost("era5", use: WeatherApiController.archive.query)
+        categoriesRoute.getAndPost("archive", use: WeatherApiController.archive.query)
+        categoriesRoute.getAndPost("forecast", use: WeatherApiController.forecast.query)
         categoriesRoute.getAndPost("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
         )
@@ -61,48 +50,70 @@ public struct ForecastapiController: RouteCollection {
         )
 
         categoriesRoute.getAndPost("elevation", use: DemController().query)
-        categoriesRoute.getAndPost("air-quality", use: WeatherApiController(
-            has15minutely: false,
-            hasCurrentWeather: true,
-            defaultModel: .air_quality_best_match,
-            subdomain: "air-quality-api",
-            alias: ["res1-api"],
-            type: .airQuality
-        ).query)
-        categoriesRoute.getAndPost("seasonal", use: WeatherApiController(
-            has15minutely: false,
-            hasCurrentWeather: false,
-            defaultModel: .ecmwf_seasonal_seamless,
-            subdomain: "seasonal-api",
-            type: .seasonal
-        ).query)
-        categoriesRoute.getAndPost("flood", use: WeatherApiController(
-            has15minutely: false,
-            hasCurrentWeather: false,
-            defaultModel: .flood_best_match,
-            subdomain: "flood-api",
-            type: .flood
-        ).query)
-        categoriesRoute.getAndPost("climate", use: WeatherApiController(
-            has15minutely: false,
-            hasCurrentWeather: false,
-            defaultModel: .MRI_AGCM3_2_S,
-            subdomain: "climate-api",
-            type: .climate
-        ).query)
-        categoriesRoute.getAndPost("marine", use: WeatherApiController(
-            has15minutely: true,
-            hasCurrentWeather: true,
-            defaultModel: .marine_best_match,
-            subdomain: "marine-api",
-            type: .marine
-        ).query)
-        categoriesRoute.getAndPost("ensemble", use: WeatherApiController(
-            defaultModel: .best_match,
-            subdomain: "ensemble-api",
-            type: .ensemble).query
-        )
+        categoriesRoute.getAndPost("air-quality", use: WeatherApiController.airQuality.query)
+        categoriesRoute.getAndPost("seasonal", use: WeatherApiController.seasonal.query)
+        categoriesRoute.getAndPost("flood", use: WeatherApiController.flood.query)
+        categoriesRoute.getAndPost("climate", use: WeatherApiController.climate.query)
+        categoriesRoute.getAndPost("marine", use: WeatherApiController.marine.query)
+        categoriesRoute.getAndPost("ensemble", use: WeatherApiController.ensemble.query)
     }
+}
+
+/// The endpoints that exist as their own API host. Named so the REST routes and the MCP tools
+/// share one definition of defaults and capabilities.
+extension WeatherApiController {
+    static let forecast = WeatherApiController(
+        defaultModel: .best_match,
+        alias: ["historical-forecast-api", "previous-runs-api", "single-runs-api", "seasonal-api", "res1-api"]
+    )
+    static let archive = WeatherApiController(
+        has15minutely: false,
+        hasCurrentWeather: false,
+        defaultModel: .archive_best_match,
+        subdomain: "archive-api",
+        alias: ["satellite-api"]
+    )
+    static let airQuality = WeatherApiController(
+        has15minutely: false,
+        hasCurrentWeather: true,
+        defaultModel: .air_quality_best_match,
+        subdomain: "air-quality-api",
+        alias: ["res1-api"],
+        type: .airQuality
+    )
+    static let seasonal = WeatherApiController(
+        has15minutely: false,
+        hasCurrentWeather: false,
+        defaultModel: .ecmwf_seasonal_seamless,
+        subdomain: "seasonal-api",
+        type: .seasonal
+    )
+    static let flood = WeatherApiController(
+        has15minutely: false,
+        hasCurrentWeather: false,
+        defaultModel: .flood_best_match,
+        subdomain: "flood-api",
+        type: .flood
+    )
+    static let climate = WeatherApiController(
+        has15minutely: false,
+        hasCurrentWeather: false,
+        defaultModel: .MRI_AGCM3_2_S,
+        subdomain: "climate-api",
+        type: .climate
+    )
+    static let marine = WeatherApiController(
+        has15minutely: true,
+        hasCurrentWeather: true,
+        defaultModel: .marine_best_match,
+        subdomain: "marine-api",
+        type: .marine
+    )
+    static let ensemble = WeatherApiController(
+        defaultModel: .ncep_gefs_seamless,
+        subdomain: "ensemble-api",
+        type: .ensemble
+    )
 }
 
 struct WeatherApiController {
