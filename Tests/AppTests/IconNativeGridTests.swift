@@ -1,15 +1,14 @@
 import Foundation
 @testable import App
-@testable import SphericalCube
-@testable import SphericalCubeTestSupport
+@testable import ReducedLatLon
 import OmFileFormat
 import Testing
 
 @Suite struct IconNativeGridTests {
     @Test func initializedDomainsShareDecodedElevations() async throws {
         let fixture = try makeFixture(centers: [
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
         ])
         defer { fixture.remove() }
         let file = try await makeElevationFile([100, 500])
@@ -64,11 +63,39 @@ import Testing
         try file.validateFileAndInstall()
         let installed = try #require(file.cache.get())
 
-        try truncateLastByte(of: fixture.file)
+        try Data(Data(contentsOf: fixture.file).dropLast()).write(to: fixture.file, options: .atomic)
         #expect(throws: IconNativeDomainError.self) {
             try file.validateFileAndInstall()
         }
-        #expect(try #require(file.cache.get()) === installed)
+        #expect(file.cache.get() === installed)
+        #expect(installed.point(at: 0) == fixture.centers[0])
+    }
+
+    @Test func identityMismatchNeverPublishesDownloadedArtifact() async throws {
+        let fixture = try makeGlobalFixture()
+        defer { fixture.remove() }
+        let valid = makeIdentity(fixture)
+        let bytes = try Data(contentsOf: fixture.file)
+        let published = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: published) }
+        try bytes.write(to: published)
+        for mismatch in 0..<5 {
+            let identity = IconNativeGridIdentity(
+                gridNumber: mismatch == 0 ? 47 : valid.gridNumber,
+                gridUUID: mismatch == 1 ? UUID() : valid.gridUUID,
+                cellCount: valid.cellCount + (mismatch == 2 ? 1 : 0),
+                isGlobal: mismatch == 3 ? false : valid.isGlobal,
+                latitudeBandCount: valid.latitudeBandCount + (mismatch == 4 ? 1 : 0),
+                maximumDistanceMeters: valid.maximumDistanceMeters,
+                sourceFile: valid.sourceFile
+            )
+            let file = IconNativeGridFile(localFile: published.path, identity: identity)
+            await #expect(throws: IconNativeDomainError.self) {
+                _ = try await file.load(file: DataAsClass(data: bytes))
+            }
+            #expect(try Data(contentsOf: published) == bytes)
+            #expect(file.cache.get() == nil)
+        }
     }
 
     @Test func loadRejectsTruncatedArtifactBeforePublication() async throws {
@@ -104,8 +131,8 @@ import Testing
 
     @Test func seaAndTerrainSelectionReuseElevations() async throws {
         let fixture = try makeFixture(centers: [
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
         ])
         defer { fixture.remove() }
         for (mode, elevations) in [(GridSelectionMode.land, [Float(0), 500]), (.sea, [100, -999])] {
@@ -131,12 +158,12 @@ import Testing
 
     @Test func seaAndTerrainSelectionStayWithinNearbyDistance() async throws {
         let fixture = try makeFixture(centers: [
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.4)
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0.1),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0.4)
         ])
         defer { fixture.remove() }
-        let nearbyDistance = SphericalPoint.squaredChordDistance(meters: 30_000)
+        let nearbyDistance = IconNativeGridIdentity.squaredChordDistance(meters: 30_000)
         for (mode, elevations) in [
             (GridSelectionMode.land, [Float(0), 0, 2_000]),
             (.sea, [100, 100, -999])
@@ -181,8 +208,8 @@ import Testing
         let file = try await makeElevationFile([100, -999], scaleFactor: 10)
         defer { file.remove() }
         let fixture = try makeFixture(centers: [
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0),
-            SphericalPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0.1)
         ])
         defer { fixture.remove() }
         let result = try await fixture.grid.findPoint(lat: 0, lon: 0.04, elevation: 500,
@@ -212,7 +239,7 @@ import Testing
 
 }
 
-private extension SphericalCubeFixture {
+private extension NativeGridFixture {
     var grid: IconNativeGrid {
         IconNativeGrid(
             storage: index,
@@ -222,20 +249,13 @@ private extension SphericalCubeFixture {
     }
 }
 
-private func truncateLastByte(of file: URL) throws {
-    let handle = try FileHandle(forWritingTo: file)
-    defer { try? handle.close() }
-    let size = try handle.seekToEnd()
-    try handle.truncate(atOffset: size - 1)
-}
-
-private func makeIdentity(_ fixture: SphericalCubeFixture) -> IconNativeGridIdentity {
+private func makeIdentity(_ fixture: NativeGridFixture) -> IconNativeGridIdentity {
     IconNativeGridIdentity(
         gridNumber: 26,
         gridUUID: UUID(uuidString: "00010203-0405-0607-0809-0a0b0c0d0e0f")!,
         cellCount: fixture.centers.count,
         isGlobal: true,
-        level: fixture.index.level,
+        latitudeBandCount: fixture.index.latitudeBandCount,
         maximumDistanceMeters: 10_000_000,
         sourceFile: "synthetic.nc.bz2"
     )
@@ -256,6 +276,21 @@ private func checkSourceCoordinates(
         artifactFile: artifactFile.path
     )
     let source = try IconNativeGrid.Generator.readSource(file: sourceFile, identity: identity)
+    let originalBytes = try Data(contentsOf: artifactFile)
+    _ = try IconNativeGrid.Generator.generateAndPublish(
+        sourceFile: sourceFile, identity: identity, artifactFile: artifactFile.path
+    )
+    #expect(try Data(contentsOf: artifactFile) == originalBytes)
+    let wrongIdentity = IconNativeGridIdentity(gridNumber: identity.gridNumber, gridUUID: identity.gridUUID,
+        cellCount: identity.cellCount + 1, isGlobal: identity.isGlobal,
+        latitudeBandCount: identity.latitudeBandCount, maximumDistanceMeters: identity.maximumDistanceMeters,
+        sourceFile: identity.sourceFile)
+    #expect(throws: IconNativeGridSourceError.self) {
+        _ = try IconNativeGrid.Generator.generateAndPublish(
+            sourceFile: sourceFile, identity: wrongIdentity, artifactFile: artifactFile.path
+        )
+    }
+    #expect(try Data(contentsOf: artifactFile) == originalBytes)
 
     #expect(grid.nx == identity.cellCount)
     let artifactBytes = try #require(
@@ -264,7 +299,10 @@ private func checkSourceCoordinates(
     #expect(artifactBytes <= maximumArtifactBytes)
     let stride = max(1, source.count / targetSampleCount)
     for cell in Swift.stride(from: 0, to: source.count, by: stride) {
-        #expect(centerDirectionDistance(source[cell], grid.storage.point(at: cell)) <= 2)
+        let stored = grid.storage.point(at: cell)
+        #expect(source[cell].x.bitPattern == stored.x.bitPattern)
+        #expect(source[cell].y.bitPattern == stored.y.bitPattern)
+        #expect(source[cell].z.bitPattern == stored.z.bitPattern)
     }
 }
 

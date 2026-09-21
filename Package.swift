@@ -50,16 +50,21 @@ let package = Package(
     ] : []),
     targets: [
         .target(
-            name: "SphericalCube",
-            dependencies: [
-                .product(name: "OmFileFormat", package: "om-file-format"),
-            ],
+            name: "ReducedLatLon",
+            dependencies: [.product(name: "OmFileFormat", package: "om-file-format")],
             swiftSettings: swiftFlags
+        ),
+        .testTarget(
+            name: "ReducedLatLonTests",
+            dependencies: [
+                .target(name: "ReducedLatLon"),
+                .product(name: "OmFileFormat", package: "om-file-format")
+            ]
         ),
         .target(
             name: "App",
             dependencies: [
-                .target(name: "SphericalCube"),
+                .target(name: "ReducedLatLon"),
                 .product(name: "SwiftZarr", package: "swift-zarr"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Crypto", package: "swift-crypto"),
@@ -132,9 +137,8 @@ let package = Package(
         .testTarget(
             name: "AppTests",
             dependencies: [
+                .target(name: "ReducedLatLon"),
                 .target(name: "App"),
-                .target(name: "SphericalCubeTestSupport"),
-                .target(name: "SphericalCube"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "VaporTesting", package: "vapor")
             ]
@@ -152,22 +156,6 @@ let package = Package(
             dependencies: [
                 .target(name: "OmTime")
             ]
-        ),
-        .testTarget(
-            name: "SphericalCubeTests",
-            dependencies: [
-                .target(name: "SphericalCube"),
-                .target(name: "SphericalCubeTestSupport"),
-                .product(name: "OmFileFormat", package: "om-file-format"),
-            ]
-        ),
-        .target(
-            name: "SphericalCubeTestSupport",
-            dependencies: [
-                .target(name: "SphericalCube"),
-                .product(name: "OmFileFormat", package: "om-file-format"),
-            ],
-            path: "Tests/SphericalCubeTestSupport"
         ),
     ]
 )

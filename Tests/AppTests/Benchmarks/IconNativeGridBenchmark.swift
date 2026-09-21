@@ -1,243 +1,244 @@
 import Foundation
 import OmFileFormat
+import ReducedLatLon
 import Testing
 @testable import App
-@testable import SphericalCube
 
-/// Opt-in benchmark using an existing global or D2 grid.bin.
-/// ICON_NATIVE_GRID_BENCHMARK=1 ICON_NATIVE_GRID_ARTIFACT=/path/to/grid.bin \
-/// swift test -c release --jobs 16 -Xswiftc -num-threads -Xswiftc 16 --filter IconNativeGridBenchmarkTests
+/// Opt-in measurements of the production native ICON adapter; see docs/icon-native-grid-format.md.
 @Suite struct IconNativeGridBenchmarkTests {
-    private let queryCount = 65_536
-    private let repeats = 8
-    private let elevationQueryCount = 1_024
+    private struct Query: Codable {
+        let latitude: Float
+        let longitude: Float
+    }
+
+    private struct Corpus: Codable {
+        let ordinary: [Query]
+        let sea: [Query]
+        let land: [Query]
+    }
+
+    private struct Measurement: Codable {
+        let operation: String
+        let samplesNS: [Double]
+        let checksum: Int
+        let queries: Int
+    }
+
+    private struct Selection: Codable, Equatable {
+        let pointID: Int
+        let kind: Int
+        let elevationBits: UInt32
+
+        init(_ result: (gridpoint: Int, gridElevation: ElevationOrSea)?) {
+            pointID = result?.gridpoint ?? -1
+            switch result?.gridElevation {
+            case nil: kind = 0; elevationBits = 0
+            case .noData: kind = 1; elevationBits = 0
+            case .sea: kind = 2; elevationBits = 0
+            case .landWithoutElevation: kind = 3; elevationBits = 0
+            case .elevation(let value): kind = 4; elevationBits = value.bitPattern
+            }
+        }
+    }
+
     private let sampleCount = 9
-    private typealias Query = (latitude: Float, longitude: Float)
+    private let repeats = 8
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_GRID_BENCHMARK"] == "1"))
     func benchmark() async throws {
-        let path = try #require(ProcessInfo.processInfo.environment["ICON_NATIVE_GRID_ARTIFACT"],
-            "Set ICON_NATIVE_GRID_ARTIFACT to an existing global or D2 grid.bin")
-        let storage = try SphericalCubeIndex(file: URL(fileURLWithPath: path))
-        let identity = try #require([IconNativeGridIdentity.global, .d2].first { $0.gridNumber == storage.identity.number })
+        let env = ProcessInfo.processInfo.environment
+        let path = try #require(env["ICON_NATIVE_GRID_ARTIFACT"], "Set ICON_NATIVE_GRID_ARTIFACT to a global or D2 grid.bin")
+        let storage = try ReducedLatLonIndex(file: URL(fileURLWithPath: path))
+        let identity = try #require([IconNativeGridIdentity.global, .d2].first { $0.gridNumber == storage.metadata.number })
         try identity.validate(storage: storage, path: path)
-        let grid = IconNativeGrid(
-            storage: storage,
-            maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
-            nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared
-        )
-        let queries = makeQueries(grid: grid)
-        let workloads = [(name: "ordinary", queries: queries, repeats: repeats)]
-            + [(name: "seam/corner", queries: makeBoundaryQueries(grid: grid), repeats: 4)]
-        print("ICON native grid benchmark: \(path)")
-        print("  cells: \(grid.nx), queries/sample: \(queryCount * repeats), samples: \(sampleCount)")
-        for workload in workloads {
-            printResult("\(workload.name) nearest lookup", measure(executions: workload.queries.count * workload.repeats) {
-                lookupChecksum(grid: grid, queries: workload.queries, repeats: workload.repeats)
-            })
-            printResult("\(workload.name) lookup with candidates", measure(executions: workload.queries.count * workload.repeats) {
-                lookupWithCandidatesChecksum(grid: grid, queries: workload.queries, repeats: workload.repeats)
-            })
-        }
-        try await measureElevationSelection(grid: grid, queries: queries)
-    }
+        let grid = IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
 
-    /// Cover all cube seams and corners, with queries on and just across each boundary.
-    /// Regional grids may return nil here; global grids exercise populated boundaries.
-    private func makeBoundaryQueries(grid: IconNativeGrid) -> [Query] {
-        let width = 2 / Double(grid.storage.resolution)
-        var queries = [Query]()
-        for face in 0..<6 {
-            for epsilon in [-0.0001, 0, 0.0001] {
-                for sign in [-1.0, 1.0] {
-                    let boundary = sign + epsilon * width
-                    for step in 0..<256 {
-                        let along = -1 + (Double(step) + 0.5) * 2 / 256
-                        queries.append(SphericalCubeGeometry.faceVector(face: face, u: boundary, v: along).coordinate)
-                        queries.append(SphericalCubeGeometry.faceVector(face: face, u: along, v: boundary).coordinate)
-                        for otherSign in [-1.0, 1.0] {
-                            queries.append(SphericalCubeGeometry.faceVector(
-                                face: face, u: boundary, v: otherSign + epsilon * width).coordinate)
-                        }
+        let corpus: Corpus
+        let reader: OmFileReaderArray<FileHandleWithCount, Float>
+        var generated: ElevationFileFixture?
+        defer { generated?.remove() }
+        if let directory = env["ICON_NATIVE_GRID_BENCHMARK_CORPUS"] {
+            let folder = URL(fileURLWithPath: directory)
+            corpus = try JSONDecoder().decode(Corpus.self, from: Data(contentsOf: folder.appendingPathComponent("queries.json")))
+            reader = try await OmFileReader(file: folder.appendingPathComponent("elevations.om").path).expectArray(of: Float.self)
+        } else {
+            let elevations = (0..<grid.nx).map { id -> Float in
+                let sea = storage.metadata.coversWholeSphere ? storage.point(at: id).z >= 0 : id < grid.nx / 2
+                return sea ? -999 : Float(100 + (id * 37) % 2_000)
+            }
+            corpus = try makeCorpus(grid: grid, elevations: elevations)
+            let file = try await makeElevationFile(elevations)
+            generated = file
+            reader = file.reader
+        }
+        try #require(!corpus.ordinary.isEmpty && !corpus.sea.isEmpty && !corpus.land.isEmpty)
+        let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
+        let cached = IconNativeGrid(storage: storage, maximumChordDistanceSquared: grid.maximumChordDistanceSquared,
+            nearbyMaximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared, elevations: decoded)
+        if let expectedFile = env["ICON_NATIVE_GRID_BENCHMARK_EXPECTED"] {
+            let expected = try JSONDecoder().decode([[Selection]].self, from: Data(contentsOf: URL(fileURLWithPath: expectedFile)))
+            let scenarios = [(corpus.sea, GridSelectionMode.sea), (corpus.land, .land), (corpus.land, .sea)]
+            try #require(expected.count == scenarios.count)
+            for (i, scenario) in scenarios.enumerated() {
+                for adapter in [grid, cached] {
+                    var actual = [Selection]()
+                    for query in scenario.0 {
+                        actual.append(Selection(try await adapter.findPoint(lat: query.latitude, lon: query.longitude,
+                            elevation: -10_000, elevationFile: reader, mode: scenario.1)))
                     }
+                    try #require(actual == expected[i])
                 }
             }
         }
-        return queries
-    }
 
-    private func measureElevationSelection(grid: IconNativeGrid, queries: [Query]) async throws {
-        // Preserve the original synthetic elevation workload on operational grid coordinates.
-        let elevations: [Float] = (0..<grid.nx).map { pointID in
-            let isSea = grid.storage.coversWholeSphere
-                ? grid.storage.point(at: pointID).z >= 0 : pointID < grid.nx / 2
-            return isSea ? -999 : Float(100 + (pointID * 37) % 2_000)
+        var results = [Measurement]()
+        results.append(try measure("Nearest lookup", executions: corpus.ordinary.count * repeats) {
+            nearestChecksum(grid, queries: corpus.ordinary)
+        })
+        for (name, adapter, queries, mode) in [
+            ("Uncached elevation sea hit", grid, corpus.sea, GridSelectionMode.sea),
+            ("Cached elevation sea hit", cached, corpus.sea, .sea),
+            ("Uncached elevation terrain search", grid, corpus.land, .land),
+            ("Cached elevation terrain search", cached, corpus.land, .land),
+            ("Uncached sea search from land", grid, corpus.land, .sea),
+            ("Cached sea search from land", cached, corpus.land, .sea)
+        ] {
+            results.append(try await measureAsync(name, executions: queries.count) {
+                try await selectionChecksum(adapter, reader: reader, queries: queries, mode: mode)
+            })
         }
-        var seaQueries = [Query]()
-        var landQueries = [Query]()
-        for query in queries {
-            guard let pointID = grid.findPoint(lat: query.latitude, lon: query.longitude) else { continue }
-            if elevations[pointID] <= -999, seaQueries.count < elevationQueryCount {
-                seaQueries.append(query)
-            } else if elevations[pointID] > -999, landQueries.count < elevationQueryCount {
-                landQueries.append(query)
-            }
-            if seaQueries.count == elevationQueryCount, landQueries.count == elevationQueryCount { break }
+        results.append(try measure("Nearest plus ten candidates", executions: corpus.ordinary.count * repeats) {
+            candidateChecksum(grid, queries: corpus.ordinary)
+        })
+        let boundaries = makeBoundaryQueries(grid: grid)
+        results.append(try measure("Boundary nearest lookup", executions: boundaries.count * repeats) {
+            nearestChecksum(grid, queries: boundaries)
+        })
+        results.append(try measure("Boundary nearest plus ten candidates", executions: boundaries.count * repeats) {
+            candidateChecksum(grid, queries: boundaries)
+        })
+        print("ICON native grid benchmark: \(path), \(grid.nx) cells, \(sampleCount) samples")
+        for result in results {
+            print("  \(result.operation): \(result.samplesNS.sorted()[sampleCount / 2] / 1_000) µs/query; checksum \(result.checksum)")
         }
-        try #require(seaQueries.count == elevationQueryCount && landQueries.count == elevationQueryCount,
-            "Artifact must supply \(elevationQueryCount) queries for each synthetic sea/land workload")
-        let file = try await makeElevationFile(elevations)
-        defer { file.remove() }
-        let reader = file.reader
-        print("  elevation queries/sample: \(elevationQueryCount)")
-        let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
-        let cachedGrid = IconNativeGrid(storage: grid.storage,
-            maximumChordDistanceSquared: grid.maximumChordDistanceSquared,
-            nearbyMaximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared,
-            elevations: decoded)
-
-        let scenarios: [(name: String, queries: [Query], mode: GridSelectionMode)] = [
-            ("sea hit", seaQueries, .sea),
-            ("sea search from land", landQueries, .sea),
-            ("forced terrain search with fallback", landQueries, .land)
-        ]
-        for scenario in scenarios {
-            let raw = try await measureAsync(executions: elevationQueryCount) {
-                try await selectionChecksum(grid: grid, reader: reader, queries: scenario.queries, mode: scenario.mode)
-            }
-            let warm = try await measureAsync(executions: elevationQueryCount) {
-                try await selectionChecksum(grid: cachedGrid, reader: reader, queries: scenario.queries, mode: scenario.mode)
-            }
-            printResult("raw \(scenario.name)", raw)
-            printResult("warm \(scenario.name)", warm)
+        if let output = env["ICON_NATIVE_GRID_BENCHMARK_RESULT"] {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            try encoder.encode(results).write(to: URL(fileURLWithPath: output), options: .atomic)
         }
     }
 
-    private func measure(
-        executions: Int,
-        _ operation: () -> Int
-    ) -> (samples: [Double], checksum: Int) {
-        var checksum = operation()
-        var samples = [Double]()
-        samples.reserveCapacity(sampleCount)
-        for _ in 0..<sampleCount {
-            let start = DispatchTime.now().uptimeNanoseconds
-            checksum &+= operation()
-            let elapsed = DispatchTime.now().uptimeNanoseconds - start
-            samples.append(Double(elapsed) / Double(executions))
-        }
-        samples.sort()
-        return (samples, checksum)
-    }
-
-    private func measureAsync(
-        executions: Int,
-        _ operation: () async throws -> Int
-    ) async throws -> (samples: [Double], checksum: Int) {
-        var checksum = try await operation()
-        var samples = [Double]()
-        samples.reserveCapacity(sampleCount)
-        for _ in 0..<sampleCount {
-            let start = DispatchTime.now().uptimeNanoseconds
-            checksum &+= try await operation()
-            let elapsed = DispatchTime.now().uptimeNanoseconds - start
-            samples.append(Double(elapsed) / Double(executions))
-        }
-        samples.sort()
-        return (samples, checksum)
-    }
-
-    private func printResult(
-        _ name: String,
-        _ measurement: (samples: [Double], checksum: Int)
-    ) {
-        print("  \(name) median: \(measurement.samples[sampleCount / 2]) ns/query")
-        print("  \(name) range: \(measurement.samples[0])...\(measurement.samples[sampleCount - 1]) ns/query")
-        print("  \(name) checksum: \(measurement.checksum)")
-    }
-
-    private func makeQueries(grid: IconNativeGrid) -> [(latitude: Float, longitude: Float)] {
+    private func makeCorpus(grid: IconNativeGrid, elevations: [Float]) throws -> Corpus {
         var state: UInt64 = 0xbb67_ae85_84ca_a73b
-        var queries = [(latitude: Float, longitude: Float)]()
-        queries.reserveCapacity(queryCount)
-        for _ in 0..<queryCount {
+        var ordinary = [Query]()
+        var sea = [Query]()
+        var land = [Query]()
+        for _ in 0..<65_536 {
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-            let cell = Int(state % UInt64(grid.nx))
-            let coordinate = grid.getCoordinates(gridpoint: cell)
+            let coordinate = grid.getCoordinates(gridpoint: Int(state % UInt64(grid.nx)))
             let latitudeOffset = Float(Int((state >> 32) % 2_001) - 1_000) * 0.00001
             state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             let longitudeOffset = Float(Int((state >> 32) % 2_001) - 1_000) * 0.00001
-            queries.append(
-                (
-                    latitude: min(90, max(-90, coordinate.latitude + latitudeOffset)),
-                    longitude: coordinate.longitude + longitudeOffset
-                )
-            )
+            let query = Query(latitude: min(90, max(-90, coordinate.latitude + latitudeOffset)), longitude: coordinate.longitude + longitudeOffset)
+            ordinary.append(query)
+            guard let id = grid.findPoint(lat: query.latitude, lon: query.longitude) else { continue }
+            if elevations[id] <= -999, sea.count < 1_024 { sea.append(query) }
+            if elevations[id] > -999, land.count < 1_024 { land.append(query) }
+        }
+        try #require(sea.count == 1_024 && land.count == 1_024)
+        return Corpus(ordinary: ordinary, sea: sea, land: land)
+    }
+
+    /// Sample populated band/column boundaries and wider regional offsets, plus poles and dateline.
+    private func makeBoundaryQueries(grid: IconNativeGrid) -> [Query] {
+        let bands = grid.storage.latitudeBandCount
+        let height = 180 / Double(bands)
+        var queries = [Query]()
+        for id in stride(from: 0, to: grid.nx, by: max(1, grid.nx / 1_024)) {
+            let point = grid.getCoordinates(gridpoint: id)
+            let row = min(bands - 1, max(0, Int((Double(point.latitude) + 90) / height)))
+            let latitude = -90 + Double(row) * height
+            let columns = max(1, Int((360 * cos((latitude + height / 2) * .pi / 180) / height).rounded()))
+            let width = 360 / Double(columns)
+            let longitude = -180 + floor((Double(point.longitude) + 180) / width) * width
+            for epsilon in [-0.0001, 0, 0.0001] {
+                queries.append(Query(latitude: Float(max(-90, min(90, latitude + epsilon * height))), longitude: point.longitude))
+                queries.append(Query(latitude: point.latitude, longitude: Float(longitude + epsilon * width)))
+            }
+            for offset: Float in [-1, 1] {
+                queries.append(Query(latitude: min(90, max(-90, point.latitude + offset)), longitude: point.longitude + offset))
+            }
+        }
+        for latitude: Float in [-90, -89.99999, 0, 89.99999, 90] {
+            for longitude: Float in [-540, -180, -179.99999, 0, 179.99999, 180, 540] {
+                queries.append(Query(latitude: latitude, longitude: longitude))
+            }
         }
         return queries
     }
 
-    @inline(never)
-    private func lookupChecksum(
-        grid: IconNativeGrid,
-        queries: [(latitude: Float, longitude: Float)],
-        repeats: Int
-    ) -> Int {
-        var checksum = 0
-        for _ in 0..<repeats {
-            for query in queries {
-                checksum &+= grid.storage.nearestPointID(
-                    latitude: query.latitude,
-                    longitude: query.longitude,
-                    maximumChordDistanceSquared: grid.maximumChordDistanceSquared
-                ) ?? -1
-            }
+    private func measure(_ name: String, executions: Int, _ operation: () -> Int) throws -> Measurement {
+        let expected = operation()
+        var samples = [Double]()
+        for _ in 0..<sampleCount {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let checksum = operation()
+            let elapsed = DispatchTime.now().uptimeNanoseconds - start
+            try #require(checksum == expected)
+            samples.append(Double(elapsed) / Double(executions))
         }
-        return checksum
+        return Measurement(operation: name, samplesNS: samples, checksum: expected, queries: executions)
+    }
+
+    private func measureAsync(_ name: String, executions: Int, _ operation: () async throws -> Int) async throws -> Measurement {
+        let expected = try await operation()
+        var samples = [Double]()
+        for _ in 0..<sampleCount {
+            let start = DispatchTime.now().uptimeNanoseconds
+            let checksum = try await operation()
+            let elapsed = DispatchTime.now().uptimeNanoseconds - start
+            try #require(checksum == expected)
+            samples.append(Double(elapsed) / Double(executions))
+        }
+        return Measurement(operation: name, samplesNS: samples, checksum: expected, queries: executions)
     }
 
     @inline(never)
-    private func lookupWithCandidatesChecksum(
-        grid: IconNativeGrid,
-        queries: [(latitude: Float, longitude: Float)],
-        repeats: Int
-    ) -> Int {
-        var checksum = 0
+    private func nearestChecksum(_ grid: IconNativeGrid, queries: [Query]) -> Int {
+        var sum = 0
+        for _ in 0..<repeats {
+            for query in queries { sum &+= grid.findPoint(lat: query.latitude, lon: query.longitude) ?? -1 }
+        }
+        return sum
+    }
+
+    @inline(never)
+    private func candidateChecksum(_ grid: IconNativeGrid, queries: [Query]) -> Int {
+        var sum = 0
         for _ in 0..<repeats {
             for query in queries {
-                guard let lookup = grid.storage.nearestLookup(
-                    latitude: query.latitude,
-                    longitude: query.longitude,
-                    maximumChordDistanceSquared: grid.maximumChordDistanceSquared
-                ) else {
-                    checksum &+= -1
-                    continue
+                guard let lookup = grid.storage.nearestLookup(latitude: query.latitude, longitude: query.longitude,
+                    maximumChordDistanceSquared: grid.maximumChordDistanceSquared) else { sum &+= -1; continue }
+                let candidates = grid.storage.nearestCandidates(from: lookup, maximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared)
+                sum &+= candidates.count
+                for i in 0..<candidates.count {
+                    sum = (sum &* 31) &+ candidates.pointIDs[i] &+ Int(candidates.distancesSquared[i].bitPattern)
                 }
-                let candidates = grid.storage.nearestCandidates(
-                    from: lookup,
-                    maximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared
-                )
-                checksum &+= candidates.pointIDs[0] &+ candidates.count
             }
         }
-        return checksum
+        return sum
     }
 
     @inline(never)
-    private func selectionChecksum(
-        grid: IconNativeGrid,
-        reader: any OmFileReaderArrayProtocol<Float>,
-        queries: [Query],
-        mode: GridSelectionMode
-    ) async throws -> Int {
-        var checksum = 0
+    private func selectionChecksum(_ grid: IconNativeGrid, reader: any OmFileReaderArrayProtocol<Float>,
+                                   queries: [Query], mode: GridSelectionMode) async throws -> Int {
+        var sum = 0
         for query in queries {
-            let result = try await grid.findPoint(
-                lat: query.latitude, lon: query.longitude, elevation: -10_000,
-                elevationFile: reader, mode: mode
-            )
-            checksum &+= result?.gridpoint ?? -1
+            let result = Selection(try await grid.findPoint(lat: query.latitude, lon: query.longitude,
+                elevation: -10_000, elevationFile: reader, mode: mode))
+            sum = (sum &* 31) &+ result.pointID &+ result.kind &+ Int(result.elevationBits)
         }
-        return checksum
+        return sum
     }
 }

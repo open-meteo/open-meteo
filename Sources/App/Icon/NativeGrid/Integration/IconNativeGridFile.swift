@@ -1,13 +1,14 @@
 import Foundation
 import OmFileFormat
 import OmFileIO
-import SphericalCube
+import ReducedLatLon
 import Synchronization
 
 extension IconNativeGridIdentity {
-    func loadStorage(mapped: MmapFile, path: String) throws -> SphericalCubeIndex {
+    /// Validates a mapped artifact and its operational identity, wrapping failures with its path.
+    func loadStorage(mapped: MmapFile, path: String) throws -> ReducedLatLonIndex {
         do {
-            let storage = try SphericalCubeIndex(mapped: mapped)
+            let storage = try ReducedLatLonIndex(mapped: mapped)
             try validate(storage: storage, path: path)
             return storage
         } catch let error as IconNativeDomainError {
@@ -17,14 +18,15 @@ extension IconNativeGridIdentity {
         }
     }
 
-    func validate(storage: SphericalCubeIndex, path: String) throws(IconNativeDomainError) {
-        guard storage.identity.number == gridNumber else {
+    /// Rejects structurally valid artifacts whose dataset or index resolution does not match ICON.
+    func validate(storage: ReducedLatLonIndex, path: String) throws(IconNativeDomainError) {
+        guard storage.metadata.number == gridNumber else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: path,
-                reason: "expected grid number \(gridNumber), got \(storage.identity.number)"
+                reason: "expected grid number \(gridNumber), got \(storage.metadata.number)"
             )
         }
-        guard storage.identity.uuid == gridUUID.bytes else {
+        guard storage.metadata.uuid == gridUUID.bytes else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: path,
                 reason: "grid UUID does not match \(gridUUID.hexString)"
@@ -36,22 +38,23 @@ extension IconNativeGridIdentity {
                 reason: "expected \(cellCount) cells, got \(storage.pointCount)"
             )
         }
-        guard storage.coversWholeSphere == isGlobal else {
+        guard storage.metadata.coversWholeSphere == isGlobal else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: path,
                 reason: "global/regional grid kind does not match"
             )
         }
-        guard storage.level == level else {
+        guard storage.latitudeBandCount == latitudeBandCount else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: path,
-                reason: "expected grid level \(level), got \(storage.level)"
+                reason: "expected \(latitudeBandCount) latitude bands, got \(storage.latitudeBandCount)"
             )
         }
     }
 
 }
 
+/// Static artifact location and lifetime-pinned cache shared by domains using the same ICON mesh.
 struct IconNativeGridFile: OmFileManagable, Sendable {
     typealias Payload = IconNativeGridPayload
 
@@ -60,7 +63,8 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let identity: IconNativeGridIdentity
     let cache = IconNativeGridCache()
 
-    func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> SphericalCubeIndex
+    /// Materializes a complete backend, validating it before atomically replacing the local file.
+    func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> ReducedLatLonIndex
     where Backend.DataType: DataProtocol {
         try await materialize(file: file) { handle in
             try identity.loadStorage(mapped: MmapFile(fn: handle), path: localFile)
@@ -76,12 +80,14 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
 
 /// Local files remain mapped; remote files are validated before atomic publication.
 struct IconNativeGridPayload: OmFilePayload {
-    let storage: SphericalCubeIndex
+    let storage: ReducedLatLonIndex
 
+    /// Maps and structurally validates a local file; its domain checks operational identity later.
     init(fd: FileHandle, size: Int64) throws {
-        storage = try SphericalCubeIndex(mapped: MmapFile(fn: fd))
+        storage = try ReducedLatLonIndex(mapped: MmapFile(fn: fd))
     }
 
+    /// Loads a supported remote registry path through validated local materialization.
     init(file: OmHttpReaderBackend) async throws {
         let artifact: IconNativeGridFile
         switch file.object {
@@ -132,8 +138,9 @@ extension IconNativeGridFile {
         }
     }
 
+    /// Resolves and pins a validated index, returning an adapter with this grid's distance policy.
     func load() async throws -> IconNativeGrid {
-        let storage: SphericalCubeIndex
+        let storage: ReducedLatLonIndex
         if let cached = cache.get() {
             storage = cached
         } else {
@@ -158,14 +165,15 @@ extension IconNativeGridFile {
 /// Pins a successfully loaded mapping for this artifact. Local and remote file
 /// discovery belongs to `OmFileSystemManager`.
 final class IconNativeGridCache: Sendable {
-    private let entry = AtomicLazyReference<SphericalCubeIndex>()
+    private let entry = AtomicLazyReference<ReducedLatLonIndex>()
 
-    func get() -> SphericalCubeIndex? {
+    /// Returns the first successfully installed mapping, or nil before initialization.
+    func get() -> ReducedLatLonIndex? {
         entry.load()
     }
 
     /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
-    func install(_ storage: SphericalCubeIndex) {
+    func install(_ storage: ReducedLatLonIndex) {
         _ = entry.storeIfNil(storage)
     }
 

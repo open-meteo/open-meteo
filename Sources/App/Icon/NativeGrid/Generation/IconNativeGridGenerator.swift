@@ -1,6 +1,6 @@
 import Foundation
 import OmFileFormat
-import SphericalCube
+import ReducedLatLon
 import SwiftNetCDF
 
 enum IconNativeGridSourceError: Error, CustomStringConvertible {
@@ -30,12 +30,14 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
     }
 }
 
-/// Offline converter from DWD's official ICON grid NetCDF to a provider-neutral spherical cube
+/// Offline converter from DWD's official ICON grid NetCDF to a provider-neutral reduced latitude–longitude
 /// artifact. It preserves NetCDF cell order as canonical point IDs and supplies ICON-specific
 /// identity, coverage, resolution, distance, and size policies. Spatial-index construction belongs
 /// here, never in API coordinate lookup.
 extension IconNativeGrid {
     enum Generator {
+        /// Builds from an official NetCDF mesh, validates the unpublished artifact and identity,
+        /// then atomically publishes it. Failures leave an existing destination untouched.
         static func generateAndPublish(
             sourceFile: String,
             identity: IconNativeGridIdentity,
@@ -45,8 +47,8 @@ extension IconNativeGrid {
         {
             let points = try readSource(file: sourceFile, identity: identity)
             let maximumFileSize = identity.isGlobal ? 128 * 1_024 * 1_024 : 32 * 1_024 * 1_024
-            let metadata = SphericalCubeArtifact.Metadata(
-                identity: .init(number: identity.gridNumber, uuid: identity.gridUUID.bytes),
+            let metadata = ReducedLatLonArtifact.Metadata(
+                number: identity.gridNumber, uuid: identity.gridUUID.bytes,
                 coversWholeSphere: identity.isGlobal
             )
             let artifactHandle = try FileHandle.createNewFile(
@@ -54,14 +56,15 @@ extension IconNativeGrid {
                 overwrite: true,
                 temporary: true
             )
-            try SphericalCubeArtifact.Writer.write(
+            try ReducedLatLonArtifact.Writer.write(
                 to: artifactHandle,
                 metadata: metadata,
                 points: points,
-                level: identity.level,
+                latitudeBandCount: identity.latitudeBandCount,
                 maximumFileSize: maximumFileSize
             )
-            let grid = IconNativeGrid(storage: try SphericalCubeIndex(mapped: MmapFile(fn: artifactHandle)),
+            let storage = try identity.loadStorage(mapped: MmapFile(fn: artifactHandle), path: artifactFile)
+            let grid = IconNativeGrid(storage: storage,
                 maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
                 nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
             try artifactHandle.linkTemporary(file: artifactFile)
@@ -70,7 +73,7 @@ extension IconNativeGrid {
 
         /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
         /// location offset in native forecast files.
-        static func readSource(file: String, identity: IconNativeGridIdentity) throws -> [SphericalPoint] {
+        static func readSource(file: String, identity: IconNativeGridIdentity) throws -> [ReducedLatLonPoint] {
             do {
                 guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
                     throw IconNativeGridSourceError.couldNotOpen(file)
@@ -125,8 +128,8 @@ extension IconNativeGrid {
             return try typed.read()
         }
 
-        private static func makePoints(longitudes: [Double], latitudes: [Double] ) throws -> [SphericalPoint] {
-            var points = [SphericalPoint]()
+        private static func makePoints(longitudes: [Double], latitudes: [Double]) throws -> [ReducedLatLonPoint] {
+            var points = [ReducedLatLonPoint]()
             points.reserveCapacity(longitudes.count)
             for index in longitudes.indices {
                 let longitude = longitudes[index]
@@ -137,7 +140,7 @@ extension IconNativeGrid {
                 else {
                     throw IconNativeGridSourceError.invalidValue(variable: "clon/clat", index: index)
                 }
-                points.append(SphericalPoint(latitudeRadians: latitude, longitudeRadians: longitude))
+                points.append(ReducedLatLonPoint(latitudeRadians: latitude, longitudeRadians: longitude))
             }
             return points
         }

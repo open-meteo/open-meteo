@@ -1,8 +1,8 @@
 import Foundation
 import OmFileFormat
-import SphericalCube
+import ReducedLatLon
 
-/// ICON-specific `Gridable` adapter around the provider-neutral spherical cube index.
+/// ICON-specific `Gridable` adapter around the provider-neutral reduced latitude–longitude index.
 ///
 /// Canonical point IDs are official ICON mass-point offsets, so a lookup result indexes native
 /// GRIB and static-variable arrays directly. Terrain and sea modes reuse the index's local candidate
@@ -11,13 +11,14 @@ import SphericalCube
 struct IconNativeGrid: Gridable {
     typealias SliceType = Range<Int>
 
-    let storage: SphericalCubeIndex
+    let storage: ReducedLatLonIndex
     let maximumChordDistanceSquared: Float
     let nearbyMaximumChordDistanceSquared: Float
     var elevations: ElevationValues?
 
+    /// Combines a validated index with ICON's acceptance/candidate radii and optional static elevations.
     init(
-        storage: SphericalCubeIndex,
+        storage: ReducedLatLonIndex,
         maximumChordDistanceSquared: Float,
         nearbyMaximumChordDistanceSquared: Float,
         elevations: ElevationValues? = nil
@@ -37,7 +38,7 @@ struct IconNativeGrid: Gridable {
         """
         GEOGCRS["ICON Native Grid",
             DATUM["Sphere",
-                ELLIPSOID["Sphere",\(Int(SphericalPoint.earthRadiusMeters)),0]],
+                ELLIPSOID["Sphere",\(Int(IconNativeGridIdentity.earthRadiusMeters)),0]],
             CS[ellipsoidal,2],
                 AXIS["latitude",north],
                 AXIS["longitude",east],
@@ -45,6 +46,7 @@ struct IconNativeGrid: Gridable {
         """
     }
 
+    /// Returns a canonical mass-point ID within the configured nearest distance, or nil.
     func findPoint(lat: Float, lon: Float) -> Int? {
         storage.nearestPointID(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared)
     }
@@ -55,11 +57,13 @@ struct IconNativeGrid: Gridable {
 
     func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
 
+    /// Returns the stored mass-point direction as latitude/longitude degrees for a canonical ID.
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
         precondition(gridpoint >= 0 && gridpoint < storage.pointCount, "ICON grid point out of range")
         return storage.point(at: gridpoint).coordinate
     }
 
+    /// Prefers the nearest sea point among bounded candidates, falling back to the initial nearest.
     func findPointInSea(
         lat: Float,
         lon: Float,
@@ -91,6 +95,7 @@ struct IconNativeGrid: Gridable {
         return elevationResult(gridpoint: nearest, value: nearestElevation)
     }
 
+    /// Applies ICON's elevation/distance score to bounded land candidates, retaining nearest fallback.
     func findPointTerrainOptimised(
         lat: Float,
         lon: Float,
@@ -124,7 +129,7 @@ struct IconNativeGrid: Gridable {
             if !candidateElevation.isFinite || candidateElevation <= -999 {
                 continue
             }
-            let distanceKilometres = sqrt(max(0, candidates.distancesSquared[position])) * Float(SphericalPoint.earthRadiusMeters / 1_000)
+            let distanceKilometres = sqrt(max(0, candidates.distancesSquared[position])) * Float(IconNativeGridIdentity.earthRadiusMeters / 1_000)
             let elevationDelta = candidateElevation >= 9999 ? 0 : abs(candidateElevation - elevation)
             let score = elevationDelta + distanceKilometres * 30
             if score < bestScore || (score == bestScore && (bestPosition < 0 || candidates.pointIDs[position] < candidates.pointIDs[bestPosition])) {
@@ -150,7 +155,7 @@ struct IconNativeGrid: Gridable {
     }
 
     private func getCandidateElevations(
-        candidates: SphericalCubeIndex.NearbyPoints,
+        candidates: ReducedLatLonIndex.NearbyPoints,
         knownValue: Float,
         elevationFile: any OmFileReaderArrayProtocol<Float>
     ) async throws -> InlineArray<10, Float> {
