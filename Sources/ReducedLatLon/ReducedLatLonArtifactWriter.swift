@@ -34,11 +34,9 @@ extension ReducedLatLonArtifact {
                 throw ReducedLatLonArtifactError.invalidHeader
             }
             // Cache the quantized positions so regional span discovery does not repeat trigonometry.
-            var rows = [Int]()
-            var columnsByPoint = [Int]()
-            var occupied = [[Int]](repeating: [], count: bandCount)
-            rows.reserveCapacity(points.count)
-            columnsByPoint.reserveCapacity(points.count)
+            var positions = [(band: Int, column: Int)]()
+            var occupied = [[Int]](repeating: [], count: metadata.coversWholeSphere ? 0 : bandCount)
+            positions.reserveCapacity(points.count)
             for (id, point) in points.enumerated() {
                 let norm = Double(point.x) * Double(point.x) + Double(point.y) * Double(point.y) + Double(point.z) * Double(point.z)
                 guard norm.isFinite, abs(norm - 1) <= 4 * Double(Float.ulpOfOne) else {
@@ -47,12 +45,13 @@ extension ReducedLatLonArtifact {
                 let angles = point.radians
                 let row = band(latitude: angles.latitude, count: bandCount)
                 let column = column(longitude: angles.longitude, count: columns(band: row, bandCount: bandCount))
-                rows.append(row)
-                columnsByPoint.append(column)
-                occupied[row].append(column)
+                positions.append((band: row, column: column))
+                if !metadata.coversWholeSphere {
+                    occupied[row].append(column)
+                }
             }
-            let firstBand = metadata.coversWholeSphere ? 0 : rows.min()!
-            let lastBand = metadata.coversWholeSphere ? bandCount - 1 : rows.max()!
+            let firstBand = metadata.coversWholeSphere ? 0 : positions.min { $0.band < $1.band }!.band
+            let lastBand = metadata.coversWholeSphere ? bandCount - 1 : positions.max { $0.band < $1.band }!.band
             var bands = [Band]()
             var bucketCount = 0
             for row in firstBand...lastBand {
@@ -85,9 +84,9 @@ extension ReducedLatLonArtifact {
             let fileBytes = layout.fileBytes
             guard fileBytes <= maximumFileSize else { throw ReducedLatLonArtifactError.artifactTooLarge }
             var offsets = [UInt32](repeating: 0, count: bucketCount + 1)
-            for id in points.indices {
-                let row = bands[rows[id] - firstBand]
-                offsets[row.firstBucket + row.localColumn(columnsByPoint[id]) + 1] += 1
+            for position in positions {
+                let row = bands[position.band - firstBand]
+                offsets[row.firstBucket + row.localColumn(position.column) + 1] += 1
             }
             for i in 1...bucketCount { offsets[i] += offsets[i - 1] }
             var cursors = offsets
@@ -113,8 +112,8 @@ extension ReducedLatLonArtifact {
                 }
                 for i in offsets.indices { put(&bytes, directoryOffset + i * 4, offsets[i]) }
                 for id in points.indices {
-                    let row = bands[rows[id] - firstBand]
-                    let bucket = row.firstBucket + row.localColumn(columnsByPoint[id])
+                    let row = bands[positions[id].band - firstBand]
+                    let bucket = row.firstBucket + row.localColumn(positions[id].column)
                     let position = cursors[bucket]
                     cursors[bucket] += 1
                     let offset = pointsOffset + Int(position) * 16
