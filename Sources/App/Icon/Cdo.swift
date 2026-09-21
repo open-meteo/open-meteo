@@ -14,15 +14,15 @@ struct CdoHelper: Sendable {
         return cdo != nil
     }
 
-    init(domain: IconDomains, nativeGridIdentity: IconNativeGridIdentity?, logger: Logger, curl: Curl) async throws {
-        // icon global needs resampling to plate carree
+    init(domain: IconDomains, nativeGridIdentity: IconNativeGridIdentity?, curl: Curl) async throws {
+        // Native output preserves cell order; regular output uses remapping where required.
         self.curl = curl
         cdo = nativeGridIdentity == nil ? try await CdoIconGlobal(curl: curl, domain: domain) : nil
         grid = domain.grid
         self.nativeGridIdentity = nativeGridIdentity
     }
 
-    // Uncompress bz2, reproject to regular grid and read into memory
+    /// Downloads and decodes GRIB, validating native grid identity or optionally remapping to a regular grid.
     func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
         guard let cdo else {
             return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
