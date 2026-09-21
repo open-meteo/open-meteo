@@ -43,6 +43,8 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
+        // Pre-1.0: pinned exactly so an upgrade is a deliberate change with a changelog review
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1"),
         //.package(url: "https://github.com/swift-server/async-http-client.git", from: "1.9.0")
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
@@ -61,6 +63,7 @@ let package = Package(
                 .product(name: "SwiftEccodes", package: "SwiftEccodes"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
+                .product(name: "MCP", package: "swift-sdk"),
                 .target(name: "Lbzip2"),
                 "CHelper",
                 //.product(name: "SwiftParallelBzip2", package: "SwiftParallelBzip2"),

@@ -195,10 +195,17 @@ extension Request {
     /// fn params: hostname, unlockSlot, numberOfLocationsMaximum, params
     @discardableResult
     func withApiParameter<T: ForecastapiResponder>(_ subdomain: String, alias: [String] = [], fn: (ApiRequestInfo, ApiQueryParameter) async throws -> T) async throws -> Response {
+        try await withApiAccess(subdomain, alias: alias, parse: parseApiParams, fn: fn)
+    }
+
+    /// Host classification, API key checks, rate limiting and usage accounting shared by every entry
+    /// point. `parse` supplies the query parameters: the REST routes read them from the URL or the
+    /// body, an MCP tool call carries them inside a JSON-RPC message.
+    func withApiAccess<T: ForecastapiResponder>(_ subdomain: String, alias: [String] = [], parse: () throws -> ApiQueryParameter, fn: (ApiRequestInfo, ApiQueryParameter) async throws -> T) async throws -> Response {
         // let host = "api.open-meteo.com"
         guard let host = headers[.host].first(where: { $0.contains("open-meteo.com") }) else {
             // localhost or not an openmeteo host
-            let params = try parseApiParams()
+            let params = try parse()
             let responder = try await fn(ApiRequestInfo(host: nil, numberOfLocationsMaximum: nil), params)
             let weight = responder.calculateQueryWeight()
             return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
@@ -213,7 +220,7 @@ extension Request {
 
         if isFreeApi {
             return try await withFreeApiRateLimiter() { (slot) in
-                let params = try parseApiParams()
+                let params = try parse()
                 guard params.apikey == nil && headers.contains(name: "X-Api-Key") == false else {
                     guard self.method != .POST else {
                         throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
@@ -234,7 +241,7 @@ extension Request {
             }
         }
 
-        let params = try parseApiParams()
+        let params = try parse()
         guard let apikey = headers["X-Api-Key"].first ?? params.apikey else {
             throw ApiKeyManagerError.apiKeyRequired
         }
