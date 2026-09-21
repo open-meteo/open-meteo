@@ -1,3 +1,4 @@
+import AsyncHTTPClient
 import Foundation
 import MCP
 import Vapor
@@ -118,7 +119,10 @@ struct McpTools {
 
     static let weatherTools: [WeatherTool] = [forecast, historicalWeather, airQuality, marine, seasonal, flood, climate, ensemble]
 
-    static let definitions: [Tool] = weatherTools.map(\.definition) + [elevation]
+    static let definitions: [Tool] = [geocoding] + weatherTools.map(\.definition) + [elevation]
+
+    /// The geocoding API is its own binary on its own host; self-hosters point this at theirs.
+    static let geocodingURL = Environment.get("GEOCODING_API_URL") ?? "https://geocoding-api.open-meteo.com"
 
     private static let readOnly = Tool.Annotations(readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false)
 
@@ -283,6 +287,24 @@ struct McpTools {
         professional: true
     )
 
+    static let geocoding = Tool(
+        name: "geocoding",
+        title: "Geocoding",
+        description: "Find places by name or postal code and return their coordinates, country, administrative region, population, elevation and time zone. Call this first when a request names a place, then pass latitude and longitude to the other tools. Matches are ordered by relevance.",
+        inputSchema: [
+            "type": "object",
+            "properties": [
+                "name": ["type": "string", "minLength": 2, "description": "Place name or postal code, at least two characters; fuzzy matching from three."],
+                "count": ["type": "integer", "minimum": 1, "maximum": 100, "description": "Number of matches, default 10."],
+                "language": ["type": "string", "description": "Two-letter language code for the returned names, default en."],
+                "countryCode": ["type": "string", "pattern": "^[A-Z]{2}$", "description": "Only matches in this ISO 3166-1 alpha-2 country, e.g. DE."],
+            ],
+            "required": ["name"],
+            "additionalProperties": false,
+        ],
+        annotations: readOnly
+    )
+
     static let elevation = Tool(
         name: "elevation",
         title: "Elevation",
@@ -392,6 +414,13 @@ struct McpTools {
                 response = try await request.withApiAccess("api", parse: { query }) { _, params in
                     try DemController().run(params: params, logger: request.logger, httpClient: request.application.http.client.shared)
                 }
+            } else if params.name == Self.geocoding.name {
+                try Self.rejectUnknownArguments(arguments, schema: Self.geocoding.inputSchema)
+                let url = try Self.geocodingSearchURL(arguments: arguments)
+                let query = try ApiQueryParameter(mcpArguments: [:])
+                response = try await request.withApiAccess("api", parse: { query }) { _, _ in
+                    GeocodingResponder(url: url, client: request.application.http.client.shared)
+                }
             } else if let tool = Self.weatherTools.first(where: { $0.definition.name == params.name }) {
                 try Self.rejectUnknownArguments(arguments, schema: tool.definition.inputSchema)
                 let query = try ApiQueryParameter(mcpArguments: arguments)
@@ -418,6 +447,36 @@ struct McpTools {
             // Data and validation errors are tool results, not protocol errors: the model reads
             // the same reason text the REST error middleware sends and can correct its call.
             return .init(content: [.text(Self.message(for: error, environment: request.application.environment))], isError: true)
+        }
+    }
+
+    static func geocodingSearchURL(arguments: [String: Value], base: String = geocodingURL) throws -> String {
+        guard let name = arguments["name"]?.stringValue, name.count >= 2 else {
+            throw ForecastApiError.generic(message: "Parameter 'name' must be at least 2 characters")
+        }
+        guard var components = URLComponents(string: "\(base)/v1/search") else {
+            throw ForecastApiError.generic(message: "Geocoding API URL is not valid: \(base)")
+        }
+        var items = [URLQueryItem(name: "name", value: name)]
+        for key in ["count", "language", "countryCode"] {
+            if let value = arguments[key].flatMap(queryValue) {
+                items.append(URLQueryItem(name: key, value: value))
+            }
+        }
+        components.queryItems = items
+        guard let url = components.string else {
+            throw ForecastApiError.generic(message: "Could not build the geocoding request")
+        }
+        return url
+    }
+
+    private static func queryValue(_ value: Value) -> String? {
+        switch value {
+        case .string(let string): return string
+        case .int(let int): return String(int)
+        case .double(let double): return String(double)
+        case .bool(let bool): return String(bool)
+        default: return nil
         }
     }
 
@@ -461,6 +520,30 @@ struct McpTools {
         default:
             return environment.isRelease ? "Something went wrong." : String(describing: error)
         }
+    }
+}
+
+/// One geocoding search, run as a responder so the call goes through the same access checks and
+/// rate limiting as every other tool. Weight 1, like a single-location lookup.
+struct GeocodingResponder: ForecastapiResponder {
+    let url: String
+    let client: HTTPClient
+
+    func calculateQueryWeight() -> Float {
+        1
+    }
+
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Vapor.Response {
+        var upstreamRequest = HTTPClientRequest(url: url)
+        upstreamRequest.headers.add(name: "User-Agent", value: "open-meteo-mcp")
+        let upstream = try await client.execute(upstreamRequest, timeout: .seconds(30))
+        let body = try await upstream.body.collect(upTo: 4 << 20)
+        guard upstream.status == .ok else {
+            // The geocoding API reports problems as {"error":true,"reason":"..."}; pass the reason on.
+            let reason = try? JSONDecoder().decode(ErrorMiddleware.ErrorResponse2.self, from: Data(buffer: body)).reason
+            throw ForecastApiError.generic(message: reason ?? "Geocoding request failed with HTTP \(upstream.status.code)")
+        }
+        return Vapor.Response(status: .ok, headers: ["Content-Type": "application/json"], body: .init(buffer: body))
     }
 }
 

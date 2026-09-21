@@ -76,13 +76,17 @@ import VaporTesting
                 #expect(res.status == .ok)
                 let result = try #require(try json(res)["result"] as? [String: Any])
                 let tools = try #require(result["tools"] as? [[String: Any]])
-                #expect(tools.map { $0["name"] as? String } == ["weather_forecast", "historical_weather", "air_quality", "marine_weather", "seasonal_forecast", "flood_forecast", "climate_projection", "ensemble_forecast", "elevation"])
+                #expect(tools.map { $0["name"] as? String } == ["geocoding", "weather_forecast", "historical_weather", "air_quality", "marine_weather", "seasonal_forecast", "flood_forecast", "climate_projection", "ensemble_forecast", "elevation"])
                 for tool in tools {
                     let schema = try #require(tool["inputSchema"] as? [String: Any])
                     let properties = try #require(schema["properties"] as? [String: Any])
-                    #expect(properties["latitude"] != nil && properties["longitude"] != nil)
                     let required = try #require(schema["required"] as? [String])
-                    #expect(required.contains("latitude") && required.contains("longitude"))
+                    if tool["name"] as? String == "geocoding" {
+                        #expect(required == ["name"])
+                    } else {
+                        #expect(properties["latitude"] != nil && properties["longitude"] != nil)
+                        #expect(required.contains("latitude") && required.contains("longitude"))
+                    }
                     let annotations = try #require(tool["annotations"] as? [String: Any])
                     #expect(annotations["readOnlyHint"] as? Bool == true)
                 }
@@ -143,6 +147,25 @@ import VaporTesting
                 #expect(text == "Unknown parameter: format")
             }
         }
+    }
+
+    @Test func geocodingRejectsShortNamesAsToolError() async throws {
+        try await withMcpApp { app in
+            let params = #"{"name":"geocoding","arguments":{"name":"P"}}"#
+            try await app.test(.POST, "mcp", headers: Self.headers, body: rpc("tools/call", params: params)) { res in
+                let (text, isError) = try toolText(try json(res))
+                #expect(isError)
+                #expect(text == "Parameter 'name' must be at least 2 characters")
+            }
+        }
+    }
+
+    @Test func geocodingSearchURL() throws {
+        let url = try McpTools.geocodingSearchURL(
+            arguments: ["name": "São Paulo", "count": 3, "countryCode": "BR"],
+            base: "https://geo.example"
+        )
+        #expect(url == "https://geo.example/v1/search?name=S%C3%A3o%20Paulo&count=3&countryCode=BR")
     }
 
     @Test func perCallCeilings() {
