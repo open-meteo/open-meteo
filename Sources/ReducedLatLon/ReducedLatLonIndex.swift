@@ -189,11 +189,7 @@ package final class ReducedLatLonIndex: Sendable {
         let latitudeRadians = Double(latitude) * (.pi / 180)
         let longitudeRadians = Double(longitude) * (.pi / 180)
         let seed = location(latitude: latitudeRadians, longitude: longitudeRadians, cosine: query.cosine)
-        // Pin the mapping through the last span read, including early returns. Keeping this
-        // lexical borrow in the hot entry avoids an outlined callback and its extra stack frame.
-        let mapped = self.mapped
-        defer { withExtendedLifetime(mapped) {} }
-        let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
+        let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(self.mapped.data))
         var best = Match()
         if let bucket = seed.bucket {
             scanNearest(bucket..<bucket + 1, bytes: bytes, query: query.point, best: &best)
@@ -257,10 +253,7 @@ package final class ReducedLatLonIndex: Sendable {
     @inline(never)
     private func candidates(from lookup: Lookup, limit: Float) -> NearbyPoints {
         precondition(limit.isFinite && limit > 0 && limit <= 4 && lookup.distanceSquared <= limit)
-        // The span cannot outlive this scope; the deferred lifetime fence pins its owner.
-        let mapped = self.mapped
-        defer { withExtendedLifetime(mapped) {} }
-        let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(mapped.data))
+        let bytes = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(self.mapped.data))
         var state = CandidateState()
         if let seed = lookup.bucket {
             scanCandidates(seed..<seed + 1, bytes: bytes, lookup: lookup, limit: limit, state: &state)
