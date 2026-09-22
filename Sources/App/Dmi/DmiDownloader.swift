@@ -291,7 +291,7 @@ struct DmiDownload: AsyncCommand {
                 previous = previousScoped
                 
                 if generateElevationFile {
-                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
                 }
                 let completed = i == timestamps.count - 1
                 return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)

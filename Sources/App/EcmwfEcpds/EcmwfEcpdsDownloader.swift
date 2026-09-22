@@ -398,10 +398,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         logger.info("Got \(shortName)")
                         var d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                         if shortName == "lsm" {
-                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain)
+                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
                         } else {
                             d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain)
+                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
                         }
                         return
                     }

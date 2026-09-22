@@ -61,7 +61,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
                 let handles = try await runs.asyncFlatMap { run in
-                    return try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables)
+                    return try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadS3Bucket: nil)
                 }
                 try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
@@ -70,11 +70,11 @@ struct EumetsatSarahDownload: AsyncCommand {
 
         let api = EumetsatApiDownloader(application: context.application, key: apiKey, secret: apiSecret, deadLineHours: 3)
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
-        let handles = try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables)
+        let handles = try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
-    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatSarahDomain, api: EumetsatApiDownloader, variables: [EumetsatSarahVariable]) async throws -> [GenericVariableHandle] {
+    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatSarahDomain, api: EumetsatApiDownloader, variables: [EumetsatSarahVariable], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         // Download meta data for elevation and scan time offsets
@@ -108,7 +108,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             let elevation: [Float] = meta.elevation.enumerated().map { i, value in
                 return meta.timeDifference[i].isNaN ? .nan : meta.landMask[i] == 0 ? -999 : Float(value)
             }
-            try elevation.writeOmFile2D(file: elevationFile.getFilePath(), grid: domain.grid, createNetCdf: false)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
         }
 
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
