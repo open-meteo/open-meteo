@@ -1483,6 +1483,44 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self),
                 (GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
             ])
+        case .gem_seamless, .cmc_gem_seamless:
+            // Keep both generations of GDPS/RDPS for archive and forecast fallback.
+            // Derive each product independently before mixing; HRDPS West is not part of seamless.
+            return .multipleWithPrecipitationProbability([
+                (GemDomain.gem_gdps_15km_upper_level, GemVariable.self),
+                (GemDomain.gem_global, GemVariable.self),
+                (GemDomain.gem_gdps_15km, GemVariable.self),
+                (GemDomain.gem_regional, GemVariable.self),
+                (GemDomain.gem_rdps_10km, GemVariable.self),
+                (GemDomain.gem_hrdps_continental, GemVariable.self)
+            ], precipitationProb: GemDomain.gem_global_ensemble)
+        case .gem_global, .cmc_gem_gdps:
+            // Coordinate requests use all generations; gridpoint requests retain the legacy grid.
+            return .singleWithSupplementalDomains(
+                GemDomain.gem_global,
+                GemVariable.self,
+                lowerPriority: [(GemDomain.gem_gdps_15km_upper_level, GemVariable.self)],
+                higherPriority: [(GemDomain.gem_gdps_15km, GemVariable.self)],
+                precipitationProb: GemDomain.gem_global_ensemble,
+                gridpointPolicy: .primaryOnly
+            )
+        case .gem_regional, .cmc_gem_rdps:
+            // The old and new RDPS grids have different indexing.
+            return .singleWithSupplementalDomains(
+                GemDomain.gem_regional,
+                GemVariable.self,
+                lowerPriority: [],
+                higherPriority: [(GemDomain.gem_rdps_10km, GemVariable.self)],
+                precipitationProb: nil,
+                gridpointPolicy: .primaryOnly
+            )
+        case .gem_hrdps_continental, .cmc_gem_hrdps:
+            return .single(GemDomain.gem_hrdps_continental, GemVariable.self)
+        case .gem_hrdps_west, .cmc_gem_hrdps_west:
+            return .single(GemDomain.gem_hrdps_west, GemVariable.self)
+        case .gem_global_ensemble, .cmc_gem_geps:
+            // Preserve the coordinate-only GEPS API contract.
+            return .multiple([(GemDomain.gem_global_ensemble, GemVariable.self)])
         case .cmc_gem_geps_ensemble_mean:
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
         case .bom_access_global_ensemble_mean:
@@ -2155,17 +2193,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .chmi_aladin_seamless:
             return [] // migrated
         case .gem_seamless, .cmc_gem_seamless:
-            let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities] + (try await GemMixer(domains: [.gem_gdps_15km_upper_level, .gem_global, .gem_gdps_15km, .gem_regional, .gem_rdps_10km, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+            return [] // migrated
         case .gem_global, .cmc_gem_gdps:
-            let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities] + (try await GemMixer(domains: [.gem_gdps_15km_upper_level, .gem_global, .gem_gdps_15km], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+            return [] // migrated
         case .gem_regional, .cmc_gem_rdps:
-            return try await GemMixer(domains: [.gem_regional, .gem_rdps_10km], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            return [] // migrated
         case .gem_hrdps_continental, .cmc_gem_hrdps:
-            return try await GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .gem_hrdps_west, .cmc_gem_hrdps_west:
-            return try await GemReader(domain: .gem_hrdps_west, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .archive_best_match:
             return [try await Era5Factory.makeArchiveBestMatch(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5_seamless, .copernicus_era5_seamless:
@@ -2255,7 +2291,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_gefs025, .gfs05, .ncep_gefs05, .ncep_gefs_seamless:
             return [] // migrated
         case .gem_global_ensemble, .cmc_gem_geps:
-            return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .bom_access_global_ensemble:
             return [] // migrated
         case .google_weathernext2_ensemble:
@@ -2370,13 +2406,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .chmi_aladin_seamless: 
             return nil
         case .gem_global, .cmc_gem_gdps:
-            return GemDomain.gem_global
+            return nil // migrated
         case .gem_regional, .cmc_gem_rdps:
-            return GemDomain.gem_regional
+            return nil // migrated
         case .gem_hrdps_continental, .cmc_gem_hrdps:
-            return GemDomain.gem_hrdps_continental
+            return nil // migrated
         case .gem_hrdps_west, .cmc_gem_hrdps_west:
-            return GemDomain.gem_hrdps_west
+            return nil // migrated
         case .era5, .copernicus_era5:
             return CdsDomain.era5
         case .era5_land, .copernicus_era5_land:
@@ -2608,13 +2644,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .chmi_aladin_seamless:
             return nil //migrated
         case .gem_global, .cmc_gem_gdps:
-            return try await GemReader(domain: .gem_global, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .gem_regional, .cmc_gem_rdps:
-            return try await GemReader(domain: .gem_regional, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .gem_hrdps_continental, .cmc_gem_hrdps:
-            return try await GemReader(domain: .gem_hrdps_continental, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .gem_hrdps_west, .cmc_gem_hrdps_west:
-            return try await GemReader(domain: .gem_hrdps_west, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .era5, .copernicus_era5:
             return try await Era5Factory.makeReader(domain: .era5, gridpoint: gridpoint, options: options)
         case .era5_land, .copernicus_era5_land:
