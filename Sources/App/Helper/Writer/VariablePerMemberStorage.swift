@@ -1,4 +1,5 @@
 import Foundation
+import Vapor
 
 
 /// Thread safe storage for downloading GRIB messages. Can be used to post process data.
@@ -140,7 +141,7 @@ extension VariablePerMemberStorage {
     /// Generate elevation file
     /// - `elevation`: in metres
     /// - `landMask` 0 = sea, 1 = land. Fractions below 0.5 are considered sea.
-    func generateElevationFile(elevation: V, landmask: V, domain: GenericDomain) throws {
+    func generateElevationFile(elevation: V, landmask: V, domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
         let elevationFile = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: elevationFile.getFilePath()) {
             return
@@ -164,7 +165,7 @@ extension VariablePerMemberStorage {
         try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         #endif
 
-        try elevation.writeOmFile2D(file: elevationFile.getFilePath(), grid: domain.grid, createNetCdf: false)
+        try await elevation.writeStaticOmFile(file: elevationFile, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
     
     /// Lower freezing level or snowfall height below grid-cell elevation to adjust data to mixed terrain

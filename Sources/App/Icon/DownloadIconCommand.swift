@@ -69,7 +69,7 @@ struct DownloadIconCommand: AsyncCommand {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(application: Application, outputs: IconDownloadDomains, run: Timestamp) async throws {
+    func convertSurfaceElevation(application: Application, outputs: IconDownloadDomains, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let domain = outputs.source
         let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
@@ -122,16 +122,17 @@ struct DownloadIconCommand: AsyncCommand {
         }
 
         if needsPrimary {
-            try hsurf.writeOmFile2D(file: outputs.primary.surfaceElevationFileOm.getFilePath(), grid: outputs.primary.grid, createNetCdf: false)
+            try await hsurf.writeStaticOmFile(file: outputs.primary.surfaceElevationFileOm, grid: outputs.primary.grid, application: application, uploadS3Bucket: uploadS3Bucket)
         }
         if let remappedDomain = missingRemapped {
             guard let remapper = try await CdoIconGlobal(curl: curl, domain: .icon) else {
                 preconditionFailure("Remapped ICON elevation requires a grid mapping")
             }
-            try remapper.remap(hsurf).writeOmFile2D(
-                file: remappedDomain.surfaceElevationFileOm.getFilePath(),
+            try await remapper.remap(hsurf).writeStaticOmFile(
+                file: remappedDomain.surfaceElevationFileOm,
                 grid: remappedDomain.grid,
-                createNetCdf: false
+                application: application,
+                uploadS3Bucket: uploadS3Bucket
             )
         }
     }
@@ -580,7 +581,7 @@ struct DownloadIconCommand: AsyncCommand {
         }
         let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await convertSurfaceElevation(application: context.application, outputs: outputs, run: run)
+        try await convertSurfaceElevation(application: context.application, outputs: outputs, run: run, uploadS3Bucket: signature.uploadS3Bucket)
 
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, outputs: outputs, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
 
