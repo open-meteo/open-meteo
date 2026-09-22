@@ -137,8 +137,8 @@ actor GoogleCloudStorageAuth {
 }
 
 /// Base64url encoding without padding, as required by the JWT spec (RFC 7515).
-private func base64url(_ data: some DataProtocol) -> String {
-    Data(data).base64EncodedString()
+private func base64url(_ data: Data) -> String {
+    data.base64EncodedString()
         .replacingOccurrences(of: "+", with: "-")
         .replacingOccurrences(of: "/", with: "_")
         .replacingOccurrences(of: "=", with: "")
