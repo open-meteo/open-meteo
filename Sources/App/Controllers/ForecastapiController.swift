@@ -1276,6 +1276,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 domains.append((NcepRrfsDomain.ncep_rrfs_conus_15min, NcepRrfs15MinVariable.self))
             }
             return .multipleWithPrecipitationProbability(domains, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
+        case .kma_gdps:
+            return .single(KmaDomain.gdps, KmaVariable.self)
+        case .kma_ldps:
+            return .single(KmaDomain.ldps, KmaVariable.self)
+        case .kma_seamless:
+            return .multiple([
+                (KmaDomain.gdps, KmaVariable.self),
+                (KmaDomain.ldps, KmaVariable.self)
+            ])
         case .gfs025, .ncep_gfs025:
             return .single(GfsDomain.gfs025, Gfs025Variable.self)
         case .gfs013, .ncep_gfs013:
@@ -2245,16 +2254,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated to upper level
         case .satellite_radiation_seamless:
             return [] // migrated to upper level
-        case .kma_seamless:
-            let ldps = try await KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let gdps = try await KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [gdps, ldps].compactMap({ $0 })
-        case .kma_gdps:
-            let reader = try await KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [reader].compactMap({ $0 })
-        case .kma_ldps:
-            let reader = try await KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [reader].compactMap({ $0 })
+        case .kma_seamless, .kma_gdps, .kma_ldps:
+            return [] // migrated
         case .italia_meteo_arpae_icon_2i:
             return [] // migrated
         case .meteoswiss_icon_ch1:
@@ -2490,12 +2491,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .jma_jaxa_mtg_fci:
             return nil
-        case .kma_seamless:
-            return nil
-        case .kma_gdps:
-            return KmaDomain.gdps
-        case .kma_ldps:
-            return KmaDomain.ldps
+        case .kma_seamless, .kma_gdps, .kma_ldps:
+            return nil // migrated
         case .italia_meteo_arpae_icon_2i:
             return nil // migrated
         case .meteoswiss_icon_ch1:
@@ -2727,12 +2724,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .jma_jaxa_mtg_fci:
             return nil
-        case .kma_seamless:
-            return nil
-        case .kma_gdps:
-            return try await KmaReader(domain: .gdps, gridpoint: gridpoint, options: options)
-        case .kma_ldps:
-            return try await KmaReader(domain: .ldps, gridpoint: gridpoint, options: options)
+        case .kma_seamless, .kma_gdps, .kma_ldps:
+            return nil // migrated
         case .italia_meteo_arpae_icon_2i:
             return nil // migrated
         case .meteoswiss_icon_ch1:
