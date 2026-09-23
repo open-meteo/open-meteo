@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.7.0](https://github.com/open-meteo/open-meteo/compare/1.6.0...1.7.0) (2026-09-23)
+
+
+### Features
+
+* finish DMI migration ([#2150](https://github.com/open-meteo/open-meteo/issues/2150)) ([cc3f4e5](https://github.com/open-meteo/open-meteo/commit/cc3f4e5e956b39a56ab182faeccfd3d936ae6b4c))
+* migrate cmc to generic structure ([#2147](https://github.com/open-meteo/open-meteo/issues/2147)) ([29c9a89](https://github.com/open-meteo/open-meteo/commit/29c9a892a3420e918d8cdc8975083130bb29ea4e))
+* migrate kma to generic structure ([#2146](https://github.com/open-meteo/open-meteo/issues/2146)) ([7eb1aed](https://github.com/open-meteo/open-meteo/commit/7eb1aed7429167a4533eab57ff892e74f8140cf9))
+
+
+### Bug Fixes
+
+* build failure in Swift 6.4 release build ([#2144](https://github.com/open-meteo/open-meteo/issues/2144)) ([fb7e804](https://github.com/open-meteo/open-meteo/commit/fb7e8046633bafe1244e16abf1c1491bae48ecca))
+* bump aws-actions/configure-aws-credentials from 6.2.4 to 6.3.0 ([#2142](https://github.com/open-meteo/open-meteo/issues/2142)) ([87063f8](https://github.com/open-meteo/open-meteo/commit/87063f8bba7ed741c7e6a3288aeee67683c5f4e1))
+* bump github.com/apple/swift-log from 1.15.0 to 1.15.1 in the swift-dependencies group ([#2128](https://github.com/open-meteo/open-meteo/issues/2128)) ([e669e62](https://github.com/open-meteo/open-meteo/commit/e669e6293ce2f0c70646fd61af8fe0c529fc0c53))
+* bump googleapis/release-please-action from 4 to 5 ([#2127](https://github.com/open-meteo/open-meteo/issues/2127)) ([c085b34](https://github.com/open-meteo/open-meteo/commit/c085b347f599ba7d0809b321c01b8aa9fcc90eec))
+* **Meteofrance HD 15min:** 15min precipitation and snow is not available anymore ([#2120](https://github.com/open-meteo/open-meteo/issues/2120)) ([9701689](https://github.com/open-meteo/open-meteo/commit/9701689dd81ebef2d478800366c586c8a02c0c19))
+* static file uploading ([#2145](https://github.com/open-meteo/open-meteo/issues/2145)) ([690aa0b](https://github.com/open-meteo/open-meteo/commit/690aa0b321e4950a0dbf70a8cdf93ecd64044e47))
+
 ## [1.6.0](https://github.com/open-meteo/open-meteo/compare/1.5.7...1.6.0) (2026-09-10)
 
 
