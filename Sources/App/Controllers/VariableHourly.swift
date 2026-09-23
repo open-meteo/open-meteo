@@ -643,6 +643,7 @@ private struct VariableHourlyDerivationCompatibility {
     let usesLegacyIconEpsRadiationStorage: Bool
     let allowsSoilDepthCompatibilityAliases: Bool
     let reversesWaveDirections: Bool
+    let estimatesDiffuseRadiationFromShortwave: Bool
 
     private init(
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
@@ -652,7 +653,8 @@ private struct VariableHourlyDerivationCompatibility {
         convertsPressureLevelVerticalVelocity: Bool = false,
         usesLegacyIconEpsRadiationStorage: Bool = false,
         allowsSoilDepthCompatibilityAliases: Bool = true,
-        reversesWaveDirections: Bool = false
+        reversesWaveDirections: Bool = false,
+        estimatesDiffuseRadiationFromShortwave: Bool = false
     ) {
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
@@ -662,6 +664,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
         self.allowsSoilDepthCompatibilityAliases = allowsSoilDepthCompatibilityAliases
         self.reversesWaveDirections = reversesWaveDirections
+        self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
     }
 
     private static func gfs(
@@ -675,6 +678,14 @@ private struct VariableHourlyDerivationCompatibility {
 
     init(domain: DomainRegistry) {
         switch domain {
+        case .kma_gdps:
+            self = .init(estimatesDiffuseRadiationFromShortwave: true)
+        case .kma_ldps:
+            self = .init(
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true,
+                estimatesDiffuseRadiationFromShortwave: true
+            )
         case .ncep_gfs013:
             self = .gfs()
         case .ncep_gfs025:
@@ -751,7 +762,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     private func weatherCodeConvectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
-        // The legacy NBM adapter deliberately passed nil here, which is not equivalent to a zero
+        // NBM and KMA LDPS deliberately pass nil here, which is not equivalent to a zero
         // value in the thunderstorm confidence calculation.
         guard !compatibility.omitsConvectivePrecipitationFromWeatherCode else {
             return nil
@@ -965,6 +976,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
 
         let rawVariable = Reader.variableFromString(variable.rawValue)
 
+        if variable == .diffuse_radiation, compatibility.estimatesDiffuseRadiationFromShortwave {
+            guard let shortwave = shortwaveRadiationInput() else { return nil }
+            return .one(shortwave) { shortwave, time in
+                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                return DataAndUnit(diffuse, shortwave.unit)
+            }
+        }
+
         if compatibility.reversesWaveDirections, let rawVariable {
             switch variable {
             case .wave_direction, .wind_wave_direction, .swell_wave_direction, .secondary_swell_wave_direction:
@@ -1016,7 +1035,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         }
 
-        // Some NCEP domains do not store showers; synthesize zero where precipitation is available.
+        // Some domains do not store showers; synthesize zero where precipitation is available.
         if variable == .showers, compatibility.convectivePrecipitation == .zeroWherePrecipitationIsAvailable,
            let convectivePrecipitation = convectivePrecipitationInput() {
             return .from(input: convectivePrecipitation)
@@ -1475,6 +1494,13 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         case .cloudcover:
             return getDeriverMap(variable: .cloud_cover)
+        case .cloud_cover:
+            guard let low = Reader.variableFromString("cloud_cover_low"),
+                  let mid = Reader.variableFromString("cloud_cover_mid"),
+                  let high = Reader.variableFromString("cloud_cover_high") else { return nil }
+            return .three(.raw(low), .raw(mid), .raw(high)) { low, mid, high, _ in
+                DataAndUnit(Meteorology.cloudCoverTotal(low: low.data, mid: mid.data, high: high.data), .percentage)
+            }
         case .cloudcover_low:
             return getDeriverMap(variable: .cloud_cover_low)
         case .cloudcover_mid:
