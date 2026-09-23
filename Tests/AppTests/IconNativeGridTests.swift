@@ -248,7 +248,7 @@ private func makeIdentity(_ fixture: NativeGridFixture) -> IconNativeGridIdentit
         isGlobal: true,
         latitudeBandCount: fixture.index.latitudeBandCount,
         maximumDistanceMeters: 10_000_000,
-        sourceFile: "synthetic.nc.bz2"
+        sourceFile: "synthetic.nc"
     )
 }
 

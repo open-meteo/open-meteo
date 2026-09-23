@@ -13,6 +13,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
     /// Number of equal-height latitude bands used by the spatial index.
     let latitudeBandCount: Int
     let maximumDistanceMeters: Float
+    /// Uncompressed NetCDF filename in MPI's DWD grid catalogue, also used for the local cache.
     let sourceFile: String
 
     static let global = Self(
@@ -22,7 +23,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         isGlobal: true,
         latitudeBandCount: 1_111,
         maximumDistanceMeters: 20_000,
-        sourceFile: "icon_grid_0026_R03B07_G.nc.bz2"
+        sourceFile: "icon_grid_0026_R03B07_G.nc"
     )
 
     static let d2 = Self(
@@ -32,7 +33,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         isGlobal: false,
         latitudeBandCount: 4_446,
         maximumDistanceMeters: 4_000,
-        sourceFile: "icon_grid_0047_R19B07_L.nc.bz2"
+        sourceFile: "icon_grid_0047_R19B07_L.nc"
     )
 
     /// ICON's spherical Earth radius in metres, independent of the index format.
@@ -56,7 +57,9 @@ struct IconNativeGridIdentity: Sendable, Hashable {
     }
 
     var sourceUrl: String {
-        "https://opendata.dwd.de/weather/lib/cdo/\(sourceFile)"
+        // Catalogue: http://icon-downloads.mpimet.mpg.de/dwd_grids.xml
+        // This server provides plain NetCDF files over HTTP (HTTPS is unavailable).
+        "http://icon-downloads.mpimet.mpg.de/grids/public/edzw/\(sourceFile)"
     }
 }
 
@@ -99,7 +102,7 @@ extension IconNativeDomains {
         let staticDirectory = "\(registry.directory)static/"
         try FileManager.default.createDirectory(atPath: staticDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-        let sourceFile = "\(downloadDirectory)\(identity.sourceFile.dropLast(4))"
+        let sourceFile = "\(downloadDirectory)\(identity.sourceFile)"
         let sourceExisted = FileManager.default.fileExists(atPath: sourceFile)
         let curl = Curl(logger: application.logger, client: application.dedicatedHttpClient)
 
@@ -108,7 +111,7 @@ extension IconNativeDomains {
             try await curl.download(
                 url: identity.sourceUrl,
                 toFile: sourceFile,
-                bzip2Decode: true,
+                bzip2Decode: false,
                 cacheDirectory: nil
             )
         }
