@@ -687,7 +687,8 @@ private struct VariableHourlyDerivationCompatibility {
         case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
             self = .init(
                 aliasesSoilTemperature0To10cmTo0To7cm: true,
-                convectivePrecipitation: .zeroWherePrecipitationIsAvailable
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true
             )
         case .ecmwf_ifs, .ecmwf_aifs025_single, .ecmwf_aifs025_ensemble:
             self = .init(aliasesSoilTemperature0To10cmTo0To7cm: true)
