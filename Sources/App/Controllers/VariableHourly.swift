@@ -1269,7 +1269,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 .windSpeed(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_175m"), levelFrom: 175, levelTo: 180) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_200m"), levelFrom: 200, levelTo: 180) ??
-                .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), levelFrom: 200, levelTo: 180)
+                .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), levelFrom: 200, levelTo: 180) ??
+                .windSpeed(speed: Reader.variableFromString("wind_speed_150m"), levelFrom: 150, levelTo: 180)
         case .winddirection_180m:
             return getDeriverMap(variable: .wind_direction_180m)
         case .wind_direction_180m:
@@ -1277,7 +1278,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ??
                 .direct(Reader.variableFromString("wind_direction_175m")) ??
                 .direct(Reader.variableFromString("wind_direction_200m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ??
+                .direct(Reader.variableFromString("wind_direction_150m"))
         case .windspeed_200m:
             return getDeriverMap(variable: .wind_speed_200m)
         case .wind_speed_200m:
@@ -1634,7 +1636,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 .direct(Reader.variableFromString("temperature_150m")) ??
                 .direct(Reader.variableFromString("temperature_100m"))
         case .temperature_180m:
-            return .direct(Reader.variableFromString("temperature_200m"))
+            return .direct(Reader.variableFromString("temperature_200m")) ??
+                .direct(Reader.variableFromString("temperature_150m"))
         case .global_tilted_irradiance:
             guard
                 let directRadiation = getDeriverMap(variable: .direct_radiation),
