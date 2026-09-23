@@ -75,14 +75,6 @@ enum ProbabilityReader {
         return reader
     }
 
-    /// Reader for probabilities based on GEM ENSEMBLE
-    static func makeGemReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<GemDomain, ProbabilityVariable> {
-        guard let reader = try await GenericReader<GemDomain, ProbabilityVariable>(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            throw ModelError.domainInitFailed(domain: GemDomain.gem_global_ensemble.rawValue)
-        }
-        return reader
-    }
-
     /// Reader for probabilities based on IFS0.25 ensemble
     static func makeEcmwfReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<EcmwfDomain, ProbabilityVariable> {
         guard let reader = try await GenericReader<EcmwfDomain, ProbabilityVariable>(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
