@@ -649,6 +649,7 @@ private struct VariableHourlyDerivationCompatibility {
     let allowsSoilDepthCompatibilityAliases: Bool
     let reversesWaveDirections: Bool
     let estimatesDiffuseRadiationFromShortwave: Bool
+    let derivesCloudLayersFromPressureHumidity: Bool
 
     private init(
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
@@ -659,7 +660,8 @@ private struct VariableHourlyDerivationCompatibility {
         usesLegacyIconEpsRadiationStorage: Bool = false,
         allowsSoilDepthCompatibilityAliases: Bool = true,
         reversesWaveDirections: Bool = false,
-        estimatesDiffuseRadiationFromShortwave: Bool = false
+        estimatesDiffuseRadiationFromShortwave: Bool = false,
+        derivesCloudLayersFromPressureHumidity: Bool = false
     ) {
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
@@ -670,6 +672,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.allowsSoilDepthCompatibilityAliases = allowsSoilDepthCompatibilityAliases
         self.reversesWaveDirections = reversesWaveDirections
         self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
+        self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
     }
 
     private static func gfs(
@@ -683,6 +686,10 @@ private struct VariableHourlyDerivationCompatibility {
 
     init(domain: DomainRegistry) {
         switch domain {
+        case .cmc_gem_gdps, .cmc_gem_gdps_15km, .cmc_gem_gdps_15km_upper_level,
+             .cmc_gem_rdps, .cmc_gem_rdps_10km, .cmc_gem_hrdps, .cmc_gem_hrdps_west,
+             .cmc_gem_geps:
+            self = .init(derivesCloudLayersFromPressureHumidity: true)
         case .kma_gdps:
             self = .init(estimatesDiffuseRadiationFromShortwave: true)
         case .kma_ldps:
@@ -1506,6 +1513,28 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .three(.raw(low), .raw(mid), .raw(high)) { low, mid, high, _ in
                 DataAndUnit(Meteorology.cloudCoverTotal(low: low.data, mid: mid.data, high: high.data), .percentage)
             }
+        case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            guard compatibility.derivesCloudLayersFromPressureHumidity else {
+                return nil
+            }
+            let levels: [Int]
+            switch variable {
+            case .cloud_cover_low: levels = [1000, 950, 850]
+            case .cloud_cover_mid: levels = [700, 600, 500]
+            default: levels = [400, 300, 200]
+            }
+            // Preserve GEM's pressure samples and maximum order, including sparse GEPS files.
+            // Missing levels stay missing; do not interpolate or substitute other levels.
+            let clouds = levels.compactMap { level in
+                getDeriverMap(variable: VariableOrSpread<ForecastPressureVariable>(
+                    variable: ForecastPressureVariable(variable: .cloud_cover, level: level),
+                    isSpread: false
+                ))
+            }
+            guard clouds.count == 3 else {
+                return nil
+            }
+            return maximum(maximum(clouds[0], clouds[1]), clouds[2])
         case .cloudcover_low:
             return getDeriverMap(variable: .cloud_cover_low)
         case .cloudcover_mid:
