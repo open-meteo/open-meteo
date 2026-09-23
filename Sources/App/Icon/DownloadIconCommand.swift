@@ -66,7 +66,7 @@ struct DownloadIconCommand: AsyncCommand {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(application: Application, domain: IconDomains, run: Timestamp) async throws {
+    func convertSurfaceElevation(application: Application, domain: IconDomains, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -111,7 +111,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
 
-        try hsurf.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
+        try await hsurf.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
 
     /// Download ICON global, eu and d2 *.grid2.bz2 files
@@ -510,7 +510,7 @@ struct DownloadIconCommand: AsyncCommand {
         let logger = context.application.logger
         let generateFullRun = domain.countEnsembleMember == 1
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
+        try await convertSurfaceElevation(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket)
 
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
 

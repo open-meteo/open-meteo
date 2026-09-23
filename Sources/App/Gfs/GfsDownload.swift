@@ -150,7 +150,7 @@ struct GfsDownload: AsyncCommand {
         return surface
     }
 
-    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileType, grid: any Gridable, isGlobal: Bool) async throws {
+    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileType, grid: any Gridable, isGlobal: Bool, uploadS3Bucket: String?) async throws {
         let logger = application.logger
 
         /// download seamask and height
@@ -204,7 +204,7 @@ struct GfsDownload: AsyncCommand {
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
 
-        try height.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: grid, createNetCdf: false)
+        try await height.data.writeStaticOmFile(file: surfaceElevationFileOm, grid: grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
     }
 
     /// download GFS025 and NAM CONUS
@@ -215,7 +215,7 @@ struct GfsDownload: AsyncCommand {
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0, useAws: downloadFromAws)
         if ![GfsDomain.hrrr_conus_15min, .gfswave025, .gfswave025_ens, .gfswave016].contains(domain) {
             // 15min hrrr data uses hrrr domain elevation files
-            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal, uploadS3Bucket: uploadS3Bucket)
         }
 
         let deadLineHours: Double
@@ -397,7 +397,7 @@ struct GfsDownload: AsyncCommand {
                     /// Generate land mask from regular data for GFS Wave013
                     if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                         let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
-                        try height.data.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+                        try await height.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
                     }
                     
                     // Deaccumulate precipitation

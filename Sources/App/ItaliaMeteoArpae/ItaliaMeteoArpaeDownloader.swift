@@ -57,14 +57,14 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try await downloadElevation(application: context.application, domain: domain, run: run)
+        try await downloadElevation(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp) async throws {
+    func downloadElevation(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, uploadS3Bucket: String?) async throws {
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
@@ -88,7 +88,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
             }
         }
 
-        try elevation.array.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+        try await elevation.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
     }
 
     func download(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
