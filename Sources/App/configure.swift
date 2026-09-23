@@ -40,7 +40,13 @@ enum OpenMeteo {
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
-        let cache = AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        guard let upstreamFetchConcurrency = Int(Environment.get("UPSTREAM_FETCH_CONCURRENCY") ?? "60"), upstreamFetchConcurrency > 0 else {
+            fatalError("UPSTREAM_FETCH_CONCURRENCY must be a positive integer")
+        }
+        let cache = AtomicCacheCoordinator(
+            cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount),
+            maxConcurrentUpstreamFetches: upstreamFetchConcurrency
+        )
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache
     }()
