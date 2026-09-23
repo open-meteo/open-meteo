@@ -1,6 +1,8 @@
 import Foundation
 import OmFileFormat
 import SwiftNetCDF
+import Vapor
+import OmFileIO
 
 /// Small helper class to generate compressed files
 public final class OmFileWriterHelper: Sendable {
@@ -104,6 +106,17 @@ extension Array where Element == Float {
         let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
         let root = try writeFile.write(array: writerFinalised, name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
         try writeFile.writeTrailer(rootVariable: root)
+    }
+
+    /// Writes a new static file and queues its upload, if configured. Callers skip existing files.
+    /// Retains caller isolation through the write so elevation-generating actors cannot interleave writes.
+    nonisolated(nonsending) func writeStaticOmFile(file: OmFileType, grid: any Gridable, application: Application, uploadS3Bucket: String?, createNetCdf: Bool = false) async throws {
+        try writeOmFile2D(file: file.getFilePath(), grid: grid, createNetCdf: createNetCdf)
+        for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
+            let uploads = queue.startMultiPartUploads()
+            await uploads.uploadMultipart(file: file.getFilePath(), objectName: file.getRelativeFilePathWithData(), lastModified: .now())
+            await queue.finishMultiPartUploads(uploads)
+        }
     }
 
     /// Write a spatial om file using grid dimensions and 20x20 chunks. Mostly used to write elevation files

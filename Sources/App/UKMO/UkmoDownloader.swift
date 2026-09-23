@@ -103,7 +103,7 @@ struct UkmoDownload: AsyncCommand {
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
@@ -155,7 +155,7 @@ struct UkmoDownload: AsyncCommand {
         }
     }*/
 
-    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
+    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadS3Bucket: String?) async throws {
         // UKMO Global data has been manually converted from GRIB files
         /*try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: ["/Users/patrick/Downloads/UKMO_static/uk2km_ground_land-cover+model-terrain-height_00.grib2"], createNetCdf: createNetcdf, shift180LongitudeAndFlipLatitude: false)
         fatalError()*/
@@ -189,7 +189,7 @@ struct UkmoDownload: AsyncCommand {
                     elevation[i] = -999 // mask sea grid points
                 }
             }
-            try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: createNetcdf)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetcdf)
             return
         }
 
@@ -229,7 +229,7 @@ struct UkmoDownload: AsyncCommand {
                 elevation[i] = -999 // mask sea grid points
             }
         }
-        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: createNetcdf)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetcdf)
     }
 
     /**
