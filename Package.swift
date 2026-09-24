@@ -50,8 +50,21 @@ let package = Package(
     ] : []),
     targets: [
         .target(
+            name: "ReducedLatLon",
+            dependencies: [.product(name: "OmFileFormat", package: "om-file-format")],
+            swiftSettings: swiftFlags
+        ),
+        .testTarget(
+            name: "ReducedLatLonTests",
+            dependencies: [
+                .target(name: "ReducedLatLon"),
+                .product(name: "OmFileFormat", package: "om-file-format")
+            ]
+        ),
+        .target(
             name: "App",
             dependencies: [
+                .target(name: "ReducedLatLon"),
                 .product(name: "SwiftZarr", package: "swift-zarr"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Crypto", package: "swift-crypto"),
@@ -124,6 +137,7 @@ let package = Package(
         .testTarget(
             name: "AppTests",
             dependencies: [
+                .target(name: "ReducedLatLon"),
                 .target(name: "App"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "VaporTesting", package: "vapor")

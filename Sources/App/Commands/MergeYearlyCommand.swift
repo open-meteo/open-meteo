@@ -36,7 +36,7 @@ struct MergeYearlyCommand: AsyncCommand {
         let logger = context.application.logger
         let registry = try DomainRegistry.load(rawValue: signature.domain)
         let years = try signature.years.getYearsRange()
-        guard let domain = registry.getDomain() else {
+        guard let domain = try await registry.getDomain() else {
             fatalError("Did not get domain object")
         }
 

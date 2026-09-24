@@ -1,0 +1,216 @@
+import Foundation
+import OmFileFormat
+import ReducedLatLon
+
+/// ICON-specific `Gridable` adapter around the provider-neutral reduced latitude–longitude index.
+///
+/// Canonical point IDs are official ICON mass-point offsets, so a lookup result indexes native
+/// GRIB and static-variable arrays directly. Terrain and sea modes reuse the index's local candidate
+/// search; ICON's Earth radius and elevation scoring remain integration policy rather than artifact
+/// format concerns. Regional acceptance is distance-based, not polygon containment.
+struct IconNativeGrid: Gridable {
+    typealias SliceType = Range<Int>
+
+    let storage: ReducedLatLonIndex
+    let maximumChordDistanceSquared: Float
+    let nearbyMaximumChordDistanceSquared: Float
+    var elevations: ElevationValues?
+
+    /// Combines a validated index with ICON's acceptance/candidate radii and optional static elevations.
+    init(
+        storage: ReducedLatLonIndex,
+        maximumChordDistanceSquared: Float,
+        nearbyMaximumChordDistanceSquared: Float,
+        elevations: ElevationValues? = nil
+    ) {
+        self.storage = storage
+        self.maximumChordDistanceSquared = maximumChordDistanceSquared
+        self.nearbyMaximumChordDistanceSquared = nearbyMaximumChordDistanceSquared
+        self.elevations = elevations
+    }
+
+    var nx: Int { storage.pointCount }
+    var ny: Int { 1 }
+    /// Unused: native sea and terrain searches use the spherical index.
+    var searchRadius: Int { 2 }
+
+    var crsWkt2: String {
+        """
+        GEOGCRS["ICON Native Grid",
+            DATUM["Sphere",
+                ELLIPSOID["Sphere",\(Int(IconNativeGridIdentity.earthRadiusMeters)),0]],
+            CS[ellipsoidal,2],
+                AXIS["latitude",north],
+                AXIS["longitude",east],
+                ANGLEUNIT["degree",0.0174532925199433]]
+        """
+    }
+
+    /// Returns a canonical mass-point ID within the configured nearest distance, or nil.
+    func findPoint(lat: Float, lon: Float) -> Int? {
+        storage.nearestPointID(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared)
+    }
+
+    func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
+
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Range<Int>? { nil }
+
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
+
+    /// Returns the stored mass-point direction as latitude/longitude degrees for a canonical ID.
+    func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
+        precondition(gridpoint >= 0 && gridpoint < storage.pointCount, "ICON grid point out of range")
+        return storage.point(at: gridpoint).coordinate
+    }
+
+    /// Prefers the nearest sea point among bounded candidates, falling back to the initial nearest.
+    func findPointInSea(
+        lat: Float,
+        lon: Float,
+        elevationFile: any OmFileReaderArrayProtocol<Float>
+    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared) else {
+            return nil
+        }
+        let nearest = lookup.pointID
+        let nearestElevation = try await getPointElevation(
+            pointID: nearest, elevationFile: elevationFile
+        )
+        if nearestElevation <= -999 {
+            return (nearest, .sea)
+        }
+        let candidates = storage.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: nearbyMaximumChordDistanceSquared
+        )
+        let elevations = try await getCandidateElevations(
+            candidates: candidates,
+            knownValue: nearestElevation,
+            elevationFile: elevationFile
+        )
+
+        for position in 1..<candidates.count where elevations[position] <= -999 {
+            return (candidates.pointIDs[position], .sea)
+        }
+        return elevationResult(gridpoint: nearest, value: nearestElevation)
+    }
+
+    /// Applies ICON's elevation/distance score to bounded land candidates, retaining nearest fallback.
+    /// Accepts the nearest land point immediately when elevation differs by at most 100 metres.
+    /// Otherwise minimizes elevation difference plus chord-distance kilometres times 30 among
+    /// at most ten candidates, breaking score ties by canonical ID. Elevations >= 9999 denote
+    /// land without elevation and contribute zero elevation difference; nonfinite and sea values
+    /// (<= -999) are excluded. No eligible candidate, or a score above 1500, falls back to nearest.
+    func findPointTerrainOptimised(
+        lat: Float,
+        lon: Float,
+        elevation: Float,
+        elevationFile: any OmFileReaderArrayProtocol<Float>
+    ) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        guard let lookup = storage.nearestLookup(latitude: lat, longitude: lon, maximumChordDistanceSquared: maximumChordDistanceSquared) else {
+            return nil
+        }
+        let nearest = lookup.pointID
+        let nearestElevation = try await getPointElevation(
+            pointID: nearest, elevationFile: elevationFile
+        )
+        if nearestElevation.isFinite, nearestElevation > -999, abs(nearestElevation - elevation) <= 100 {
+            return elevationResult(gridpoint: nearest, value: nearestElevation)
+        }
+        let candidates = storage.nearestCandidates(
+            from: lookup,
+            maximumChordDistanceSquared: nearbyMaximumChordDistanceSquared
+        )
+        let elevations = try await getCandidateElevations(
+            candidates: candidates,
+            knownValue: nearestElevation,
+            elevationFile: elevationFile
+        )
+
+        var bestPosition = -1
+        var bestScore = Float.greatestFiniteMagnitude
+        for position in 0..<candidates.count {
+            let candidateElevation = elevations[position]
+            if !candidateElevation.isFinite || candidateElevation <= -999 {
+                continue
+            }
+            let distanceKilometres = sqrt(max(0, candidates.distancesSquared[position])) * Float(IconNativeGridIdentity.earthRadiusMeters / 1_000)
+            let elevationDelta = candidateElevation >= 9999 ? 0 : abs(candidateElevation - elevation)
+            let score = elevationDelta + distanceKilometres * 30
+            if score < bestScore || (score == bestScore && (bestPosition < 0 || candidates.pointIDs[position] < candidates.pointIDs[bestPosition])) {
+                bestScore = score
+                bestPosition = position
+            }
+        }
+
+        if bestPosition < 0 || bestScore > 1500 {
+            return elevationResult(gridpoint: nearest, value: nearestElevation)
+        }
+        return elevationResult(gridpoint: candidates.pointIDs[bestPosition], value: elevations[bestPosition])
+    }
+
+    private func getPointElevation(
+        pointID: Int,
+        elevationFile: any OmFileReaderArrayProtocol<Float>
+    ) async throws -> Float {
+        if let elevations {
+            return elevations[pointID]
+        }
+        return try await readFromStaticFile(gridpoint: pointID, file: elevationFile)
+    }
+
+    private func getCandidateElevations(
+        candidates: ReducedLatLonIndex.NearbyPoints,
+        knownValue: Float,
+        elevationFile: any OmFileReaderArrayProtocol<Float>
+    ) async throws -> InlineArray<10, Float> {
+        if let elevations {
+            return elevations.read(
+                pointIDs: candidates.pointIDs,
+                count: candidates.count
+            )
+        }
+
+        var sortedCells = InlineArray<10, Int>(repeating: -1)
+        var sortedPositions = InlineArray<10, Int>(repeating: -1)
+        var sortedCount = 0
+        if candidates.count > 1 {
+            for originalPosition in 1..<candidates.count {
+                let cell = candidates.pointIDs[originalPosition]
+                var insertion = sortedCount
+                while insertion > 0, cell < sortedCells[insertion - 1] {
+                    sortedCells[insertion] = sortedCells[insertion - 1]
+                    sortedPositions[insertion] = sortedPositions[insertion - 1]
+                    insertion -= 1
+                }
+                sortedCells[insertion] = cell
+                sortedPositions[insertion] = originalPosition
+                sortedCount += 1
+            }
+        }
+        var result = InlineArray<10, Float>(repeating: .nan)
+        result[0] = knownValue
+        var start = 0
+        while start < sortedCount {
+            var end = start
+            while end + 1 < sortedCount, sortedCells[end + 1] == sortedCells[end] + 1 {
+                end += 1
+            }
+            let lower = UInt64(sortedCells[start])
+            let upper = UInt64(sortedCells[end] + 1)
+            let values = try await elevationFile.read(range: [0..<1, lower..<upper])
+            for position in start...end {
+                result[sortedPositions[position]] = values[sortedCells[position] - sortedCells[start]]
+            }
+            start = end + 1
+        }
+        return result
+    }
+
+    private func elevationResult(gridpoint: Int, value: Float) -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        if value.isNaN { return nil }
+        if value <= -999 { return (gridpoint, .sea) }
+        if value >= 9999 { return (gridpoint, .landWithoutElevation) }
+        return (gridpoint, .elevation(value))
+    }
+}

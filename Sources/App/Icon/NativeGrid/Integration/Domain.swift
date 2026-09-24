@@ -1,0 +1,155 @@
+import Foundation
+import OmFileFormat
+import OmFileIO
+import Vapor
+
+/// Immutable identity of an operational DWD grid. Both the NetCDF definition and every native
+/// GRIB message must match these values so data cannot silently be paired with another grid order.
+struct IconNativeGridIdentity: Sendable, Hashable {
+    let gridNumber: UInt32
+    let gridUUID: UUID
+    let cellCount: Int
+    let isGlobal: Bool
+    /// Number of equal-height latitude bands used by the spatial index.
+    let latitudeBandCount: Int
+    let maximumDistanceMeters: Float
+    /// Uncompressed NetCDF filename in MPI's DWD grid catalogue, also used for the local cache.
+    let sourceFile: String
+
+    static let global = Self(
+        gridNumber: 26,
+        gridUUID: UUID(uuidString: "a27b8de6-18c4-11e4-820a-b5b098c6a5c0")!,
+        cellCount: 2_949_120,
+        isGlobal: true,
+        latitudeBandCount: 1_111,
+        maximumDistanceMeters: 20_000,
+        sourceFile: "icon_grid_0026_R03B07_G.nc"
+    )
+
+    static let d2 = Self(
+        gridNumber: 47,
+        gridUUID: UUID(uuidString: "c6b12daa-91ad-6404-5b26-c1b6452a2a20")!,
+        cellCount: 542_040,
+        isGlobal: false,
+        latitudeBandCount: 4_446,
+        maximumDistanceMeters: 4_000,
+        sourceFile: "icon_grid_0047_R19B07_L.nc"
+    )
+
+    /// ICON's spherical Earth radius in metres, independent of the index format.
+    static let earthRadiusMeters: Double = 6_371_229
+
+    /// Converts a surface distance in metres to squared chord distance on the unit sphere.
+    static func squaredChordDistance(meters: Double) -> Float {
+        let chord = 2 * sin(meters / earthRadiusMeters * 0.5)
+        return Float(chord * chord)
+    }
+
+    /// Maximum accepted distance for the initial nearest-cell lookup.
+    var maximumChordDistanceSquared: Float {
+        Self.squaredChordDistance(meters: Double(maximumDistanceMeters))
+    }
+
+    /// Terrain and sea selection inspect a slightly wider, resolution-scaled neighbourhood than
+    /// the distance used to accept the initial nearest-cell lookup.
+    var nearbyMaximumChordDistanceSquared: Float {
+        Self.squaredChordDistance(meters: Double(maximumDistanceMeters) * 1.5)
+    }
+
+    var sourceUrl: String {
+        // Catalogue: http://icon-downloads.mpimet.mpg.de/dwd_grids.xml
+        // This server provides plain NetCDF files over HTTP (HTTPS is unavailable).
+        "http://icon-downloads.mpimet.mpg.de/grids/public/edzw/\(sourceFile)"
+    }
+}
+
+enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable {
+    case missingGridArtifact(String)
+    case invalidGridArtifact(path: String, reason: String)
+
+    var description: String {
+        switch self {
+        case .missingGridArtifact(let path):
+            return "Missing native ICON grid artifact at \(path)"
+        case .invalidGridArtifact(let path, let reason):
+            return "Invalid native ICON grid artifact at \(path): \(reason)"
+        }
+    }
+}
+
+extension IconNativeDomains {
+    /// Validates/reuses the local artifact or regenerates it offline; only regenerated files upload.
+    func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
+        let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
+        let artifact = nativeGridFile
+        let identity = artifact.identity
+        let registry = artifact.registry
+        do {
+            // Downloader preparation deliberately validates the on-disk artifact. API lookups use
+            // the atomically pinned mapping and never enter this disk-maintenance path.
+            try artifact.validateFileAndInstall()
+            // Valid existing artifacts are reused without uploading. Delete grid.bin locally to
+            // force regeneration, and supply --upload-s3-bucket to upload the regenerated artifact.
+            return
+        } catch IconNativeDomainError.missingGridArtifact {
+            application.logger.info("Generating missing native ICON grid artifact for '\(rawValue)'")
+        } catch {
+            application.logger.warning("Regenerating invalid native ICON grid artifact for '\(rawValue)': \(error)")
+        }
+
+        // Bootstrap is intentionally owned by the downloader: obtain the official NetCDF mesh,
+        // generate the lookup artifact offline, then atomically publish it to the static registry.
+        let staticDirectory = "\(registry.directory)static/"
+        try FileManager.default.createDirectory(atPath: staticDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        let sourceFile = "\(downloadDirectory)\(identity.sourceFile)"
+        let sourceExisted = FileManager.default.fileExists(atPath: sourceFile)
+        let curl = Curl(logger: application.logger, client: application.dedicatedHttpClient)
+
+        func downloadSource() async throws {
+            application.logger.info("Downloading native ICON grid definition '\(identity.sourceFile)'")
+            try await curl.download(
+                url: identity.sourceUrl,
+                toFile: sourceFile,
+                bzip2Decode: false,
+                cacheDirectory: nil
+            )
+        }
+
+        if !sourceExisted {
+            try await downloadSource()
+        }
+
+        let artifactPath = "\(staticDirectory)grid.bin"
+        let grid: IconNativeGrid
+        do {
+            grid = try IconNativeGrid.Generator.generateAndPublish(
+                sourceFile: sourceFile,
+                identity: identity,
+                artifactFile: artifactPath
+            )
+        } catch let error as IconNativeGridSourceError where sourceExisted {
+            // A cached source may be truncated or may belong to an older operational grid. Retry
+            // source errors once with an atomic replacement; readers of the old inode stay valid.
+            application.logger.warning("Replacing unusable cached ICON grid definition: \(error)")
+            try await downloadSource()
+            grid = try IconNativeGrid.Generator.generateAndPublish(
+                sourceFile: sourceFile,
+                identity: identity,
+                artifactFile: artifactPath
+            )
+        }
+
+        artifact.cache.install(grid.storage)
+        application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
+        for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
+            let uploads = queue.startMultiPartUploads()
+            await uploads.uploadMultipart(
+                file: artifactPath,
+                objectName: "data/\(registry.rawValue)/static/grid.bin",
+                lastModified: .now()
+            )
+            await queue.finishMultiPartUploads(uploads)
+        }
+    }
+}
