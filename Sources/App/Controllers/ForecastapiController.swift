@@ -1913,7 +1913,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 }
             }
             // For Northern Europe and Iceland use DMI Harmonie
-            if (44..<66).contains(lat), let dmiEurope = try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if (44..<66).contains(lat), let dmiEurope = try await DmiDomain.harmonie_arome_europe.makeDerivedHourly(variableType: DmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
@@ -1923,7 +1923,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     iconEu,
                     ifs025,
                     ifsHres,
-                    dmiEurope.asOptionalReader
+                    dmiEurope
                 ])
             }
             // For North America, use HRRR
