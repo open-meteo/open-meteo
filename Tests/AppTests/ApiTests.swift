@@ -74,7 +74,7 @@ import VaporTesting
 
     @Test func parseApiParamsGET() async throws {
         try await withApp { app in
-            let url = URI(string: "/forecast?latitude=52.52&longitude=13.41&timezone=auto")
+            let url = URI(string: "/forecast?latitude=52.52&longitude=13.41&timezone=auto&snow_depth_unit=cm")
             let request = Request(
                 application: app,
                 method: .GET,
@@ -91,6 +91,7 @@ import VaporTesting
             #expect(params.bounding_box == [])
             #expect(params.start_hour == [])
             #expect(params.timezone == [.auto])
+            #expect(params.snow_depth_unit == .cm)
             #expect(params.end_hour == [])
             #expect(params.start_minutely_15 == [])
             #expect(params.end_minutely_15 == [])
@@ -107,6 +108,7 @@ import VaporTesting
             #expect(params2.latitude == [52.52, 45.1])
             #expect(params2.longitude == [13.41, 14.2])
             #expect(params2.elevation == [23.0, 45.0])
+            #expect(params2.snow_depth_unit == nil)
         }
     }
 
@@ -139,6 +141,7 @@ import VaporTesting
             {
                 "latitude": ["52.52"],
                 "longitude": ["13.41"],
+                "snow_depth_unit": "m"
             }
             """
             var headers = HTTPHeaders()
@@ -156,6 +159,7 @@ import VaporTesting
 
             #expect(params.latitude == [52.52])
             #expect(params.longitude == [13.41])
+            #expect(params.snow_depth_unit == .m)
             #expect(params.start_date == [])
             #expect(params.end_date == [])
             #expect(params.bounding_box == [])
@@ -193,6 +197,70 @@ import VaporTesting
             #expect(params.end_hour == [])
             #expect(params.start_minutely_15 == [])
             #expect(params.end_minutely_15 == [])
+        }
+    }
+
+    @Test func snowDepthUnitConversion() throws {
+        func decode(_ json: String) throws -> ApiQueryParameter {
+            try JSONDecoder().decode(ApiQueryParameter.self, from: Data(json.utf8))
+        }
+
+        let snowDepth = ForecastVariable.surface(VariableAndPreviousDay(.snow_depth, 0))
+        let visibility = ForecastVariable.surface(VariableAndPreviousDay(.visibility, 0))
+        let snowHeight = ForecastVariable.surface(VariableAndPreviousDay(.snow_height, 0)).variableAndPreviousDay.0
+        let input = DataAndUnit([0, 0.001, 0.01, .nan], .metre)
+
+        let centimetres = input.convertAndRound(
+            params: try decode(#"{"snow_depth_unit":"cm","precipitation_unit":"inch"}"#),
+            variable: snowDepth
+        )
+        #expect(centimetres.unit == .centimetre)
+        #expect(centimetres.data[0] == 0)
+        #expect(centimetres.data[1] == 0.1)
+        #expect(centimetres.data[2] == 1)
+        #expect(centimetres.data[3].isNaN)
+
+        let alias = input.convertAndRound(
+            params: try decode(#"{"snow_depth_unit":"cm"}"#),
+            variable: snowHeight
+        )
+        #expect(alias.unit == .centimetre)
+
+        let aggregate = input.convertAndRound(
+            params: try decode(#"{"snow_depth_unit":"cm"}"#),
+            variable: ForecastVariableDaily.snow_depth_mean
+        )
+        #expect(aggregate.unit == .centimetre)
+        #expect(aggregate.data[1] == 0.1)
+
+        let metres = input.convertAndRound(
+            params: try decode(#"{"snow_depth_unit":"m","precipitation_unit":"inch"}"#),
+            variable: snowDepth
+        )
+        #expect(metres.unit == .metre)
+        #expect(metres.data[2] == 0.01)
+
+        let legacy = input.convertAndRound(
+            params: try decode(#"{"precipitation_unit":"inch"}"#),
+            variable: snowDepth
+        )
+        #expect(legacy.unit == .feet)
+
+        let legacyLength = input.convertAndRound(
+            params: try decode(#"{"length_unit":"imperial"}"#),
+            variable: snowDepth
+        )
+        #expect(legacyLength.unit == .feet)
+
+        let unrelatedLength = input.convertAndRound(
+            params: try decode(#"{"snow_depth_unit":"cm"}"#),
+            variable: visibility
+        )
+        #expect(unrelatedLength.unit == .metre)
+        #expect(unrelatedLength.data[2] == 0.01)
+
+        #expect(throws: DecodingError.self) {
+            try decode(#"{"snow_depth_unit":"yards"}"#)
         }
     }
 }
