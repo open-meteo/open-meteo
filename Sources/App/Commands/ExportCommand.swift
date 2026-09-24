@@ -917,50 +917,6 @@ enum ExportFormat: String, RawRepresentableString, CaseIterable {
         return genericDomain.grid
     }
 
-    func getReader(position: Int, options: GenericReaderOptions) async throws -> any GenericReaderProtocol {
-        switch self {
-        case .CMCC_CM2_VHR4:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position, options: options), domain: Cmip6Domain.CMCC_CM2_VHR4), domain: Cmip6Domain.CMCC_CM2_VHR4)
-        case .MRI_AGCM3_2_S:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position, options: options), domain: .MRI_AGCM3_2_S), domain: .MRI_AGCM3_2_S)
-        case .FGOALS_f3_H:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position, options: options), domain: .FGOALS_f3_H), domain: .FGOALS_f3_H)
-        case .HiRAM_SIT_HR:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position, options: options), domain: .HiRAM_SIT_HR), domain: .HiRAM_SIT_HR)
-        case .EC_Earth3P_HR:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position, options: options), domain: .EC_Earth3P_HR), domain: .EC_Earth3P_HR)
-        case .MPI_ESM1_2_XR:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position, options: options), domain: .MPI_ESM1_2_XR), domain: .MPI_ESM1_2_XR)
-        case .NICAM16_8S:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position, options: options), domain: .NICAM16_8S), domain: .NICAM16_8S)
-        case .glofas_v3_consolidated:
-            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position, options: options)
-        case .glofas_v4_consolidated:
-            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position, options: options)
-        case .glofas_v3_forecast:
-            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position, options: options)
-        case .glofas_v3_seasonal:
-            return try await GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position, options: options)
-        case .era5_land:
-            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position, options: options)), options: options)
-        case .era5:
-            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position, options: options)), options: options)
-        case .ecmwf_ifs:
-            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, position: position, options: options)), options: options)
-        case .ecmwf_ifs025:
-            return try await EcmwfReader(domain: .ifs025, gridpoint: position, options: options)
-        case .era5_seamless:
-            let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position, options: options)
-            guard
-                let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
-            else {
-                // Not possible
-                throw ForecastapiError.noDataAvailableForThisLocation
-            }
-            return Era5Reader<GenericReaderMixerSameVariableType<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameVariableType(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
-        }
-    }
-
     func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> any GenericReaderProtocol {
         guard let cmipDomain = self.cmipDomain else {
             fatalError("Regridding only supported for CMIP domains")
