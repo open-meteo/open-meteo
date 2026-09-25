@@ -30,6 +30,7 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
 | Pressure | `pressure_msl`, `surface_pressure` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
+| Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `lifted_index`, `boundary_layer_height`, `total_column_integrated_water_vapour`, `freezing_level_height` |
@@ -50,6 +51,7 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
 | Pressure | `pressure_msl`, `surface_pressure` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
+| Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `lifted_index`, `boundary_layer_height`, `total_column_integrated_water_vapour`, `freezing_level_height` |
@@ -70,6 +72,7 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
 | Pressure | `pressure_msl`, `surface_pressure` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
+| Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation` |
 | Wind gusts | `wind_gusts_10m` |
@@ -84,6 +87,7 @@ This product has no pressure-level fields.
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
 | Pressure | `pressure_msl`, `surface_pressure` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
+| Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `total_column_integrated_water_vapour` |
@@ -109,6 +113,10 @@ The North America reader has no ensemble precipitation-probability supplement: t
 Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature fields at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658 and 4572 m are above mean sea level, with names such as `temperature_305m`; other temperature height levels are above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas.
 
 Temperatures are stored in Celsius, pressure in hPa, snowfall in centimetres, and CIN as a positive magnitude.
+
+### Radar reflectivity
+
+`radar_reflectivity` uses instantaneous `REFC` at the entire-atmosphere level in all four domains. It represents the maximum simulated radar reflectivity over the atmospheric column, in dBZ. Values are stored unchanged at 0.1 dBZ precision, including negative values, with linear time interpolation. No accumulation or averaging conversion is applied.
 
 ### Radiation
 
@@ -151,3 +159,5 @@ Run the inventory, conversion and scheduling tests with `swift test --filter Nce
 ### API encoding limitation
 
 RRFS model identifiers are not yet available in the installed FlatBuffers SDK, so binary responses currently encode the model as `undefined`.
+
+The installed FlatBuffers SDK also lacks `radar_reflectivity` and the dBZ unit. The variable encodes as `undefined` in binary responses. Its unit currently uses an `undefined` placeholder in all response formats, with a TODO to use dBZ when the SDK supports it. The stored values remain in dBZ.

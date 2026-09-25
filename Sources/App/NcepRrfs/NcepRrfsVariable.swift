@@ -19,6 +19,8 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
     case snowfall_water_equivalent
     case snowfall
     case wind_gusts_10m
+    /// Instantaneous maximum simulated radar reflectivity over the atmospheric column, in dBZ.
+    case radar_reflectivity
     case visibility
     case shortwave_radiation
     case diffuse_radiation
@@ -90,6 +92,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .radar_reflectivity: return true
         case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .surface_pressure, .precipitation, .snowfall_water_equivalent,
@@ -121,6 +124,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .radar_reflectivity: return false
         case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return false
         case .temperature_2m, .surface_temperature:
             return true
@@ -131,6 +135,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
         case .freezing_rain, .snow_depth_water_equivalent: return .millimetre
         case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m, .surface_temperature, .temperature_30m,
@@ -181,6 +186,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .radar_reflectivity: return 10
         case .freezing_rain, .snow_depth_water_equivalent: return 10
         case .cloud_base, .cloud_ceiling, .cloud_top: return 0.1
         case .temperature_2m, .surface_temperature, .temperature_30m,
@@ -225,6 +231,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .radar_reflectivity: return .linear
         case .freezing_rain: return .backwards_sum
         case .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return .linear
         case .temperature_2m, .pressure_msl, .surface_temperature,
@@ -285,6 +292,8 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
     case snowfall_water_equivalent
     case snowfall
     case wind_gusts_10m
+    /// Instantaneous maximum simulated radar reflectivity over the atmospheric column, in dBZ.
+    case radar_reflectivity
     case visibility
     case shortwave_radiation
     case diffuse_radiation
@@ -298,6 +307,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .radar_reflectivity: return true
         case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .surface_pressure, .precipitation, .snowfall_water_equivalent,
@@ -311,6 +321,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .radar_reflectivity: return false
         case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return false
         case .temperature_2m:
             return true
@@ -325,6 +336,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
         case .freezing_rain: return .millimetre
         case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m:
@@ -352,6 +364,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .radar_reflectivity: return 10
         case .freezing_rain: return 10
         case .cloud_base, .cloud_ceiling, .cloud_top: return 0.1
         case .temperature_2m:
@@ -372,6 +385,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .radar_reflectivity: return .linear
         case .freezing_rain: return .backwards_sum
         case .cloud_base, .cloud_ceiling, .cloud_top: return .linear
         case .temperature_2m, .pressure_msl:
@@ -405,6 +419,8 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
     case snowfall_water_equivalent
     case snowfall
     case wind_gusts_10m
+    /// Instantaneous maximum simulated radar reflectivity over the atmospheric column, in dBZ.
+    case radar_reflectivity
     case visibility
     case shortwave_radiation
     case categorical_freezing_rain
@@ -428,6 +444,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .radar_reflectivity: return true
         case .freezing_rain: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .surface_pressure, .precipitation, .snowfall_water_equivalent,
@@ -444,6 +461,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .radar_reflectivity: return false
         case .freezing_rain: return false
         case .temperature_2m:
             return true
@@ -462,6 +480,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
         case .freezing_rain: return .millimetre
         case .temperature_2m:
             return .celsius
@@ -495,6 +514,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .radar_reflectivity: return 10
         case .freezing_rain: return 10
         case .temperature_2m:
             return 20
@@ -519,6 +539,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .radar_reflectivity: return .linear
         case .freezing_rain: return .backwards_sum
         case .temperature_2m, .pressure_msl, .total_column_integrated_water_vapour:
             return .hermite(bounds: nil)

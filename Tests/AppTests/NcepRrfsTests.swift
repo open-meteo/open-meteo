@@ -22,6 +22,27 @@ import OmFileIO
         return try #require(decoded.first).matches
     }
 
+    @Test func radarReflectivity() throws {
+        #expect(ForecastSurfaceVariable(rawValue: "radar_reflectivity") != nil)
+        for domain in NcepRrfsDomain.allCases {
+            let fields = domain.downloadVariables(forecastHour: 1, pressureFile: false)
+                .filter { $0.variable.rawValue == "radar_reflectivity" }
+            #expect(fields.count == (domain == .ncep_rrfs_conus_15min ? 4 : 1))
+            for field in fields {
+                #expect(field.variable.unit == .undefined) // TODO: Expect dBZ once supported by the SDK.
+                #expect(field.variable.scalefactor == 10)
+                #expect(!field.variable.isElevationCorrectable)
+                #expect(field.interval.type == "instant")
+                #expect(!field.requiresSolarBackwardsConversion)
+                var values: [Float] = [-20, 0, 12.5, 65, .nan]
+                field.variable.convertUnits(data: &values)
+                #expect(Array(values.prefix(4)) == [-20, 0, 12.5, 65])
+                #expect(values[4].isNaN)
+                #expect(field.gribIndexName == ":REFC:entire atmosphere (considered as a single layer):\(field.minute == 60 ? "1 hour" : "\(field.minute) min") fcst:")
+            }
+        }
+    }
+
     @Test func seamlessForecastMapping() throws {
         let model = try #require(MultiDomains(rawValue: "ncep_rrfs_seamless"))
         for include15Min in [false, true] {

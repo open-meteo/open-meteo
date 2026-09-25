@@ -143,6 +143,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case uv_index_clear_sky
     case vapor_pressure_deficit
     case vapour_pressure_deficit
+    /// Instantaneous column-maximum simulated radar reflectivity, in dBZ.
+    case radar_reflectivity
     case visibility
     case weathercode
     case weather_code
