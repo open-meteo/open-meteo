@@ -1,6 +1,6 @@
-# NOAA RRFS ingestion
+# NCEP RRFS models
 
-Run `swift run openmeteo-api download-noaa-rrfs DOMAIN --run YYYYMMDDHH --concurrent 4`.
+## Domains and model grids
 
 | Domain | Interval | Cycles | Forecast | Members |
 | --- | --- | --- | --- | --- |
@@ -9,25 +9,13 @@ Run `swift run openmeteo-api download-noaa-rrfs DOMAIN --run YYYYMMDDHH --concur
 | `ncep_rrfs_conus_15min` | 15 minutes | Hourly | 18 hours | 1 |
 | `ncep_rrfs_conus_ensemble` | 1 hour | 00/06/12/18 UTC | 60 hours | 5 |
 
-Without `--run`, the cycle is selected with a 3-hour-45-minute availability delay. The default source is `https://noaa-rrfs-ops-pds.s3.amazonaws.com`; `--server` overrides the root while retaining the RRFS directory layout. `--timeinterval YYYYMMDD-YYYYMMDD` downloads historical cycles. `--max-forecast-hour` limits processing for a smoke run. Standard `--create-netcdf`, `--skip-timeseries`, and `--upload-s3-bucket` options are supported.
-
-The downloader defines the required inputs through `CurlIndexedVariable` and calls `curl.downloadIndexedGrib`, which fetches the `.idx` inventory and requests only the matching byte ranges. Exact inventory matches preserve distinct subhourly timestamps and statistical intervals. Decoding and compression run concurrently. Accumulations and averages are processed in chronological order per variable and member, including across subhourly file boundaries. Each subhourly file contains four timestamps; no subhourly forecast-hour-zero file is requested. A GRIB/inventory count mismatch or missing wind component fails the download.
-
 The three CONUS domains share an exact 1799 × 1059 Lambert conformal grid with 3000-metre spacing. Terrain and land mask come from the deterministic analysis. Ensemble members `m001` through `m005` are stored as members 0 through 4.
 
-`ncep_rrfs_north_america` uses its own 1127 × 683 rotated latitude/longitude grid, with 0.1083° spacing in rotated coordinates (the nominal 13 km product). Its rotated origin is 36.9303°S, 61°W, and the GRIB southern pole is 35°S, 247°E, with zero additional rotation. Terrain and land mask come from its own `2dfld.13km.f000.na` analysis. Grid-relative winds are rotated using the spherical bearing toward geographic north. Missing values outside the model footprint remain NaN. Both `2dfld.13km.fFFF.na` and `prslev.13km.fFFF.na` files are downloaded, following the [NCEP RRFS product naming](https://www.nco.ncep.noaa.gov/pmb/products/rrfs/). The supplied surface inventories and the verified pressure inventory match the CONUS deterministic catalog, so both domains use `NcepRrfsVariable`.
+`ncep_rrfs_north_america` uses its own 1127 × 683 rotated latitude/longitude grid, with 0.1083° spacing in rotated coordinates (the nominal 13 km product). Its rotated origin is 36.9303°S, 61°W, and the GRIB southern pole is 35°S, 247°E, with zero additional rotation. Terrain and land mask come from its own `2dfld.13km.f000.na` analysis. Grid-relative winds are rotated using the spherical bearing toward geographic north. Missing values outside the model footprint remain NaN.
 
-Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature fields at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658 and 4572 m are above mean sea level, with names such as `temperature_305m`; other temperature height levels are above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas. The forecast API model `ncep_rrfs_seamless` prioritizes RRFS 15-minute data (when requested), RRFS hourly, GFS 0.25°, and finally GEFS 0.5° (`gfs05`), using the corresponding variable catalog for each reader.
+The forecast controller also accepts each individual model: `ncep_rrfs_conus`, `ncep_rrfs_conus_15min`, `ncep_rrfs_conus_ensemble` (five members), and `ncep_rrfs_north_america`.
 
-Stored fields include temperature, humidity, pressure, precipitation, snowfall and snowfall water equivalent, cloud cover, radiation, CAPE, CIN, visibility and gusts. The deterministic product additionally supplies boundary-layer height, soil fields, heat fluxes and freezing-level height. Hourly deterministic and ensemble shortwave radiation selects the last-hour average. Diffuse radiation and the 15-minute product only provide instantaneous solar fluxes, converted to backward averages using `backwardsAveragedToInstantFactor`; temperatures use Celsius, pressure hPa, snowfall centimetres, and CIN a positive magnitude.
-
-Snowfall water equivalent uses cumulative `TSNOWP` for the deterministic hourly and 15-minute products, differenced into interval amounts in mm. The reduced ensemble product supplies `CPOFP` instead, used to estimate snowfall water equivalent from precipitation times the frozen fraction. Each variable enum declares its product-specific GRIB attributes, unit conversions, solar-radiation handling and wind output pairs through `NcepRrfsVariableDownloadable`. Only the declared inputs are downloaded, with one index request per file.
-
-Run the inventory, conversion and scheduling tests with `swift test --filter NcepRrfsTests`. To additionally decode an existing ensemble GRIB sample, set `RRFS_TEST_GRIB=/path/to/file.grib2` with its `.idx` alongside it. `RRFS_TEST_DOMAIN` can select another RRFS domain for another sample.
-
-The forecast controller also accepts each individual model: `ncep_rrfs_conus`, `ncep_rrfs_conus_15min`, `ncep_rrfs_conus_ensemble` (five members), and `ncep_rrfs_north_america`. RRFS model identifiers are not yet available in the installed FlatBuffers SDK, so binary responses currently encode the model as `undefined`.
-
-RRFS ensemble processing also writes hourly `precipitation_probability`: the percentage of the five members with at least 0.1 mm of precipitation in that hour. It is calculated from the deaccumulated member fields, stored once as member zero, and exposed by the CONUS RRFS controller models. Forecast hour zero has no precipitation probability.
+The forecast API model `ncep_rrfs_seamless` prioritizes RRFS 15-minute data (when requested), RRFS hourly, GFS 0.25°, and finally GEFS 0.5° (`gfs05`), using the corresponding variable catalog for each reader.
 
 ## Variable catalogs
 
@@ -114,8 +102,52 @@ The three CONUS RRFS forecast-controller models also expose `precipitation_proba
 
 The North America reader has no ensemble precipitation-probability supplement: the available RRFS ensemble covers CONUS only. `ncep_rrfs_seamless` retains its existing CONUS/GFS composition.
 
-## Cloud heights and frozen water
+## Variable processing
+
+### Wind, temperature and units
+
+Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature fields at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658 and 4572 m are above mean sea level, with names such as `temperature_305m`; other temperature height levels are above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas.
+
+Temperatures are stored in Celsius, pressure in hPa, snowfall in centimetres, and CIN as a positive magnitude.
+
+### Radiation
+
+Hourly deterministic and ensemble shortwave radiation selects the last-hour average. Diffuse radiation and the 15-minute product only provide instantaneous solar fluxes, converted to backward averages using `backwardsAveragedToInstantFactor`.
+
+### Snowfall water equivalent
+
+Snowfall water equivalent uses cumulative `TSNOWP` for the deterministic hourly and 15-minute products, differenced into interval amounts in mm. The reduced ensemble product supplies `CPOFP` instead, used to estimate snowfall water equivalent from precipitation times the frozen fraction.
+
+### Cloud heights and frozen water
 
 - `cloud_base`, `cloud_ceiling` and `cloud_top` are available in both hourly deterministic domains and the 15-minute CONUS domain. Cloud base is the lowest detected cloud base, ceiling is the lowest broken/overcast cloud-base diagnostic, and cloud top is the upper cloud boundary. Each uses its distinct `HGT` GRIB level. The GRIB heights are above sea level; ingestion subtracts model terrain to store metres above ground, with sea elevation treated as zero and negative resulting heights clamped to zero. Missing coverage and no-cloud values remain NaN. See the [UPP field definitions](https://upp.readthedocs.io/en/upp_v10.1.0/UPP_GRIB2_Table.html).
 - `freezing_rain` uses `FRZR` in all four domains. Cumulative water-equivalent precipitation is differenced into hourly or 15-minute amounts, in mm. It is separate from the existing `categorical_freezing_rain` flag.
 - `snow_depth_water_equivalent` uses instantaneous `WEASD` in both hourly deterministic domains. It is the water stored in the existing snowpack, in mm (1 kg/m² = 1 mm), and is not deaccumulated. `snowfall_water_equivalent` remains the amount of new snowfall during an interval.
+
+### Precipitation probability
+
+RRFS ensemble processing also writes hourly `precipitation_probability`: the percentage of the five members with at least 0.1 mm of precipitation in that hour. It is calculated from the deaccumulated member fields, stored once as member zero, and exposed by the CONUS RRFS controller models. Forecast hour zero has no precipitation probability.
+
+## Downloader implementation
+
+### Running the downloader
+
+Run `swift run openmeteo-api download-noaa-rrfs DOMAIN --run YYYYMMDDHH --concurrent 4`.
+
+Without `--run`, the cycle is selected with a 3-hour-45-minute availability delay. The default source is `https://noaa-rrfs-ops-pds.s3.amazonaws.com`; `--server` overrides the root while retaining the RRFS directory layout. `--timeinterval YYYYMMDD-YYYYMMDD` downloads historical cycles. `--max-forecast-hour` limits processing for a smoke run. Standard `--create-netcdf`, `--skip-timeseries`, and `--upload-s3-bucket` options are supported.
+
+### File selection and processing
+
+Both `2dfld.13km.fFFF.na` and `prslev.13km.fFFF.na` files are downloaded, following the [NCEP RRFS product naming](https://www.nco.ncep.noaa.gov/pmb/products/rrfs/). The supplied surface inventories and the verified pressure inventory match the CONUS deterministic catalog, so both domains use `NcepRrfsVariable`.
+
+Each variable enum declares its product-specific GRIB attributes, unit conversions, solar-radiation handling and wind output pairs through `NcepRrfsVariableDownloadable`. Only the declared inputs are downloaded, with one index request per file.
+
+The downloader defines the required inputs through `CurlIndexedVariable` and calls `curl.downloadIndexedGrib`, which fetches the `.idx` inventory and requests only the matching byte ranges. Exact inventory matches preserve distinct subhourly timestamps and statistical intervals. Decoding and compression run concurrently. Accumulations and averages are processed in chronological order per variable and member, including across subhourly file boundaries. Each subhourly file contains four timestamps; no subhourly forecast-hour-zero file is requested. A GRIB/inventory count mismatch or missing wind component fails the download.
+
+### Tests
+
+Run the inventory, conversion and scheduling tests with `swift test --filter NcepRrfsTests`. To additionally decode an existing ensemble GRIB sample, set `RRFS_TEST_GRIB=/path/to/file.grib2` with its `.idx` alongside it. `RRFS_TEST_DOMAIN` can select another RRFS domain for another sample.
+
+### API encoding limitation
+
+RRFS model identifiers are not yet available in the installed FlatBuffers SDK, so binary responses currently encode the model as `undefined`.
