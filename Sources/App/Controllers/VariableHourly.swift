@@ -21,7 +21,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_2m
+    /// Lowest detected cloud base, including scattered clouds, in metres above ground.
     case cloud_base
+    /// Lowest broken/overcast cloud base (ceiling diagnostic), in metres above ground.
+    case cloud_ceiling
+    /// Upper cloud boundary in metres above ground, not the ceiling/base.
     case cloud_top
     case convective_cloud_base
     case convective_cloud_top
@@ -47,6 +51,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case lightning_potential
     case mass_density_8m
     case precipitation
+    case freezing_rain
     case precipitation_probability
     case precipitation_type
     case pressure_msl

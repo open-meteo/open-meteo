@@ -298,6 +298,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance, previousDay: previousDay)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant, previousDay: previousDay)
+        case .cloud_ceiling, .freezing_rain:
+            // The installed SDK has no identifiers for these fields yet.
+            return .init(variable: .undefined, previousDay: previousDay)
         case .cloud_base:
             return .init(variable: .cloudBase, previousDay: previousDay)
         case .cloud_top:

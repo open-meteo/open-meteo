@@ -57,6 +57,15 @@ struct NcepRrfsDownloader: AsyncCommand {
         Process.alarm(seconds: 7 * 3600)
         defer { Process.alarm(seconds: 0) }
         try await downloadElevation(curl: curl, domain: domain, run: run, server: server)
+        let domainElevation: [Float]?
+        if domain != .ncep_rrfs_conus_ensemble {
+            guard let elevation = try await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
+                throw NcepRrfsError.missingElevation
+            }
+            domainElevation = elevation
+        } else {
+            domainElevation = nil
+        }
         let grid = domain.grid
         let trueNorth = domain == .ncep_rrfs_north_america
             ? domain.northAmericaGrid.getTrueNorthDirection() : domain.conusGrid.getTrueNorthDirection()
@@ -93,6 +102,9 @@ struct NcepRrfsDownloader: AsyncCommand {
                         }
                         var array = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                         variable.convertUnits(data: &array.data)
+                        if variable.isCloudHeight, let domainElevation {
+                            variable.convertCloudHeightToAboveGround(data: &array.data, elevation: domainElevation)
+                        }
                         let timestepWriter = try await writer.getWriter(time: time)
                         if domain == .ncep_rrfs_conus_15min {
                             if variable.rawValue == "temperature_2m" { try await rh.ingest(.temperature(array), member: member, writer: timestepWriter) }

@@ -3,6 +3,14 @@
 import Foundation
 
 enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
+    case freezing_rain
+    case snow_depth_water_equivalent
+    /// Lowest detected cloud base, in metres above ground; may include scattered clouds.
+    case cloud_base
+    /// Ceiling diagnostic: lowest broken/overcast cloud base, in metres above ground.
+    case cloud_ceiling
+    /// Upper boundary of the cloud layer, in metres above ground; not its ceiling/base.
+    case cloud_top
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
@@ -82,6 +90,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .surface_pressure, .precipitation, .snowfall_water_equivalent,
              .snowfall, .wind_gusts_10m, .visibility,
@@ -112,6 +121,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return false
         case .temperature_2m, .surface_temperature:
             return true
         default:
@@ -121,6 +131,8 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .freezing_rain, .snow_depth_water_equivalent: return .millimetre
+        case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m, .surface_temperature, .temperature_30m,
              .temperature_50m, .temperature_80m, .temperature_100m,
              .temperature_160m, .temperature_320m, .temperature_305m,
@@ -169,6 +181,8 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .freezing_rain, .snow_depth_water_equivalent: return 10
+        case .cloud_base, .cloud_ceiling, .cloud_top: return 0.1
         case .temperature_2m, .surface_temperature, .temperature_30m,
              .temperature_50m, .temperature_80m, .temperature_100m,
              .temperature_160m, .temperature_320m, .temperature_305m,
@@ -211,6 +225,8 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .freezing_rain: return .backwards_sum
+        case .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return .linear
         case .temperature_2m, .pressure_msl, .surface_temperature,
              .total_column_integrated_water_vapour, .sensible_heat_flux, .latent_heat_flux,
              .lifted_index, .temperature_30m, .temperature_50m,
@@ -254,6 +270,13 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 }
 
 enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
+    case freezing_rain
+    /// Lowest detected cloud base, in metres above ground; may include scattered clouds.
+    case cloud_base
+    /// Ceiling diagnostic: lowest broken/overcast cloud base, in metres above ground.
+    case cloud_ceiling
+    /// Upper boundary of the cloud layer, in metres above ground; not its ceiling/base.
+    case cloud_top
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
@@ -275,6 +298,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .surface_pressure, .precipitation, .snowfall_water_equivalent,
              .snowfall, .wind_gusts_10m, .visibility,
@@ -287,6 +311,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return false
         case .temperature_2m:
             return true
         case .relative_humidity_2m, .pressure_msl, .surface_pressure,
@@ -300,6 +325,8 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .freezing_rain: return .millimetre
+        case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m:
             return .celsius
         case .relative_humidity_2m:
@@ -325,6 +352,8 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .freezing_rain: return 10
+        case .cloud_base, .cloud_ceiling, .cloud_top: return 0.1
         case .temperature_2m:
             return 20
         case .relative_humidity_2m, .shortwave_radiation, .diffuse_radiation,
@@ -343,6 +372,8 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .freezing_rain: return .backwards_sum
+        case .cloud_base, .cloud_ceiling, .cloud_top: return .linear
         case .temperature_2m, .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
@@ -365,6 +396,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 }
 
 enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
+    case freezing_rain
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
@@ -396,6 +428,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .freezing_rain: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .surface_pressure, .precipitation, .snowfall_water_equivalent,
              .snowfall, .wind_gusts_10m, .visibility,
@@ -411,6 +444,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .freezing_rain: return false
         case .temperature_2m:
             return true
         case .relative_humidity_2m, .pressure_msl, .surface_pressure,
@@ -428,6 +462,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .freezing_rain: return .millimetre
         case .temperature_2m:
             return .celsius
         case .relative_humidity_2m, .cloud_cover, .cloud_cover_low,
@@ -460,6 +495,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .freezing_rain: return 10
         case .temperature_2m:
             return 20
         case .relative_humidity_2m, .shortwave_radiation, .categorical_freezing_rain,
@@ -483,6 +519,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .freezing_rain: return .backwards_sum
         case .temperature_2m, .pressure_msl, .total_column_integrated_water_vapour:
             return .hermite(bounds: nil)
         case .relative_humidity_2m, .cloud_cover, .cloud_cover_low,

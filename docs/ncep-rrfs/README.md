@@ -41,8 +41,8 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
 | Pressure | `pressure_msl`, `surface_pressure` |
-| Precipitation and snow | `precipitation`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `categorical_freezing_rain` |
-| Clouds and visibility | `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
+| Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
+| Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `lifted_index`, `boundary_layer_height`, `total_column_integrated_water_vapour`, `freezing_level_height` |
 | Wind gusts | `wind_gusts_10m` |
@@ -61,8 +61,8 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
 | Pressure | `pressure_msl`, `surface_pressure` |
-| Precipitation and snow | `precipitation`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `categorical_freezing_rain` |
-| Clouds and visibility | `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
+| Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
+| Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `lifted_index`, `boundary_layer_height`, `total_column_integrated_water_vapour`, `freezing_level_height` |
 | Wind gusts | `wind_gusts_10m` |
@@ -81,8 +81,8 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
 | Pressure | `pressure_msl`, `surface_pressure` |
-| Precipitation and snow | `precipitation`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
-| Clouds and visibility | `visibility` |
+| Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
+| Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation` |
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 80 m AGL |
@@ -95,7 +95,7 @@ This product has no pressure-level fields.
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
 | Pressure | `pressure_msl`, `surface_pressure` |
-| Precipitation and snow | `precipitation`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
+| Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
 | Clouds and visibility | `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `total_column_integrated_water_vapour` |
@@ -113,3 +113,9 @@ The variables above are stored separately for all five members. The additional `
 The three CONUS RRFS forecast-controller models also expose `precipitation_probability` from `ncep_rrfs_conus_ensemble`; it is an hourly ensemble statistic, not a separate probability calculated from the deterministic or 15-minute product. `ncep_rrfs_seamless` combines the underlying readers and does not have a separate stored variable catalog.
 
 The North America reader has no ensemble precipitation-probability supplement: the available RRFS ensemble covers CONUS only. `ncep_rrfs_seamless` retains its existing CONUS/GFS composition.
+
+## Cloud heights and frozen water
+
+- `cloud_base`, `cloud_ceiling` and `cloud_top` are available in both hourly deterministic domains and the 15-minute CONUS domain. Cloud base is the lowest detected cloud base, ceiling is the lowest broken/overcast cloud-base diagnostic, and cloud top is the upper cloud boundary. Each uses its distinct `HGT` GRIB level. The GRIB heights are above sea level; ingestion subtracts model terrain to store metres above ground, with sea elevation treated as zero and negative resulting heights clamped to zero. Missing coverage and no-cloud values remain NaN. See the [UPP field definitions](https://upp.readthedocs.io/en/upp_v10.1.0/UPP_GRIB2_Table.html).
+- `freezing_rain` uses `FRZR` in all four domains. Cumulative water-equivalent precipitation is differenced into hourly or 15-minute amounts, in mm. It is separate from the existing `categorical_freezing_rain` flag.
+- `snow_depth_water_equivalent` uses instantaneous `WEASD` in both hourly deterministic domains. It is the water stored in the existing snowpack, in mm (1 kg/m² = 1 mm), and is not deaccumulated. `snowfall_water_equivalent` remains the amount of new snowfall during an interval.

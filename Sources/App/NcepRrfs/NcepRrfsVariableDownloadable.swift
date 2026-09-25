@@ -9,6 +9,7 @@ protocol NcepRrfsVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var isSolarRadiation: Bool { get }
+    var isCloudHeight: Bool { get }
     var isDewpoint: Bool { get }
     var isFrozenPrecipitationPercent: Bool { get }
     var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? { get }
@@ -48,8 +49,17 @@ extension NcepRrfsVariableDownloadable {
         return ":\(gribInput.parameter):\(gribInput.level):\(step):"
     }
 
+    var isCloudHeight: Bool { false }
     var isDewpoint: Bool { false }
     var isFrozenPrecipitationPercent: Bool { false }
+
+    func convertCloudHeightToAboveGround(data: inout [Float], elevation: [Float]) {
+        for i in data.indices {
+            let terrain = elevation[i] == -999 ? 0 : elevation[i]
+            // Preserve missing coverage and the upstream no-cloud sentinel.
+            data[i] = data[i].isNaN || data[i] <= -99999 || terrain.isNaN ? .nan : max(data[i] - terrain, 0)
+        }
+    }
 
     func convertUnits(data: inout [Float]) {
         if let multiplyAdd {
@@ -97,6 +107,11 @@ extension NcepRrfsDomain {
 extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
     var gribInput: (parameter: String, level: String) {
         switch self {
+        case .freezing_rain: return ("FRZR", "surface")
+        case .snow_depth_water_equivalent: return ("WEASD", "surface")
+        case .cloud_base: return ("HGT", "cloud base")
+        case .cloud_ceiling: return ("HGT", "cloud ceiling")
+        case .cloud_top: return ("HGT", "cloud top")
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
@@ -176,6 +191,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var gribStep: NcepRrfsGribStep {
         switch self {
+        case .freezing_rain: return .accumulation
         case .precipitation:
             return .hourlyAccumulation
         case .snowfall_water_equivalent,
@@ -192,6 +208,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var skipHour0: Bool {
         switch self {
+        case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall, .sensible_heat_flux, .latent_heat_flux: return true
         default: return false
         }
@@ -232,6 +249,13 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
         }
     }
 
+    var isCloudHeight: Bool {
+        switch self {
+        case .cloud_base, .cloud_ceiling, .cloud_top: return true
+        default: return false
+        }
+    }
+
     var isSolarRadiation: Bool {
         switch self {
         case .shortwave_radiation, .diffuse_radiation: return true
@@ -257,6 +281,10 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
     var gribInput: (parameter: String, level: String) {
         switch self {
+        case .freezing_rain: return ("FRZR", "surface")
+        case .cloud_base: return ("HGT", "cloud base")
+        case .cloud_ceiling: return ("HGT", "cloud ceiling")
+        case .cloud_top: return ("HGT", "cloud top")
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("DPT", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
@@ -278,6 +306,7 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
 
     var gribStep: NcepRrfsGribStep {
         switch self {
+        case .freezing_rain: return .accumulation
         case .precipitation,
              .snowfall_water_equivalent,
              .snowfall:
@@ -289,6 +318,7 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
 
     var skipHour0: Bool {
         switch self {
+        case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall: return true
         default: return false
         }
@@ -300,6 +330,13 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
         case .pressure_msl, .surface_pressure: return (0.01, 0)
         case .snowfall: return (100, 0)
         default: return nil
+        }
+    }
+
+    var isCloudHeight: Bool {
+        switch self {
+        case .cloud_base, .cloud_ceiling, .cloud_top: return true
+        default: return false
         }
     }
 
@@ -325,6 +362,7 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
 extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
     var gribInput: (parameter: String, level: String) {
         switch self {
+        case .freezing_rain: return ("FRZR", "surface")
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
@@ -356,6 +394,7 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var gribStep: NcepRrfsGribStep {
         switch self {
+        case .freezing_rain: return .accumulation
         case .precipitation:
             return .hourlyAccumulation
         case .snowfall:
@@ -369,6 +408,7 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var skipHour0: Bool {
         switch self {
+        case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall: return true
         default: return false
         }
@@ -459,6 +499,13 @@ extension SurfaceAndPressureVariable: NcepRrfsVariableDownloadable where Surface
         switch self {
         case .surface(let variable): return variable.multiplyAdd
         case .pressure(let variable): return variable.multiplyAdd
+        }
+    }
+
+    var isCloudHeight: Bool {
+        switch self {
+        case .surface(let variable): return variable.isCloudHeight
+        case .pressure(let variable): return variable.isCloudHeight
         }
     }
 

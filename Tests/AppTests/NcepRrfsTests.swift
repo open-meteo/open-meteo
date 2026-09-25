@@ -331,6 +331,46 @@ import OmFileIO
         }
     }
 
+    @Test func cloudHeightsAndWaterAmounts() throws {
+        var heights: [Float] = [1500, 300, 50, .nan, -99999, 1000]
+        NcepRrfsSurfaceVariable.cloud_base.convertCloudHeightToAboveGround(
+            data: &heights, elevation: [500, -999, 100, 0, 0, .nan])
+        #expect(Array(heights.prefix(3)) == [1000, 300, 0])
+        #expect(heights.suffix(3).allSatisfy { $0.isNaN })
+        var snowpack: [Float] = [0, 25.5, 100]
+        NcepRrfsSurfaceVariable.snow_depth_water_equivalent.convertUnits(data: &snowpack)
+        #expect(snowpack == [0, 25.5, 100])
+        #expect(NcepRrfsSurfaceVariable.snow_depth_water_equivalent.gribStep == .instant)
+        #expect(!NcepRrfsSurfaceVariable.snow_depth_water_equivalent.skipHour0)
+        #expect(NcepRrfsSurfaceVariable.snow_depth_water_equivalent.unit == .millimetre)
+        #expect(ForecastSurfaceVariable(rawValue: "cloud_top") != nil)
+        #expect(ForecastSurfaceVariable(rawValue: "cloud_ceiling") != nil)
+        #expect(ForecastSurfaceVariable(rawValue: "freezing_rain") != nil)
+        for domain in NcepRrfsDomain.allCases {
+            let inputs = domain.downloadVariables(forecastHour: 3, pressureFile: false)
+            let freezingRain = inputs.filter { $0.variable.rawValue == "freezing_rain" }
+            #expect(freezingRain.count == (domain == .ncep_rrfs_conus_15min ? 4 : 1))
+            #expect(freezingRain.allSatisfy { $0.interval.start == 0 && $0.interval.type == "accum" && $0.variable.skipHour0 })
+            #expect(inputs.filter { $0.variable.isCloudHeight }.count == (domain == .ncep_rrfs_conus_ensemble ? 0 : domain == .ncep_rrfs_conus_15min ? 12 : 3))
+        }
+        for variable in [NcepRrfsSurfaceVariable.cloud_base, .cloud_ceiling, .cloud_top] {
+            let input = NcepRrfsDownloadVariable(variable: variable, minute: 60)
+            let index = "1:0:d=2026092400:HGT:cloud base:1 hour fcst:\n2:100:d=2026092400:HGT:cloud ceiling:1 hour fcst:\n3:200:d=2026092400:HGT:cloud top:1 hour fcst:"
+            let decoded = try Curl.decodeGribIndices(indices: [index], variables: [input], errorOnMissing: true, logger: Logger(label: "cloud-height-test"))
+            #expect(decoded[0].matches.count == 1)
+            switch variable {
+            case .cloud_base: #expect(decoded[0].range == "0-99")
+            case .cloud_ceiling: #expect(decoded[0].range == "100-199")
+            case .cloud_top: #expect(decoded[0].range == "200-")
+            default: Issue.record("Unexpected cloud variable")
+            }
+        }
+        let freezingRain = NcepRrfsDownloadVariable(variable: NcepRrfsSurfaceVariable.freezing_rain, minute: 180)
+        let decoded = try Curl.decodeGribIndices(indices: ["1:0:d=2026092400:FRZR:surface:0-3 hour acc fcst:\n2:100:d=2026092400:FRZR:surface:2-3 hour acc fcst:"], variables: [freezingRain], errorOnMissing: true, logger: Logger(label: "freezing-rain-test"))
+        #expect(decoded[0].matches.count == 1)
+        #expect(decoded[0].range == "0-99")
+    }
+
     @Test func conversionsAndMetadata() {
         let conversions: [(any NcepRrfsVariableDownloadable, Float, Float)] = [
             (NcepRrfsSurfaceVariable.temperature_2m, 273.15, 0),
@@ -363,7 +403,7 @@ import OmFileIO
             try self.records("rrfs.t00z.2dfld.3km.subh.f00\(hour).conus.grib2.idx", domain: .ncep_rrfs_conus_15min)
         }
         let deaverager = GribDeaverager()
-        for variable in ["precipitation", "snowfall_water_equivalent"] {
+        for variable in ["precipitation", "snowfall_water_equivalent", "freezing_rain"] {
             let accumulated = records.filter { $0.variable.rawValue == variable }
             #expect(accumulated.count == 8)
             for (i, record) in accumulated.enumerated() {
