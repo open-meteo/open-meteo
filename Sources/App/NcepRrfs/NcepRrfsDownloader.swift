@@ -56,7 +56,7 @@ struct NcepRrfsDownloader: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6)
         Process.alarm(seconds: 7 * 3600)
         defer { Process.alarm(seconds: 0) }
-        try await downloadElevation(curl: curl, domain: domain, run: run, server: server)
+        try await downloadElevation(curl: curl, domain: domain, run: run, server: server, application: application, uploadS3Bucket: uploadS3Bucket)
         let domainElevation: [Float]?
         if domain != .ncep_rrfs_conus_ensemble {
             guard let elevation = try await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
@@ -169,7 +169,7 @@ struct NcepRrfsDownloader: AsyncCommand {
         return handles
     }
 
-    private func downloadElevation(curl: Curl, domain: NcepRrfsDomain, run: Timestamp, server: String) async throws {
+    private func downloadElevation(curl: Curl, domain: NcepRrfsDomain, run: Timestamp, server: String, application: Application, uploadS3Bucket: String?) async throws {
         guard !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) else { return }
         // The CONUS products share terrain; North America has its own rotated grid.
         let elevationDomain: NcepRrfsDomain = domain == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus
@@ -179,7 +179,7 @@ struct NcepRrfsDownloader: AsyncCommand {
             let array = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
             await storage.set(variable: variable, timestamp: run, member: 0, data: array)
         }
-        try await storage.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+        try await storage.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
         guard FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) else { throw NcepRrfsError.missingElevation }
     }
 }
