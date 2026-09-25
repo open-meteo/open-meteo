@@ -17,7 +17,7 @@ The three CONUS domains share an exact 1799 × 1059 Lambert conformal grid with 
 
 `ncep_rrfs_north_america` uses its own 1127 × 683 rotated latitude/longitude grid, with 0.1083° spacing in rotated coordinates (the nominal 13 km product). Its rotated origin is 36.9303°S, 61°W, and the GRIB southern pole is 35°S, 247°E, with zero additional rotation. Terrain and land mask come from its own `2dfld.13km.f000.na` analysis. Grid-relative winds are rotated using the spherical bearing toward geographic north. Missing values outside the model footprint remain NaN. Both `2dfld.13km.fFFF.na` and `prslev.13km.fFFF.na` files are downloaded, following the [NCEP RRFS product naming](https://www.nco.ncep.noaa.gov/pmb/products/rrfs/). The supplied surface inventories and the verified pressure inventory match the CONUS deterministic catalog, so both domains use `NcepRrfsVariable`.
 
-Grid-relative winds become speed and true-north direction. Wind and temperature height variables use names such as `wind_speed_305m` and `temperature_305m`. The supplied 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658 and 4572 m levels are above mean sea level; the other height levels are above ground. The deterministic catalog includes every supplied wind height through 4572 m MSL. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas. The forecast API model `ncep_rrfs_seamless` prioritizes RRFS 15-minute data (when requested), RRFS hourly, GFS 0.25°, and finally GEFS 0.5° (`gfs05`), using the corresponding variable catalog for each reader.
+Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature fields at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658 and 4572 m are above mean sea level, with names such as `temperature_305m`; other temperature height levels are above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas. The forecast API model `ncep_rrfs_seamless` prioritizes RRFS 15-minute data (when requested), RRFS hourly, GFS 0.25°, and finally GEFS 0.5° (`gfs05`), using the corresponding variable catalog for each reader.
 
 Stored fields include temperature, humidity, pressure, precipitation, snowfall and snowfall water equivalent, cloud cover, radiation, CAPE, CIN, visibility and gusts. The deterministic product additionally supplies boundary-layer height, soil fields, heat fluxes and freezing-level height. Hourly deterministic and ensemble shortwave radiation selects the last-hour average. Diffuse radiation and the 15-minute product only provide instantaneous solar fluxes, converted to backward averages using `backwardsAveragedToInstantFactor`; temperatures use Celsius, pressure hPa, snowfall centimetres, and CIN a positive magnitude.
 
@@ -48,7 +48,6 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 30, 50, 80, 100, 160, 320 m AGL |
 | Temperature above ground | `temperature_{height}m` at 30, 50, 80, 100, 160, 320 m AGL |
-| Wind above sea level | `wind_speed_{height}m`, `wind_direction_{height}m` at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL |
 | Temperature above sea level | `temperature_{height}m` at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL |
 | Soil | `soil_temperature_{depth}cm`, `soil_moisture_{depth}cm` at 0, 1, 4, 10, 30, 60, 100, 160, 300 cm |
 
@@ -69,7 +68,6 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 30, 50, 80, 100, 160, 320 m AGL |
 | Temperature above ground | `temperature_{height}m` at 30, 50, 80, 100, 160, 320 m AGL |
-| Wind above sea level | `wind_speed_{height}m`, `wind_direction_{height}m` at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL |
 | Temperature above sea level | `temperature_{height}m` at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL |
 | Soil | `soil_temperature_{depth}cm`, `soil_moisture_{depth}cm` at 0, 1, 4, 10, 30, 60, 100, 160, 300 cm |
 

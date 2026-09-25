@@ -43,26 +43,6 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
     case wind_direction_160m
     case wind_speed_320m
     case wind_direction_320m
-    case wind_speed_305m
-    case wind_direction_305m
-    case wind_speed_457m
-    case wind_direction_457m
-    case wind_speed_610m
-    case wind_direction_610m
-    case wind_speed_914m
-    case wind_direction_914m
-    case wind_speed_1524m
-    case wind_direction_1524m
-    case wind_speed_1829m
-    case wind_direction_1829m
-    case wind_speed_2134m
-    case wind_direction_2134m
-    case wind_speed_2743m
-    case wind_direction_2743m
-    case wind_speed_3658m
-    case wind_direction_3658m
-    case wind_speed_4572m
-    case wind_direction_4572m
     case temperature_30m
     case temperature_50m
     case temperature_80m
@@ -162,10 +142,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
             return .centimetre
         case .wind_gusts_10m, .wind_speed_10m, .wind_speed_30m,
              .wind_speed_50m, .wind_speed_80m, .wind_speed_100m,
-             .wind_speed_160m, .wind_speed_320m, .wind_speed_305m,
-             .wind_speed_457m, .wind_speed_610m, .wind_speed_914m,
-             .wind_speed_1524m, .wind_speed_1829m, .wind_speed_2134m,
-             .wind_speed_2743m, .wind_speed_3658m, .wind_speed_4572m:
+             .wind_speed_160m, .wind_speed_320m:
             return .metrePerSecond
         case .visibility, .snow_depth, .boundary_layer_height,
              .freezing_level_height:
@@ -181,10 +158,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
             return .kilogramPerSquareMetre
         case .wind_direction_10m, .wind_direction_30m, .wind_direction_50m,
              .wind_direction_80m, .wind_direction_100m, .wind_direction_160m,
-             .wind_direction_320m, .wind_direction_305m, .wind_direction_457m,
-             .wind_direction_610m, .wind_direction_914m, .wind_direction_1524m,
-             .wind_direction_1829m, .wind_direction_2134m, .wind_direction_2743m,
-             .wind_direction_3658m, .wind_direction_4572m:
+             .wind_direction_320m:
             return .degreeDirection
         case .soil_moisture_0cm, .soil_moisture_1cm, .soil_moisture_4cm,
              .soil_moisture_10cm, .soil_moisture_30cm, .soil_moisture_60cm,
@@ -210,19 +184,13 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
              .cloud_cover_mid, .cloud_cover_high, .convective_inhibition,
              .wind_direction_10m, .wind_direction_30m, .wind_direction_50m,
              .wind_direction_80m, .wind_direction_100m, .wind_direction_160m,
-             .wind_direction_320m, .wind_direction_305m, .wind_direction_457m,
-             .wind_direction_610m, .wind_direction_914m, .wind_direction_1524m,
-             .wind_direction_1829m, .wind_direction_2134m, .wind_direction_2743m,
-             .wind_direction_3658m, .wind_direction_4572m:
+             .wind_direction_320m:
             return 1
         case .pressure_msl, .surface_pressure, .precipitation,
              .snowfall_water_equivalent, .wind_gusts_10m, .total_column_integrated_water_vapour,
              .lifted_index, .wind_speed_10m, .wind_speed_30m,
              .wind_speed_50m, .wind_speed_80m, .wind_speed_100m,
-             .wind_speed_160m, .wind_speed_320m, .wind_speed_305m,
-             .wind_speed_457m, .wind_speed_610m, .wind_speed_914m,
-             .wind_speed_1524m, .wind_speed_1829m, .wind_speed_2134m,
-             .wind_speed_2743m, .wind_speed_3658m, .wind_speed_4572m:
+             .wind_speed_160m, .wind_speed_320m:
             return 10
         case .snowfall, .snow_depth:
             return 100
@@ -268,10 +236,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
             return .backwards_sum
         case .wind_gusts_10m, .wind_speed_10m, .wind_speed_30m,
              .wind_speed_50m, .wind_speed_80m, .wind_speed_100m,
-             .wind_speed_160m, .wind_speed_320m, .wind_speed_305m,
-             .wind_speed_457m, .wind_speed_610m, .wind_speed_914m,
-             .wind_speed_1524m, .wind_speed_1829m, .wind_speed_2134m,
-             .wind_speed_2743m, .wind_speed_3658m, .wind_speed_4572m:
+             .wind_speed_160m, .wind_speed_320m:
             return .hermite(bounds: 0...1e9)
         case .shortwave_radiation, .diffuse_radiation:
             return .solar_backwards_averaged
@@ -281,10 +246,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
             return .hermite(bounds: 0...10e9)
         case .wind_direction_10m, .wind_direction_30m, .wind_direction_50m,
              .wind_direction_80m, .wind_direction_100m, .wind_direction_160m,
-             .wind_direction_320m, .wind_direction_305m, .wind_direction_457m,
-             .wind_direction_610m, .wind_direction_914m, .wind_direction_1524m,
-             .wind_direction_1829m, .wind_direction_2134m, .wind_direction_2743m,
-             .wind_direction_3658m, .wind_direction_4572m:
+             .wind_direction_320m:
             return .linearDegrees
         }
     }

@@ -167,8 +167,13 @@ import OmFileIO
         #expect(fields.filter { $0.variable.rawValue == "shortwave_radiation" }.map { $0.interval.type } == ["avg"])
         #expect(fields.filter { $0.variable.rawValue == "cloud_cover" }.map { $0.interval.type } == ["instant"])
         let names = Set(fields.map { $0.variable.rawValue })
-        for required in ["cape", "convective_inhibition", "boundary_layer_height", "wind_speed_4572m", "wind_speed_320m", "soil_temperature_0cm", "soil_moisture_300cm"] {
+        for required in ["cape", "convective_inhibition", "boundary_layer_height", "wind_speed_320m", "soil_temperature_0cm", "soil_moisture_300cm"] {
             #expect(names.contains(required))
+        }
+        for height in [305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572] {
+            #expect(NcepRrfsSurfaceVariable(rawValue: "wind_speed_\(height)m") == nil)
+            #expect(NcepRrfsSurfaceVariable(rawValue: "wind_direction_\(height)m") == nil)
+            #expect(NcepRrfsSurfaceVariable(rawValue: "temperature_\(height)m") != nil)
         }
         for variable in NcepRrfsSurfaceVariable.allCases {
             let input = variable.rawValue
@@ -350,7 +355,7 @@ import OmFileIO
             _ = variable.unit
             _ = variable.interpolation
         }
-        #expect(NcepRrfsSurfaceVariable.wind_direction_4572m.unit == .degreeDirection)
+        #expect(NcepRrfsSurfaceVariable.wind_direction_320m.unit == .degreeDirection)
     }
 
     @Test func chronologicalDeaccumulationAcrossHourAndMemberBoundaries() async throws {
