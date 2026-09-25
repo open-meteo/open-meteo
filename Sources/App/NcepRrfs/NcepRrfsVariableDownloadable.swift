@@ -115,7 +115,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
-        case .surface_pressure: return ("PRES", "surface")
         case .precipitation: return ("APCP", "surface")
         case .snowfall_water_equivalent: return ("TSNOWP", "surface")
         case .snowfall: return ("ASNOW", "surface")
@@ -223,7 +222,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
              .soil_temperature_100cm,
              .soil_temperature_160cm,
              .soil_temperature_300cm: return (1, -273.15)
-        case .pressure_msl, .surface_pressure: return (0.01, 0)
+        case .pressure_msl: return (0.01, 0)
         case .snowfall: return (100, 0)
         case .convective_inhibition: return (-1, 0)
         default: return nil
@@ -269,7 +268,6 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("DPT", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
-        case .surface_pressure: return ("PRES", "surface")
         case .precipitation: return ("APCP", "surface")
         case .snowfall_water_equivalent: return ("TSNOWP", "surface")
         case .snowfall: return ("ASNOW", "surface")
@@ -309,7 +307,7 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
         switch self {
         case .temperature_2m,
              .relative_humidity_2m: return (1, -273.15)
-        case .pressure_msl, .surface_pressure: return (0.01, 0)
+        case .pressure_msl: return (0.01, 0)
         case .snowfall: return (100, 0)
         default: return nil
         }
@@ -348,7 +346,6 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
-        case .surface_pressure: return ("PRES", "surface")
         case .precipitation: return ("APCP", "surface")
         case .snowfall_water_equivalent: return ("CPOFP", "surface")
         case .snowfall: return ("ASNOW", "surface")
@@ -399,7 +396,7 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m: return (1, -273.15)
-        case .pressure_msl, .surface_pressure: return (0.01, 0)
+        case .pressure_msl: return (0.01, 0)
         case .snowfall: return (100, 0)
         case .convective_inhibition: return (-1, 0)
         default: return nil

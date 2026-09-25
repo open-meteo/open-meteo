@@ -14,7 +14,6 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
-    case surface_pressure
     case precipitation
     case snowfall_water_equivalent
     case snowfall
@@ -85,7 +84,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .radar_reflectivity: return true
         case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
-             .surface_pressure, .precipitation, .snowfall_water_equivalent,
+             .precipitation, .snowfall_water_equivalent,
              .snowfall, .wind_gusts_10m, .visibility,
              .shortwave_radiation, .diffuse_radiation, .categorical_freezing_rain,
              .surface_temperature, .snow_depth, .cloud_cover,
@@ -138,7 +137,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .relative_humidity_2m, .cloud_cover, .cloud_cover_low,
              .cloud_cover_mid, .cloud_cover_high:
             return .percentage
-        case .pressure_msl, .surface_pressure:
+        case .pressure_msl:
             return .hectopascal
         case .precipitation, .snowfall_water_equivalent:
             return .millimetre
@@ -190,7 +189,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
              .wind_direction_80m, .wind_direction_100m, .wind_direction_160m,
              .wind_direction_320m:
             return 1
-        case .pressure_msl, .surface_pressure, .precipitation,
+        case .pressure_msl, .precipitation,
              .snowfall_water_equivalent, .wind_gusts_10m, .total_column_integrated_water_vapour,
              .lifted_index, .wind_speed_10m, .wind_speed_30m,
              .wind_speed_50m, .wind_speed_80m, .wind_speed_100m,
@@ -234,7 +233,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .relative_humidity_2m, .cloud_cover, .cloud_cover_low,
              .cloud_cover_mid, .cloud_cover_high:
             return .hermite(bounds: 0...100)
-        case .surface_pressure, .visibility, .snow_depth,
+        case .visibility, .snow_depth,
              .freezing_level_height:
             return .linear
         case .precipitation, .snowfall_water_equivalent, .snowfall:
@@ -269,7 +268,6 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
-    case surface_pressure
     case precipitation
     case snowfall_water_equivalent
     case snowfall
@@ -292,7 +290,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
         case .radar_reflectivity: return true
         case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
-             .surface_pressure, .precipitation, .snowfall_water_equivalent,
+             .precipitation, .snowfall_water_equivalent,
              .snowfall, .wind_gusts_10m, .visibility,
              .shortwave_radiation, .diffuse_radiation, .categorical_freezing_rain,
              .wind_speed_10m, .wind_direction_10m, .wind_speed_80m,
@@ -307,7 +305,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
         case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return false
         case .temperature_2m:
             return true
-        case .relative_humidity_2m, .pressure_msl, .surface_pressure,
+        case .relative_humidity_2m, .pressure_msl,
              .precipitation, .snowfall_water_equivalent, .snowfall,
              .wind_gusts_10m, .visibility, .shortwave_radiation,
              .diffuse_radiation, .categorical_freezing_rain, .wind_speed_10m,
@@ -325,7 +323,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
             return .celsius
         case .relative_humidity_2m:
             return .percentage
-        case .pressure_msl, .surface_pressure:
+        case .pressure_msl:
             return .hectopascal
         case .precipitation, .snowfall_water_equivalent:
             return .millimetre
@@ -354,7 +352,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
         case .relative_humidity_2m, .shortwave_radiation, .diffuse_radiation,
              .categorical_freezing_rain, .wind_direction_10m, .wind_direction_80m:
             return 1
-        case .pressure_msl, .surface_pressure, .precipitation,
+        case .pressure_msl, .precipitation,
              .snowfall_water_equivalent, .wind_gusts_10m, .wind_speed_10m,
              .wind_speed_80m:
             return 10
@@ -374,7 +372,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .surface_pressure, .visibility:
+        case .visibility:
             return .linear
         case .precipitation, .snowfall_water_equivalent, .snowfall:
             return .backwards_sum
@@ -396,7 +394,6 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
-    case surface_pressure
     case precipitation
     case snowfall_water_equivalent
     case snowfall
@@ -429,7 +426,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
         case .radar_reflectivity: return true
         case .freezing_rain: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
-             .surface_pressure, .precipitation, .snowfall_water_equivalent,
+             .precipitation, .snowfall_water_equivalent,
              .snowfall, .wind_gusts_10m, .visibility,
              .shortwave_radiation, .categorical_freezing_rain, .cloud_cover,
              .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high,
@@ -447,7 +444,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
         case .freezing_rain: return false
         case .temperature_2m:
             return true
-        case .relative_humidity_2m, .pressure_msl, .surface_pressure,
+        case .relative_humidity_2m, .pressure_msl,
              .precipitation, .snowfall_water_equivalent, .snowfall,
              .wind_gusts_10m, .visibility, .shortwave_radiation,
              .categorical_freezing_rain, .cloud_cover, .cloud_cover_low,
@@ -469,7 +466,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
         case .relative_humidity_2m, .cloud_cover, .cloud_cover_low,
              .cloud_cover_mid, .cloud_cover_high:
             return .percentage
-        case .pressure_msl, .surface_pressure:
+        case .pressure_msl:
             return .hectopascal
         case .precipitation, .snowfall_water_equivalent:
             return .millimetre
@@ -505,7 +502,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
              .cloud_cover_high, .convective_inhibition, .wind_direction_10m,
              .wind_direction_80m, .wind_direction_160m, .wind_direction_320m:
             return 1
-        case .pressure_msl, .surface_pressure, .precipitation,
+        case .pressure_msl, .precipitation,
              .snowfall_water_equivalent, .wind_gusts_10m, .total_column_integrated_water_vapour,
              .wind_speed_10m, .wind_speed_80m, .wind_speed_160m,
              .wind_speed_320m:
@@ -528,7 +525,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
         case .relative_humidity_2m, .cloud_cover, .cloud_cover_low,
              .cloud_cover_mid, .cloud_cover_high:
             return .hermite(bounds: 0...100)
-        case .surface_pressure, .visibility:
+        case .visibility:
             return .linear
         case .precipitation, .snowfall_water_equivalent, .snowfall:
             return .backwards_sum

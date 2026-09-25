@@ -28,7 +28,7 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | Group | Variables |
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
-| Pressure | `pressure_msl`, `surface_pressure` |
+| Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
@@ -48,7 +48,7 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Group | Variables |
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
-| Pressure | `pressure_msl`, `surface_pressure` |
+| Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
@@ -68,7 +68,7 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Group | Variables |
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
-| Pressure | `pressure_msl`, `surface_pressure` |
+| Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `visibility` |
@@ -83,7 +83,7 @@ This product has no pressure-level fields.
 | Group | Variables |
 | --- | --- |
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
-| Pressure | `pressure_msl`, `surface_pressure` |
+| Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
@@ -105,6 +105,8 @@ The three CONUS RRFS forecast-controller models also expose `precipitation_proba
 The North America reader has no ensemble precipitation-probability supplement: the available RRFS ensemble covers CONUS only. `ncep_rrfs_seamless` retains its existing CONUS/GFS composition.
 
 ## Variable processing
+
+`surface_pressure` is calculated on demand by the forecast API from `pressure_msl`, `temperature_2m` and the requested elevation. RRFS surface-pressure GRIB fields are not downloaded or stored.
 
 ### Wind, temperature and units
 
