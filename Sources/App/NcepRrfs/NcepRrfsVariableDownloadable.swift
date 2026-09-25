@@ -159,16 +159,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
         case .temperature_100m: return ("TMP", "100 m above ground")
         case .temperature_160m: return ("TMP", "160 m above ground")
         case .temperature_320m: return ("TMP", "320 m above ground")
-        case .temperature_305m: return ("TMP", "305 m above mean sea level")
-        case .temperature_457m: return ("TMP", "457 m above mean sea level")
-        case .temperature_610m: return ("TMP", "610 m above mean sea level")
-        case .temperature_914m: return ("TMP", "914 m above mean sea level")
-        case .temperature_1524m: return ("TMP", "1524 m above mean sea level")
-        case .temperature_1829m: return ("TMP", "1829 m above mean sea level")
-        case .temperature_2134m: return ("TMP", "2134 m above mean sea level")
-        case .temperature_2743m: return ("TMP", "2743 m above mean sea level")
-        case .temperature_3658m: return ("TMP", "3658 m above mean sea level")
-        case .temperature_4572m: return ("TMP", "4572 m above mean sea level")
         case .soil_temperature_0cm: return ("TSOIL", "0-0 m below ground")
         case .soil_moisture_0cm: return ("SOILW", "0-0 m below ground")
         case .soil_temperature_1cm: return ("TSOIL", "0.01-0.01 m below ground")
@@ -224,16 +214,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
              .temperature_100m,
              .temperature_160m,
              .temperature_320m,
-             .temperature_305m,
-             .temperature_457m,
-             .temperature_610m,
-             .temperature_914m,
-             .temperature_1524m,
-             .temperature_1829m,
-             .temperature_2134m,
-             .temperature_2743m,
-             .temperature_3658m,
-             .temperature_4572m,
              .soil_temperature_0cm,
              .soil_temperature_1cm,
              .soil_temperature_4cm,

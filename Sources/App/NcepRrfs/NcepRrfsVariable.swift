@@ -59,16 +59,6 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
     case temperature_100m
     case temperature_160m
     case temperature_320m
-    case temperature_305m
-    case temperature_457m
-    case temperature_610m
-    case temperature_914m
-    case temperature_1524m
-    case temperature_1829m
-    case temperature_2134m
-    case temperature_2743m
-    case temperature_3658m
-    case temperature_4572m
     case soil_temperature_0cm
     case soil_moisture_0cm
     case soil_temperature_1cm
@@ -140,10 +130,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m, .surface_temperature, .temperature_30m,
              .temperature_50m, .temperature_80m, .temperature_100m,
-             .temperature_160m, .temperature_320m, .temperature_305m,
-             .temperature_457m, .temperature_610m, .temperature_914m,
-             .temperature_1524m, .temperature_1829m, .temperature_2134m,
-             .temperature_2743m, .temperature_3658m, .temperature_4572m,
+             .temperature_160m, .temperature_320m,
              .soil_temperature_0cm, .soil_temperature_1cm, .soil_temperature_4cm,
              .soil_temperature_10cm, .soil_temperature_30cm, .soil_temperature_60cm,
              .soil_temperature_100cm, .soil_temperature_160cm, .soil_temperature_300cm:
@@ -191,10 +178,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .cloud_base, .cloud_ceiling, .cloud_top: return 0.1
         case .temperature_2m, .surface_temperature, .temperature_30m,
              .temperature_50m, .temperature_80m, .temperature_100m,
-             .temperature_160m, .temperature_320m, .temperature_305m,
-             .temperature_457m, .temperature_610m, .temperature_914m,
-             .temperature_1524m, .temperature_1829m, .temperature_2134m,
-             .temperature_2743m, .temperature_3658m, .temperature_4572m,
+             .temperature_160m, .temperature_320m,
              .soil_temperature_0cm, .soil_temperature_1cm, .soil_temperature_4cm,
              .soil_temperature_10cm, .soil_temperature_30cm, .soil_temperature_60cm,
              .soil_temperature_100cm, .soil_temperature_160cm, .soil_temperature_300cm:
@@ -238,10 +222,8 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
              .total_column_integrated_water_vapour, .sensible_heat_flux, .latent_heat_flux,
              .lifted_index, .temperature_30m, .temperature_50m,
              .temperature_80m, .temperature_100m, .temperature_160m,
-             .temperature_320m, .temperature_305m, .temperature_457m,
-             .temperature_610m, .temperature_914m, .temperature_1524m,
-             .temperature_1829m, .temperature_2134m, .temperature_2743m,
-             .temperature_3658m, .temperature_4572m, .soil_temperature_0cm,
+             .temperature_320m,
+             .soil_temperature_0cm,
              .soil_moisture_0cm, .soil_temperature_1cm, .soil_moisture_1cm,
              .soil_temperature_4cm, .soil_moisture_4cm, .soil_temperature_10cm,
              .soil_moisture_10cm, .soil_temperature_30cm, .soil_moisture_30cm,

@@ -2,12 +2,12 @@
 
 ## Domains and model grids
 
-| Domain | Interval | Cycles | Forecast | Members |
-| --- | --- | --- | --- | --- |
-| `ncep_rrfs_north_america` | 1 hour | 00/06/12/18 UTC | 84 hours | 1 |
-| `ncep_rrfs_conus` | 1 hour | 00/06/12/18 UTC | 84 hours | 1 |
-| `ncep_rrfs_conus_15min` | 15 minutes | Hourly | 18 hours | 1 |
-| `ncep_rrfs_conus_ensemble` | 1 hour | 00/06/12/18 UTC | 60 hours | 5 |
+| Domain | Resolution | Interval | Cycles | Forecast | Members |
+| --- | --- | --- | --- | --- | --- |
+| `ncep_rrfs_north_america` | 13 km (nominal) | 1 hour | 00/06/12/18 UTC | 84 hours | 1 |
+| `ncep_rrfs_conus` | 3 km | 1 hour | 00/06/12/18 UTC | 84 hours | 1 |
+| `ncep_rrfs_conus_15min` | 3 km | 15 minutes | Hourly | 18 hours | 1 |
+| `ncep_rrfs_conus_ensemble` | 3 km | 1 hour | 00/06/12/18 UTC | 60 hours | 5 |
 
 The three CONUS domains share an exact 1799 × 1059 Lambert conformal grid with 3000-metre spacing. Terrain and land mask come from the deterministic analysis. Ensemble members `m001` through `m005` are stored as members 0 through 4.
 
@@ -21,7 +21,7 @@ The forecast API model `ncep_rrfs_seamless` prioritizes RRFS 15-minute data (whe
 
 These are the stored model variables defined in [NcepRrfsVariable.swift](../../Sources/App/NcepRrfs/NcepRrfsVariable.swift), including fields calculated during ingestion. Additional variables derived by the forecast reader are outside this list. GRIB input mappings are defined in [NcepRrfsVariableDownloadable.swift](../../Sources/App/NcepRrfs/NcepRrfsVariableDownloadable.swift).
 
-In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with each listed value. Heights marked AGL are above ground; ASL heights are above mean sea level. ASL variable names have no `_asl` or `_msl` suffix. Soil depths are in centimetres below ground. For example, `temperature_{height}m` at 305 m ASL is `temperature_305m`, and `temperature_{pressure}hPa` at 500 hPa is `temperature_500hPa`.
+In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with each listed value. Heights marked AGL are above ground. Soil depths are in centimetres below ground. For example, `temperature_{height}m` at 320 m AGL is `temperature_320m`, and `temperature_{pressure}hPa` at 500 hPa is `temperature_500hPa`.
 
 ### `ncep_rrfs_north_america`
 
@@ -37,7 +37,6 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 30, 50, 80, 100, 160, 320 m AGL |
 | Temperature above ground | `temperature_{height}m` at 30, 50, 80, 100, 160, 320 m AGL |
-| Temperature above sea level | `temperature_{height}m` at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL |
 | Soil | `soil_temperature_{depth}cm`, `soil_moisture_{depth}cm` at 0, 1, 4, 10, 30, 60, 100, 160, 300 cm |
 
 Pressure-level variables: `temperature_{pressure}hPa`, `relative_humidity_{pressure}hPa`, `geopotential_height_{pressure}hPa`, `wind_speed_{pressure}hPa`, `wind_direction_{pressure}hPa`, `vertical_velocity_{pressure}hPa`.
@@ -58,7 +57,6 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 30, 50, 80, 100, 160, 320 m AGL |
 | Temperature above ground | `temperature_{height}m` at 30, 50, 80, 100, 160, 320 m AGL |
-| Temperature above sea level | `temperature_{height}m` at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL |
 | Soil | `soil_temperature_{depth}cm`, `soil_moisture_{depth}cm` at 0, 1, 4, 10, 30, 60, 100, 160, 300 cm |
 
 Pressure-level variables: `temperature_{pressure}hPa`, `relative_humidity_{pressure}hPa`, `geopotential_height_{pressure}hPa`, `wind_speed_{pressure}hPa`, `wind_direction_{pressure}hPa`, `vertical_velocity_{pressure}hPa`.
@@ -110,7 +108,7 @@ The North America reader has no ensemble precipitation-probability supplement: t
 
 ### Wind, temperature and units
 
-Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature fields at 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658 and 4572 m are above mean sea level, with names such as `temperature_305m`; other temperature height levels are above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas.
+Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature height levels are also above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas.
 
 Temperatures are stored in Celsius, pressure in hPa, snowfall in centimetres, and CIN as a positive magnitude.
 

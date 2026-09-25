@@ -194,7 +194,7 @@ import OmFileIO
         for height in [305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572] {
             #expect(NcepRrfsSurfaceVariable(rawValue: "wind_speed_\(height)m") == nil)
             #expect(NcepRrfsSurfaceVariable(rawValue: "wind_direction_\(height)m") == nil)
-            #expect(NcepRrfsSurfaceVariable(rawValue: "temperature_\(height)m") != nil)
+            #expect(NcepRrfsSurfaceVariable(rawValue: "temperature_\(height)m") == nil)
         }
         for variable in NcepRrfsSurfaceVariable.allCases {
             let input = variable.rawValue
