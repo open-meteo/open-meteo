@@ -5,6 +5,8 @@ import Foundation
 /// GRIB attributes belong to the variable catalog of each RRFS product.
 protocol NcepRrfsVariableDownloadable: GenericVariable {
     var gribInput: (parameter: String, level: String) { get }
+    /// Additional inventory qualifiers, such as aerosol species and particle size.
+    var gribIndexSuffix: String { get }
     var gribStep: NcepRrfsGribStep { get }
     var skipHour0: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
@@ -46,8 +48,10 @@ extension NcepRrfsVariableDownloadable {
             default: step = "\(minute / divisor) \(unit) fcst"
             }
         }
-        return ":\(gribInput.parameter):\(gribInput.level):\(step):"
+        return ":\(gribInput.parameter):\(gribInput.level):\(step):\(gribIndexSuffix)"
     }
+
+    var gribIndexSuffix: String { "" }
 
     var isCloudHeight: Bool { false }
     var isDewpoint: Bool { false }
@@ -105,8 +109,19 @@ extension NcepRrfsDomain {
 }
 
 extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
+    var gribIndexSuffix: String {
+        switch self {
+        case .pm2_5: return "aerosol=Total aerosol:aerosol_size <2.5e-06"
+        case .pm10: return "aerosol=Total aerosol:aerosol_size <1e-05"
+        case .pm2_5_total_organic_matter: return "aerosol=Particulate organic matter dry:aerosol_size <2.5e-06:"
+        default: return ""
+        }
+    }
+
     var gribInput: (parameter: String, level: String) {
         switch self {
+        case .aerosol_optical_depth: return ("AOTK", "entire atmosphere (considered as a single layer)")
+        case .pm2_5_total_organic_matter, .pm2_5, .pm10: return ("MASSDEN", "8 m above ground")
         case .freezing_rain: return ("FRZR", "surface")
         case .snow_depth_water_equivalent: return ("WEASD", "surface")
         case .cloud_base: return ("HGT", "cloud base")
@@ -181,6 +196,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var gribStep: NcepRrfsGribStep {
         switch self {
+        case .pm2_5, .pm10: return .hourlyAverage
         case .freezing_rain: return .accumulation
         case .precipitation:
             return .hourlyAccumulation
@@ -198,6 +214,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var skipHour0: Bool {
         switch self {
+        case .pm2_5, .pm10: return true
         case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall, .sensible_heat_flux, .latent_heat_flux: return true
         default: return false
@@ -205,6 +222,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
     }
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
+        case .pm2_5_total_organic_matter, .pm2_5, .pm10: return (1e9, 0)
         case .temperature_2m,
              .surface_temperature,
              .temperature_30m,
@@ -342,6 +360,7 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
 extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
     var gribInput: (parameter: String, level: String) {
         switch self {
+        case .aerosol_optical_depth: return ("AOTK", "entire atmosphere (considered as a single layer)")
         case .freezing_rain: return ("FRZR", "surface")
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
@@ -457,6 +476,13 @@ extension NcepRrfsPressureVariable: NcepRrfsVariableDownloadable {
 }
 
 extension SurfaceAndPressureVariable: NcepRrfsVariableDownloadable where Surface: NcepRrfsVariableDownloadable, Pressure: NcepRrfsVariableDownloadable {
+    var gribIndexSuffix: String {
+        switch self {
+        case .surface(let variable): return variable.gribIndexSuffix
+        case .pressure(let variable): return variable.gribIndexSuffix
+        }
+    }
+
     var gribInput: (parameter: String, level: String) {
         switch self {
         case .surface(let variable): return variable.gribInput

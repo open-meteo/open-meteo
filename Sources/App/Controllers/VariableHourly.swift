@@ -1118,6 +1118,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
 
         switch variable {
+        case .mass_density_8m:
+            // RRFS stores fine organic aerosol under its descriptive API name.
+            // Native fields (including HRRR mass_density_8m) take precedence above.
+            return .direct(Reader.variableFromString("pm2_5_total_organic_matter"))
         case .european_aqi_pm2_5:
             guard let pm2_5 = Reader.variableFromString("pm2_5") else {
                 return nil

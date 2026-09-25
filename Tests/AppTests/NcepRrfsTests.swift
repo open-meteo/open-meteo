@@ -46,6 +46,144 @@ import OmFileIO
         #expect(result.unit.abbreviation == "m/s")
     }
 
+    @Test func aerosolOpticalDepthMetadataAndSelection() throws {
+        #expect(ForecastSurfaceVariable(rawValue: "aerosol_optical_depth") != nil)
+        for domain in NcepRrfsDomain.allCases {
+            for hour in [0, 1] where hour > 0 || domain != .ncep_rrfs_conus_15min {
+                let fields = domain.downloadVariables(forecastHour: hour, pressureFile: false)
+                    .filter { $0.variable.rawValue == "aerosol_optical_depth" }
+                #expect(fields.count == (domain == .ncep_rrfs_conus_15min ? 0 : 1))
+                for field in fields {
+                    #expect(field.variable.unit == .dimensionless)
+                    #expect(field.variable.scalefactor == 100)
+                    #expect(!field.variable.isElevationCorrectable)
+                    #expect(field.interval.type == "instant")
+                    #expect(!field.requiresSolarBackwardsConversion)
+                    #expect(field.gribIndexName == ":AOTK:entire atmosphere (considered as a single layer):\(hour == 0 ? "anl" : "1 hour fcst"):")
+                    var data: [Float] = [0, 0.12, 1.5, .nan]
+                    field.variable.convertUnits(data: &data)
+                    #expect(Array(data.prefix(3)) == [0, 0.12, 1.5])
+                    #expect(data[3].isNaN)
+                }
+            }
+        }
+    }
+
+    @Test func particulateMatterUsesLastHourTotalAerosol() async throws {
+        let index = """
+        1:0:d=2026092000:MASSDEN:8 m above ground:3 hour fcst:aerosol=Particulate organic matter dry:aerosol_size <2.5e-06:
+        2:100:d=2026092000:MASSDEN:8 m above ground:0-3 hour ave fcst:aerosol=Total aerosol:aerosol_size <2.5e-06
+        3:200:d=2026092000:MASSDEN:8 m above ground:2-3 hour ave fcst:aerosol=Total aerosol:aerosol_size <1e-05
+        4:300:d=2026092000:MASSDEN:8 m above ground:2-3 hour ave fcst:aerosol=Total aerosol:aerosol_size <2.5e-06
+        """
+        for (variable, range) in [(NcepRrfsSurfaceVariable.pm2_5, "300-"), (.pm10, "200-299")] {
+            #expect(variable.unit == .microgramsPerCubicMetre)
+            #expect(variable.scalefactor == 10)
+            #expect(variable.gribIndexName(minute: 0) == nil)
+            #expect(ForecastSurfaceVariable(rawValue: variable.rawValue) != nil)
+            let field = NcepRrfsDownloadVariable(variable: variable, minute: 180)
+            #expect(field.interval.start == 120)
+            #expect(field.interval.type == "avg")
+            #expect(!field.requiresSolarBackwardsConversion)
+            let decoded = try Curl.decodeGribIndices(indices: [index], variables: [field], errorOnMissing: true, logger: Logger(label: "rrfs-pm-test"))
+            #expect(decoded.count == 1)
+            #expect(decoded[0].range == range)
+            let deaverager = GribDeaverager()
+            for hour in 1...3 {
+                var values: [Float] = [Float(hour) * 10e-9, .nan]
+                variable.convertUnits(data: &values)
+                var array = Array2D(data: values, nx: 2, ny: 1)
+                let interval = variable.gribStep.interval(minute: hour * 60)
+                let keep = await deaverager.deaccumulateIfRequired(variable: variable.rawValue, member: 0, stepType: interval.type, stepRange: "\(interval.start)-\(hour * 60)", array2d: &array)
+                #expect(keep)
+                #expect(abs(array.data[0] - Float(hour) * 10) < 0.00001)
+                #expect(array.data[1].isNaN)
+            }
+            for domain in NcepRrfsDomain.allCases {
+                let analysis = domain.downloadVariables(forecastHour: 0, pressureFile: false)
+                #expect(!analysis.contains { $0.variable.rawValue == variable.rawValue })
+                let forecast = domain.downloadVariables(forecastHour: 1, pressureFile: false)
+                #expect(forecast.contains { $0.variable.rawValue == variable.rawValue } == (domain == .ncep_rrfs_conus || domain == .ncep_rrfs_north_america))
+            }
+        }
+    }
+
+    private struct AerosolReader<Variable: GenericVariable>: GenericReaderProtocol {
+        typealias MixingVar = Variable
+        let modelLat: Float = 45
+        let modelLon: Float = -100
+        let modelElevation: ElevationOrSea = .elevation(100)
+        let targetElevation: Float = 100
+        let modelDtSeconds = 3600
+        func getStatic(type: ReaderStaticVariable) async throws -> Float? { nil }
+        func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {}
+        func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+            DataAndUnit([12.5], variable.unit)
+        }
+    }
+
+    @Test func legacyMassDensityAliasPreservesHrrr() async throws {
+        let options = try GenericReaderOptions(logger: Logger(label: "rrfs-aerosol-alias"), httpClient: nil)
+        let time = TimerangeDtAndSettings(time: TimerangeDt(start: Timestamp(2026, 9, 20), nTime: 1, dtSeconds: 3600), ensembleMember: 0, ensembleMemberLevel: 0, previousDay: 0, run: nil)
+        let legacy = try #require(ForecastVariable(rawValue: "mass_density_8m"))
+        let organic = try #require(ForecastVariable(rawValue: "pm2_5_total_organic_matter"))
+        #expect(NcepRrfsSurfaceVariable(rawValue: "mass_density_8m") == nil)
+        #expect(NcepRrfsSurfaceVariable.pm2_5_total_organic_matter.omFileName.file == "pm2_5_total_organic_matter")
+        for domain in [DomainRegistry.ncep_rrfs_conus, .ncep_rrfs_north_america] {
+            let rrfs = VariableHourlyDeriver(reader: AerosolReader<NcepRrfsSurfaceVariable>(), options: options, domainRegistry: domain)
+            guard case .direct(let input) = rrfs.getDeriverMap(variable: legacy) else {
+                Issue.record("Expected direct RRFS organic-aerosol alias")
+                continue
+            }
+            #expect(input == .pm2_5_total_organic_matter)
+            let oldResult = try await rrfs.get(variable: legacy, time: time)
+            let newResult = try await rrfs.get(variable: organic, time: time)
+            #expect(oldResult?.data == [12.5])
+            #expect(oldResult?.data == newResult?.data)
+            #expect(oldResult?.unit == .microgramsPerCubicMetre)
+        }
+        let hrrr = VariableHourlyDeriver(reader: AerosolReader<HrrrSurfaceVariable>(), options: options, domainRegistry: .ncep_hrrr_conus)
+        guard case .direct(let input) = hrrr.getDeriverMap(variable: legacy) else {
+            Issue.record("Expected native HRRR mass density")
+            return
+        }
+        #expect(input == .mass_density_8m)
+        #expect(input.omFileName.file == "mass_density_8m")
+        #expect(hrrr.getDeriverMap(variable: organic) == nil)
+    }
+
+    @Test func massDensitySelectsOrganicAerosol() throws {
+        let variable = NcepRrfsSurfaceVariable.pm2_5_total_organic_matter
+        #expect(variable.unit == .microgramsPerCubicMetre)
+        #expect(variable.scalefactor == HrrrSurfaceVariable.mass_density_8m.scalefactor)
+        #expect(!variable.skipHour0)
+        #expect(ForecastSurfaceVariable(rawValue: variable.rawValue) != nil)
+        var values: [Float] = [0, 1e-9, 25e-9, .nan]
+        variable.convertUnits(data: &values)
+        #expect(values[0] == 0)
+        #expect(abs(values[1] - 1) < 0.00001)
+        #expect(abs(values[2] - 25) < 0.00001)
+        #expect(values[3].isNaN)
+        for (hour, step) in [(0, "anl"), (1, "1 hour fcst")] {
+            let field = NcepRrfsDownloadVariable(variable: variable, minute: hour * 60)
+            let index = """
+            1:0:d=2026092000:MASSDEN:8 m above ground:\(step):aerosol=Dust dry:aerosol_size <2.5e-06:
+            2:100:d=2026092000:MASSDEN:8 m above ground:0-1 hour ave fcst:aerosol=Total aerosol:aerosol_size <2.5e-06
+            3:200:d=2026092000:MASSDEN:8 m above ground:\(step):aerosol=Particulate organic matter dry:aerosol_size <2.5e-06:
+            4:300:d=2026092000:MASSDEN:8 m above ground:\(step):aerosol=Dust dry:aerosol_size >=2.5e-06,<1e-05:
+            """
+            let decoded = try Curl.decodeGribIndices(indices: [index], variables: [field], errorOnMissing: true, logger: Logger(label: "rrfs-aerosol-test"))
+            #expect(decoded.count == 1)
+            #expect(decoded[0].range == "200-299")
+            #expect(field.interval.type == "instant")
+            let wrapped = NcepRrfsVariable.surface(variable)
+            #expect(wrapped.gribIndexName(minute: hour * 60) == field.gribIndexName)
+        }
+        for domain in [NcepRrfsDomain.ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble] {
+            #expect(!domain.downloadVariables(forecastHour: 1, pressureFile: false).contains { $0.variable.rawValue == variable.rawValue })
+        }
+    }
+
     @Test func radarReflectivity() throws {
         #expect(ForecastSurfaceVariable(rawValue: "radar_reflectivity") != nil)
         for domain in NcepRrfsDomain.allCases {

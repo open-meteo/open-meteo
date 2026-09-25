@@ -3,6 +3,13 @@
 import Foundation
 
 enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
+    /// Fine dry organic aerosol mass concentration at 8 m above ground, in µg/m³.
+    case pm2_5_total_organic_matter
+    /// Last-hour mean total aerosol concentration at 8 m above ground, in µg/m³.
+    case pm2_5
+    case pm10
+    /// Instantaneous column-integrated aerosol optical depth, dimensionless.
+    case aerosol_optical_depth
     case freezing_rain
     case snow_depth_water_equivalent
     /// Lowest detected cloud base, in metres above ground; may include scattered clouds.
@@ -81,6 +88,9 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .aerosol_optical_depth: return true
+        case .pm2_5, .pm10: return true
+        case .pm2_5_total_organic_matter: return false
         case .radar_reflectivity: return true
         case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
@@ -113,6 +123,9 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .aerosol_optical_depth: return false
+        case .pm2_5, .pm10: return false
+        case .pm2_5_total_organic_matter: return false
         case .radar_reflectivity: return false
         case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return false
         case .temperature_2m, .surface_temperature:
@@ -124,6 +137,9 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .aerosol_optical_depth: return .dimensionless
+        case .pm2_5, .pm10: return .microgramsPerCubicMetre
+        case .pm2_5_total_organic_matter: return .microgramsPerCubicMetre
         case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
         case .freezing_rain, .snow_depth_water_equivalent: return .millimetre
         case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
@@ -172,6 +188,9 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .aerosol_optical_depth: return 100
+        case .pm2_5, .pm10: return 10
+        case .pm2_5_total_organic_matter: return 0.1
         case .radar_reflectivity: return 10
         case .freezing_rain, .snow_depth_water_equivalent: return 10
         case .cloud_base, .cloud_ceiling, .cloud_top: return 0.1
@@ -214,6 +233,9 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .aerosol_optical_depth: return .linear
+        case .pm2_5, .pm10: return .backwards
+        case .pm2_5_total_organic_matter: return .linear
         case .radar_reflectivity: return .linear
         case .freezing_rain: return .backwards_sum
         case .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return .linear
@@ -390,6 +412,8 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 }
 
 enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
+    /// Instantaneous column-integrated aerosol optical depth, dimensionless.
+    case aerosol_optical_depth
     case freezing_rain
     case temperature_2m
     case relative_humidity_2m
@@ -423,6 +447,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
+        case .aerosol_optical_depth: return true
         case .radar_reflectivity: return true
         case .freezing_rain: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
@@ -440,6 +465,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var isElevationCorrectable: Bool {
         switch self {
+        case .aerosol_optical_depth: return false
         case .radar_reflectivity: return false
         case .freezing_rain: return false
         case .temperature_2m:
@@ -459,6 +485,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
+        case .aerosol_optical_depth: return .dimensionless
         case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
         case .freezing_rain: return .millimetre
         case .temperature_2m:
@@ -493,6 +520,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var scalefactor: Float {
         switch self {
+        case .aerosol_optical_depth: return 100
         case .radar_reflectivity: return 10
         case .freezing_rain: return 10
         case .temperature_2m:
@@ -518,6 +546,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var interpolation: ReaderInterpolation {
         switch self {
+        case .aerosol_optical_depth: return .linear
         case .radar_reflectivity: return .linear
         case .freezing_rain: return .backwards_sum
         case .temperature_2m, .pressure_msl, .total_column_integrated_water_vapour:

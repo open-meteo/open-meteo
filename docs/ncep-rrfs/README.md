@@ -30,6 +30,7 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
 | Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
+| Aerosols | `pm2_5_total_organic_matter`, `pm2_5`, `pm10`, `aerosol_optical_depth` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
@@ -50,6 +51,7 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m`, `surface_temperature` |
 | Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `snow_depth`, `snow_depth_water_equivalent`, `categorical_freezing_rain` |
+| Aerosols | `pm2_5_total_organic_matter`, `pm2_5`, `pm10`, `aerosol_optical_depth` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
@@ -85,6 +87,7 @@ This product has no pressure-level fields.
 | Temperature and humidity | `temperature_2m`, `relative_humidity_2m` |
 | Pressure | `pressure_msl` |
 | Precipitation and snow | `precipitation`, `freezing_rain`, `snowfall`, `snowfall_water_equivalent`, `categorical_freezing_rain` |
+| Aerosols | `aerosol_optical_depth` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
 | Radiation and heat fluxes | `shortwave_radiation` |
@@ -128,6 +131,18 @@ For example, the 40 cm boundary is interpolated between the 30 and 60 cm samples
 Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature height levels are also above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas.
 
 Temperatures are stored in Celsius, pressure in hPa, snowfall in centimetres, and CIN as a positive magnitude.
+
+### Aerosol optical depth
+
+`aerosol_optical_depth` selects instantaneous `AOTK` for the entire atmospheric column in both hourly deterministic domains and the CONUS ensemble. It is dimensionless, stored at 0.01 precision, and interpolated linearly without unit conversion or deaveraging. Ensemble values are stored separately for each member. The 15-minute product does not provide this field. AOD describes aerosol extinction through the full column, not near-surface particulate concentration.
+
+### Aerosol mass density
+
+`pm2_5_total_organic_matter` is available in the hourly deterministic CONUS and North America products, including analysis time. It selects instantaneous `MASSDEN` at 8 m above ground with `aerosol=Particulate organic matter dry` and `aerosol_size <2.5e-06`. Explicit aerosol qualifiers exclude the dust fields and hourly averaged total-aerosol PM2.5/PM10 fields. This is the organic-aerosol component used for smoke concentration, not total PM2.5.
+
+As in HRRR, values are converted from kg/m³ to µg/m³ by multiplying by 10⁹, stored with a scale factor of 0.1, and interpolated linearly. No deaccumulation or averaging conversion is applied. The existing forecast API and FlatBuffers mappings for `pm2_5_total_organic_matter` are reused. The RRFS 15-minute and ensemble inventories do not provide this field. The legacy API name `mass_density_8m` derives directly from `pm2_5_total_organic_matter`, without changing values or units. RRFS stores only the new name; HRRR retains its native `mass_density_8m` field.
+
+`pm2_5` and `pm10` select the **total aerosol** `MASSDEN` fields at 8 m above ground, with particle-size cutoffs `<2.5e-06` m and `<1e-05` m respectively. They are available in both hourly deterministic domains from forecast hour 1; analysis, 15-minute and ensemble products lack these fields. Each forecast hour selects the preceding hour's average (for example, `2-3 hour ave fcst` at hour 3), with no instantaneous fallback. Values are converted from kg/m³ to µg/m³ using 10⁹ and stored at 0.1 µg/m³ precision. Backward interpolation preserves the preceding-hour interpretation at finer output intervals. The existing `pm2_5` and `pm10` forecast API and FlatBuffers mappings are reused.
 
 ### Radar reflectivity
 
