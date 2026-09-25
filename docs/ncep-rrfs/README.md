@@ -107,6 +107,75 @@ The three CONUS RRFS forecast-controller models also expose `precipitation_proba
 
 The North America reader has no ensemble precipitation-probability supplement: the available RRFS ensemble covers CONUS only. `ncep_rrfs_seamless` retains its existing CONUS/GFS composition.
 
+## Available fields not yet implemented
+
+The table below groups unused physical fields in the checked-in `.idx` inventories. API names are **suggestions**, not registered variables or commitments to add them. Availability means a field appears in the supplied files; analysis and forecast steps can differ. **D** = both hourly deterministic domains (`ncep_rrfs_conus` and `ncep_rrfs_north_america`), **Q** = `ncep_rrfs_conus_15min`, **E** = `ncep_rrfs_conus_ensemble`. A missing model letter means the supplied inventory does not contain the field.
+
+Units show the native GRIB unit, with a proposed API conversion where useful. `{depth}` means the nine soil point depths listed above. Braced alternatives consolidate related fields; levels and statistical intervals must still be selected explicitly when implementing them. Fields already used or derived by the API are discussed separately below.
+
+| Suggested API name / family | GRIB code and distinguishing level or qualifier | Models | Unit / processing notes |
+| --- | --- | --- | --- |
+| `longwave_radiation`, `longwave_radiation_upwards`, `shortwave_radiation_upwards` | `DLWRF`, `ULWRF`, `USWRF`: surface | D, Q | W/m²; D has hourly averages and instantaneous fields, Q instantaneous only |
+| `outgoing_longwave_radiation`, `outgoing_shortwave_radiation` | `ULWRF`, `USWRF`: top of atmosphere | D; Q has `ULWRF` only | W/m²; preserve instantaneous versus averaged intervals |
+| `shortwave_radiation_clear_sky_instant` | `CSDSF`: surface | D | W/m²; native clear-sky flux, distinct from the API's solar-geometry estimate |
+| `albedo`, `snow_albedo_max` | `ALBDO`, `MXSALB`: surface | D | % |
+| `ground_heat_flux`, `snow_phase_change_heat_flux` | `GFLUX`, `SNOHF`: surface | D | W/m²; hourly averages; `GFLUX` also instantaneous |
+| `soil_moisture_liquid_{depth}cm` | `SOILL`: point soil depths 0–300 cm | D | m³/m³; liquid component of the stored total soil moisture |
+| `soil_water_column`, `canopy_water` | `CISOILM`: underground column; `CNWAT`: surface | D | kg/m² → mm of water |
+| `soil_moisture_availability`, `soil_moisture_{wilting_point,stress_threshold,evaporation_threshold,porosity}` | `MSTAV`; `WILT`, `SMREF`, `SMDRY`, `POROS` | D | `MSTAV`: %; other fields: fraction (volumetric soil water or pore space) |
+| `potential_evaporation`, `potential_evaporation_heat_flux`, `snow_sublimation_heat_flux` | `PEVAP`, `PEVPR`, `SBSNO`: surface | D | `PEVAP`: accumulated kg/m² → interval mm; `PEVPR`/`SBSNO`: W/m², not mm/h |
+| `surface_runoff`, `snow_melt` | `SSRUN`, `SNOM`: surface | D | Accumulated kg/m² → interval mm |
+| `snow_cover`, `snow_density` | `SNOWC`, `SDEN`: surface | D | %, kg/m³ respectively |
+| `vegetation_cover`, `leaf_area_index`, `vegetation_type`, `soil_type`, `root_zone_layer_count` | `VEG`, `LAI`, `VGTYP`, `SOTYP`, `RLYRS` | D | %, dimensionless area ratio, category codes, category codes, count respectively |
+| `surface_roughness`, `friction_velocity`, `surface_drag_coefficient`, `surface_exchange_coefficient`, `stomatal_resistance_min` | `SFCR`, `FRICV`, `CD`, `SFEXC`, `RSMIN` | D | m, m/s, dimensionless, kg/(m²·s), s/m respectively |
+| `water_surface_temperature`, `sea_ice_cover`, `ice_growth_rate` | `WTMP`, `ICEC`, `ICEG` (10 m ASL) | D | K → °C, fraction → %, m/s respectively; `ICEG` needs product-specific interpretation before exposure |
+| `pm2_5_dust`, `pm2_5_to_10_dust` | `MASSDEN`: 8 m AGL, dust `<2.5e-06` m and `>=2.5e-06,<1e-05` m | D | kg/m³ → µg/m³; instantaneous; sum both to obtain dust below 10 µm |
+| `column_mass_{organic_matter,pm2_5_dust,coarse_dust,pm10_dust}` | `COLMD`: entire atmosphere, organic/dust species and particle-size qualifiers | D | kg/m² → mg/m²; column burden, not near-surface concentration |
+| `aerosol_layer_{base,top}`, `aerosol_mass_density_height` | `HGTMD`: lowest/highest level above `1e-09 kg/m³`, plus entire-atmosphere diagnostic | D | m; verify vertical reference and meaning of the column diagnostic before implementation |
+| `{organic_aerosol,dust}_emission_flux` | `AEMFLX`: organic matter `<2.5e-06` m; dust `<1e-05` m | D | kg/(m²·s) |
+| `ventilation_rate`, `boundary_layer_wind_{speed,direction}` | `VRATE`; `UGRD`/`VGRD`: planetary boundary layer | D | m²/s; wind components m/s → speed m/s and direction ° |
+| `precipitation_rate`, `precipitation_rate_max` | `PRATE`: surface | D, Q; max only D | kg/(m²·s) → mm/h; distinguish instantaneous and hourly maximum |
+| `frozen_rain` | `FROZR`: surface | D, Q | Accumulated kg/m² → interval mm; distinct from implemented freezing rain (`FRZR`) |
+| `categorical_{rain,snow,ice_pellets}` | `CRAIN`, `CSNOW`, `CICEP`: surface | D, Q, E | Categorical flags |
+| `temperature_2m_{min,max}_hourly`, `relative_humidity_2m_{min,max}_hourly` | `TMIN`/`TMAX`, `MINRH`/`MAXRH`: 2 m AGL | D; E has humidity only | K → °C, %; native within-hour extrema, not extrema of sampled hourly values |
+| `wind_speed_10m_max_hourly`, `wind_{u,v}_10m_at_max_speed` | `WIND`; `MAXUW`/`MAXVW`: 10 m AGL | D, E; components only D | m/s; hourly maxima, separate from `GUST` |
+| `radar_echo_top`, `vertically_integrated_liquid` | `RETOP`, `VIL`: entire atmosphere | D, Q, E for `RETOP`; D, Q for `VIL` | m, kg/m² respectively |
+| `radar_reflectivity_{1000m,4000m,minus10c}`, `radar_reflectivity_{1000m,minus10c}_max` | `REFD`: 1000/4000 m AGL and 263 K level; `MAXREF`: 1000 m and 263 K | D; Q has instantaneous 1000/4000 m only | dBZ; `MAXREF` is hourly maximum |
+| `updraft_velocity_max`, `downdraft_velocity_max`, `hail_size_max` | `MAXUVV`, `MAXDVV`: 100–1000 mb; `HAIL`: surface | D, E for velocities; D for hail | m/s; hail m → mm; hourly maxima, not hail accumulation |
+| `lightning_potential`, `lightning_strike_density_{type}` | `LTNG`: entire atmosphere; `LTNGSD`: 1/2 m level labels | D, E for `LTNG`; D for `LTNGSD` | `LTNG`: dimensionless diagnostic; `LTNGSD`: m⁻² s⁻¹; verify RRFS type labels/scaling, do not interpret 1/2 m as measurement heights |
+| `updraft_helicity_2_to_5km`, `updraft_helicity_{0_to_3km,2_to_5km}_{min,max}` | `UPHL`; `MNUPHL`/`MXUPHL` | D, Q for instantaneous; D, E for extrema | m²/s² |
+| `storm_relative_helicity_{0_to_1km,0_to_3km}`, `effective_storm_relative_helicity` | `HLCY`; `EFHL` | D, E for `HLCY`; D for `EFHL` | m²/s² |
+| `wind_shear_{u,v}_{0_to_1km,0_to_6km}`, `storm_motion_{u,v}` | `VUCSH`/`VVCSH`; `USTM`/`VSTM` at 0–6 km | D, E for shear; D for storm motion | m/s |
+| `cape_{parcel}`, `convective_inhibition_{parcel}`, `cape_0_to_3km`, `downdraft_cape`, `lifted_index_best` | `CAPE`/`CIN`: 180–0, 90–0, 255–0 mb above ground; `CAPE`: 0–3000 m; `DCAPE`; `4LFTX` | D | J/kg; lifted index K; preserve parcel definition and CIN sign convention |
+| `relative_vorticity_{layer}_max`, `critical_angle` | `RELV`: 0–1 km, 0–2 km, first hybrid level; `CANGLE`: 0–500 m | D | s⁻¹, ° respectively |
+| `cloud_cover_boundary_layer`, `cloud_top_temperature`, `cloud_{base,top}_pressure` | `TCDC`: boundary-layer clouds; `TMP`: cloud top; `PRES`: cloud base/top and grid-scale cloud boundaries | D, E for boundary-layer cover; D for others | %, K → °C, Pa → hPa respectively |
+| `wet_bulb_zero_height`, `supercooled_liquid_{base,top}`, `condensation_level_height`, `equilibrium_level_height`, `freezing_level_height_highest`, `minus20c_height` | `HGT`: corresponding diagnostic levels | D | m; verify ASL/AGL reference before exposing |
+| `tropopause_{temperature,potential_temperature,pressure,height,wind_speed,wind_direction,wind_shear}`, `maximum_wind_{pressure,height,speed,direction}` | `TMP`/`POT`/`PRES`/`HGT`/`UGRD`/`VGRD`/`VWSH`: tropopause; `PRES`/`HGT`/`UGRD`/`VGRD`: max wind | D | K (TMP → °C), Pa → hPa, m, m/s, °; `VWSH`: s⁻¹ |
+| `specific_humidity_{level}`, `potential_temperature_{level}`, `dew_point_depression_2m`, `relative_humidity_column` | `SPFH`: surface/2 m/80 m/305 m ASL/pressure layers; `POT`: surface and 30–0 mb; `DEPR`; `RHPW` | D; Q has 2 m `SPFH`; E has pressure-level `SPFH` | kg/kg → g/kg; K; K temperature difference; % respectively |
+| `absolute_vorticity_{pressure}hPa`, `{cloud_water,cloud_ice,rain,snow,graupel}_mixing_ratio_{pressure}hPa`, `stream_function_{pressure}hPa` | `ABSV`; `CLMR`/`ICMR`/`RWMR`/`SNMR`/`GRLE`; `STRM` at 250/500 hPa | D; E has `ABSV` only | s⁻¹; kg/kg → g/kg; m²/s respectively; consolidate all native pressure levels |
+| `moisture_convergence_{level}`, `parcel_lifted_index`, `parcel_pressure`, `condensation_level_pressure`, `freezing_level_{pressure,relative_humidity}` | `MCONV`: column/850/950 hPa/30–0 mb; `PLI`; `PLPL`; `PRES`: condensation/freezing levels; `RH`: freezing levels | D | `MCONV`: kg/(kg·s); `PLI`: K; pressures Pa → hPa; RH %; confirm column-MCONV normalization |
+| `wildfire_potential`, `fire_radiative_power` | Unnamed `discipline=2, parmcat=4, parm=26` (`WFIREPOT`) and `parm=36` (`FRADPOW`) | D, E for potential; D for power | Dimensionless, W respectively; names resolved from NCEP's current table |
+| `brightness_temperature_goes16_band_{7…16}`, `brightness_temperature_goes18_band_{8…16}`, `brightness_temperature` | `SBTA167`…`SBTA1616`; unnamed `3/192/77…85` (`SBTA188`…`SBTA1816`); `BRTEMP` | D | K; simulated outgoing infrared brightness temperatures |
+
+The inventory is not itself proof that a field has useful non-missing values. Before adding a candidate, check a GRIB sample for units, missing-value sentinels, time ranges and level semantics. In particular, the supplied potential-evaporation messages are unusually small, and several specialist diagnostics require more validation.
+
+### Alternate inputs and deliberately omitted fields
+
+| Suggested API name / family | Unused GRIB input | Models | Unit / reason not stored |
+| --- | --- | --- | --- |
+| `surface_pressure` | `PRES`: surface | D, Q, E | Pa → hPa; already derived from mean-sea-level pressure, temperature and elevation |
+| `dew_point_2m`, `dew_point_{pressure}hPa` | `DPT`: 2 m and pressure levels | D, E; Q already uses 2 m DPT to obtain RH | K → °C; API derives dew point from temperature/RH, so no additional stored field is needed |
+| `direct_radiation` | `VBDSF`: surface | D, Q | W/m²; native instantaneous beam field not ingested; API derives direct radiation from total and diffuse radiation |
+| `frozen_precipitation_percent` | `CPOFP`: surface | D, Q; E already uses it internally | %; deterministic products use native snowfall water equivalent instead |
+| `cloud_ceiling` in the ensemble | `CEIL`: cloud ceiling | D, E | m; D already uses `HGT:cloud ceiling`; E has a possible additional input requiring reference/sentinel validation |
+| `temperature_{height}m_asl`, `wind_{speed,direction}_{height}m_asl` | `TMP`, `UGRD`, `VGRD`: 305, 457, 610, 914, 1524, 1829, 2134, 2743, 3658, 4572 m ASL | D | K → °C, m/s, °; deliberately removed; names here explicitly distinguish ASL from AGL |
+| Existing pressure-variable families at additional levels | `TMP`, `RH`, `HGT`, `UGRD`, `VGRD`, `DZDT`: 2, 5, 7, 10, 20, 30 hPa | D | Existing family units; native inventories extend above the implemented 50 hPa minimum |
+| `boundary_layer_{temperature,humidity,pressure,wind}_{layer}` | `TMP`, `RH`, `SPFH`, `PRES`, `UGRD`, `VGRD`: six 30-hPa layers from 0 to 180 hPa above ground; also `DPT`, `POT`, `PWAT` in the lowest layer | D | K → °C, % / kg/kg, Pa → hPa, m/s; separate pressure-relative layers, not standard isobaric levels |
+
+Grid coordinates, model-level counts and static terrain/land-mask records (`NLAT`, `ELON`, `LMH`, `LMV`, `HGT:surface`, `LAND`) are infrastructure rather than proposed weather API variables. Duplicate statistical versions of implemented fields are not separate candidates. Less common records `ELMELT`, `UESH`/`VESH`, `UEID`/`VEID`, `LAYTH`, and unnamed hydrological probability parameters `1/1/196–197` are left without API names pending verification of their exact diagnostics, units and threshold definitions; their presence alone is not sufficient to expose them.
+
+Parameter units and unnamed-code interpretations can be checked against NCEP's [moisture](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-0-1.shtml), [soil](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-2-3.shtml), [land surface](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-2-0.shtml), [convection](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-0-7.shtml), [lightning](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-0-17.shtml), [aerosols](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-0-20.shtml), [fire weather](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-2-4.shtml) and [satellite imagery](https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-2-3-192.shtml) tables.
+
 ## Variable processing
 
 `surface_pressure` is calculated on demand by the forecast API from `pressure_msl`, `temperature_2m` and the requested elevation. RRFS surface-pressure GRIB fields are not downloaded or stored.
