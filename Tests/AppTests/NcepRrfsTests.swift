@@ -35,6 +35,17 @@ import OmFileIO
         #expect(ForecastSurfaceVariable(rawValue: "precipitation_probability") != nil)
     }
 
+    @Test func verticalVelocityRemainsInMetresPerSecond() throws {
+        let variable = try #require(NcepRrfsConusPressureVariable(rawValue: "vertical_velocity_500hPa"))
+        #expect(variable.gribInput.parameter == "DZDT")
+        #expect(variable.multiplyAdd == nil)
+        let units = ApiUnits(temperature_unit: nil, windspeed_unit: nil, wind_speed_unit: .kmh, precipitation_unit: nil, length_unit: nil)
+        let result = DataAndUnit([-2, 0, 3], variable.unit).convertAndRound(params: units)
+        #expect(result.data == [-2, 0, 3])
+        #expect(result.unit == .metrePerSecondNotUnitConverted)
+        #expect(result.unit.abbreviation == "m/s")
+    }
+
     @Test func radarReflectivity() throws {
         #expect(ForecastSurfaceVariable(rawValue: "radar_reflectivity") != nil)
         for domain in NcepRrfsDomain.allCases {

@@ -595,8 +595,11 @@ struct NcepRrfsPressureVariable<Schema: NcepRrfsPressureSchema>: GenericVariable
             return .percentage
         case .geopotential_height:
             return .metre
-        case .wind_speed, .vertical_velocity:
+        case .wind_speed:
             return .metrePerSecond
+        case .vertical_velocity:
+            // DZDT is already geometric velocity in m/s; do not apply wind-speed units.
+            return .metrePerSecondNotUnitConverted
         case .wind_direction:
             return .degreeDirection
         }
