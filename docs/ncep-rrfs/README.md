@@ -108,6 +108,21 @@ The North America reader has no ensemble precipitation-probability supplement: t
 
 `surface_pressure` is calculated on demand by the forecast API from `pressure_msl`, `temperature_2m` and the requested elevation. RRFS surface-pressure GRIB fields are not downloaded or stored.
 
+### Soil layer averages
+
+The hourly deterministic CONUS and North America products store soil temperature and moisture at point depths of 0, 1, 4, 10, 30, 60, 100, 160 and 300 cm. The forecast API additionally derives the legacy GFS/HRRR layers `soil_temperature_{layer}cm` and `soil_moisture_{layer}cm`, where `{layer}` is `0_to_10`, `10_to_40`, `40_to_100` or `100_to_200`.
+
+For each layer, the deriver assumes a linear profile between adjacent point depths, interpolates values at the layer boundaries, integrates using trapezoids, and divides by the layer thickness. This gives a depth-weighted mean rather than an equal average of the available points. The resulting weights apply to both temperature and moisture:
+
+| Layer | Input depths (cm) | Weights, in the same order |
+| --- | --- | --- |
+| 0–10 cm | 0, 1, 4, 10 | 0.05, 0.20, 0.45, 0.30 |
+| 10–40 cm | 10, 30, 60 | 1/3, 11/18, 1/18 |
+| 40–100 cm | 30, 60, 100 | 1/9, 5/9, 1/3 |
+| 100–200 cm | 100, 160, 300 | 3/10, 9/14, 2/35 |
+
+For example, the 40 cm boundary is interpolated between the 30 and 60 cm samples; the 200 cm boundary uses the 160 and 300 cm samples. No extrapolation is needed. Temperature remains in °C and moisture in m³/m³. These are approximations from point samples, not native model layer means. Missing input values propagate as NaN; an unavailable required depth makes the derivation unavailable. Existing native layer fields take precedence, so GFS and HRRR retain their stored layer values. The RRFS 15-minute and ensemble products have no soil profiles and do not gain these derived layers.
+
 ### Wind, temperature and units
 
 Grid-relative winds become speed and true-north direction. Wind height variables use above-ground levels, such as `wind_speed_320m`. Temperature height levels are also above ground. The ensemble catalog reflects its smaller NOMADS field selection. Pressure levels use separate deterministic and ensemble schemas.
