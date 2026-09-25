@@ -57,8 +57,9 @@ struct NcepRrfsDownloader: AsyncCommand {
         Process.alarm(seconds: 7 * 3600)
         defer { Process.alarm(seconds: 0) }
         try await downloadElevation(curl: curl, domain: domain, run: run, server: server)
-        let grid = domain.projectedGrid
-        let trueNorth = grid.getTrueNorthDirection()
+        let grid = domain.grid
+        let trueNorth = domain == .ncep_rrfs_north_america
+            ? domain.northAmericaGrid.getTrueNorthDirection() : domain.conusGrid.getTrueNorthDirection()
         let deaverager = GribDeaverager()
         let lastHour = maxForecastHour ?? domain.forecastHours.upperBound
         var handles = [GenericVariableHandle]()
@@ -158,8 +159,9 @@ struct NcepRrfsDownloader: AsyncCommand {
 
     private func downloadElevation(curl: Curl, domain: NcepRrfsDomain, run: Timestamp, server: String) async throws {
         guard !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) else { return }
-        // Subhourly files have no land mask. Static fields use the same deterministic grid for all domains.
-        let url = NcepRrfsDomain.ncep_rrfs_conus.gribUrls(run: run, forecastHour: 0, member: 0, server: server)[0]
+        // The CONUS products share terrain; North America has its own rotated grid.
+        let elevationDomain: NcepRrfsDomain = domain == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus
+        let url = elevationDomain.gribUrls(run: run, forecastHour: 0, member: 0, server: server)[0]
         let storage = VariablePerMemberStorage<NcepRrfsStaticVariable>()
         for (variable, message) in try await curl.downloadIndexedGrib(url: [url], variables: NcepRrfsStaticVariable.allCases) {
             let array = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array

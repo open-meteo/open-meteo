@@ -110,7 +110,7 @@ import OmFileIO
     }
 
     @Test func exactGridAndRotation() {
-        let grid = NcepRrfsDomain.ncep_rrfs_conus.projectedGrid
+        let grid = NcepRrfsDomain.ncep_rrfs_conus.conusGrid
         #expect(grid.nx == 1799 && grid.ny == 1059)
         #expect(grid.dx == 3000 && grid.dy == 3000)
         let origin = grid.getCoordinates(gridpoint: 0)
@@ -119,6 +119,47 @@ import OmFileIO
         let north = grid.getTrueNorthDirection()
         #expect(north.allSatisfy { $0.isFinite })
         #expect(abs(north[0]) > 10)
+    }
+
+    @Test func northAmericaGridAndMapping() throws {
+        let domain = NcepRrfsDomain.ncep_rrfs_north_america
+        let grid = domain.northAmericaGrid
+        #expect(grid.nx == 1127 && grid.ny == 683 && grid.count == 769741)
+        #expect(domain.domainRegistryStatic == .ncep_rrfs_north_america)
+        #expect(domain.forecastHours == 0...84)
+        #expect(domain.dtSeconds == 3600 && domain.updateIntervalSeconds == 21600)
+        #expect(domain.countEnsembleMember == 1)
+        // Geographic positions independently decoded by ecCodes from the supplied GRIB.
+        for (point, latitude, longitude) in [(0, Float(-1.557), Float(-157.379)),
+                                            (1126, -1.526, -68.651),
+                                            (384870, 55.000, -113.047),
+                                            (769740, 41.500, -1.908)] {
+            let coordinates = grid.getCoordinates(gridpoint: point)
+            #expect(abs(coordinates.latitude - latitude) < 0.002)
+            #expect(abs(coordinates.longitude - longitude) < 0.002)
+            #expect(grid.findPoint(lat: coordinates.latitude, lon: coordinates.longitude) == point)
+        }
+        let north = grid.getTrueNorthDirection()
+        #expect(north.allSatisfy { $0.isFinite })
+        // Compare spherical rotation with an independent local projection derivative.
+        for point in [0, 1126, 384870, 769740] {
+            let coordinates = grid.getCoordinates(gridpoint: point)
+            let origin = grid.projection.forward(latitude: coordinates.latitude, longitude: coordinates.longitude)
+            let geographicNorth = grid.projection.forward(latitude: coordinates.latitude + 0.01, longitude: coordinates.longitude)
+            let angle = atan2((geographicNorth.x - origin.x) * cos(origin.y.degreesToRadians), geographicNorth.y - origin.y).radiansToDegrees
+            #expect(abs(north[point] - angle) < 0.2)
+        }
+        let urls = domain.gribUrls(run: Timestamp(2026, 9, 24), forecastHour: 84, member: 0, server: "https://example.com")
+        #expect(urls == ["2dfld", "prslev"].map { "https://example.com/rrfs.20260924/00/rrfs.t00z.\($0).13km.f084.na.grib2" })
+        let model = try #require(MultiDomains(rawValue: domain.rawValue))
+        guard case .single(let source, let variables) = model.getDomainAndVariable() else {
+            Issue.record("Expected North America RRFS reader")
+            return
+        }
+        #expect(source.domainRegistry == .ncep_rrfs_north_america)
+        #expect(ObjectIdentifier(variables) == ObjectIdentifier(NcepRrfsVariable.self))
+        #expect(model.genericDomain?.domainRegistry == .ncep_rrfs_north_america)
+        #expect(model.flatBufferModel == .undefined)
     }
 
     @Test func hourlyInventorySelectionAndCatalogCoverage() throws {
@@ -220,10 +261,10 @@ import OmFileIO
 
     @Test func protocolSelectorsMatchAvailableInventories() throws {
         let files = try FileManager.default.contentsOfDirectory(at: fixtureDirectory, includingPropertiesForKeys: nil).filter { $0.pathExtension == "idx" }
-        #expect(files.count == 9)
+        #expect(files.count == 12)
         for file in files {
             let name = file.lastPathComponent
-            let domain: NcepRrfsDomain = name.contains("m001") ? .ncep_rrfs_conus_ensemble : name.contains("subh") ? .ncep_rrfs_conus_15min : .ncep_rrfs_conus
+            let domain: NcepRrfsDomain = name.contains("13km") ? .ncep_rrfs_north_america : name.contains("m001") ? .ncep_rrfs_conus_ensemble : name.contains("subh") ? .ncep_rrfs_conus_15min : .ncep_rrfs_conus
             let hour = try forecastHour(filename: name)
             let variables = domain.downloadVariables(forecastHour: hour, pressureFile: name.contains("prslev"))
             let index = try String(contentsOf: file, encoding: .utf8)
@@ -364,9 +405,14 @@ import OmFileIO
             let runTime = try #require(message.getLong(attribute: "dataTime"))
             let run = try Timestamp.from(yyyymmdd: "\(runDate)\(runTime.zeroPadded(len: 4))")
             #expect(timestamp == run.add(record.minute * 60))
-            var array = try message.to2D(nx: 1799, ny: 1059, shift180LongitudeAndFlipLatitudeIfRequired: false).array
+            var array = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
             record.variable.convertUnits(data: &array.data)
             #expect(array.data.contains { $0.isFinite })
+            if domain == .ncep_rrfs_north_america && record.variable.rawValue == "temperature_2m" {
+                #expect(array.data.count == 769741)
+                #expect(array.data.first?.isNaN == true)
+                #expect(array.data[384870].isFinite)
+            }
             if record.variable.rawValue == "temperature_2m" { #expect(array.data.allSatisfy { $0.isNaN || (-100...70).contains($0) }) }
             if record.variable.rawValue == "convective_inhibition" { #expect(array.data.allSatisfy { $0.isNaN || $0 >= 0 }) }
             decoded += 1

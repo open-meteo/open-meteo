@@ -759,6 +759,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ncep_gfs_seamless
     case ncep_rrfs_seamless
     case ncep_rrfs_conus
+    case ncep_rrfs_north_america
     case ncep_rrfs_conus_15min
     case ncep_rrfs_conus_ensemble
     case ncep_gfs_global
@@ -1256,6 +1257,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Generic domains with hourly data that can use the generic deriver controller
     func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
         switch self {
+        case .ncep_rrfs_north_america:
+            return .single(NcepRrfsDomain.ncep_rrfs_north_america, NcepRrfsVariable.self)
         case .ncep_rrfs_conus:
             return .singleWithPrecipitationProbability(NcepRrfsDomain.ncep_rrfs_conus, NcepRrfsVariable.self, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
         case .ncep_rrfs_conus_15min:
@@ -2099,7 +2102,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, include15Min: Bool) async throws -> [any GenericReaderProtocol] {
         switch self {
-        case .best_match, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
+        case .best_match, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
             return [] // migrated
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless,
              .gfs_global, .ncep_gfs_global,
@@ -2417,7 +2420,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return WeatherNextDomain.weathernext_global_ensemble_mean
         case .best_match:
             return nil
-        case .gfs_seamless, .gfs_mix, .ncep_seamless, .ncep_gfs_seamless, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
+        case .gfs_seamless, .gfs_mix, .ncep_seamless, .ncep_gfs_seamless, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
             return nil
         case .gfs_global, .ncep_gfs_global:
             return nil
@@ -2661,7 +2664,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
             return nil
-        case .gfs_seamless, .ncep_seamless, .gfs_mix, .ncep_gfs_seamless, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
+        case .gfs_seamless, .ncep_seamless, .gfs_mix, .ncep_gfs_seamless, .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
             return nil
         case .gfs_global, .ncep_gfs_global:
             return nil

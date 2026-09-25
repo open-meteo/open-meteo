@@ -954,7 +954,7 @@ extension MultiDomains {
         switch self {
         case .best_match:
             return .bestMatch
-        case .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
+        case .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
             // The SDK does not yet define an RRFS model identifier.
             return .undefined
         case .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:

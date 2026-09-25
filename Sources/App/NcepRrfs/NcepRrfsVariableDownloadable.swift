@@ -76,12 +76,12 @@ extension NcepRrfsDomain {
         let fields: [any NcepRrfsVariableDownloadable]
         if pressureFile {
             switch self {
-            case .ncep_rrfs_conus, .ncep_rrfs_conus_15min: fields = NcepRrfsConusPressureVariable.allVariables
+            case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_north_america: fields = NcepRrfsConusPressureVariable.allVariables
             case .ncep_rrfs_conus_ensemble: fields = NcepRrfsEnsemblePressureVariable.allVariables
             }
         } else {
             switch self {
-            case .ncep_rrfs_conus: fields = NcepRrfsSurfaceVariable.allCases
+            case .ncep_rrfs_conus, .ncep_rrfs_north_america: fields = NcepRrfsSurfaceVariable.allCases
             case .ncep_rrfs_conus_15min: fields = NcepRrfs15MinVariable.allCases
             case .ncep_rrfs_conus_ensemble: fields = NcepRrfsEnsembleSurfaceVariable.allCases
             }
