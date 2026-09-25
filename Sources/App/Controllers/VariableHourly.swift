@@ -9,6 +9,31 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
     case winddirection
 
+    // Additional native RRFS surface fields. Soil depths are point levels in centimetres.
+    case categorical_freezing_rain
+    case soil_moisture_0cm
+    case soil_moisture_100cm
+    case soil_moisture_10cm
+    case soil_moisture_160cm
+    case soil_moisture_1cm
+    case soil_moisture_300cm
+    case soil_moisture_30cm
+    case soil_moisture_4cm
+    case soil_moisture_60cm
+    case soil_temperature_100cm
+    case soil_temperature_10cm
+    case soil_temperature_160cm
+    case soil_temperature_1cm
+    case soil_temperature_300cm
+    case soil_temperature_30cm
+    case soil_temperature_4cm
+    case soil_temperature_60cm
+    case temperature_160m
+    case temperature_30m
+    case temperature_320m
+    case wind_direction_320m
+    case wind_speed_320m
+
     case wet_bulb_temperature_2m
     case apparent_temperature
     case cape

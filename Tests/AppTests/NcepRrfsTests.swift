@@ -22,6 +22,19 @@ import OmFileIO
         return try #require(decoded.first).matches
     }
 
+    @Test func allDownloadedSurfaceVariablesAreExposed() throws {
+        for domain in NcepRrfsDomain.allCases {
+            for hour in [0, 1] where hour > 0 || domain != .ncep_rrfs_conus_15min {
+                for field in domain.downloadVariables(forecastHour: hour, pressureFile: false) {
+                    let name = field.variable.rawValue
+                    #expect(ForecastSurfaceVariable(rawValue: name) != nil, "Missing API variable: \(domain) / \(name)")
+                    #expect(ForecastVariable(rawValue: name) != nil, "Cannot parse forecast variable: \(name)")
+                }
+            }
+        }
+        #expect(ForecastSurfaceVariable(rawValue: "precipitation_probability") != nil)
+    }
+
     @Test func radarReflectivity() throws {
         #expect(ForecastSurfaceVariable(rawValue: "radar_reflectivity") != nil)
         for domain in NcepRrfsDomain.allCases {

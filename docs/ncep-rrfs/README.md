@@ -158,4 +158,4 @@ Run the inventory, conversion and scheduling tests with `swift test --filter Nce
 
 RRFS model identifiers are not yet available in the installed FlatBuffers SDK, so binary responses currently encode the model as `undefined`.
 
-The installed FlatBuffers SDK also lacks `radar_reflectivity` and the dBZ unit. The variable encodes as `undefined` in binary responses. Its unit currently uses an `undefined` placeholder in all response formats, with a TODO to use dBZ when the SDK supports it. The stored values remain in dBZ.
+The installed FlatBuffers SDK also lacks `categorical_freezing_rain`, `radar_reflectivity` and the dBZ unit. These variables encode as `undefined` in binary responses. The radar-reflectivity unit currently uses an `undefined` placeholder in all response formats, with a TODO to use dBZ when the SDK supports it. The stored values remain in dBZ.

@@ -6,6 +6,51 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         let previousDay = Int16(previousDay)
         switch variable {
+        case .soil_moisture_0cm:
+            return .init(variable: .soilMoisture, depth: 0, previousDay: previousDay)
+        case .soil_moisture_100cm:
+            return .init(variable: .soilMoisture, depth: 100, previousDay: previousDay)
+        case .soil_moisture_10cm:
+            return .init(variable: .soilMoisture, depth: 10, previousDay: previousDay)
+        case .soil_moisture_160cm:
+            return .init(variable: .soilMoisture, depth: 160, previousDay: previousDay)
+        case .soil_moisture_1cm:
+            return .init(variable: .soilMoisture, depth: 1, previousDay: previousDay)
+        case .soil_moisture_300cm:
+            return .init(variable: .soilMoisture, depth: 300, previousDay: previousDay)
+        case .soil_moisture_30cm:
+            return .init(variable: .soilMoisture, depth: 30, previousDay: previousDay)
+        case .soil_moisture_4cm:
+            return .init(variable: .soilMoisture, depth: 4, previousDay: previousDay)
+        case .soil_moisture_60cm:
+            return .init(variable: .soilMoisture, depth: 60, previousDay: previousDay)
+        case .soil_temperature_100cm:
+            return .init(variable: .soilTemperature, depth: 100, previousDay: previousDay)
+        case .soil_temperature_10cm:
+            return .init(variable: .soilTemperature, depth: 10, previousDay: previousDay)
+        case .soil_temperature_160cm:
+            return .init(variable: .soilTemperature, depth: 160, previousDay: previousDay)
+        case .soil_temperature_1cm:
+            return .init(variable: .soilTemperature, depth: 1, previousDay: previousDay)
+        case .soil_temperature_300cm:
+            return .init(variable: .soilTemperature, depth: 300, previousDay: previousDay)
+        case .soil_temperature_30cm:
+            return .init(variable: .soilTemperature, depth: 30, previousDay: previousDay)
+        case .soil_temperature_4cm:
+            return .init(variable: .soilTemperature, depth: 4, previousDay: previousDay)
+        case .soil_temperature_60cm:
+            return .init(variable: .soilTemperature, depth: 60, previousDay: previousDay)
+        case .temperature_160m:
+            return .init(variable: .temperature, altitude: 160, previousDay: previousDay)
+        case .temperature_30m:
+            return .init(variable: .temperature, altitude: 30, previousDay: previousDay)
+        case .temperature_320m:
+            return .init(variable: .temperature, altitude: 320, previousDay: previousDay)
+        case .wind_direction_320m:
+            return .init(variable: .windDirection, altitude: 320, previousDay: previousDay)
+        case .wind_speed_320m:
+            return .init(variable: .windSpeed, altitude: 320, previousDay: previousDay)
+
         case .temperature:
             return .init(variable: .temperature, altitude: 2, previousDay: previousDay)
         case .windspeed:
@@ -298,7 +343,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance, previousDay: previousDay)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant, previousDay: previousDay)
-        case .cloud_ceiling, .freezing_rain, .radar_reflectivity:
+        case .cloud_ceiling, .freezing_rain, .radar_reflectivity, .categorical_freezing_rain:
             // The installed SDK has no identifiers for these fields yet.
             return .init(variable: .undefined, previousDay: previousDay)
         case .cloud_base:
