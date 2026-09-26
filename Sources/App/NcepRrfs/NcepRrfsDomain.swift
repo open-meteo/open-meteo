@@ -22,7 +22,13 @@ enum NcepRrfsDomain: String, CaseIterable, GenericDomain {
         case .ncep_rrfs_conus_ensemble: return 0...60
         }
     }
-    var omFileLength: Int { (forecastHours.upperBound + 96) * 3600 / dtSeconds + 1 }
+    var omFileLength: Int {
+        switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_north_america: return 120 // 3.5 days hourly forecast, chunk 5 days
+        case .ncep_rrfs_conus_15min: return 192 // 18 hours forecast, chunk 48 hours
+        case .ncep_rrfs_conus_ensemble: return 96 // 2.5 days, chunk 4 days
+        }
+    }
     var lastRun: Timestamp { lastRun(now: .now()) }
     func lastRun(now: Timestamp) -> Timestamp {
         now.add(-3 * 3600 - 45 * 60).floor(toNearestHour: updateIntervalSeconds / 3600)
