@@ -67,6 +67,10 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_nbm_conus
     case ncep_nbm_alaska
     case ncep_nam_conus
+    case ncep_rrfs_conus
+    case ncep_rrfs_north_america
+    case ncep_rrfs_conus_15min
+    case ncep_rrfs_conus_ensemble
     case ncep_aigefs025
     case ncep_aigfs025
     case ncep_hgefs025_ensemble_mean
@@ -228,6 +232,8 @@ enum DomainRegistry: String, CaseIterable {
 
     func getDomain() -> GenericDomain? {
         switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
+            return NcepRrfsDomain(rawValue: rawValue)!
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
         case .meteofrance_arome_france_hd:

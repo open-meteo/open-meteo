@@ -12,6 +12,13 @@ protocol CurlIndexedVariable {
     var exactMatch: Bool { get }
 }
 
+extension CurlIndexedVariable {
+    func matches(indexLine: Substring) -> Bool {
+        guard let gribIndexName else { return false }
+        return exactMatch ? indexLine.hasSuffix(gribIndexName) : indexLine.contains(gribIndexName)
+    }
+}
+
 extension Curl {
     /// {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "fc", "stream": "oper", "step": "102", "levelist": "300", "levtype": "pl", "param": "t", "_offset": 6699726, "_length": 609046}
     /// {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levelist": "925", "levtype": "pl", "number": "4", "param": "u", "_offset": 291741552, "_length": 609069}
@@ -71,22 +78,22 @@ extension Curl {
             indices.append(index)
         }
 
+        return try Self.decodeGribIndices(indices: indices, variables: variables, errorOnMissing: errorOnMissing, logger: logger)
+    }
+
+    /// Match already fetched inventories without making HTTP requests.
+    static func decodeGribIndices<Variable: CurlIndexedVariable>(indices: [String], variables: [Variable], errorOnMissing: Bool, logger: Logger) throws -> [(matches: [Variable], range: String, minSize: Int)] {
+        let count = variables.reduce(0, { $0 + ($1.gribIndexName == nil ? 0 : 1) })
+        guard count > 0 else { return [] }
         var result = [(matches: [Variable], range: String, minSize: Int)]()
-        result.reserveCapacity(url.count)
+        result.reserveCapacity(indices.count)
 
         for index in indices {
+            let lines = index.split(separator: "\n")
             var matches = [Variable]()
             matches.reserveCapacity(count)
-            guard let range = index.split(separator: "\n").indexToRange(include: { idx in
-                guard let match = variables.first(where: {
-                    guard let gribIndexName = $0.gribIndexName else {
-                        return false
-                    }
-                    if $0.exactMatch {
-                        return idx.hasSuffix(gribIndexName)
-                    }
-                    return idx.contains(gribIndexName)
-                }) else {
+            guard let range = lines.indexToRange(include: { idx in
+                guard let match = variables.first(where: { $0.matches(indexLine: idx) }) else {
                     return false
                 }
                 guard !matches.contains(where: { $0.gribIndexName == match.gribIndexName }) else {

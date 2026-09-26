@@ -9,6 +9,31 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
     case winddirection
 
+    // Additional native RRFS surface fields. Soil depths are point levels in centimetres.
+    case categorical_freezing_rain
+    case soil_moisture_0cm
+    case soil_moisture_100cm
+    case soil_moisture_10cm
+    case soil_moisture_160cm
+    case soil_moisture_1cm
+    case soil_moisture_300cm
+    case soil_moisture_30cm
+    case soil_moisture_4cm
+    case soil_moisture_60cm
+    case soil_temperature_100cm
+    case soil_temperature_10cm
+    case soil_temperature_160cm
+    case soil_temperature_1cm
+    case soil_temperature_300cm
+    case soil_temperature_30cm
+    case soil_temperature_4cm
+    case soil_temperature_60cm
+    case temperature_160m
+    case temperature_30m
+    case temperature_320m
+    case wind_direction_320m
+    case wind_speed_320m
+
     case wet_bulb_temperature_2m
     case apparent_temperature
     case cape
@@ -21,7 +46,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_2m
+    /// Lowest detected cloud base, including scattered clouds, in metres above ground.
     case cloud_base
+    /// Lowest broken/overcast cloud base (ceiling diagnostic), in metres above ground.
+    case cloud_ceiling
+    /// Upper cloud boundary in metres above ground, not the ceiling/base.
     case cloud_top
     case convective_cloud_base
     case convective_cloud_top
@@ -47,6 +76,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case lightning_potential
     case mass_density_8m
     case precipitation
+    case freezing_rain
     case precipitation_probability
     case precipitation_type
     case pressure_msl
@@ -138,6 +168,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case uv_index_clear_sky
     case vapor_pressure_deficit
     case vapour_pressure_deficit
+    /// Instantaneous column-maximum simulated radar reflectivity, in dBZ.
+    case radar_reflectivity
     case visibility
     case weathercode
     case weather_code
@@ -947,6 +979,26 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         return nil
     }
     
+    /// Integrate a piecewise-linear soil profile over a layer. The weights below are
+    /// trapezoidal integration weights divided by layer thickness; see docs/ncep-rrfs/README.md.
+    private func soilLayerAverage(_ variables: [ForecastSurfaceVariable], weights: [Float]) -> DerivedMapping<Reader.MixingVar>? {
+        precondition(variables.count == weights.count && !variables.isEmpty)
+        var result: DerivedMapping<Reader.MixingVar>?
+        for (variable, weight) in zip(variables, weights) {
+            guard let input = Reader.variableFromString(variable.rawValue) else { return nil }
+            if let previous = result {
+                result = .two(.mapped(previous), .raw(input)) { sum, value, _ in
+                    DataAndUnit(zip(sum.data, value.data).map { $0 + $1 * weight }, sum.unit)
+                }
+            } else {
+                result = .one(.raw(input)) { value, _ in
+                    DataAndUnit(value.data.map { $0 * weight }, value.unit)
+                }
+            }
+        }
+        return result
+    }
+
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
         if compatibility.usesLegacyIconEpsRadiationStorage {
@@ -1066,6 +1118,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
 
         switch variable {
+        case .mass_density_8m:
+            // RRFS stores fine organic aerosol under its descriptive API name.
+            // Native fields (including HRRR mass_density_8m) take precedence above.
+            return .direct(Reader.variableFromString("pm2_5_total_organic_matter"))
         case .european_aqi_pm2_5:
             guard let pm2_5 = Reader.variableFromString("pm2_5") else {
                 return nil
@@ -1726,6 +1782,23 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .ocean_current_direction:
             return .oceanCurrentDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
+        case .soil_temperature_0_to_10cm:
+            return soilLayerAverage([.soil_temperature_0cm, .soil_temperature_1cm, .soil_temperature_4cm, .soil_temperature_10cm], weights: [0.05, 0.2, 0.45, 0.3])
+        case .soil_temperature_10_to_40cm:
+            return soilLayerAverage([.soil_temperature_10cm, .soil_temperature_30cm, .soil_temperature_60cm], weights: [1.0 / 3, 11.0 / 18, 1.0 / 18])
+        case .soil_temperature_40_to_100cm:
+            return soilLayerAverage([.soil_temperature_30cm, .soil_temperature_60cm, .soil_temperature_100cm], weights: [1.0 / 9, 5.0 / 9, 1.0 / 3])
+        case .soil_temperature_100_to_200cm:
+            return soilLayerAverage([.soil_temperature_100cm, .soil_temperature_160cm, .soil_temperature_300cm], weights: [0.3, 9.0 / 14, 2.0 / 35])
+        case .soil_moisture_0_to_10cm:
+            return soilLayerAverage([.soil_moisture_0cm, .soil_moisture_1cm, .soil_moisture_4cm, .soil_moisture_10cm], weights: [0.05, 0.2, 0.45, 0.3])
+        case .soil_moisture_10_to_40cm:
+            return soilLayerAverage([.soil_moisture_10cm, .soil_moisture_30cm, .soil_moisture_60cm], weights: [1.0 / 3, 11.0 / 18, 1.0 / 18])
+        case .soil_moisture_40_to_100cm:
+            return soilLayerAverage([.soil_moisture_30cm, .soil_moisture_60cm, .soil_moisture_100cm], weights: [1.0 / 9, 5.0 / 9, 1.0 / 3])
+        case .soil_moisture_100_to_200cm:
+            return soilLayerAverage([.soil_moisture_100cm, .soil_moisture_160cm, .soil_moisture_300cm], weights: [0.3, 9.0 / 14, 2.0 / 35])
+
         case .soil_temperature_0cm:
             guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))
