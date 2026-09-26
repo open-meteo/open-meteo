@@ -57,6 +57,7 @@ Apps:
 - [CycleWeather](https://cycleweather.app) CycleWeather is a free iOS weather app for cyclists, showing a color-coded 7-day hourly forecast — temperature (feels-like), precipitation, wind, air quality, and UV — with rain alerts and radar, all in one glanceable view.
 - [Drizz.li](https://drizz.li) Open-source and statically-hosted weather site that turns Open-Meteo API data into detailed, localized forecasts with custom charts and an embedded weather map.
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
+- [duskline](https://dusklineweather.pages.dev/) Installable PWA with worldwide search, 10-day forecasts, air quality, NWS alerts for the U.S., and 30 interface languages — no account, no backend, no tracking.
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
 - [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
