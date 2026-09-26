@@ -40,8 +40,11 @@ extension NcepRrfsVariableDownloadable {
             step = "anl"
         } else {
             let hourly = interval.start % 60 == 0 && minute % 60 == 0
-            let unit = hourly ? "hour" : "min"
-            let divisor = hourly ? 60 : 1
+            // wgrib2 expresses whole-day statistical intervals in days, but
+            // instantaneous forecasts retain hours (e.g. 24 hour fcst).
+            let daily = interval.type != "instant" && interval.start % 1440 == 0 && minute % 1440 == 0
+            let unit = daily ? "day" : hourly ? "hour" : "min"
+            let divisor = daily ? 1440 : hourly ? 60 : 1
             switch interval.type {
             case "accum": step = "\(interval.start / divisor)-\(minute / divisor) \(unit) acc fcst"
             case "avg": step = "\(interval.start / divisor)-\(minute / divisor) \(unit) ave fcst"

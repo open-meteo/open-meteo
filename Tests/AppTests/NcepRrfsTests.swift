@@ -449,7 +449,7 @@ import OmFileIO
 
     @Test func protocolSelectorsMatchAvailableInventories() throws {
         let files = try FileManager.default.contentsOfDirectory(at: fixtureDirectory, includingPropertiesForKeys: nil).filter { $0.pathExtension == "idx" }
-        #expect(files.count == 12)
+        #expect(files.count == 13)
         for file in files {
             let name = file.lastPathComponent
             let domain: NcepRrfsDomain = name.contains("13km") ? .ncep_rrfs_north_america : name.contains("m001") ? .ncep_rrfs_conus_ensemble : name.contains("subh") ? .ncep_rrfs_conus_15min : .ncep_rrfs_conus
@@ -579,6 +579,36 @@ import OmFileIO
             _ = variable.interpolation
         }
         #expect(NcepRrfsSurfaceVariable.wind_direction_320m.unit == .degreeDirection)
+    }
+
+    @Test func accumulationSelectorsAtDayBoundaries() async throws {
+        for domain in NcepRrfsDomain.allCases where domain != .ncep_rrfs_conus_15min {
+            for hour in [23, 24, 25, 48, 60, 72] {
+                let fields = domain.downloadVariables(forecastHour: hour, pressureFile: false)
+                for field in fields where field.interval.type == "accum" && field.interval.start == 0 {
+                    let step = hour % 24 == 0 ? "0-\(hour / 24) day" : "0-\(hour) hour"
+                    #expect(field.gribIndexName?.contains(":\(step) acc fcst:") == true)
+                    #expect(field.interval.start == 0)
+                    #expect(field.minute == hour * 60)
+                }
+                let temperature = try #require(fields.first { $0.variable.rawValue == "temperature_2m" })
+                #expect(temperature.gribIndexName == ":TMP:2 m above ground:\(hour) hour fcst:")
+                let solar = try #require(fields.first { $0.variable.rawValue == "shortwave_radiation" })
+                #expect(solar.gribIndexName == ":DSWRF:surface:\(hour - 1)-\(hour) hour ave fcst:")
+            }
+        }
+        // Day-based index strings must not alter internal minute-based deaccumulation.
+        for variable in [NcepRrfsSurfaceVariable.freezing_rain, .snowfall_water_equivalent, .snowfall] {
+            let deaverager = GribDeaverager()
+            for hour in [23, 24, 25] {
+                let field = NcepRrfsDownloadVariable(variable: variable, minute: hour * 60)
+                var array = Array2D(data: [Float(hour)], nx: 1, ny: 1)
+                let keep = await deaverager.deaccumulateIfRequired(variable: variable.rawValue, member: 0,
+                    stepType: field.interval.type, stepRange: "\(field.interval.start)-\(field.minute)", array2d: &array)
+                #expect(keep)
+                #expect(array.data == [hour == 23 ? 23 : 1])
+            }
+        }
     }
 
     @Test func chronologicalDeaccumulationAcrossHourAndMemberBoundaries() async throws {
