@@ -63,6 +63,7 @@ Apps:
 - [Going Blue](https://going.blue/) Expedition weather forecasts via satellite, with a custom codec that packs hundreds of forecast data points into each message.
 - [Heat Rules](https://heatrules.com/) A free browser-based calculator for occupational heat exposure limits. Inputs: location, work intensity, acclimatization status. Outputs: work/rest schedule, water intake, and the standard each number comes from.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
+- [Imago](https://imago.onslate.in) Open-source, browser-only tool that turns an API response into an interface. Its landing page draws a live Open-Meteo forecast. ([GitHub](https://github.com/Sibhimanyu/imago))
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
