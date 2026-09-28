@@ -101,6 +101,7 @@ Apps:
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
 - [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
 - [WorldWeatherMonitor](https://world-weather-monitor.vercel.app/) An interactive world weather map that displays real-time weather conditions for cities around the globe.
+- [ZarSage](https://zarsage.ai/) Farm app using Open-Meteo forecasts to show field weather and screen spray windows alongside field records and daily work.
 
 Repositories:
 
