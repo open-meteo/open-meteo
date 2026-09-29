@@ -13,7 +13,7 @@ struct IconRemapper: Sendable {
         }
     }
 
-    /// Build once from the native index, refining candidates with the original Double coordinates.
+    /// Reuse historical weights where native input was already processed; otherwise build from the native index.
     /// For DWD ICON D2 this yields a mapping equivalent to the data produced by DWD themselves.
     /// For ICON EU data is not equivalent. Regular lat-lon output on ICON EU uses RBF or BCT interpolation
     /// during regridding. Here everything is currently nearest neighbour regridding, same as what CDO does.
@@ -21,6 +21,30 @@ struct IconRemapper: Sendable {
         guard [.icon, .iconEu, .iconD2, .iconEps, .iconEuEps, .iconD2Eps].contains(domain),
               let target = domain.grid as? RegularGrid else {
             throw IconDownloadError(description: "No regular remapping grid for \(domain)")
+        }
+        if [.icon, .iconEps, .iconEuEps, .iconD2Eps].contains(domain) {
+            // Preserve the original CDO tie-breaking and missing-value mask for unchanged source grids.
+            let directory = "\(domain.domainRegistry.directory)static/"
+            let weightsFile = "\(directory)cdo_weights.nc"
+            if !FileManager.default.fileExists(atPath: weightsFile) {
+                try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+                try await curl.download(
+                    url: "https://openmeteo.s3.amazonaws.com/data/\(domain.domainRegistry.rawValue)/static/cdo_weights.nc",
+                    toFile: weightsFile, bzip2Decode: false
+                )
+            }
+            guard let weights = try NetCDF.open(path: weightsFile, allowUpdate: false),
+                  let src = try weights.getVariable(name: "src_address")?.asType(Int32.self)?.read(),
+                  let dst = try weights.getVariable(name: "dst_address")?.asType(Int32.self)?.read(),
+                  src.count == dst.count, !src.isEmpty,
+                  src.allSatisfy({ $0 > 0 && $0 <= domain.sourceGridIdentity.cellCount }),
+                  dst.allSatisfy({ $0 > 0 && $0 <= target.count }) else {
+                throw IconDownloadError(description: "Invalid remapping weights: \(weightsFile)")
+            }
+            var mapping = [Int32](repeating: -1, count: target.count)
+            for i in src.indices { mapping[Int(dst[i]) - 1] = src[i] - 1 }
+            self.mapping = mapping
+            return
         }
         let artifact = domain.nativeDomain.nativeGridFile
         guard let source = try await artifact.prepare(curl: curl, loadSource: true).source else {
