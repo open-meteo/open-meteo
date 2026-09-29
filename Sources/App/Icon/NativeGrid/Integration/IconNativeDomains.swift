@@ -2,23 +2,35 @@ import Logging
 
 enum IconNativeDomains: String, CaseIterable {
     case iconNative = "icon-native"
+    case iconEuNative = "icon-eu-native"
     case iconD2Native = "icon-d2-native"
     case iconD2Native15min = "icon-d2-native-15min"
+    case iconEpsNative = "icon-eps-native"
+    case iconEuEpsNative = "icon-eu-eps-native"
+    case iconD2EpsNative = "icon-d2-eps-native"
 
     /// Shared forecast metadata and variable mappings come from the corresponding regular domain.
     var sourceDomain: IconDomains {
         switch self {
         case .iconNative: return .icon
+        case .iconEuNative: return .iconEu
         case .iconD2Native: return .iconD2
         case .iconD2Native15min: return .iconD2_15min
+        case .iconEpsNative: return .iconEps
+        case .iconEuEpsNative: return .iconEuEps
+        case .iconD2EpsNative: return .iconD2Eps
         }
     }
 
     var domainRegistry: DomainRegistry {
         switch self {
         case .iconNative: return .dwd_icon_global_native
+        case .iconEuNative: return .dwd_icon_eu_native
         case .iconD2Native: return .dwd_icon_d2_native
         case .iconD2Native15min: return .dwd_icon_d2_native_15min
+        case .iconEpsNative: return .dwd_icon_eps_native
+        case .iconEuEpsNative: return .dwd_icon_eu_eps_native
+        case .iconD2EpsNative: return .dwd_icon_d2_eps_native
         }
     }
 
@@ -38,12 +50,18 @@ enum IconNativeDomains: String, CaseIterable {
     var nativeGridFile: IconNativeGridFile {
         switch self {
         case .iconNative: return Self.globalGridFile
-        case .iconD2Native, .iconD2Native15min: return Self.d2GridFile
+        case .iconEuNative: return Self.europeGridFile
+        case .iconD2Native, .iconD2Native15min, .iconD2EpsNative: return Self.d2GridFile
+        case .iconEpsNative: return Self.globalEnsembleGridFile
+        case .iconEuEpsNative: return Self.europeEnsembleGridFile
         }
     }
 
     private static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
     private static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
+    private static let europeGridFile = IconNativeGridFile(registry: .dwd_icon_eu_native, identity: .europe)
+    private static let globalEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_eps_native, identity: .globalEnsemble)
+    private static let europeEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_eu_eps_native, identity: .europeEnsemble)
 
     func load() async throws -> IconNativeDomain {
         try await Self.domains.load(self)
