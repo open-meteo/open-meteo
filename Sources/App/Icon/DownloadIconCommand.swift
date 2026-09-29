@@ -196,7 +196,7 @@ struct DownloadIconCommand: AsyncCommand {
                         guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: job.member, stepType: stepType, startStep: step.start, currentStep: step.end, array2d: &array2d) else { continue }
                         if let variable = variable as? IconSurfaceVariable {
                             variable.correctDownloadedValues(data: &array2d.data)
-                            if [IconSurfaceVariable.precipitation, .snowfall_height, .freezing_level_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
+                            if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
                                 await storage15min.set(variable: variable, timestamp: timestamp, member: job.member, data: array2d)
                                 continue
                             }
