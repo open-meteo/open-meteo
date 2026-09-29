@@ -819,8 +819,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_d2
     case dwd_icon_d2_15min
     case dwd_icon_global_native
+    case dwd_icon_eu_native
     case dwd_icon_d2_native
     case dwd_icon_d2_native_15min
+    case dwd_icon_global_eps_native
+    case dwd_icon_eu_eps_native
+    case dwd_icon_d2_eps_native
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
@@ -1325,6 +1329,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             )
         case .dwd_icon_d2_native_15min:
             return .single(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+        case .dwd_icon_eu_native:
+            return .singleWithPrecipitationProbability(
+                try await IconNativeDomains.iconEuNative.load(), IconVariable.self,
+                precipitationProb: IconDomains.iconEuEps
+            )
+        case .dwd_icon_global_eps_native:
+            return .single(try await IconNativeDomains.iconEpsNative.load(), DwdIconEpsGlobalVariable.self)
+        case .dwd_icon_eu_eps_native:
+            return .single(try await IconNativeDomains.iconEuEpsNative.load(), DwdIconEuEpsGlobalVariable.self)
+        case .dwd_icon_d2_eps_native:
+            return .single(try await IconNativeDomains.iconD2EpsNative.load(), DwdIconD2EpsGlobalVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
@@ -2193,7 +2208,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .dwd_icon_d2_15min:
             return [] // migrated
-        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return [] // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -2411,7 +2427,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
@@ -2651,7 +2668,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)
@@ -2854,11 +2872,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         switch self {
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return IconDomains.iconEps.countEnsembleMember
-        case .icon_global_eps, .dwd_icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps, .dwd_icon_global_eps_native:
             return IconDomains.iconEps.countEnsembleMember
-        case .icon_eu_eps, .dwd_icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps, .dwd_icon_eu_eps_native:
             return IconDomains.iconEuEps.countEnsembleMember
-        case .icon_d2_eps, .dwd_icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps, .dwd_icon_d2_eps_native:
             return IconDomains.iconD2Eps.countEnsembleMember
         case .ecmwf_ifs025_ensemble:
             return EcmwfDomain.ifs025_ensemble.countEnsembleMember
