@@ -51,12 +51,12 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     typealias VariableOpt = DailyVariable
     let reader: Reader
     
-    /// Workaround to enable or disable `maxTwo` or `minTwo` aggregations. `best_match` does not (yet) provide a correct temperature_2m_max that matches all local domains. It may only come from one global model.
-    let allowMinMaxTwoAggregations: Bool
+    /// Use model-provided min/max fields when available. Disabled for mixed readers because these fields may come from a different model than the hourly temperature.
+    let useModelProvidedMinMax: Bool
     
-    init(reader: Reader, allowMinMaxTwoAggregations: Bool) {
+    init(reader: Reader, useModelProvidedMinMax: Bool) {
         self.reader = reader
-        self.allowMinMaxTwoAggregations = allowMinMaxTwoAggregations
+        self.useModelProvidedMinMax = useModelProvidedMinMax
     }
     
     var modelLat: Float {
@@ -108,31 +108,22 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
                 return nil
             }
             return DataAndUnit(data.data.mean(by: stepsModel), data.unit)
-        case .minTwo(let interval, let hourly), .maxTwo(let interval, let hourly):
-            let isMinimum: Bool
-            if case .minTwo = variable.aggregation { isMinimum = true } else { isMinimum = false }
-            func aggregate(_ data: DataAndUnit, steps: Int) -> DataAndUnit {
-                DataAndUnit(isMinimum ? data.data.min(by: steps) : data.data.max(by: steps), data.unit)
+        case .minTwo(let variable, let b):
+            if useModelProvidedMinMax, let data = try await reader.get(variable: variable, time: timeModel) {
+                return DataAndUnit(data.data.min(by: stepsModel), data.unit)
             }
-            var intervalDaily: DataAndUnit?
-            var incompleteDays: [Int] = []
-            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: interval, time: timeModel) {
-                let daily = aggregate(data, steps: stepsModel)
-                // Check raw coverage: one missing interval invalidates that day's extrema.
-                incompleteDays = daily.data.indices.filter { day in
-                    !data.data[(day * stepsModel)..<((day + 1) * stepsModel)].allSatisfy(\.isFinite)
-                }
-                if incompleteDays.isEmpty { return daily }
-                intervalDaily = daily
+            guard let data = try await reader.get(variable: b, time: time1h) else {
+                return nil
             }
-            let hourlyData = try await reader.get(variable: hourly, time: time1h)
-            let hourlyDaily = hourlyData.map { aggregate($0, steps: 24) }
-            guard let intervalDaily else { return hourlyDaily }
-            var values = intervalDaily.data
-            for day in incompleteDays {
-                values[day] = hourlyDaily?.data[day] ?? .nan
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, let b):
+            if useModelProvidedMinMax, let data = try await reader.get(variable: variable, time: timeModel) {
+                return DataAndUnit(data.data.max(by: stepsModel), data.unit)
             }
-            return DataAndUnit(values, intervalDaily.unit)
+            guard let data = try await reader.get(variable: b, time: time1h) else {
+                return nil
+            }
+            return DataAndUnit(data.data.max(by: 24), data.unit)
         case .sum(let variable):
             guard let data = try await reader.get(variable: variable, time: timeModel) else {
                 return nil

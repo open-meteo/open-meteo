@@ -554,7 +554,7 @@ extension GenericDomain {
             return (nil, nil, nil, nil)
         }
         let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: true), nil, nil)
     }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
@@ -562,13 +562,13 @@ extension GenericDomain {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
         let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: true), nil, nil)
     }
 }
 
 extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariable {
-    func makeDailyAggregator(allowMinMaxTwoAggregations: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
-        return .init(reader: self, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
+    func makeDailyAggregator(useModelProvidedMinMax: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
+        return .init(reader: self, useModelProvidedMinMax: useModelProvidedMinMax)
     }
 }
 
