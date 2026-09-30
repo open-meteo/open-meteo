@@ -546,6 +546,19 @@ extension GenericDomain {
     func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
+
+    private var useModelProvidedDailyMinMax: Bool {
+        switch domainRegistry {
+        case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble,
+             .ecmwf_aifs025, .ecmwf_aifs025_single, .ecmwf_aifs025_ensemble,
+             .ecmwf_ifs, .copernicus_era5, .copernicus_era5_land, .copernicus_era5_ensemble,
+             .copernicus_cerra, .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
+            // Preserve hourly temperature aggregation from the legacy ECMWF and reanalysis readers.
+            return false
+        default:
+            return true
+        }
+    }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
@@ -554,7 +567,7 @@ extension GenericDomain {
             return (nil, nil, nil, nil)
         }
         let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: true), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: useModelProvidedDailyMinMax), nil, nil)
     }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
@@ -562,7 +575,7 @@ extension GenericDomain {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
         let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: true), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: useModelProvidedDailyMinMax), nil, nil)
     }
 }
 
