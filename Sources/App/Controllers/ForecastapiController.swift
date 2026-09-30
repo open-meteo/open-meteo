@@ -2148,6 +2148,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     return MultiDomains.hourlyToMultiSameType(readers) ?? (nil, nil, nil, nil)
                 }
             case .mixedBeforeDerivation(let groups, _):
+                // Include ERA5 radiation and ensemble companions in gridpoint reads after migrating the ECMWF adapters.
                 guard groups.count == 1, let group = groups.first,
                       let (domain, variable) = group.singleDomainSource else { return (nil, nil, nil, nil) }
                 let primary = try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
