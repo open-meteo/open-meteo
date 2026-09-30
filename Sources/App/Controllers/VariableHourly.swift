@@ -636,6 +636,7 @@ private struct VariableHourlyDerivationCompatibility {
     }
 
     let aliasesSoilTemperature0To10cmTo0To7cm: Bool
+    let supportsEra5SoilMoistureIndices: Bool
     let convectivePrecipitation: ConvectivePrecipitation
     let omitsConvectivePrecipitationFromWeatherCode: Bool
     let shortwaveRadiationScale: Float?
@@ -649,6 +650,7 @@ private struct VariableHourlyDerivationCompatibility {
 
     private init(
         aliasesSoilTemperature0To10cmTo0To7cm: Bool = false,
+        supportsEra5SoilMoistureIndices: Bool = false,
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
         omitsConvectivePrecipitationFromWeatherCode: Bool = false,
         shortwaveRadiationScale: Float? = nil,
@@ -661,6 +663,7 @@ private struct VariableHourlyDerivationCompatibility {
         derivesCloudLayersFromPressureHumidity: Bool = false
     ) {
         self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
+        self.supportsEra5SoilMoistureIndices = supportsEra5SoilMoistureIndices
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
         self.shortwaveRadiationScale = shortwaveRadiationScale
@@ -687,14 +690,21 @@ private struct VariableHourlyDerivationCompatibility {
         case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
             self = .init(
                 aliasesSoilTemperature0To10cmTo0To7cm: true,
+                supportsEra5SoilMoistureIndices: true,
                 convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
                 omitsConvectivePrecipitationFromWeatherCode: true
             )
         case .ecmwf_ifs, .ecmwf_aifs025_single, .ecmwf_aifs025_ensemble:
-            self = .init(aliasesSoilTemperature0To10cmTo0To7cm: true)
+            self = .init(
+                aliasesSoilTemperature0To10cmTo0To7cm: true,
+                supportsEra5SoilMoistureIndices: true
+            )
         case .copernicus_era5, .copernicus_era5_land, .copernicus_era5_ensemble,
              .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
-            self = .init(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+            self = .init(
+                supportsEra5SoilMoistureIndices: true,
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable
+            )
         case .cmc_gem_gdps, .cmc_gem_gdps_15km, .cmc_gem_gdps_15km_upper_level,
              .cmc_gem_rdps, .cmc_gem_rdps_10km, .cmc_gem_hrdps, .cmc_gem_hrdps_west,
              .cmc_gem_geps:
@@ -1842,6 +1852,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .soil_moisture_index_0_to_7cm, .soil_moisture_index_7_to_28cm,
              .soil_moisture_index_28_to_100cm, .soil_moisture_index_100_to_255cm,
              .soil_moisture_index_0_to_100cm:
+            guard compatibility.supportsEra5SoilMoistureIndices else { return nil }
             let moistureName = variable.rawValue.replacingOccurrences(of: "soil_moisture_index_", with: "soil_moisture_")
             guard let moistureVariable = ForecastSurfaceVariable(rawValue: moistureName),
                   let moisture = getDeriverMap(variable: moistureVariable) else { return nil }
