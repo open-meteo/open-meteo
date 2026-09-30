@@ -1834,10 +1834,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 }), .percentage)
             }
         case .growing_degree_days_base_0_limit_50:
-            // Preserve the hourly contribution, including requests with a different timestep.
             guard let temperature = Reader.variableFromString("temperature_2m") else { return nil }
-            return .one(.raw(temperature)) { temperature, _ in
-                DataAndUnit(temperature.data.map { max(min($0, 50), 0) / 24 }, .gddCelsius)
+            return .one(.raw(temperature)) { temperature, time in
+                let fractionOfDay = Float(time.dtSeconds) / 86400
+                return DataAndUnit(temperature.data.map { max(min($0, 50), 0) * fractionOfDay }, .gddCelsius)
             }
         case .soil_moisture_index_0_to_7cm, .soil_moisture_index_7_to_28cm,
              .soil_moisture_index_28_to_100cm, .soil_moisture_index_100_to_255cm,
