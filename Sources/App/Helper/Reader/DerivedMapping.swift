@@ -169,6 +169,16 @@ extension TimerangeDt {
     }
 }
 
+private extension GenericReaderBaseProtocol {
+    func getEra5SoilType() async throws -> SoilTypeEra5? {
+        guard let soilType = try await getStatic(type: .soilType) else {
+            throw ForecastApiError.generic(message: "Could not read soil type")
+        }
+        guard soilType.isFinite else { return nil }
+        return SoilTypeEra5(rawValue: Int(soilType))
+    }
+}
+
 protocol GenericDeriverProtocol: GenericReaderOptionalProtocol {
     associatedtype Reader: GenericReaderProtocol
     
@@ -242,10 +252,7 @@ extension GenericDeriverProtocol {
     fileprivate func get(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
         case .soilMoistureIndex(let input):
-            guard let soilType = try await reader.getStatic(type: .soilType) else {
-                throw ForecastApiError.generic(message: "Could not read soil type")
-            }
-            guard soilType.isFinite, let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+            guard let type = try await reader.getEra5SoilType() else {
                 return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
             }
             let moisture = try await get(mapping: input, time: time)
@@ -439,10 +446,7 @@ extension GenericDeriverOptionalProtocol {
     fileprivate func get(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         switch variable {
         case .soilMoistureIndex(let input):
-            guard let soilType = try await reader.getStatic(type: .soilType) else {
-                throw ForecastApiError.generic(message: "Could not read soil type")
-            }
-            guard soilType.isFinite, let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+            guard let type = try await reader.getEra5SoilType() else {
                 return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
             }
             guard let moisture = try await get(mapping: input, time: time) else { return nil }
