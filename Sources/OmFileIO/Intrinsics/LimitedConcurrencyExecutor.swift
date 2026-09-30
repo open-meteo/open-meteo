@@ -14,6 +14,10 @@ public actor LimitedConcurrencyExecutor {
         self.maxConcurrency = maxConcurrency
     }
 
+    public func statistics() -> (active: Int, queued: Int) {
+        (activeCount, suspensionQueue.count)
+    }
+
     /// Claim one execution slot, suspending if the executor is already full.
     public func acquire() async {
         if activeCount >= maxConcurrency {
