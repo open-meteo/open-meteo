@@ -85,19 +85,25 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         })
     }
     
-    static func windDirection(u: Variable?, v: Variable?) -> Self? {
+    /// Optionally rotate grid-relative wind direction to true north using an angle in degrees.
+    static func windDirection(u: Variable?, v: Variable?, trueNorth: Float? = nil) -> Self? {
         guard let u, let v else {
             return nil
         }
-        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v))
+        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v), trueNorth: trueNorth)
     }
 
-    static func windDirection(u: RawOrMapped?, v: RawOrMapped?) -> Self? {
+    static func windDirection(u: RawOrMapped?, v: RawOrMapped?, trueNorth: Float? = nil) -> Self? {
         guard let u, let v else {
             return nil
         }
         return .two(u, v, {u, v, _ in
-            return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
+            var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            if let trueNorth {
+                // Correct for true north in HRRR and NAM
+                direction = direction.map { ($0 - trueNorth + 360).truncatingRemainder(dividingBy: 360) }
+            }
+            return DataAndUnit(direction, .degreeDirection)
         })
     }
 

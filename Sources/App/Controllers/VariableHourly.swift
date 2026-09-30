@@ -756,6 +756,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     let options: GenericReaderOptions
     private let compatibility: VariableHourlyDerivationCompatibility
     private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
+    /// Correct wind direction for HRRR and NAM models on the demand
+    private let trueNorth: Float?
 
     init(
         reader: Reader,
@@ -766,6 +768,19 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         self.options = options
         self.compatibility = .init(domain: domainRegistry)
         self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
+        let windGridDomain: GfsDomain?
+        switch domainRegistry {
+        case .ncep_hrrr_conus: windGridDomain = .hrrr_conus
+        case .ncep_hrrr_conus_15min: windGridDomain = .hrrr_conus_15min
+        case .ncep_nam_conus: windGridDomain = .nam_conus
+        default: windGridDomain = nil
+        }
+        if let grid = windGridDomain?.grid as? ProjectionGrid<LambertConformalConicProjection> {
+            // Stored U/V are grid-relative. HRRR models need to be corrected for true north
+            trueNorth = -grid.projection.n * (reader.modelLon - grid.projection.λ0_dec)
+        } else {
+            trueNorth = nil
+        }
     }
 
     private func convectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
@@ -926,7 +941,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .wind_direction:
             return .windDirection(
                 u: pressureLevelInput(.wind_u_component, at: pressure.level),
-                v: pressureLevelInput(.wind_v_component, at: pressure.level)
+                v: pressureLevelInput(.wind_v_component, at: pressure.level),
+                trueNorth: trueNorth
             )
         case .dew_point:
             guard
@@ -1202,7 +1218,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_10m:
             return getDeriverMap(variable: .wind_direction_10m)
         case .wind_direction_10m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), trueNorth: trueNorth)
         case .windspeed_20m:
             return getDeriverMap(variable: .wind_speed_20m)
         case .wind_speed_20m:
@@ -1210,11 +1226,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_20m:
             return getDeriverMap(variable: .wind_direction_20m)
         case .wind_direction_20m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_20m"), v: Reader.variableFromString("wind_v_component_20m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_20m"), v: Reader.variableFromString("wind_v_component_20m"), trueNorth: trueNorth)
         case .wind_speed_30m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_30m"), v: Reader.variableFromString("wind_v_component_30m"))
         case .wind_direction_30m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_30m"), v: Reader.variableFromString("wind_v_component_30m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_30m"), v: Reader.variableFromString("wind_v_component_30m"), trueNorth: trueNorth)
         case .windspeed_40m:
             return getDeriverMap(variable: .wind_speed_40m)
         case .wind_speed_40m:
@@ -1222,7 +1238,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_40m:
             return getDeriverMap(variable: .wind_direction_40m)
         case .wind_direction_40m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"), trueNorth: trueNorth)
         case .windspeed_50m:
             return getDeriverMap(variable: .wind_speed_50m)
         case .wind_speed_50m:
@@ -1230,11 +1246,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_50m:
             return getDeriverMap(variable: .wind_direction_50m)
         case .wind_direction_50m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_50m"), v: Reader.variableFromString("wind_v_component_50m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_50m"), v: Reader.variableFromString("wind_v_component_50m"), trueNorth: trueNorth)
         case .wind_speed_70m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"))
         case .wind_direction_70m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), trueNorth: trueNorth)
         case .windspeed_80m:
             return getDeriverMap(variable: .wind_speed_80m)
         case .wind_speed_80m:
@@ -1248,10 +1264,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_80m)
         case .wind_direction_80m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_75m")) ??
                 .direct(Reader.variableFromString("wind_direction_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth)
         case .windspeed_100m:
             return getDeriverMap(variable: .wind_speed_100m)
         case .wind_speed_100m:
@@ -1263,9 +1279,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_100m)
         case .wind_direction_100m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"), trueNorth: trueNorth)
         case .windspeed_120m:
             return getDeriverMap(variable: .wind_speed_120m)
         case .wind_speed_120m:
@@ -1280,15 +1296,15 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_120m)
         case .wind_direction_120m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_125m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth)
         case .wind_speed_140m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"))
         case .wind_direction_140m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"), trueNorth: trueNorth)
         case .windspeed_150m:
             return getDeriverMap(variable: .wind_speed_150m)
         case .wind_speed_150m:
@@ -1296,11 +1312,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_150m:
             return getDeriverMap(variable: .wind_direction_150m)
         case .wind_direction_150m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), trueNorth: trueNorth)
         case .wind_speed_160m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_160m"), v: Reader.variableFromString("wind_v_component_160m"))
         case .wind_direction_160m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_160m"), v: Reader.variableFromString("wind_v_component_160m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_160m"), v: Reader.variableFromString("wind_v_component_160m"), trueNorth: trueNorth)
         case .windspeed_180m:
             return getDeriverMap(variable: .wind_speed_180m)
         case .wind_speed_180m:
@@ -1315,10 +1331,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_180m)
         case .wind_direction_180m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_175m")) ??
                 .direct(Reader.variableFromString("wind_direction_200m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_150m"))
         case .windspeed_200m:
             return getDeriverMap(variable: .wind_speed_200m)
@@ -1331,9 +1347,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_200m)
         case .wind_direction_200m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"), trueNorth: trueNorth)
         case .windgusts_10m:
             return getDeriverMap(variable: .wind_gusts_10m)
         case .wind_speed_10m_spread:
