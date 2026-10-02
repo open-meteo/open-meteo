@@ -78,7 +78,7 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
 }
 
 extension IconNativeDomains {
-    /// Validates/reuses the local artifact or regenerates it offline; only regenerated files upload.
+    /// Validates/reuses the local artifact or regenerates it offline; only generated files upload.
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
         let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
         let artifact = nativeGridFile
@@ -121,27 +121,33 @@ extension IconNativeDomains {
         }
 
         let artifactPath = "\(staticDirectory)grid.bin"
-        let grid: IconNativeGrid
+        let coordinatesFile = OmFileType.staticFile(domain: registry, variable: "coordinates")
+        let generated: (grid: IconNativeGrid, coordinatesGenerated: Bool)
         do {
-            grid = try IconNativeGrid.Generator.generateAndPublish(
+            generated = try IconNativeGrid.Generator.generateAndPublish(
                 sourceFile: sourceFile,
                 identity: identity,
-                artifactFile: artifactPath
+                artifactFile: artifactPath,
+                coordinatesFile: coordinatesFile.getFilePath()
             )
         } catch let error as IconNativeGridSourceError where sourceExisted {
             // A cached source may be truncated or may belong to an older operational grid. Retry
             // source errors once with an atomic replacement; readers of the old inode stay valid.
             application.logger.warning("Replacing unusable cached ICON grid definition: \(error)")
             try await downloadSource()
-            grid = try IconNativeGrid.Generator.generateAndPublish(
+            generated = try IconNativeGrid.Generator.generateAndPublish(
                 sourceFile: sourceFile,
                 identity: identity,
-                artifactFile: artifactPath
+                artifactFile: artifactPath,
+                coordinatesFile: coordinatesFile.getFilePath()
             )
         }
 
-        artifact.cache.install(grid.storage)
+        artifact.cache.install(generated.grid.storage)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
+        if generated.coordinatesGenerated {
+            application.logger.info("Generated native ICON coordinates at \(coordinatesFile.getFilePath())")
+        }
         for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
             let uploads = queue.startMultiPartUploads()
             await uploads.uploadMultipart(
@@ -149,6 +155,13 @@ extension IconNativeDomains {
                 objectName: "data/\(registry.rawValue)/static/grid.bin",
                 lastModified: .now()
             )
+            if generated.coordinatesGenerated {
+                await uploads.uploadMultipart(
+                    file: coordinatesFile.getFilePath(),
+                    objectName: coordinatesFile.getRelativeFilePathWithData(),
+                    lastModified: .now()
+                )
+            }
             await queue.finishMultiPartUploads(uploads)
         }
     }

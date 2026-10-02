@@ -37,15 +37,17 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
 extension IconNativeGrid {
     enum Generator {
         /// Builds from an official NetCDF mesh, validates the unpublished artifact and identity,
-        /// then atomically publishes it. Failures leave an existing destination untouched.
+        /// writes missing coordinates from the same source, then atomically publishes the artifact.
+        /// Generation and validation failures leave an existing artifact untouched.
         static func generateAndPublish(
             sourceFile: String,
             identity: IconNativeGridIdentity,
-            artifactFile: String
+            artifactFile: String,
+            coordinatesFile: String
         )
-            throws -> IconNativeGrid
+            throws -> (grid: IconNativeGrid, coordinatesGenerated: Bool)
         {
-            let points = try readSource(file: sourceFile, identity: identity)
+            let source = try readSource(file: sourceFile, identity: identity)
             let maximumFileSize = identity.isGlobal ? 128 * 1_024 * 1_024 : 32 * 1_024 * 1_024
             let metadata = ReducedLatLonArtifact.Metadata(
                 number: identity.gridNumber, uuid: identity.gridUUID.bytes,
@@ -59,7 +61,7 @@ extension IconNativeGrid {
             try ReducedLatLonArtifact.Writer.write(
                 to: artifactHandle,
                 metadata: metadata,
-                points: points,
+                points: source.points,
                 latitudeBandCount: identity.latitudeBandCount,
                 maximumFileSize: maximumFileSize
             )
@@ -67,13 +69,18 @@ extension IconNativeGrid {
             let grid = IconNativeGrid(storage: storage,
                 maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
                 nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
+            let coordinatesGenerated = try writeCoordinatesOmFileIfMissing(
+                file: coordinatesFile, latitudes: source.latitudes, longitudes: source.longitudes
+            )
             try artifactHandle.linkTemporary(file: artifactFile)
-            return grid
+            return (grid, coordinatesGenerated)
         }
 
         /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
         /// location offset in native forecast files.
-        static func readSource(file: String, identity: IconNativeGridIdentity) throws -> [ReducedLatLonPoint] {
+        static func readSource(file: String, identity: IconNativeGridIdentity) throws
+            -> (points: [ReducedLatLonPoint], latitudes: [Double], longitudes: [Double])
+        {
             do {
                 guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
                     throw IconNativeGridSourceError.couldNotOpen(file)
@@ -87,7 +94,8 @@ extension IconNativeGrid {
                     throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
                 }
 
-                return try makePoints(longitudes: clon, latitudes: clat)
+                let points = try makePoints(longitudes: clon, latitudes: clat)
+                return (points, clat, clon)
             } catch let error as IconNativeGridSourceError {
                 throw error
             } catch {
@@ -145,5 +153,32 @@ extension IconNativeGrid {
             return points
         }
 
+        /// Uses the validated source coordinates directly, before Cartesian Float32 rounding.
+        private static func writeCoordinatesOmFileIfMissing(file: String, latitudes: [Double], longitudes: [Double]) throws -> Bool {
+            guard !FileManager.default.fileExists(atPath: file) else {
+                return false
+            }
+            let handle = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
+            let writer = OmFileWriter(fn: handle, initialCapacity: 4 * 1_024)
+            func writeCoordinate(_ values: [Double], name: String, unit: String) throws -> OmOffsetSize {
+                let array = try writer.writeArray(
+                    data: values.map { Float($0 * 180 / .pi) },
+                    dimensions: [1, UInt64(values.count)],
+                    chunkDimensions: [1, UInt64(min(400, values.count))],
+                    compression: .fpx_xor2d,
+                    scale_factor: 1,
+                    add_offset: 0
+                )
+                let unit = try writer.write(value: unit, name: "unit", children: [])
+                return try writer.write(array: array, name: name, children: [unit])
+            }
+            let latitude = try writeCoordinate(latitudes, name: "lat", unit: "degrees_north")
+            let longitude = try writeCoordinate(longitudes, name: "lon", unit: "degrees_east")
+            let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+            let root = try writer.writeNone(name: "", children: [latitude, longitude, createdAt])
+            try writer.writeTrailer(rootVariable: root)
+            try handle.linkTemporary(file: file)
+            return true
+        }
     }
 }

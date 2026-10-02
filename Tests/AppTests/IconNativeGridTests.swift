@@ -260,16 +260,20 @@ private func checkSourceCoordinates(
 ) throws {
     let sourceFile = try #require(sourceFile)
     let artifactFile = temporaryArtifactFile()
+    let coordinatesFile = artifactFile.appendingPathExtension("coordinates.om")
     defer { try? FileManager.default.removeItem(at: artifactFile) }
-    let grid = try IconNativeGrid.Generator.generateAndPublish(
+    defer { try? FileManager.default.removeItem(at: coordinatesFile) }
+    let (grid, _) = try IconNativeGrid.Generator.generateAndPublish(
         sourceFile: sourceFile,
         identity: identity,
-        artifactFile: artifactFile.path
+        artifactFile: artifactFile.path,
+        coordinatesFile: coordinatesFile.path
     )
-    let source = try IconNativeGrid.Generator.readSource(file: sourceFile, identity: identity)
+    let source = try IconNativeGrid.Generator.readSource(file: sourceFile, identity: identity).points
     let originalBytes = try Data(contentsOf: artifactFile)
     _ = try IconNativeGrid.Generator.generateAndPublish(
-        sourceFile: sourceFile, identity: identity, artifactFile: artifactFile.path
+        sourceFile: sourceFile, identity: identity, artifactFile: artifactFile.path,
+        coordinatesFile: coordinatesFile.path
     )
     #expect(try Data(contentsOf: artifactFile) == originalBytes)
     let wrongIdentity = IconNativeGridIdentity(gridNumber: identity.gridNumber, gridUUID: identity.gridUUID,
@@ -278,7 +282,8 @@ private func checkSourceCoordinates(
         sourceFile: identity.sourceFile)
     #expect(throws: IconNativeGridSourceError.self) {
         _ = try IconNativeGrid.Generator.generateAndPublish(
-            sourceFile: sourceFile, identity: wrongIdentity, artifactFile: artifactFile.path
+            sourceFile: sourceFile, identity: wrongIdentity, artifactFile: artifactFile.path,
+            coordinatesFile: coordinatesFile.path
         )
     }
     #expect(try Data(contentsOf: artifactFile) == originalBytes)
