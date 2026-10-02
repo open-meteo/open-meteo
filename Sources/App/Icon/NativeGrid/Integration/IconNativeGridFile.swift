@@ -100,7 +100,7 @@ struct IconNativeGridPayload: OmFilePayload {
                 path: file.object, reason: "Unknown native grid path"
             )
         }
-        let cached = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
+        let cached = try OpenMeteo.makeBlockCachedReader(file)
         storage = try await domain.nativeGridFile.load(file: cached)
     }
 

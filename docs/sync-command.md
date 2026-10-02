@@ -64,6 +64,22 @@ With Docker, you can just spawn this command and leave it running in the backgro
 The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this command. It can be enabled in `/etc/default/openmeteo-api.env` by setting `SYNC_ENABLED=true`, `SYNC_APIKEY=mykey123`, `SYNC_DOMAINS=cmc_gem_gdps,dwd_icon`, `SYNC_VARIABLES=temperature_2m,shortwave_radiation` and `SYNC_REPEAT_INTERVAL=5` followed by a restart with `systemctl restart openmeteo-sync`.
 
 
+## Dual-mode API storage
+
+`OpenMeteo.remoteDataPressureLevelsOnly` in [configure.swift](/Sources/App/configure.swift) is the central hardcoded switch for dual mode. It is enabled by default. Set it to `false` and rebuild to restore unrestricted remote fallback.
+
+With the switch enabled, readers first use local files. Only pressure-level OM files under `data/` and `data_run/` may fall back to `REMOTE_DATA_DIRECTORY` through the atomic block cache. This includes pressure-level spread, previous-day and ensemble-member variants. All other data, static artifacts and JSON metadata must be available locally. Spatial files remain local-only because they can contain multiple variables. Missing local non-pressure-level files are treated as unavailable, even if copies exist remotely or blocks remain in a cache from a previous deployment.
+
+Use the existing sync selectors to download non-pressure-level and previous-day data. For example, retaining a second server/model group for precipitation probability:
+
+```sh
+SYNC_VARIABLES='really_download_all_previous_day,really_download_all_surface_levels;precipitation_probability'
+```
+
+The previous-day selector includes all previous-day directories, including any pressure-level previous-day directories present upstream. Existing local pressure-level files continue to take precedence over remote files. The sync command covers `data/`; deployments serving full-run data must also synchronize the required non-pressure-level files and metadata in `data_run/`.
+
+Configure `REMOTE_DATA_DIRECTORY`, `CACHE_FILE`, `CACHE_SIZE` and `BLOCK_SIZE` as usual. Remote directory listings are unaffected; a listed object may still be unavailable for remote reads under this policy. Changing the hardcoded switch requires rebuilding and restarting the API.
+
 ## Cleanup old data
 To automatically cleanup old data, the following cronjobs can be used.
 

@@ -5,6 +5,11 @@ import Synchronization
 import OmFileIO
 
 enum OpenMeteo {
+    /// Dual mode: only pressure-level files may use remote storage; all other files must be synced locally.
+    /// Set to false to restore unrestricted remote fallback. Requires rebuilding and restarting.
+    static let remoteDataPressureLevelsOnly = true
+    static let remoteDataPolicy = RemoteDataPolicy(pressureLevelsOnly: remoteDataPressureLevelsOnly)
+
     /// Data directory with trailing slash
     static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
@@ -35,7 +40,7 @@ enum OpenMeteo {
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
     static let dataBlockCacheInitialized = Atomic(false)
 
-    static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
+    private static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
         let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
@@ -44,6 +49,18 @@ enum OpenMeteo {
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache
     }()
+
+    /// Check before evaluating the cache argument, including when updating or preloading a file.
+    static func makeBlockCachedReader(_ file: OmHttpReaderBackend, cache: @autoclosure () -> AtomicCacheCoordinator<MmapFile> = dataBlockCache) throws -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        guard remoteDataPolicy.allowsRemoteFile(path: file.object) else {
+            throw RemoteDataPolicyError.remoteFileNotAllowed(file.object)
+        }
+        return OmReaderBlockCache(backend: file, cache: cache(), cacheKey: file.cacheKey)
+    }
+
+    static var dataBlockCacheStatistics: AtomicBlockCacheStatistics {
+        dataBlockCacheInitialized.load(ordering: .relaxed) ? dataBlockCache.cache.statistics() : .zero
+    }
     
     /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
     /*static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
