@@ -3,6 +3,8 @@ import Foundation
 @testable import ReducedLatLon
 import OmFileFormat
 import Testing
+import AsyncHTTPClient
+import Logging
 
 @Suite struct IconNativeGridTests {
     @Test func initializedDomainsShareDecodedElevations() async throws {
@@ -269,10 +271,10 @@ private func checkSourceCoordinates(
         artifactFile: artifactFile.path,
         coordinatesFile: coordinatesFile.path
     )
-    let source = try IconNativeGrid.Generator.readSource(file: sourceFile, identity: identity).points
+    let coordinates = try IconNativeGrid.Generator.readCoordinates(file: sourceFile, identity: identity)
     let originalBytes = try Data(contentsOf: artifactFile)
     _ = try IconNativeGrid.Generator.generateAndPublish(
-        sourceFile: sourceFile, identity: identity, artifactFile: artifactFile.path,
+        coordinates: coordinates, identity: identity, artifactFile: artifactFile.path,
         coordinatesFile: coordinatesFile.path
     )
     #expect(try Data(contentsOf: artifactFile) == originalBytes)
@@ -293,12 +295,13 @@ private func checkSourceCoordinates(
         artifactFile.resourceValues(forKeys: [.fileSizeKey]).fileSize
     )
     #expect(artifactBytes <= maximumArtifactBytes)
-    let stride = max(1, source.count / targetSampleCount)
-    for cell in Swift.stride(from: 0, to: source.count, by: stride) {
+    let stride = max(1, coordinates.latitudes.count / targetSampleCount)
+    for cell in Swift.stride(from: 0, to: coordinates.latitudes.count, by: stride) {
+        let source = ReducedLatLonPoint(latitudeRadians: coordinates.latitudes[cell], longitudeRadians: coordinates.longitudes[cell])
         let stored = grid.storage.point(at: cell)
-        #expect(source[cell].x.bitPattern == stored.x.bitPattern)
-        #expect(source[cell].y.bitPattern == stored.y.bitPattern)
-        #expect(source[cell].z.bitPattern == stored.z.bitPattern)
+        #expect(source.x.bitPattern == stored.x.bitPattern)
+        #expect(source.y.bitPattern == stored.y.bitPattern)
+        #expect(source.z.bitPattern == stored.z.bitPattern)
     }
 }
 

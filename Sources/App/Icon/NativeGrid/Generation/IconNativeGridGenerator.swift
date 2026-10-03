@@ -36,6 +36,8 @@ enum IconNativeGridSourceError: Error, CustomStringConvertible {
 /// here, never in API coordinate lookup.
 extension IconNativeGrid {
     enum Generator {
+        typealias Coordinates = (latitudes: [Double], longitudes: [Double])
+
         /// Builds from an official NetCDF mesh, validates the unpublished artifact and identity,
         /// writes missing coordinates from the same source, then atomically publishes the artifact.
         /// Generation and validation failures leave an existing artifact untouched.
@@ -47,7 +49,23 @@ extension IconNativeGrid {
         )
             throws -> (grid: IconNativeGrid, coordinatesGenerated: Bool)
         {
-            let source = try readSource(file: sourceFile, identity: identity)
+            let coordinates = try readCoordinates(file: sourceFile, identity: identity)
+            return try generateAndPublish(
+                coordinates: coordinates, identity: identity,
+                artifactFile: artifactFile, coordinatesFile: coordinatesFile
+            )
+        }
+
+        /// Reuses coordinates already validated by readCoordinates, without reopening the mesh.
+        static func generateAndPublish(
+            coordinates: Coordinates,
+            identity: IconNativeGridIdentity,
+            artifactFile: String,
+            coordinatesFile: String
+        ) throws -> (grid: IconNativeGrid, coordinatesGenerated: Bool) {
+            let points = zip(coordinates.latitudes, coordinates.longitudes).map {
+                ReducedLatLonPoint(latitudeRadians: $0, longitudeRadians: $1)
+            }
             let maximumFileSize = identity.isGlobal ? 128 * 1_024 * 1_024 : 32 * 1_024 * 1_024
             let metadata = ReducedLatLonArtifact.Metadata(
                 number: identity.gridNumber, uuid: identity.gridUUID.bytes,
@@ -61,7 +79,7 @@ extension IconNativeGrid {
             try ReducedLatLonArtifact.Writer.write(
                 to: artifactHandle,
                 metadata: metadata,
-                points: source.points,
+                points: points,
                 latitudeBandCount: identity.latitudeBandCount,
                 maximumFileSize: maximumFileSize
             )
@@ -70,7 +88,7 @@ extension IconNativeGrid {
                 maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
                 nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
             let coordinatesGenerated = try writeCoordinatesOmFileIfMissing(
-                file: coordinatesFile, latitudes: source.latitudes, longitudes: source.longitudes
+                file: coordinatesFile, latitudes: coordinates.latitudes, longitudes: coordinates.longitudes
             )
             try artifactHandle.linkTemporary(file: artifactFile)
             return (grid, coordinatesGenerated)
@@ -78,29 +96,34 @@ extension IconNativeGrid {
 
         /// Cell arrays remain in NetCDF/GRIB order; this makes a cell index directly usable as the
         /// location offset in native forecast files.
-        static func readSource(file: String, identity: IconNativeGridIdentity) throws
-            -> (points: [ReducedLatLonPoint], latitudes: [Double], longitudes: [Double])
-        {
+        static func readCoordinates(file: String, identity: IconNativeGridIdentity) throws -> Coordinates {
             do {
                 guard let group = try NetCDF.open(path: file, allowUpdate: false) else {
                     throw IconNativeGridSourceError.couldNotOpen(file)
                 }
-                try validateAttributes(group: group, identity: identity)
-
-                let cellCount = identity.cellCount
-                let clon = try readDouble(group: group, name: "clon")
-                let clat = try readDouble(group: group, name: "clat")
-                guard clon.count == cellCount, clat.count == cellCount else {
-                    throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
-                }
-
-                let points = try makePoints(longitudes: clon, latitudes: clat)
-                return (points, clat, clon)
+                return try readCoordinates(group: group, identity: identity)
             } catch let error as IconNativeGridSourceError {
                 throw error
             } catch {
                 throw IconNativeGridSourceError.io(path: file, reason: String(describing: error))
             }
+        }
+
+        static func readCoordinates(group: Group, identity: IconNativeGridIdentity) throws -> Coordinates {
+            try validateAttributes(group: group, identity: identity)
+            let latitudes = try readDouble(group: group, name: "clat")
+            let longitudes = try readDouble(group: group, name: "clon")
+            guard latitudes.count == identity.cellCount, longitudes.count == identity.cellCount else {
+                throw IconNativeGridSourceError.invalidTopology("coordinate array length mismatch")
+            }
+            for index in latitudes.indices {
+                let latitude = latitudes[index], longitude = longitudes[index]
+                guard latitude.isFinite, longitude.isFinite,
+                      abs(latitude) <= .pi / 2 + 1e-8, abs(longitude) <= .pi + 1e-8 else {
+                    throw IconNativeGridSourceError.invalidValue(variable: "clon/clat", index: index)
+                }
+            }
+            return (latitudes, longitudes)
         }
 
         private static func validateAttributes(group: Group, identity: IconNativeGridIdentity) throws {
@@ -134,23 +157,6 @@ extension IconNativeGrid {
                 throw IconNativeGridSourceError.invalidDimensions(variable: name, actual: actual)
             }
             return try typed.read()
-        }
-
-        private static func makePoints(longitudes: [Double], latitudes: [Double]) throws -> [ReducedLatLonPoint] {
-            var points = [ReducedLatLonPoint]()
-            points.reserveCapacity(longitudes.count)
-            for index in longitudes.indices {
-                let longitude = longitudes[index]
-                let latitude = latitudes[index]
-                guard longitude.isFinite, latitude.isFinite,
-                    longitude >= -.pi - 1e-8, longitude <= .pi + 1e-8,
-                    latitude >= -.pi / 2 - 1e-8, latitude <= .pi / 2 + 1e-8
-                else {
-                    throw IconNativeGridSourceError.invalidValue(variable: "clon/clat", index: index)
-                }
-                points.append(ReducedLatLonPoint(latitudeRadians: latitude, longitudeRadians: longitude))
-            }
-            return points
         }
 
         /// Uses the validated source coordinates directly, before Cartesian Float32 rounding.
