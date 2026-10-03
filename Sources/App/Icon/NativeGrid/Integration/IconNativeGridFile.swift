@@ -155,6 +155,7 @@ extension IconNativeGridFile {
         }
         return IconNativeGrid(
             storage: storage,
+            resolutionMeters: identity.resolutionMeters,
             maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared
         )

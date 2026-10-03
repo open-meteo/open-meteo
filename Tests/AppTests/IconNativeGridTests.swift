@@ -22,21 +22,21 @@ import Testing
         #expect(Array(empty).isEmpty)
     }
 
-    @Test(arguments: [UInt32(26), 47, 123])
-    func boundingBoxEstimate(gridNumber: UInt32) throws {
+    @Test(arguments: [IconNativeGridIdentity.global, .d2])
+    func boundingBoxEstimate(identity: IconNativeGridIdentity) throws {
         let file = temporaryArtifactFile()
         defer { try? FileManager.default.removeItem(at: file) }
         try ReducedLatLonArtifact.Writer.write(to: file,
-            metadata: .init(number: gridNumber, uuid: Array(0..<16), coversWholeSphere: true),
+            metadata: .init(number: 123, uuid: Array(0..<16), coversWholeSphere: true),
             points: Array(repeating: ReducedLatLonPoint(x: 1, y: 0, z: 0), count: 100), latitudeBandCount: 1)
-        let grid = IconNativeGrid(storage: try ReducedLatLonIndex(file: file),
+        let grid = IconNativeGrid(storage: try ReducedLatLonIndex(file: file), resolutionMeters: identity.resolutionMeters,
             maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
         let box = BoundingBoxWGS84(latitude: 0..<0.1, longitude: 0..<0.1)
         // About 124 km²: one nominal global cell or 31 nominal D2 cells.
-        #expect(grid.estimatedNumberOfGridCells(boundingBox: box) == (gridNumber == 26 ? 1 : gridNumber == 47 ? 31 : nil))
-        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: 60..<60.1, longitude: 0..<0.1)) == (gridNumber == 26 ? 1 : gridNumber == 47 ? 16 : nil))
-        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: -90..<90, longitude: -180..<180)) == (gridNumber == 123 ? nil : 100))
-        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: 0..<0, longitude: 0..<1)) == (gridNumber == 123 ? nil : 0))
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: box) == (identity.isGlobal ? 1 : 31))
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: 60..<60.1, longitude: 0..<0.1)) == (identity.isGlobal ? 1 : 16))
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: -90..<90, longitude: -180..<180)) == 100)
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: 0..<0, longitude: 0..<1)) == 0)
     }
 
     @Test func initializedDomainsShareDecodedElevations() async throws {
@@ -49,7 +49,7 @@ import Testing
         let replacement = try await makeElevationFile([900, 700])
         defer { file.remove(); replacement.remove() }
         let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
-        let grid = IconNativeGrid(storage: fixture.grid.storage,
+        let grid = IconNativeGrid(storage: fixture.grid.storage, resolutionMeters: fixture.grid.resolutionMeters,
             maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
             elevations: elevations)
@@ -120,6 +120,7 @@ import Testing
                 cellCount: valid.cellCount + (mismatch == 2 ? 1 : 0),
                 isGlobal: mismatch == 3 ? false : valid.isGlobal,
                 latitudeBandCount: valid.latitudeBandCount + (mismatch == 4 ? 1 : 0),
+                resolutionMeters: valid.resolutionMeters,
                 maximumDistanceMeters: valid.maximumDistanceMeters,
                 sourceFile: valid.sourceFile
             )
@@ -173,7 +174,7 @@ import Testing
             let file = try await makeElevationFile(elevations)
             defer { file.remove() }
             let elevations = try await ElevationValues(decoded: file.reader.read(), expectedCount: 2)
-            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage,
+            let nativeGrid = IconNativeGrid(storage: fixture.grid.storage, resolutionMeters: fixture.grid.resolutionMeters,
                 maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
                 nearbyMaximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
                 elevations: elevations)
@@ -207,6 +208,7 @@ import Testing
             let decoded = try await ElevationValues(decoded: file.reader.read(), expectedCount: 3)
             let grid = IconNativeGrid(
                 storage: fixture.index,
+                resolutionMeters: fixture.grid.resolutionMeters,
                 maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
                 nearbyMaximumChordDistanceSquared: nearbyDistance,
                 elevations: decoded
@@ -268,6 +270,7 @@ private extension NativeGridFixture {
     var grid: IconNativeGrid {
         IconNativeGrid(
             storage: index,
+            resolutionMeters: IconNativeGridIdentity.global.resolutionMeters,
             maximumChordDistanceSquared: maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: maximumChordDistanceSquared
         )
@@ -281,6 +284,7 @@ private func makeIdentity(_ fixture: NativeGridFixture) -> IconNativeGridIdentit
         cellCount: fixture.centers.count,
         isGlobal: true,
         latitudeBandCount: fixture.index.latitudeBandCount,
+        resolutionMeters: IconNativeGridIdentity.global.resolutionMeters,
         maximumDistanceMeters: 10_000_000,
         sourceFile: "synthetic.nc"
     )
@@ -312,7 +316,7 @@ private func checkSourceCoordinates(
     #expect(try Data(contentsOf: artifactFile) == originalBytes)
     let wrongIdentity = IconNativeGridIdentity(gridNumber: identity.gridNumber, gridUUID: identity.gridUUID,
         cellCount: identity.cellCount + 1, isGlobal: identity.isGlobal,
-        latitudeBandCount: identity.latitudeBandCount, maximumDistanceMeters: identity.maximumDistanceMeters,
+        latitudeBandCount: identity.latitudeBandCount, resolutionMeters: identity.resolutionMeters, maximumDistanceMeters: identity.maximumDistanceMeters,
         sourceFile: identity.sourceFile)
     #expect(throws: IconNativeGridSourceError.self) {
         _ = try IconNativeGrid.Generator.generateAndPublish(
