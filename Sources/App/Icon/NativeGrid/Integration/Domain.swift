@@ -12,6 +12,8 @@ struct IconNativeGridIdentity: Sendable, Hashable {
     let isGlobal: Bool
     /// Number of equal-height latitude bands used by the spatial index.
     let latitudeBandCount: Int
+    /// Nominal horizontal resolution used to estimate bounding-box cell counts.
+    let resolutionMeters: Double
     let maximumDistanceMeters: Float
     /// Uncompressed NetCDF filename in MPI's DWD grid catalogue, also used for the local cache.
     let sourceFile: String
@@ -22,6 +24,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         cellCount: 2_949_120,
         isGlobal: true,
         latitudeBandCount: 1_111,
+        resolutionMeters: 13_200,
         maximumDistanceMeters: 20_000,
         sourceFile: "icon_grid_0026_R03B07_G.nc"
     )
@@ -32,6 +35,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         cellCount: 542_040,
         isGlobal: false,
         latitudeBandCount: 4_446,
+        resolutionMeters: 2_000,
         maximumDistanceMeters: 4_000,
         sourceFile: "icon_grid_0047_R19B07_L.nc"
     )
