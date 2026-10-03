@@ -9,7 +9,7 @@ import ReducedLatLon
 /// search; ICON's Earth radius and elevation scoring remain integration policy rather than artifact
 /// format concerns. Regional acceptance is distance-based, not polygon containment.
 struct IconNativeGrid: Gridable {
-    typealias SliceType = Range<Int>
+    typealias SliceType = [Int]
 
     let storage: ReducedLatLonIndex
     let maximumChordDistanceSquared: Float
@@ -53,9 +53,23 @@ struct IconNativeGrid: Gridable {
 
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
 
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> Range<Int>? { nil }
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> [Int]? {
+        storage.pointIDs(latitude: bb.latitude, longitude: bb.longitude)
+    }
 
-    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? {
+        let resolution: Double
+        switch storage.metadata.number {
+        case 26: resolution = 13_200
+        case 47: resolution = 2_000
+        default: return nil
+        }
+        let radians = Double.pi / 180
+        let radius = IconNativeGridIdentity.earthRadiusMeters
+        let area = radius * radius * (Double(bb.longitude.upperBound) - Double(bb.longitude.lowerBound)) * radians
+            * (sin(Double(bb.latitude.upperBound) * radians) - sin(Double(bb.latitude.lowerBound) * radians))
+        return Int(min(Double(storage.pointCount), max(0, ceil(area / (resolution * resolution)))))
+    }
 
     /// Returns the stored mass-point direction as latitude/longitude degrees for a canonical ID.
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {

@@ -5,6 +5,40 @@ import OmFileFormat
 import Testing
 
 @Suite struct IconNativeGridTests {
+    @Test func boundingBoxUsesCanonicalIDs() throws {
+        let fixture = try makeFixture(centers: [
+            ReducedLatLonPoint(latitudeDegrees: 20, longitudeDegrees: 20),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
+            ReducedLatLonPoint(latitudeDegrees: 5, longitudeDegrees: 5),
+            ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0)
+        ])
+        defer { fixture.remove() }
+        let grid: any Gridable = fixture.grid
+        let box = BoundingBoxWGS84(latitude: 0..<10, longitude: 0..<10)
+        let ids = try #require(grid.findBox(boundingBox: box))
+        #expect(Array(ids) == [1, 2, 3])
+        #expect(Array(ids) == [1, 2, 3]) // The controller enumerates results more than once.
+        let empty = try #require(grid.findBox(boundingBox: .init(latitude: -80..<(-70), longitude: 0..<10)))
+        #expect(Array(empty).isEmpty)
+    }
+
+    @Test(arguments: [UInt32(26), 47, 123])
+    func boundingBoxEstimate(gridNumber: UInt32) throws {
+        let file = temporaryArtifactFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        try ReducedLatLonArtifact.Writer.write(to: file,
+            metadata: .init(number: gridNumber, uuid: Array(0..<16), coversWholeSphere: true),
+            points: Array(repeating: ReducedLatLonPoint(x: 1, y: 0, z: 0), count: 100), latitudeBandCount: 1)
+        let grid = IconNativeGrid(storage: try ReducedLatLonIndex(file: file),
+            maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
+        let box = BoundingBoxWGS84(latitude: 0..<0.1, longitude: 0..<0.1)
+        // About 124 km²: one nominal global cell or 31 nominal D2 cells.
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: box) == (gridNumber == 26 ? 1 : gridNumber == 47 ? 31 : nil))
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: 60..<60.1, longitude: 0..<0.1)) == (gridNumber == 26 ? 1 : gridNumber == 47 ? 16 : nil))
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: -90..<90, longitude: -180..<180)) == (gridNumber == 123 ? nil : 100))
+        #expect(grid.estimatedNumberOfGridCells(boundingBox: .init(latitude: 0..<0, longitude: 0..<1)) == (gridNumber == 123 ? nil : 0))
+    }
+
     @Test func initializedDomainsShareDecodedElevations() async throws {
         let fixture = try makeFixture(centers: [
             ReducedLatLonPoint(latitudeDegrees: 0, longitudeDegrees: 0),
