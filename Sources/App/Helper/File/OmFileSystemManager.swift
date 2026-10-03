@@ -25,7 +25,12 @@ final class OmFileSystemManager: Sendable {
     
     let localFileSystem: OmFileSystemLocal.Directory
     
-    let remoteFileSystem: OmFileSystemS3?
+    private let remoteFileSystem: OmFileSystemS3?
+
+    init(localFileSystem: OmFileSystemLocal.Directory, remoteFileSystem: OmFileSystemS3?) {
+        self.localFileSystem = localFileSystem
+        self.remoteFileSystem = remoteFileSystem
+    }
     
     private init() {
         /// Make om root directory with data, data_run and data_spatial
@@ -91,19 +96,20 @@ final class OmFileSystemManager: Sendable {
     func getDirectory(path: String, client: HTTPClient, logger: Logger) async throws -> LocalAndRemoteDirectory? {
         let local = await localFileSystem.getDirectory(fullPath: path)
         guard let remoteFileSystem else {
-            return LocalAndRemoteDirectory(local: local, remote: nil)
+            return LocalAndRemoteDirectory(path: path, local: local, remote: nil)
         }
         let remote = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path)
-        return LocalAndRemoteDirectory(local: local, remote: remote)
+        return LocalAndRemoteDirectory(path: path, local: local, remote: remote)
     }
     
     func getFile(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> FileType? {
         if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
         }
-        if localOnly == false, let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
+        if localOnly == false, OpenMeteo.remoteDataPolicy.allowsRemoteFile(path: path),
+           let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
             let client = await file.file.makeCachedClient(context: file.context)
-            let file = OmReaderBlockCache(backend: client, cache: OpenMeteo.dataBlockCache, cacheKey: client.cacheKey)
+            let file = try OpenMeteo.makeBlockCachedReader(client)
             return .remote(file)
         }
         return nil
@@ -116,7 +122,7 @@ final class OmFileSystemManager: Sendable {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
             return try await fn(payload)
         }
-        guard let remoteFileSystem else {
+        guard OpenMeteo.remoteDataPolicy.allowsRemoteFile(path: path), let remoteFileSystem else {
             return nil
         }
         /// Check for remote file
@@ -160,17 +166,19 @@ final class OmFileSystemManager: Sendable {
 
 extension OmFileSystemManager {
     struct LocalAndRemoteDirectory {
+        let path: String
         let local: OmFileSystemLocal.Directory?
-        let remote: OmFileSystemS3.DirectoryWithContext?
+        fileprivate let remote: OmFileSystemS3.DirectoryWithContext?
         
         /// Get a sub directory in this directory
         func getDirectory(name: String) async throws -> LocalAndRemoteDirectory {
+            let path = "\(path)\(name)/"
             let local = await local?.getDirectory(name: name)
             guard let remote else {
-                return LocalAndRemoteDirectory(local: local, remote: nil)
+                return LocalAndRemoteDirectory(path: path, local: local, remote: nil)
             }
             let remoteContents = try await remote.getDirectory(name: name)
-            return LocalAndRemoteDirectory(local: local, remote: remoteContents)
+            return LocalAndRemoteDirectory(path: path, local: local, remote: remoteContents)
         }
         
         /// Get a file in this directory
@@ -178,7 +186,8 @@ extension OmFileSystemManager {
             if let file = await local?.getFile(name: name) {
                 return .local(file)
             }
-            if let remote, let file = await remote.getFile(name: name) {
+            if OpenMeteo.remoteDataPolicy.allowsRemoteFile(path: "\(path)\(name)"),
+               let remote, let file = await remote.getFile(name: name) {
                 return .remote(file)
             }
             return nil
