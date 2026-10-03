@@ -53,14 +53,14 @@ enum FullRunMetaFile/*: RemoteFileManageableJson*/ {
     case latest(DomainRegistry)
     case run(DomainRegistry, Timestamp)
     
-    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+    /*func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         switch self {
         case .latest(_):
             return 30
         case .run(_, let run):
             return modificationTime == nil ? 30 : run > now.subtract(hours: 24) ? 5*60 : 24*3600
         }
-    }
+    }*/
 }
 
 extension FullRunMetaFile: OmFileManagable {

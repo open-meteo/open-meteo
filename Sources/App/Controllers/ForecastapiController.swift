@@ -353,7 +353,7 @@ struct WeatherApiController {
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
                 var countedModels = Set<MultiDomains>()
                 locations = try await domains.asyncFlatMap({ domain in
-                    guard let grid = domain.genericDomain?.grid else {
+                    guard let grid = try? await domain.genericDomain()?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
                     guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
@@ -818,6 +818,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_icon_global_native
+    case dwd_icon_d2_native
+    case dwd_icon_d2_native_15min
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
@@ -1250,7 +1253,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     /// Generic domains with hourly data that can use the generic deriver controller
-    func getDomainAndVariable(include15Min: Bool = false) -> DomainReaderMapping? {
+    func getDomainAndVariable(include15Min: Bool = false) async throws -> DomainReaderMapping? {
         switch self {
         case .kma_gdps:
             return .single(KmaDomain.gdps, KmaVariable.self)
@@ -1305,6 +1308,23 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ])
         case .ncep_nbm_conus:
             return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
+        case .dwd_icon_global_native:
+            return .singleWithPrecipitationProbability(
+                try await IconNativeDomains.iconNative.load(),
+                IconVariable.self,
+                precipitationProb: IconDomains.iconEps
+            )
+        case .dwd_icon_d2_native:
+            return .singleWithSupplementalDomains(
+                try await IconNativeDomains.iconD2Native.load(),
+                IconVariable.self,
+                lowerPriority: [],
+                higherPriority: [(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)],
+                precipitationProb: IconDomains.iconD2Eps,
+                gridpointPolicy: .primaryOnly
+            )
+        case .dwd_icon_d2_native_15min:
+            return .single(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
         case .ncep_aigfs025:
             return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
@@ -1740,7 +1760,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
-        if let d = getDomainAndVariable(include15Min: include15Min) {
+        if let d = try await getDomainAndVariable(include15Min: include15Min) {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         
@@ -1802,7 +1822,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // Scandinavian region, combine MetNo Nordic with IFS HRES
             if lat >= 54.9, let _ = try await MetNoDomain.nordic_pp.makeHourlyReader(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                guard let mapping = Self.metno_seamless.getDomainAndVariable() else {
+                guard let mapping = try await Self.metno_seamless.getDomainAndVariable() else {
                     throw ModelError.domainInitFailed(domain: Self.metno_seamless.rawValue)
                 }
                 return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -2085,7 +2105,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
-        if let mapping = getDomainAndVariable() {
+        if let mapping = try await getDomainAndVariable() {
             switch mapping {
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _):
@@ -2172,6 +2192,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_d2, .dwd_icon_d2:
             return [] // migrated
         case .dwd_icon_d2_15min:
+            return [] // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
             return [] // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -2350,8 +2372,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    var genericDomain: (any GenericDomain)? {
-        if let d = getDomainAndVariable() {
+    func genericDomain() async throws -> (any GenericDomain)? {
+        if let d = try await getDomainAndVariable() {
             return d.singleDomain
         }
         
@@ -2388,6 +2410,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_d2, .dwd_icon_d2:
             return nil // migrated
         case .dwd_icon_d2_15min:
+            return nil // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
             return nil // migrated
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
@@ -2626,6 +2650,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_d2, .dwd_icon_d2:
             return nil // migrated
         case .dwd_icon_d2_15min:
+            return nil // migrated
+        case .dwd_icon_global_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
             return nil // migrated
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)

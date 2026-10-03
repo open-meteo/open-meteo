@@ -89,11 +89,6 @@ enum ReaderStaticVariable {
     case elevation
 }
 
-struct DomainInitContext {
-    let logger: Logger
-    let httpClient: HTTPClient
-}
-
 /**
  Generic reader implementation that resolves a grid point and interpolates data.
  Corrects elevation
@@ -129,6 +124,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Initialise reader to read a single grid-point
+    // TODO: Use decoded cached elevations for icon native domains in both initializers 
+    // and getStatic(.elevation) to avoid redundant filesystem-cache access and OM reads.
     public init(domain: Domain, position: Int, options: GenericReaderOptions) async throws {
         self.domain = domain
         self.position = position
