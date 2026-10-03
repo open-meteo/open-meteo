@@ -58,6 +58,52 @@ private func verify(_ index: ReducedLatLonIndex, _ points: [Point], latitude: Fl
 }
 
 @Suite struct ReducedLatLonTests {
+    @Test(arguments: [1, 32, 97], [true, false])
+    func boundingBoxesMatchFullScan(bands: Int, global: Bool) throws {
+        var points = centers(513)
+        if !global {
+            points = points.filter { abs($0.coordinate.longitude) > 150 && abs($0.coordinate.latitude) > 15 }
+        }
+        // Include both dateline representations and distinct IDs at the same coordinate.
+        points += [Point(x: -1, y: 0, z: 0), Point(x: -1, y: -Float.zero, z: 0),
+                   Point(x: 1, y: 0, z: 0), Point(x: 1, y: 0, z: 0)]
+        if global {
+            points += [Point(x: 0, y: 0, z: 1), Point(x: 0, y: 0, z: -1)]
+        }
+        let (file, index) = try fixture(points, bands: bands, global: global)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        func check(_ latitude: Range<Float>, _ longitude: Range<Float>) {
+            let expected = points.indices.filter {
+                let c = points[$0].coordinate
+                return latitude.contains(c.latitude) && longitude.contains(c.longitude)
+            }
+            #expect(index.pointIDs(latitude: latitude, longitude: longitude) == expected)
+        }
+
+        check(-90..<90, -180..<180)
+        check(0..<0, -180..<180)
+        check(-90..<90, 0..<0)
+        for south in stride(from: Float(-90), to: 90, by: 15) {
+            check(south..<min(90, south + 15), -180..<180)
+            for west in stride(from: Float(-180), to: 180, by: 15) {
+                check(south..<min(90, south + 15), west..<min(180, west + 15))
+            }
+        }
+        // Exact point boundaries and adjacent Float bounds must agree with returned coordinates.
+        for point in points {
+            let c = point.coordinate
+            check(max(-90, c.latitude.nextDown)..<min(90, c.latitude.nextUp),
+                  max(-180, c.longitude.nextDown)..<min(180, c.longitude.nextUp))
+            check(c.latitude..<90, c.longitude..<180)
+            check(-90..<c.latitude, -180..<c.longitude)
+        }
+        for row in 0...bands {
+            let latitude = Float(-90 + Double(row) * 180 / Double(bands))
+            check(max(-90, latitude.nextDown)..<min(90, latitude.nextUp), -180..<180)
+        }
+    }
+
     @Test func unpublishedHandleAndAtomicReplacementPreserveMappings() throws {
         let originalPoints = centers(17)
         let (file, originalIndex) = try fixture(originalPoints)

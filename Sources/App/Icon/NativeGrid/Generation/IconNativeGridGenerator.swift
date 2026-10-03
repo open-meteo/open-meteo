@@ -67,6 +67,7 @@ extension IconNativeGrid {
             )
             let storage = try identity.loadStorage(mapped: MmapFile(fn: artifactHandle), path: artifactFile)
             let grid = IconNativeGrid(storage: storage,
+                resolutionMeters: identity.resolutionMeters,
                 maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
                 nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
             let coordinatesGenerated = try writeCoordinatesOmFileIfMissing(
