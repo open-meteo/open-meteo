@@ -1,11 +1,18 @@
 /// Controls which stored files may fall back to the remote block cache.
-struct RemoteDataPolicy: Sendable {
-    let pressureLevelsOnly: Bool
+enum RemoteDataPolicy: String, CaseIterable, Sendable {
+    case all
+    case pressureLevelsOnly
 
     func allowsRemoteFile(path: String) -> Bool {
-        guard pressureLevelsOnly else {
+        switch self {
+        case .all:
             return true
+        case .pressureLevelsOnly:
+            return Self.isPressureLevelFile(path: path)
         }
+    }
+
+    private static func isPressureLevelFile(path: String) -> Bool {
         let parts = path.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
               let filename = parts.last, filename.hasSuffix(".om") else {

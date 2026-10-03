@@ -5,10 +5,14 @@ import Synchronization
 import OmFileIO
 
 enum OpenMeteo {
-    /// Dual mode: only pressure-level files may use remote storage; all other files must be synced locally.
-    /// Set to false to restore unrestricted remote fallback. Requires rebuilding and restarting.
-    static let remoteDataPressureLevelsOnly = true
-    static let remoteDataPolicy = RemoteDataPolicy(pressureLevelsOnly: remoteDataPressureLevelsOnly)
+    /// Select which files may use remote storage. Defaults to unrestricted remote fallback.
+    static let remoteDataPolicy: RemoteDataPolicy = {
+        let value = Environment.get("REMOTE_DATA_POLICY") ?? RemoteDataPolicy.all.rawValue
+        guard let policy = RemoteDataPolicy(rawValue: value) else {
+            fatalError("Invalid REMOTE_DATA_POLICY '\(value)'. Expected one of: \(RemoteDataPolicy.allCases.map(\.rawValue).joined(separator: ", "))")
+        }
+        return policy
+    }()
 
     /// Data directory with trailing slash
     static let dataDirectory = {
@@ -191,6 +195,8 @@ extension Application {
 
 // configures your application
 public func configure(_ app: Application) throws {
+    // Validate the policy at startup, before the first remote read.
+    _ = OpenMeteo.remoteDataPolicy
     TimeZone.ReferenceType.default = TimeZone.gmt
 
     let corsConfiguration = CORSMiddleware.Configuration(

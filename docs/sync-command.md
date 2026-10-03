@@ -66,7 +66,7 @@ The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this com
 
 ## Dual-mode API storage
 
-`OpenMeteo.remoteDataPressureLevelsOnly` in [configure.swift](/Sources/App/configure.swift) is the central hardcoded switch for dual mode. It is enabled by default. Set it to `false` and rebuild to restore unrestricted remote fallback.
+Set the environment variable `REMOTE_DATA_POLICY=pressureLevelsOnly` to enable dual mode. By default, all data are allowed to use remote fallback. Leave the variable unset or set it to `all` for unrestricted remote fallback. These are the supported policy values; an unknown value causes the API to fail at startup.
 
 With the switch enabled, readers first use local files. Only pressure-level OM files under `data/` and `data_run/` may fall back to `REMOTE_DATA_DIRECTORY` through the atomic block cache. This includes pressure-level spread and ensemble-member variants. All other data, static artifacts and JSON metadata must be available locally. Spatial files remain local-only because they can contain multiple variables. Missing local non-pressure-level files are treated as unavailable, even if copies exist remotely or blocks remain in a cache from a previous deployment.
 
@@ -78,7 +78,7 @@ SYNC_VARIABLES='really_download_all_surface_levels;precipitation_probability'
 
 Pressure-level variables disable previous-day storage (`storePreviousForecast = false`), so this combination synchronizes non-pressure-level data, including previous days. Existing local pressure-level files continue to take precedence over remote files. The sync command covers `data/`; deployments serving full-run data must also synchronize the required non-pressure-level files and metadata in `data_run/`.
 
-Configure `REMOTE_DATA_DIRECTORY`, `CACHE_FILE`, `CACHE_SIZE` and `BLOCK_SIZE` as usual. Remote directory listings are unaffected; a listed object may still be unavailable for remote reads under this policy. Changing the hardcoded switch requires rebuilding and restarting the API.
+Configure `REMOTE_DATA_DIRECTORY`, `CACHE_FILE`, `CACHE_SIZE` and `BLOCK_SIZE` as usual. Remote directory listings are unaffected; a listed object may still be unavailable for remote reads under this policy. Restart the API after changing `REMOTE_DATA_POLICY`; no rebuild is required.
 
 ## Cleanup old data
 To automatically cleanup old data, the following cronjobs can be used.
