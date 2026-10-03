@@ -209,6 +209,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")
     app.asyncCommands.use(GfsGraphCastDownload(), as: "download-gfs-graphcast")
     app.asyncCommands.use(NbmDownload(), as: "download-nbm")
+    app.asyncCommands.use(NcepRrfsDownloader(), as: "download-ncep-rrfs")
     app.asyncCommands.use(JmaDownload(), as: "download-jma")
     app.asyncCommands.use(MetNoDownloader(), as: "download-metno")
     app.asyncCommands.use(GeoSphereDownloader(), as: "download-geosphere")
