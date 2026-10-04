@@ -12,7 +12,7 @@ extension Zensun {
 
     /// Estimate averaged diffuse flux from the instantaneous diffuse/total ratio and a native
     /// total-flux average. Returns ratios for the next step, separate from the geometry-based KT.
-    /// Blend current and cached ratios from 5° to 1°, then reuse the cache below 1°.
+    /// Blend current and cached ratios from 3° to 1°, then reuse the cache below 1°.
     /// Ratios are bounded to 0...1. Without history, a positive total permits a current ratio;
     /// otherwise a sunlit average is missing. Fully dark averages reset the cache.
     public static func instantaneousDiffuseRadiationToBackwardsAverage(
@@ -43,7 +43,7 @@ extension Zensun {
             let sinElevation = cos(colatitude) * cosSolarColatitude
                 + sin(colatitude) * sinSolarColatitude * cos(solarLongitude - longitude.degreesToRadians)
             let elevation = asin(min(max(sinElevation, -1), 1)).radiansToDegrees
-            let weight = min(max((elevation - 1) / 4, 0), 1)
+            let weight = min(max((elevation - 1) / 2, 0), 1)
             let current = ratios[i]
             if let previous, previous.ratio[i].isFinite {
                 let cached = min(max(previous.ratio[i], 0), 1)

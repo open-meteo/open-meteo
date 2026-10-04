@@ -7,7 +7,7 @@ extension Zensun {
     /// missing input. Unavailable KT is NaN.
     /// `dtSeconds` is the averaging interval; the previous sample may have a different time gap.
     /// KT is the clearness index relative to extraterrestrial horizontal radiation, consistent
-    /// with the other solar interpolation routines. Blend linearly from current KT at 5°
+    /// with the other solar interpolation routines. Blend linearly from current KT at 3°
     /// to cached KT at 1°, retaining the blended KT for the next step.
     /// Without usable history, use current KT above 1°; at or below 1°, leave values unscaled. Missing values stay missing.
     public static func instantaneousSolarRadiationToBackwardsAverage(
@@ -63,7 +63,7 @@ extension Zensun {
             } else if instantaneousElevation > minimumElevation {
                 let currentKt = max(data[i], 0) / (instant * solarConstant)
                 let elevation = asin(min(instantaneousElevation, 1)).radiansToDegrees
-                let weight = min(max((elevation - 1) / 4, 0), 1)
+                let weight = min(max((elevation - 1) / 2, 0), 1)
                 if weight < 1, let previous, previous.clearnessIndex[i].isFinite {
                     clearnessIndex[i] = weight * currentKt + (1 - weight) * max(previous.clearnessIndex[i], 0)
                 } else {

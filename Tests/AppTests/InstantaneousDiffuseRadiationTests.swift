@@ -27,7 +27,7 @@ import Testing
     }
 
     @Test(arguments: [(Float(-1), Float(0.25), Float(30)), (0, 0.25, 30),
-                      (1, 0.25, 30), (3, 0.375, 45), (5, 0.5, 60), (10, 0.5, 60)])
+                      (1, 0.25, 30), (2, 0.375, 45), (3, 0.5, 60), (10, 0.5, 60)])
     func blendsRatioAtLowSun(elevation: Float, expectedRatio: Float, expectedRadiation: Float) {
         let time = Timestamp(2022, 8, 17, 12)
         let solarLongitude = -15 * (time.hourWithFraction - 12 + time.getSunEquationOfTime())

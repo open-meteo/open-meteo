@@ -28,7 +28,7 @@ import Testing
                     continue
                 }
                 let elevation = asin(min(instant[i] * radius * radius, 1)).radiansToDegrees
-                let expectedKt: Float = 0.2 + min(max((elevation - 1) / 4, 0), 1) * 0.4
+                let expectedKt: Float = 0.2 + min(max((elevation - 1) / 2, 0), 1) * 0.4
                 #expect(abs(kt[i] - expectedKt) < 0.0001)
                 #expect(abs(data[i] - expectedKt * Zensun.solarConstant * mean) < 0.02)
             }
@@ -129,15 +129,15 @@ import Testing
         (0.01, 0.2, 33.85),
         (0.99, 0.2, 38.35),
         (1, 0.2, 38.40),
-        (1.01, 0.2015, 38.73),
-        (2, 0.35, 75.23),
-        (3, 0.5, 118.90),
-        (4, 0.65, 169.39),
-        (4.99, 0.7985, 226.04),
+        (1.01, 0.203, 39.02),
+        (2, 0.5, 107.47),
+        (3, 0.8, 190.24),
+        (4, 0.8, 208.48),
+        (4.99, 0.8, 226.46),
         (5, 0.8, 226.64),
         (5.01, 0.8, 226.82)
     ])
-    func blendsFromFiveToOneDegrees(elevation: Float, expectedKt: Float, expectedRadiation: Float) {
+    func blendsFromThreeToOneDegrees(elevation: Float, expectedKt: Float, expectedRadiation: Float) {
         let time = Timestamp(2022, 8, 17, 12)
         // Position an equatorial grid point at the requested afternoon solar elevation.
         let solarLongitude = -15 * (time.hourWithFraction - 12 + time.getSunEquationOfTime())
@@ -150,8 +150,8 @@ import Testing
         var data = [max(instant, 0) * Zensun.solarConstant * 0.8]
         let kt = Zensun.instantaneousSolarRadiationToBackwardsAverage(data: &data,
             previous: (time.add(-3600), [0.2]), grid: grid, time: time, dtSeconds: 3600)
-        // 1° -> cached KT, 3° -> equal weights, 5° -> current KT.
-        let expected: Float = 0.2 + min(max((elevation - 1) / 4, 0), 1) * 0.6
+        // 1° -> cached KT, 2° -> equal weights, 3° -> current KT.
+        let expected: Float = 0.2 + min(max((elevation - 1) / 2, 0), 1) * 0.6
         #expect(abs(kt[0] - expected) < 0.0001)
         #expect((kt[0] * 10000).rounded() / 10000 == expectedKt)
         #expect((data[0] * 100).rounded() / 100 == expectedRadiation)
