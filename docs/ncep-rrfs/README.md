@@ -33,7 +33,7 @@ In the compact names below, replace `{height}`, `{depth}` or `{pressure}` with e
 | Aerosols | `pm2_5_total_organic_matter`, `pm2_5`, `pm10`, `aerosol_optical_depth` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
-| Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
+| Radiation and heat fluxes | `shortwave_radiation`, `shortwave_radiation_clear_sky`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `lifted_index`, `boundary_layer_height`, `total_column_integrated_water_vapour`, `freezing_level_height` |
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 30, 50, 80, 100, 160, 320 m AGL |
@@ -54,7 +54,7 @@ Pressure levels: **50, 70, 100 hPa**, then **125–1000 hPa in steps of 25 hPa**
 | Aerosols | `pm2_5_total_organic_matter`, `pm2_5`, `pm10`, `aerosol_optical_depth` |
 | Radar reflectivity | `radar_reflectivity` |
 | Clouds and visibility | `cloud_base`, `cloud_ceiling`, `cloud_top`, `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`, `visibility` |
-| Radiation and heat fluxes | `shortwave_radiation`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
+| Radiation and heat fluxes | `shortwave_radiation`, `shortwave_radiation_clear_sky`, `diffuse_radiation`, `sensible_heat_flux`, `latent_heat_flux` |
 | Convection and atmosphere | `cape`, `convective_inhibition`, `lifted_index`, `boundary_layer_height`, `total_column_integrated_water_vapour`, `freezing_level_height` |
 | Wind gusts | `wind_gusts_10m` |
 | Wind above ground | `wind_speed_{height}m`, `wind_direction_{height}m` at 10, 30, 50, 80, 100, 160, 320 m AGL |
@@ -117,7 +117,6 @@ Units show the native GRIB unit, with a proposed API conversion where useful. `{
 | --- | --- | --- | --- |
 | `longwave_radiation`, `longwave_radiation_upwards`, `shortwave_radiation_upwards` | `DLWRF`, `ULWRF`, `USWRF`: surface | D, Q | W/m²; D has hourly averages and instantaneous fields, Q instantaneous only |
 | `outgoing_longwave_radiation`, `outgoing_shortwave_radiation` | `ULWRF`, `USWRF`: top of atmosphere | D; Q has `ULWRF` only | W/m²; preserve instantaneous versus averaged intervals |
-| `shortwave_radiation_clear_sky_instant` | `CSDSF`: surface | D | W/m²; native clear-sky flux, distinct from the API's solar-geometry estimate |
 | `albedo`, `snow_albedo_max` | `ALBDO`, `MXSALB`: surface | D | % |
 | `ground_heat_flux`, `snow_phase_change_heat_flux` | `GFLUX`, `SNOHF`: surface | D | W/m²; hourly averages; `GFLUX` also instantaneous |
 | `soil_moisture_liquid_{depth}cm` | `SOILL`: point soil depths 0–300 cm | D | m³/m³; liquid component of the stored total soil moisture |
@@ -221,7 +220,15 @@ As in HRRR, values are converted from kg/m³ to µg/m³ by multiplying by 10⁹,
 
 ### Radiation
 
-Hourly deterministic and ensemble shortwave radiation selects the last-hour average. Diffuse radiation and the 15-minute product only provide instantaneous solar fluxes, converted using the reusable `Zensun.instantaneousSolarRadiationToBackwardsAverage` function. Normally, it scales the current flux by the ratio of interval-mean to instantaneous extraterrestrial horizontal radiation. Above 5° solar elevation, the current sample’s KT is used. Between 5° and 1°, it blends linearly toward cached KT from the preceding step, with current weight `(elevation - 1°) / 4°` and equal weights at 3°. At or below 1°, only cached KT is used. The blended KT is retained for the next step. This preserves radiation from the sunlit portion of an interval even when its ending flux is zero. The helper returns KT for the next call and takes the previous KT together with its actual timestamp, independently of the output averaging interval, so other downloaders can use it across changes from hourly to three-hourly forecast steps. KT is relative to extraterrestrial radiation, consistent with the existing solar routines. Fully dark intervals become zero; missing values remain missing. Without usable history, current KT is used above 1°; at or below 1°, values remain unscaled and nonnegative. KT is computed from each current instantaneous field once, reused at sunset and low sun, and cleared for nighttime or missing input. KT history is retained separately per variable and member, including across subhourly file boundaries; native hourly averages are unchanged.
+Hourly deterministic and ensemble `shortwave_radiation` selects the native last-hour `DSWRF` average. The hourly deterministic CONUS and North America downloads also request instantaneous `DSWRF` as an internal dependency, using the same index request. This extra input is never written to the database; the API's `shortwave_radiation_instant` remains derived from stored averages.
+
+For deterministic `diffuse_radiation`, `Zensun.instantaneousDiffuseRadiationToBackwardsAverage` estimates `diffuse_average = (VDDSF_instant / DSWRF_instant) × DSWRF_average`. The diffuse-to-total ratio is bounded to 0…1. Above 5° solar elevation it uses the current ratio; between 5° and 1° it blends toward the cached ratio with current weight `(elevation - 1°) / 4°`; at or below 1° it uses the cached ratio. A zero instantaneous total also uses cached history. Without history, a positive instantaneous total supplies a ratio; otherwise a positive averaged total produces a missing diffuse value. Fully dark (zero averaged total) intervals produce zero and clear the ratio cache. Missing input values remain missing. This is an approximation that assumes the ratio represents the interval; it preserves the native total-radiation average and bounds diffuse radiation by that total. The ensemble has no diffuse input.
+
+`shortwave_radiation_clear_sky` selects instantaneous surface `CSDSF` in both hourly deterministic domains. It uses W/m², a scale factor of 1, solar backward-averaged interpolation, and previous-forecast storage. It is converted using solar geometry rather than the all-sky total-flux ratio, to avoid introducing cloud effects into the clear-sky field. The existing forecast API and FlatBuffers mappings expose the stored average and the derived `shortwave_radiation_clear_sky_instant`. The 15-minute and ensemble inventories do not provide `CSDSF`.
+
+Clear-sky flux and the 15-minute product's instantaneous total/diffuse fluxes use `Zensun.instantaneousSolarRadiationToBackwardsAverage`. It scales the current flux by the ratio of interval-mean to instantaneous extraterrestrial horizontal radiation. Above 5° it uses current KT; between 5° and 1° it blends toward cached KT; at or below 1° it uses cached KT. Without history, current KT is used above 1°; at or below 1°, values remain unscaled and nonnegative. Fully dark intervals become zero and missing values remain missing. KT is relative to extraterrestrial radiation and is separate from the diffuse-to-total ratio.
+
+Both conversions retain their coefficients separately per variable and member, with actual previous timestamps independent of the output averaging interval. Cached values persist across subhourly file boundaries. Forecast hour 0 seeds the caches but its instantaneous solar fields are not written to disk. Native hourly means are stored unchanged.
 
 ### Snowfall water equivalent
 

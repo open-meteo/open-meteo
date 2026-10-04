@@ -491,7 +491,7 @@ import OmFileIO
             #expect(!inputs.isEmpty)
             for input in inputs {
                 let record = input
-                let usesAverage = domain != .ncep_rrfs_conus_15min && record.variable.gribInput.parameter == "DSWRF"
+                let usesAverage = domain != .ncep_rrfs_conus_15min && record.variable.rawValue == "shortwave_radiation"
                 #expect(record.interval.type == (usesAverage ? "avg" : "instant"))
                 #expect(record.requiresSolarBackwardsConversion == !usesAverage)
                 #expect(record.interval.start == record.minute - (usesAverage ? 60 : 0))
@@ -512,6 +512,38 @@ import OmFileIO
                 try Curl.decodeGribIndices(indices: [runningAverage], variables: [input], errorOnMissing: true, logger: Logger(label: "solar-test"))
             }
         }
+    }
+
+    @Test func solarRatioInputsAndClearSky() throws {
+        for domain in NcepRrfsDomain.allCases {
+            let deterministic = domain == .ncep_rrfs_conus || domain == .ncep_rrfs_north_america
+            for hour in [0, 1, 24] where hour > 0 || domain != .ncep_rrfs_conus_15min {
+                let fields = domain.downloadVariables(forecastHour: hour, pressureFile: false)
+                let auxiliary = fields.filter { $0.variable is NcepRrfsAuxiliaryVariable }
+                #expect(auxiliary.count == (deterministic && hour > 0 ? 1 : 0))
+                if let input = auxiliary.first {
+                    #expect(input.gribIndexName == ":DSWRF:surface:\(hour) hour fcst:")
+                    #expect(input.interval.type == "instant")
+                }
+                let clearSky = fields.filter { $0.variable.rawValue == "shortwave_radiation_clear_sky" }
+                #expect(clearSky.count == (deterministic ? 1 : 0))
+                if let input = clearSky.first {
+                    #expect(input.gribIndexName == ":CSDSF:surface:\(hour == 0 ? "anl" : "\(hour) hour fcst"):")
+                    #expect(input.requiresSolarBackwardsConversion)
+                    #expect(input.variable.unit == .wattPerSquareMetre)
+                    #expect(input.variable.scalefactor == 1)
+                    #expect(input.variable.storePreviousForecast)
+                }
+                if deterministic && hour == 0 {
+                    // The native analysis DSWRF seeds both conversions, without a duplicate request.
+                    #expect(fields.filter { $0.variable.gribInput.parameter == "DSWRF" }.count == 1)
+                }
+                #expect(domain.downloadVariables(forecastHour: hour, pressureFile: true)
+                    .allSatisfy { !($0.variable is NcepRrfsAuxiliaryVariable) })
+            }
+        }
+        #expect(NcepRrfsSurfaceVariable(rawValue: "shortwave_radiation_instant") == nil)
+        #expect(ForecastSurfaceVariable(rawValue: "shortwave_radiation_clear_sky") != nil)
     }
 
     @Test func cloudHeightsAndWaterAmounts() throws {

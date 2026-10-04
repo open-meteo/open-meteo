@@ -90,7 +90,7 @@ struct NcepRrfsDownloadVariable: CurlIndexedVariable, Sendable {
 
 extension NcepRrfsDomain {
     func downloadVariables(forecastHour: Int, pressureFile: Bool) -> [NcepRrfsDownloadVariable] {
-        let fields: [any NcepRrfsVariableDownloadable]
+        var fields: [any NcepRrfsVariableDownloadable]
         if pressureFile {
             switch self {
             case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_north_america: fields = NcepRrfsConusPressureVariable.allVariables
@@ -102,6 +102,10 @@ extension NcepRrfsDomain {
             case .ncep_rrfs_conus_15min: fields = NcepRrfs15MinVariable.allCases
             case .ncep_rrfs_conus_ensemble: fields = NcepRrfsEnsembleSurfaceVariable.allCases
             }
+        }
+        // Analysis already selects instantaneous DSWRF as shortwave_radiation.
+        if !pressureFile && forecastHour > 0 && (self == .ncep_rrfs_conus || self == .ncep_rrfs_north_america) {
+            fields.append(NcepRrfsAuxiliaryVariable.shortwave_radiation_instant)
         }
         let minutes = self == .ncep_rrfs_conus_15min
             ? Array(stride(from: forecastHour * 60 - 45, through: forecastHour * 60, by: 15)) : [forecastHour * 60]
@@ -140,6 +144,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
         case .radar_reflectivity: return ("REFC", "entire atmosphere (considered as a single layer)")
         case .visibility: return ("VIS", "surface")
         case .shortwave_radiation: return ("DSWRF", "surface")
+        case .shortwave_radiation_clear_sky: return ("CSDSF", "surface")
         case .diffuse_radiation: return ("VDDSF", "surface")
         case .categorical_freezing_rain: return ("CFRZR", "surface")
         case .surface_temperature: return ("TMP", "surface")
@@ -262,7 +267,7 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var isSolarRadiation: Bool {
         switch self {
-        case .shortwave_radiation, .diffuse_radiation: return true
+        case .shortwave_radiation, .shortwave_radiation_clear_sky, .diffuse_radiation: return true
         default: return false
         }
     }
@@ -549,4 +554,23 @@ extension SurfaceAndPressureVariable: NcepRrfsVariableDownloadable where Surface
         }
     }
 
+}
+
+/// Download-only dependency for converting deterministic diffuse radiation using native totals.
+/// The API's instantaneous shortwave remains derived from the stored hourly mean.
+enum NcepRrfsAuxiliaryVariable: String, NcepRrfsVariableDownloadable {
+    case shortwave_radiation_instant
+
+    var omFileName: (file: String, level: Int) { (rawValue, 0) }
+    var scalefactor: Float { 1 }
+    var interpolation: ReaderInterpolation { .solar_backwards_averaged }
+    var unit: SiUnit { .wattPerSquareMetre }
+    var isElevationCorrectable: Bool { false }
+    var storePreviousForecast: Bool { false }
+    var gribInput: (parameter: String, level: String) { ("DSWRF", "surface") }
+    var gribStep: NcepRrfsGribStep { .instant }
+    var skipHour0: Bool { false }
+    var multiplyAdd: (multiply: Float, add: Float)? { nil }
+    var isSolarRadiation: Bool { true }
+    var windComponents: (speed: NcepRrfsVariable, direction: NcepRrfsVariable)? { nil }
 }

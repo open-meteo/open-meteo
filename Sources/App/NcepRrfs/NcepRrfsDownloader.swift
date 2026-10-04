@@ -71,6 +71,9 @@ struct NcepRrfsDownloader: AsyncCommand {
             ? domain.northAmericaGrid.getTrueNorthDirection() : domain.conusGrid.getTrueNorthDirection()
         let deaverager = GribDeaverager()
         let previousSolarKt = VariablePerMemberStorage<String>()
+        let previousDiffuseRatio = VariablePerMemberStorage<String>()
+        /// Uses instant and avg solar radiation to transfer this ratio to diffuse and clear sky radiation
+        let usesSolarRatio = domain == .ncep_rrfs_conus || domain == .ncep_rrfs_north_america
         let lastHour = maxForecastHour ?? domain.forecastHours.upperBound
         var handles = [GenericVariableHandle]()
         var validTimes = [Timestamp]()
@@ -91,6 +94,7 @@ struct NcepRrfsDownloader: AsyncCommand {
                     let snow = domain == .ncep_rrfs_conus_ensemble && !url.contains("prslev") && hour > 0
                         ? VariablePerMemberStorage<NcepRrfsSnowInput>() : nil
                     let accumulated = NcepRrfsAccumulatedFields()
+                    let solarTotals = VariablePerMemberStorage<NcepRrfsSolarTotal>()
                     let messages = try await curl.downloadIndexedGrib(url: [url], variables: variables)
                     try await messages.foreachConcurrent(nConcurrent: concurrent) { input, message in
                         let variable = input.variable
@@ -103,6 +107,12 @@ struct NcepRrfsDownloader: AsyncCommand {
                         }
                         var array = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                         variable.convertUnits(data: &array.data)
+                        if usesSolarRatio && variable.gribInput.parameter == "DSWRF" {
+                            await solarTotals.set(variable: input.interval.type == "instant" ? .instant : .average,
+                                timestamp: time, member: member, data: array)
+                            // This extra instantaneous field is an input, never a database output.
+                            if variable is NcepRrfsAuxiliaryVariable { return }
+                        }
                         if variable.isCloudHeight, let domainElevation {
                             variable.convertCloudHeightToAboveGround(data: &array.data, elevation: domainElevation)
                         }
@@ -139,6 +149,29 @@ struct NcepRrfsDownloader: AsyncCommand {
                             if input.requiresSolarBackwardsConversion {
                                 let time = run.add(input.minute * 60)
                                 let previousTime = time.add(-domain.dtSeconds)
+                                if usesSolarRatio && variable.rawValue == "diffuse_radiation" {
+                                    guard let totalInstant = await solarTotals.get(variable: .instant, timestamp: time, member: member) else {
+                                        throw NcepRrfsError.missingSolarTotal
+                                    }
+                                    if input.minute == 0 {
+                                        // Analysis has no averaged flux: only seed the ratio, never convert or write it.
+                                        var ratio = raw
+                                        ratio.data = Zensun.instantaneousDiffuseRadiationRatio(data: raw.data, shortwaveInstant: totalInstant.data)
+                                        await previousDiffuseRatio.set(variable: variable.rawValue, timestamp: time, member: member, data: ratio)
+                                        continue
+                                    }
+                                    guard let totalAverage = await solarTotals.get(variable: .average, timestamp: time, member: member) else {
+                                        throw NcepRrfsError.missingSolarTotal
+                                    }
+                                    let previous = await previousDiffuseRatio.remove(variable: variable.rawValue, timestamp: previousTime, member: member)
+                                    var ratio = raw
+                                    ratio.data = Zensun.instantaneousDiffuseRadiationToBackwardsAverage(data: &array.data,
+                                        shortwaveInstant: totalInstant.data, shortwaveAverage: totalAverage.data,
+                                        previous: previous.map { (time: previousTime, ratio: $0.data) }, grid: grid, time: time)
+                                    await previousDiffuseRatio.set(variable: variable.rawValue, timestamp: time, member: member, data: ratio)
+                                    try await writer.write(time: time, member: member, variable: variable, data: array.data)
+                                    continue
+                                }
                                 let previous = await previousSolarKt.remove(variable: variable.rawValue, timestamp: previousTime, member: member)
                                 var kt = raw
                                 kt.data = Zensun.instantaneousSolarRadiationToBackwardsAverage(data: &array.data,
@@ -207,8 +240,10 @@ private actor NcepRrfsAccumulatedFields {
 }
 
 private enum NcepRrfsSnowInput: Hashable, Sendable { case precipitation, fraction }
+private enum NcepRrfsSolarTotal: Hashable, Sendable { case instant, average }
 
 private enum NcepRrfsError: Error {
     case invalidTimestamp
     case missingElevation
+    case missingSolarTotal
 }

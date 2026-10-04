@@ -29,6 +29,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
     case radar_reflectivity
     case visibility
     case shortwave_radiation
+    case shortwave_radiation_clear_sky
     case diffuse_radiation
     case categorical_freezing_rain
     case surface_temperature
@@ -90,7 +91,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         switch self {
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
              .precipitation, .snowfall_water_equivalent, .snowfall,
-             .wind_gusts_10m, .visibility, .shortwave_radiation,
+             .wind_gusts_10m, .visibility, .shortwave_radiation, .shortwave_radiation_clear_sky,
              .diffuse_radiation, .cloud_cover, .cloud_cover_low,
              .cloud_cover_mid, .cloud_cover_high, .cape,
              .convective_inhibition, .lifted_index, .wind_speed_10m,
@@ -162,7 +163,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .visibility, .snow_depth, .boundary_layer_height,
              .freezing_level_height:
             return .metre
-        case .shortwave_radiation, .diffuse_radiation, .sensible_heat_flux,
+        case .shortwave_radiation, .shortwave_radiation_clear_sky, .diffuse_radiation, .sensible_heat_flux,
              .latent_heat_flux:
             return .wattPerSquareMetre
         case .categorical_freezing_rain, .lifted_index:
@@ -197,7 +198,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
              .soil_temperature_10cm, .soil_temperature_30cm, .soil_temperature_60cm,
              .soil_temperature_100cm, .soil_temperature_160cm, .soil_temperature_300cm:
             return 20
-        case .relative_humidity_2m, .shortwave_radiation, .diffuse_radiation,
+        case .relative_humidity_2m, .shortwave_radiation, .shortwave_radiation_clear_sky, .diffuse_radiation,
              .categorical_freezing_rain, .cloud_cover, .cloud_cover_low,
              .cloud_cover_mid, .cloud_cover_high, .convective_inhibition,
              .wind_direction_10m, .wind_direction_30m, .wind_direction_50m,
@@ -260,7 +261,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
              .wind_speed_50m, .wind_speed_80m, .wind_speed_100m,
              .wind_speed_160m, .wind_speed_320m:
             return .hermite(bounds: 0...1e9)
-        case .shortwave_radiation, .diffuse_radiation:
+        case .shortwave_radiation, .shortwave_radiation_clear_sky, .diffuse_radiation:
             return .solar_backwards_averaged
         case .categorical_freezing_rain:
             return .backwards
