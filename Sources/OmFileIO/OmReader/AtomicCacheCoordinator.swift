@@ -7,12 +7,20 @@ import Foundation
 public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     typealias Key = UInt64
     public nonisolated let cache: AtomicBlockCache<Backend>
+    private let upstreamFetchExecutor: LimitedConcurrencyExecutor
     private var queue: [Key: [CheckedContinuation<UnsafeRawBufferPointer, any Error>]] = [:]
     
-    public init(cache: AtomicBlockCache<Backend>) {
+    public init(cache: AtomicBlockCache<Backend>, maxConcurrentUpstreamFetches: Int = 60) {
         self.cache = cache
+        self.upstreamFetchExecutor = LimitedConcurrencyExecutor(maxConcurrency: maxConcurrentUpstreamFetches)
         self.queue = .init()
     }    
+
+    /// Unique fetch operations holding a permit (including retries), or waiting for one.
+    /// Callers waiting for the same cache keys are not counted again.
+    public func upstreamFetchStatistics() async -> (active: Int, queued: Int) {
+        await upstreamFetchExecutor.statistics()
+    }
     
     /**
      Fetch a range of keys. If consecutive keys are missing, fetch them in one call from the backend
@@ -39,7 +47,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     private func getIsolated<T: ContiguousBytes & Sendable>(
         key keyStart: Key,
         count: Int,
-        provider: (_ key: Key, _ count: Int) async throws -> T,
+        provider: @Sendable (_ key: Key, _ count: Int) async throws -> T,
         dataCallback: @Sendable (Key, UnsafeRawBufferPointer) -> ()
     ) async throws {
         
@@ -102,7 +110,13 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                 let fetchStart = keyStart &+ UInt64(offset)
                 do {
                     /// Contains data for all keys in `toFetch`. Needs to be chunked
-                    let fetched = try await provider(fetchStart, count)
+                    // Keys are already reserved, so duplicates share this fetch even
+                    // while it waits for capacity. Hold the permit through all retries
+                    // and body collection performed by the provider.
+                    let fetched = try await upstreamFetchExecutor.execute {
+                        try Task.checkCancellation()
+                        return try await provider(fetchStart, count)
+                    }
                     fetched.withUnsafeBytes({fetched in
                         let nBlocks = fetched.count.divideRoundedUp(divisor: blockSize)
                         assert(count == nBlocks)
