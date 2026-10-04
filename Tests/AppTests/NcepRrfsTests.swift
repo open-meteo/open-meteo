@@ -205,10 +205,10 @@ import OmFileIO
         }
     }
 
-    @Test func seamlessForecastMapping() throws {
+    @Test func seamlessForecastMapping() async throws {
         let model = try #require(MultiDomains(rawValue: "ncep_rrfs_seamless"))
         for include15Min in [false, true] {
-            guard case .multipleWithPrecipitationProbability(let sources, let probability) = model.getDomainAndVariable(include15Min: include15Min) else {
+            guard case .multipleWithPrecipitationProbability(let sources, let probability) = try await model.getDomainAndVariable(include15Min: include15Min) else {
                 Issue.record("Expected RRFS seamless domain mapping")
                 return
             }
@@ -221,12 +221,12 @@ import OmFileIO
             #expect(ObjectIdentifier(sources[2].1) == ObjectIdentifier(NcepRrfsVariable.self))
             if include15Min { #expect(ObjectIdentifier(sources[3].1) == ObjectIdentifier(NcepRrfs15MinVariable.self)) }
         }
-        #expect(model.genericDomain == nil)
+        #expect(try await model.genericDomain() == nil)
         #expect(model.countEnsembleMember == 1)
         #expect(model.flatBufferModel == .undefined)
     }
 
-    @Test func individualForecastMappings() throws {
+    @Test func individualForecastMappings() async throws {
         let expected: [(NcepRrfsDomain, any GenericVariable.Type)] = [
             (.ncep_rrfs_conus, NcepRrfsVariable.self),
             (.ncep_rrfs_conus_15min, NcepRrfs15MinVariable.self),
@@ -235,7 +235,7 @@ import OmFileIO
         for (domain, variableType) in expected {
             let model = try #require(MultiDomains(rawValue: domain.rawValue))
             for include15Min in [false, true] {
-                guard case .singleWithPrecipitationProbability(let source, let variables, let probability) = model.getDomainAndVariable(include15Min: include15Min) else {
+                guard case .singleWithPrecipitationProbability(let source, let variables, let probability) = try await model.getDomainAndVariable(include15Min: include15Min) else {
                     Issue.record("Expected an individual RRFS reader")
                     return
                 }
@@ -243,7 +243,7 @@ import OmFileIO
                 #expect(probability.domainRegistry == .ncep_rrfs_conus_ensemble)
                 #expect(ObjectIdentifier(variables) == ObjectIdentifier(variableType))
             }
-            #expect(model.genericDomain?.domainRegistry == domain.domainRegistry)
+            #expect(try await model.genericDomain()?.domainRegistry == domain.domainRegistry)
             #expect(model.countEnsembleMember == domain.countEnsembleMember)
             #expect(model.flatBufferModel == .undefined)
         }
@@ -273,7 +273,7 @@ import OmFileIO
         #expect(probability == [0, 20, 60, 100])
     }
 
-    @Test func domainSchedulesAndMemberUrls() {
+    @Test func domainSchedulesAndMemberUrls() async throws {
         let run = Timestamp(2026, 9, 20)
         #expect(NcepRrfsDomain.ncep_rrfs_conus.forecastHours == 0...84)
         #expect(NcepRrfsDomain.ncep_rrfs_conus_15min.forecastHours == 1...18)
@@ -288,7 +288,7 @@ import OmFileIO
             #expect(urls[0] == "https://example.com/rrfsens.20260920/00/m00\(member + 1)/rrfs.t00z.m00\(member + 1).2dfldnomads.3km.f060.conus.grib2")
         }
         for domain in NcepRrfsDomain.allCases {
-            #expect(domain.domainRegistry.getDomain()?.domainRegistry == domain.domainRegistry)
+            #expect(try await domain.domainRegistry.getDomain()?.domainRegistry == domain.domainRegistry)
         }
     }
 
@@ -304,7 +304,7 @@ import OmFileIO
         #expect(abs(north[0]) > 10)
     }
 
-    @Test func northAmericaGridAndMapping() throws {
+    @Test func northAmericaGridAndMapping() async throws {
         let domain = NcepRrfsDomain.ncep_rrfs_north_america
         let grid = domain.northAmericaGrid
         #expect(grid.nx == 1127 && grid.ny == 683 && grid.count == 769741)
@@ -335,13 +335,13 @@ import OmFileIO
         let urls = domain.gribUrls(run: Timestamp(2026, 9, 24), forecastHour: 84, member: 0, server: "https://example.com")
         #expect(urls == ["2dfld", "prslev"].map { "https://example.com/rrfs.20260924/00/rrfs.t00z.\($0).13km.f084.na.grib2" })
         let model = try #require(MultiDomains(rawValue: domain.rawValue))
-        guard case .single(let source, let variables) = model.getDomainAndVariable() else {
+        guard case .single(let source, let variables) = try await model.getDomainAndVariable() else {
             Issue.record("Expected North America RRFS reader")
             return
         }
         #expect(source.domainRegistry == .ncep_rrfs_north_america)
         #expect(ObjectIdentifier(variables) == ObjectIdentifier(NcepRrfsVariable.self))
-        #expect(model.genericDomain?.domainRegistry == .ncep_rrfs_north_america)
+        #expect(try await model.genericDomain()?.domainRegistry == .ncep_rrfs_north_america)
         #expect(model.flatBufferModel == .undefined)
     }
 

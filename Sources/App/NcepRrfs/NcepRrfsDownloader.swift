@@ -70,6 +70,7 @@ struct NcepRrfsDownloader: AsyncCommand {
         let trueNorth = domain == .ncep_rrfs_north_america
             ? domain.northAmericaGrid.getTrueNorthDirection() : domain.conusGrid.getTrueNorthDirection()
         let deaverager = GribDeaverager()
+        let previousSolarKt = VariablePerMemberStorage<String>()
         let lastHour = maxForecastHour ?? domain.forecastHours.upperBound
         var handles = [GenericVariableHandle]()
         var validTimes = [Timestamp]()
@@ -123,14 +124,9 @@ struct NcepRrfsDownloader: AsyncCommand {
                             return
                         }
                         // Averaged solar inputs cover the last hour and need no deaveraging.
-                        if input.interval.type == "accum" || (input.interval.type == "avg" && !variable.isSolarRadiation) {
+                        if input.requiresSolarBackwardsConversion || input.interval.type == "accum" || (input.interval.type == "avg" && !variable.isSolarRadiation) {
                             await accumulated.append(input: input, array: array)
                             return
-                        }
-                        if input.requiresSolarBackwardsConversion {
-                            let factor = Zensun.backwardsAveragedToInstantFactor(grid: grid, locationRange: 0..<grid.count,
-                                timerange: TimerangeDt(start: time, nTime: 1, dtSeconds: domain.dtSeconds))
-                            for i in array.data.indices where factor.data[i] >= 0.05 { array.data[i] /= factor.data[i] }
                         }
                         try await timestepWriter.write(member: member, variable: variable, data: array.data)
                     }
@@ -140,6 +136,20 @@ struct NcepRrfsDownloader: AsyncCommand {
                         for (input, raw) in fields.sorted(by: { $0.0.minute < $1.0.minute }) {
                             let variable = input.variable
                             var array = raw
+                            if input.requiresSolarBackwardsConversion {
+                                let time = run.add(input.minute * 60)
+                                let previousTime = time.add(-domain.dtSeconds)
+                                let previous = await previousSolarKt.remove(variable: variable.rawValue, timestamp: previousTime, member: member)
+                                var kt = raw
+                                kt.data = Zensun.instantaneousSolarRadiationToBackwardsAverage(data: &array.data,
+                                    previous: previous.map { (time: previousTime, clearnessIndex: $0.data) },
+                                    grid: grid, time: time, dtSeconds: domain.dtSeconds)
+                                await previousSolarKt.set(variable: variable.rawValue, timestamp: time, member: member, data: kt)
+                                // Analysis seeds KT but has no preceding forecast interval to store.
+                                guard input.minute > 0 else { continue }
+                                try await writer.write(time: time, member: member, variable: variable, data: array.data)
+                                continue
+                            }
                             guard await deaverager.deaccumulateIfRequired(variable: variable.rawValue, member: member,
                                 stepType: input.interval.type, stepRange: "\(input.interval.start)-\(input.minute)", array2d: &array) else { continue }
                             if variable.rawValue == "precipitation" {
