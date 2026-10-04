@@ -47,7 +47,9 @@ struct MetricsController: RouteCollection {
         guard req.remoteAddress?.isLocalhost == true else {
             throw Abort(.forbidden)
         }
-        let cacheStats = OpenMeteo.dataBlockCacheStatistics
+        let cacheStats = OpenMeteo.dataBlockCacheInitialized.load(ordering: .relaxed)
+            ? OpenMeteo.dataBlockCache.cache.statistics()
+            : .zero
 
         let monitored_ips = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
 

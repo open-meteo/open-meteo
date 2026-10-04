@@ -77,7 +77,7 @@ public struct OmFileSystemS3: Sendable {
 
     public actor File {
         /// Full object name e.g. `data/dwd_icon/temperature_2m/chunk_1234.om`
-        let objectName: String
+        public nonisolated let objectName: String
         var contentLength: Int
         var lastModified: Timestamp
         var eTag: String

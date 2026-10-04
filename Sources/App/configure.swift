@@ -5,14 +5,7 @@ import Synchronization
 import OmFileIO
 
 enum OpenMeteo {
-    /// Select which files may use remote storage. Defaults to unrestricted remote fallback.
-    static let remoteDataPolicy: RemoteDataPolicy = {
-        let value = Environment.get("REMOTE_DATA_POLICY") ?? RemoteDataPolicy.all.rawValue
-        guard let policy = RemoteDataPolicy(rawValue: value) else {
-            fatalError("Invalid REMOTE_DATA_POLICY '\(value)'. Expected one of: \(RemoteDataPolicy.allCases.map(\.rawValue).joined(separator: ", "))")
-        }
-        return policy
-    }()
+    static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
 
     /// Data directory with trailing slash
     static let dataDirectory = {
@@ -44,7 +37,7 @@ enum OpenMeteo {
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
     static let dataBlockCacheInitialized = Atomic(false)
 
-    private static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
+    static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
         let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
@@ -53,18 +46,6 @@ enum OpenMeteo {
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache
     }()
-
-    /// Check before evaluating the cache argument, including when updating or preloading a file.
-    static func makeBlockCachedReader(_ file: OmHttpReaderBackend, cache: @autoclosure () -> AtomicCacheCoordinator<MmapFile> = dataBlockCache) throws -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-        guard remoteDataPolicy.allowsRemoteFile(path: file.object) else {
-            throw RemoteDataPolicyError.remoteFileNotAllowed(file.object)
-        }
-        return OmReaderBlockCache(backend: file, cache: cache(), cacheKey: file.cacheKey)
-    }
-
-    static var dataBlockCacheStatistics: AtomicBlockCacheStatistics {
-        dataBlockCacheInitialized.load(ordering: .relaxed) ? dataBlockCache.cache.statistics() : .zero
-    }
     
     /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
     /*static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
@@ -195,8 +176,6 @@ extension Application {
 
 // configures your application
 public func configure(_ app: Application) throws {
-    // Validate the policy at startup, before the first remote read.
-    _ = OpenMeteo.remoteDataPolicy
     TimeZone.ReferenceType.default = TimeZone.gmt
 
     let corsConfiguration = CORSMiddleware.Configuration(

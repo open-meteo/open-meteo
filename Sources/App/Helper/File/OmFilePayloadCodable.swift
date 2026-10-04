@@ -22,7 +22,7 @@ extension OmFilePayloadCodable {
     }
     
     init(file: OmHttpReaderBackend) async throws {
-        let file = try OpenMeteo.makeBlockCachedReader(file)
+        let file = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
         let buffer = try await file.getData(offset: 0, count: file.count)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

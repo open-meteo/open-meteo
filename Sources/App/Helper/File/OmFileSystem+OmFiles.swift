@@ -28,12 +28,12 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
     }
     
     init(file: OmHttpReaderBackend) async throws {
-        let file = try OpenMeteo.makeBlockCachedReader(file)
+        let file = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
         try await self.init(remoteFile: file)
     }
     
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> OmFileLocalRemoteOmReader {
-        let file = try OpenMeteo.makeBlockCachedReader(file)
+        let file = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
         // Mark the old file as deleted/modified.
         // Cached queries still work, but new queries will immediately throw an error without unnecessarily doing HTTP requests.
         guard let reader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {
