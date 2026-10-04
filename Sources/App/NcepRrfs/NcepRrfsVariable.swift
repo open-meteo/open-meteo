@@ -88,35 +88,31 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
-        case .aerosol_optical_depth: return true
-        case .pm2_5, .pm10: return true
-        case .pm2_5_total_organic_matter: return false
-        case .radar_reflectivity: return true
-        case .freezing_rain, .snow_depth_water_equivalent, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
-             .precipitation, .snowfall_water_equivalent,
-             .snowfall, .wind_gusts_10m, .visibility,
-             .shortwave_radiation, .diffuse_radiation, .categorical_freezing_rain,
-             .surface_temperature, .snow_depth, .cloud_cover,
-             .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high,
-             .cape, .convective_inhibition, .boundary_layer_height,
-             .total_column_integrated_water_vapour, .freezing_level_height, .sensible_heat_flux,
-             .latent_heat_flux, .lifted_index, .wind_speed_10m,
-             .wind_direction_10m, .wind_speed_30m, .wind_direction_30m,
-             .wind_speed_50m, .wind_direction_50m, .wind_speed_80m,
-             .wind_direction_80m, .wind_speed_100m, .wind_direction_100m,
-             .wind_speed_160m, .wind_direction_160m, .wind_speed_320m,
-             .wind_direction_320m, .temperature_30m, .temperature_50m,
-             .temperature_80m, .temperature_100m, .temperature_160m,
-             .temperature_320m, .soil_temperature_0cm, .soil_moisture_0cm,
-             .soil_temperature_1cm, .soil_moisture_1cm, .soil_temperature_4cm,
-             .soil_moisture_4cm, .soil_temperature_10cm, .soil_moisture_10cm,
-             .soil_temperature_30cm, .soil_moisture_30cm, .soil_temperature_60cm,
-             .soil_moisture_60cm, .soil_temperature_100cm, .soil_moisture_100cm,
-             .soil_temperature_160cm, .soil_moisture_160cm, .soil_temperature_300cm,
-             .soil_moisture_300cm:
+             .precipitation, .snowfall_water_equivalent, .snowfall,
+             .wind_gusts_10m, .visibility, .shortwave_radiation,
+             .diffuse_radiation, .cloud_cover, .cloud_cover_low,
+             .cloud_cover_mid, .cloud_cover_high, .cape,
+             .convective_inhibition, .lifted_index, .wind_speed_10m,
+             .wind_direction_10m, .wind_speed_80m, .wind_direction_80m,
+             .wind_speed_100m, .wind_direction_100m:
             return true
-        default:
+        case .pm2_5_total_organic_matter, .pm2_5, .pm10,
+             .aerosol_optical_depth, .freezing_rain, .snow_depth_water_equivalent,
+             .cloud_base, .cloud_ceiling, .cloud_top,
+             .radar_reflectivity, .categorical_freezing_rain, .surface_temperature,
+             .snow_depth, .boundary_layer_height, .total_column_integrated_water_vapour,
+             .freezing_level_height, .sensible_heat_flux, .latent_heat_flux,
+             .wind_speed_30m, .wind_direction_30m, .wind_speed_160m,
+             .wind_direction_160m, .wind_speed_320m, .wind_direction_320m, .wind_speed_50m, .wind_direction_50m,
+             .temperature_30m, .temperature_50m, .temperature_80m,
+             .temperature_100m, .temperature_160m, .temperature_320m,
+             .soil_temperature_0cm, .soil_moisture_0cm, .soil_temperature_1cm,
+             .soil_moisture_1cm, .soil_temperature_4cm, .soil_moisture_4cm,
+             .soil_temperature_10cm, .soil_moisture_10cm, .soil_temperature_30cm,
+             .soil_moisture_30cm, .soil_temperature_60cm, .soil_moisture_60cm,
+             .soil_temperature_100cm, .soil_moisture_100cm, .soil_temperature_160cm,
+             .soil_moisture_160cm, .soil_temperature_300cm, .soil_moisture_300cm:
             return false
         }
     }
@@ -309,15 +305,15 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
-        case .radar_reflectivity: return true
-        case .freezing_rain, .cloud_base, .cloud_ceiling, .cloud_top: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
-             .precipitation, .snowfall_water_equivalent,
-             .snowfall, .wind_gusts_10m, .visibility,
-             .shortwave_radiation, .diffuse_radiation, .categorical_freezing_rain,
-             .wind_speed_10m, .wind_direction_10m, .wind_speed_80m,
-             .wind_direction_80m:
+             .precipitation, .snowfall_water_equivalent, .snowfall,
+             .wind_gusts_10m, .visibility, .shortwave_radiation,
+             .diffuse_radiation, .wind_speed_10m, .wind_direction_10m,
+             .wind_speed_80m, .wind_direction_80m:
             return true
+        case .freezing_rain, .cloud_base, .cloud_ceiling,
+             .cloud_top, .radar_reflectivity, .categorical_freezing_rain:
+            return false
         }
     }
 
@@ -447,19 +443,18 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
 
     var storePreviousForecast: Bool {
         switch self {
-        case .aerosol_optical_depth: return true
-        case .radar_reflectivity: return true
-        case .freezing_rain: return true
         case .temperature_2m, .relative_humidity_2m, .pressure_msl,
-             .precipitation, .snowfall_water_equivalent,
-             .snowfall, .wind_gusts_10m, .visibility,
-             .shortwave_radiation, .categorical_freezing_rain, .cloud_cover,
-             .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high,
-             .cape, .convective_inhibition, .total_column_integrated_water_vapour,
+             .precipitation, .snowfall_water_equivalent, .snowfall,
+             .wind_gusts_10m, .visibility, .shortwave_radiation,
+             .cloud_cover, .cloud_cover_low, .cloud_cover_mid,
+             .cloud_cover_high, .cape, .convective_inhibition,
              .wind_speed_10m, .wind_direction_10m, .wind_speed_80m,
-             .wind_direction_80m, .wind_speed_160m, .wind_direction_160m,
-             .wind_speed_320m, .wind_direction_320m:
+             .wind_direction_80m:
             return true
+        case .aerosol_optical_depth, .freezing_rain, .radar_reflectivity,
+             .categorical_freezing_rain, .total_column_integrated_water_vapour, .wind_speed_160m,
+             .wind_direction_160m, .wind_speed_320m, .wind_direction_320m:
+            return false
         }
     }
 
