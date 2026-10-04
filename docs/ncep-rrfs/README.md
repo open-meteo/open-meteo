@@ -201,6 +201,8 @@ Grid-relative winds become speed and true-north direction. Wind height variables
 
 Temperatures are stored in Celsius, pressure in hPa, snowfall in centimetres, and CIN as a positive magnitude.
 
+For `lifted_index` in both hourly deterministic domains, subtract 273.15 from the raw `LFTX` value. [UPP's CLDRAD output routine](https://github.com/NOAA-EMC/UPP/blob/develop/sorc/ncep_post.fd/CLDRAD.f) adds this offset for non-RAP models; it is an encoding convention, not a Kelvin-to-Celsius conversion of a temperature difference. Thus raw values of 280 and 290 represent lifted indices of 6.85 and 16.85. HRRR uses the RAP path without this offset and remains unchanged. Previously ingested RRFS lifted-index files need to be downloaded and processed again to correct stored values.
+
 ### Aerosol optical depth
 
 `aerosol_optical_depth` selects instantaneous `AOTK` for the entire atmospheric column in both hourly deterministic domains and the CONUS ensemble. It is dimensionless, stored at 0.01 precision, and interpolated linearly without unit conversion or deaveraging. Ensemble values are stored separately for each member. The 15-minute product does not provide this field. AOD describes aerosol extinction through the full column, not near-surface particulate concentration.

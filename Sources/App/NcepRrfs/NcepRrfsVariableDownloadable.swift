@@ -226,6 +226,9 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .pm2_5_total_organic_matter, .pm2_5, .pm10: return (1e9, 0)
+        // UPP CLDRAD adds TFRZ to lifted index for non-RAP models.
+        // Undo that encoding offset to recover the temperature difference.
+        case .lifted_index: return (1, -273.15)
         case .temperature_2m,
              .surface_temperature,
              .temperature_30m,

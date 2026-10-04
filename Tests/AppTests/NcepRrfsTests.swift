@@ -560,6 +560,10 @@ import OmFileIO
             (NcepRrfsSurfaceVariable.pressure_msl, 101325, 1013.25),
             (NcepRrfsSurfaceVariable.snowfall, 0.02, 2),
             (NcepRrfsSurfaceVariable.convective_inhibition, -150, 150),
+            (NcepRrfsSurfaceVariable.lifted_index, 280, 6.85),
+            (NcepRrfsSurfaceVariable.lifted_index, 290, 16.85),
+            (NcepRrfsSurfaceVariable.lifted_index, 273.15, 0),
+            (NcepRrfsSurfaceVariable.lifted_index, 268.15, -5),
             (NcepRrfs15MinVariable.relative_humidity_2m, 273.15, 0), // DPT input
             (NcepRrfsEnsembleSurfaceVariable.relative_humidity_2m, 75, 75),
             (NcepRrfsConusPressureVariable(variable: .temperature, level: 500), 273.15, 0)
