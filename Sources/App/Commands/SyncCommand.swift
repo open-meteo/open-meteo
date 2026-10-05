@@ -130,6 +130,9 @@ struct SyncCommand: AsyncCommand {
         
         let modelsChunkLength = max(1, serverModelVariable.count / concurrentModels)
 
+        /// Models that failed in one-shot mode. The other models still sync, then the command fails
+        let failures = SyncFailures()
+
         /// Download from each server concurrently
         try await serverModelVariable.chunks(ofCount: modelsChunkLength).foreachConcurrent(nConcurrent: serverModelVariable.count) {
             while true {
@@ -151,6 +154,9 @@ struct SyncCommand: AsyncCommand {
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
+                        if signature.repeatInterval == nil {
+                            await failures.add(model.rawValue)
+                        }
                     }
                 }
                 if downloadPressureNow {
@@ -162,6 +168,10 @@ struct SyncCommand: AsyncCommand {
                 logger.info("Repeat in \(repeatInterval) minutes for models \($0.map(\.model.rawValue).joined(separator: ","))")
                 try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
             }
+        }
+        let failed = await failures.models
+        if !failed.isEmpty {
+            throw SyncModelsFailed(models: failed)
         }
     }
     
@@ -322,3 +332,20 @@ fileprivate extension Array where Element == S3List.ListV2File {
     }
 }
 
+/// Models whose sync threw an error in one-shot mode
+fileprivate actor SyncFailures {
+    private(set) var models = [String]()
+
+    func add(_ model: String) {
+        models.append(model)
+    }
+}
+
+/// Thrown at the end of a one-shot sync, so the process exits non-zero
+struct SyncModelsFailed: Error, CustomStringConvertible {
+    let models: [String]
+
+    var description: String {
+        "Sync failed for models: \(models.joined(separator: ","))"
+    }
+}
