@@ -555,8 +555,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         }
         let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-        let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
+        return .init(name: "hourly", time: timeHourlyRead, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
             

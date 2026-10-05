@@ -430,7 +430,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return ForecastApiTimeRange(
                 dailyDisplay: daily,
                 dailyRead: daily,
-                hourlyDisplay: hourly,
                 hourlyRead: hourly,
                 minutely15: minutely_15
             )
@@ -464,7 +463,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return ForecastApiTimeRange(
                 dailyDisplay: daily.add(-1 * actualUtcOffset),
                 dailyRead: daily.add(-1 * utcOffset),
-                hourlyDisplay: hourly.add(-1 * actualUtcOffset),
                 hourlyRead: hourly.add(-1 * utcOffset),
                 minutely15: minutely_15.add(-1 * actualUtcOffset)
             )
@@ -482,7 +480,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return ForecastApiTimeRange(
             dailyDisplay: daily.add(-1 * actualUtcOffset),
             dailyRead: daily.add(-1 * utcOffset),
-            hourlyDisplay: hourly.add(-1 * actualUtcOffset),
             hourlyRead: hourly.add(-1 * utcOffset),
             minutely15: minutely_15.add(-1 * actualUtcOffset)
         )
@@ -547,10 +544,7 @@ struct ForecastApiTimeRange {
     /// Time actually read in data
     let dailyRead: TimerangeDt
 
-    /// Time displayed in output. May contains 15 shifts due to 15 minute timezone offsets
-    let hourlyDisplay: TimerangeDt
-
-    /// Time actually read in data
+    /// Actual hourly sample times in UTC, also used for output. Fractional timezone offsets are applied only when formatting output.
     let hourlyRead: TimerangeDt
 
     let minutely15: TimerangeDt
