@@ -2,7 +2,6 @@ import Foundation
 import OmFileFormat
 import OmFileIO
 import Vapor
-import SwiftNetCDF
 
 /// Immutable identity of an operational DWD grid. Both the NetCDF definition and every native
 /// GRIB message must match these values so data cannot silently be paired with another grid order.
@@ -124,19 +123,82 @@ enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable 
 extension IconNativeDomains {
     /// Validates/reuses the local artifact or regenerates it offline; only generated files upload.
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
+        let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
         let artifact = nativeGridFile
+        let identity = artifact.identity
+        let registry = artifact.registry
+        do {
+            // Downloader preparation deliberately validates the on-disk artifact. API lookups use
+            // the atomically pinned mapping and never enter this disk-maintenance path.
+            try artifact.validateFileAndInstall()
+            // Valid existing artifacts are reused without uploading. Delete grid.bin locally to
+            // force regeneration, and supply --upload-s3-bucket to upload the regenerated artifact.
+            return
+        } catch IconNativeDomainError.missingGridArtifact {
+            application.logger.info("Generating missing native ICON grid artifact for '\(rawValue)'")
+        } catch {
+            application.logger.warning("Regenerating invalid native ICON grid artifact for '\(rawValue)': \(error)")
+        }
+
+        // Bootstrap is intentionally owned by the downloader: obtain the official NetCDF mesh,
+        // generate the lookup artifact offline, then atomically publish it to the static registry.
+        let staticDirectory = "\(registry.directory)static/"
+        try FileManager.default.createDirectory(atPath: staticDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        let sourceFile = "\(downloadDirectory)\(identity.sourceFile)"
+        let sourceExisted = FileManager.default.fileExists(atPath: sourceFile)
         let curl = Curl(logger: application.logger, client: application.dedicatedHttpClient)
-        let prepared = try await artifact.prepare(curl: curl)
-        guard prepared.generated else { return }
-        let coordinatesFile = OmFileType.staticFile(domain: artifact.registry, variable: "coordinates")
+
+        func downloadSource() async throws {
+            application.logger.info("Downloading native ICON grid definition '\(identity.sourceFile)'")
+            try await curl.download(
+                url: identity.sourceUrl,
+                toFile: sourceFile,
+                bzip2Decode: false,
+                cacheDirectory: nil
+            )
+        }
+
+        if !sourceExisted {
+            try await downloadSource()
+        }
+
+        let artifactPath = "\(staticDirectory)grid.bin"
+        let coordinatesFile = OmFileType.staticFile(domain: registry, variable: "coordinates")
+        let generated: (grid: IconNativeGrid, coordinatesGenerated: Bool)
+        do {
+            generated = try IconNativeGrid.Generator.generateAndPublish(
+                sourceFile: sourceFile,
+                identity: identity,
+                artifactFile: artifactPath,
+                coordinatesFile: coordinatesFile.getFilePath()
+            )
+        } catch let error as IconNativeGridSourceError where sourceExisted {
+            // A cached source may be truncated or may belong to an older operational grid. Retry
+            // source errors once with an atomic replacement; readers of the old inode stay valid.
+            application.logger.warning("Replacing unusable cached ICON grid definition: \(error)")
+            try await downloadSource()
+            generated = try IconNativeGrid.Generator.generateAndPublish(
+                sourceFile: sourceFile,
+                identity: identity,
+                artifactFile: artifactPath,
+                coordinatesFile: coordinatesFile.getFilePath()
+            )
+        }
+
+        artifact.cache.install(generated.grid.storage)
+        application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
+        if generated.coordinatesGenerated {
+            application.logger.info("Generated native ICON coordinates at \(coordinatesFile.getFilePath())")
+        }
         for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
             let uploads = queue.startMultiPartUploads()
             await uploads.uploadMultipart(
-                file: artifact.getFilePath(),
-                objectName: artifact.getRelativeFilePathWithData(),
+                file: artifactPath,
+                objectName: "data/\(registry.rawValue)/static/grid.bin",
                 lastModified: .now()
             )
-            if prepared.coordinatesGenerated {
+            if generated.coordinatesGenerated {
                 await uploads.uploadMultipart(
                     file: coordinatesFile.getFilePath(),
                     objectName: coordinatesFile.getRelativeFilePathWithData(),
@@ -145,63 +207,5 @@ extension IconNativeDomains {
             }
             await queue.finishMultiPartUploads(uploads)
         }
-    }
-}
-
-extension IconNativeGridFile {
-    /// Downloader-only preparation. Native ingestion needs the source only when rebuilding;
-    /// remapping also retains its validated coordinates and mesh topology.
-    func prepare(curl: Curl, loadSource: Bool = false) async throws -> (
-        generated: Bool, coordinatesGenerated: Bool,
-        source: (mesh: Group, coordinates: IconNativeGrid.Generator.Coordinates)?
-    ) {
-        var generated = false
-        do {
-            try validateFileAndInstall()
-        } catch {
-            curl.logger.info("Generating native ICON index: \(error)")
-            generated = true
-        }
-        if !generated && !loadSource { return (false, false, nil) }
-
-        let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(registry.rawValue)/"
-        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-        let sourceFile = "\(downloadDirectory)\(identity.sourceFile)"
-        let sourceExisted = FileManager.default.fileExists(atPath: sourceFile)
-        func downloadSource() async throws {
-            try await curl.download(url: identity.sourceUrl, toFile: sourceFile, bzip2Decode: false, cacheDirectory: nil)
-        }
-        func readSource() throws -> (mesh: Group, coordinates: IconNativeGrid.Generator.Coordinates) {
-            guard let mesh = try NetCDF.open(path: sourceFile, allowUpdate: false) else {
-                throw IconNativeGridSourceError.couldNotOpen(sourceFile)
-            }
-            return (mesh, try IconNativeGrid.Generator.readCoordinates(group: mesh, identity: identity))
-        }
-        if !sourceExisted { try await downloadSource() }
-        let source: (mesh: Group, coordinates: IconNativeGrid.Generator.Coordinates)
-        do {
-            source = try readSource()
-        } catch where sourceExisted {
-            // Replace an unusable cached mesh once; a bad fresh download fails validation.
-            curl.logger.warning("Replacing unusable cached ICON grid definition: \(error)")
-            try await downloadSource()
-            source = try readSource()
-        }
-        var coordinatesGenerated = false
-        if generated {
-            try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: localFile).deletingLastPathComponent().path, withIntermediateDirectories: true)
-            let coordinatesFile = OmFileType.staticFile(domain: registry, variable: "coordinates")
-            let result = try IconNativeGrid.Generator.generateAndPublish(
-                coordinates: source.coordinates, identity: identity, artifactFile: localFile,
-                coordinatesFile: coordinatesFile.getFilePath()
-            )
-            cache.install(result.grid.storage)
-            coordinatesGenerated = result.coordinatesGenerated
-            curl.logger.info("Generated native ICON grid artifact at \(localFile)")
-            if coordinatesGenerated {
-                curl.logger.info("Generated native ICON coordinates at \(coordinatesFile.getFilePath())")
-            }
-        }
-        return (generated, coordinatesGenerated, source)
     }
 }

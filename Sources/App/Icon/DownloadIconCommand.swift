@@ -440,6 +440,9 @@ struct DownloadIconCommand: AsyncCommand {
         guard !signature.skipRegridding || nativeDomain == .iconNative else {
             throw Abort(.badRequest, reason: "--skip-regridding is only supported for icon or icon-native.")
         }
+        if nativeDomain == nil && [.iconEu, .iconD2, .iconD2_15min].contains(domain) {
+            throw Abort(.badRequest, reason: "Regular-grid downloads for \(domain.rawValue) are no longer supported. Use \(domain.nativeDomain.rawValue) instead.")
+        }
         let nConcurrent = signature.concurrent ?? 1
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         _ = domain.getDownloadForecastSteps(run: run.hour) // Reject unsupported runs before preparing static files.
