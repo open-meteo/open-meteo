@@ -45,7 +45,7 @@ import Testing
         let storage = try ReducedLatLonIndex(file: URL(fileURLWithPath: path))
         let identity = try #require([IconNativeGridIdentity.global, .d2].first { $0.gridNumber == storage.metadata.number })
         try identity.validate(storage: storage, path: path)
-        let grid = IconNativeGrid(storage: storage, maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
+        let grid = IconNativeGrid(storage: storage, resolutionMeters: identity.resolutionMeters, maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared)
 
         let elevations = (0..<grid.nx).map { id -> Float in
@@ -58,7 +58,7 @@ import Testing
         let reader = file.reader
         try #require(!corpus.ordinary.isEmpty && !corpus.sea.isEmpty && !corpus.land.isEmpty)
         let decoded = try await ElevationValues(decoded: reader.read(), expectedCount: grid.nx)
-        let cached = IconNativeGrid(storage: storage, maximumChordDistanceSquared: grid.maximumChordDistanceSquared,
+        let cached = IconNativeGrid(storage: storage, resolutionMeters: grid.resolutionMeters, maximumChordDistanceSquared: grid.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: grid.nearbyMaximumChordDistanceSquared, elevations: decoded)
         var results = [Measurement]()
         results.append(try measure("Nearest lookup", executions: corpus.ordinary.count * repeats) {
