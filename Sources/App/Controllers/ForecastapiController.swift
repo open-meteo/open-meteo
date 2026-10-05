@@ -353,7 +353,7 @@ struct WeatherApiController {
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
                 var countedModels = Set<MultiDomains>()
                 locations = try await domains.asyncFlatMap({ domain in
-                    guard let grid = try? await domain.genericDomain()?.grid else {
+                    guard let grid = try await domain.genericDomain()?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
                     guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
@@ -383,7 +383,7 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution, outputCoordinates: grid.getCoordinates(gridpoint: gridpoint))
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     }
@@ -398,7 +398,7 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution, outputCoordinates: grid.getCoordinates(gridpoint: gridpoint))
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     })
@@ -435,11 +435,11 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let readerMonthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     
     var latitude: Float {
-        readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
+        outputCoordinates?.latitude ?? readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
     }
     
     var longitude: Float {
-        readerHourly?.modelLon ?? readerDaily?.modelLon ?? .nan
+        outputCoordinates?.longitude ?? readerHourly?.modelLon ?? readerDaily?.modelLon ?? .nan
     }
     
     var elevation: Float? {
@@ -454,6 +454,8 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let timezone: TimezoneWithOffset
     let currentTime: Timestamp
     let temporalResolution: ApiTemporalResolution
+    /// Bounding-box output follows its declared grid while readers may use other source cells.
+    var outputCoordinates: (latitude: Float, longitude: Float)? = nil
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         if let currentVariables, let readerHourly {
@@ -1109,9 +1111,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     enum SupplementalGridpointPolicy: Equatable {
         case primaryOnly
         case alignedSupplemental
+        case remappedSupplemental
     }
 
     enum DomainReaderMapping {
+        /// Sources are ordered by increasing priority. Bounding-box sources are sampled on the output domain's grid.
+        case multipleWithBoundingBox(
+            [(any GenericDomain, any GenericVariable.Type)],
+            boundingBox: (domain: any GenericDomain, sources: [(any GenericDomain, any GenericVariable.Type)])?,
+            allowMinMaxTwoAggregations: Bool = false
+        )
         case single(any GenericDomain, any GenericVariable.Type)
         case multiple([(any GenericDomain, any GenericVariable.Type)])
         /// Mixes raw fields within each group, then places derived groups above supplemental readers.
@@ -1142,8 +1151,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             lon: Float,
             elevation: Float,
             mode: GridSelectionMode,
-            options: GenericReaderOptions
+            options: GenericReaderOptions,
+            allowEmpty: Bool = false
         ) async throws -> (readers: [any GenericReaderOptionalProtocol<ForecastVariable>], elevation: Float) {
+            let sources = try await availableDomainsForRun(sources, run: options.requestedRun, allowEmpty: allowEmpty) { registry, run in
+                try await registry.getFullRunMeta(client: options.httpClient, logger: options.logger, run: run.toTimestamp()) != nil
+            }
             var elevation = elevation
             let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.reversed().asyncCompactMap { source in
                 guard let reader = try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
@@ -1157,8 +1170,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return (readers, elevation)
         }
         
+        static func availableDomainsForRun(_ sources: [(any GenericDomain, any GenericVariable.Type)], run: IsoDateTime?, allowEmpty: Bool = false, hasRun: (DomainRegistry, IsoDateTime) async throws -> Bool) async throws -> [(any GenericDomain, any GenericVariable.Type)] {
+            guard let run else { return sources }
+            let available: [(any GenericDomain, any GenericVariable.Type)] = try await sources.asyncCompactMap { source in
+                try await hasRun(source.0.domainRegistry, run) ? source : nil
+            }
+            if !allowEmpty, available.isEmpty, let source = sources.last {
+                throw ForecastApiError.modelRunUnavailable(model: source.0.domainRegistry, run: run.toTimestamp())
+            }
+            return available
+        }
+
         var singleDomain: (any GenericDomain)? {
             switch self {
+            case .multipleWithBoundingBox(_, let boundingBox, _):
+                return boundingBox?.domain
             case .single(let domain, _),
                  .singleWithPrecipitationProbability(let domain, _, _),
                  .singleWithSupplementalDomains(let domain, _, _, _, _, _):
@@ -1172,6 +1198,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
             switch self {
+            case .multipleWithBoundingBox(let domains, _, let allowMinMaxTwoAggregations):
+                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return MultiDomains.hourlyToMultiSameType(forecast.readers, prefetchAllReaders: true, smoothTransitions: false, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
             case .single(let domain, let variable):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             case .singleWithPrecipitationProbability(let domain, let variable, let precipitationProb):
@@ -1203,7 +1232,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     resolvedElevation = result.elevation
                     return result.reader
                 }.reversed()
-                let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                let supplementalReaders = try await Self.makeDomainReaders(sources: supplemental, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options, allowEmpty: true)
                 guard !derivedGroupReaders.isEmpty || !supplementalReaders.readers.isEmpty else {
                     return nil
                 }
@@ -1216,7 +1245,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard !localForecast.readers.isEmpty else {
                     return nil
                 }
-                let globalForecast = try await Self.makeDomainReaders(sources: global, lat: lat, lon: lon, elevation: localForecast.elevation, mode: mode, options: options)
+                let globalForecast = try await Self.makeDomainReaders(sources: global, lat: lat, lon: lon, elevation: localForecast.elevation, mode: mode, options: options, allowEmpty: true)
                 let probability = try await precipitationProb?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: globalForecast.elevation, mode: mode, options: options)?.asOptionalReader
                 return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + globalForecast.readers + localForecast.readers)
             case .singleWithSupplementalDomains(let domain, let variable, let lowerPriority, let higherPriority, let precipitationProb, _):
@@ -1228,6 +1257,24 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let probability = try await precipitationProb?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
                 return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + forecast.readers)
             }
+        }
+
+        func getBoundingBoxReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
+            guard case .multipleWithBoundingBox(_, let boundingBox, _) = self, let boundingBox else {
+                return (nil, nil, nil, nil)
+            }
+            let coordinate = boundingBox.domain.grid.getCoordinates(gridpoint: gridpoint)
+            let sources = try await Self.availableDomainsForRun(boundingBox.sources, run: options.requestedRun) { registry, run in
+                try await registry.getFullRunMeta(client: options.httpClient, logger: options.logger, run: run.toTimestamp()) != nil
+            }
+            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { source in
+                let position = source.0.domainRegistry == boundingBox.domain.domainRegistry ? gridpoint : source.0.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
+                guard let position else { return nil }
+                return try await source.0.makeGenericHourlyDaily(variableType: source.1, position: position, options: options).hourly
+            }
+            // Keep an empty reader so an unmapped output cell still produces null forecast columns.
+            let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
+            return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
         }
 
     }
@@ -1467,29 +1514,43 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .jms_gsm, .jma_gsm:
             return .single(JmaDomain.gsm, JmaVariable.self)
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
-            return .multiple([
+            return .multipleWithBoundingBox([
                 (IconDomains.iconEps, ProbabilityVariable.self),
                 (IconDomains.iconEuEps, ProbabilityVariable.self),
                 (IconDomains.icon, IconVariable.self),
+                (try await IconNativeDomains.iconNative.load(), IconVariable.self),
                 (IconDomains.iconEu, IconVariable.self),
                 (IconDomains.iconD2, IconVariable.self),
-                (IconDomains.iconD2_15min, IconVariable.self)
-            ])
+                (try await IconNativeDomains.iconD2Native.load(), IconVariable.self),
+                (IconDomains.iconD2_15min, IconVariable.self),
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+            ], boundingBox: nil)
         case .icon_global, .dwd_icon_global, .dwd_icon:
-            return .singleWithPrecipitationProbability(IconDomains.icon, IconVariable.self, precipitationProb: IconDomains.iconEps)
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (IconDomains.icon, IconVariable.self),
+                (try await IconNativeDomains.iconNative.load(), IconVariable.self)
+            ]
+            return .multipleWithBoundingBox([(IconDomains.iconEps, ProbabilityVariable.self)] + sources,
+                boundingBox: (IconDomains.icon, sources))
         case .icon_eu, .dwd_icon_eu:
             return .singleWithPrecipitationProbability(IconDomains.iconEu, IconVariable.self, precipitationProb: IconDomains.iconEuEps)
         case .icon_d2, .dwd_icon_d2:
-            return .singleWithSupplementalDomains(
-                IconDomains.iconD2,
-                IconVariable.self,
-                lowerPriority: [],
-                higherPriority: [(IconDomains.iconD2_15min, IconVariable.self)],
-                precipitationProb: IconDomains.iconD2Eps,
-                gridpointPolicy: .primaryOnly
-            )
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (IconDomains.iconD2, IconVariable.self),
+                (try await IconNativeDomains.iconD2Native.load(), IconVariable.self)
+            ]
+            let quarterHourly: [(any GenericDomain, any GenericVariable.Type)] = [
+                (IconDomains.iconD2_15min, IconVariable.self),
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+            ]
+            return .multipleWithBoundingBox([(IconDomains.iconD2Eps, ProbabilityVariable.self)] + sources + quarterHourly,
+                boundingBox: (IconDomains.iconD2, sources))
         case .dwd_icon_d2_15min:
-            return .single(IconDomains.iconD2_15min, IconVariable.self)
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (IconDomains.iconD2_15min, IconVariable.self),
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+            ]
+            return .multipleWithBoundingBox(sources, boundingBox: (IconDomains.iconD2_15min, sources), allowMinMaxTwoAggregations: true)
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .multiple([
                 (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
@@ -1545,14 +1606,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (GemDomain.gem_hrdps_continental, GemVariable.self)
             ], precipitationProb: GemDomain.gem_global_ensemble)
         case .gem_global, .cmc_gem_gdps:
-            // Coordinate requests use all generations; gridpoint requests retain the legacy grid.
+            // Coordinate requests use all generations; gridpoint requests sample each generation on the legacy grid.
             return .singleWithSupplementalDomains(
                 GemDomain.gem_global,
                 GemVariable.self,
                 lowerPriority: [(GemDomain.gem_gdps_15km_upper_level, GemVariable.self)],
                 higherPriority: [(GemDomain.gem_gdps_15km, GemVariable.self)],
                 precipitationProb: GemDomain.gem_global_ensemble,
-                gridpointPolicy: .primaryOnly
+                gridpointPolicy: .remappedSupplemental
             )
         case .gem_regional, .cmc_gem_rdps:
             // The old and new RDPS grids have different indexing.
@@ -1562,7 +1623,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 lowerPriority: [],
                 higherPriority: [(GemDomain.gem_rdps_10km, GemVariable.self)],
                 precipitationProb: nil,
-                gridpointPolicy: .primaryOnly
+                gridpointPolicy: .remappedSupplemental
             )
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return .single(GemDomain.gem_hrdps_continental, GemVariable.self)
@@ -1773,13 +1834,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     static func hourlyToMultiSameType(
         _ readers: [any GenericReaderOptionalProtocol<ForecastVariable>],
-        prefetchAllReaders: Bool = false
+        prefetchAllReaders: Bool = false,
+        smoothTransitions: Bool = true,
+        allowMinMaxTwoAggregations: Bool = false
     ) -> ForecastReaderResult? {
         guard readers.count > 0 else {
             return nil
         }
-        let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: prefetchAllReaders)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+        let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: prefetchAllReaders, smoothTransitions: smoothTransitions)
+        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: allowMinMaxTwoAggregations), nil, nil)
     }
 
     static func hourlyToMultiSameType(
@@ -1816,7 +1879,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 options: options
             )
         case .best_match:
-            guard let icon = try await IconDomains.icon.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            // Keep these storage pairs separate from the probability and quarter-hourly companions below.
+            func makeReader(domain: IconDomains, native: IconNativeDomains) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
+                let preferred = try await native.load().makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let fallback = try await domain.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation.isNaN ? preferred?.resolvedTargetElevation ?? elevation : elevation, mode: mode, options: options)
+                let readers = [fallback, preferred].compactMap { $0 }
+                guard !readers.isEmpty else { return nil }
+                return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
+            }
+            guard let icon = try await makeReader(domain: .icon, native: .iconNative) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1838,7 +1909,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // For Netherlands and Belgium use KNMI, IFS and ICON
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconD2 = try await IconDomains.iconD2.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native)
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities.asOptionalReader,
                     gfsUvIndex,
@@ -1869,8 +1940,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             // If Icon-d2 is available, use icon domains
-            if let iconD2 = try await IconDomains.iconD2.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-               let iconD2_15min = try await IconDomains.iconD2_15min.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native),
+               let iconD2_15min = try await makeReader(domain: .iconD2_15min, native: .iconD2Native15min) {
                 // TODO: check how out of projection areas are handled
                 guard let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
@@ -2137,6 +2208,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         
         if let mapping = try await getDomainAndVariable() {
             switch mapping {
+            case .multipleWithBoundingBox:
+                return try await mapping.getBoundingBoxReaders(gridpoint: gridpoint, options: options)
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
@@ -2144,8 +2217,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 switch gridpointPolicy {
                 case .primaryOnly:
                     return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-                case .alignedSupplemental:
+                case .remappedSupplemental:
                     let sources = lowerPriority + [(domain, variable)] + higherPriority
+                    return try await DomainReaderMapping.multipleWithBoundingBox(sources, boundingBox: (domain, sources)).getBoundingBoxReaders(gridpoint: gridpoint, options: options)
+                case .alignedSupplemental:
+                    let sources = try await DomainReaderMapping.availableDomainsForRun(lowerPriority + [(domain, variable)] + higherPriority, run: options.requestedRun) { registry, run in
+                        try await registry.getFullRunMeta(client: options.httpClient, logger: options.logger, run: run.toTimestamp()) != nil
+                    }
                     let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { source in
                         let result = try await source.0.makeGenericHourlyDaily(variableType: source.1, position: gridpoint, options: options)
                         return result.hourly

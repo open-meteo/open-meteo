@@ -26,8 +26,10 @@ struct GenericReaderOptions {
     let logger: Logger
     
     let httpClient: HTTPClient?
+    /// Limit reader construction to the explicitly requested initialization.
+    let requestedRun: IsoDateTime?
 
-    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?) throws {
+    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?, requestedRun: IsoDateTime? = nil) throws {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
         if let tilt {
             guard tilt.isNaN || (tilt >= 0 && tilt <= 90) else {
@@ -44,6 +46,7 @@ struct GenericReaderOptions {
         self.azimuth = azimuth ?? 0
         self.logger = logger
         self.httpClient = httpClient
+        self.requestedRun = requestedRun
     }
 }
 
