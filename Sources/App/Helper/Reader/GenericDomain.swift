@@ -41,12 +41,6 @@ protocol GenericDomain: Sendable {
 }
 
 extension GenericDomain {
-    /// Reader construction can omit unavailable sources without hiding metadata errors.
-    func hasRequestedRun(options: GenericReaderOptions) async throws -> Bool {
-        guard let run = options.requestedRun else { return true }
-        return try await domainRegistry.getFullRunMeta(client: options.httpClient, logger: options.logger, run: run.toTimestamp()) != nil
-    }
-
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }

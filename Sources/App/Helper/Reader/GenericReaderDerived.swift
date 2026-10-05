@@ -29,16 +29,13 @@ struct GenericReaderOptions {
     /// Evaluate solar calculations at this cell after nearest-neighbour remapping.
     var remappedCoordinates: (latitude: Float, longitude: Float)? = nil
 
-    /// Limit reader construction to the explicitly requested initialization.
-    let requestedRun: IsoDateTime?
-
     func with(remappedCoordinates: (latitude: Float, longitude: Float)) -> Self {
         var options = self
         options.remappedCoordinates = remappedCoordinates
         return options
     }
 
-    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?, requestedRun: IsoDateTime? = nil) throws {
+    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?) throws {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
         if let tilt {
             guard tilt.isNaN || (tilt >= 0 && tilt <= 90) else {
@@ -55,7 +52,6 @@ struct GenericReaderOptions {
         self.azimuth = azimuth ?? 0
         self.logger = logger
         self.httpClient = httpClient
-        self.requestedRun = requestedRun
     }
 }
 
