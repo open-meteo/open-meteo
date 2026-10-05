@@ -1514,21 +1514,22 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .jms_gsm, .jma_gsm:
             return .single(JmaDomain.gsm, JmaVariable.self)
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
+            // Keep regular lat-lon storage preferred until the native-grid cutover.
             return .multipleWithBoundingBox([
                 (IconDomains.iconEps, ProbabilityVariable.self),
                 (IconDomains.iconEuEps, ProbabilityVariable.self),
-                (IconDomains.icon, IconVariable.self),
                 (try await IconNativeDomains.iconNative.load(), IconVariable.self),
+                (IconDomains.icon, IconVariable.self),
                 (IconDomains.iconEu, IconVariable.self),
-                (IconDomains.iconD2, IconVariable.self),
                 (try await IconNativeDomains.iconD2Native.load(), IconVariable.self),
-                (IconDomains.iconD2_15min, IconVariable.self),
-                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+                (IconDomains.iconD2, IconVariable.self),
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
+                (IconDomains.iconD2_15min, IconVariable.self)
             ], boundingBox: nil)
         case .icon_global, .dwd_icon_global, .dwd_icon:
             let sources: [(any GenericDomain, any GenericVariable.Type)] = [
-                (IconDomains.icon, IconVariable.self),
-                (try await IconNativeDomains.iconNative.load(), IconVariable.self)
+                (try await IconNativeDomains.iconNative.load(), IconVariable.self),
+                (IconDomains.icon, IconVariable.self)
             ]
             return .multipleWithBoundingBox([(IconDomains.iconEps, ProbabilityVariable.self)] + sources,
                 boundingBox: (IconDomains.icon, sources))
@@ -1536,19 +1537,19 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .singleWithPrecipitationProbability(IconDomains.iconEu, IconVariable.self, precipitationProb: IconDomains.iconEuEps)
         case .icon_d2, .dwd_icon_d2:
             let sources: [(any GenericDomain, any GenericVariable.Type)] = [
-                (IconDomains.iconD2, IconVariable.self),
-                (try await IconNativeDomains.iconD2Native.load(), IconVariable.self)
+                (try await IconNativeDomains.iconD2Native.load(), IconVariable.self),
+                (IconDomains.iconD2, IconVariable.self)
             ]
             let quarterHourly: [(any GenericDomain, any GenericVariable.Type)] = [
-                (IconDomains.iconD2_15min, IconVariable.self),
-                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
+                (IconDomains.iconD2_15min, IconVariable.self)
             ]
             return .multipleWithBoundingBox([(IconDomains.iconD2Eps, ProbabilityVariable.self)] + sources + quarterHourly,
                 boundingBox: (IconDomains.iconD2, sources))
         case .dwd_icon_d2_15min:
             let sources: [(any GenericDomain, any GenericVariable.Type)] = [
-                (IconDomains.iconD2_15min, IconVariable.self),
-                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
+                (IconDomains.iconD2_15min, IconVariable.self)
             ]
             return .multipleWithBoundingBox(sources, boundingBox: (IconDomains.iconD2_15min, sources), allowMinMaxTwoAggregations: true)
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
