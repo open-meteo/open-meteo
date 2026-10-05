@@ -40,43 +40,39 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         sourceFile: "icon_grid_0047_R19B07_L.nc"
     )
 
-    // Extends will change slightly on Oct. 6 2026
-    // We will only start archiving this native domain after with the new grid
+    // Operational from 2026-10-06 06 UTC. Identities verified against the official
+    // NetCDF meshes and DWD's 2026-07-15 00 UTC test GRIBs.
     static let europe = Self(
-        gridNumber: 27, 
-        gridUUID: UUID(uuidString: "ec13b8bc-b82d-11e4-b13f-4d55411d42e6")!,
-        cellCount: 659_156, 
-        isGlobal: false, 
+        gridNumber: 62,
+        gridUUID: UUID(uuidString: "832c1507-fbc7-3eb3-8413-9890094d2c60")!,
+        cellCount: 768_608,
+        isGlobal: false,
         latitudeBandCount: 2_222,
         resolutionMeters: 6_600,
-        maximumDistanceMeters: 13_000, 
-        sourceFile: "icon_grid_0027_R03B08_N02.nc"
+        maximumDistanceMeters: 13_000,
+        sourceFile: "icon_grid_0062_R03B08_N02.nc"
     )
 
-    // Resolution will change on Oct. 6 2026
-    // We will only start archiving this native domain after with the new grid
     static let globalEnsemble = Self(
-        gridNumber: 36, 
-        gridUUID: UUID(uuidString: "ae487d14-fe2e-11e4-af85-e50a2a56a360")!,
-        cellCount: 737_280, 
-        isGlobal: true, 
-        latitudeBandCount: 556,
-        resolutionMeters: 26_500,
-        maximumDistanceMeters: 52_000, 
-        sourceFile: "icon_grid_0036_R03B06_G.nc"
+        gridNumber: 39,
+        gridUUID: UUID(uuidString: "49c340e2-248d-11e5-8105-c12d5e3b00a4")!,
+        cellCount: 1_310_720,
+        isGlobal: true,
+        latitudeBandCount: 741,
+        resolutionMeters: 20_000,
+        maximumDistanceMeters: 40_000,
+        sourceFile: "icon_grid_0039_R02B07_G.nc"
     )
 
-    // Resolution will change on Oct. 6 2026
-    // We will only start archiving this native domain after with the new grid
     static let europeEnsemble = Self(
-        gridNumber: 37, 
-        gridUUID: UUID(uuidString: "ae487d28-fe2e-11e4-af85-e50a2a56a360")!,
-        cellCount: 164_984, 
-        isGlobal: false, 
-        latitudeBandCount: 1_111,
-        resolutionMeters: 13_200,
-        maximumDistanceMeters: 26_000, 
-        sourceFile: "icon_grid_0037_R03B07_N02.nc"
+        gridNumber: 63,
+        gridUUID: UUID(uuidString: "f0e39c82-3852-5790-474a-63af800a2dc0")!,
+        cellCount: 342_428,
+        isGlobal: false,
+        latitudeBandCount: 1_481,
+        resolutionMeters: 10_000,
+        maximumDistanceMeters: 20_000,
+        sourceFile: "icon_grid_0063_R02B08_N02.nc"
     )
 
     /// ICON's spherical Earth radius in metres, independent of the index format.
