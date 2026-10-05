@@ -118,6 +118,15 @@ enum IconNativeDomains: String, CaseIterable {
         try await Self.domains.load(self)
     }
 
+    /// Missing grids are unavailable supplemental sources; invalid grids remain errors.
+    func loadIfAvailable() async throws -> IconNativeDomain? {
+        do {
+            return try await load()
+        } catch IconNativeDomainError.missingGridArtifact {
+            return nil
+        }
+    }
+
     static let logger = Logger(label: "IconNativeDomain")
     private static let domains = IconNativeDomainCache()
 }
