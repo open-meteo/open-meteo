@@ -49,6 +49,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         cellCount: 659_156, 
         isGlobal: false, 
         latitudeBandCount: 2_222,
+        resolutionMeters: 6_600,
         maximumDistanceMeters: 13_000, 
         sourceFile: "icon_grid_0027_R03B08_N02.nc"
     )
@@ -61,6 +62,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         cellCount: 737_280, 
         isGlobal: true, 
         latitudeBandCount: 556,
+        resolutionMeters: 26_500,
         maximumDistanceMeters: 52_000, 
         sourceFile: "icon_grid_0036_R03B06_G.nc"
     )
@@ -73,6 +75,7 @@ struct IconNativeGridIdentity: Sendable, Hashable {
         cellCount: 164_984, 
         isGlobal: false, 
         latitudeBandCount: 1_111,
+        resolutionMeters: 13_200,
         maximumDistanceMeters: 26_000, 
         sourceFile: "icon_grid_0037_R03B07_N02.nc"
     )
