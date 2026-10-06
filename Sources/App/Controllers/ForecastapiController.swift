@@ -1504,9 +1504,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconDomains.iconEuEps, ProbabilityVariable.self),
                 (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), ProbabilityVariable.self),
                 (try await IconNativeDomains.iconNative.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.icon, IconVariable.self),
+                (try await IconNativeDomains.iconEuNative.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconEuNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.iconEu, IconVariable.self),
                 (try await IconNativeDomains.iconD2Native.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconD2NativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.iconD2, IconVariable.self),
                 (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
                 (IconDomains.iconD2_15min, IconVariable.self)
@@ -1558,12 +1562,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .multiple([
                 (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
-                (IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self)
+                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), DwdIconEpsGlobalVariable.self),
+                (IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self),
+                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), DwdIconEuEpsGlobalVariable.self)
             ])
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .multiple([
                 (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
-                (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+                (try await IconNativeDomains.iconEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEpsGlobalVariable>.self),
+                (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
+                (try await IconNativeDomains.iconEuEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
             ])
         case .icon_global_eps, .dwd_icon_global_eps:
             // Regular EPS ingestion has stopped; prefer native storage and retain regular archives.
@@ -1918,8 +1926,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // Keep these storage pairs separate from the probability and quarter-hourly companions below.
             func makeReader(domain: IconDomains, native: IconNativeDomains) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
                 let preferred = try await native.loadIfAvailable()?.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let fallback = try await domain.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation.isNaN ? preferred?.resolvedTargetElevation ?? elevation : elevation, mode: mode, options: options)
-                let readers = [fallback, preferred].compactMap { $0 }
+                let resolvedElevation = elevation.isNaN ? preferred?.resolvedTargetElevation ?? elevation : elevation
+                let fallback = try await domain.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                let modelLevel = try await native.modelLevelDomain?.loadIfAvailable()?.makeDerivedHourly(variableType: IconModelLevelVariable.self, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                let readers = [fallback, preferred, modelLevel].compactMap { $0 }
                 guard !readers.isEmpty else { return nil }
                 return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
             }
@@ -1944,9 +1954,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For Netherlands and Belgium use KNMI, IFS and ICON
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native)
                 return MultiDomains.hourlyToMultiSameType([
+                    iconProbabilities.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     gfsUvIndex,
                     icon,
@@ -1979,7 +1990,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native),
                let iconD2_15min = try await makeReader(domain: .iconD2_15min, native: .iconD2Native15min) {
                 // TODO: check how out of projection areas are handled
-                guard let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                guard let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
                 return MultiDomains.hourlyToMultiSameType([
@@ -2026,8 +2037,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For Northern Europe and Iceland use DMI Harmonie
             if (44..<66).contains(lat), let dmiEurope = try await DmiDomain.harmonie_arome_europe.makeDerivedHourly(variableType: DmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 return MultiDomains.hourlyToMultiSameType([
+                    iconProbabilities.asOptionalReader,
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     gfs,
@@ -2045,6 +2057,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType([
+                    iconProbabilities.asOptionalReader,
                     gfsProbabilites.asOptionalReader,
                     nbmProbabilities?.asOptionalReader,
                     icon,
@@ -2058,6 +2071,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                let jmaMsm = try await JmaDomain.msm.makeDerivedHourly(variableType: JmaSurfaceVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                let jmaMsmUpper = try await JmaDomain.msm_upper_level.makeDerivedHourly(variableType: JmaPressureVariable.self, lat: lat, lon: lon, elevation: jmaMsm.resolvedTargetElevation, mode: mode, options: options) {
                 return MultiDomains.hourlyToMultiSameType([
+                    iconProbabilities.asOptionalReader,
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
                     gfs,
@@ -2069,7 +2083,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
 
             // Remaining eastern europe
-            if let iconEu = try await IconDomains.iconEu.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative) {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites.asOptionalReader,
                     ifsProbabilities.asOptionalReader,
@@ -2083,6 +2097,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
             // Remaining parts of the world
             return MultiDomains.hourlyToMultiSameType([
+                iconProbabilities.asOptionalReader,
                 gfsProbabilites.asOptionalReader,
                 ifsProbabilities.asOptionalReader,
                 gfs,
