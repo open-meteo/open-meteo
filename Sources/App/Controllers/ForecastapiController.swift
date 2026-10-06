@@ -1510,17 +1510,26 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconDomains.iconD2_15min, IconVariable.self)
             ])
         case .icon_global, .dwd_icon_global, .dwd_icon:
+            // Keep regular deterministic storage preferred, including its model-level fields, until cutover.
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
                 (try await IconNativeDomains.iconNative.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.icon, IconVariable.self)
             ]
             return .multipleWithBoundingBox([(IconDomains.iconEps, ProbabilityVariable.self)] + sources,
                 boundingBox: (IconDomains.icon, sources), allowMinMaxTwoAggregations: false)
         case .icon_eu, .dwd_icon_eu:
-            return .singleWithPrecipitationProbability(IconDomains.iconEu, IconVariable.self, precipitationProb: IconDomains.iconEuEps)
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (try await IconNativeDomains.iconEuNative.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconEuNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+                (IconDomains.iconEu, IconVariable.self)
+            ]
+            return .multipleWithBoundingBox([(IconDomains.iconEuEps, ProbabilityVariable.self)] + sources,
+                boundingBox: (IconDomains.iconEu, sources), allowMinMaxTwoAggregations: false)
         case .icon_d2, .dwd_icon_d2:
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
                 (try await IconNativeDomains.iconD2Native.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconD2NativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.iconD2, IconVariable.self)
             ]
             let quarterHourly: [((any GenericDomain)?, any GenericVariable.Type)] = [
@@ -1546,17 +1555,48 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
             ])
         case .icon_global_eps, .dwd_icon_global_eps:
-            return .single(IconDomains.iconEps, DwdIconEpsGlobalVariable.self)
+            // Regular EPS ingestion has stopped; prefer native storage and retain regular archives.
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
+                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), DwdIconEpsGlobalVariable.self)
+            ]
+            return .multipleWithBoundingBox(sources,
+                boundingBox: (IconDomains.iconEps, sources), allowMinMaxTwoAggregations: true)
         case .icon_eu_eps, .dwd_icon_eu_eps:
-            return .single(IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self)
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self),
+                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), DwdIconEuEpsGlobalVariable.self)
+            ]
+            return .multipleWithBoundingBox(sources,
+                boundingBox: (IconDomains.iconEuEps, sources), allowMinMaxTwoAggregations: true)
         case .icon_d2_eps, .dwd_icon_d2_eps:
-            return .single(IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self)
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self),
+                (try await IconNativeDomains.iconD2EpsNative.loadIfAvailable(), DwdIconD2EpsGlobalVariable.self)
+            ]
+            return .multipleWithBoundingBox(sources,
+                boundingBox: (IconDomains.iconD2Eps, sources), allowMinMaxTwoAggregations: true)
         case .dwd_icon_eps_ensemble_mean:
-            return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self)
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
+                (try await IconNativeDomains.iconEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEpsGlobalVariable>.self)
+            ]
+            return .multipleWithBoundingBox(sources,
+                boundingBox: (IconDomains.iconEpsEnsembleMean, sources), allowMinMaxTwoAggregations: true)
         case .dwd_icon_eu_eps_ensemble_mean:
-            return .single(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
+                (try await IconNativeDomains.iconEuEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
+            ]
+            return .multipleWithBoundingBox(sources,
+                boundingBox: (IconDomains.iconEuEpsEnsembleMean, sources), allowMinMaxTwoAggregations: true)
         case .dwd_icon_d2_eps_ensemble_mean:
-            return .single(IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
+            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+                (IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<DwdIconD2EpsGlobalVariable>.self),
+                (try await IconNativeDomains.iconD2EpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
+            ]
+            return .multipleWithBoundingBox(sources,
+                boundingBox: (IconDomains.iconD2EpsEnsembleMean, sources), allowMinMaxTwoAggregations: true)
         case .ecmwf_ifs025_ensemble_mean:
             return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
         case .ecmwf_aifs025_ensemble_mean:
