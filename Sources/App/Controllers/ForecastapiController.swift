@@ -1316,7 +1316,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .singleWithPrecipitationProbability(
                 try await IconNativeDomains.iconNative.load(),
                 IconVariable.self,
-                precipitationProb: IconDomains.iconEps
+                precipitationProb: try await IconNativeDomains.iconEpsNative.load()
             )
         case .dwd_icon_d2_native:
             return .singleWithSupplementalDomains(
@@ -1324,7 +1324,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 IconVariable.self,
                 lowerPriority: [],
                 higherPriority: [(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)],
-                precipitationProb: IconDomains.iconD2Eps,
+                precipitationProb: try await IconNativeDomains.iconD2EpsNative.load(),
                 gridpointPolicy: .primaryOnly
             )
         case .dwd_icon_d2_native_15min:
@@ -1332,7 +1332,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dwd_icon_eu_native:
             return .singleWithPrecipitationProbability(
                 try await IconNativeDomains.iconEuNative.load(), IconVariable.self,
-                precipitationProb: IconDomains.iconEuEps
+                precipitationProb: try await IconNativeDomains.iconEuEpsNative.load()
             )
         case .dwd_icon_global_eps_native:
             return .single(try await IconNativeDomains.iconEpsNative.load(), DwdIconEpsGlobalVariable.self)
