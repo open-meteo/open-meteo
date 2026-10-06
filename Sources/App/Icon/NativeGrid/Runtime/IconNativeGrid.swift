@@ -9,21 +9,24 @@ import ReducedLatLon
 /// search; ICON's Earth radius and elevation scoring remain integration policy rather than artifact
 /// format concerns. Regional acceptance is distance-based, not polygon containment.
 struct IconNativeGrid: Gridable {
-    typealias SliceType = Range<Int>
+    typealias SliceType = [Int]
 
     let storage: ReducedLatLonIndex
+    let resolutionMeters: Double
     let maximumChordDistanceSquared: Float
     let nearbyMaximumChordDistanceSquared: Float
     var elevations: ElevationValues?
 
-    /// Combines a validated index with ICON's acceptance/candidate radii and optional static elevations.
+    /// Combines a validated index with ICON's resolution, search radii, and optional static elevations.
     init(
         storage: ReducedLatLonIndex,
+        resolutionMeters: Double,
         maximumChordDistanceSquared: Float,
         nearbyMaximumChordDistanceSquared: Float,
         elevations: ElevationValues? = nil
     ) {
         self.storage = storage
+        self.resolutionMeters = resolutionMeters
         self.maximumChordDistanceSquared = maximumChordDistanceSquared
         self.nearbyMaximumChordDistanceSquared = nearbyMaximumChordDistanceSquared
         self.elevations = elevations
@@ -53,9 +56,17 @@ struct IconNativeGrid: Gridable {
 
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? { nil }
 
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> Range<Int>? { nil }
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> [Int]? {
+        storage.pointIDs(latitude: bb.latitude, longitude: bb.longitude)
+    }
 
-    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? { nil }
+    func estimatedNumberOfGridCells(boundingBox bb: BoundingBoxWGS84) -> Int? {
+        let radians = Double.pi / 180
+        let radius = IconNativeGridIdentity.earthRadiusMeters
+        let area = radius * radius * (Double(bb.longitude.upperBound) - Double(bb.longitude.lowerBound)) * radians
+            * (sin(Double(bb.latitude.upperBound) * radians) - sin(Double(bb.latitude.lowerBound) * radians))
+        return Int(min(Double(storage.pointCount), max(0, ceil(area / (resolutionMeters * resolutionMeters)))))
+    }
 
     /// Returns the stored mass-point direction as latitude/longitude degrees for a canonical ID.
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {

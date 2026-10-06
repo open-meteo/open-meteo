@@ -99,6 +99,41 @@ package final class ReducedLatLonIndex: Sendable {
         Int(ReducedLatLonArtifact.uint(bytes, directoryOffset + buckets.lowerBound * 4))..<Int(ReducedLatLonArtifact.uint(bytes, directoryOffset + buckets.upperBound * 4))
     }
 
+    /// Returns ascending canonical IDs whose decoded coordinates lie in the half-open box.
+    /// Bounds must be valid geographic degrees; longitude ranges cannot cross the dateline.
+    package func pointIDs(latitude: Range<Float>, longitude: Range<Float>) -> [Int] {
+        guard !latitude.isEmpty, !longitude.isEmpty else { return [] }
+        // Include neighbouring buckets to cover rounding from stored directions to Float degrees.
+        let lower = max(firstBand, Int(floor((Double(latitude.lowerBound) + 90) / 180 * Double(latitudeBandCount))) - 1)
+        let upper = min(firstBand + bands.count - 1, Int(floor((Double(latitude.upperBound) + 90) / 180 * Double(latitudeBandCount))) + 1)
+        guard lower <= upper else { return [] }
+        return withBytes { bytes in
+            var ids = [Int]()
+            for row in lower...upper {
+                let band = bands[row - firstBand]
+                guard band.storedColumnCount > 0 else { continue }
+                let columns = band.longitudeColumnCount
+                let first = Int(floor((Double(longitude.lowerBound) + 180) / 360 * Double(columns))) - 1
+                let last = Int(floor((Double(longitude.upperBound) + 180) / 360 * Double(columns))) + 1
+                let start = (first + columns) % columns
+                for step in 0..<min(columns, last - first + 1) {
+                    let local = band.localColumn((start + step) % columns)
+                    guard local < band.storedColumnCount else { continue }
+                    let bucket = band.firstBucket + local
+                    for position in pointRange(bucket..<bucket + 1, bytes: bytes) {
+                        let offset = pointsOffset + position * 16
+                        let coordinate = ReducedLatLonArtifact.point(bytes, offset).coordinate
+                        if latitude.contains(coordinate.latitude), longitude.contains(coordinate.longitude) {
+                            ids.append(Int(ReducedLatLonArtifact.uint(bytes, offset + 12)))
+                        }
+                    }
+                }
+            }
+            ids.sort()
+            return ids
+        }
+    }
+
     @inline(__always)
     func bucket(latitude: Double, longitude: Double) -> Int? {
         location(latitude: latitude, longitude: longitude >= .pi ? longitude - 2 * .pi : longitude, cosine: 0).bucket
