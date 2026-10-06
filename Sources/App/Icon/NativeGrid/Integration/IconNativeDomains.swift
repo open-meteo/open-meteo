@@ -9,6 +9,19 @@ enum IconNativeDomains: String, CaseIterable {
     case iconEuEpsNative = "icon-eu-eps-native"
     case iconD2EpsNative = "icon-d2-eps-native"
 
+    case iconEpsNativeEnsembleMean = "icon-eps-native-ensemble-mean"
+    case iconEuEpsNativeEnsembleMean = "icon-eu-eps-native-ensemble-mean"
+    case iconD2EpsNativeEnsembleMean = "icon-d2-eps-native-ensemble-mean"
+
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .iconEpsNative: return .iconEpsNativeEnsembleMean
+        case .iconEuEpsNative: return .iconEuEpsNativeEnsembleMean
+        case .iconD2EpsNative: return .iconD2EpsNativeEnsembleMean
+        default: return nil
+        }
+    }
+
     /// Shared forecast metadata and variable mappings come from the corresponding regular domain.
     var sourceDomain: IconDomains {
         switch self {
@@ -17,8 +30,11 @@ enum IconNativeDomains: String, CaseIterable {
         case .iconD2Native: return .iconD2
         case .iconD2Native15min: return .iconD2_15min
         case .iconEpsNative: return .iconEps
+        case .iconEpsNativeEnsembleMean: return .iconEpsEnsembleMean
         case .iconEuEpsNative: return .iconEuEps
+        case .iconEuEpsNativeEnsembleMean: return .iconEuEpsEnsembleMean
         case .iconD2EpsNative: return .iconD2Eps
+        case .iconD2EpsNativeEnsembleMean: return .iconD2EpsEnsembleMean
         }
     }
 
@@ -29,13 +45,22 @@ enum IconNativeDomains: String, CaseIterable {
         case .iconD2Native: return .dwd_icon_d2_native
         case .iconD2Native15min: return .dwd_icon_d2_native_15min
         case .iconEpsNative: return .dwd_icon_eps_native
+        case .iconEpsNativeEnsembleMean: return .dwd_icon_eps_native_ensemble_mean
         case .iconEuEpsNative: return .dwd_icon_eu_eps_native
+        case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native_ensemble_mean
         case .iconD2EpsNative: return .dwd_icon_d2_eps_native
+        case .iconD2EpsNativeEnsembleMean: return .dwd_icon_d2_eps_native_ensemble_mean
         }
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        self == .iconD2Native15min ? .dwd_icon_d2_native : domainRegistry
+        switch self {
+        case .iconD2Native15min: return .dwd_icon_d2_native
+        case .iconEpsNativeEnsembleMean: return .dwd_icon_eps_native
+        case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native
+        case .iconD2EpsNativeEnsembleMean: return .dwd_icon_d2_eps_native
+        default: return domainRegistry
+        }
     }
 
     var dtSeconds: Int { sourceDomain.dtSeconds }
@@ -51,9 +76,9 @@ enum IconNativeDomains: String, CaseIterable {
         switch self {
         case .iconNative: return Self.globalGridFile
         case .iconEuNative: return Self.europeGridFile
-        case .iconD2Native, .iconD2Native15min, .iconD2EpsNative: return Self.d2GridFile
-        case .iconEpsNative: return Self.globalEnsembleGridFile
-        case .iconEuEpsNative: return Self.europeEnsembleGridFile
+        case .iconD2Native, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return Self.d2GridFile
+        case .iconEpsNative, .iconEpsNativeEnsembleMean: return Self.globalEnsembleGridFile
+        case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean: return Self.europeEnsembleGridFile
         }
     }
 

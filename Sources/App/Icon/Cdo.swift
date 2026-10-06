@@ -13,9 +13,9 @@ struct IconRemapper: Sendable {
         }
     }
 
-    /// Reuse historical CDO weights and masks for global ICON and EPS domains.
+    /// Reuse historical CDO weights and masks for deterministic global ICON.
     init(curl: Curl, domain: IconDomains) async throws {
-        guard [.icon, .iconEps, .iconEuEps, .iconD2Eps].contains(domain),
+        guard domain == .icon,
               let target = domain.grid as? RegularGrid else {
             throw IconDownloadError(description: "No regular remapping grid for \(domain)")
         }
