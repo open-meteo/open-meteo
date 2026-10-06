@@ -353,7 +353,8 @@ struct WeatherApiController {
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
                 var countedModels = Set<MultiDomains>()
                 locations = try await domains.asyncFlatMap({ domain in
-                    guard let grid = try await domain.genericDomain()?.grid else {
+                    let mapping = try await domain.getDomainAndVariable()
+                    guard let grid = domain.genericDomain(mapping: mapping)?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
                     guard let numberOfGridCells = grid.estimatedNumberOfGridCells(boundingBox: bbox) else {
@@ -371,7 +372,7 @@ struct WeatherApiController {
                         OmMetrics.recordModelRequest(models: [domain], locationCount: locationCount)
                     }
                     /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
-                    let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
+                    let run = (domain.useLatestRun && run == nil) ? try await mapping?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
 
                     if dates.count == 0 {
                         if params.run != nil {
@@ -383,7 +384,7 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let coordinates = grid.getCoordinates(gridpoint: gridpoint)
-                            let r = try await domain.getReaders(gridpoint: gridpoint, options: options.with(remappedCoordinates: coordinates))
+                            let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options.with(remappedCoordinates: coordinates))
                             let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution, remappedCoordinates: coordinates)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
@@ -399,7 +400,7 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let coordinates = grid.getCoordinates(gridpoint: gridpoint)
-                            let r = try await domain.getReaders(gridpoint: gridpoint, options: options.with(remappedCoordinates: coordinates))
+                            let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options.with(remappedCoordinates: coordinates))
                             let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution, remappedCoordinates: coordinates)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
@@ -1246,16 +1247,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
-        func getBoundingBoxReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
-            guard case .multipleWithBoundingBox(_, let boundingBox, _) = self else {
-                return (nil, nil, nil, nil)
-            }
-            let coordinate = options.remappedCoordinates ?? boundingBox.domain.grid.getCoordinates(gridpoint: gridpoint)
-            let sources = boundingBox.sources.compactMap { domain, variable in domain.map { ($0, variable) } }
-            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { source in
-                let position = source.0.domainRegistry == boundingBox.domain.domainRegistry ? gridpoint : source.0.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
+        static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [((any GenericDomain)?, any GenericVariable.Type)], gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
+            let coordinate = options.remappedCoordinates ?? outputDomain.grid.getCoordinates(gridpoint: gridpoint)
+            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { domain, variable in
+                guard let domain else { return nil }
+                let position = domain.domainRegistry == outputDomain.domainRegistry ? gridpoint : domain.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
                 guard let position else { return nil }
-                return try await source.0.makeGenericHourlyDaily(variableType: source.1, position: position, options: options).hourly
+                return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, options: options).hourly
             }
             // Keep an empty reader so an unmapped output cell still produces null forecast columns.
             let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
@@ -2190,12 +2188,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         
     }
     
-    func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
+    func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
+        let mapping = try await getDomainAndVariable()
+        return try await getReaders(gridpoint: gridpoint, mapping: mapping, options: options)
+    }
+
+    /// Reuse the resolved mapping for every cell of a bounding-box request.
+    func getReaders(gridpoint: Int, mapping: DomainReaderMapping?, options: GenericReaderOptions) async throws -> ForecastReaderResult {
         
-        if let mapping = try await getDomainAndVariable() {
+        if let mapping {
             switch mapping {
-            case .multipleWithBoundingBox:
-                return try await mapping.getBoundingBoxReaders(gridpoint: gridpoint, options: options)
+            case .multipleWithBoundingBox(_, let boundingBox, _):
+                return try await DomainReaderMapping.getBoundingBoxReaders(outputDomain: boundingBox.domain, sources: boundingBox.sources, gridpoint: gridpoint, options: options)
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
@@ -2464,8 +2468,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     func genericDomain() async throws -> (any GenericDomain)? {
-        if let d = try await getDomainAndVariable() {
-            return d.singleDomain
+        genericDomain(mapping: try await getDomainAndVariable())
+    }
+
+    func genericDomain(mapping: DomainReaderMapping?) -> (any GenericDomain)? {
+        if let mapping {
+            return mapping.singleDomain
         }
         
         switch self {
