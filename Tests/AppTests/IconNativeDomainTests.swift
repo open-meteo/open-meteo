@@ -37,6 +37,25 @@ import Logging
         #expect(metadata.updateIntervalSeconds == IconDomains.iconD2_15min.updateIntervalSeconds)
     }
 
+    @Test(arguments: [IconNativeDomains.iconNative, .iconEuNative, .iconD2Native])
+    func modelLevelDomainsShareStaticResourcesOnly(parent: IconNativeDomains) throws {
+        let modelLevel = try #require(parent.modelLevelDomain)
+        #expect(modelLevel.modelLevelParent == parent)
+        #expect(modelLevel.domainRegistry != parent.domainRegistry)
+        #expect(modelLevel.domainRegistryStatic == parent.domainRegistry)
+        #expect(modelLevel.nativeGridFile.getFilePath() == parent.nativeGridFile.getFilePath())
+        #expect(modelLevel.domainRegistry.nativeDefinition == modelLevel)
+        let metadata = try #require(modelLevel.domainRegistry.timeSeriesMetadata)
+        #expect(metadata.dtSeconds == parent.dtSeconds)
+        #expect(metadata.omFileLength == parent.omFileLength)
+        for variable in IconSurfaceVariable.allCases {
+            #expect((IconModelLevelVariable(rawValue: variable.rawValue) != nil)
+                    == (variable.getVarAndLevel(domain: parent.sourceDomain)?.cat == "model-level"))
+        }
+        #expect(IconModelLevelVariable(rawValue: "temperature_850hPa") == nil)
+        #expect(IconModelLevelVariable(rawValue: "temperature_2m") == nil)
+    }
+
     @Test func d2DownloadOutputs() async throws {
         let deterministic = try await IconDownloadDomains(.iconD2)
         #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)

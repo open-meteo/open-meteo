@@ -54,7 +54,7 @@ actor IconNativeDomainCache {
 
     func load(_ definition: IconNativeDomains) async throws -> IconNativeDomain {
         // D2's hourly and quarter-hourly domains use exactly the same static resources.
-        let resourceDefinition: IconNativeDomains = definition == .iconD2Native15min ? .iconD2Native : definition
+        let resourceDefinition: IconNativeDomains = definition.modelLevelParent ?? (definition == .iconD2Native15min ? .iconD2Native : definition)
         switch cache[resourceDefinition] {
         case .loaded(let domain):
             return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)

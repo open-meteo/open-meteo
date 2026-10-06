@@ -87,8 +87,11 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_d2
     case dwd_icon_d2_15min
     case dwd_icon_global_native
+    case dwd_icon_global_native_model_level
     case dwd_icon_eu_native
+    case dwd_icon_eu_native_model_level
     case dwd_icon_d2_native
+    case dwd_icon_d2_native_model_level
     case dwd_icon_d2_native_15min
     case dwd_icon_eps_native
     case dwd_icon_eps_native_ensemble_mean
@@ -240,8 +243,11 @@ enum DomainRegistry: String, CaseIterable {
     var nativeDefinition: IconNativeDomains? {
         switch self {
         case .dwd_icon_global_native: return .iconNative
+        case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
         case .dwd_icon_eu_native: return .iconEuNative
+        case .dwd_icon_eu_native_model_level: return .iconEuNativeModelLevel
         case .dwd_icon_d2_native: return .iconD2Native
+        case .dwd_icon_d2_native_model_level: return .iconD2NativeModelLevel
         case .dwd_icon_d2_native_15min: return .iconD2Native15min
         case .dwd_icon_eps_native: return .iconEpsNative
         case .dwd_icon_eps_native_ensemble_mean: return .iconEpsNativeEnsembleMean
@@ -384,7 +390,8 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
              .dwd_icon_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
             return nil
