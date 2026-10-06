@@ -45,11 +45,18 @@ enum ProbabilityReader {
     }
 
     /// Notes: Does not use ICON-D2, because it has fewer members. It need some kind of mixing
-    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameVariableType<GenericReader<IconDomains, ProbabilityVariable>> {
-        return await GenericReaderMixerSameVariableType(reader: [
-            try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-            try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        ].compactMap({ $0 }))
+    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerByVariableName<ProbabilityVariable> {
+        // EPS ingestion has moved to native storage, independently of the deterministic cutover.
+        let domains: [(any GenericDomain)?] = [
+            IconDomains.iconEps,
+            try await IconNativeDomains.iconEpsNative.loadIfAvailable(),
+            IconDomains.iconEuEps,
+            try await IconNativeDomains.iconEuEpsNative.loadIfAvailable()
+        ]
+        let readers = try await domains.asyncCompactMap { domain in
+            try await domain?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        }
+        return GenericReaderMixerByVariableName(reader: readers)
     }
 
     /// Reader for probabilities based on NCEP NBM

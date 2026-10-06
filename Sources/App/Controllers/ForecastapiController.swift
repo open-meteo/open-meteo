@@ -1497,10 +1497,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .jms_gsm, .jma_gsm:
             return .single(JmaDomain.gsm, JmaVariable.self)
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
-            // Keep regular lat-lon storage preferred until the native-grid cutover.
+            // Prefer native EPS probabilities; deterministic storage keeps its regular-first priority until cutover.
             return .multiple([
                 (IconDomains.iconEps, ProbabilityVariable.self),
+                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), ProbabilityVariable.self),
                 (IconDomains.iconEuEps, ProbabilityVariable.self),
+                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), ProbabilityVariable.self),
                 (try await IconNativeDomains.iconNative.loadIfAvailable(), IconVariable.self),
                 (IconDomains.icon, IconVariable.self),
                 (IconDomains.iconEu, IconVariable.self),
@@ -1516,7 +1518,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (try await IconNativeDomains.iconNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.icon, IconVariable.self)
             ]
-            return .multipleWithBoundingBox([(IconDomains.iconEps, ProbabilityVariable.self)] + sources,
+            return .multipleWithBoundingBox([
+                (IconDomains.iconEps, ProbabilityVariable.self),
+                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), ProbabilityVariable.self)
+            ] + sources,
                 boundingBox: (IconDomains.icon, sources), allowMinMaxTwoAggregations: false)
         case .icon_eu, .dwd_icon_eu:
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
@@ -1524,7 +1529,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (try await IconNativeDomains.iconEuNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
                 (IconDomains.iconEu, IconVariable.self)
             ]
-            return .multipleWithBoundingBox([(IconDomains.iconEuEps, ProbabilityVariable.self)] + sources,
+            return .multipleWithBoundingBox([
+                (IconDomains.iconEuEps, ProbabilityVariable.self),
+                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), ProbabilityVariable.self)
+            ] + sources,
                 boundingBox: (IconDomains.iconEu, sources), allowMinMaxTwoAggregations: false)
         case .icon_d2, .dwd_icon_d2:
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
@@ -1536,7 +1544,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
                 (IconDomains.iconD2_15min, IconVariable.self)
             ]
-            return .multipleWithBoundingBox([(IconDomains.iconD2Eps, ProbabilityVariable.self)] + sources + quarterHourly,
+            return .multipleWithBoundingBox([
+                (IconDomains.iconD2Eps, ProbabilityVariable.self),
+                (try await IconNativeDomains.iconD2EpsNative.loadIfAvailable(), ProbabilityVariable.self)
+            ] + sources + quarterHourly,
                 boundingBox: (IconDomains.iconD2, sources), allowMinMaxTwoAggregations: false)
         case .dwd_icon_d2_15min:
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
