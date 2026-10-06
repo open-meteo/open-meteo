@@ -1113,7 +1113,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     enum SupplementalGridpointPolicy: Equatable {
         case primaryOnly
         case alignedSupplemental
-        case remappedSupplemental
     }
 
     enum DomainReaderMapping {
@@ -1593,14 +1592,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (GemDomain.gem_hrdps_continental, GemVariable.self)
             ], precipitationProb: GemDomain.gem_global_ensemble)
         case .gem_global, .cmc_gem_gdps:
-            // Coordinate requests use all generations; gridpoint requests sample each generation on the legacy grid.
+            // Coordinate requests use all generations; gridpoint requests retain the legacy grid.
             return .singleWithSupplementalDomains(
                 GemDomain.gem_global,
                 GemVariable.self,
                 lowerPriority: [(GemDomain.gem_gdps_15km_upper_level, GemVariable.self)],
                 higherPriority: [(GemDomain.gem_gdps_15km, GemVariable.self)],
                 precipitationProb: GemDomain.gem_global_ensemble,
-                gridpointPolicy: .remappedSupplemental
+                gridpointPolicy: .primaryOnly
             )
         case .gem_regional, .cmc_gem_rdps:
             // The old and new RDPS grids have different indexing.
@@ -1610,7 +1609,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 lowerPriority: [],
                 higherPriority: [(GemDomain.gem_rdps_10km, GemVariable.self)],
                 precipitationProb: nil,
-                gridpointPolicy: .remappedSupplemental
+                gridpointPolicy: .primaryOnly
             )
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return .single(GemDomain.gem_hrdps_continental, GemVariable.self)
@@ -2204,9 +2203,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 switch gridpointPolicy {
                 case .primaryOnly:
                     return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
-                case .remappedSupplemental:
-                    let sources = lowerPriority + [(domain, variable)] + higherPriority
-                    return try await DomainReaderMapping.multipleWithBoundingBox(sources, boundingBox: (domain, sources)).getBoundingBoxReaders(gridpoint: gridpoint, options: options)
                 case .alignedSupplemental:
                     let sources = lowerPriority + [(domain, variable)] + higherPriority
                     let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { source in
