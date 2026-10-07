@@ -1,7 +1,6 @@
 /// Define functions to download surface and pressure level variables for ICON
-protocol IconVariableDownloadable: GenericVariable, Hashable {
+protocol IconVariableDownloadable: DwdVariableDownloadable {
     func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool
-    var multiplyAdd: (multiply: Float, add: Float)? { get }
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)?
 }
 

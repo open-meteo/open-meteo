@@ -50,18 +50,18 @@ import Logging
         #expect(metadata.omFileLength == parent.omFileLength)
         for variable in IconSurfaceVariable.allCases {
             #expect((IconModelLevelVariable(rawValue: variable.rawValue) != nil)
-                    == (variable.getVarAndLevel(domain: parent.sourceDomain)?.cat == "model-level"))
+                    == (variable.getVarAndLevel(model: parent.sourceModel)?.cat == "model-level"))
         }
         #expect(IconModelLevelVariable(rawValue: "temperature_850hPa") == nil)
         #expect(IconModelLevelVariable(rawValue: "temperature_2m") == nil)
     }
 
     @Test func d2DownloadOutputs() async throws {
-        let deterministic = try await IconDownloadDomains(.iconD2)
+        let deterministic = try await DwdDownloadDomains(.iconD2)
         #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)
         #expect(deterministic.ensembleMean == nil)
 
-        let ensemble = try await IconDownloadDomains(.iconD2Eps)
+        let ensemble = try await DwdDownloadDomains(.iconD2Eps)
         #expect(ensemble.ensembleMean?.domainRegistry == IconDomains.iconD2EpsEnsembleMean.domainRegistry)
         #expect(ensemble.fifteenMinute == nil)
     }

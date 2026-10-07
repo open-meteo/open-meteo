@@ -8,7 +8,7 @@ import Foundation
    PS        - surface pressure (not reduced)
    RELHUM_2M - 2 m relative humidity
    T_2M      - 2 m temperature
-   TOT_PREC  - total precipitation (3-hourly accumulation)
+   TOT_PREC  - total precipitation accumulated since forecast start
    U_10M     - 10 m zonal wind component
    V_10M     - 10 m meridional wind component
  */
@@ -136,30 +136,39 @@ enum AiconModelLevelVariableType: String, CaseIterable, Sendable {
     case windV           = "V"
 }
 
-/**
- A concrete AICON model-level variable: variable type + AICON level index (1–13).
-
- Conforms to `HeightVariableRespresentable` so that `rawValue` is derived automatically
- as e.g. `"T_13m"`, giving free `init?(rawValue:)` and `Codable` support consistent with
- the rest of the codebase.
- */
-struct AiconModelLevelVariable: HeightVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable, Sendable {
+/// A native model-level index, not a height above ground or a pressure level.
+struct AiconModelLevelVariable: RawRepresentable, GenericVariable, Hashable, Sendable {
     let variable: AiconModelLevelVariableType
-    /// AICON level index, 1-based (1–13)
     let level: Int
+
+    init(variable: AiconModelLevelVariableType, level: Int) {
+        self.variable = variable
+        self.level = level
+    }
+
+    static func valid(level: Int) -> Bool { (1...13).contains(level) }
+
+    init?(rawValue: String) {
+        guard let separator = rawValue.range(of: "_level", options: .backwards),
+              let variable = AiconModelLevelVariableType(rawValue: rawValue[..<separator.lowerBound].uppercased()),
+              let level = Int(rawValue[separator.upperBound...]), Self.valid(level: level) else { return nil }
+        self.init(variable: variable, level: level)
+    }
+
+    var rawValue: String { "\(variable.rawValue.lowercased())_level\(level)" }
 
     var storePreviousForecast: Bool { return false }
 
     var omFileName: (file: String, level: Int) {
         // Storage groups by filename; each model level needs a distinct file.
-        return ("\(variable.rawValue.lowercased())_level\(level)", 0)
+        return (rawValue, 0)
     }
 
     var scalefactor: Float {
         switch variable {
         case .temperature:      return 20
-        case .pressure:         return 0.1
-        case .specificHumidity: return 1000  // kg/kg → g/kg
+        case .pressure:         return 10
+        case .specificHumidity: return 1000
         case .windU, .windV:    return 10
         }
     }
@@ -178,7 +187,7 @@ struct AiconModelLevelVariable: HeightVariableRespresentable, GenericVariable, H
     }
 
     var isElevationCorrectable: Bool {
-        return variable == .temperature
+        return false
     }
 
     /// Upper-case directory name used on the opendata server: "P", "QV", "T", "U", "V"
@@ -193,6 +202,8 @@ struct AiconModelLevelVariable: HeightVariableRespresentable, GenericVariable, H
             return (1, -273.15)  // Kelvin → °C
         case .pressure:
             return (1 / 100, 0)  // Pa → hPa
+        case .specificHumidity:
+            return (1000, 0)     // kg/kg → g/kg
         default:
             return nil
         }
