@@ -32,6 +32,9 @@ extension IconNativeDomain {
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
             client: .shared, logger: IconNativeDomains.logger
         )
+        if definition.sourceDomain == .iconD2Ruc && payload == nil {
+            throw IconNativeDomainError.missingElevationArtifact(definition.domainRegistryStatic!.rawValue)
+        }
         let elevations: ElevationValues?
         if let payload {
             elevations = try await ElevationValues(decoded: payload.reader.read(), expectedCount: grid.nx)
@@ -54,7 +57,7 @@ actor IconNativeDomainCache {
 
     func load(_ definition: IconNativeDomains) async throws -> IconNativeDomain {
         // D2's hourly and quarter-hourly domains use exactly the same static resources.
-        let resourceDefinition: IconNativeDomains = definition.modelLevelParent ?? (definition == .iconD2Native15min ? .iconD2Native : definition)
+        let resourceDefinition: IconNativeDomains = definition.modelLevelParent ?? (definition == .iconD2Native15min ? .iconD2Native : definition == .iconD2RucNative15min ? .iconD2RucNative : definition)
         switch cache[resourceDefinition] {
         case .loaded(let domain):
             return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)

@@ -90,6 +90,9 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_global_native_model_level
     case dwd_icon_eu_native
     case dwd_icon_eu_native_model_level
+    case dwd_icon_d2_ruc_native
+    case dwd_icon_d2_ruc_native_15min
+    case dwd_icon_d2_ruc_native_model_level
     case dwd_icon_d2_native
     case dwd_icon_d2_native_model_level
     case dwd_icon_d2_native_15min
@@ -246,6 +249,9 @@ enum DomainRegistry: String, CaseIterable {
         case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
         case .dwd_icon_eu_native: return .iconEuNative
         case .dwd_icon_eu_native_model_level: return .iconEuNativeModelLevel
+        case .dwd_icon_d2_ruc_native: return .iconD2RucNative
+        case .dwd_icon_d2_ruc_native_15min: return .iconD2RucNative15min
+        case .dwd_icon_d2_ruc_native_model_level: return .iconD2RucNativeModelLevel
         case .dwd_icon_d2_native: return .iconD2Native
         case .dwd_icon_d2_native_model_level: return .iconD2NativeModelLevel
         case .dwd_icon_d2_native_15min: return .iconD2Native15min
@@ -269,7 +275,7 @@ enum DomainRegistry: String, CaseIterable {
     /// Used by file scheduling and synchronization without opening grid or elevation files.
     var timeSeriesMetadata: DomainTimeSeriesMetadata? {
         if let nativeDefinition {
-            return DomainTimeSeriesMetadata(nativeDefinition.sourceDomain)
+            return DomainTimeSeriesMetadata(nativeDefinition)
         }
         return regularDomain.map { DomainTimeSeriesMetadata($0) }
     }
@@ -390,7 +396,8 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
              .dwd_icon_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
@@ -629,6 +636,12 @@ struct DomainTimeSeriesMetadata {
     let dtSeconds: Int
     let omFileLength: Int
     let updateIntervalSeconds: Int
+
+    init(_ domain: IconNativeDomains) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
+    }
 
     init(_ domain: any GenericDomain) {
         self.dtSeconds = domain.dtSeconds

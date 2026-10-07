@@ -106,7 +106,7 @@ struct GenericVariableHandle: Sendable {
 
         for (domain, handles) in groups {
             let generateFullRun = generateFullRun && domain.generateFullRun
-            if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
+            if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 || domain.domainRegistry.nativeDefinition?.sourceDomain == .iconD2Ruc {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
                 try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta, uploadQueues: uploadQueues)

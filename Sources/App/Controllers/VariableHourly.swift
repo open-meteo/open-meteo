@@ -628,6 +628,7 @@ private let pressureLevelInterpolationTable: [DomainRegistry: [Int: SurroundingP
         900: (850, 950),
         925: (850, 950),
     ],
+    .dwd_icon_d2_ruc_native: [800: (700, 850), 900: (850, 950), 925: (850, 950)],
     .dwd_icon_d2_native: [
         800: (700, 850),
         900: (850, 950),
@@ -731,6 +732,8 @@ private struct VariableHourlyDerivationCompatibility {
                 pressureLevelGeopotentialHeightScale: 9.80665,
                 convertsPressureLevelVerticalVelocity: true
             )
+        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level:
+            self = .init(convectivePrecipitation: .zeroWherePrecipitationIsAvailable, omitsConvectivePrecipitationFromWeatherCode: true)
         case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
             self = .init(usesLegacyIconEpsRadiationStorage: true)
         case .meteofrance_wave:

@@ -46,7 +46,7 @@ extension Array where Element == Float {
             interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange, missingValuesAreBackwardsAveraged: false)
         case .backwards_sum:
             interpolateInplaceBackwards(nTime: time.count, isSummation: true)
-        case .backwards:
+        case .backwards, .backwards_max:
             interpolateInplaceBackwards(nTime: time.count, isSummation: false)
         }
     }

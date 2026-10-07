@@ -827,6 +827,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_global_native_model_level
     case dwd_icon_eu_native
     case dwd_icon_eu_native_model_level
+    case icon_d2_ruc
+    case dwd_icon_d2_ruc
+    case dwd_icon_d2_ruc_native
+    case dwd_icon_d2_ruc_native_15min
+    case dwd_icon_d2_ruc_native_model_level
     case dwd_icon_d2_native
     case dwd_icon_d2_native_model_level
     case dwd_icon_d2_native_15min
@@ -1121,10 +1126,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case multipleWithBoundingBox(
             [((any GenericDomain)?, any GenericVariable.Type)],
             boundingBox: (domain: any GenericDomain, sources: [((any GenericDomain)?, any GenericVariable.Type)]),
-            allowMinMaxTwoAggregations: Bool
+            allowMinMaxTwoAggregations: Bool,
+            rawGroups: [RawReaderDerivationGroup] = []
         )
         case single(any GenericDomain, any GenericVariable.Type)
-        case multiple([((any GenericDomain)?, any GenericVariable.Type)])
+        case multiple([((any GenericDomain)?, any GenericVariable.Type)], rawGroups: [RawReaderDerivationGroup] = [])
         /// Mixes raw fields within each group, then places derived groups above supplemental readers.
         case mixedBeforeDerivation(
             groups: [RawReaderDerivationGroup],
@@ -1149,6 +1155,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
         private static func makeDomainReaders(
             sources: [((any GenericDomain)?, any GenericVariable.Type)],
+            rawGroups: [RawReaderDerivationGroup] = [],
             lat: Float,
             lon: Float,
             elevation: Float,
@@ -1157,6 +1164,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         ) async throws -> (readers: [any GenericReaderOptionalProtocol<ForecastVariable>], elevation: Float) {
             let sources = sources.compactMap { domain, variable in domain.map { ($0, variable) } }
             var elevation = elevation
+            let groupedReaders: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await rawGroups.reversed().asyncCompactMap { group in
+                guard let result = try await group.makeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else { return nil }
+                elevation = result.elevation
+                return result.reader
+            }.reversed()
             let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.reversed().asyncCompactMap { source in
                 guard let reader = try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     return nil
@@ -1166,12 +1178,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 }
                 return reader
             }.reversed()
-            return (readers, elevation)
+            return (readers + groupedReaders, elevation)
         }
         
         var singleDomain: (any GenericDomain)? {
             switch self {
-            case .multipleWithBoundingBox(_, let boundingBox, _):
+            case .multipleWithBoundingBox(_, let boundingBox, _, _):
                 return boundingBox.domain
             case .single(let domain, _),
                  .singleWithPrecipitationProbability(let domain, _, _),
@@ -1186,8 +1198,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
         func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
             switch self {
-            case .multipleWithBoundingBox(let domains, _, let allowMinMaxTwoAggregations):
-                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            case .multipleWithBoundingBox(let domains, _, let allowMinMaxTwoAggregations, let rawGroups):
+                let forecast = try await Self.makeDomainReaders(sources: domains, rawGroups: rawGroups, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(forecast.readers, prefetchAllReaders: true, smoothTransitions: false, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
             case .single(let domain, let variable):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1202,8 +1214,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let probability = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)?.asOptionalReader
                 return MultiDomains.hourlyToMultiSameType([probability].compactMap { $0 } + forecast.readers)
-            case .multiple(let domains):
-                let forecast = try await Self.makeDomainReaders(sources: domains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            case .multiple(let domains, let rawGroups):
+                let forecast = try await Self.makeDomainReaders(sources: domains, rawGroups: rawGroups, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType(forecast.readers)
             case .mixedBeforeDerivation(let groups, let supplemental):
                 var resolvedElevation = elevation
@@ -1247,13 +1259,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
-        static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [((any GenericDomain)?, any GenericVariable.Type)], allowMinMaxTwoAggregations: Bool, gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
+        static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [((any GenericDomain)?, any GenericVariable.Type)], rawGroups: [RawReaderDerivationGroup] = [], allowMinMaxTwoAggregations: Bool, gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
             let coordinate = options.remappedCoordinates ?? outputDomain.grid.getCoordinates(gridpoint: gridpoint)
-            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { domain, variable in
+            var readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { domain, variable in
                 guard let domain else { return nil }
                 let position = domain.domainRegistry == outputDomain.domainRegistry ? gridpoint : domain.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
                 guard let position else { return nil }
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, options: options).hourly
+            }
+            for group in rawGroups {
+                if let result = try await group.makeReader(lat: coordinate.latitude, lon: coordinate.longitude, elevation: .nan, mode: .nearest, options: options) {
+                    readers.append(result.reader)
+                }
             }
             // Keep an empty reader so an unmapped output cell still produces null forecast columns.
             let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
@@ -1271,6 +1288,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         default:
             return false
         }
+    }
+
+    private static func rucDerivationGroup(required: Bool = false) async throws -> RawReaderDerivationGroup? {
+        guard let parent = try await (required ? IconNativeDomains.iconD2RucNative.load() : IconNativeDomains.iconD2RucNative.loadIfAvailable()) else { return nil }
+        let domains = [
+            parent,
+            try await IconNativeDomains.iconD2RucNativeModelLevel.loadIfAvailable(),
+            try await IconNativeDomains.iconD2RucNative15min.loadIfAvailable()
+        ].compactMap { $0 }
+        return RawReaderDerivationGroup(domains: domains, variableType: IconRucVariable.self, derivationDomain: parent, primaryDomain: parent)
     }
 
     private static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
@@ -1353,6 +1380,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 precipitationProb: try await IconNativeDomains.iconEpsNative.load(),
                 gridpointPolicy: .alignedSupplemental
             )
+        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native:
+            return .mixedBeforeDerivation(groups: [try await Self.rucDerivationGroup(required: true)].compactMap { $0 }, supplemental: [])
+        case .dwd_icon_d2_ruc_native_15min:
+            return .single(try await IconNativeDomains.iconD2RucNative15min.load(), IconRucVariable.self)
+        case .dwd_icon_d2_ruc_native_model_level:
+            return .single(try await IconNativeDomains.iconD2RucNativeModelLevel.load(), IconModelLevelVariable.self)
         case .dwd_icon_d2_native:
             return .singleWithSupplementalDomains(
                 try await IconNativeDomains.iconD2Native.load(),
@@ -1514,7 +1547,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconDomains.iconD2, IconVariable.self),
                 (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
                 (IconDomains.iconD2_15min, IconVariable.self)
-            ])
+            ], rawGroups: [try await Self.rucDerivationGroup()].compactMap { $0 })
         case .icon_global, .dwd_icon_global, .dwd_icon:
             // Keep regular deterministic storage preferred, including its model-level fields, until cutover.
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
@@ -1552,7 +1585,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (IconDomains.iconD2Eps, ProbabilityVariable.self),
                 (try await IconNativeDomains.iconD2EpsNative.loadIfAvailable(), ProbabilityVariable.self)
             ] + sources + quarterHourly,
-                boundingBox: (IconDomains.iconD2, sources), allowMinMaxTwoAggregations: false)
+                boundingBox: (IconDomains.iconD2, sources), allowMinMaxTwoAggregations: false,
+                rawGroups: [try await Self.rucDerivationGroup()].compactMap { $0 })
         case .dwd_icon_d2_15min:
             let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
                 (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
@@ -1933,6 +1967,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard !readers.isEmpty else { return nil }
                 return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
             }
+            func makeRucReader() async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
+                return try await Self.rucDerivationGroup()?.makeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader
+            }
             guard let icon = try await makeReader(domain: .icon, native: .iconNative) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
@@ -1963,6 +2000,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     icon,
                     iconEu,
                     iconD2,
+                    try await makeRucReader(),
                     ifs025.asOptionalReader,
                     ifsHres.asOptionalReader,
                     knmiNetherlands
@@ -2001,7 +2039,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     icon,
                     iconEu,
                     iconD2,
-                    include15Min ? iconD2_15min : nil
+                    include15Min ? iconD2_15min : nil,
+                    try await makeRucReader()
                 ])
             }
             // For western europe, use arome models
@@ -2265,8 +2304,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         
         if let mapping {
             switch mapping {
-            case .multipleWithBoundingBox(_, let boundingBox, let allowMinMaxTwoAggregations):
-                return try await DomainReaderMapping.getBoundingBoxReaders(outputDomain: boundingBox.domain, sources: boundingBox.sources, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations, gridpoint: gridpoint, options: options)
+            case .multipleWithBoundingBox(_, let boundingBox, let allowMinMaxTwoAggregations, let rawGroups):
+                return try await DomainReaderMapping.getBoundingBoxReaders(outputDomain: boundingBox.domain, sources: boundingBox.sources, rawGroups: rawGroups, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations, gridpoint: gridpoint, options: options)
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
@@ -2286,7 +2325,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 guard groups.count == 1, let singleDomainSource = groups.first?.singleDomainSource else {
                     return (nil, nil, nil, nil)
                 }
-                return try await singleDomainSource.0.makeGenericHourlyDaily(variableType: singleDomainSource.1, position: gridpoint, options: options)
+                let coordinate = options.remappedCoordinates ?? singleDomainSource.0.grid.getCoordinates(gridpoint: gridpoint)
+                return try await mapping.getReaders(lat: coordinate.latitude, lon: coordinate.longitude, elevation: .nan, mode: .nearest, options: options) ?? (nil, nil, nil, nil)
             case .multiple, .multipleWithPrecipitationProbability, .seamlessLocal:
                 return (nil, nil, nil, nil)
             }
@@ -2353,7 +2393,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .dwd_icon_d2_15min:
             return [] // migrated
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return [] // migrated
@@ -2577,7 +2618,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
@@ -2819,7 +2861,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
