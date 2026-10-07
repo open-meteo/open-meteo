@@ -104,10 +104,13 @@ struct IconNativeGridIdentity: Sendable, Hashable {
 
 enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable {
     case missingGridArtifact(String)
+    case missingElevationArtifact(String)
     case invalidGridArtifact(path: String, reason: String)
 
     var description: String {
         switch self {
+        case .missingElevationArtifact(let path):
+            return "Missing native ICON elevation artifact at \(path)"
         case .missingGridArtifact(let path):
             return "Missing native ICON grid artifact at \(path)"
         case .invalidGridArtifact(let path, let reason):

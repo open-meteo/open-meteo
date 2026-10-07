@@ -11,6 +11,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     case icon
     case iconEu = "icon-eu"
     case iconD2 = "icon-d2"
+    case iconD2Ruc = "icon-d2-ruc"
     case iconD2_15min = "icon-d2-15min"
     case iconEps = "icon-eps"
     case iconEuEps = "icon-eu-eps"
@@ -46,6 +47,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return .dwd_icon
         case .iconEu:
             return .dwd_icon_eu
+        case .iconD2Ruc: return .dwd_icon_d2_ruc_native
         case .iconD2:
             return .dwd_icon_d2
         case .iconD2_15min:
@@ -95,6 +97,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return 180 + 1 + 3 * 24
         case .iconEu, .iconEuEps, .iconEuEpsEnsembleMean:
             return 120 + 1 + 3 * 24
+        case .iconD2Ruc: return 27 + 1 + 3 * 24
         case .iconD2, .iconD2Eps, .iconD2EpsEnsembleMean:
             return 48 + 1 + 3 * 24
         case .iconD2_15min:
@@ -109,7 +112,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
         case .iconEu:
             return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000] // disabled: 775, 825, 875
-        case .iconD2:
+        case .iconD2, .iconD2Ruc:
             return [                      200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
         case .iconD2_15min:
             return []
@@ -126,6 +129,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .icon:
             return 6 * 3600
+        case .iconD2Ruc: return 3600
         case .iconEu, .iconD2, .iconD2_15min:
             return 3 * 3600
         case .iconEps, .iconEpsEnsembleMean:
@@ -145,6 +149,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .icon: return .iconNative
         case .iconEu: return .iconEuNative
+        case .iconD2Ruc: return .iconD2RucNative
         case .iconD2: return .iconD2Native
         case .iconD2_15min: return .iconD2Native15min
         case .iconEps, .iconEpsEnsembleMean: return .iconEpsNative
@@ -198,6 +203,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return Array(0...30)
         case .iconD2_15min:
             return Array(0...48 * 4 - 1)
+        case .iconD2Ruc: return Array(0...27)
         case .iconD2Eps, .iconD2:
             return Array(0...48)
         case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
@@ -211,6 +217,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
         case .iconEu:
             return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
+        case .iconD2Ruc:
+            preconditionFailure("RUC requires an initialized native domain")
         case .iconD2_15min, .iconD2:
             return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         case .iconEps, .iconEpsEnsembleMean:
@@ -236,11 +244,19 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return 120 // was 90
         case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean:
             return 74 // was 60
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
+        case .iconD2Ruc, .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
             return 65
         }
     }
 
     /// ICON uses 1.5°C melting point temperature: https://gitlab.dkrz.de/icon/icon-model/-/blob/release-2024.01-public/src/atm_phy_nwp/mo_nh_interface_nwp.f90?ref_type=heads#L2232
     static let tMelt = Float(1.5)
+}
+
+extension IconDomains {
+    /// Include the RUC endpoint, but never request quarter hours beyond its horizon.
+    func downloadLeadSeconds(hour: Int, quarterHourly: Bool) -> [Int] {
+        let offsets = quarterHourly ? [0, 900, 1800, 2700] : [0]
+        return offsets.map { hour * 3600 + $0 }.filter { self != .iconD2Ruc || $0 <= 27 * 3600 }
+    }
 }

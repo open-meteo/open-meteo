@@ -37,7 +37,7 @@ import Logging
         #expect(metadata.updateIntervalSeconds == IconDomains.iconD2_15min.updateIntervalSeconds)
     }
 
-    @Test(arguments: [IconNativeDomains.iconNative, .iconEuNative, .iconD2Native])
+    @Test(arguments: [IconNativeDomains.iconNative, .iconEuNative, .iconD2Native, .iconD2RucNative])
     func modelLevelDomainsShareStaticResourcesOnly(parent: IconNativeDomains) throws {
         let modelLevel = try #require(parent.modelLevelDomain)
         #expect(modelLevel.modelLevelParent == parent)

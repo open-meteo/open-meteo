@@ -6,7 +6,20 @@ protocol IconVariableDownloadable: GenericVariable, Hashable {
 }
 
 extension IconSurfaceVariable: IconVariableDownloadable {
-    var hasQuarterHourlyData: Bool {
+    var rucCorrectionDependencies: [IconSurfaceVariable] {
+        switch self {
+        case .rain: return [.temperature_2m, .snowfall_height, .snowfall_water_equivalent]
+        case .snowfall_water_equivalent: return [.temperature_2m, .snowfall_height]
+        case .snowfall_height, .freezing_level_height: return [.temperature_2m]
+        case .weather_code: return [.temperature_2m, .precipitation, .snowfall_height]
+        default: return []
+        }
+    }
+
+    func hasQuarterHourlyData(domain: IconDomains) -> Bool {
+        if domain == .iconD2Ruc {
+            return [.direct_radiation, .diffuse_radiation, .precipitation, .rain, .snowfall_water_equivalent, .cape, .convective_inhibition, .lightning_potential, .snowfall_height, .freezing_level_height, .updraft, .visibility].contains(self)
+        }
         switch self {
         case .direct_radiation, .diffuse_radiation, .precipitation, .cape,
              .lightning_potential, .snowfall_height, .snowfall_water_equivalent,
@@ -46,7 +59,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return false
         }
         // download hour0 from ICON-D2, because it still contains 15 min data
-        if forDownload && domain == .iconD2 && self != .weather_code {
+        if forDownload && (domain == .iconD2 || domain == .iconD2Ruc) && self != .weather_code {
             return false
         }
 
@@ -64,6 +77,16 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     }
 
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)? {
+        if domain == .iconD2Ruc {
+            switch self {
+            case .soil_temperature_0cm, .soil_temperature_6cm, .soil_temperature_18cm, .soil_temperature_54cm,
+                 .soil_moisture_0_to_1cm, .soil_moisture_1_to_3cm, .soil_moisture_3_to_9cm, .soil_moisture_9_to_27cm, .soil_moisture_27_to_81cm,
+                 .sensible_heat_flux, .latent_heat_flux, .convective_cloud_base, .convective_cloud_top, .showers, .snowfall_convective_water_equivalent:
+                return nil
+            case .visibility: return ("VIS", "single-level", nil)
+            default: return getVarAndLevel(domain: .iconD2)
+            }
+        }
         if domain == .iconEps || domain == .iconEuEps || domain == .iconD2Eps {
             switch self {
             case .diffuse_radiation:
@@ -242,6 +265,10 @@ extension IconSurfaceVariable: IconVariableDownloadable {
 }
 
 extension IconPressureVariable: IconVariableDownloadable {
+    func requiresSpecificHumidityConversion(domain: IconDomains) -> Bool {
+        domain == .iconD2Ruc && variable == .relative_humidity && ![500, 700].contains(level)
+    }
+
     func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool {
         return false
     }
@@ -262,6 +289,9 @@ extension IconPressureVariable: IconVariableDownloadable {
         if domain == .iconD2_15min {
             return nil
         }
+        if domain == .iconD2Ruc && !domain.levels.contains(level) {
+            return nil
+        }
         switch variable {
         case .temperature:
         return ("t", "pressure-level", level)
@@ -272,7 +302,7 @@ extension IconPressureVariable: IconVariableDownloadable {
         case .geopotential_height:
             return ("fi", "pressure-level", level)
         case .relative_humidity:
-            return ("relhum", "pressure-level", level)
+            return (requiresSpecificHumidityConversion(domain: domain) ? "QV" : "relhum", "pressure-level", level)
         }
     }
 }

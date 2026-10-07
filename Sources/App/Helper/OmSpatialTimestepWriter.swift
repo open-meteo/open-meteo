@@ -333,7 +333,7 @@ actor OmSpatialMultistepWriter {
     func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let validTimes = validTimes ?? writer.map { $0.time }
         // Only upload META JSON for the last timestamp
-        let lastTimestamp = writer.last?.time
+        let lastTimestamp = writer.map { $0.time }.max()
         let handles = try await writer.asyncFlatMap({
             let isLast = $0.time == lastTimestamp
             return try await $0.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: isLast)
