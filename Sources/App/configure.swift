@@ -221,6 +221,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadCmipCommand(), as: "download-cmip6")
     app.asyncCommands.use(SatelliteDownloadCommand(), as: "download-satellite")
     app.asyncCommands.use(MeteoSwissDownload(), as: "download-meteoswiss")
+    app.asyncCommands.use(DownloadIconCommand(), as: "download-aicon")
     app.asyncCommands.use(SyncCommand(), as: "sync")
     app.asyncCommands.use(S3SyncCommand(), as: "s3-sync")
     app.asyncCommands.use(ExportCommand(), as: "export")

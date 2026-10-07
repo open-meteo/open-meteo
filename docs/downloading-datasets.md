@@ -55,7 +55,8 @@ Usage: /usr/local/bin/openmeteo-api <command>
 Commands:
                     benchmark Benchmark Open-Meteo core functions like data manipulation and compression
                    convert-om Convert between om file format version or convert to NetCDF
-                     download Download a specified icon model run
+                     download Download a specified DWD ICON or AICON model run
+               download-aicon Alias for the DWD downloader
                  download-bom Download a specified Bom model run
                 download-cams Download global and european CAMS air quality forecasts
                 download-chmi Download ČHMÚ ALADIN Czech model
@@ -141,6 +142,25 @@ Options:
 Flags:
   skip-existing
 ```
+
+### DWD AICON
+
+AICON uses the same `download` command as ICON. The existing `download-aicon` command is an alias. Forecasts are stored on the full native ICON global grid; AICON has no regular latitude/longitude output. Grid coordinates and elevation are shared with `dwd_icon_global_native` and prepared automatically on the first download.
+
+Surface fields and the 13 model levels use separate storage domains, `dwd_aicon_global` and `dwd_aicon_global_model_level`. Download them independently to keep model-level availability from delaying surface updates:
+
+```bash
+<exe> download aicon --run 00 --group surface
+<exe> download aicon-model-level --run 00
+```
+
+Without `--group` or `--only-variables`, both groups are downloaded. Select individual fields through the parent domain, using model indices rather than metre heights:
+
+```bash
+<exe> download aicon --run 00 --only-variables temperature_2m,precipitation,qv_level13,t_level13
+```
+
+Model-level names use `p`, `qv`, `t`, `u`, or `v`, followed by `_level1` through `_level13`. All forecasts have three-hour steps: 00/12 UTC runs extend to 180 hours, 06/18 UTC runs to 120 hours, and 03/09/15/21 UTC runs to 48 hours. `--skip-timeseries`, `--create-netcdf`, and `--upload-s3-bucket` are available through the shared downloader.
 
 ### ECMWF IFS
 For the ECMWF API, only one domain is available with runs at `00,06,12,18`. Currently it is not supported to only download a subset of weather variables, but all variables need to be downloaded.

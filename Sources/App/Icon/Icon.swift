@@ -154,18 +154,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     }
 
     func getGribUrl(field: (variable: String, cat: String, level: Int?), run: Timestamp, leadSeconds: Int, member: Int = 0) -> String {
-        let levelPath: String
-        switch field.cat {
-        case "pressure-level": levelPath = "lvt1/100/lv1/\(field.level! * 100)/"
-        case "model-level": levelPath = "lvt1/150/lv1/\(field.level!)/"
-        case "soil-level": levelPath = "lvt1/106/lv1/\(Double(field.level!) / 100)/"
-        default: levelPath = ""
-        }
-        let model = self == .iconD2_15min ? IconDomains.iconD2 : self
-        let ensemble = countEnsembleMember > 1 ? "e/\((member + 1).zeroPadded(len: 2))/" : ""
-        let hours = (leadSeconds / 3600).zeroPadded(len: 3)
-        let minutes = ((leadSeconds % 3600) / 60).zeroPadded(len: 2)
-        return "https://opendata.dwd.de/weather/nwp/v1/m/\(model.rawValue)/p/\(field.variable.uppercased())/\(levelPath)r/\(run.iso8601_YYYY_MM_dd_HH_mm)/\(ensemble)s/PT\(hours)H\(minutes)M.grib2"
+        DwdModel.icon(self).getGribUrl(field: field, run: run, leadSeconds: leadSeconds, member: member)
     }
 
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
