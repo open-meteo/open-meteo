@@ -21,6 +21,9 @@ DATA_DIRECTORY=/Volumes/2TB_1GBs/data/ API_SYNC_APIKEYS=123 openmeteo-api
 DATA_DIRECTORY=/Volumes/2TB_1GBs/data2/ openmeteo-api sync cmc_gem_gdps,dwd_icon_d2,dwd_icon temperature_2m --server http://127.0.0.1:8080/ --apikey 123 --past-days 30 --repeat-interval 5
 */
 struct SyncCommand: AsyncCommand {
+    /// A failed model marks the process as failed, so the command ends non-zero after the other models synced
+    var exitStatus: ProcessExitStatus = .shared
+
     var help: String {
         return "Download the open-meteo weather database from a S3 server."
     }
@@ -130,9 +133,6 @@ struct SyncCommand: AsyncCommand {
         
         let modelsChunkLength = max(1, serverModelVariable.count / concurrentModels)
 
-        /// Models that failed in one-shot mode. The other models still sync, then the command fails
-        let failures = SyncFailures()
-
         /// Download from each server concurrently
         try await serverModelVariable.chunks(ofCount: modelsChunkLength).foreachConcurrent(nConcurrent: serverModelVariable.count) {
             while true {
@@ -154,9 +154,7 @@ struct SyncCommand: AsyncCommand {
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
-                        if signature.repeatInterval == nil {
-                            await failures.add(model.rawValue)
-                        }
+                        exitStatus.markFailure()
                     }
                 }
                 if downloadPressureNow {
@@ -168,10 +166,6 @@ struct SyncCommand: AsyncCommand {
                 logger.info("Repeat in \(repeatInterval) minutes for models \($0.map(\.model.rawValue).joined(separator: ","))")
                 try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
             }
-        }
-        let failed = await failures.models
-        if !failed.isEmpty {
-            throw SyncModelsFailed(models: failed)
         }
     }
     
@@ -332,20 +326,3 @@ fileprivate extension Array where Element == S3List.ListV2File {
     }
 }
 
-/// Models whose sync threw an error in one-shot mode
-fileprivate actor SyncFailures {
-    private(set) var models = [String]()
-
-    func add(_ model: String) {
-        models.append(model)
-    }
-}
-
-/// Thrown at the end of a one-shot sync, so the process exits non-zero
-struct SyncModelsFailed: Error, CustomStringConvertible {
-    let models: [String]
-
-    var description: String {
-        "Sync failed for models: \(models.joined(separator: ","))"
-    }
-}
