@@ -31,7 +31,7 @@ import OmFileFormat
    AICON 12 → ICON level 112  (≈  739m)
    AICON 13 → ICON level 119  (≈   42m)
  */
-enum AiconDomain: String, CaseIterable, GenericDomain {
+enum AiconDomain: String, CaseIterable, Sendable {
 
     case aicon_global = "aicon"
 
@@ -49,11 +49,10 @@ enum AiconDomain: String, CaseIterable, GenericDomain {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        // Reuse ICON global static files (elevation, land-sea mask)
-        // since AICON uses the same R3B7 grid
+        // Reuse ICON global native static files in the same cell order.
         switch self {
         case .aicon_global:
-            return .dwd_icon
+            return .dwd_icon_global_native
         }
     }
 
@@ -97,18 +96,17 @@ enum AiconDomain: String, CaseIterable, GenericDomain {
         return 6 * 3600
     }
 
-    /// The grid is identical to ICON global regular lat-lon output (R3B7 remapped)
-    var grid: any Gridable {
-        switch self {
-        case .aicon_global:
-            // Same as ICON global regular-lat-lon grid
-            return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
-        }
+    /// AICON retains every cell in the full ICON global grid, in native order.
+    var nativeGridDefinition: IconNativeDomains { .iconNative }
+
+    func load() async throws -> AiconNativeDomain {
+        let native = try await nativeGridDefinition.load()
+        return AiconNativeDomain(definition: self, nativeGrid: native.nativeGrid)
     }
 
     /// Base URL for AICON open data
     var serverBaseUrl: String {
-        return "http://opendata.dwd.de/weather/nwp/v1/m/aicon/p"
+        return "https://opendata.dwd.de/weather/nwp/v1/m/aicon/p"
     }
 
     /// Format a run timestamp into the server's directory name: "2026-03-16T12:00"
@@ -135,7 +133,7 @@ enum AiconDomain: String, CaseIterable, GenericDomain {
     /// Pattern: `{base}/{VAR}/lvt1/150/lv1/{LEVEL}/r/{run-dir}/s/{lead}.grib2`
     ///
     /// The `lvt1/150` segment is a fixed part of the AICON server path for model-level data
-    /// (level type 1, version 150).
+    /// (GRIB level type 150: generalized vertical height coordinate).
     func modelLevelVariableUrl(variable: String, level: Int, run: Timestamp, forecastHours: Int) -> String {
         let runDir = runDirectoryName(run: run)
         let lead = leadTimeFileName(hours: forecastHours)
@@ -150,5 +148,29 @@ extension AiconDomain {
         let now = Timestamp.now()
         // Allow 2 hours of production time before considering a run complete
         return now.with(hour: ((now.hour - 2 + 24) % 24) / 6 * 6)
+    }
+}
+
+/// AICON storage domain initialized with the full native ICON global grid.
+struct AiconNativeDomain: GenericDomain {
+    let definition: AiconDomain
+    let nativeGrid: IconNativeGrid
+
+    var grid: any Gridable { nativeGrid }
+    var domainRegistry: DomainRegistry { definition.domainRegistry }
+    var domainRegistryStatic: DomainRegistry? { definition.domainRegistryStatic }
+    var dtSeconds: Int { definition.dtSeconds }
+    var updateIntervalSeconds: Int { definition.updateIntervalSeconds }
+    var hasYearlyFiles: Bool { definition.hasYearlyFiles }
+    var masterTimeRange: Range<Timestamp>? { definition.masterTimeRange }
+    var omFileLength: Int { definition.omFileLength }
+    var countEnsembleMember: Int { definition.countEnsembleMember }
+}
+
+extension DomainTimeSeriesMetadata {
+    init(_ domain: AiconDomain) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
     }
 }

@@ -151,7 +151,8 @@ struct AiconModelLevelVariable: HeightVariableRespresentable, GenericVariable, H
     var storePreviousForecast: Bool { return false }
 
     var omFileName: (file: String, level: Int) {
-        return (variable.rawValue.lowercased(), level)
+        // Storage groups by filename; each model level needs a distinct file.
+        return ("\(variable.rawValue.lowercased())_level\(level)", 0)
     }
 
     var scalefactor: Float {

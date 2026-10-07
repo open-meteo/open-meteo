@@ -208,10 +208,6 @@ enum DomainRegistry: String, CaseIterable {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
     
-    var directoryStatic: String {
-        return "\(self.directory)/static/"
-    }
-    
     var directorySpatial: String? {
         return OpenMeteo.dataSpatialDirectory.map { "\($0)\(rawValue)/" }
     }
@@ -265,6 +261,9 @@ enum DomainRegistry: String, CaseIterable {
     }
 
     func getDomain() async throws -> (any GenericDomain)? {
+        if self == .dwd_aicon_global {
+            return try await AiconDomain.aicon_global.load()
+        }
         if let nativeDefinition {
             return try await nativeDefinition.load()
         }
@@ -273,6 +272,9 @@ enum DomainRegistry: String, CaseIterable {
 
     /// Used by file scheduling and synchronization without opening grid or elevation files.
     var timeSeriesMetadata: DomainTimeSeriesMetadata? {
+        if self == .dwd_aicon_global {
+            return DomainTimeSeriesMetadata(AiconDomain.aicon_global)
+        }
         if let nativeDefinition {
             return DomainTimeSeriesMetadata(nativeDefinition.sourceDomain)
         }
@@ -390,7 +392,7 @@ enum DomainRegistry: String, CaseIterable {
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
         case .dwd_aicon_global:
-            return AiconDomain.aicon_global
+            return nil
         case .dwd_icon:
             return IconDomains.icon
         case .dwd_icon_d2:

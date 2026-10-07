@@ -4,25 +4,8 @@ import OmFileFormat
 import Dispatch
 
 /**
- Download command for the AICON model (DWD's AI-based ICON variant).
-
- AICON provides 3-hourly forecasts up to 180 h on the same global R3B7 icosahedral grid
- as ICON global, remapped to a regular lat-lon grid on the opendata server.
- Data is served under:
-   http://opendata.dwd.de/weather/nwp/v1/m/aicon/p/
-
- URL patterns
- ────────────
- Surface variables:
-   .../p/{VAR}/r/{YYYY-MM-DDTHH:00}/s/PT{HHH}H00M.grib2
-
- Model-level variables (13 levels, 1-based):
-   .../p/{VAR}/lvt1/150/lv1/{LEVEL}/r/{YYYY-MM-DDTHH:00}/s/PT{HHH}H00M.grib2
-
- Unlike classic ICON open-data, AICON files are plain .grib2 (no bzip2 compression).
- The remapped lat-lon grid matches ICON global exactly, so the same CDO weights are reused
- via CdoHelper (which returns nil for AiconDomain.iconGridName, skipping the icosahedral
- remapping step and reading the array directly at the correct dimensions).
+ Download DWD AICON v1 fields directly to full native ICON global grid storage.
+ Surface and all 13 model levels are served as plain GRIB2 files.
  */
 struct DownloadAiconCommand: AsyncCommand {
     struct Signature: CommandSignature {
@@ -52,12 +35,12 @@ struct DownloadAiconCommand: AsyncCommand {
 
      For every 3-hourly forecast step in the selected run (up to 180 h for 0/12z,
      up to 120 h for 6/18z) all surface and model-level variables are downloaded
-     concurrently, remapped if necessary via CdoHelper,
+     concurrently, decoded and validated in native cell order,
      and written to the om-file storage.
      */
     func downloadAicon(
         application: Application,
-        domain: AiconDomain,
+        domain: AiconNativeDomain,
         run: Timestamp,
         surfaceVariables: [AiconSurfaceVariable],
         modelLevelVariables: [AiconModelLevelVariable],
@@ -65,8 +48,6 @@ struct DownloadAiconCommand: AsyncCommand {
         uploadS3Bucket: String?
     ) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-
-        try FileManager.default.createDirectory(atPath: domain.domainRegistry.directoryStatic, withIntermediateDirectories: true)
 
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -80,10 +61,8 @@ struct DownloadAiconCommand: AsyncCommand {
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
-
-        let deaverager = GribDeaverager()
-        let timestamps = domain.forecastSteps(run: run).map { run.add(hours: $0) }
+        let downloader = AiconGribDownloader(domain: domain.definition, curl: curl)
+        let timestamps = domain.definition.forecastSteps(run: run).map { run.add(hours: $0) }
 
         let handles = try await timestamps.enumerated().asyncMap { (i, timestamp) -> [GenericVariableHandle] in
             let forecastHours = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -100,54 +79,31 @@ struct DownloadAiconCommand: AsyncCommand {
 
             // Download surface variables concurrently
             try await surfaceVariables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                let url = domain.surfaceVariableUrl(
+                let url = domain.definition.surfaceVariableUrl(
                     variable: variable.gribVariableName,
                     run: run,
                     forecastHours: forecastHours
                 )
-                // bzip2Decode: false — AICON files are plain .grib2
-                let messages = try await cdo.downloadAndRemap(url, bzip2Decode: false)
-                for (message, var array2d) in messages {
-                    // guard let stepRange = message.get(attribute: "stepRange"),
-                    //       let stepType  = message.get(attribute: "stepType") else {
-                    //     fatalError("AICON GRIB2 message is missing stepRange / stepType")
-                    // }
-                    if let fma = variable.multiplyAdd {
-                        array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-                    try await writer.write(member: 0, variable: variable, data: array2d.data)
+                var array2d = try await downloader.download(url: url, run: run, forecastHours: forecastHours)
+                if let fma = variable.multiplyAdd {
+                    array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+                try await writer.write(member: 0, variable: variable, data: array2d.data)
             }
 
             // Download model-level variables concurrently
             try await modelLevelVariables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                let url = domain.modelLevelVariableUrl(
+                let url = domain.definition.modelLevelVariableUrl(
                     variable: variable.gribVariableName,
                     level: variable.level,
                     run: run,
                     forecastHours: forecastHours
                 )
-                // bzip2Decode: false — AICON files are plain .grib2
-                let messages = try await cdo.downloadAndRemap(url, bzip2Decode: false)
-                for (message, var array2d) in messages {
-                    guard let stepRange = message.get(attribute: "stepRange"),
-                          let stepType  = message.get(attribute: "stepType") else {
-                        fatalError("AICON GRIB2 message is missing stepRange / stepType")
-                    }
-                    if let fma = variable.multiplyAdd {
-                        array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-                    // guard await deaverager.deaccumulateIfRequired(
-                    //     variable: variable,
-                    //     member: 0,
-                    //     stepType: stepType,
-                    //     stepRange: stepRange,
-                    //     array2d: &array2d
-                    // ) else {
-                    //     continue
-                    // }
-                    try await writer.write(member: 0, variable: variable, data: array2d.data)
+                var array2d = try await downloader.download(url: url, run: run, forecastHours: forecastHours)
+                if let fma = variable.multiplyAdd {
+                    array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+                try await writer.write(member: 0, variable: variable, data: array2d.data)
             }
 
             let completed = i == timestamps.count - 1
@@ -167,15 +123,17 @@ struct DownloadAiconCommand: AsyncCommand {
         let start = DispatchTime.now()
         let logger = context.application.logger
 
-        let domain = try AiconDomain.load(rawValue: signature.domain)
+        let definition = try AiconDomain.load(rawValue: signature.domain)
+        try await definition.nativeGridDefinition.prepareNativeGrid(application: context.application, uploadS3Bucket: signature.uploadS3Bucket)
+        let domain = try await definition.load()
         let nConcurrent = signature.concurrent ?? 1
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? definition.lastRun
 
-        logger.info("Downloading AICON domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        logger.info("Downloading AICON domain '\(definition.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         // Build default variable lists: all surface variables + all 13 model levels × 5 types
         let defaultSurface = AiconSurfaceVariable.allCases
-        let defaultModelLevel: [AiconModelLevelVariable] = domain.modelLevels.flatMap { level in
+        let defaultModelLevel: [AiconModelLevelVariable] = definition.modelLevels.flatMap { level in
             AiconModelLevelVariableType.allCases.map { AiconModelLevelVariable(variable: $0, level: level) }
         }
 
