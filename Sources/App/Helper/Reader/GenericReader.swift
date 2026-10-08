@@ -134,7 +134,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         } else {
             self.modelElevation = .noData
         }
-        self.targetElevation = .nan
+        // Grid-point requests use model terrain for elevation-dependent derived variables.
+        self.targetElevation = self.modelElevation.numeric
         let coords = domain.grid.getCoordinates(gridpoint: position)
         self.modelLat = coords.latitude
         self.modelLon = coords.longitude
