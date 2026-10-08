@@ -546,6 +546,19 @@ extension GenericDomain {
     func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
+
+    private var useModelProvidedDailyMinMax: Bool {
+        switch domainRegistry {
+        case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble,
+             .ecmwf_aifs025, .ecmwf_aifs025_single, .ecmwf_aifs025_ensemble,
+             .ecmwf_ifs, .copernicus_era5, .copernicus_era5_land, .copernicus_era5_ensemble,
+             .copernicus_cerra, .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
+            // Preserve hourly temperature aggregation from the legacy ECMWF and reanalysis readers.
+            return false
+        default:
+            return true
+        }
+    }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
@@ -554,7 +567,7 @@ extension GenericDomain {
             return (nil, nil, nil, nil)
         }
         let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: useModelProvidedDailyMinMax), nil, nil)
     }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
@@ -562,13 +575,13 @@ extension GenericDomain {
         
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
         let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(useModelProvidedMinMax: useModelProvidedDailyMinMax), nil, nil)
     }
 }
 
 extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariable {
-    func makeDailyAggregator(allowMinMaxTwoAggregations: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
-        return .init(reader: self, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
+    func makeDailyAggregator(useModelProvidedMinMax: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
+        return .init(reader: self, useModelProvidedMinMax: useModelProvidedMinMax)
     }
 }
 
@@ -641,6 +654,8 @@ private struct VariableHourlyDerivationCompatibility {
         case zeroWherePrecipitationIsAvailable
     }
 
+    let aliasesSoilTemperature0To10cmTo0To7cm: Bool
+    let supportsEra5SoilMoistureIndices: Bool
     let convectivePrecipitation: ConvectivePrecipitation
     let omitsConvectivePrecipitationFromWeatherCode: Bool
     let shortwaveRadiationScale: Float?
@@ -653,6 +668,8 @@ private struct VariableHourlyDerivationCompatibility {
     let derivesCloudLayersFromPressureHumidity: Bool
 
     private init(
+        aliasesSoilTemperature0To10cmTo0To7cm: Bool = false,
+        supportsEra5SoilMoistureIndices: Bool = false,
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
         omitsConvectivePrecipitationFromWeatherCode: Bool = false,
         shortwaveRadiationScale: Float? = nil,
@@ -664,6 +681,8 @@ private struct VariableHourlyDerivationCompatibility {
         estimatesDiffuseRadiationFromShortwave: Bool = false,
         derivesCloudLayersFromPressureHumidity: Bool = false
     ) {
+        self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
+        self.supportsEra5SoilMoistureIndices = supportsEra5SoilMoistureIndices
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
         self.shortwaveRadiationScale = shortwaveRadiationScale
@@ -687,6 +706,24 @@ private struct VariableHourlyDerivationCompatibility {
 
     init(domain: DomainRegistry) {
         switch domain {
+        case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
+            self = .init(
+                aliasesSoilTemperature0To10cmTo0To7cm: true,
+                supportsEra5SoilMoistureIndices: true,
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true
+            )
+        case .ecmwf_ifs, .ecmwf_aifs025_single, .ecmwf_aifs025_ensemble:
+            self = .init(
+                aliasesSoilTemperature0To10cmTo0To7cm: true,
+                supportsEra5SoilMoistureIndices: true
+            )
+        case .copernicus_era5, .copernicus_era5_land, .copernicus_era5_ensemble,
+             .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
+            self = .init(
+                supportsEra5SoilMoistureIndices: true,
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable
+            )
         case .cmc_gem_gdps, .cmc_gem_gdps_15km, .cmc_gem_gdps_15km_upper_level,
              .cmc_gem_rdps, .cmc_gem_rdps_10km, .cmc_gem_hrdps, .cmc_gem_hrdps_west,
              .cmc_gem_geps:
@@ -1064,8 +1101,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         }
 
-        // Some domains do not store showers; synthesize zero where precipitation is available.
-        if variable == .showers, compatibility.convectivePrecipitation == .zeroWherePrecipitationIsAvailable,
+        // Some domains do not store showers; use their precipitation-component policy.
+        if variable == .showers, compatibility.convectivePrecipitation != .storedShowers,
            let convectivePrecipitation = convectivePrecipitationInput() {
             return .from(input: convectivePrecipitation)
         }
@@ -1606,6 +1643,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return nil
             }
             if let showers = convectivePrecipitationInput() {
+                // ECPDS archives before October 2025 may lack showers; missing values contribute zero.
                 return .three(.raw(precip), .mapped(snowwater), showers) { precip, snowwater, showers, _ in
                     let rain = zip(precip.data, zip(snowwater.data, showers.data)).map({
                         return max($0.0 - $0.1.0 - ($0.1.1.isNaN ? 0 : $0.1.1), 0)
@@ -1748,6 +1786,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .ocean_current_direction:
             return .oceanCurrentDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
+        case .skin_temperature:
+            return .direct(Reader.variableFromString("surface_temperature")) ?? .direct(Reader.variableFromString("soil_temperature_0cm"))
+        case .soil_temperature_0_to_10cm:
+            guard compatibility.aliasesSoilTemperature0To10cmTo0To7cm else { return nil }
+            return .direct(Reader.variableFromString("soil_temperature_0_to_7cm"))
         case .soil_temperature_0cm:
             guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))
@@ -1819,14 +1862,20 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                     return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
                 }), .percentage)
             }
-//        case .soil_moisture_index_0_to_7cm:
-//            guard let soilMoisture = getDeriverMap(variable: .soil_moisture_0_to_7cm) else {
-//                return nil
-//            }
-//            return .one(.mapped(soilMoisture)) { soilMoisture, _ in
-//                let soilMoisture = try await get(raw: .soil_moisture_7_to_28cm, time: time)
-//                return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
-//            }
+        case .growing_degree_days_base_0_limit_50:
+            guard let temperature = Reader.variableFromString("temperature_2m") else { return nil }
+            return .one(.raw(temperature)) { temperature, time in
+                let fractionOfDay = Float(time.dtSeconds) / 86400
+                return DataAndUnit(temperature.data.map { max(min($0, 50), 0) * fractionOfDay }, .gddCelsius)
+            }
+        case .soil_moisture_index_0_to_7cm, .soil_moisture_index_7_to_28cm,
+             .soil_moisture_index_28_to_100cm, .soil_moisture_index_100_to_255cm,
+             .soil_moisture_index_0_to_100cm:
+            guard compatibility.supportsEra5SoilMoistureIndices else { return nil }
+            let moistureName = variable.rawValue.replacingOccurrences(of: "soil_moisture_index_", with: "soil_moisture_")
+            guard let moistureVariable = ForecastSurfaceVariable(rawValue: moistureName),
+                  let moisture = getDeriverMap(variable: moistureVariable) else { return nil }
+            return .soilMoistureIndex(.mapped(moisture))
         case .snow_depth_water_equivalent:
             // snow depth in metre
             // water equivalent in millimetre, density in kg/m3

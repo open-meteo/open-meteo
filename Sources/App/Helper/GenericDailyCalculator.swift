@@ -51,12 +51,12 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     typealias VariableOpt = DailyVariable
     let reader: Reader
     
-    /// Workaround to enable or disable `maxTwo` or `minTwo` aggregations. `best_match` does not (yet) provide a correct temperature_2m_max that matches all local domains. It may only come from one global model.
-    let allowMinMaxTwoAggregations: Bool
+    /// Use model-provided min/max fields when available. Disabled for mixed readers because these fields may come from a different model than the hourly temperature.
+    let useModelProvidedMinMax: Bool
     
-    init(reader: Reader, allowMinMaxTwoAggregations: Bool) {
+    init(reader: Reader, useModelProvidedMinMax: Bool) {
         self.reader = reader
-        self.allowMinMaxTwoAggregations = allowMinMaxTwoAggregations
+        self.useModelProvidedMinMax = useModelProvidedMinMax
     }
     
     var modelLat: Float {
@@ -109,7 +109,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             }
             return DataAndUnit(data.data.mean(by: stepsModel), data.unit)
         case .minTwo(let variable, let b):
-            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeModel) {
+            if useModelProvidedMinMax, let data = try await reader.get(variable: variable, time: timeModel) {
                 return DataAndUnit(data.data.min(by: stepsModel), data.unit)
             }
             guard let data = try await reader.get(variable: b, time: time1h) else {
@@ -117,7 +117,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             }
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .maxTwo(let variable, let b):
-            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeModel) {
+            if useModelProvidedMinMax, let data = try await reader.get(variable: variable, time: timeModel) {
                 return DataAndUnit(data.data.max(by: stepsModel), data.unit)
             }
             guard let data = try await reader.get(variable: b, time: time1h) else {
