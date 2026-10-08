@@ -26,6 +26,14 @@ extension Array where Element == Float {
                 }
                 return self[start...end].mean()
             })
+        case .backwards_max:
+            return timeNew.map { t in
+                guard let start = timeOld.index(of: t.add(backSeconds)),
+                      let end = timeOld.index(of: t) else { return .nan }
+                let values = self[start...end]
+                guard !values.contains(where: { $0.isNaN }) else { return .nan }
+                return values.max() ?? .nan
+            }
         case .backwards_sum:
             /// Sum past steps
             return timeNew.map({ t in

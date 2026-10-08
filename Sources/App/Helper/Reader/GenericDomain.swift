@@ -157,6 +157,9 @@ enum ReaderInterpolation {
     /// Take the next hour, and devide by `dt` to preserve sums like precipitation
     case backwards_sum
 
+    /// Maximum over preceding intervals; replicate backwards when interpolating finer output.
+    case backwards_max
+
     /// Replicate value backwards. E.g. min/max of previous hours
     case backwards
 
@@ -169,7 +172,7 @@ enum ReaderInterpolation {
             return 2
         case .solar_backwards_averaged, .solar_backwards_missing_not_averaged:
             return 2
-        case .backwards_sum, .backwards:
+        case .backwards_sum, .backwards_max, .backwards:
             return 1
         }
     }

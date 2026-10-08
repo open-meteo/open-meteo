@@ -14,7 +14,7 @@ extension Array where Element == Float {
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
         case .backwards_sum:
             return backwardsSum(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
-        case .backwards:
+        case .backwards, .backwards_max:
             return backwards(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         }
     }

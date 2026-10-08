@@ -37,6 +37,12 @@ import Testing
         }
     }
 
+    @Test func rucPriorityFallsBackAfterHorizon() async throws {
+        let readers = [RunFixtureReader(values: [10, 20]), RunFixtureReader(values: [30, .nan])]
+        let mixer = GenericReaderMultiSameType<ForecastVariable>(reader: readers.map { $0.asOptionalReader }, prefetchAllReaders: true, smoothTransitions: false)
+        #expect(try await mixer.get(variable: variable, time: time())?.data == [30, 20])
+    }
+
     @Test func availableReadersStillFillGaps() async throws {
         for mixer in mixers([RunFixtureReader(values: [10, 20]), RunFixtureReader(values: [.nan, .nan])]) {
             #expect(try await mixer.get(variable: variable, time: time())?.data == [10, 20])
