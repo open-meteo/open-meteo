@@ -25,6 +25,11 @@ enum LengthUnit: String, Codable {
     case imperial
 }
 
+enum SnowDepthUnit: String, Codable {
+    case m
+    case cm
+}
+
 struct ApiUnits: ApiUnitsSelectable {
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
@@ -106,5 +111,21 @@ struct DataAndUnit: Sendable {
             unit = .feet
         }
         return DataAndUnit(data, unit)
+    }
+
+    /// Convert snow depth independently from the other length-based variables.
+    /// An explicit snow depth unit takes precedence over the general unit preferences.
+    func convertAndRound<Variable: FlatBuffersVariable>(params: ApiQueryParameter, variable: Variable) -> DataAndUnit {
+        if unit == .metre,
+           let snowDepthUnit = params.snow_depth_unit,
+           variable.getFlatBuffersMeta().variable == .snowDepth {
+            switch snowDepthUnit {
+            case .m:
+                return self
+            case .cm:
+                return DataAndUnit(data.map { $0 * 100 }, .centimetre)
+            }
+        }
+        return convertAndRound(params: params)
     }
 }

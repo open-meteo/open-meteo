@@ -74,6 +74,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let wind_speed_unit: WindspeedUnit?
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
+    let snow_depth_unit: SnowDepthUnit?
     let timeformat: Timeformat?
     let temporal_resolution: ApiTemporalResolution?
 
@@ -169,6 +170,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         wind_speed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .wind_speed_unit)
         precipitation_unit = try c.decodeIfPresent(PrecipitationUnit.self, forKey: .precipitation_unit)
         length_unit = try c.decodeIfPresent(LengthUnit.self, forKey: .length_unit)
+        snow_depth_unit = try c.decodeIfPresent(SnowDepthUnit.self, forKey: .snow_depth_unit)
         timeformat = try c.decodeIfPresent(Timeformat.self, forKey: .timeformat)
         temporal_resolution = try c.decodeIfPresent(ApiTemporalResolution.self, forKey: .temporal_resolution)
         past_days = try c.decodeIfPresent(Int.self, forKey: .past_days)
