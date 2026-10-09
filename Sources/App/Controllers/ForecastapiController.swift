@@ -819,8 +819,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_d2
     case dwd_icon_d2_15min
     case dwd_icon_global_native
+    case dwd_icon_global_native_model_level
     case dwd_icon_eu_native
+    case dwd_icon_eu_native_model_level
     case dwd_icon_d2_native
+    case dwd_icon_d2_native_model_level
     case dwd_icon_d2_native_15min
     case dwd_icon_global_eps_native
     case dwd_icon_eu_eps_native
@@ -1313,27 +1316,39 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_nbm_conus:
             return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
         case .dwd_icon_global_native:
-            return .singleWithPrecipitationProbability(
-                try await IconNativeDomains.iconNative.load(),
-                IconVariable.self,
-                precipitationProb: try await IconNativeDomains.iconEpsNative.load()
+            return .singleWithSupplementalDomains(
+                try await IconNativeDomains.iconNative.load(), IconVariable.self,
+                lowerPriority: [],
+                higherPriority: [(try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self)],
+                precipitationProb: try await IconNativeDomains.iconEpsNative.load(),
+                gridpointPolicy: .alignedSupplemental
             )
         case .dwd_icon_d2_native:
             return .singleWithSupplementalDomains(
                 try await IconNativeDomains.iconD2Native.load(),
                 IconVariable.self,
                 lowerPriority: [],
-                higherPriority: [(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)],
+                higherPriority: [(try await IconNativeDomains.iconD2NativeModelLevel.load(), IconModelLevelVariable.self),
+                                 (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)],
                 precipitationProb: try await IconNativeDomains.iconD2EpsNative.load(),
-                gridpointPolicy: .primaryOnly
+                gridpointPolicy: .alignedSupplemental
             )
         case .dwd_icon_d2_native_15min:
             return .single(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
         case .dwd_icon_eu_native:
-            return .singleWithPrecipitationProbability(
+            return .singleWithSupplementalDomains(
                 try await IconNativeDomains.iconEuNative.load(), IconVariable.self,
-                precipitationProb: try await IconNativeDomains.iconEuEpsNative.load()
+                lowerPriority: [],
+                higherPriority: [(try await IconNativeDomains.iconEuNativeModelLevel.load(), IconModelLevelVariable.self)],
+                precipitationProb: try await IconNativeDomains.iconEuEpsNative.load(),
+                gridpointPolicy: .alignedSupplemental
             )
+        case .dwd_icon_global_native_model_level:
+            return .single(try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self)
+        case .dwd_icon_eu_native_model_level:
+            return .single(try await IconNativeDomains.iconEuNativeModelLevel.load(), IconModelLevelVariable.self)
+        case .dwd_icon_d2_native_model_level:
+            return .single(try await IconNativeDomains.iconD2NativeModelLevel.load(), IconModelLevelVariable.self)
         case .dwd_icon_global_eps_native:
             return .single(try await IconNativeDomains.iconEpsNative.load(), DwdIconEpsGlobalVariable.self)
         case .dwd_icon_eu_eps_native:
@@ -2208,7 +2223,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .dwd_icon_d2_15min:
             return [] // migrated
-        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return [] // migrated
         case .ecmwf_ifs04:
@@ -2427,7 +2443,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
         case .ecmwf_ifs04:
@@ -2668,7 +2685,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
         case .ecmwf_ifs04:
