@@ -87,8 +87,15 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_d2
     case dwd_icon_d2_15min
     case dwd_icon_global_native
+    case dwd_icon_eu_native
     case dwd_icon_d2_native
     case dwd_icon_d2_native_15min
+    case dwd_icon_eps_native
+    case dwd_icon_eps_native_ensemble_mean
+    case dwd_icon_eu_eps_native
+    case dwd_icon_eu_eps_native_ensemble_mean
+    case dwd_icon_d2_eps_native
+    case dwd_icon_d2_eps_native_ensemble_mean
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
@@ -206,7 +213,8 @@ enum DomainRegistry: String, CaseIterable {
         switch self {
         case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
-        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps:
+        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps,
+             .dwd_icon_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return 3
         case .ncep_gefs05, .ncep_gefs025, .ncep_aigefs025, .ncep_gefswave025:
             return 3
@@ -232,8 +240,15 @@ enum DomainRegistry: String, CaseIterable {
     var nativeDefinition: IconNativeDomains? {
         switch self {
         case .dwd_icon_global_native: return .iconNative
+        case .dwd_icon_eu_native: return .iconEuNative
         case .dwd_icon_d2_native: return .iconD2Native
         case .dwd_icon_d2_native_15min: return .iconD2Native15min
+        case .dwd_icon_eps_native: return .iconEpsNative
+        case .dwd_icon_eps_native_ensemble_mean: return .iconEpsNativeEnsembleMean
+        case .dwd_icon_eu_eps_native: return .iconEuEpsNative
+        case .dwd_icon_eu_eps_native_ensemble_mean: return .iconEuEpsNativeEnsembleMean
+        case .dwd_icon_d2_eps_native: return .iconD2EpsNative
+        case .dwd_icon_d2_eps_native_ensemble_mean: return .iconD2EpsNativeEnsembleMean
         default: return nil
         }
     }
@@ -369,11 +384,9 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .dwd_icon_global_native:
-            return nil
-        case .dwd_icon_d2_native:
-            return nil
-        case .dwd_icon_d2_native_15min:
+        case .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
+             .dwd_icon_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
             return nil
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps

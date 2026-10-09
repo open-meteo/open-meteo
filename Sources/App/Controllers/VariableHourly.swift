@@ -623,6 +623,7 @@ private let pressureLevelInterpolationTable: [DomainRegistry: [Int: SurroundingP
     .dwd_icon: [975: (950, 1000)],
     .dwd_icon_global_native: [975: (950, 1000)],
     .dwd_icon_eu: [975: (950, 1000)],
+    .dwd_icon_eu_native: [975: (950, 1000)],
     .dwd_icon_d2: [
         800: (700, 850),
         900: (850, 950),

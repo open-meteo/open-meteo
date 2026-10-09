@@ -1,106 +1,44 @@
 import Foundation
-import Vapor
-@preconcurrency import SwiftEccodes
-import CHelper
 import SwiftNetCDF
 
-struct CdoHelper: Sendable {
-    let cdo: CdoIconGlobal?
-    let grid: any Gridable
-    let nativeGridIdentity: IconNativeGridIdentity?
-    let curl: Curl
-
-    var needsRemapping: Bool {
-        return cdo != nil
-    }
-
-    init(domain: IconDomains, nativeGridIdentity: IconNativeGridIdentity?, curl: Curl) async throws {
-        // Native output preserves cell order; regular output uses remapping where required.
-        self.curl = curl
-        cdo = nativeGridIdentity == nil ? try await CdoIconGlobal(curl: curl, domain: domain) : nil
-        grid = domain.grid
-        self.nativeGridIdentity = nativeGridIdentity
-    }
-
-    /// Downloads and decodes GRIB, validating native grid identity or optionally remapping to a regular grid.
-    func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
-        guard let cdo else {
-            return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
-                if let identity = nativeGridIdentity {
-                    return (message, try IconNativeGribDecoder.decode(message: message, identity: identity))
-                }
-                return (message, Array2D(data: try message.getDouble().map(Float.init), nx: grid.nx, ny: grid.ny))
-            }
-        }
-        /// Nearest neighbour interpolation
-        let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
-        return try messages.map { message in
-            let source = try message.getDouble()
-            let destination = cdo.remap(source)
-            let grid2d = Array2D(data: destination, nx: grid.nx, ny: grid.ny)
-            return (message, grid2d)
-        }
-    }
-}
-
-extension IconDomains {
-    fileprivate var iconGridName: String? {
-        switch self {
-        case .icon:
-            return "0026_R03B07_G"
-        case .iconEu:
-            return nil
-        case .iconD2:
-            return nil
-        case .iconD2_15min:
-            return nil
-        case .iconEps:
-            return "0036_R03B06_G"
-        case .iconEuEps:
-            return "0037_R03B07_N02"
-        case .iconD2Eps:
-            return "0047_R19B07_L"
-        default:
-            return nil
-        }
-    }
-}
-
-struct CdoIconGlobal: Sendable {
+struct IconRemapper: Sendable {
     let mapping: [Int32]
 
-    func remap<T: BinaryFloatingPoint>(_ source: [T]) -> [Float] {
+    func remap(_ source: [Float]) -> [Float] {
         mapping.map { index in
             guard index >= 0 else {
                 return .nan
             }
-            return Float(source[Int(index)])
+            return source[Int(index)]
         }
     }
 
-    /// Download and prepare weights for icon global remapping
-    public init?(curl: Curl, domain: IconDomains) async throws {
-        guard domain.iconGridName != nil else {
-            return nil
+    /// Reuse historical CDO weights and masks for deterministic global ICON.
+    init(curl: Curl, domain: IconDomains) async throws {
+        guard domain == .icon,
+              let target = domain.grid as? RegularGrid else {
+            throw IconDownloadError(description: "No regular remapping grid for \(domain)")
         }
-        let fm = FileManager.default
-        let weightsFile = "\(domain.domainRegistry.directory)static/cdo_weights.nc"
-        
-        if !fm.fileExists(atPath: weightsFile) {
-            let remoteFile = "https://openmeteo.s3.amazonaws.com/data/\(domain.domainRegistry.rawValue)/static/cdo_weights.nc"
-            try await curl.download(url: remoteFile, toFile: weightsFile, bzip2Decode: false)
+        // Preserve the original CDO tie-breaking and missing-value mask for unchanged source grids.
+        let directory = "\(domain.domainRegistry.directory)static/"
+        let weightsFile = "\(directory)cdo_weights.nc"
+        if !FileManager.default.fileExists(atPath: weightsFile) {
+            try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+            try await curl.download(
+                url: "https://openmeteo.s3.amazonaws.com/data/\(domain.domainRegistry.rawValue)/static/cdo_weights.nc",
+                toFile: weightsFile, bzip2Decode: false
+            )
         }
-        guard let src_address = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "src_address")?.asType(Int32.self)?.read() else {
-            fatalError("could not open weights file")
+        guard let weights = try NetCDF.open(path: weightsFile, allowUpdate: false),
+              let src = try weights.getVariable(name: "src_address")?.asType(Int32.self)?.read(),
+              let dst = try weights.getVariable(name: "dst_address")?.asType(Int32.self)?.read(),
+              src.count == dst.count, !src.isEmpty,
+              src.allSatisfy({ $0 > 0 && $0 <= domain.sourceGridIdentity.cellCount }),
+              dst.allSatisfy({ $0 > 0 && $0 <= target.count }) else {
+            throw IconDownloadError(description: "Invalid remapping weights: \(weightsFile)")
         }
-        guard let dst_address = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "dst_address")?.asType(Int32.self)?.read() else {
-            fatalError("could not open weights file")
-        }
-
-        var mapping = [Int32](repeating: -1, count: domain.grid.count)
-        for (i, src) in src_address.enumerated() {
-            mapping[Int(dst_address[i]) - 1] = src - 1
-        }
+        var mapping = [Int32](repeating: -1, count: target.count)
+        for i in src.indices { mapping[Int(dst[i]) - 1] = src[i] - 1 }
         self.mapping = mapping
     }
 }
