@@ -112,6 +112,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Longitude of the grid point
     let modelLon: Float
 
+    /// Output-cell coordinates for temporal interpolation after spatial remapping.
+    let remappedCoordinates: (latitude: Float, longitude: Float)?
+
     /// If set, use new data files
     let omFileSplitter: OmFileSplitter
     
@@ -142,9 +145,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.omFileSplitter = OmFileSplitter(domain)
         self.logger = options.logger
         self.httpClient = options.httpClient
+        self.remappedCoordinates = options.remappedCoordinates
     }
 
-    /// Return nil, if the coordinates are outside the domain grid
+    /// Return nil if the coordinates are outside the grid.
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         // check if coordinates are in domain, otherwise return nil
         let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
@@ -157,6 +161,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
         self.logger = options.logger
         self.httpClient = options.httpClient
+        self.remappedCoordinates = options.remappedCoordinates
 
         omFileSplitter = OmFileSplitter(domain)
 
@@ -217,7 +222,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         // Interpolate data
         let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
         let data = try await readRaw(variable: variable, time: time.with(time: timeLow))
-        let interpolated = data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
+        let coordinates = remappedCoordinates ?? (latitude: modelLat, longitude: modelLon)
+        let interpolated = data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: coordinates.latitude, longitude: coordinates.longitude, scalefactor: variable.scalefactor)
         return scale(data: interpolated, isElevationCorrectable: variable.isElevationCorrectable, unit: variable.unit)
     }
 

@@ -15,7 +15,7 @@ protocol GenericReaderDerived: GenericReaderProtocol {
     func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws
 }
 
-/// Parameters for tilted radiation calculation
+/// Options for reader construction and derived calculations
 struct GenericReaderOptions {
     /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical.
     var tilt: Float
@@ -26,6 +26,14 @@ struct GenericReaderOptions {
     let logger: Logger
     
     let httpClient: HTTPClient?
+    /// Evaluate solar calculations at this cell after nearest-neighbour remapping.
+    var remappedCoordinates: (latitude: Float, longitude: Float)? = nil
+
+    func with(remappedCoordinates: (latitude: Float, longitude: Float)) -> Self {
+        var options = self
+        options.remappedCoordinates = remappedCoordinates
+        return options
+    }
 
     public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?) throws {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.

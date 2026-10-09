@@ -36,11 +36,15 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
+        var fallback = ReaderRunFallback(time: time)
         for reader in reader {
-            if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
+            if try await fallback.read({
+                try await reader.prefetchData(mixed: variable.rawValue, time: time) ? true : nil
+            }) == true {
                 break
             }
         }
+        try fallback.finish()
         return true
     }
 
@@ -48,8 +52,9 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var result: DataAndUnit?
+        var fallback = ReaderRunFallback(time: time)
         for r in reader.reversed() {
-            guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
+            guard let d = try await fallback.read({ try await r.get(mixed: variable.rawValue, time: time) }) else {
                 continue
             }
             result = result?.combined(withLowerPriority: d) ?? d
@@ -57,6 +62,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
                 break
             }
         }
+        try fallback.finish()
         return result
     }
 }
@@ -83,13 +89,16 @@ extension GenericReaderProtocol {
 struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
     let reader: [any GenericReaderOptionalProtocol<Variable>]
     let prefetchAllReaders: Bool
+    let smoothTransitions: Bool
 
     init(
         reader: [any GenericReaderOptionalProtocol<Variable>],
-        prefetchAllReaders: Bool = false
+        prefetchAllReaders: Bool = false,
+        smoothTransitions: Bool = true
     ) {
         self.reader = reader
         self.prefetchAllReaders = prefetchAllReaders
+        self.smoothTransitions = smoothTransitions
     }
 
     var modelLat: Float {
@@ -114,13 +123,17 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
         var prefetched = false
+        var fallback = ReaderRunFallback(time: time)
         for reader in reader {
-            let accepted = try await reader.prefetchData(variable: variable, time: time)
+            let accepted = try await fallback.read {
+                try await reader.prefetchData(variable: variable, time: time) ? true : nil
+            } ?? false
             prefetched = prefetched || accepted
             if accepted && !prefetchAllReaders {
                 break
             }
         }
+        try fallback.finish()
         return prefetched
     }
 
@@ -134,15 +147,23 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var result: DataAndUnit?
+        var fallback = ReaderRunFallback(time: time)
         for r in reader.reversed() {
-            guard let d = try await r.get(variable: variable, time: time) else {
+            guard let d = try await fallback.read({ try await r.get(variable: variable, time: time) }) else {
                 continue
             }
-            result = result?.combined(withLowerPriority: d) ?? d
+            if !smoothTransitions, let preferred = result {
+                var data = preferred.data
+                data.integrateIfNaN(d.data)
+                result = DataAndUnit(data, preferred.unit)
+            } else {
+                result = result?.combined(withLowerPriority: d) ?? d
+            }
             if result?.data.containsNaN() == false {
                 break
             }
         }
+        try fallback.finish()
         return result
     }
 }
