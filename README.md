@@ -86,6 +86,7 @@ Apps:
 - [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
+- [ThaiFloodRisk](https://thaifloodrisk.com/en) Flood risk scores and daily flood odds for Bangkok and Thailand, built on Open-Meteo forecast, historical weather, river discharge (Flood API) and marine data.
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
 - [Typhoon](https://archisman-panigrahi.github.io/typhoon) A stylish weather app for GNU/Linux that acts as a desktop widget
