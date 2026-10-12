@@ -1119,12 +1119,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     enum DomainReaderMapping {
         /// Sources are ordered by increasing priority. Bounding-box sources are sampled on the output domain's grid.
         case multipleWithBoundingBox(
-            [((any GenericDomain)?, any GenericVariable.Type)],
-            boundingBox: (domain: any GenericDomain, sources: [((any GenericDomain)?, any GenericVariable.Type)]),
+            [(any GenericDomain, any GenericVariable.Type)],
+            boundingBox: (domain: any GenericDomain, sources: [(any GenericDomain, any GenericVariable.Type)]),
             allowMinMaxTwoAggregations: Bool
         )
         case single(any GenericDomain, any GenericVariable.Type)
-        case multiple([((any GenericDomain)?, any GenericVariable.Type)])
+        case multiple([(any GenericDomain, any GenericVariable.Type)])
         /// Mixes raw fields within each group, then places derived groups above supplemental readers.
         case mixedBeforeDerivation(
             groups: [RawReaderDerivationGroup],
@@ -1148,14 +1148,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         )
 
         private static func makeDomainReaders(
-            sources: [((any GenericDomain)?, any GenericVariable.Type)],
+            sources: [(any GenericDomain, any GenericVariable.Type)],
             lat: Float,
             lon: Float,
             elevation: Float,
             mode: GridSelectionMode,
             options: GenericReaderOptions
         ) async throws -> (readers: [any GenericReaderOptionalProtocol<ForecastVariable>], elevation: Float) {
-            let sources = sources.compactMap { domain, variable in domain.map { ($0, variable) } }
             var elevation = elevation
             let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.reversed().asyncCompactMap { source in
                 guard let reader = try await source.0.makeDerivedHourly(variableType: source.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
@@ -1247,10 +1246,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
-        static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [((any GenericDomain)?, any GenericVariable.Type)], allowMinMaxTwoAggregations: Bool, gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
+        static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [(any GenericDomain, any GenericVariable.Type)], allowMinMaxTwoAggregations: Bool, gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
             let coordinate = options.remappedCoordinates ?? outputDomain.grid.getCoordinates(gridpoint: gridpoint)
             let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { domain, variable in
-                guard let domain else { return nil }
                 let position = domain.domainRegistry == outputDomain.domainRegistry ? gridpoint : domain.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
                 guard let position else { return nil }
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, options: options).hourly
@@ -1500,119 +1498,119 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // Prefer native EPS probabilities; deterministic storage keeps its regular-first priority until cutover.
             return .multiple([
                 (IconDomains.iconEps, ProbabilityVariable.self),
-                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), ProbabilityVariable.self),
+                (try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self),
                 (IconDomains.iconEuEps, ProbabilityVariable.self),
-                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), ProbabilityVariable.self),
-                (try await IconNativeDomains.iconNative.loadIfAvailable(), IconVariable.self),
-                (try await IconNativeDomains.iconNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+                (try await IconNativeDomains.iconEuEpsNative.load(), ProbabilityVariable.self),
+                (try await IconNativeDomains.iconNative.load(), IconVariable.self),
+                (try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self),
                 (IconDomains.icon, IconVariable.self),
-                (try await IconNativeDomains.iconEuNative.loadIfAvailable(), IconVariable.self),
-                (try await IconNativeDomains.iconEuNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+                (try await IconNativeDomains.iconEuNative.load(), IconVariable.self),
+                (try await IconNativeDomains.iconEuNativeModelLevel.load(), IconModelLevelVariable.self),
                 (IconDomains.iconEu, IconVariable.self),
-                (try await IconNativeDomains.iconD2Native.loadIfAvailable(), IconVariable.self),
-                (try await IconNativeDomains.iconD2NativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+                (try await IconNativeDomains.iconD2Native.load(), IconVariable.self),
+                (try await IconNativeDomains.iconD2NativeModelLevel.load(), IconModelLevelVariable.self),
                 (IconDomains.iconD2, IconVariable.self),
-                (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 (IconDomains.iconD2_15min, IconVariable.self)
             ])
         case .icon_global, .dwd_icon_global, .dwd_icon:
             // Keep regular deterministic storage preferred, including its model-level fields, until cutover.
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
-                (try await IconNativeDomains.iconNative.loadIfAvailable(), IconVariable.self),
-                (try await IconNativeDomains.iconNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (try await IconNativeDomains.iconNative.load(), IconVariable.self),
+                (try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self),
                 (IconDomains.icon, IconVariable.self)
             ]
             return .multipleWithBoundingBox([
                 (IconDomains.iconEps, ProbabilityVariable.self),
-                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), ProbabilityVariable.self)
+                (try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self)
             ] + sources,
                 boundingBox: (IconDomains.icon, sources), allowMinMaxTwoAggregations: false)
         case .icon_eu, .dwd_icon_eu:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
-                (try await IconNativeDomains.iconEuNative.loadIfAvailable(), IconVariable.self),
-                (try await IconNativeDomains.iconEuNativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (try await IconNativeDomains.iconEuNative.load(), IconVariable.self),
+                (try await IconNativeDomains.iconEuNativeModelLevel.load(), IconModelLevelVariable.self),
                 (IconDomains.iconEu, IconVariable.self)
             ]
             return .multipleWithBoundingBox([
                 (IconDomains.iconEuEps, ProbabilityVariable.self),
-                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), ProbabilityVariable.self)
+                (try await IconNativeDomains.iconEuEpsNative.load(), ProbabilityVariable.self)
             ] + sources,
                 boundingBox: (IconDomains.iconEu, sources), allowMinMaxTwoAggregations: false)
         case .icon_d2, .dwd_icon_d2:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
-                (try await IconNativeDomains.iconD2Native.loadIfAvailable(), IconVariable.self),
-                (try await IconNativeDomains.iconD2NativeModelLevel.loadIfAvailable(), IconModelLevelVariable.self),
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (try await IconNativeDomains.iconD2Native.load(), IconVariable.self),
+                (try await IconNativeDomains.iconD2NativeModelLevel.load(), IconModelLevelVariable.self),
                 (IconDomains.iconD2, IconVariable.self)
             ]
-            let quarterHourly: [((any GenericDomain)?, any GenericVariable.Type)] = [
-                (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
+            let quarterHourly: [(any GenericDomain, any GenericVariable.Type)] = [
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 (IconDomains.iconD2_15min, IconVariable.self)
             ]
             return .multipleWithBoundingBox([
                 (IconDomains.iconD2Eps, ProbabilityVariable.self),
-                (try await IconNativeDomains.iconD2EpsNative.loadIfAvailable(), ProbabilityVariable.self)
+                (try await IconNativeDomains.iconD2EpsNative.load(), ProbabilityVariable.self)
             ] + sources + quarterHourly,
                 boundingBox: (IconDomains.iconD2, sources), allowMinMaxTwoAggregations: false)
         case .dwd_icon_d2_15min:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
-                (try await IconNativeDomains.iconD2Native15min.loadIfAvailable(), IconVariable.self),
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
+                (try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 (IconDomains.iconD2_15min, IconVariable.self)
             ]
             return .multipleWithBoundingBox(sources, boundingBox: (IconDomains.iconD2_15min, sources), allowMinMaxTwoAggregations: true)
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .multiple([
                 (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
-                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), DwdIconEpsGlobalVariable.self),
+                (try await IconNativeDomains.iconEpsNative.load(), DwdIconEpsGlobalVariable.self),
                 (IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self),
-                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), DwdIconEuEpsGlobalVariable.self)
+                (try await IconNativeDomains.iconEuEpsNative.load(), DwdIconEuEpsGlobalVariable.self)
             ])
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .multiple([
                 (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
-                (try await IconNativeDomains.iconEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEpsGlobalVariable>.self),
+                (try await IconNativeDomains.iconEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEpsGlobalVariable>.self),
                 (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
-                (try await IconNativeDomains.iconEuEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
+                (try await IconNativeDomains.iconEuEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
             ])
         case .icon_global_eps, .dwd_icon_global_eps:
             // Regular EPS ingestion has stopped; prefer native storage and retain regular archives.
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
                 (IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
-                (try await IconNativeDomains.iconEpsNative.loadIfAvailable(), DwdIconEpsGlobalVariable.self)
+                (try await IconNativeDomains.iconEpsNative.load(), DwdIconEpsGlobalVariable.self)
             ]
             return .multipleWithBoundingBox(sources,
                 boundingBox: (IconDomains.iconEps, sources), allowMinMaxTwoAggregations: true)
         case .icon_eu_eps, .dwd_icon_eu_eps:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
                 (IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self),
-                (try await IconNativeDomains.iconEuEpsNative.loadIfAvailable(), DwdIconEuEpsGlobalVariable.self)
+                (try await IconNativeDomains.iconEuEpsNative.load(), DwdIconEuEpsGlobalVariable.self)
             ]
             return .multipleWithBoundingBox(sources,
                 boundingBox: (IconDomains.iconEuEps, sources), allowMinMaxTwoAggregations: true)
         case .icon_d2_eps, .dwd_icon_d2_eps:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
                 (IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self),
-                (try await IconNativeDomains.iconD2EpsNative.loadIfAvailable(), DwdIconD2EpsGlobalVariable.self)
+                (try await IconNativeDomains.iconD2EpsNative.load(), DwdIconD2EpsGlobalVariable.self)
             ]
             return .multipleWithBoundingBox(sources,
                 boundingBox: (IconDomains.iconD2Eps, sources), allowMinMaxTwoAggregations: true)
         case .dwd_icon_eps_ensemble_mean:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
                 (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
-                (try await IconNativeDomains.iconEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEpsGlobalVariable>.self)
+                (try await IconNativeDomains.iconEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEpsGlobalVariable>.self)
             ]
             return .multipleWithBoundingBox(sources,
                 boundingBox: (IconDomains.iconEpsEnsembleMean, sources), allowMinMaxTwoAggregations: true)
         case .dwd_icon_eu_eps_ensemble_mean:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
                 (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
-                (try await IconNativeDomains.iconEuEpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
+                (try await IconNativeDomains.iconEuEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
             ]
             return .multipleWithBoundingBox(sources,
                 boundingBox: (IconDomains.iconEuEpsEnsembleMean, sources), allowMinMaxTwoAggregations: true)
         case .dwd_icon_d2_eps_ensemble_mean:
-            let sources: [((any GenericDomain)?, any GenericVariable.Type)] = [
+            let sources: [(any GenericDomain, any GenericVariable.Type)] = [
                 (IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<DwdIconD2EpsGlobalVariable>.self),
-                (try await IconNativeDomains.iconD2EpsNativeEnsembleMean.loadIfAvailable(), VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
+                (try await IconNativeDomains.iconD2EpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
             ]
             return .multipleWithBoundingBox(sources,
                 boundingBox: (IconDomains.iconD2EpsEnsembleMean, sources), allowMinMaxTwoAggregations: true)
@@ -1925,10 +1923,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // best_match may change its model selection over time, so native ICON intentionally takes priority here.
             // Keep these storage pairs separate from the probability and quarter-hourly companions below.
             func makeReader(domain: IconDomains, native: IconNativeDomains) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
-                let preferred = try await native.loadIfAvailable()?.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let preferred = try await native.load().makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let resolvedElevation = elevation.isNaN ? preferred?.resolvedTargetElevation ?? elevation : elevation
                 let fallback = try await domain.makeDerivedHourly(variableType: IconVariable.self, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
-                let modelLevel = try await native.modelLevelDomain?.loadIfAvailable()?.makeDerivedHourly(variableType: IconModelLevelVariable.self, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
+                let modelLevel = try await native.modelLevelDomain?.load().makeDerivedHourly(variableType: IconModelLevelVariable.self, lat: lat, lon: lon, elevation: resolvedElevation, mode: mode, options: options)
                 let readers = [fallback, preferred, modelLevel].compactMap { $0 }
                 guard !readers.isEmpty else { return nil }
                 return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)

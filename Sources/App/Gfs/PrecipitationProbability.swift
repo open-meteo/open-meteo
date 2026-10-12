@@ -47,14 +47,14 @@ enum ProbabilityReader {
     /// Notes: Does not use ICON-D2, because it has fewer members. It need some kind of mixing
     static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerByVariableName<ProbabilityVariable> {
         // EPS ingestion has moved to native storage, independently of the deterministic cutover.
-        let domains: [(any GenericDomain)?] = [
+        let domains: [any GenericDomain] = [
             IconDomains.iconEps,
-            try await IconNativeDomains.iconEpsNative.loadIfAvailable(),
+            try await IconNativeDomains.iconEpsNative.load(),
             IconDomains.iconEuEps,
-            try await IconNativeDomains.iconEuEpsNative.loadIfAvailable()
+            try await IconNativeDomains.iconEuEpsNative.load()
         ]
         let readers = try await domains.asyncCompactMap { domain in
-            try await domain?.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            try await domain.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         }
         return GenericReaderMixerByVariableName(reader: readers)
     }
