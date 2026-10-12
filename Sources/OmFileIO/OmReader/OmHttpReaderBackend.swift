@@ -27,6 +27,9 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         
     public let lastModified: Timestamp
     
+    /// Client for HEAD and range requests. Its connection limit per host caps the requests in flight
+    public let client: HTTPClient
+    
     /// Timestamp in seconds when the last data was successfully fetched from the backend.
     /// If set to `0`, the file has been deleted or modified. In both cases, it is not valid anymore
     /// TODO: this is only used to store HTTP etag/modified errors
@@ -40,14 +43,15 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     }
     
     /// Note: Only used if S3 based eTag throws an error after the file got updated on the remote end. Per default S3 List attributes are used to initialise this client.
-    public init(context: S3ServerHealth, object: String) async throws {
+    public init(context: S3ServerHealth, object: String, client: HTTPClient = .shared) async throws {
         self.server = context
+        self.client = client
         let serverUrl = try await context.getServerFor(hash: object.fnv1aHash64)
         var headRequest = HTTPClientRequest(url: serverUrl.uploadURL(remotePath: object))
         headRequest.method = .HEAD
         context.logger.debug("Sending HEAD requests to \(headRequest.url.stripHttpPassword())")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(2))
-        let headResponse = try await HTTPClient.shared.executeRetry(headRequest, logger: context.logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
+        let headResponse = try await client.executeRetry(headRequest, logger: context.logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
         guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
             throw OmHttpReaderBackendError.contentLengthMissing
         }
@@ -71,10 +75,11 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     }
     
     /// Last modified, eTag and count is used from S3 list operations
-    public init(context: S3ServerHealth, object: String, count: Int, eTag: String, lastModified: Timestamp) {
+    public init(context: S3ServerHealth, object: String, count: Int, eTag: String, lastModified: Timestamp, client: HTTPClient = .shared) {
         assert(eTag.hasPrefix("\""))
         assert(eTag.hasSuffix("\""))
         self.server = context
+        self.client = client
         self.object = object
         self.count = count
         self.eTag = eTag
@@ -103,7 +108,7 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
         do {
-            let buffer = try await HTTPClient.shared.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
+            let buffer = try await client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
             lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
             return buffer
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {

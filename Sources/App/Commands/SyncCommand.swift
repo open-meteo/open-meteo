@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileIO
+import Synchronization
 
 /**
 Download the open-meteo weather database from a S3 server.
@@ -61,6 +62,9 @@ struct SyncCommand: AsyncCommand {
 
         @Option(name: "year", help: "Download one year or a range of years (e.g. 2000-2005)")
         var year: String?
+
+        @Option(name: "bbox", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks outside the box widened by the grid search radius plus one cell are written as NaN")
+        var bbox: String?
     }
 
     /// All weather variables that may be available for `previous days API`
@@ -99,6 +103,7 @@ struct SyncCommand: AsyncCommand {
         let pastDays = signature.pastDays ?? 7
         let concurrent = signature.concurrent ?? 2
         let concurrentModels = signature.concurrentModels ?? 2
+        let bbox = try signature.bbox.map { try BoundingBoxWGS84(commaSeparated: $0) }
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
@@ -140,6 +145,11 @@ struct SyncCommand: AsyncCommand {
                 /// Used for `really_download_all_but_pressure_once_per_day` to download pressure data only once per day
                 let downloadPressureNow = lastPressureDownloadDate != Timestamp.now().with(hour: 0)
                 for (server, model, variablesSig) in $0 {
+                    /// Range reads get a client of their own with 16 connections per file, because the shared client allows 8 per host for all files
+                    let rangeClient = bbox == nil || model == .copernicus_dem90 ? nil : HTTPClient(
+                        eventLoopGroupProvider: .shared(context.application.eventLoopGroup),
+                        configuration: .init(connectionPool: .init(idleTimeout: .minutes(1), concurrentHTTP1ConnectionsPerHostSoftLimit: concurrent * 16))
+                    )
                     do {
                         try await syncModel(
                             application: context.application,
@@ -150,12 +160,15 @@ struct SyncCommand: AsyncCommand {
                             yearRange: yearRange,
                             pastDays: pastDays,
                             apikey: signature.apikey,
-                            downloadPressureNow: downloadPressureNow
+                            downloadPressureNow: downloadPressureNow,
+                            bbox: bbox,
+                            rangeClient: rangeClient
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
                         exitStatus.markFailure()
                     }
+                    try? await rangeClient?.shutdown()
                 }
                 if downloadPressureNow {
                     lastPressureDownloadDate = Timestamp.now().with(hour: 0)
@@ -169,8 +182,20 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?, rangeClient: HTTPClient? = nil) async throws {
         let logger = application.logger
+        
+        /// The digital elevation model has no grid and only static files, which are copied whole
+        let keep: SyncBoundingBox?
+        if let bbox, model != .copernicus_dem90 {
+            guard model.nativeDefinition == nil, let grid = try await model.getDomain()?.grid else {
+                throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
+            }
+            keep = try SyncBoundingBox(grid: grid, box: bbox)
+        } else {
+            keep = nil
+        }
+        let endpoint = S3ServerHealth(logger: logger, servers: [S3BucketEndpoint(rawEndpoint: server, profile: nil)], checksHealth: false)
         
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
         let downloadAllVariables = variablesSig.contains("really_download_all_variables")
@@ -207,7 +232,7 @@ struct SyncCommand: AsyncCommand {
                 return []
             }
             let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
-            let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+            let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory, modificationTimeOnly: keep != nil)
             return Array(filtered)
         }.flatMap({$0})
         
@@ -218,42 +243,81 @@ struct SyncCommand: AsyncCommand {
         let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
         logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
         let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
+        /// With a mask, a failed file is logged and the other files of the model still run. The model then fails with the first error
+        let firstFailure = Mutex<(any Error)?>(nil)
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
-            var request = ClientRequest(url: URI("\(server)\(download.name)"))
-            if apikey != nil {
-                try request.query.encode(S3DataController.DownloadParams(apikey: apikey))
-            }
-            let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
-            let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
-            let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
-            try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-            // Another process might be updating this file right now. E.g. Second sync operation
-            FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
-            if localFile.hasSuffix("/meta.json") {
-                let body = try await client.executeRetryAndCollect(.init(url: request.url.string), logger: logger, upTo: 2*1024*1024, deadline: .minutes(5))
-                await progress.add(body.readableBytes)
-                guard let json = try body.readJSONDecodable(ModelUpdateMetaJson.self) else {
-                    logger.error("Not a valid ModelUpdateMetaJson \(pathNoData)")
-                    return
+            do {
+                var request = ClientRequest(url: URI("\(server)\(download.name)"))
+                if apikey != nil {
+                    try request.query.encode(S3DataController.DownloadParams(apikey: apikey))
                 }
-                /// Update the `last_run_availability_time` within meta.json
-                try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
-            } else {
-                for _ in 0..<10 {
-                    do {
-                        let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
-                        /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
-                        try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
-                        await progress.add(try response.contentLength() ?? 0)
-                        break
-                    } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
-                        /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
-                        try FileManager.default.removeItemIfExists(at: localFile)
+                let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
+                let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
+                let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
+                try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
+                // Another process might be updating this file right now. E.g. Second sync operation
+                FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
+                if localFile.hasSuffix("/meta.json") {
+                    let body = try await client.executeRetryAndCollect(.init(url: request.url.string), logger: logger, upTo: 2*1024*1024, deadline: .minutes(5))
+                    await progress.add(body.readableBytes)
+                    guard let json = try body.readJSONDecodable(ModelUpdateMetaJson.self) else {
+                        logger.error("Not a valid ModelUpdateMetaJson \(pathNoData)")
+                        return
+                    }
+                    /// Update the `last_run_availability_time` within meta.json
+                    try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
+                } else {
+                    var loggedTimeout = false
+                    /// Error of the last try if it was a masked read. Whole downloads keep falling through after 10 tries as before
+                    var maskedFailure: (any Error)?
+                    for _ in 0..<10 {
+                        maskedFailure = nil
+                        var wholeDownload = false
+                        do {
+                            /// Static files are 2D and copied whole, so they skip the remote header read
+                            if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
+                                /// The API key travels in the URL query like a whole download, because the server reads it only from there
+                                let remote = try await OmHttpReaderBackend(context: endpoint, object: download.name + (request.url.query.map { "?\($0)" } ?? ""), client: rangeClient ?? .shared)
+                                if try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
+                                    break
+                                }
+                            }
+                            wholeDownload = true
+                            let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
+                            /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
+                            try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
+                            await progress.add(try response.contentLength() ?? 0)
+                            break
+                        } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                            /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
+                            /// A read with a bounding box has not touched the local file yet, so the API keeps serving it
+                            if wholeDownload {
+                                try FileManager.default.removeItemIfExists(at: localFile)
+                            } else {
+                                maskedFailure = CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
+                            }
+                        } catch CurlError.timeoutReached where !wholeDownload {
+                            maskedFailure = CurlError.timeoutReached
+                            /// A slow range read fails this attempt only, so one slow file does not stop the model
+                            if !loggedTimeout {
+                                logger.warning("Timeout reading \(download.name) with a bounding box, retrying the file")
+                                loggedTimeout = true
+                            }
+                        }
+                    }
+                    if let maskedFailure {
+                        throw maskedFailure
                     }
                 }
+            } catch where keep != nil {
+                logger.error("Sync of \(download.name) failed: \(error)")
+                firstFailure.withLock { $0 = $0 ?? error }
             }
         }
         await progress.finish()
+        if let failure = firstFailure.withLock({ $0 }) {
+            throw failure
+        }
     }
 }
 
@@ -305,7 +369,8 @@ fileprivate extension Array where Element == S3List.ListV2File {
     }
 
     /// Compare remote files to local files. Only keep files that are not available locally or older.
-    func includeFiles(compareLocalDirectory: String) -> [Element] {
+    /// With `modificationTimeOnly`, sizes are not compared, because files synced with a bounding box differ in size from the remote file
+    func includeFiles(compareLocalDirectory: String, modificationTimeOnly: Bool) -> [Element] {
         let resourceKeys = Set<URLResourceKey>([.contentModificationDateKey, .fileSizeKey])
         return self.filter({ remoteFile in
             let pathNoData = remoteFile.name[remoteFile.name.index(remoteFile.name.startIndex, offsetBy: 5)..<remoteFile.name.endIndex]
@@ -315,7 +380,7 @@ fileprivate extension Array where Element == S3List.ListV2File {
                   let modificationTime = resourceValues.contentModificationDate else {
                 return true
             }
-            if remoteFile.name.contains("meta.json") {
+            if remoteFile.name.contains("meta.json") || modificationTimeOnly {
                 /// meta.json is modified during sync to replace the `last_run_availability_time`.
                 /// Size might be different. Only check for modification time.
                 return remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
