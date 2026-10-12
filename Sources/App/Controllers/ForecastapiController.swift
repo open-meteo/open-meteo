@@ -1180,7 +1180,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
 
         static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain) -> Self {
-            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: true)
+            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: true, requirePrimaryCoverage: true)
         }
 
         static func multipleWithPrecipitationProbability(_ primary: [Source], precipitationProb: any GenericDomain) -> Self {
