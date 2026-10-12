@@ -542,7 +542,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 }
             }
             
-            guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
+            guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params, variable: v) else {
                 return .init(variable: variable, unit: .undefined, value: .nan)
             }
             return .init(variable: variable, unit: d.unit, value: d.data.first ?? .nan)
@@ -579,7 +579,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = timeHourlyRead.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)
-                guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
+                guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params, variable: v) else {
                     return nil
                 }
                 unit = d.unit
@@ -641,7 +641,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                     ensembleMemberLevel: allMembersForRiverDischarge ? nil : member,
                     run: run
                 )
-                guard let d = try await readerDaily.get(variable: variable, time: timeRead)?.convertAndRound(params: params) else {
+                guard let d = try await readerDaily.get(variable: variable, time: timeRead)?.convertAndRound(params: params, variable: variable) else {
                     return nil
                 }
                 unit = d.unit
@@ -683,7 +683,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)
-                guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
+                guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params, variable: v) else {
                     return nil
                 }
                 unit = d.unit
@@ -708,7 +708,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             dtSeconds: 7*24*3600
         )
         return ApiSection<WeeklyVariable>(name: "weekly", time: timeWeekly, columns: try await variables.asyncCompactMap { variable in
-            guard let d = try await readerWeekly.get(variable: variable, time: timeWeekly.toSettings())?.convertAndRound(params: params) else {
+            guard let d = try await readerWeekly.get(variable: variable, time: timeWeekly.toSettings())?.convertAndRound(params: params, variable: variable) else {
                 return nil
             }
             assert(timeWeekly.count == d.data.count)
@@ -724,7 +724,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
         let timeMonthlyRead = timeMonthlyDisplay
         return ApiSection<MonthlyVariable>(name: "monthly", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
-            guard let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings())?.convertAndRound(params: params) else {
+            guard let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings())?.convertAndRound(params: params, variable: variable) else {
                 return nil
             }
             assert(timeMonthlyDisplay.count == d.data.count)
