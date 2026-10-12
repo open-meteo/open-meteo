@@ -377,6 +377,12 @@ struct MeteoFranceDownload: AsyncCommand {
                         return
                     }
 
+                    // Accumulated radiation is scaled for 1 hour steps. ARPEGE World has 3 hourly steps after hour 48
+                    if let surface = variable as? MeteoFranceSurfaceVariable, surface == .shortwave_radiation, stepType == "accum", domain == .arpege_world,
+                       timestamp.timeIntervalSince1970 - run.timeIntervalSince1970 > 48 * 3600 {
+                        grib2d.array.data.multiplyAdd(multiply: 1 / 3, add: 0)
+                    }
+
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                     try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
                 }
