@@ -21,6 +21,9 @@ DATA_DIRECTORY=/Volumes/2TB_1GBs/data/ API_SYNC_APIKEYS=123 openmeteo-api
 DATA_DIRECTORY=/Volumes/2TB_1GBs/data2/ openmeteo-api sync cmc_gem_gdps,dwd_icon_d2,dwd_icon temperature_2m --server http://127.0.0.1:8080/ --apikey 123 --past-days 30 --repeat-interval 5
 */
 struct SyncCommand: AsyncCommand {
+    /// A failed model marks the process as failed, so the command ends non-zero after the other models synced
+    var exitStatus: ProcessExitStatus = .shared
+
     var help: String {
         return "Download the open-meteo weather database from a S3 server."
     }
@@ -151,6 +154,7 @@ struct SyncCommand: AsyncCommand {
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
+                        exitStatus.markFailure()
                     }
                 }
                 if downloadPressureNow {

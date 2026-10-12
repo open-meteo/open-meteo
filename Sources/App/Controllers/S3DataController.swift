@@ -154,7 +154,7 @@ struct S3DataController: RouteCollection {
                     throw S3ApiError.forbidden
                 }
                 guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly) else {
-                    throw CurlError.fileNotFound
+                    throw Abort(.notFound)
                 }
                 return (1, try await req.asyncStreamFile(file: file, mediaType: mediaType))
             })
@@ -167,7 +167,7 @@ struct S3DataController: RouteCollection {
         }
         
         guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly) else {
-            throw CurlError.fileNotFound
+            throw Abort(.notFound)
         }
         return try await req.asyncStreamFile(file: file, mediaType: mediaType)
     }

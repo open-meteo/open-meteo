@@ -69,8 +69,8 @@ enum IconNativeDomains: String, CaseIterable {
         case .iconD2Native: return .dwd_icon_d2_native
         case .iconD2NativeModelLevel: return .dwd_icon_d2_native_model_level
         case .iconD2Native15min: return .dwd_icon_d2_native_15min
-        case .iconEpsNative: return .dwd_icon_eps_native
-        case .iconEpsNativeEnsembleMean: return .dwd_icon_eps_native_ensemble_mean
+        case .iconEpsNative: return .dwd_icon_global_eps_native
+        case .iconEpsNativeEnsembleMean: return .dwd_icon_global_eps_native_ensemble_mean
         case .iconEuEpsNative: return .dwd_icon_eu_eps_native
         case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native_ensemble_mean
         case .iconD2EpsNative: return .dwd_icon_d2_eps_native
@@ -82,7 +82,7 @@ enum IconNativeDomains: String, CaseIterable {
         if let modelLevelParent { return modelLevelParent.domainRegistry }
         switch self {
         case .iconD2Native15min: return .dwd_icon_d2_native
-        case .iconEpsNativeEnsembleMean: return .dwd_icon_eps_native
+        case .iconEpsNativeEnsembleMean: return .dwd_icon_global_eps_native
         case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native
         case .iconD2EpsNativeEnsembleMean: return .dwd_icon_d2_eps_native
         default: return domainRegistry
@@ -111,7 +111,7 @@ enum IconNativeDomains: String, CaseIterable {
     private static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
     private static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
     private static let europeGridFile = IconNativeGridFile(registry: .dwd_icon_eu_native, identity: .europe)
-    private static let globalEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_eps_native, identity: .globalEnsemble)
+    private static let globalEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_global_eps_native, identity: .globalEnsemble)
     private static let europeEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_eu_eps_native, identity: .europeEnsemble)
 
     func load() async throws -> IconNativeDomain {
