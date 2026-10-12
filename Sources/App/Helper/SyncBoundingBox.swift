@@ -3,6 +3,7 @@ import OmFileFormat
 import OmTime
 import OmFileIO
 import Logging
+import Synchronization
 
 /// Grid cells that `sync --bbox` keeps: the cells inside the box, widened by the grid search radius plus one.
 /// Chunks of a weather variable file that hold none of them are written as NaN, so the API returns null outside the box.
@@ -147,8 +148,9 @@ struct SyncBoundingBox: Sendable {
 
     /// Write `remote` to `file` with every chunk without a kept cell as NaN. Kept chunks are decoded and encoded again with the same settings.
     /// Legacy files store a flat 2D array `[ny * nx, time]`; they are masked the same way, as a grid of one row, and keep their 2D layout.
-    /// Returns false and writes nothing if the file is not a float array of one of these two layouts on this grid with scalar attributes only.
-    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, bufferValues: Int = Self.bufferValues) async throws -> Bool {
+    /// Returns the bytes fetched from `remote`, or nil and writes nothing if the file is not a float array of one of these two layouts on this grid with scalar attributes only.
+    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, bufferValues: Int = Self.bufferValues) async throws -> Int? {
+        let remote = CountingBackend(remote)
         let reader = try await OmFileReader(fn: remote)
         /// Gaps up to 16 KiB are read along. A larger gap would join the chunk rows of a narrow box into whole rows of the grid
         let array = reader.asArray(of: Float.self, io_size_max: 2 * 1024 * 1024, io_size_merge: 16 * 1024)
@@ -156,19 +158,19 @@ struct SyncBoundingBox: Sendable {
         let flat = dims.count == 2 && dims[0] == ny * nx
         guard let array, flat || (dims.count == 3 && dims[0] == ny && dims[1] == nx) else {
             logger.info("Not a float array on the model grid, dims \(dims), type \(reader.dataType), copying whole: \(file)")
-            return false
+            return nil
         }
         let chunks = array.getChunkDimensions().map(Int.init)
         /// Planning works on `[rows, columns, time]` for both layouts
         let plan = flat ? flattened() : self
         let size = flat ? [1, dims[0], dims[1]] : dims
         let tile = flat ? [1, chunks[0], chunks[1]] : chunks
-        var attributes = [OmFileReader<Backend>]()
+        var attributes = [OmFileReader<CountingBackend<Backend>>]()
         for i in 0 ..< reader.numberOfChildren {
             guard let child = try await reader.getChild(i), child.numberOfChildren == 0,
                   (OmDataType.int8.rawValue ... OmDataType.string.rawValue).contains(child.dataType.rawValue) else {
                 logger.debug("Attributes are not all plain values, copying whole: \(file)")
-                return false
+                return nil
             }
             attributes.append(child)
         }
@@ -302,7 +304,33 @@ struct SyncBoundingBox: Sendable {
             }
         }
         try fn.linkTemporary(file: file)
-        return true
+        return remote.fetched.load(ordering: .relaxed)
+    }
+}
+
+/// Sums the bytes read from the wrapped backend, for the transfer statistics
+final class CountingBackend<Backend: OmFileReaderBackend>: OmFileReaderBackend {
+    let backend: Backend
+    let fetched = Atomic(0)
+
+    init(_ backend: Backend) {
+        self.backend = backend
+    }
+
+    var count: Int { backend.count }
+
+    func prefetchData(offset: Int, count: Int) async throws {
+        try await backend.prefetchData(offset: offset, count: count)
+    }
+
+    func getData(offset: Int, count: Int) async throws -> Backend.DataType {
+        fetched.add(count, ordering: .relaxed)
+        return try await backend.getData(offset: offset, count: count)
+    }
+
+    func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
+        fetched.add(count, ordering: .relaxed)
+        return try await backend.withData(offset: offset, count: count, fn: fn)
     }
 }
 

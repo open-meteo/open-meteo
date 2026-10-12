@@ -57,7 +57,10 @@ import Logging
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
-        #expect(try await keep.write(remote: fixture(values), to: file, modificationTime: Timestamp(1_600_000_000), logger: Logger(label: "test"), bufferValues: bufferValues))
+        let source = try fixture(values)
+        let fetched = try #require(try await keep.write(remote: source, to: file, modificationTime: Timestamp(1_600_000_000), logger: Logger(label: "test"), bufferValues: bufferValues))
+        /// Less than the whole file is read, because the chunks outside the box are skipped
+        #expect(fetched > 0 && fetched < source.count)
 
         let reader = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: file))))
         let array = try reader.expectArray(of: Float.self)
@@ -118,7 +121,7 @@ import Logging
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-gaussian-\(UUID().uuidString).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
         let source = try fixture(values, dimensions: [1, UInt64(gaussian.nx), 2], chunks: [1, 100, 2])
-        #expect(try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test")))
+        #expect(try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test")) != nil)
 
         let read = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: file)))).expectArray(of: Float.self).read()
         var keptChunks = 0
@@ -143,7 +146,7 @@ import Logging
         let source = try fixture(values, dimensions: [UInt64(cells), UInt64(time)], chunks: [UInt64(chunkCells), 3])
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
-        #expect(try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test")))
+        #expect(try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test")) != nil)
 
         let reader = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: file))))
         let array = try reader.expectArray(of: Float.self)
@@ -176,7 +179,7 @@ import Logging
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         let flat = try fixture([Float](repeating: 1, count: 12 * 15), dimensions: [12, 15], chunks: [4, 5])
-        #expect(try await keep.write(remote: flat, to: file, modificationTime: nil, logger: Logger(label: "test")) == false)
+        #expect(try await keep.write(remote: flat, to: file, modificationTime: nil, logger: Logger(label: "test")) == nil)
         #expect(FileManager.default.fileExists(atPath: file) == false)
     }
 }

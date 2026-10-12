@@ -278,7 +278,8 @@ struct SyncCommand: AsyncCommand {
                             if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
                                 /// The API key travels in the URL query like a whole download, because the server reads it only from there
                                 let remote = try await OmHttpReaderBackend(context: endpoint, object: download.name + (request.url.query.map { "?\($0)" } ?? ""), client: rangeClient ?? .shared)
-                                if try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
+                                if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
+                                    await progress.add(fetched)
                                     break
                                 }
                             }
