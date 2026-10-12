@@ -41,20 +41,15 @@ struct GenericReaderMixerByVariableName<Variable: GenericVariable>: GenericReade
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
-        var fallback = ReaderRunFallback(time: time)
         for reader in reader {
-            _ = try await fallback.read {
-                try await reader.prefetchData(mixed: variable.rawValue, time: time) ? true : nil
-            }
+            _ = try await reader.prefetchData(mixed: variable.rawValue, time: time)
         }
-        try fallback.finish()
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         var result: DataAndUnit?
-        var fallback = ReaderRunFallback(time: time)
         for reader in reader.reversed() {
-            guard let value = try await fallback.read({ try await reader.get(mixed: variable.rawValue, time: time) }) else {
+            guard let value = try await reader.get(mixed: variable.rawValue, time: time) else {
                 continue
             }
             result = result?.combined(withLowerPriority: value) ?? value
@@ -62,7 +57,6 @@ struct GenericReaderMixerByVariableName<Variable: GenericVariable>: GenericReade
                 break
             }
         }
-        try fallback.finish()
         return result ?? DataAndUnit(Array(repeating: .nan, count: time.time.count), variable.unit)
     }
 }
@@ -107,14 +101,9 @@ extension GenericReaderMixerRaw {
     }
 
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws {
-        var fallback = ReaderRunFallback(time: time)
         for reader in reader {
-            _ = try await fallback.read {
-                try await reader.prefetchData(variable: variable, time: time)
-                return true
-            }
+            try await reader.prefetchData(variable: variable, time: time)
         }
-        try fallback.finish()
     }
 
     func prefetchData(variables: [Reader.MixingVar], time: TimerangeDtAndSettings) async throws {
@@ -131,18 +120,14 @@ extension GenericReaderMixerRaw {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var result: DataAndUnit?
-        var fallback = ReaderRunFallback(time: time)
         // default case, just place new data in 1:1
         for r in reader.reversed() {
-            guard let d = try await fallback.read({ try await r.get(variable: variable, time: time) }) else {
-                continue
-            }
+            let d = try await r.get(variable: variable, time: time)
             result = result?.combined(withLowerPriority: d) ?? d
             if result?.data.containsNaN() == false {
                 break
             }
         }
-        try fallback.finish()
         guard let result else {
             fatalError("Expected data in mixer for variable \(variable)")
         }

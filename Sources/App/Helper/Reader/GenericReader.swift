@@ -53,9 +53,6 @@ struct TimerangeDtAndSettings: Hashable  {
     let ensembleMemberLevel: Int
 
     let previousDay: Int
-    
-    /// If a single run is selected
-    let run: IsoDateTime?
 
     var dtSeconds: Int {
         time.dtSeconds
@@ -66,21 +63,21 @@ struct TimerangeDtAndSettings: Hashable  {
     }
 
     func with(start: Timestamp) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, run: run)
+        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 
     func with(time: TimerangeDt? = nil, ensembleMember: Int? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, run: run)
+        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, run: run)
+        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 }
 
 extension TimerangeDt {
-    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil, run: IsoDateTime? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0, run: run)
+    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0)
     }
 }
 
@@ -119,6 +116,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     
     let httpClient: HTTPClient?
 
+    /// Selected and validated at initialization; shared by every read from this reader.
+    let run: IsoDateTime?
+
     var modelDtSeconds: Int {
         return domain.dtSeconds
     }
@@ -127,6 +127,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     // TODO: Use decoded cached elevations for icon native domains in both initializers 
     // and getStatic(.elevation) to avoid redundant filesystem-cache access and OM reads.
     public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws {
+        try await options.validateRun(domain: domain.domainRegistry)
         self.domain = domain
         self.position = position
         if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger) {
@@ -142,10 +143,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.omFileSplitter = OmFileSplitter(domain)
         self.logger = options.logger
         self.httpClient = options.httpClient
+        self.run = options.run
     }
 
-    /// Return nil if the coordinates are outside the grid.
+    /// Return nil outside the grid. A missing requested run throws during initialization.
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        try await options.validateRun(domain: domain.domainRegistry)
         // check if coordinates are in domain, otherwise return nil
         let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
         guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {
@@ -157,6 +160,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
         self.logger = options.logger
         self.httpClient = options.httpClient
+        self.run = options.run
 
         omFileSplitter = OmFileSplitter(domain)
 
@@ -166,7 +170,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
         if time.dtSeconds == domain.dtSeconds {
-            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient, run: run)
             return
         }
 
@@ -175,12 +179,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
             time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
 
-        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), logger: logger, httpClient: httpClient)
+        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), logger: logger, httpClient: httpClient, run: run)
     }
 
     /// Read
     private func readRaw(variable: Variable, time: TimerangeDtAndSettings) async throws -> [Float] {
-        return try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+        return try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient, run: run)
     }
     
     /// Scale and apply elevation correction. Must be done after temporal interpolation to preserve scaling

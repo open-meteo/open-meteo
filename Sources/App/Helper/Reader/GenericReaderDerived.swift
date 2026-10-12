@@ -27,7 +27,17 @@ struct GenericReaderOptions {
     
     let httpClient: HTTPClient?
 
-    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?) throws {
+    /// Run selected before reader construction (including an automatically resolved latest run).
+    var run: IsoDateTime?
+
+    func validateRun(domain: DomainRegistry) async throws {
+        guard let run else { return }
+        guard try await domain.getFullRunMeta(client: httpClient, logger: logger, run: run.toTimestamp()) != nil else {
+            throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
+        }
+    }
+
+    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) throws {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
         if let tilt {
             guard tilt.isNaN || (tilt >= 0 && tilt <= 90) else {
@@ -44,6 +54,7 @@ struct GenericReaderOptions {
         self.azimuth = azimuth ?? 0
         self.logger = logger
         self.httpClient = httpClient
+        self.run = run
     }
 }
 
