@@ -1937,19 +1937,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let readers = forecast.readers + supplemental.readers
                 return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
             }
-            guard let icon = try await makeReader(domain: .icon, native: .iconNative) else {
-                throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-            }
+
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let gfsForecast = try await DomainReaderMapping(
-                primary: [
-                    .mixedBeforeDerivation(Self.gfsGlobalDerivationGroup)
-                ],
-                prefetchAllReaders: true, requirePrimaryCoverage: true
-            )
-                .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                    primary: [
+                        .mixedBeforeDerivation(Self.gfsGlobalDerivationGroup)
+                    ],
+                    prefetchAllReaders: true, requirePrimaryCoverage: true
+                ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+
+            // do not fail a request because people did not synchronize icon-native grid.bin file in the best_match branch
+            let icon = try? await makeReader(domain: .icon, native: .iconNative)
+                
             guard
                 let gfs = gfsForecast?.hourly,
                 let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
@@ -1960,8 +1961,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For Netherlands and Belgium use KNMI, IFS and ICON
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
-                let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native)
+                let iconEu = try? await makeReader(domain: .iconEu, native: .iconEuNative)
+                let iconD2 = try? await makeReader(domain: .iconD2, native: .iconD2Native)
                 return MultiDomains.hourlyToMultiSameType([
                     iconProbabilities.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
@@ -1993,12 +1994,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             // If Icon-d2 is available, use icon domains
-            if let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native),
-               let iconD2_15min = try await makeReader(domain: .iconD2_15min, native: .iconD2Native15min) {
-                // TODO: check how out of projection areas are handled
-                guard let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative) else {
-                    throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-                }
+            if let iconD2 = try? await makeReader(domain: .iconD2, native: .iconD2Native),
+               let iconD2_15min = try? await makeReader(domain: .iconD2_15min, native: .iconD2Native15min) {
+                let iconEu = try? await makeReader(domain: .iconEu, native: .iconEuNative)
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities?.asOptionalReader,
                     iconProbabilities.asOptionalReader,
@@ -2043,7 +2041,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For Northern Europe and Iceland use DMI Harmonie
             if (44..<66).contains(lat), let dmiEurope = try await DmiDomain.harmonie_arome_europe.makeDerivedHourly(variableType: DmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
+                let iconEu = try? await makeReader(domain: .iconEu, native: .iconEuNative)
                 return MultiDomains.hourlyToMultiSameType([
                     iconProbabilities.asOptionalReader,
                     gfsProbabilites?.asOptionalReader,
@@ -2092,7 +2090,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
 
             // Remaining eastern europe
-            if let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative) {
+            if let iconEu = try? await makeReader(domain: .iconEu, native: .iconEuNative) {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites?.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
