@@ -127,7 +127,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     // TODO: Use decoded cached elevations for icon native domains in both initializers 
     // and getStatic(.elevation) to avoid redundant filesystem-cache access and OM reads.
     public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws {
-        try await options.validateRun(domain: domain.domainRegistry)
+        try await options.validateRun(domain: domain)
         self.domain = domain
         self.position = position
         if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger) {
@@ -148,7 +148,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Return nil outside the grid. A missing requested run throws during initialization.
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        try await options.validateRun(domain: domain.domainRegistry)
+        try await options.validateRun(domain: domain)
         // check if coordinates are in domain, otherwise return nil
         let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
         guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {

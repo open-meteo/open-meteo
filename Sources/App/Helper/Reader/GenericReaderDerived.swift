@@ -30,10 +30,10 @@ struct GenericReaderOptions {
     /// Run selected before reader construction (including an automatically resolved latest run).
     var run: IsoDateTime?
 
-    func validateRun(domain: DomainRegistry) async throws {
+    func validateRun(domain: any GenericDomain) async throws {
         guard let run else { return }
-        guard try await domain.getFullRunMeta(client: httpClient, logger: logger, run: run.toTimestamp()) != nil else {
-            throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
+        guard try await domain.isRunAvailable(run: run.toTimestamp(), client: httpClient, logger: logger) else {
+            throw ForecastApiError.modelRunUnavailable(model: domain.domainRegistry, run: run.toTimestamp())
         }
     }
 

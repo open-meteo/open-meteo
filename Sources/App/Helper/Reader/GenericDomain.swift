@@ -38,9 +38,16 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
+
+    /// Whether metadata exists for the requested run. Invalid metadata must throw.
+    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool
 }
 
 extension GenericDomain {
+    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool {
+        try await domainRegistry.getFullRunMeta(client: client, logger: logger, run: run) != nil
+    }
+
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }
