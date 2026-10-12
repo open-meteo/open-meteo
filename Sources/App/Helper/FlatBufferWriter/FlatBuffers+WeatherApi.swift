@@ -992,11 +992,11 @@ extension MultiDomains {
             return .iconSeamless
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
-        case .dwd_icon_global_native:
+        case .dwd_icon_global_native, .dwd_icon_global_native_model_level:
             return .iconGlobal // TODO: Add to SDK
         case .icon_eu, .dwd_icon_eu:
             return .iconEu
-        case .dwd_icon_eu_native:
+        case .dwd_icon_eu_native, .dwd_icon_eu_native_model_level:
             return .iconEu // TODO: Add to SDK
         case .dwd_icon_global_eps_native:
             return .iconGlobal // TODO: Add to SDK
@@ -1006,7 +1006,7 @@ extension MultiDomains {
             return .iconD2 // TODO: Add to SDK
         case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
-        case .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
+        case .dwd_icon_d2_native, .dwd_icon_d2_native_15min, .dwd_icon_d2_native_model_level:
             return .iconD2 // TODO: Add to SDK
         case .ecmwf_ifs04:
             return .ecmwfIfs04

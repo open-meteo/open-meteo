@@ -159,6 +159,9 @@ struct DownloadIconCommand: AsyncCommand {
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
             let writer = OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: outputs.ensembleMean)
+            let modelLevelWriter = outputs.modelLevel.map {
+                OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger)
+            }
             let remappedWriter = remappedDomain.map {
                 OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
             }
@@ -168,7 +171,12 @@ struct DownloadIconCommand: AsyncCommand {
             }
 
             @Sendable func write(member: Int, variable: any GenericVariable, data: [Float]) async throws {
-                try await writer.write(member: member, variable: variable, data: data)
+                if let modelLevelWriter,
+                   IconModelLevelVariable(rawValue: variable.omFileName.file) != nil {
+                    try await modelLevelWriter.write(member: member, variable: variable, data: data)
+                } else {
+                    try await writer.write(member: member, variable: variable, data: data)
+                }
                 if let remappedWriter {
                     guard let remapper else {
                         preconditionFailure("Remapped ICON writer requires a grid mapping")
@@ -420,6 +428,7 @@ struct DownloadIconCommand: AsyncCommand {
             let completed = i == timestamps.count - 1
             let validTimes = Array(timestamps[0...i])
             let handles = try await writer.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                + (modelLevelWriter?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
                 + (remappedWriter?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
                 + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
             
@@ -434,8 +443,9 @@ struct DownloadIconCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
-        let nativeDomain = IconNativeDomains(rawValue: signature.domain)
+        let requestedNativeDomain = IconNativeDomains(rawValue: signature.domain)
             ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
+        let nativeDomain = requestedNativeDomain?.modelLevelParent ?? requestedNativeDomain
         let domain = try nativeDomain?.sourceDomain ?? IconDomains.load(rawValue: signature.domain)
         guard !signature.skipRegridding || nativeDomain == .iconNative else {
             throw Abort(.badRequest, reason: "--skip-regridding is only supported for icon or icon-native.")
@@ -454,7 +464,11 @@ struct DownloadIconCommand: AsyncCommand {
             fatalError("Parameter 'onlyVariables' and 'groups' must not be used simultaneously")
         }
 
-        let group = try VariableGroup.load(rawValueOptional: signature.group) ?? .all
+        let group = try VariableGroup.load(rawValueOptional: signature.group)
+            ?? (requestedNativeDomain?.modelLevelParent != nil ? .modelLevel : .all)
+        if requestedNativeDomain?.modelLevelParent != nil && (group != .modelLevel || signature.onlyVariables != nil) {
+            throw Abort(.badRequest, reason: "Model-level domains only support --group modelLevel. Use the parent domain for --only-variables.")
+        }
 
         let onlyVariables: [any IconVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
@@ -559,6 +573,7 @@ struct IconDownloadDomains: Sendable {
     let primary: any GenericDomain
     let remapped: (any GenericDomain)?
     let ensembleMean: (any GenericDomain)?
+    let modelLevel: (any GenericDomain)?
     let fifteenMinute: (any GenericDomain)?
 
     let nativeDomain: IconNativeDomains?
@@ -573,6 +588,7 @@ struct IconDownloadDomains: Sendable {
         self.primary = domain
         self.remapped = nil
         self.ensembleMean = domain.ensembleMeanDomain
+        self.modelLevel = nil
         self.fifteenMinute = domain == .iconD2 ? IconDomains.iconD2_15min : nil
     }
 
@@ -581,6 +597,7 @@ struct IconDownloadDomains: Sendable {
         self.nativeDomain = domain
         let grid = try await domain.nativeGridFile.load()
         self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
+        self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
         self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
         self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
         self.fifteenMinute = domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
