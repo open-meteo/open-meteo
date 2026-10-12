@@ -135,6 +135,43 @@ import Logging
         #expect(keptChunks > 7 && keptChunks < 40)
     }
 
+    /// Legacy files store `[ny * nx, time]` as a flat 2D array. The mask keeps the chunks of the cells inside the box and keeps the layout
+    @Test func legacyFlatFileKeepsLayoutAndMasksChunks() async throws {
+        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
+        let cells = grid.ny * grid.nx, time = 5, chunkCells = 7
+        let values = (0 ..< cells * time).map { Float($0 % 400) / 20 }
+        let source = try fixture(values, dimensions: [UInt64(cells), UInt64(time)], chunks: [UInt64(chunkCells), 3])
+        let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        #expect(try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test")))
+
+        let reader = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: file))))
+        let array = try reader.expectArray(of: Float.self)
+        #expect(array.getDimensions() == [UInt64(cells), UInt64(time)])
+        #expect(array.getChunkDimensions() == [UInt64(chunkCells), 3])
+        #expect(array.compression == .pfor_delta2d_int16)
+        #expect(array.scaleFactor == 20 && array.addOffset == 0)
+        #expect(try await reader.getChild(name: "time_start")?.readScalar() == 1_700_000_000)
+
+        /// Rows 3..<9 and columns 5..<11 as flat cells; a chunk is kept if any of its cells is inside
+        let flat = keep.flattened()
+        let read = try await array.read()
+        var keptChunks = 0
+        for chunk in 0 ..< (cells + chunkCells - 1) / chunkCells {
+            let range = chunk * chunkCells ..< min(cells, (chunk + 1) * chunkCells)
+            let kept = range.contains { y in (3 ..< 9).contains(y / grid.nx) && (5 ..< 11).contains(y % grid.nx) }
+            #expect(flat.keeps(rows: 0 ..< 1, columns: range) == kept)
+            keptChunks += kept ? 1 : 0
+            for cell in range {
+                for t in 0 ..< time {
+                    let same: Bool = kept ? read[cell * time + t].bitPattern == values[cell * time + t].bitPattern : read[cell * time + t].isNaN
+                    #expect(same)
+                }
+            }
+        }
+        #expect(keptChunks > 0 && keptChunks < (cells + chunkCells - 1) / chunkCells)
+    }
+
     @Test func otherLayoutsAreNotWritten() async throws {
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"

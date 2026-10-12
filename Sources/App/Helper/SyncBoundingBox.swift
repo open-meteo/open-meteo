@@ -113,6 +113,29 @@ struct SyncBoundingBox: Sendable {
         self.cells = cells
     }
 
+    private init(ny: Int, nx: Int, rows: Range<Int>, columns: Range<Int>, cells: [Bool]?) {
+        self.ny = ny
+        self.nx = nx
+        self.rows = rows
+        self.columns = columns
+        self.cells = cells
+    }
+
+    /// The same cells as a grid of one row, like a reduced Gaussian grid: legacy files store `[ny * nx, time]`, so a flat cell index is the position along that row
+    func flattened() -> SyncBoundingBox {
+        var cells = self.cells ?? [Bool](repeating: false, count: ny * nx)
+        if self.cells == nil {
+            for y in rows {
+                for x in columns {
+                    cells[y * nx + x] = true
+                }
+            }
+        }
+        let first = cells.firstIndex(of: true), last = cells.lastIndex(of: true)
+        let columns: Range<Int> = first.map { $0 ..< last! + 1 } ?? 0 ..< 0
+        return SyncBoundingBox(ny: 1, nx: ny * nx, rows: columns.isEmpty ? 0 ..< 0 : 0 ..< 1, columns: columns, cells: cells)
+    }
+
     /// True if a kept cell lies in these rows and columns
     func keeps(rows: Range<Int>, columns: Range<Int>) -> Bool {
         let rows = rows.clamped(to: self.rows), columns = columns.clamped(to: self.columns)
@@ -123,17 +146,23 @@ struct SyncBoundingBox: Sendable {
     }
 
     /// Write `remote` to `file` with every chunk without a kept cell as NaN. Kept chunks are decoded and encoded again with the same settings.
-    /// Returns false and writes nothing if the file is not a 3D float array `[ny, nx, time]` on this grid with scalar attributes only.
+    /// Legacy files store a flat 2D array `[ny * nx, time]`; they are masked the same way, as a grid of one row, and keep their 2D layout.
+    /// Returns false and writes nothing if the file is not a float array of one of these two layouts on this grid with scalar attributes only.
     func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, bufferValues: Int = Self.bufferValues) async throws -> Bool {
         let reader = try await OmFileReader(fn: remote)
         /// Gaps up to 16 KiB are read along. A larger gap would join the chunk rows of a narrow box into whole rows of the grid
         let array = reader.asArray(of: Float.self, io_size_max: 2 * 1024 * 1024, io_size_merge: 16 * 1024)
         let dims = array?.getDimensions().map(Int.init) ?? []
-        guard let array, dims.count == 3, dims[0] == ny, dims[1] == nx else {
-            logger.info("Not a float array [\(ny), \(nx), time], copying whole: \(file)")
+        let flat = dims.count == 2 && dims[0] == ny * nx
+        guard let array, flat || (dims.count == 3 && dims[0] == ny && dims[1] == nx) else {
+            logger.info("Not a float array on the model grid, dims \(dims), type \(reader.dataType), copying whole: \(file)")
             return false
         }
         let chunks = array.getChunkDimensions().map(Int.init)
+        /// Planning works on `[rows, columns, time]` for both layouts
+        let plan = flat ? flattened() : self
+        let size = flat ? [1, dims[0], dims[1]] : dims
+        let tile = flat ? [1, chunks[0], chunks[1]] : chunks
         var attributes = [OmFileReader<Backend>]()
         for i in 0 ..< reader.numberOfChildren {
             guard let child = try await reader.getChild(i), child.numberOfChildren == 0,
@@ -143,15 +172,15 @@ struct SyncBoundingBox: Sendable {
             }
             attributes.append(child)
         }
-        let nChunks: [Int] = (0 ..< 3).map { (dims[$0] + chunks[$0] - 1) / chunks[$0] }
+        let nChunks: [Int] = (0 ..< 3).map { (size[$0] + tile[$0] - 1) / tile[$0] }
         var kept = [Bool]()
         /// Chunk columns from the first to the last kept chunk of each chunk row
         var spans = [Range<Int>]()
         for cy in 0 ..< nChunks[0] {
-            let rows: Range<Int> = cy * chunks[0] ..< (cy + 1) * chunks[0]
+            let rows: Range<Int> = cy * tile[0] ..< (cy + 1) * tile[0]
             var first = nChunks[1], last = -1
             for cx in 0 ..< nChunks[1] {
-                let keep = keeps(rows: rows, columns: cx * chunks[1] ..< (cx + 1) * chunks[1])
+                let keep = plan.keeps(rows: rows, columns: cx * tile[1] ..< (cx + 1) * tile[1])
                 kept.append(keep)
                 if keep {
                     first = min(first, cx)
@@ -161,7 +190,7 @@ struct SyncBoundingBox: Sendable {
             spans.append(last < 0 ? 0 ..< 0 : first ..< last + 1)
         }
         /// A read covers some kept chunks of one chunk row, or the kept chunk columns of up to 4 chunk rows. Chunks in between that are not kept are read too
-        let columnValues: Int = chunks[0] * chunks[1] * dims[2]
+        let columnValues: Int = tile[0] * tile[1] * size[2]
         let chunksPerRead: Int = max(1, min(4 * nChunks[1], bufferValues / columnValues))
         /// Chunk rows and columns of each read, in the order the chunks are written: a run of kept chunks in one row,
         /// or the kept chunks of following rows too while a row holds one run and all fit in one read
@@ -196,14 +225,20 @@ struct SyncBoundingBox: Sendable {
         var nextRead = 0, valuesInFlight = 0
         func takeRead() async throws -> [Float] {
             while pending.count < Self.readsInFlight, nextRead < reads.count {
-                let y: Range<Int> = reads[nextRead].rows.lowerBound * chunks[0] ..< min(reads[nextRead].rows.upperBound * chunks[0], ny)
-                let x: Range<Int> = reads[nextRead].columns.lowerBound * chunks[1] ..< min(reads[nextRead].columns.upperBound * chunks[1], nx)
-                let values: Int = y.count * x.count * dims[2]
+                let y: Range<Int> = reads[nextRead].rows.lowerBound * tile[0] ..< min(reads[nextRead].rows.upperBound * tile[0], plan.ny)
+                let x: Range<Int> = reads[nextRead].columns.lowerBound * tile[1] ..< min(reads[nextRead].columns.upperBound * tile[1], plan.nx)
+                let values: Int = y.count * x.count * size[2]
                 guard pending.isEmpty || valuesInFlight + values <= Self.valuesInFlight else {
                     break
                 }
-                let range: InlineArray<3, Range<UInt64>> = [UInt64(y.lowerBound) ..< UInt64(y.upperBound), UInt64(x.lowerBound) ..< UInt64(x.upperBound), 0 ..< UInt64(dims[2])]
-                pending.append((Task { try await array.readConcurrent(range: range) }, values))
+                let xRange: Range<UInt64> = UInt64(x.lowerBound) ..< UInt64(x.upperBound), time: Range<UInt64> = 0 ..< UInt64(size[2])
+                if flat {
+                    let range: InlineArray<2, Range<UInt64>> = [xRange, time]
+                    pending.append((Task { try await array.readConcurrent(range: range) }, values))
+                } else {
+                    let range: InlineArray<3, Range<UInt64>> = [UInt64(y.lowerBound) ..< UInt64(y.upperBound), xRange, time]
+                    pending.append((Task { try await array.readConcurrent(range: range) }, values))
+                }
                 valuesInFlight += values
                 nextRead += 1
             }
@@ -231,9 +266,9 @@ struct SyncBoundingBox: Sendable {
                         let lastTime: Int = ct == nChunks[2] - 1 ? 1 : 0
                         let shape = lastRow + lastColumn + lastTime
                         if nanChunks[shape] == nil {
-                            let height: Int = min(chunks[0], dims[0] - cy * chunks[0])
-                            let width: Int = min(chunks[1], dims[1] - cx * chunks[1])
-                            let length: Int = min(chunks[2], dims[2] - ct * chunks[2])
+                            let height: Int = min(tile[0], size[0] - cy * tile[0])
+                            let width: Int = min(tile[1], size[1] - cx * tile[1])
+                            let length: Int = min(tile[2], size[2] - ct * tile[2])
                             let count = height * width * length
                             nanChunks[shape] = try out.compressChunk(chunkIndex: (cy * nChunks[1] + cx) * nChunks[2] + ct, array: [Float](repeating: .nan, count: count))
                         }
@@ -246,15 +281,15 @@ struct SyncBoundingBox: Sendable {
                     read = reads[nextRead - pending.count]
                     values = try await takeRead()
                 }
-                let y: Range<Int> = read.rows.lowerBound * chunks[0] ..< min(read.rows.upperBound * chunks[0], ny)
-                let x: Range<Int> = read.columns.lowerBound * chunks[1] ..< min(read.columns.upperBound * chunks[1], nx)
-                let height: Int = min(chunks[0], ny - cy * chunks[0])
-                let width: Int = min(chunks[1], nx - cx * chunks[1]) * dims[2]
+                let y: Range<Int> = read.rows.lowerBound * tile[0] ..< min(read.rows.upperBound * tile[0], plan.ny)
+                let x: Range<Int> = read.columns.lowerBound * tile[1] ..< min(read.columns.upperBound * tile[1], plan.nx)
+                let height: Int = min(tile[0], plan.ny - cy * tile[0])
+                let width: Int = min(tile[1], plan.nx - cx * tile[1]) * size[2]
                 for row in 0 ..< height {
-                    let start: Int = ((cy * chunks[0] + row - y.lowerBound) * x.count + cx * chunks[1] - x.lowerBound) * dims[2]
+                    let start: Int = ((cy * tile[0] + row - y.lowerBound) * x.count + cx * tile[1] - x.lowerBound) * size[2]
                     values.withUnsafeBufferPointer { column.baseAddress!.advanced(by: row * width).update(from: $0.baseAddress!.advanced(by: start), count: width) }
                 }
-                try out.writeData(pointer: UnsafeBufferPointer(start: column.baseAddress, count: height * width), arrayDimensions: [UInt64(height), UInt64(width / dims[2]), UInt64(dims[2])])
+                try out.writeData(pointer: UnsafeBufferPointer(start: column.baseAddress, count: height * width), arrayDimensions: flat ? [UInt64(width / size[2]), UInt64(size[2])] : [UInt64(height), UInt64(width / size[2]), UInt64(size[2])])
             }
         }
         let children = try attributes.map { try $0.copyScalar(to: writer) }
