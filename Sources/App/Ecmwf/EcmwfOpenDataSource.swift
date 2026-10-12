@@ -29,9 +29,7 @@ enum EcmwfOpenDataSource: String, CaseIterable {
     }
 
     static func supportsMultipleRanges(url: String) -> Bool {
-        let host = URLComponents(string: url)?.host ?? ""
-        return !host.hasSuffix(".amazonaws.com") && !host.hasSuffix(".blob.core.windows.net")
-            && host != "storage.googleapis.com" && !host.hasSuffix(".storage.googleapis.com")
+        return URLComponents(string: url)?.host?.lowercased() == "data.ecmwf.int"
     }
 
     /// Resolve source-specific authentication and capabilities before handing off to the downloader.

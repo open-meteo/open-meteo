@@ -152,7 +152,7 @@ Select an [ECMWF Open Data cloud mirror](https://www.ecmwf.int/en/forecasts/data
 <exe> download-ecmwf --domain aifs025_ensemble --source google --run 00 --concurrent 4
 ```
 
-Use `--server https://example.com/forecasts/` for a custom root URL instead of `--source`. Direct URLs to the public ECMWF Azure container also obtain tokens automatically.
+Use `--server https://example.com/forecasts/` for a custom root URL instead of `--source`. Only `data.ecmwf.int` uses multiple ranges per request; all other servers use separate range requests. Direct URLs to the public ECMWF Azure container also obtain tokens automatically.
 
 
 ### ERA5
