@@ -52,11 +52,11 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     let reader: Reader
     
     /// Use model-provided min/max fields when available. Disabled for mixed readers because these fields may come from a different model than the hourly temperature.
-    let useModelProvidedMinMax: Bool
+    let allowMinMaxTwoAggregations: Bool
     
-    init(reader: Reader, useModelProvidedMinMax: Bool) {
+    init(reader: Reader, allowMinMaxTwoAggregations: Bool) {
         self.reader = reader
-        self.useModelProvidedMinMax = useModelProvidedMinMax
+        self.allowMinMaxTwoAggregations = allowMinMaxTwoAggregations
     }
     
     var modelLat: Float {
@@ -109,7 +109,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             }
             return DataAndUnit(data.data.mean(by: stepsModel), data.unit)
         case .minTwo(let variable, let b):
-            if useModelProvidedMinMax, let data = try await reader.get(variable: variable, time: timeModel) {
+            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeModel) {
                 return DataAndUnit(data.data.min(by: stepsModel), data.unit)
             }
             guard let data = try await reader.get(variable: b, time: time1h) else {
@@ -117,7 +117,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             }
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .maxTwo(let variable, let b):
-            if useModelProvidedMinMax, let data = try await reader.get(variable: variable, time: timeModel) {
+            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeModel) {
                 return DataAndUnit(data.data.max(by: stepsModel), data.unit)
             }
             guard let data = try await reader.get(variable: b, time: time1h) else {
