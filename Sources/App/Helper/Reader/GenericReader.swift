@@ -126,7 +126,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Initialise reader to read a single grid-point
     // TODO: Use decoded cached elevations for icon native domains in both initializers 
     // and getStatic(.elevation) to avoid redundant filesystem-cache access and OM reads.
-    public init(domain: Domain, position: Int, options: GenericReaderOptions) async throws {
+    public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws {
         self.domain = domain
         self.position = position
         if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger) {
@@ -136,7 +136,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         }
         // Grid-point requests use model terrain for elevation-dependent derived variables.
         self.targetElevation = self.modelElevation.numeric
-        let coords = options.remappedCoordinates ?? domain.grid.getCoordinates(gridpoint: position)
+        let coords = modelCoordinates ?? domain.grid.getCoordinates(gridpoint: position)
         self.modelLat = coords.latitude
         self.modelLon = coords.longitude
         self.omFileSplitter = OmFileSplitter(domain)
@@ -160,7 +160,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
         omFileSplitter = OmFileSplitter(domain)
 
-        (modelLat, modelLon) = options.remappedCoordinates ?? domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
+        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.

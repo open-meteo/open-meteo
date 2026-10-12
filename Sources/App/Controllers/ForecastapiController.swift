@@ -383,8 +383,7 @@ struct WeatherApiController {
                         var locationId = -1
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
-                            let coordinates = grid.getCoordinates(gridpoint: gridpoint)
-                            let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options.with(remappedCoordinates: coordinates))
+                            let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options)
                             let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
@@ -399,8 +398,7 @@ struct WeatherApiController {
                         var locationId = -1
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
-                            let coordinates = grid.getCoordinates(gridpoint: gridpoint)
-                            let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options.with(remappedCoordinates: coordinates))
+                            let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options)
                             let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
@@ -1245,11 +1243,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
 
         static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [(any GenericDomain, any GenericVariable.Type)], allowMinMaxTwoAggregations: Bool, gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
-            let coordinate = options.remappedCoordinates ?? outputDomain.grid.getCoordinates(gridpoint: gridpoint)
+            let coordinate = outputDomain.grid.getCoordinates(gridpoint: gridpoint)
             let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { domain, variable in
                 let position = domain.domainRegistry == outputDomain.domainRegistry ? gridpoint : domain.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
                 guard let position else { return nil }
-                return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, options: options).hourly
+                return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, modelCoordinates: coordinate, options: options).hourly
             }
             // Keep an empty reader so an unmapped output cell still produces null forecast columns.
             let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)

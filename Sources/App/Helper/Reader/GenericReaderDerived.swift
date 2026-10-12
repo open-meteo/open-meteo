@@ -26,14 +26,6 @@ struct GenericReaderOptions {
     let logger: Logger
     
     let httpClient: HTTPClient?
-    /// Override reader model coordinates with the output cell after nearest-neighbour remapping.
-    var remappedCoordinates: (latitude: Float, longitude: Float)? = nil
-
-    func with(remappedCoordinates: (latitude: Float, longitude: Float)) -> Self {
-        var options = self
-        options.remappedCoordinates = remappedCoordinates
-        return options
-    }
 
     public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?) throws {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
