@@ -1242,18 +1242,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
         }
 
-        static func getBoundingBoxReaders(outputDomain: any GenericDomain, sources: [(any GenericDomain, any GenericVariable.Type)], allowMinMaxTwoAggregations: Bool, gridpoint: Int, options: GenericReaderOptions) async throws -> ForecastReaderResult {
-            let coordinate = outputDomain.grid.getCoordinates(gridpoint: gridpoint)
-            let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await sources.asyncCompactMap { domain, variable in
-                let position = domain.domainRegistry == outputDomain.domainRegistry ? gridpoint : domain.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
-                guard let position else { return nil }
-                return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, modelCoordinates: coordinate, options: options).hourly
-            }
-            // Keep an empty reader so an unmapped output cell still produces null forecast columns.
-            let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
-            return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: allowMinMaxTwoAggregations), nil, nil)
-        }
-
     }
     
     /// If true, use domain from `getDomainAndVariable().singleDomain` to resolve the latest run.
@@ -2260,7 +2248,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         if let mapping {
             switch mapping {
             case .multipleWithBoundingBox(_, let boundingBox, let allowMinMaxTwoAggregations):
-                return try await DomainReaderMapping.getBoundingBoxReaders(outputDomain: boundingBox.domain, sources: boundingBox.sources, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations, gridpoint: gridpoint, options: options)
+                let coordinate = boundingBox.domain.grid.getCoordinates(gridpoint: gridpoint)
+                let readers: [any GenericReaderOptionalProtocol<ForecastVariable>] = try await boundingBox.sources.asyncCompactMap { domain, variable in
+                    let position = domain.domainRegistry == boundingBox.domain.domainRegistry ? gridpoint : domain.grid.findPoint(lat: coordinate.latitude, lon: coordinate.longitude)
+                    guard let position else { return nil }
+                    return try await domain.makeGenericHourlyDaily(variableType: variable, position: position, modelCoordinates: coordinate, options: options).hourly
+                }
+                // Keep an empty reader so an unmapped output cell still produces null forecast columns.
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: allowMinMaxTwoAggregations), nil, nil)
             case .single(let domain, let variable),
                  .singleWithPrecipitationProbability(let domain, let variable, _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
