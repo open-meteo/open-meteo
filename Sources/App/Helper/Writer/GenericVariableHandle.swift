@@ -491,9 +491,16 @@ actor GribDeaverager {
     
     /// Returns false if step should be skipped
     func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, array2d: inout Array2D) async -> Bool {
+        if stepType != "accum" && stepType != "avg" { return true }
+        guard let (start, end) = stepRange.splitTo2Integer() else { return false }
+        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, startStep: start, currentStep: end, array2d: &array2d)
+    }
+
+    /// Numeric intervals must use the same unit for every step of a variable/member stream.
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, startStep: Int, currentStep: Int, array2d: inout Array2D) async -> Bool {
         // Deaccumulate precipitation
         if stepType == "accum" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
+            guard startStep != currentStep else {
                 return false
             }
             // Store data for next timestep
@@ -508,7 +515,7 @@ actor GribDeaverager {
 
         // Deaverage data
         if stepType == "avg" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
+            guard startStep != currentStep else {
                 return false
             }
             // Store data for next timestep

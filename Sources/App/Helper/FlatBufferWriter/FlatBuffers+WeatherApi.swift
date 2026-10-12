@@ -996,6 +996,14 @@ extension MultiDomains {
             return .iconGlobal // TODO: Add to SDK
         case .icon_eu, .dwd_icon_eu:
             return .iconEu
+        case .dwd_icon_eu_native:
+            return .iconEu // TODO: Add to SDK
+        case .dwd_icon_global_eps_native:
+            return .iconGlobal // TODO: Add to SDK
+        case .dwd_icon_eu_eps_native:
+            return .iconEu // TODO: Add to SDK
+        case .dwd_icon_d2_eps_native:
+            return .iconD2 // TODO: Add to SDK
         case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
         case .dwd_icon_d2_native, .dwd_icon_d2_native_15min:
