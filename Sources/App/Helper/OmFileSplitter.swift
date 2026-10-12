@@ -76,7 +76,7 @@ struct OmFileSplitter {
     }
 
     /// Prefetch all required data into memory
-    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?) async throws {
+    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws {
         // TODO: maybe we can keep the file handles better in scope
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
@@ -84,10 +84,7 @@ struct OmFileSplitter {
         var start = indexTime.lowerBound
         
         /// Read individual runs from dedicated database
-        if let run = time.run {
-            guard try await domain.getFullRunMeta(client: httpClient, logger: logger, run: run.toTimestamp()) != nil else {
-                throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
-            }
+        if let run {
             let file = OmFileType.run(domain: domain, variable: variable, run: run)
             try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
                 guard let timestamps = omFile.timestamps else {
@@ -175,12 +172,12 @@ struct OmFileSplitter {
         }
     }
 
-    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?) async throws -> Array2DFastTime {
-        let data = try await read(variable: variable, location: location, level: level, time: time, logger: logger, httpClient: httpClient)
+    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws -> Array2DFastTime {
+        let data = try await read(variable: variable, location: location, level: level, time: time, logger: logger, httpClient: httpClient, run: run)
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
 
-    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?) async throws -> [Float] {
+    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
@@ -190,10 +187,7 @@ struct OmFileSplitter {
         var out = [Float](repeating: .nan, count: nTime * location.count)
         
         /// Read individual runs from dedicated database
-        if let run = time.run {
-            guard try await domain.getFullRunMeta(client: httpClient, logger: logger, run: run.toTimestamp()) != nil else {
-                throw ForecastApiError.modelRunUnavailable(model: domain, run: run.toTimestamp())
-            }
+        if let run {
             let file = OmFileType.run(domain: domain, variable: variable.omFileName.file, run: run)
             try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
                 guard let timestamps = omFile.timestamps else {
