@@ -190,6 +190,9 @@ struct GemDownload: AsyncCommand {
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
+            /// Actual step length. Some domains switch to 3 or 6 hourly steps later in the forecast
+            let previousTimestamp = i == 0 ? nil : timestamps[i-1]
+            let dtSecondsOfStep = previousTimestamp.map { timestamp.timeIntervalSince1970 - $0.timeIntervalSince1970 } ?? domain.dtSeconds
             struct GemSurfaceVariableMember: Hashable {
                 let variable: GemSurfaceVariable
                 let member: Int
@@ -244,7 +247,7 @@ struct GemDownload: AsyncCommand {
                         }
                         
                         // Scaling before compression with scalefactor
-                        if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
+                        if let fma = variable.multiplyAdd(dtSeconds: dtSecondsOfStep) {
                             grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
 

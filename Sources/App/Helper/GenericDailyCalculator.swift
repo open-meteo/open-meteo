@@ -51,7 +51,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     typealias VariableOpt = DailyVariable
     let reader: Reader
     
-    /// Workaround to enable or disable `maxTwo` or `minTwo` aggregations. `best_match` does not (yet) provide a correct temperature_2m_max that matches all local domains. It may only come from one global model.
+    /// Use model-provided min/max fields when available. Disabled for mixed readers because these fields may come from a different model than the hourly temperature.
     let allowMinMaxTwoAggregations: Bool
     
     init(reader: Reader, allowMinMaxTwoAggregations: Bool) {
