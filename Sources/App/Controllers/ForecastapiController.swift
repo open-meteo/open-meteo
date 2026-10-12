@@ -385,7 +385,7 @@ struct WeatherApiController {
                             locationId += 1
                             let coordinates = grid.getCoordinates(gridpoint: gridpoint)
                             let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options.with(remappedCoordinates: coordinates))
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution, remappedCoordinates: coordinates)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     }
@@ -401,7 +401,7 @@ struct WeatherApiController {
                             locationId += 1
                             let coordinates = grid.getCoordinates(gridpoint: gridpoint)
                             let r = try await domain.getReaders(gridpoint: gridpoint, mapping: mapping, options: options.with(remappedCoordinates: coordinates))
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution, remappedCoordinates: coordinates)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     })
@@ -438,11 +438,11 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let readerMonthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     
     var latitude: Float {
-        remappedCoordinates?.latitude ?? readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
+        readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
     }
     
     var longitude: Float {
-        remappedCoordinates?.longitude ?? readerHourly?.modelLon ?? readerDaily?.modelLon ?? .nan
+        readerHourly?.modelLon ?? readerDaily?.modelLon ?? .nan
     }
     
     var elevation: Float? {
@@ -457,8 +457,6 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let timezone: TimezoneWithOffset
     let currentTime: Timestamp
     let temporalResolution: ApiTemporalResolution
-    /// Bounding-box output follows its declared grid while readers may use other source cells.
-    var remappedCoordinates: (latitude: Float, longitude: Float)? = nil
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         if let currentVariables, let readerHourly {
@@ -534,13 +532,13 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             if case .surface(let v) = v {
                 switch v.variable {
                 case .is_day:
-                    let isDay = Zensun.calculateIsDay(timeRange: currentTimeRange, lat: latitude, lon: longitude)
+                    let isDay = Zensun.calculateIsDay(timeRange: currentTimeRange, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
                     return .init(variable: variable, unit: .dimensionlessInteger, value: isDay.first ?? .nan)
                 case .terrestrial_radiation:
-                    let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: latitude, longitude: longitude, timerange: currentTimeRange)
+                    let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: currentTimeRange)
                     return .init(variable: variable, unit: .wattPerSquareMetre, value: solar.first ?? .nan)
                 case .terrestrial_radiation_instant:
-                    let solar = Zensun.extraTerrestrialRadiationInstant(latitude: latitude, longitude: longitude, timerange: currentTimeRange)
+                    let solar = Zensun.extraTerrestrialRadiationInstant(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: currentTimeRange)
                     return .init(variable: variable, unit: .wattPerSquareMetre, value: solar.first ?? .nan)
                 default:
                     break
@@ -568,13 +566,13 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             if case .surface(let v) = v {
                 switch v.variable {
                 case .is_day:
-                    let isDay = Zensun.calculateIsDay(timeRange: timeHourlyRead, lat: latitude, lon: longitude)
+                    let isDay = Zensun.calculateIsDay(timeRange: timeHourlyRead, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
                     return .init(variable: variable, unit: .dimensionlessInteger, variables: [ApiArray.float(isDay)])
                 case .terrestrial_radiation:
-                    let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: latitude, longitude: longitude, timerange: timeHourlyRead)
+                    let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: timeHourlyRead)
                     return .init(variable: variable, unit: .wattPerSquareMetre, variables: [ApiArray.float(solar)])
                 case .terrestrial_radiation_instant:
-                    let solar = Zensun.extraTerrestrialRadiationInstant(latitude: latitude, longitude: longitude, timerange: timeHourlyRead)
+                    let solar = Zensun.extraTerrestrialRadiationInstant(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: timeHourlyRead)
                     return .init(variable: variable, unit: .wattPerSquareMetre, variables: [ApiArray.float(solar)])
                 default:
                     break
@@ -613,7 +611,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             let members = allMembersForRiverDischarge ? 0..<51 : members
             if variable == .sunrise || variable == .sunset {
                 // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
-                let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: latitude, lon: longitude, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 riseSet = times
                 if variable == .sunset {
                     return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -623,7 +621,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             }
             if variable == .moonrise || variable == .moonset {
                 // only calculate moonrise/set once. Uses `dailyDisplay` (local midnight in UTC) like sunrise/set
-                let times = moonRiseSet ?? Moon.calculateMoonRiseSet(timeRange: time.dailyDisplay.range, lat: latitude, lon: longitude)
+                let times = moonRiseSet ?? Moon.calculateMoonRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon)
                 moonRiseSet = times
                 if variable == .moonset {
                     return ApiColumn(variable: .moonset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -636,7 +634,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiColumn(variable: .moon_phase, unit: .fraction, variables: [.float(phase)])
             }
             if variable == .daylight_duration {
-                let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: latitude)
+                let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerDaily.modelLat)
                 return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
             }
             var unit: SiUnit?
@@ -672,13 +670,13 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             if case .surface(let v) = v {
                 switch v.variable {
                 case .is_day:
-                    let isDay = Zensun.calculateIsDay(timeRange: time.minutely15, lat: latitude, lon: longitude)
+                    let isDay = Zensun.calculateIsDay(timeRange: time.minutely15, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
                     return .init(variable: variable, unit: .dimensionlessInteger, variables: [ApiArray.float(isDay)])
                 case .terrestrial_radiation:
-                    let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: latitude, longitude: longitude, timerange: time.minutely15)
+                    let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: time.minutely15)
                     return .init(variable: variable, unit: .wattPerSquareMetre, variables: [ApiArray.float(solar)])
                 case .terrestrial_radiation_instant:
-                    let solar = Zensun.extraTerrestrialRadiationInstant(latitude: latitude, longitude: longitude, timerange: time.minutely15)
+                    let solar = Zensun.extraTerrestrialRadiationInstant(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: time.minutely15)
                     return .init(variable: variable, unit: .wattPerSquareMetre, variables: [ApiArray.float(solar)])
                 default:
                     break

@@ -106,14 +106,11 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// The desired elevation. Used to correct temperature forecasts
     let targetElevation: Float
 
-    /// Latitude of the grid point
+    /// Latitude of the output cell, or the grid point when not remapped.
     let modelLat: Float
 
-    /// Longitude of the grid point
+    /// Longitude of the output cell, or the grid point when not remapped.
     let modelLon: Float
-
-    /// Output-cell coordinates for temporal interpolation after spatial remapping.
-    let remappedCoordinates: (latitude: Float, longitude: Float)?
 
     /// If set, use new data files
     let omFileSplitter: OmFileSplitter
@@ -139,13 +136,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         }
         // Grid-point requests use model terrain for elevation-dependent derived variables.
         self.targetElevation = self.modelElevation.numeric
-        let coords = domain.grid.getCoordinates(gridpoint: position)
+        let coords = options.remappedCoordinates ?? domain.grid.getCoordinates(gridpoint: position)
         self.modelLat = coords.latitude
         self.modelLon = coords.longitude
         self.omFileSplitter = OmFileSplitter(domain)
         self.logger = options.logger
         self.httpClient = options.httpClient
-        self.remappedCoordinates = options.remappedCoordinates
     }
 
     /// Return nil if the coordinates are outside the grid.
@@ -161,11 +157,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
         self.logger = options.logger
         self.httpClient = options.httpClient
-        self.remappedCoordinates = options.remappedCoordinates
 
         omFileSplitter = OmFileSplitter(domain)
 
-        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
+        (modelLat, modelLon) = options.remappedCoordinates ?? domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
@@ -222,8 +217,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         // Interpolate data
         let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
         let data = try await readRaw(variable: variable, time: time.with(time: timeLow))
-        let coordinates = remappedCoordinates ?? (latitude: modelLat, longitude: modelLon)
-        let interpolated = data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: coordinates.latitude, longitude: coordinates.longitude, scalefactor: variable.scalefactor)
+        let interpolated = data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
         return scale(data: interpolated, isElevationCorrectable: variable.isElevationCorrectable, unit: variable.unit)
     }
 

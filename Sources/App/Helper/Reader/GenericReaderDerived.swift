@@ -26,7 +26,7 @@ struct GenericReaderOptions {
     let logger: Logger
     
     let httpClient: HTTPClient?
-    /// Evaluate solar calculations at this cell after nearest-neighbour remapping.
+    /// Override reader model coordinates with the output cell after nearest-neighbour remapping.
     var remappedCoordinates: (latitude: Float, longitude: Float)? = nil
 
     func with(remappedCoordinates: (latitude: Float, longitude: Float)) -> Self {
