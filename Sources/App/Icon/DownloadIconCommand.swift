@@ -67,10 +67,14 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     static func variables(model: DwdModel, group: VariableGroup, onlyVariables: String?) throws -> [any DwdVariableDownloadable] {
+        if model == .aicon {
+            guard [.all, .surface, .surfaceAndPressure].contains(group) else {
+                throw Abort(.badRequest, reason: "The AICON downloader only supports surface variables.")
+            }
+        }
         if let onlyVariables {
             return try onlyVariables.split(separator: ",").map { name in
                 if model == .aicon {
-                    if let variable = AiconModelLevelVariable(rawValue: String(name)) { return variable }
                     return try AiconSurfaceVariable.load(rawValue: String(name))
                 }
                 if name == "visibility" {
@@ -86,9 +90,7 @@ struct DownloadIconCommand: AsyncCommand {
         switch model {
         case .aicon:
             surface = AiconSurfaceVariable.allCases
-            modelLevel = (1...13).flatMap { level in
-                AiconModelLevelVariableType.allCases.map { AiconModelLevelVariable(variable: $0, level: level) }
-            }
+            modelLevel = []
             pressure = []
         case .icon(let domain):
             surface = IconSurfaceVariable.allCases.filter { $0.getVarAndLevel(domain: domain)?.cat != "model-level" }
@@ -103,9 +105,6 @@ struct DownloadIconCommand: AsyncCommand {
         case .surfaceAndPressure: return surface + pressure
         case .modelLevel: return modelLevel
         case .pressureLevel, .pressureLevelGt500, .pressureLevelLtE500:
-            guard model != .aicon else {
-                throw Abort(.badRequest, reason: "AICON publishes model levels, not pressure levels.")
-            }
             return pressure.filter {
                 guard let level = $0.getVarAndLevel(model: model)?.level else { return false }
                 return group == .pressureLevel || (group == .pressureLevelGt500 ? level > 500 : level <= 500)

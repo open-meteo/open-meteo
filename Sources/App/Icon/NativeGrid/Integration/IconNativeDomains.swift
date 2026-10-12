@@ -2,7 +2,6 @@ import Logging
 
 enum IconNativeDomains: String, CaseIterable {
     case aiconNative = "aicon"
-    case aiconNativeModelLevel = "aicon-model-level"
 
     case iconNative = "icon-native"
     case iconEuNative = "icon-eu-native"
@@ -22,7 +21,6 @@ enum IconNativeDomains: String, CaseIterable {
 
     var modelLevelDomain: Self? {
         switch self {
-        case .aiconNative: return .aiconNativeModelLevel
         case .iconNative: return .iconNativeModelLevel
         case .iconEuNative: return .iconEuNativeModelLevel
         case .iconD2Native: return .iconD2NativeModelLevel
@@ -32,7 +30,6 @@ enum IconNativeDomains: String, CaseIterable {
 
     var modelLevelParent: Self? {
         switch self {
-        case .aiconNativeModelLevel: return .aiconNative
         case .iconNativeModelLevel: return .iconNative
         case .iconEuNativeModelLevel: return .iconEuNative
         case .iconD2NativeModelLevel: return .iconD2Native
@@ -52,7 +49,7 @@ enum IconNativeDomains: String, CaseIterable {
     /// Forecast metadata and field URLs do not imply a regular-grid storage domain.
     var sourceModel: DwdModel {
         switch self {
-        case .aiconNative, .aiconNativeModelLevel: return .aicon
+        case .aiconNative: return .aicon
         case .iconNative, .iconNativeModelLevel: return .icon(.icon)
         case .iconEuNative, .iconEuNativeModelLevel: return .icon(.iconEu)
         case .iconD2Native, .iconD2NativeModelLevel: return .icon(.iconD2)
@@ -69,7 +66,6 @@ enum IconNativeDomains: String, CaseIterable {
     var domainRegistry: DomainRegistry {
         switch self {
         case .aiconNative: return .dwd_aicon_global
-        case .aiconNativeModelLevel: return .dwd_aicon_global_model_level
         case .iconNative: return .dwd_icon_global_native
         case .iconNativeModelLevel: return .dwd_icon_global_native_model_level
         case .iconEuNative: return .dwd_icon_eu_native
@@ -109,7 +105,7 @@ enum IconNativeDomains: String, CaseIterable {
 
     var nativeGridFile: IconNativeGridFile {
         switch self {
-        case .aiconNative, .aiconNativeModelLevel, .iconNative, .iconNativeModelLevel: return Self.globalGridFile
+        case .aiconNative, .iconNative, .iconNativeModelLevel: return Self.globalGridFile
         case .iconEuNative, .iconEuNativeModelLevel: return Self.europeGridFile
         case .iconD2Native, .iconD2NativeModelLevel, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return Self.d2GridFile
         case .iconEpsNative, .iconEpsNativeEnsembleMean: return Self.globalEnsembleGridFile

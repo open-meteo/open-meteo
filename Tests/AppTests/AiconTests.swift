@@ -30,13 +30,11 @@ import Logging
         #expect(domain.definition.nativeGridFile.identity == .global)
 
         let outputs = DwdDownloadDomains(.aiconNative, grid: grid)
-        let modelLevel = try #require(outputs.modelLevel)
+        #expect(outputs.modelLevel == nil)
         #expect(outputs.remapped == nil)
         #expect(outputs.ensembleMean == nil)
         #expect(outputs.fifteenMinute == nil)
-        #expect(modelLevel.domainRegistry == .dwd_aicon_global_model_level)
-        #expect(modelLevel.domainRegistryStatic == .dwd_icon_global_native)
-        #expect(IconNativeDomains.aiconNativeModelLevel.staticResourceDomain == .iconNative)
+        #expect(IconNativeDomains.aiconNative.staticResourceDomain == .iconNative)
         #expect(DwdModel.aicon.staticSource == .icon(.icon))
         #expect(!outputs.isModelLevel(AiconSurfaceVariable.temperature_2m))
 
@@ -44,54 +42,11 @@ import Logging
         let run = Timestamp(2026, 10, 7)
         let surfaceWriter = OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: run.add(hours: 3),
             storeOnDisk: false, realm: nil, logger: Logger(label: "aicon-tests"))
-        let modelWriter = OmSpatialTimestepWriter(domain: modelLevel, run: run, time: run.add(hours: 3),
-            storeOnDisk: false, realm: nil, logger: Logger(label: "aicon-tests"))
         try await surfaceWriter.write(member: 0, variable: AiconSurfaceVariable.temperature_2m, data: [10, 20, 30])
-        // Surface output can be finalized before any model-level field is available.
         let surfaceHandles = try await surfaceWriter.finalise()
         #expect(surfaceHandles.count == 1)
         #expect(surfaceHandles[0].domain.domainRegistry == .dwd_aicon_global)
         #expect(try await surfaceHandles[0].reader.read() == [10, 20, 30])
-        for level in 1...13 {
-            let variable = AiconModelLevelVariable(variable: .temperature, level: level)
-            #expect(outputs.isModelLevel(variable))
-            try await modelWriter.write(member: 0, variable: variable, data: Array(repeating: Float(level), count: 3))
-        }
-        let modelHandles = try await modelWriter.finalise()
-        #expect(modelHandles.count == 13)
-        for (index, handle) in modelHandles.enumerated() {
-            #expect(handle.domain.domainRegistry == .dwd_aicon_global_model_level)
-            #expect(handle.variable.omFileName.file == "t_level\(index + 1)")
-            #expect(try await handle.reader.read() == Array(repeating: Float(index + 1), count: 3))
-        }
-
-        let unitWriter = OmSpatialTimestepWriter(domain: modelLevel, run: run, time: run.add(hours: 3),
-            storeOnDisk: false, realm: nil, logger: Logger(label: "aicon-tests"))
-        let humidity = AiconModelLevelVariable(variable: .specificHumidity, level: 13)
-        let pressure = AiconModelLevelVariable(variable: .pressure, level: 13)
-        for (variable, values) in [(humidity, [Float(0.01), 0.005123, .nan]), (pressure, [Float(85005), 101325, .nan])] {
-            var converted = values
-            let conversion = try #require(variable.multiplyAdd)
-            converted.multiplyAdd(multiply: conversion.multiply, add: conversion.add)
-            try await unitWriter.write(member: 0, variable: variable, data: converted)
-        }
-        let unitHandles = try await unitWriter.finalise()
-        let humidityValues = try await unitHandles[0].reader.read()
-        let pressureValues = try await unitHandles[1].reader.read()
-        #expect(abs(humidityValues[0] - 10) < 0.001)
-        #expect(abs(humidityValues[1] - 5.123) < 0.001)
-        #expect(humidityValues[2].isNaN)
-        #expect(abs(pressureValues[0] - 850.05) < 0.051)
-        #expect(abs(pressureValues[1] - 1013.25) < 0.051)
-        #expect(pressureValues[2].isNaN)
-    }
-
-    @Test func modelLevelsHaveDistinctStorageFiles() throws {
-        let variables = try DownloadIconCommand.variables(model: .aicon, group: .modelLevel, onlyVariables: nil)
-        // The writer and converter group by filename and do not use the legacy level field.
-        #expect(variables.count == 65)
-        #expect(Set(variables.map { $0.omFileName.file }).count == 65)
-        #expect(variables.allSatisfy { $0.omFileName.level == 0 })
     }
 
     @Test func schedulingMetadataDoesNotRequireGridFiles() throws {
@@ -109,8 +64,7 @@ import Logging
         #expect(try model.getDownloadForecastSteps(run: runHour) == Array(stride(from: 3, through: lastHour, by: 3)))
         #expect(model.getGribUrl(field: ("T_2M", "single-level", nil), run: run, leadSeconds: 3 * 3600)
             == "https://opendata.dwd.de/weather/nwp/v1/m/aicon/p/T_2M/r/2026-10-07T\(runHour.zeroPadded(len: 2)):00/s/PT003H00M.grib2")
-        #expect(model.getGribUrl(field: ("T", "model-level", 13), run: run, leadSeconds: 120 * 3600)
-            == "https://opendata.dwd.de/weather/nwp/v1/m/aicon/p/T/lvt1/150/lv1/13/r/2026-10-07T\(runHour.zeroPadded(len: 2)):00/s/PT120H00M.grib2")
+
     }
 
     @Test func runSelectionCrossesMidnight() throws {
@@ -119,15 +73,18 @@ import Logging
         #expect(throws: (any Error).self) { try DwdModel.aicon.getDownloadForecastSteps(run: 1) }
     }
 
-    @Test func modelLevelSelectionUsesIndices() throws {
-        let selected = try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: "temperature_2m,qv_level13,t_level1")
-        #expect(selected.map { $0.omFileName.file } == ["temperature_2m", "qv_level13", "t_level1"])
-        #expect(AiconModelLevelVariable(rawValue: "T_13m") == nil)
-        #expect(AiconModelLevelVariable(rawValue: "t_level0") == nil)
-        #expect(AiconModelLevelVariable(rawValue: "t_level14") == nil)
-        #expect(AiconModelLevelVariable(rawValue: "t_level13")?.isElevationCorrectable == false)
+    @Test func surfaceVariableSelection() throws {
+        let variables = try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: nil)
+        #expect(variables.map { $0.omFileName.file } == AiconSurfaceVariable.allCases.map(\.rawValue))
+        let selected = try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: "temperature_2m,precipitation")
+        #expect(selected.map { $0.omFileName.file } == ["temperature_2m", "precipitation"])
         #expect(throws: (any Error).self) {
-            try DownloadIconCommand.variables(model: .aicon, group: .pressureLevel, onlyVariables: nil)
+            try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: "t_level13")
+        }
+        for group in [DownloadIconCommand.VariableGroup.modelLevel, .pressureLevel, .pressureLevelGt500, .pressureLevelLtE500] {
+            #expect(throws: (any Error).self) {
+                try DownloadIconCommand.variables(model: .aicon, group: group, onlyVariables: nil)
+            }
         }
     }
 

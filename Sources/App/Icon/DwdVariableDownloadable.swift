@@ -26,13 +26,3 @@ extension AiconSurfaceVariable: DwdVariableDownloadable {
         model != .aicon || hour == 0
     }
 }
-
-extension AiconModelLevelVariable: DwdVariableDownloadable {
-    func getVarAndLevel(model: DwdModel) -> (variable: String, cat: String, level: Int?)? {
-        model == .aicon && Self.valid(level: level) ? (gribVariableName, "model-level", level) : nil
-    }
-
-    func skipHour(hour: Int, model: DwdModel, forDownload: Bool, run: Timestamp) -> Bool {
-        model != .aicon || hour == 0
-    }
-}

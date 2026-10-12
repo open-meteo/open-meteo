@@ -109,7 +109,6 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_gwam
     case dwd_sis_europe_africa_v4
     case dwd_aicon_global
-    case dwd_aicon_global_model_level
 
     case ecmwf_ifs
     case ecmwf_ifs_europe_ensemble
@@ -245,7 +244,6 @@ enum DomainRegistry: String, CaseIterable {
     var nativeDefinition: IconNativeDomains? {
         switch self {
         case .dwd_aicon_global: return .aiconNative
-        case .dwd_aicon_global_model_level: return .aiconNativeModelLevel
         case .dwd_icon_global_native: return .iconNative
         case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
         case .dwd_icon_eu_native: return .iconEuNative
@@ -388,7 +386,7 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.hrrr_conus
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
-        case .dwd_aicon_global, .dwd_aicon_global_model_level:
+        case .dwd_aicon_global:
             return nil
         case .dwd_icon:
             return IconDomains.icon
