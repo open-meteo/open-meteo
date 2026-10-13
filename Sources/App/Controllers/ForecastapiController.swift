@@ -1171,16 +1171,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             self.requirePrimaryCoverage = requirePrimaryCoverage
         }
 
-        static func single(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, allowMinMaxTwoAggregations: Bool = true) -> Self {
-            .init(primary: [.domain(domain, variable)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
+        static func single(_ domain: any GenericDomain, _ variable: any GenericVariable.Type) -> Self {
+            .init(primary: [.domain(domain, variable)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: true)
         }
 
         static func multiple(_ primary: [Source], secondary: [Source] = []) -> Self {
             .init(primary: primary, secondary: secondary)
         }
 
-        static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain, allowMinMaxTwoAggregations: Bool = true) -> Self {
-            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations, requirePrimaryCoverage: true)
+        static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain) -> Self {
+            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: true, requirePrimaryCoverage: true)
         }
 
         static func multipleWithPrecipitationProbability(_ primary: [Source], precipitationProb: any GenericDomain) -> Self {
@@ -1257,19 +1257,19 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getDomainAndVariable(include15Min: Bool = false) async throws -> DomainReaderMapping? {
         switch self {
         case .ecmwf_ifs04:
-            return .single(EcmwfDomain.ifs04, EcmwfVariable.self, allowMinMaxTwoAggregations: false)
+            return .single(EcmwfDomain.ifs04, EcmwfVariable.self)
         case .ecmwf_ifs025:
-            return .singleWithPrecipitationProbability(EcmwfDomain.ifs025, EcmwfIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble, allowMinMaxTwoAggregations: false)
+            return .singleWithPrecipitationProbability(EcmwfDomain.ifs025, EcmwfIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .ecmwf_aifs025:
             return .single(EcmwfDomain.aifs025, EcmwfVariable.self)
         case .ecmwf_aifs025_single:
             return .single(EcmwfDomain.aifs025_single, EcmwfAifsVariable.self)
         case .ecmwf_ifs025_ensemble:
-            return .single(EcmwfDomain.ifs025_ensemble, EcmwfIfsVariable.self, allowMinMaxTwoAggregations: false)
+            return .single(EcmwfDomain.ifs025_ensemble, EcmwfIfsVariable.self)
         case .ecmwf_aifs025_ensemble:
             return .single(EcmwfDomain.aifs025_ensemble, EcmwfAifsVariable.self)
         case .ecmwf_ifs:
-            return .singleWithPrecipitationProbability(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble, allowMinMaxTwoAggregations: false)
+            return .singleWithPrecipitationProbability(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .era5, .copernicus_era5:
             // Mix deterministic components with ensemble uncertainties before deriving wind spreads.
             return .init(
@@ -1624,7 +1624,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ], gridForBoundingBoxRequests: IconDomains.iconD2EpsEnsembleMean,
                 allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
         case .ecmwf_ifs025_ensemble_mean:
-            return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfIfsVariable>.self, allowMinMaxTwoAggregations: false)
+            return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfIfsVariable>.self)
         case .ecmwf_aifs025_ensemble_mean:
             return .single(EcmwfDomain.aifs025_ensemble_mean, VariableOrSpread<EcmwfAifsVariable>.self)
         case .ncep_gefs025_ensemble_mean:
@@ -1632,9 +1632,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_gefs05_ensemble_mean:
             return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self)
         case .ecmwf_ifs_europe_ensemble:
-            return .single(EcmwfEcpdsDomain.ifs_europe_ensemble, EcmwfEcdpsIfsEuropeEnsembleVariable.self, allowMinMaxTwoAggregations: false)
+            return .single(EcmwfEcpdsDomain.ifs_europe_ensemble, EcmwfEcdpsIfsEuropeEnsembleVariable.self)
         case .ecmwf_ifs_europe_ensemble_mean:
-            return .single(EcmwfEcpdsDomain.ifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsIfsEuropeEnsembleVariable>.self, allowMinMaxTwoAggregations: false)
+            return .single(EcmwfEcpdsDomain.ifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsIfsEuropeEnsembleVariable>.self)
         case .ecmwf_aifs_europe_ensemble:
             return .single(EcmwfEcpdsDomain.aifs_europe_ensemble, EcmwfEcdpsAifsEuropeEnsembleVariable.self)
         case .ecmwf_aifs_europe_ensemble_mean:
