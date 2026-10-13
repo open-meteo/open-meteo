@@ -52,7 +52,7 @@ struct GeoSphereDownloader: AsyncCommand {
     }
 
     /// Download elevation data from GeoSphere DEM file
-    func downloadElevation(application: Application, domain: GeoSphereDomain) async throws {
+    func downloadElevation(application: Application, domain: GeoSphereDomain, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -83,7 +83,7 @@ struct GeoSphereDownloader: AsyncCommand {
         }
 
         logger.info("Writing elevation file (\(elevation.count) grid points)")
-        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
 
     /// Download forecast data and return variable handles
@@ -93,7 +93,7 @@ struct GeoSphereDownloader: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        try await downloadElevation(application: application, domain: domain)
+        try await downloadElevation(application: application, domain: domain, uploadS3Bucket: uploadS3Bucket)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
 

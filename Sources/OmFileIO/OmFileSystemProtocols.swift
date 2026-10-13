@@ -43,6 +43,35 @@ public protocol OmLocalPayload: Sendable {
 
 
 public extension OmFileManagable {
+    /// Copy a backend to a local file and atomically publish it without validation.
+    func materialize<Backend: OmFileReaderBackend>(file: Backend) async throws -> FileHandle
+    where Backend.DataType: DataProtocol {
+        try await materialize(file: file, validate: { $0 })
+    }
+
+    /// Copy to a temporary local file, then validate it before atomically publishing it.
+    /// If validation throws, the destination remains unchanged. The result may retain the handle or its mapping.
+    func materialize<Backend: OmFileReaderBackend, Result>(
+        file: Backend,
+        validate: (FileHandle) throws -> Result
+    ) async throws -> Result where Backend.DataType: DataProtocol {
+        try createDirectory()
+        let path = getFilePath()
+        let handle = try FileHandle.createNewFile(
+            file: path,
+            size: file.count,
+            overwrite: true,
+            temporary: true
+        )
+        for offset in stride(from: 0, to: file.count, by: 8 * 1_024 * 1_024) {
+            let count = min(8 * 1_024 * 1_024, file.count - offset)
+            try handle.write(contentsOf: await file.getData(offset: offset, count: count))
+        }
+        let result = try validate(handle)
+        try handle.linkTemporary(file: path)
+        return result
+    }
+
     func createDirectory() throws {
         let file = getFilePath()
         guard let last = file.lastIndex(of: "/") else {

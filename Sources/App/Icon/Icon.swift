@@ -1,4 +1,5 @@
 import Foundation
+import Vapor
 import NIOConcurrencyHelpers
 import OmFileFormat
 
@@ -136,12 +137,45 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// Number of available forecast steps differs from run
+    var sourceGridIdentity: IconNativeGridIdentity {
+        nativeDomain.nativeGridFile.identity
+    }
+
+    var nativeDomain: IconNativeDomains {
+        switch self {
+        case .icon: return .iconNative
+        case .iconEu: return .iconEuNative
+        case .iconD2: return .iconD2Native
+        case .iconD2_15min: return .iconD2Native15min
+        case .iconEps, .iconEpsEnsembleMean: return .iconEpsNative
+        case .iconEuEps, .iconEuEpsEnsembleMean: return .iconEuEpsNative
+        case .iconD2Eps, .iconD2EpsEnsembleMean: return .iconD2EpsNative
+        }
+    }
+
+    func getGribUrl(field: (variable: String, cat: String, level: Int?), run: Timestamp, leadSeconds: Int, member: Int = 0) -> String {
+        let levelPath: String
+        switch field.cat {
+        case "pressure-level": levelPath = "lvt1/100/lv1/\(field.level! * 100)/"
+        case "model-level": levelPath = "lvt1/150/lv1/\(field.level!)/"
+        case "soil-level": levelPath = "lvt1/106/lv1/\(Double(field.level!) / 100)/"
+        default: levelPath = ""
+        }
+        let model = self == .iconD2_15min ? IconDomains.iconD2 : self
+        let ensemble = countEnsembleMember > 1 ? "e/\((member + 1).zeroPadded(len: 2))/" : ""
+        let hours = (leadSeconds / 3600).zeroPadded(len: 3)
+        let minutes = ((leadSeconds % 3600) / 60).zeroPadded(len: 2)
+        return "https://opendata.dwd.de/weather/nwp/v1/m/\(model.rawValue)/p/\(field.variable.uppercased())/\(levelPath)r/\(run.iso8601_YYYY_MM_dd_HH_mm)/\(ensemble)s/PT\(hours)H\(minutes)M.grib2"
+    }
+
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
     func getDownloadForecastSteps(run: Int) -> [Int] {
         switch self {
         case .iconEps:
             // Note ICON-EPS has only 6 hourly data for 6/18z runs, not used here
+            if run == 6 || run == 18 {
+                fatalError("ICON-EPS 06/18 UTC runs are not supported. Select a 00 or 12 UTC run.")
+            }
             // Hourly data until 48h, 3 hourly until 72, 6 hourly until 120h (same as ICON-EU-EPS) and 12 hourly until 180h
             return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6)) + Array(stride(from: 132, through: 180, by: 12))
         case .icon:
@@ -187,17 +221,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 689, ny: 329, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
         case .iconD2Eps, .iconD2EpsEnsembleMean:
             // R19B07 avg 2 km
-            // Note: 1px difference to use the same weights as official
+            // Retain the existing extent, one point smaller per axis than deterministic D2.
             return RegularGrid(nx: 1214, ny: 745, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
-        }
-    }
-
-    /// name in the filenames
-    var region: String {
-        switch self {
-        case .iconEps, .icon, .iconEpsEnsembleMean: return "global"
-        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean: return "europe"
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean: return "germany"
         }
     }
 

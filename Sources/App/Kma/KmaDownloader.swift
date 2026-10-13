@@ -49,14 +49,14 @@ struct KmaDownload: AsyncCommand {
         guard let server = signature.server else {
             fatalError("Option server is required")
         }
-        try await downloadElevation(application: context.application, domain: domain, run: run, server: server)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: server, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation(application: Application, domain: KmaDomain, run: Timestamp, server: String) async throws {
+    func downloadElevation(application: Application, domain: KmaDomain, run: Timestamp, server: String, uploadS3Bucket: String?) async throws {
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
@@ -86,7 +86,7 @@ struct KmaDownload: AsyncCommand {
             }
         }
 
-        try elevation.array.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+        try await elevation.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
     }
 
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {

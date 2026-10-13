@@ -106,7 +106,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                         elevation[i] = elevation[i].isNaN ? .nan : -999
                     }
                     try domain.surfaceElevationFileOm.createDirectory()
-                    try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+                    try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
                 }
                 
                 try await writer.write(member: 0, variable: variable, data: grib2d.array.data)

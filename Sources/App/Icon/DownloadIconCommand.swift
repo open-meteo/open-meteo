@@ -57,6 +57,9 @@ struct DownloadIconCommand: AsyncCommand {
         
         @Flag(name: "skip-timeseries")
         var skipTimeseries: Bool
+
+        @Flag(name: "skip-regridding", help: "For icon or icon-native, write only native global output; skip regridded forecasts and elevation")
+        var skipRegridding: Bool
     }
 
     var help: String {
@@ -66,42 +69,31 @@ struct DownloadIconCommand: AsyncCommand {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(application: Application, domain: IconDomains, run: Timestamp) async throws {
+    func convertSurfaceElevation(application: Application, outputs: IconDownloadDomains, remapper: IconRemapper?, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
-        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
-        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+        let domain = outputs.source
+        let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
+        let missingRemapped = outputs.remapped.flatMap { domain in
+            FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) ? nil : domain
+        }
+        guard needsPrimary || missingRemapped != nil else {
             return
         }
-        try domain.surfaceElevationFileOm.createDirectory()
+        if needsPrimary {
+            try outputs.primary.surfaceElevationFileOm.createDirectory()
+        }
+        try missingRemapped?.surfaceElevationFileOm.createDirectory()
 
-        let downloadDirectory = domain.downloadDirectory
+        let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
         let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
-        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
-        let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
-
-        // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
-        // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
-        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
-        let dateStr = run.format_YYYYMMddHH
-
-        // surface elevation
-        // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
-
-        let additionalTimeString = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_0" : ""
-        let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "hsurf" : "HSURF"
-        let file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName).grib2.bz2"
-        var hsurf = try await cdo.downloadAndRemap(file)[0].data.data
-
-        let variableName2 = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "fr_land" : "FR_LAND"
-        let file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName2).grib2.bz2"
-        let landFraction = try await cdo.downloadAndRemap(file2)[0].data.data
-
-        // try Array2D(data: hsurf, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(downloadDirectory)hsurf.nc")
-        // try Array2D(data: landFraction, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(downloadDirectory)fr_land.nc")
+        let downloader = IconGribDownloader(domain: domain, curl: curl, remapper: outputs.nativeDomain == nil ? remapper : nil)
+        let surface = try await downloader.downloadAndRemap(field: ("HSURF", "single-level", nil), run: run, leadSeconds: 0)
+        var hsurf = surface.data.data
+        let land = try await downloader.downloadAndRemap(field: ("FR_LAND", "single-level", nil), run: run, leadSeconds: 0)
+        let landFraction = land.data.data
 
         // Set all sea grid points to -999
         precondition(hsurf.count == landFraction.count)
@@ -111,14 +103,29 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
 
-        try hsurf.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
+        if needsPrimary {
+            try await hsurf.writeStaticOmFile(file: outputs.primary.surfaceElevationFileOm, grid: outputs.primary.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        }
+        if let remappedDomain = missingRemapped {
+            guard let remapper else {
+                preconditionFailure("Remapped ICON elevation requires a grid mapping")
+            }
+            try await remapper.remap(hsurf).writeStaticOmFile(
+                file: remappedDomain.surfaceElevationFileOm,
+                grid: remappedDomain.grid,
+                application: application,
+                uploadS3Bucket: uploadS3Bucket
+            )
+        }
     }
 
-    /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    /// Download native ICON v1 fields and adapt them to the selected outputs.
+    func downloadIcon(application: Application, outputs: IconDownloadDomains, remapper: IconRemapper?, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
-        let downloadDirectory = domain.downloadDirectory
+        let domain = outputs.source
+        let remappedDomain = outputs.remapped
+        let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
         let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
@@ -126,80 +133,84 @@ struct DownloadIconCommand: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
-        let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
+        let downloader = IconGribDownloader(domain: domain, curl: curl, remapper: outputs.nativeDomain == nil ? remapper : nil)
         let isEnsemble = domain.countEnsembleMember > 1
-
-        // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
-        // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
-        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
-        let dateStr = run.format_YYYYMMddHH
 
         let deaverager = GribDeaverager()
         let deaverager15min = GribDeaverager()
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
+            guard let elevation = try? await outputs.primary.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation
         }()
         
+        let jobs = variables.flatMap { variable in
+            (0..<domain.countEnsembleMember).map { (variable: variable, member: $0) }
+        }
         let timestamps = domain.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
         let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
-            let h3 = hour.zeroPadded(len: 3)
 
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
-            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
-            let writer15Min = OmSpatialMultistepWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: true, realm: nil, logger: logger)
+            let writer = OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: outputs.ensembleMean)
+            let modelLevelWriter = outputs.modelLevel.map {
+                OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger)
+            }
+            let remappedWriter = remappedDomain.map {
+                OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
+            }
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writer15Min = outputs.fifteenMinute.map {
+                OmSpatialMultistepWriter(domain: $0, run: run, storeOnDisk: true, realm: nil, logger: logger)
+            }
 
-            try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
-                    return
+            @Sendable func write(member: Int, variable: any GenericVariable, data: [Float]) async throws {
+                if let modelLevelWriter,
+                   IconModelLevelVariable(rawValue: variable.omFileName.file) != nil {
+                    try await modelLevelWriter.write(member: member, variable: variable, data: data)
+                } else {
+                    try await writer.write(member: member, variable: variable, data: data)
                 }
-                guard let v = variable.getVarAndLevel(domain: domain) else {
-                    return
+                if let remappedWriter {
+                    guard let remapper else {
+                        preconditionFailure("Remapped ICON writer requires a grid mapping")
+                    }
+                    try await remappedWriter.write(member: member, variable: variable, data: remapper.remap(data))
                 }
-                let level = v.level.map({ "_\($0)" }) ?? (domain == .iconD2 || domain == .iconD2Eps ? "_2d" : "")
-                let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? v.variable : v.variable.uppercased()
-                let filenameFrom = "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(variableName).grib2.bz2"
+            }
 
-                let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
-
-                var messages = try await cdo.downloadAndRemap(url)
-                if domain == .iconD2 && messages.count > 1 {
-                    // Write 15min D2 icon data
-                    for (i, (message, array2d)) in messages.enumerated() {
-                        var array2d = array2d
-                        guard let stepRange = message.get(attribute: "stepRange"),
-                              let stepType = message.get(attribute: "stepType") else {
-                            fatalError("could not get step range or type")
-                        }
-                        let timestamp = run.add(hour * 3600 + i * 900)
-                        if let fma = variable.multiplyAdd {
-                            array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                        }
-                        // Deaccumulate precipitation
-                        guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
-                            continue
-                        }
+            try await jobs.foreachConcurrent(nConcurrent: concurrent) { job in
+                let variable = job.variable
+                if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) { return }
+                guard let field = variable.getVarAndLevel(domain: domain) else { return }
+                let subhourly = writer15Min != nil && (variable as? IconSurfaceVariable)?.hasQuarterHourlyData == true && hour < 48
+                let steps = (subhourly ? [0, 900, 1800, 2700] : [0]).map { hour * 3600 + $0 }
+                let messages = try await steps.asyncMap { step in
+                    try await downloader.downloadAndRemap(field: field, run: run, leadSeconds: step, member: job.member)
+                }
+                if let writer15Min, subhourly {
+                    for (message, raw) in messages {
+                        var array2d = raw
+                        let step = try IconStepInterval(message)
+                        let stepType = try message.getOrThrow(attribute: "stepType")
+                        let timestamp = try message.getValidTimestamp()
+                        if let fma = variable.multiplyAdd { array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add) }
+                        guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: job.member, stepType: stepType, startStep: step.start, currentStep: step.end, array2d: &array2d) else { continue }
                         if let variable = variable as? IconSurfaceVariable {
                             variable.correctDownloadedValues(data: &array2d.data)
                             if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
-                                await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: array2d)
+                                await storage15min.set(variable: variable, timestamp: timestamp, member: job.member, data: array2d)
                                 continue
                             }
                         }
-                        try await writer15Min.write(time: timestamp, member: 0, variable: variable, data: array2d.data)
+                        try await writer15Min.write(time: timestamp, member: job.member, variable: variable, data: array2d.data)
                     }
-                    messages = [messages[0]]
                 }
 
                 // Make sure to skip wind gusts hour0 which only contains `0` values
@@ -207,49 +218,38 @@ struct DownloadIconCommand: AsyncCommand {
                     return
                 }
                 
-                // Contains more than 1 message for ensemble models and 15 minutes data
-                for (message, array2d) in messages {
-                    var array2d = array2d
+                // The whole-hour field is shared with the independently deaccumulated 15-minute stream.
+                let (message, raw) = messages[0]
+                var array2d = raw
                     
-                    let member = (message.getLong(attribute: "perturbationNumber") ?? 1) - 1
-                    if try timestamp != message.getValidTimestamp() {
-                        // skip 15 minutely data, that does not match the correct timestamp
-                        continue
-                    }
+                let member = job.member
 
-                    // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd {
-                        array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-
-                    guard let stepRange = message.get(attribute: "stepRange"),
-                          let stepType = message.get(attribute: "stepType") else {
-                        fatalError("could not get step range or type")
-                    }
-
-                    // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
-                        continue
-                    }
-
-                    if let variable = variable as? IconSurfaceVariable {
-                        variable.correctDownloadedValues(data: &array2d.data)
-                        
-                        if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
-                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
-                            continue
-                        }
-                        
-                        // ICON EPS downloads shortwave radiation under the name of diffuse radiation
-                        if variable == .diffuse_radiation, domain == .iconEps {
-                            try await writer.write(member: member, variable: DwdIconEpsGlobalVariable.shortwave_radiation, data: array2d.data)
-                            continue
-                        }
-                    }
-                    
-                    // logger.info("Compressing and writing data to \(filenameDest)")
-                    try await writer.write(member: member, variable: variable, data: array2d.data)
+                // Scaling before compression with scalefactor
+                if let fma = variable.multiplyAdd {
+                    array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+
+                let step = try IconStepInterval(message)
+                let stepType = try message.getOrThrow(attribute: "stepType")
+                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, startStep: step.start, currentStep: step.end, array2d: &array2d) else { return }
+
+                if let variable = variable as? IconSurfaceVariable {
+                    variable.correctDownloadedValues(data: &array2d.data)
+
+                    if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
+                        await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
+                        return
+                    }
+
+                    // ICON EPS downloads shortwave radiation under the name of diffuse radiation
+                    if variable == .diffuse_radiation, domain == .iconEps {
+                        try await write(member: member, variable: DwdIconEpsGlobalVariable.shortwave_radiation, data: array2d.data)
+                        return
+                    }
+                }
+
+                // logger.info("Compressing and writing data to \(filenameDest)")
+                try await write(member: member, variable: variable, data: array2d.data)
             }
 
             /// Calculate precipitation >0.1mm/h probability
@@ -356,11 +356,12 @@ struct DownloadIconCommand: AsyncCommand {
                     // We set them to 0 to be consistent with cloud_top and cloud_base in DMI Harmonie model
                     data.data = data.data.map { $0 < -499 ? 0 : $0 }
                 }
-                try await writer.write(member: v.member, variable: v.variable, data: data.data)
+                try await write(member: v.member, variable: v.variable, data: data.data)
             }
 
             /// Post process 15 minutes data. Note: There is no temperature in 15min data
             try await storage15min.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
+                guard let writer15Min else { return }
                 var data = data
                 /// Add snow to liquid rain if temperature is > 1.5°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain, let snowfallWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_water_equivalent)) {
@@ -423,12 +424,16 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 try await writer15Min.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data)
             }
-            
+
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let validTimes = Array(timestamps[0...i])
+            let handles = try await writer.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                + (modelLevelWriter?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
+                + (remappedWriter?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
+                + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
             
             // TODO valid times and S3 upload for 15min data
-            let handles15min = try await writer15Min.finalise(application: application, completed: false, validTimes: [], uploadS3Bucket: nil)
+            let handles15min = try await writer15Min?.finalise(application: application, completed: false, validTimes: [], uploadS3Bucket: nil) ?? []
             return (handles, handles15min)
         }
         
@@ -438,18 +443,38 @@ struct DownloadIconCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
-        let domain = try IconDomains.load(rawValue: signature.domain)
+        let requestedNativeDomain = IconNativeDomains(rawValue: signature.domain)
+            ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
+        let nativeDomain = requestedNativeDomain?.modelLevelParent ?? requestedNativeDomain
+        let domain = try nativeDomain?.sourceDomain ?? IconDomains.load(rawValue: signature.domain)
+        guard !signature.skipRegridding || nativeDomain == .iconNative else {
+            throw Abort(.badRequest, reason: "--skip-regridding is only supported for icon or icon-native.")
+        }
+        if nativeDomain == nil && [.iconEu, .iconD2, .iconD2_15min, .iconEps, .iconEuEps, .iconD2Eps].contains(domain) {
+            throw Abort(.badRequest, reason: "Regular-grid downloads for \(domain.rawValue) are no longer supported. Use \(domain.nativeDomain.rawValue) instead.")
+        }
+        if [.iconEpsEnsembleMean, .iconEuEpsEnsembleMean, .iconD2EpsEnsembleMean].contains(domain) {
+            throw Abort(.badRequest, reason: "Ensemble means are generated by downloading \(domain.nativeDomain.rawValue).")
+        }
         let nConcurrent = signature.concurrent ?? 1
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        _ = domain.getDownloadForecastSteps(run: run.hour) // Reject unsupported runs before preparing static files.
 
         if signature.onlyVariables != nil && signature.group != nil {
             fatalError("Parameter 'onlyVariables' and 'groups' must not be used simultaneously")
         }
 
-        let group = try VariableGroup.load(rawValueOptional: signature.group) ?? .all
+        let group = try VariableGroup.load(rawValueOptional: signature.group)
+            ?? (requestedNativeDomain?.modelLevelParent != nil ? .modelLevel : .all)
+        if requestedNativeDomain?.modelLevelParent != nil && (group != .modelLevel || signature.onlyVariables != nil) {
+            throw Abort(.badRequest, reason: "Model-level domains only support --group modelLevel. Use the parent domain for --only-variables.")
+        }
 
         let onlyVariables: [any IconVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
+                if $0 == "visibility" {
+                    throw Abort(.badRequest, reason: "Visibility is not available in the DWD ICON v1 feed.")
+                }
                 if let variable = IconPressureVariable(rawValue: String($0)) {
                     return variable
                 }
@@ -509,18 +534,73 @@ struct DownloadIconCommand: AsyncCommand {
 
         let logger = context.application.logger
         let generateFullRun = domain.countEnsembleMember == 1
-        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
-
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
-
-        if domain == .iconD2 {
-            // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(application: context.application, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        if let nativeDomain {
+            try await nativeDomain.prepareNativeGrid(
+                application: context.application,
+                uploadS3Bucket: signature.uploadS3Bucket
+            )
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        let outputs: IconDownloadDomains
+        if let nativeDomain {
+            outputs = try await IconDownloadDomains(nativeDomain, skipRegridding: signature.skipRegridding)
+        } else {
+            outputs = try await IconDownloadDomains(domain)
+        }
+        let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
+        logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        let needsRemapping = outputs.nativeDomain == nil || outputs.remapped != nil
+        let remapper = needsRemapping ? try await IconRemapper(
+            curl: Curl(logger: logger, client: context.application.dedicatedHttpClient), domain: outputs.source
+        ) : nil
+        try await convertSurfaceElevation(application: context.application, outputs: outputs, remapper: remapper, run: run, uploadS3Bucket: signature.uploadS3Bucket)
+
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, outputs: outputs, remapper: remapper, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
+
+        if let fifteenMinuteDomain = outputs.fifteenMinute {
+            // ICON-D2 downloads 15min data as well
+            try await GenericVariableHandle.convert(application: context.application, domain: fifteenMinuteDomain, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        }
+        try await GenericVariableHandle.convert(application: context.application, domain: outputs.primary, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
+    }
+}
+
+/// Resolved output roles for one ICON download. Native global also produces remapped output
+/// unless regridding is explicitly disabled.
+struct IconDownloadDomains: Sendable {
+    let source: IconDomains
+    let primary: any GenericDomain
+    let remapped: (any GenericDomain)?
+    let ensembleMean: (any GenericDomain)?
+    let modelLevel: (any GenericDomain)?
+    let fifteenMinute: (any GenericDomain)?
+
+    let nativeDomain: IconNativeDomains?
+
+    init(_ domain: IconDomains) async throws {
+        if domain == .icon {
+            self = try await Self(IconNativeDomains.iconNative)
+            return
+        }
+        self.source = domain
+        self.nativeDomain = nil
+        self.primary = domain
+        self.remapped = nil
+        self.ensembleMean = domain.ensembleMeanDomain
+        self.modelLevel = nil
+        self.fifteenMinute = domain == .iconD2 ? IconDomains.iconD2_15min : nil
+    }
+
+    init(_ domain: IconNativeDomains, skipRegridding: Bool = false) async throws {
+        self.source = domain.sourceDomain
+        self.nativeDomain = domain
+        let grid = try await domain.nativeGridFile.load()
+        self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
+        self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
+        self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
+        self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
+        self.fifteenMinute = domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
     }
 }
 
@@ -529,10 +609,14 @@ extension IconDomains {
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .iconEps, .icon:
+        case .iconEps:
+            return t.subtract(hours: 2).floor(toNearestHour: 12)
+        case .icon:
             // Icon has a delay of 2-3 hours after initialisation  with 4 runs a day
             return t.subtract(hours: 2).floor(toNearestHour: 6)
-        case .iconEuEps, .iconEu:
+        case .iconEuEps:
+            return t.subtract(hours: 2).floor(toNearestHour: 6)
+        case .iconEu:
             // Icon-eu has a delay of 2:40 hours after initialisation with 8 runs a day
             return t.subtract(hours: 2).floor(toNearestHour: 3)
         case .iconD2Eps, .iconD2:

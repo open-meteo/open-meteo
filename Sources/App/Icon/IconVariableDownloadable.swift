@@ -6,6 +6,16 @@ protocol IconVariableDownloadable: GenericVariable, Hashable {
 }
 
 extension IconSurfaceVariable: IconVariableDownloadable {
+    var hasQuarterHourlyData: Bool {
+        switch self {
+        case .direct_radiation, .diffuse_radiation, .precipitation, .cape,
+             .lightning_potential, .snowfall_height, .snowfall_water_equivalent,
+             .snowfall_convective_water_equivalent, .freezing_level_height, .rain, .showers:
+            return true
+        default: return false
+        }
+    }
+
     /// Vmax and precip always are empty in the first hour. Weather codes differ a lot in hour 0.
     func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool {
         if self == .direct_radiation && domain == .iconEps && hour % 3 != 0 {
@@ -188,7 +198,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .updraft:
             return domain == .iconD2 ? ("w_ctmax", "single-level", nil) : nil // only in icon d2
         case .visibility:
-            return domain == .icon ? nil : ("vis", "single-level", nil) // not in icon global
+            return nil // VIS is not published in the v1 feed. Keep the identifier for historical data.
         }
     }
 

@@ -57,6 +57,7 @@ Apps:
 - [CycleWeather](https://cycleweather.app) CycleWeather is a free iOS weather app for cyclists, showing a color-coded 7-day hourly forecast — temperature (feels-like), precipitation, wind, air quality, and UV — with rain alerts and radar, all in one glanceable view.
 - [Drizz.li](https://drizz.li) Open-source and statically-hosted weather site that turns Open-Meteo API data into detailed, localized forecasts with custom charts and an embedded weather map.
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
+- [duskline](https://dusklineweather.pages.dev/) Installable PWA with worldwide search, 10-day forecasts, air quality, NWS alerts for the U.S., and 30 interface languages — no account, no backend, no tracking.
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
 - [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
@@ -85,6 +86,7 @@ Apps:
 - [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
+- [ThaiFloodRisk](https://thaifloodrisk.com/en) Flood risk scores and daily flood odds for Bangkok and Thailand, built on Open-Meteo forecast, historical weather, river discharge (Flood API) and marine data.
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
 - [Typhoon](https://archisman-panigrahi.github.io/typhoon) A stylish weather app for GNU/Linux that acts as a desktop widget

@@ -101,7 +101,7 @@ final class OmFileSystemManager: Sendable {
         if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
         }
-        if localOnly == false, let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
+        if localOnly == false, (!OpenMeteo.remotePressureLevelsOnly || path.contains("hPa")), let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
             let client = await file.file.makeCachedClient(context: file.context)
             let file = OmReaderBlockCache(backend: client, cache: OpenMeteo.dataBlockCache, cacheKey: client.cacheKey)
             return .remote(file)
@@ -116,7 +116,7 @@ final class OmFileSystemManager: Sendable {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
             return try await fn(payload)
         }
-        guard let remoteFileSystem else {
+        guard !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
             return nil
         }
         /// Check for remote file
@@ -178,7 +178,7 @@ extension OmFileSystemManager {
             if let file = await local?.getFile(name: name) {
                 return .local(file)
             }
-            if let remote, let file = await remote.getFile(name: name) {
+            if let remote, let file = await remote.getFile(name: name), !OpenMeteo.remotePressureLevelsOnly || file.file.objectName.contains("hPa") {
                 return .remote(file)
             }
             return nil

@@ -10,6 +10,9 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
     
     case direct(Variable)
+    /// Resolve soil type lazily; prefetch only the moisture dependency.
+    /// Requires static soil types encoded using the ERA5 classification.
+    case soilMoistureIndex(RawOrMapped)
     case directShift24Hour(Variable)
     /// Read additional samples before the requested range and return a trailing mean aligned to the request.
     case runningMean(Variable, windowSeconds: Int, maximumStepSeconds: Int)
@@ -82,19 +85,25 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         })
     }
     
-    static func windDirection(u: Variable?, v: Variable?) -> Self? {
+    /// Optionally rotate grid-relative wind direction to true north using an angle in degrees.
+    static func windDirection(u: Variable?, v: Variable?, trueNorth: Float? = nil) -> Self? {
         guard let u, let v else {
             return nil
         }
-        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v))
+        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v), trueNorth: trueNorth)
     }
 
-    static func windDirection(u: RawOrMapped?, v: RawOrMapped?) -> Self? {
+    static func windDirection(u: RawOrMapped?, v: RawOrMapped?, trueNorth: Float? = nil) -> Self? {
         guard let u, let v else {
             return nil
         }
         return .two(u, v, {u, v, _ in
-            return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
+            var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            if let trueNorth {
+                // Correct for true north in HRRR and NAM
+                direction = direction.map { ($0 - trueNorth + 360).truncatingRemainder(dividingBy: 360) }
+            }
+            return DataAndUnit(direction, .degreeDirection)
         })
     }
 
@@ -157,6 +166,16 @@ extension TimerangeDt {
             to: range.upperBound,
             dtSeconds: calculationDtSeconds
         )
+    }
+}
+
+private extension GenericReaderBaseProtocol {
+    func getEra5SoilType() async throws -> SoilTypeEra5? {
+        guard let soilType = try await getStatic(type: .soilType) else {
+            throw ForecastApiError.generic(message: "Could not read soil type")
+        }
+        guard soilType.isFinite else { return nil }
+        return SoilTypeEra5(rawValue: Int(soilType))
     }
 }
 
@@ -232,6 +251,12 @@ extension GenericDeriverProtocol {
     
     fileprivate func get(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
+        case .soilMoistureIndex(let input):
+            guard let type = try await reader.getEra5SoilType() else {
+                return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
+            }
+            let moisture = try await get(mapping: input, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(moisture.data), .fraction)
         case .direct(let variable):
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
@@ -306,6 +331,8 @@ extension GenericDeriverProtocol {
     
     fileprivate func prefetchData(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws {
         switch variable {
+        case .soilMoistureIndex(let input):
+            try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
@@ -418,6 +445,12 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func get(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         switch variable {
+        case .soilMoistureIndex(let input):
+            guard let type = try await reader.getEra5SoilType() else {
+                return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
+            }
+            guard let moisture = try await get(mapping: input, time: time) else { return nil }
+            return DataAndUnit(type.calculateSoilMoistureIndex(moisture.data), .fraction)
         case .direct(let variable):
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
@@ -508,6 +541,8 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func prefetchData(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> Bool {
         switch variable {
+        case .soilMoistureIndex(let input):
+            return try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):

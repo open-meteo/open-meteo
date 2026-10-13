@@ -21,7 +21,7 @@ jobs:
     steps:
       # A dedicated token lets release tags trigger the package and Docker builds.
       # See docs/releases.md for repository setup.
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           target-branch: main

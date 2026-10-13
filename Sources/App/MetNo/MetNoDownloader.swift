@@ -101,7 +101,7 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
             logger.info("Writing elevation file")
-            try altitude.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
+            try await altitude.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
         }
 
         /// Verify projection and grid coordinates

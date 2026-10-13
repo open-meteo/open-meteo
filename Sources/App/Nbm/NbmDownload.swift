@@ -62,7 +62,7 @@ struct NbmDownload: AsyncCommand {
         disableIdleSleep()
 
         if let lsm = signature.lsmFile, let hgt = signature.hgtFile {
-            try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [lsm, hgt], createNetCdf: true)
+            try await DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [lsm, hgt], createNetCdf: true, application: context.application, uploadS3Bucket: signature.uploadS3Bucket)
             return
         }
 

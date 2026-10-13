@@ -87,7 +87,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         if !isWave {
-            try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
+            try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         }
         let generateFullRun = domain.countEnsembleMember == 1
         let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile)
@@ -95,7 +95,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download elevation file
-    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp) async throws {
+    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
@@ -149,7 +149,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
         }
         try domain.surfaceElevationFileOm.createDirectory()
-        try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
     
     struct ShortNameLevel: Hashable {

@@ -5,6 +5,8 @@ import Synchronization
 import OmFileIO
 
 enum OpenMeteo {
+    static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
+
     /// Data directory with trailing slash
     static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {

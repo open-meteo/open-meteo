@@ -13,9 +13,9 @@ struct GenericVariableHandle: Sendable {
     let time: TimerangeDt
     let member: Int
     let reader: OmFileReaderArray<MmapFile, Float>
-    let domain: GenericDomain
+    let domain: any GenericDomain
 
-    public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: GenericDomain) async throws {
+    public init(variable: any GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: any GenericDomain) async throws {
         self.reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
         let dimensions = reader.getDimensions()
         let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
@@ -28,7 +28,7 @@ struct GenericVariableHandle: Sendable {
         self.domain = domain
     }
     
-    public init(variable: any GenericVariable, time: TimerangeDt, member: Int, reader: OmFileReaderArray<MmapFile, Float>, domain: GenericDomain) {
+    public init(variable: any GenericVariable, time: TimerangeDt, member: Int, reader: OmFileReaderArray<MmapFile, Float>, domain: any GenericDomain) {
         self.variable = variable
         self.time = time
         self.member = member
@@ -41,10 +41,12 @@ struct GenericVariableHandle: Sendable {
     /// If `fullRunSkipMeta` do not generate meta.json for each run
     static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         let logger = application.logger
+        let groups = handles.groupedPreservedOrder(by: {"\($0.domain)"}).map { (_, handles) in
+            (domain: handles[0].domain, handles: handles)
+        }
         let uploadQueues = await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket)
 
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
+        for (domain, handles) in groups {
             let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
 
             if generateTimeSeries {
@@ -102,8 +104,7 @@ struct GenericVariableHandle: Sendable {
             }
         }
 
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-            let domain = handles[0].domain
+        for (domain, handles) in groups {
             let generateFullRun = generateFullRun && domain.generateFullRun
             if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
@@ -114,8 +115,7 @@ struct GenericVariableHandle: Sendable {
         }
 
         if OpenMeteo.generatePreviousDay, generateTimeSeries, let run {
-            for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.domain)"}) {
-                let domain = handles[0].domain
+            for (domain, handles) in groups {
 
                 // if run is nil, do not attempt to generate previous days files
                 logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
@@ -491,9 +491,16 @@ actor GribDeaverager {
     
     /// Returns false if step should be skipped
     func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, array2d: inout Array2D) async -> Bool {
+        if stepType != "accum" && stepType != "avg" { return true }
+        guard let (start, end) = stepRange.splitTo2Integer() else { return false }
+        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, startStep: start, currentStep: end, array2d: &array2d)
+    }
+
+    /// Numeric intervals must use the same unit for every step of a variable/member stream.
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, startStep: Int, currentStep: Int, array2d: inout Array2D) async -> Bool {
         // Deaccumulate precipitation
         if stepType == "accum" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
+            guard startStep != currentStep else {
                 return false
             }
             // Store data for next timestep
@@ -508,7 +515,7 @@ actor GribDeaverager {
 
         // Deaverage data
         if stepType == "avg" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
+            guard startStep != currentStep else {
                 return false
             }
             // Store data for next timestep

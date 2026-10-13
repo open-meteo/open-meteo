@@ -304,7 +304,7 @@ struct KnmiDownload: AsyncCommand {
             }
 
             if generateElevationFile {
-                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
             }
             return try await writerMultistep.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         }

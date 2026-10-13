@@ -112,7 +112,7 @@ struct JmaDownload: AsyncCommand {
                 Meteorology.elevation(sealevelPressure: $1.0 / 100, surfacePressure: $0 / 100, temperature_2m: $1.1 - 273.15)
             }
             try domain.surfaceElevationFileOm.createDirectory()
-            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetCdf)
         }
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion

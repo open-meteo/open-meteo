@@ -78,7 +78,7 @@ struct DownloadEra5Command: AsyncCommand {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
+        try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
 
         let concurrent = signature.concurrent ?? System.coreCount
 
@@ -88,79 +88,10 @@ struct DownloadEra5Command: AsyncCommand {
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
-    /// Generate seasonal averages for bias corrections for CMIP climate data
-    /// They way how `GenericReaderMulti` is used, is not the cleanest, but otherwise daily calculations need to be implemented manually
-    /*func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int) throws {
-        logger.info("Calculating bias correction fields")
-        
-        let binsPerYear = 6
-        let nLocationChunks = 200
-        let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: nLocationChunks, chunk1: binsPerYear)
-        let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, wind_speed_unit: nil, precipitation_unit: .mm, length_unit: .metric)
-        let variables: [Cmip6VariableOrDerived] = Cmip6Variable.allCases.map{.raw($0)} + Cmip6VariableDerivedBiasCorrected.allCases.map{.derived($0)}
-        let availableForEra5Land: [Cmip6VariableOrDerived] = [
-            Cmip6Variable.temperature_2m_min,
-            .temperature_2m_max,
-            .temperature_2m_mean,
-            .relative_humidity_2m_max,
-            .relative_humidity_2m_min,
-            .relative_humidity_2m_mean,
-            .soil_moisture_0_to_10cm_mean,
-        ].map{.raw($0)} + [
-            Cmip6VariableDerivedBiasCorrected.soil_moisture_0_to_7cm_mean,
-            .soil_moisture_7_to_28cm_mean,
-            .soil_moisture_28_to_100cm_mean,
-            .soil_temperature_0_to_7cm_mean,
-            .soil_temperature_7_to_28cm_mean,
-            .soil_temperature_28_to_100cm_mean,
-            .vapour_pressure_deficit_max
-        ].map{.derived($0)}
-        
-        let options = GenericReaderOptions()
-        
-        for variable in variables {
-            guard let era5Variable = ForecastVariableDaily(rawValue: variable.rawValue) else {
-                fatalError("Could not initialise Era5DailyWeatherVariable for \(variable)")
-            }
-            try domain.getBiasCorrectionFile(for: era5Variable.rawValue).createDirectory()
-            let biasFile = domain.getBiasCorrectionFile(for: era5Variable.rawValue).getFilePath()
-            if FileManager.default.fileExists(atPath: biasFile) {
-                continue
-            }
-            if domain == .era5_land && !availableForEra5Land.contains(where: {$0.rawValue == variable.rawValue}) {
-                logger.info("Skipping \(variable), because unavailable for ERA5-Land")
-                continue
-            }
-            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
-            let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpx_xor2d, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
-                let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
-                var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                
-                // Read location one-by-one... Multi location support does not work with derived varibales
-                for (l, gridpoint) in locationRange.enumerated() {
-                    let gridpointNext = min(gridpoint+1, writer.dim0-1)
-                    let readerNext = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)), options: options)])
-                    try readerNext.prefetchData(variables: [era5Variable], time: time)
-                    
-                    let reader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint, options: options)), options: options)])
-                    
-                    guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
-                        fatalError("Could not get \(era5Variable)")
-                    }
-                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(dataFlat), time: time.time, binsPerYear: binsPerYear).meansPerYear)
-                }
-                progress.add(bias.nLocations)
-                return ArraySlice(bias.data)
-            })
-            progress.finish()
-        }
-    }*/
-
     /**
      Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
      */
-    func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain, createNetCdf: Bool) async throws {
+    func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain, createNetCdf: Bool, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
@@ -264,7 +195,7 @@ struct DownloadEra5Command: AsyncCommand {
             try await client.shutdown()
         }
 
-        try Self.processElevationLsmGrib(domain: domain, files: Array([tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted()), createNetCdf: createNetCdf)
+        try await Self.processElevationLsmGrib(domain: domain, files: Array([tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted()), createNetCdf: createNetCdf, application: application, uploadS3Bucket: uploadS3Bucket)
 
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {
@@ -275,7 +206,7 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
 
-    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool) throws {
+    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, application: Application, uploadS3Bucket: String?) async throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
@@ -328,7 +259,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
         }
 
-        try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetCdf)
     }
 
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [any GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {

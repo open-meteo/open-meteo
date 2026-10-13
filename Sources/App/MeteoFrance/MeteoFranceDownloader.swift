@@ -92,7 +92,7 @@ struct MeteoFranceDownload: AsyncCommand {
         let useGribPackagesDownload = signature.useGribPackages && !domain.mfApiPackagesSurface.isEmpty
         let gribPackages: [String]? = signature.gribPackages.map{$0.split(separator: ",").map(String.init)}
 
-        try await downloadElevation2(application: context.application, domain: domain, run: run)
+        try await downloadElevation2(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
         try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, packages: gribPackages) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
@@ -103,7 +103,7 @@ struct MeteoFranceDownload: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp) async throws {
+    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if domain == .arome_france_15min || domain == .arome_france_hd_15min || domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities {
@@ -133,7 +133,7 @@ struct MeteoFranceDownload: AsyncCommand {
         // try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         // message.dumpAttributes()
 
-        try grib2d.array.data.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
+        try await grib2d.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
     }
 
     /// Temporarily keep those varibles to derive others

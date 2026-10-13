@@ -56,7 +56,7 @@ struct DownloadBomCommand: AsyncCommand {
         let generateFullRun = domain.countEnsembleMember == 1
         let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try await downloadElevation(application: context.application, domain: domain, server: server, run: run)
+        try await downloadElevation(application: context.application, domain: domain, server: server, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = domain == .access_global_ensemble ?
         try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) : signature.upperLevel ?
             try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) :
@@ -64,7 +64,7 @@ struct DownloadBomCommand: AsyncCommand {
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
     }
 
-    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp) async throws {
+    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -113,7 +113,7 @@ struct DownloadBomCommand: AsyncCommand {
         }
 
         elevation.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
 
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay

@@ -154,7 +154,7 @@ struct ChmiDownload: AsyncCommand {
     /// Static geopotential field -> elevation in metre. Single GRIB message.
     /// TODO: This currently does not encode sea-points as -999
     /// -> There is a separate GRIB land-sea mask variable `SURFIND_TERREMER` (land=1, sea=0) which should be processed as well!
-    func downloadElevation(application: Application, domain: ChmiDomain, run: Timestamp, curl: Curl) async throws {
+    func downloadElevation(application: Application, domain: ChmiDomain, run: Timestamp, curl: Curl, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -181,7 +181,7 @@ struct ChmiDownload: AsyncCommand {
             fatalError("Could not read geopotential for elevation")
         }
         logger.info("Writing elevation file (\(elevation.count) grid points)")
-        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
 
     /// Read a single GRIB file containing all timesteps into a time-major buffer.
@@ -246,7 +246,7 @@ struct ChmiDownload: AsyncCommand {
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
 
-        try await downloadElevation(application: application, domain: domain, run: run, curl: curl)
+        try await downloadElevation(application: application, domain: domain, run: run, curl: curl, uploadS3Bucket: uploadS3Bucket)
 
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 

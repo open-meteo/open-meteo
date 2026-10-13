@@ -86,6 +86,19 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_icon_global_native
+    case dwd_icon_global_native_model_level
+    case dwd_icon_eu_native
+    case dwd_icon_eu_native_model_level
+    case dwd_icon_d2_native
+    case dwd_icon_d2_native_model_level
+    case dwd_icon_d2_native_15min
+    case dwd_icon_global_eps_native
+    case dwd_icon_global_eps_native_ensemble_mean
+    case dwd_icon_eu_eps_native
+    case dwd_icon_eu_eps_native_ensemble_mean
+    case dwd_icon_d2_eps_native
+    case dwd_icon_d2_eps_native_ensemble_mean
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
@@ -203,7 +216,8 @@ enum DomainRegistry: String, CaseIterable {
         switch self {
         case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
-        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps:
+        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return 3
         case .ncep_gefs05, .ncep_gefs025, .ncep_aigefs025, .ncep_gefswave025:
             return 3
@@ -226,7 +240,41 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 
-    func getDomain() -> GenericDomain? {
+    var nativeDefinition: IconNativeDomains? {
+        switch self {
+        case .dwd_icon_global_native: return .iconNative
+        case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
+        case .dwd_icon_eu_native: return .iconEuNative
+        case .dwd_icon_eu_native_model_level: return .iconEuNativeModelLevel
+        case .dwd_icon_d2_native: return .iconD2Native
+        case .dwd_icon_d2_native_model_level: return .iconD2NativeModelLevel
+        case .dwd_icon_d2_native_15min: return .iconD2Native15min
+        case .dwd_icon_global_eps_native: return .iconEpsNative
+        case .dwd_icon_global_eps_native_ensemble_mean: return .iconEpsNativeEnsembleMean
+        case .dwd_icon_eu_eps_native: return .iconEuEpsNative
+        case .dwd_icon_eu_eps_native_ensemble_mean: return .iconEuEpsNativeEnsembleMean
+        case .dwd_icon_d2_eps_native: return .iconD2EpsNative
+        case .dwd_icon_d2_eps_native_ensemble_mean: return .iconD2EpsNativeEnsembleMean
+        default: return nil
+        }
+    }
+
+    func getDomain() async throws -> (any GenericDomain)? {
+        if let nativeDefinition {
+            return try await nativeDefinition.load()
+        }
+        return regularDomain
+    }
+
+    /// Used by file scheduling and synchronization without opening grid or elevation files.
+    var timeSeriesMetadata: DomainTimeSeriesMetadata? {
+        if let nativeDefinition {
+            return DomainTimeSeriesMetadata(nativeDefinition.sourceDomain)
+        }
+        return regularDomain.map { DomainTimeSeriesMetadata($0) }
+    }
+
+    private var regularDomain: (any GenericDomain)? {
         switch self {
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
@@ -342,6 +390,11 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
+        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
+             .dwd_icon_global_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
+            return nil
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
         case .dwd_icon_eps:
@@ -570,3 +623,16 @@ enum DomainRegistry: String, CaseIterable {
 //        try spawnRetriedNoFail(cmd: "aws", args: args)
 //    }
 //}
+
+
+struct DomainTimeSeriesMetadata {
+    let dtSeconds: Int
+    let omFileLength: Int
+    let updateIntervalSeconds: Int
+
+    init(_ domain: any GenericDomain) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
+    }
+}
