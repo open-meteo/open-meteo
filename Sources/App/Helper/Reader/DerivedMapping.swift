@@ -14,6 +14,8 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     /// Requires static soil types encoded using the ERA5 classification.
     case soilMoistureIndex(RawOrMapped)
     case directShift24Hour(Variable)
+    /// Analytical extrema over each backwards-looking output interval.
+    case hermiteIntervalExtrema(Variable, minimum: Bool)
     /// Read additional samples before the requested range and return a trailing mean aligned to the request.
     case runningMean(Variable, windowSeconds: Int, maximumStepSeconds: Int)
     //case independent((TimerangeDtAndSettings) -> DataAndUnit)
@@ -261,6 +263,10 @@ extension GenericDeriverProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, let minimum):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            let input = try await reader.get(variable: variable, time: time.with(time: readTime))
+            return DataAndUnit(HermiteIntervalExtrema.calculate(data: input.data, time: readTime, output: time.time, minimum: minimum), input.unit)
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             let input = try await reader.get(variable: input, time: time.with(time: readTime))
@@ -337,6 +343,9 @@ extension GenericDeriverProtocol {
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, _):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            try await prefetchData(variable: variable, time: time.with(time: readTime))
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             try await prefetchData(variable: input, time: time.with(time: readTime))
@@ -455,6 +464,10 @@ extension GenericDeriverOptionalProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, let minimum):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            guard let input = try await reader.get(variable: variable, time: time.with(time: readTime)) else { return nil }
+            return DataAndUnit(HermiteIntervalExtrema.calculate(data: input.data, time: readTime, output: time.time, minimum: minimum), input.unit)
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             guard let input = try await get(variable: input, time: time.with(time: readTime)) else {
@@ -547,6 +560,9 @@ extension GenericDeriverOptionalProtocol {
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, _):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            return try await prefetchData(variable: variable, time: time.with(time: readTime))
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             return try await prefetchData(variable: input, time: time.with(time: readTime))

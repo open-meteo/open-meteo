@@ -1140,11 +1140,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         /// All primary sources are remapped onto this grid. The domain also supplies
         /// metadata for automatic latest-run selection where enabled.
         let gridForBoundingBoxRequests: (any GenericDomain)?
-        /// Allow daily aggregations to use hourly temperature min/max. This is only safe
-        /// if all models provide it. E.g. If ICON-D2 is mixed with IFS it would only calculate
-        /// daily min/max temperature based on IFS `temperature_2m_min`, because
-        /// ICON does not provide this variable
-        let allowMinMaxTwoAggregations: Bool
         /// Prefetch every reader; otherwise stop at the first reader accepting the variable.
         let prefetchAllReaders: Bool
         /// Smooth transitions when combining model data. False only fills missing values
@@ -1157,7 +1152,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             primary: [Source],
             secondary: [Source] = [],
             gridForBoundingBoxRequests: (any GenericDomain)? = nil,
-            allowMinMaxTwoAggregations: Bool = false,
             prefetchAllReaders: Bool = false,
             smoothTransitions: Bool = true,
             requirePrimaryCoverage: Bool = false
@@ -1165,14 +1159,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             self.primary = primary
             self.secondary = secondary
             self.gridForBoundingBoxRequests = gridForBoundingBoxRequests
-            self.allowMinMaxTwoAggregations = allowMinMaxTwoAggregations
             self.prefetchAllReaders = prefetchAllReaders
             self.smoothTransitions = smoothTransitions
             self.requirePrimaryCoverage = requirePrimaryCoverage
         }
 
         static func single(_ domain: any GenericDomain, _ variable: any GenericVariable.Type) -> Self {
-            .init(primary: [.domain(domain, variable)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: true)
+            .init(primary: [.domain(domain, variable)], gridForBoundingBoxRequests: domain)
         }
 
         static func multiple(_ primary: [Source], secondary: [Source] = []) -> Self {
@@ -1180,7 +1173,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
 
         static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain) -> Self {
-            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, allowMinMaxTwoAggregations: true, requirePrimaryCoverage: true)
+            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, requirePrimaryCoverage: true)
         }
 
         static func multipleWithPrecipitationProbability(_ primary: [Source], precipitationProb: any GenericDomain) -> Self {
@@ -1222,7 +1215,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if !forecast.hasAvailableRun, let error = forecast.unavailableRun { throw error }
             if requirePrimaryCoverage && forecast.readers.isEmpty { return nil }
             let supplemental = try await Self.makeDomainReaders(sources: secondary, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)
-            return MultiDomains.hourlyToMultiSameType(supplemental.readers + forecast.readers, prefetchAllReaders: prefetchAllReaders, smoothTransitions: smoothTransitions, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
+            return MultiDomains.hourlyToMultiSameType(supplemental.readers + forecast.readers, prefetchAllReaders: prefetchAllReaders, smoothTransitions: smoothTransitions)
         }
     }
 
@@ -1571,7 +1564,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 .domain(IconDomains.iconD2_15min, IconVariable.self)
             ], gridForBoundingBoxRequests: IconDomains.iconD2_15min,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .multiple([
                 .domain(IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
@@ -1592,37 +1585,37 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
                 .domain(try await IconNativeDomains.iconEpsNative.load(), DwdIconEpsGlobalVariable.self)
             ], gridForBoundingBoxRequests: IconDomains.iconEps,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .icon_eu_eps, .dwd_icon_eu_eps:
             return .init(primary: [
                 .domain(IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self),
                 .domain(try await IconNativeDomains.iconEuEpsNative.load(), DwdIconEuEpsGlobalVariable.self)
             ], gridForBoundingBoxRequests: IconDomains.iconEuEps,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .icon_d2_eps, .dwd_icon_d2_eps:
             return .init(primary: [
                 .domain(IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self),
                 .domain(try await IconNativeDomains.iconD2EpsNative.load(), DwdIconD2EpsGlobalVariable.self)
             ], gridForBoundingBoxRequests: IconDomains.iconD2Eps,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .dwd_icon_eps_ensemble_mean:
             return .init(primary: [
                 .domain(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
                 .domain(try await IconNativeDomains.iconEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEpsGlobalVariable>.self)
             ], gridForBoundingBoxRequests: IconDomains.iconEpsEnsembleMean,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .dwd_icon_eu_eps_ensemble_mean:
             return .init(primary: [
                 .domain(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
                 .domain(try await IconNativeDomains.iconEuEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
             ], gridForBoundingBoxRequests: IconDomains.iconEuEpsEnsembleMean,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .dwd_icon_d2_eps_ensemble_mean:
             return .init(primary: [
                 .domain(IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<DwdIconD2EpsGlobalVariable>.self),
                 .domain(try await IconNativeDomains.iconD2EpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
             ], gridForBoundingBoxRequests: IconDomains.iconD2EpsEnsembleMean,
-                allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
+                prefetchAllReaders: true, smoothTransitions: false)
         case .ecmwf_ifs025_ensemble_mean:
             return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfIfsVariable>.self)
         case .ecmwf_aifs025_ensemble_mean:
@@ -1870,21 +1863,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         }
         let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: readers)
-        let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
+        let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader)
         return (hourlyReader, daily, nil, nil)
     }
 
     static func hourlyToMultiSameType(
         _ readers: [any GenericReaderOptionalProtocol<ForecastVariable>],
         prefetchAllReaders: Bool = false,
-        smoothTransitions: Bool = true,
-        allowMinMaxTwoAggregations: Bool = false
+        smoothTransitions: Bool = true
     ) -> ForecastReaderResult? {
         guard readers.count > 0 else {
             return nil
         }
         let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: prefetchAllReaders, smoothTransitions: smoothTransitions)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: allowMinMaxTwoAggregations), nil, nil)
+        return (hourly, hourly.makeDailyAggregator(), nil, nil)
     }
 
     static func hourlyToMultiSameType(
@@ -2130,12 +2122,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             
             let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
+            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator()
             let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: EcmwfEC46Variable6Hourly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let ec46hourlyToDaily = ec46hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
+            let ec46hourlyToDaily = ec46hourly.makeDailyAggregator()
             
             let ec46weekly = try await EcmwfSeasDomain.ec46_weekly.makeWeeklyDeriverCached(variableType: EcmwfEC46VariableWeekly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
                         
@@ -2149,7 +2141,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             
             let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: seas5DailyDomain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
-            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
+            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator()
             
             let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
@@ -2160,7 +2152,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let ec46Domain: EcmwfSeasDomain = isEnsembleMean ? .ec46_ensemble_mean : .ec46
             
             let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: VariableOrSpread<EcmwfEC46Variable6Hourly>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
-            let ec46hourlyToDaily = ec46hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
+            let ec46hourlyToDaily = ec46hourly.makeDailyAggregator()
             let ec46weekly = try await EcmwfSeasDomain.ec46_weekly.makeWeeklyDeriverCached(variableType: EcmwfEC46VariableWeekly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             return (ec46hourly, ec46hourlyToDaily, ec46weekly, nil)
@@ -2237,14 +2229,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let reader70e = try await JaxaHimawariDomain.himawari_70e_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, reader70e].compactMap({$0}))
-                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+                return (hourly, hourly.makeDailyAggregator(), nil, nil)
             }
             return (nil, nil, nil, nil)
         case .jma_jaxa_himawari:
             let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
               let redaer70e = try await JaxaHimawariDomain.himawari_70e_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, redaer70e].compactMap({$0}))
-            return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            return (hourly, hourly.makeDailyAggregator(), nil, nil)
             
 //        case .ncep_hgefs025_ensemble_mean:
 //            return try await GfsGraphCastDomain.hgefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -2262,7 +2254,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 //                return nil
 //            }
 //            let hourly = GenericReaderMulti<ForecastVariable>(reader: [GenericReaderCached(reader: aigfs), prob])
-//            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourly, allowMinMaxTwoAggregations: true)
+//            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourly)
 //            return (hourly, daily, nil, nil)
         default:
             return MultiDomains.hourlyToMulti(try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, include15Min: include15Min))
@@ -2301,14 +2293,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if readers.isEmpty, let error = unavailableRun { throw error }
             // Keep an empty reader so an unmapped output cell still produces null forecast columns.
             let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: mapping.prefetchAllReaders, smoothTransitions: mapping.smoothTransitions)
-            return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: mapping.allowMinMaxTwoAggregations), nil, nil)
+            return (hourly, hourly.makeDailyAggregator(), nil, nil)
         }
         
         guard let readers: any GenericReaderProtocol = try await getReader(gridpoint: gridpoint, options: options) else {
             return (nil, nil, nil, nil)
         }
         let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: [readers])
-        let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
+        let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader)
         return (hourlyReader, daily, nil, nil)
     }
     
