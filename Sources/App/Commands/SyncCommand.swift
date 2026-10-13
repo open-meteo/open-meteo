@@ -78,7 +78,16 @@ struct SyncCommand: AsyncCommand {
             }
         }
         let modelsSet = try signature.models.split(separator: ";").map({
-            try DomainRegistry.load(commaSeparated: String($0))
+            var models = try DomainRegistry.load(commaSeparated: String($0))
+            // ICON readers also use variables stored on the native grid.
+            for (model, native) in [(DomainRegistry.dwd_icon_d2, DomainRegistry.dwd_icon_d2_native),
+                                    (.dwd_icon_eu, .dwd_icon_eu_native),
+                                    (.dwd_icon, .dwd_icon_global_native)] {
+                if models.contains(model) && !models.contains(native) {
+                    models.append(native)
+                }
+            }
+            return models
         })
         guard Curl.cacheDirectory == nil else {
             fatalError("HTTP_CACHE enabled")
