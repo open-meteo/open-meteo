@@ -26,92 +26,51 @@ struct SyncBoundingBox: Sendable {
     /// Decoded values of the reads in flight per file, so a file holds at most 72 MB of reads including the one being written
     static let valuesInFlight = 8 * bufferValues
 
+    /// Keep the cells that the API's `bounding_box` returns for `box`, and every cell within the grid search radius plus one of them
     init(grid: any Gridable, box: BoundingBoxWGS84) throws {
-        /// A Gaussian grid stores its latitude rings one after another in one row, so a box is a set of cells
-        if grid is GaussianGrid {
-            self = try SyncBoundingBox(grid: grid) { box.latitude.contains($0) && box.longitude.contains($1) }
-            return
-        }
+        let gaussian = grid as? GaussianGrid
         /// Native icosahedral grids store all points in one row without neighbours to widen by
-        guard grid.ny > 1 else {
+        guard grid.ny > 1 || gaussian != nil, let slice = grid.findBox(boundingBox: box) else {
             throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
         }
         ny = grid.ny
         nx = grid.nx
-        var y0 = Int.max, y1 = -1, x0 = Int.max, x1 = -1
-        for y in 0 ..< ny {
-            for x in 0 ..< nx {
-                let (lat, lon) = grid.getCoordinates(gridpoint: y * nx + x)
-                let lon180 = (lon + 540).truncatingRemainder(dividingBy: 360) - 180
-                guard box.latitude.contains(lat), box.longitude.contains(lon180) else {
-                    continue
-                }
-                y0 = min(y0, y); y1 = max(y1, y); x0 = min(x0, x); x1 = max(x1, x)
-            }
-        }
         /// The API searches around the nearest cell, which may lie one row or column outside the box, so keep one more
         let r = grid.searchRadius + 1
-        rows = y1 < 0 ? 0 ..< 0 : max(0, y0 - r) ..< min(ny, y1 + r + 1)
-        columns = x1 < 0 ? 0 ..< 0 : max(0, x0 - r) ..< min(nx, x1 + r + 1)
-        cells = nil
-    }
-
-    /// Keep the cells whose centre `inside(latitude, longitude)` accepts, with longitudes from -180 to 180, and every cell within the grid search radius plus one of them:
-    /// rows and columns on a regular grid, neighbouring rings and points along each ring on a Gaussian grid
-    init(grid: any Gridable, inside: (Float, Float) -> Bool) throws {
-        let gaussian = grid as? GaussianGrid
-        guard grid.ny > 1 || gaussian != nil else {
-            throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
-        }
-        let ny = grid.ny, nx = grid.nx, r = grid.searchRadius + 1
-        var cells = [Bool](repeating: false, count: ny * nx)
         if let gaussian {
-            let rings = 2 * gaussian.type.latitudeLines
-            for i in 0 ..< nx {
-                let (lat, lon) = grid.getCoordinates(gridpoint: i)
-                guard inside(lat, lon >= 180 ? lon - 360 : lon) else {
-                    continue
-                }
-                /// Rings have different point counts, so take the point at the same longitude in each neighbouring ring, then `r` points either side
+            /// A Gaussian grid stores its latitude rings one after another in one row. Rings have different point counts,
+            /// so take the point at the same longitude in each neighbouring ring, then `r` points either side
+            var cells = [Bool](repeating: false, count: nx)
+            for i in slice {
                 let (y, x, points) = gaussian.type.getPos(gridpoint: i)
-                for ring in max(0, y - r) ..< min(rings, y + r + 1) {
+                for ring in max(0, y - r) ..< min(2 * gaussian.type.latitudeLines, y + r + 1) {
                     let ringPoints: Int = gaussian.nxOf(y: ring)
                     let centre = Int((Double(x) * Double(ringPoints) / Double(points)).rounded())
                     for k in 0 ..< min(2 * r + 1, ringPoints) {
-                        let along: Int = ((centre + k - r) % ringPoints + ringPoints) % ringPoints
-                        cells[gaussian.integral(y: ring) + along] = true
+                        cells[gaussian.integral(y: ring) + ((centre + k - r) % ringPoints + ringPoints) % ringPoints] = true
                     }
                 }
             }
-        } else {
-            /// Widened along each row first, then along each column
-            var wide = [Bool](repeating: false, count: ny * nx)
-            for i in 0 ..< ny * nx {
-                let (lat, lon) = grid.getCoordinates(gridpoint: i)
-                let wrapped: Float = lon >= 180 ? lon - 360 : lon < -180 ? lon + 360 : lon
-                guard inside(lat, wrapped) else {
-                    continue
-                }
-                let (y, x) = i.quotientAndRemainder(dividingBy: nx)
-                for xx in max(0, x - r) ..< min(nx, x + r + 1) {
-                    wide[y * nx + xx] = true
-                }
+            guard let first = cells.firstIndex(of: true), let last = cells.lastIndex(of: true) else {
+                throw ForecastApiError.generic(message: "the box holds no cell of this grid")
             }
-            for y in 0 ..< ny {
-                for x in 0 ..< nx where wide[y * nx + x] {
-                    for yy in max(0, y - r) ..< min(ny, y + r + 1) {
-                        cells[yy * nx + x] = true
-                    }
-                }
-            }
+            rows = 0 ..< 1
+            columns = first ..< last + 1
+            self.cells = cells
+            return
         }
-        let kept: [Int] = cells.indices.filter { cells[$0] }
-        let keptColumns: [Int] = kept.map { $0 % nx }
-        self.ny = ny
-        self.nx = nx
-        self.rows = kept.isEmpty ? 0 ..< 0 : kept[0] / nx ..< kept[kept.count - 1] / nx + 1
-        self.columns = kept.isEmpty ? 0 ..< 0 : keptColumns.min()! ..< keptColumns.max()! + 1
-        self.cells = cells
+        var y0 = Int.max, y1 = -1, x0 = Int.max, x1 = -1
+        for i in slice {
+            let (y, x) = i.quotientAndRemainder(dividingBy: nx)
+            y0 = min(y0, y); y1 = max(y1, y); x0 = min(x0, x); x1 = max(x1, x)
+        }
+        /// Like the API, a box that is not entirely inside a regional grid holds no cell
+        guard y1 >= 0 else {
+            throw ForecastApiError.generic(message: "the box holds no cell of this grid")
+        }
+        rows = max(0, y0 - r) ..< min(ny, y1 + r + 1)
+        columns = max(0, x0 - r) ..< min(nx, x1 + r + 1)
+        cells = nil
     }
 
     private init(ny: Int, nx: Int, rows: Range<Int>, columns: Range<Int>, cells: [Bool]?) {

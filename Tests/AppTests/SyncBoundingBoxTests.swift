@@ -25,15 +25,20 @@ import Logging
         let inside = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         #expect(inside.rows == 3 ..< 9)
         #expect(inside.columns == 5 ..< 11)
-        /// A query at 5.1N picks row 5, outside the box, and searches row 4 around it
+        /// The box edges round to the nearest row like the API's `bounding_box`, so 5.1N starts at row 5
         let between = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5.1 ..< 6.5, longitude: 7 ..< 8.5))
-        #expect(between.rows == 4 ..< 9)
-        /// A box larger than the grid is clamped to its edges
-        let edges = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: -20 ..< 0.5, longitude: 13.5 ..< 40))
+        #expect(between.rows == 3 ..< 9)
+        /// Rows and columns are clamped to the grid edges
+        let edges = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 0 ..< 0.5, longitude: 13.5 ..< 15))
         #expect(edges.rows == 0 ..< 3)
         #expect(edges.columns == 12 ..< 15)
-        let outside = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 50 ..< 60, longitude: 50 ..< 60))
-        #expect(outside.rows.isEmpty)
+        /// A box partly or entirely outside the grid holds no cell, like for the API
+        #expect(throws: (any Error).self) {
+            try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: -20 ..< 0.5, longitude: 13.5 ..< 40))
+        }
+        #expect(throws: (any Error).self) {
+            try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 50 ..< 60, longitude: 50 ..< 60))
+        }
         #expect(throws: (any Error).self) {
             try SyncBoundingBox(grid: RegularGrid(nx: 100, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1), box: BoundingBoxWGS84(latitude: 0 ..< 1, longitude: 0 ..< 1))
         }
@@ -91,25 +96,32 @@ import Logging
     /// Rings of the n160 Gaussian grid, the smallest one, have different point counts
     @Test func gaussianCells() throws {
         let gaussian = GaussianGrid(type: .n160)
-        let keep = try SyncBoundingBox(grid: gaussian, box: BoundingBoxWGS84(latitude: 45 ..< 48, longitude: 5 ..< 11))
+        let box = BoundingBoxWGS84(latitude: 45 ..< 48, longitude: 5 ..< 11)
+        let keep = try SyncBoundingBox(grid: gaussian, box: box)
         let cells = try #require(keep.cells)
-        var inside = [Int: ClosedRange<Int>](), kept = [Int: ClosedRange<Int>]()
+        var found = [Int: ClosedRange<Int>](), kept = [Int: ClosedRange<Int>]()
+        for i in try #require(gaussian.findBox(boundingBox: box)) {
+            #expect(cells[i])
+            let (y, x, _) = gaussian.type.getPos(gridpoint: i)
+            found[y] = min(found[y]?.lowerBound ?? x, x) ... max(found[y]?.upperBound ?? x, x)
+        }
         for i in 0 ..< gaussian.nx {
             let (lat, lon) = gaussian.getCoordinates(gridpoint: i)
             let (y, x, _) = gaussian.type.getPos(gridpoint: i)
-            if (45 ..< 48).contains(lat), (5 ..< 11).contains(lon) {
+            /// Every cell with its centre inside the box is kept
+            if box.latitude.contains(lat), box.longitude.contains(lon) {
                 #expect(cells[i])
-                inside[y] = min(inside[y]?.lowerBound ?? x, x) ... max(inside[y]?.upperBound ?? x, x)
             }
             if cells[i] {
                 kept[y] = min(kept[y]?.lowerBound ?? x, x) ... max(kept[y]?.upperBound ?? x, x)
             }
         }
-        /// Two rings north and south, and two points either side along each ring
-        let rings = try #require(inside.keys.min()) ... (try #require(inside.keys.max()))
+        /// Two rings north and south, and at least two points either side along each ring. Neighbouring rings may widen a ring further
+        let rings = try #require(found.keys.min()) ... (try #require(found.keys.max()))
         #expect(Set(kept.keys) == Set(rings.lowerBound - 2 ... rings.upperBound + 2))
-        for (y, x) in inside {
-            #expect(kept[y] == x.lowerBound - 2 ... x.upperBound + 2)
+        for (y, x) in found {
+            let keptX = try #require(kept[y])
+            #expect(keptX.lowerBound <= x.lowerBound - 2 && keptX.upperBound >= x.upperBound + 2)
         }
         #expect(keep.rows == 0 ..< 1)
     }
