@@ -13,7 +13,7 @@ import Testing
     @Test(arguments: [3600, 10800, 21600])
     func temperatureMinimumUsesIntervalsEndingWithinDay(modelDt: Int) async throws {
         let reader = FixtureReader(modelDtSeconds: modelDt, start: start)
-        let converter = DailyReaderConverter<FixtureReader, ForecastVariableDaily>(reader: reader, allowMinMaxTwoAggregations: true)
+        let converter = DailyReaderConverter<FixtureReader, ForecastVariableDaily>(reader: reader)
 
         let result = try #require(await converter.get(variable: .temperature_2m_min, time: dailyTime))
         // The starting midnight belongs to the previous day. Each following midnight
@@ -32,7 +32,7 @@ import Testing
     @Test(arguments: [3600, 10800, 21600])
     func precipitationSumUsesIntervalsEndingWithinDay(modelDt: Int) async throws {
         let reader = FixtureReader(modelDtSeconds: modelDt, start: start)
-        let converter = DailyReaderConverter<FixtureReader, ForecastVariableDaily>(reader: reader, allowMinMaxTwoAggregations: true)
+        let converter = DailyReaderConverter<FixtureReader, ForecastVariableDaily>(reader: reader)
 
         let result = try #require(await converter.get(variable: .precipitation_sum, time: dailyTime))
         // Each day has 1 mm per interval, except its final interval (7 and 11 mm).

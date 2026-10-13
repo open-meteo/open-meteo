@@ -51,14 +51,6 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     typealias VariableOpt = DailyVariable
     let reader: Reader
     
-    /// Use model-provided min/max fields when available. Disabled for mixed readers because these fields may come from a different model than the hourly temperature.
-    let allowMinMaxTwoAggregations: Bool
-    
-    init(reader: Reader, allowMinMaxTwoAggregations: Bool) {
-        self.reader = reader
-        self.allowMinMaxTwoAggregations = allowMinMaxTwoAggregations
-    }
-    
     var modelLat: Float {
         reader.modelLat
     }
@@ -111,7 +103,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
         case .minTwo(let variable, let b):
             // Interval extrema describe the preceding model timestep, including the interval ending at the next midnight.
             let timeInterval = timeModel.with(time: timeModel.time.add(modelDtSeconds))
-            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeInterval) {
+            if let data = try await reader.get(variable: variable, time: timeInterval) {
                 return DataAndUnit(data.data.min(by: stepsModel), data.unit)
             }
             guard let data = try await reader.get(variable: b, time: time1h) else {
@@ -120,7 +112,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .maxTwo(let variable, let b):
             let timeInterval = timeModel.with(time: timeModel.time.add(modelDtSeconds))
-            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeInterval) {
+            if let data = try await reader.get(variable: variable, time: timeInterval) {
                 return DataAndUnit(data.data.max(by: stepsModel), data.unit)
             }
             guard let data = try await reader.get(variable: b, time: time1h) else {
