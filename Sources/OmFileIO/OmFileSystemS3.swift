@@ -108,12 +108,15 @@ public struct OmFileSystemS3: Sendable {
             case error(Error, Timestamp)
         }
 
-        /// Cancellation and stale remote metadata are not terminal payload
+        /// Cancellation, queue saturation and stale remote metadata are not terminal payload
         /// initialisation errors. In particular, caching a 412 here would make
         /// every request replay it for a minute without attempting another
         /// HEAD revalidation.
         private static func shouldResetPayload(after error: Error) -> Bool {
             if error is CancellationError {
+                return true
+            }
+            if let error = error as? LimitedConcurrencyExecutor.QueueError, case .queueFull = error {
                 return true
             }
             guard let error = error as? CurlErrorNonRetry else {
@@ -239,7 +242,7 @@ public struct OmFileSystemS3: Sendable {
                     guard case .initialising(let queued) = payload else {
                         fatalError("State was not .initialising()")
                     }
-                    // Do not cache the cancellation as terminal error.
+                    // Let subsequent accesses retry transient failures immediately.
                     if Self.shouldResetPayload(after: error) {
                         self.payload = .none
                     } else {
