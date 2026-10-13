@@ -145,11 +145,6 @@ struct SyncCommand: AsyncCommand {
                 /// Used for `really_download_all_but_pressure_once_per_day` to download pressure data only once per day
                 let downloadPressureNow = lastPressureDownloadDate != Timestamp.now().with(hour: 0)
                 for (server, model, variablesSig) in $0 {
-                    /// Range reads get a client of their own with 16 connections per file, because the shared client allows 8 per host for all files
-                    let rangeClient = bbox == nil || model == .copernicus_dem90 ? nil : HTTPClient(
-                        eventLoopGroupProvider: .shared(context.application.eventLoopGroup),
-                        configuration: .init(connectionPool: .init(idleTimeout: .minutes(1), concurrentHTTP1ConnectionsPerHostSoftLimit: concurrent * 16))
-                    )
                     do {
                         try await syncModel(
                             application: context.application,
@@ -161,14 +156,12 @@ struct SyncCommand: AsyncCommand {
                             pastDays: pastDays,
                             apikey: signature.apikey,
                             downloadPressureNow: downloadPressureNow,
-                            bbox: bbox,
-                            rangeClient: rangeClient
+                            bbox: bbox
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
                         exitStatus.markFailure()
                     }
-                    try? await rangeClient?.shutdown()
                 }
                 if downloadPressureNow {
                     lastPressureDownloadDate = Timestamp.now().with(hour: 0)
@@ -182,7 +175,7 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?, rangeClient: HTTPClient? = nil) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?) async throws {
         let logger = application.logger
         
         /// The digital elevation model has no grid and only static files, which are copied whole
@@ -205,9 +198,7 @@ struct SyncCommand: AsyncCommand {
         let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
         let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
         
-        // Note: Ceph S3 has issues with HTTP2 and API actions with empty body payloads. Fallback to HTTP1.1
-        // See: https://github.com/swift-server/async-http-client/issues/602
-        let client = server.contains(".your-objectstorage.com") || server.contains("s3.open-meteo.com") || server.contains("127.0.0.1:7480") ? application.http1Client : application.dedicatedHttpClient
+        let client = HTTPClient.shared
         
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
@@ -277,7 +268,7 @@ struct SyncCommand: AsyncCommand {
                             /// Static files are 2D and copied whole, so they skip the remote header read
                             if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
                                 /// The API key travels in the URL query like a whole download, because the server reads it only from there
-                                let remote = try await OmHttpReaderBackend(context: endpoint, object: download.name + (request.url.query.map { "?\($0)" } ?? ""), client: rangeClient ?? .shared)
+                                let remote = try await OmHttpReaderBackend(context: endpoint, object: download.name + (request.url.query.map { "?\($0)" } ?? ""))
                                 if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
                                     await progress.add(fetched)
                                     break
