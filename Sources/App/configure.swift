@@ -45,9 +45,13 @@ enum OpenMeteo {
         guard let upstreamFetchConcurrency = Int(Environment.get("UPSTREAM_FETCH_CONCURRENCY") ?? "60"), upstreamFetchConcurrency > 0 else {
             fatalError("UPSTREAM_FETCH_CONCURRENCY must be a positive integer")
         }
+        guard let upstreamFetchMaxQueued = Int(Environment.get("UPSTREAM_FETCH_MAX_QUEUED") ?? "1000"), upstreamFetchMaxQueued >= 0 else {
+            fatalError("UPSTREAM_FETCH_MAX_QUEUED must be a non-negative integer")
+        }
         let cache = AtomicCacheCoordinator(
             cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount),
-            maxConcurrentUpstreamFetches: upstreamFetchConcurrency
+            maxConcurrentUpstreamFetches: upstreamFetchConcurrency,
+            maxQueuedUpstreamFetches: upstreamFetchMaxQueued
         )
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache

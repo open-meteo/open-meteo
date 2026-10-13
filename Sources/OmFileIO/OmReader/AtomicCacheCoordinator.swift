@@ -10,9 +10,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     private let upstreamFetchExecutor: LimitedConcurrencyExecutor
     private var queue: [Key: [CheckedContinuation<UnsafeRawBufferPointer, any Error>]] = [:]
     
-    public init(cache: AtomicBlockCache<Backend>, maxConcurrentUpstreamFetches: Int = 60) {
+    public init(cache: AtomicBlockCache<Backend>, maxConcurrentUpstreamFetches: Int = 60, maxQueuedUpstreamFetches: Int = 1_000) {
         self.cache = cache
-        self.upstreamFetchExecutor = LimitedConcurrencyExecutor(maxConcurrency: maxConcurrentUpstreamFetches)
+        self.upstreamFetchExecutor = LimitedConcurrencyExecutor(maxConcurrency: maxConcurrentUpstreamFetches, maxQueued: maxQueuedUpstreamFetches)
         self.queue = .init()
     }    
 

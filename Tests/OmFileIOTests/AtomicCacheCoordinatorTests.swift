@@ -4,8 +4,39 @@ import OmFileFormat
 import Testing
 
 @Suite struct AtomicCacheCoordinatorTests {
+    @Test func fullQueueRejectsFetchAndAllowsRetryAfterDraining() async throws {
+        let fixture = try CacheFixture(limit: 1, maxQueued: 1)
+        let coordinator = fixture.coordinator
+        let provider = ControlledProvider()
+        let first = Task { try await read(coordinator, provider, key: 10) }
+        try await eventually { await provider.started.count == 1 }
+        let second = Task { try await read(coordinator, provider, key: 20) }
+        try await eventually { await coordinator.upstreamFetchStatistics().queued == 1 }
+
+        await #expect(throws: LimitedConcurrencyExecutor.QueueError.queueFull) {
+            try await read(coordinator, provider, key: 30, count: 2)
+        }
+        #expect(await provider.started.count == 1)
+        #expect(await coordinator.upstreamFetchStatistics().active == 1)
+        #expect(await coordinator.upstreamFetchStatistics().queued == 1)
+
+        await provider.finish(10)
+        try await first.value
+        try await eventually { await provider.started.count == 2 }
+        await provider.finish(20)
+        try await second.value
+
+        // Rejection must remove reservations for every block in the range.
+        let retry = Task { try await read(coordinator, provider, key: 30, count: 2) }
+        try await eventually { await provider.started.count == 3 }
+        await provider.finish(30)
+        try await retry.value
+        #expect(await coordinator.upstreamFetchStatistics().active == 0)
+        #expect(await coordinator.upstreamFetchStatistics().queued == 0)
+    }
+
     @Test func limitsUniqueFetchesAndSharesQueuedRanges() async throws {
-        let fixture = try CacheFixture(limit: 2)
+        let fixture = try CacheFixture(limit: 2, maxQueued: 2)
         let coordinator = fixture.coordinator
         let provider = ControlledProvider()
         let first = Task { try await read(coordinator, provider, key: 10, count: 2) }
@@ -117,10 +148,10 @@ private final class CacheFixture {
     let cache: AtomicBlockCache<MmapFile>
     let coordinator: AtomicCacheCoordinator<MmapFile>
 
-    init(limit: Int) throws {
+    init(limit: Int, maxQueued: Int = 1_000) throws {
         path = FileManager.default.temporaryDirectory.appendingPathComponent("fetch-limit-\(UUID()).bin").path
         cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 256)
-        coordinator = AtomicCacheCoordinator(cache: cache, maxConcurrentUpstreamFetches: limit)
+        coordinator = AtomicCacheCoordinator(cache: cache, maxConcurrentUpstreamFetches: limit, maxQueuedUpstreamFetches: maxQueued)
     }
 
     deinit { try? FileManager.default.removeItem(atPath: path) }

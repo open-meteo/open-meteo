@@ -4,6 +4,20 @@ import Synchronization
 import Testing
 
 @Suite struct LimitedConcurrencyExecutorTests {
+    @Test func zeroQueueLimitRejectsWorkOnlyWhenAllSlotsAreOccupied() async throws {
+        let executor = LimitedConcurrencyExecutor(maxConcurrency: 1, maxQueued: 0)
+        try await executor.acquire()
+        await #expect(throws: LimitedConcurrencyExecutor.QueueError.queueFull) {
+            try await executor.execute { Issue.record("Rejected work must not run") }
+        }
+        #expect(await executor.statistics().active == 1)
+        #expect(await executor.statistics().queued == 0)
+        await executor.release()
+        let result = try await executor.execute { 42 }
+        #expect(result == 42)
+        #expect(await executor.statistics().active == 0)
+    }
+
     @Test func mapEnumeratedConcurrentDoesNotPrefetchPastExecutorCapacity() async throws {
         let nextCounter = Counter()
         let startCounter = Counter()
@@ -12,7 +26,7 @@ import Testing
         let sequence = CountingAsyncSequence(count: 20, nextCounter: nextCounter)
 
         let task = Task {
-            await sequence.mapEnumeratedConcurrent(executor: executor) { _, element in
+            try await sequence.mapEnumeratedConcurrent(executor: executor) { _, element in
                 await startCounter.increment()
                 await gate.wait()
                 return element
@@ -26,7 +40,7 @@ import Testing
         #expect(nextCalls == executor.maxConcurrency)
 
         await gate.open()
-        let result = await task.value
+        let result = try await task.value
         #expect(result == Array(0..<20))
     }
 
@@ -48,7 +62,7 @@ import Testing
         }
     }
 
-    @Test func mapEnumeratedConcurrentReleasesPermitWhenIteratorThrows() async {
+    @Test func mapEnumeratedConcurrentReleasesPermitWhenIteratorThrows() async throws {
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 1)
         let sequence = ThrowingAsyncSequence()
 
@@ -58,7 +72,7 @@ import Testing
             }
         }
 
-        let result = await executor.execute {
+        let result = try await executor.execute {
             42
         }
         #expect(result == 42)
