@@ -1258,15 +1258,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_ifs04:
             return .single(EcmwfDomain.ifs04, EcmwfVariable.self)
         case .ecmwf_ifs025:
-            return .singleWithPrecipitationProbability(EcmwfDomain.ifs025, EcmwfVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble)
+            return .singleWithPrecipitationProbability(EcmwfDomain.ifs025, EcmwfIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .ecmwf_aifs025:
             return .single(EcmwfDomain.aifs025, EcmwfVariable.self)
         case .ecmwf_aifs025_single:
-            return .single(EcmwfDomain.aifs025_single, EcmwfVariable.self)
+            return .single(EcmwfDomain.aifs025_single, EcmwfAifsVariable.self)
         case .ecmwf_ifs025_ensemble:
-            return .multiple([.domain(EcmwfDomain.ifs025_ensemble, EcmwfVariable.self)])
+            return .single(EcmwfDomain.ifs025_ensemble, EcmwfIfsVariable.self)
         case .ecmwf_aifs025_ensemble:
-            return .multiple([.domain(EcmwfDomain.aifs025_ensemble, EcmwfVariable.self)])
+            return .single(EcmwfDomain.aifs025_ensemble, EcmwfAifsVariable.self)
         case .ecmwf_ifs:
             return .singleWithPrecipitationProbability(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .era5, .copernicus_era5:
@@ -1443,7 +1443,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(ItaliaMeteoArpaeDomain.icon_2i, ItaliaMeteoArpaeVariable.self)
         case .dmi_seamless:
             return .multipleWithPrecipitationProbability([
-                .domain(EcmwfDomain.ifs025, EcmwfVariable.self),
+                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 .domain(DmiDomain.harmonie_arome_europe, DmiVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
@@ -1452,14 +1452,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .metno_seamless:
             return .multipleWithPrecipitationProbability([
                 .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                .domain(EcmwfDomain.ifs025, EcmwfVariable.self),
+                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 .domain(MetNoDomain.nordic_pp, MetNoVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .knmi_seamless:
             return .multipleWithPrecipitationProbability([
                 .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                .domain(EcmwfDomain.ifs025, EcmwfVariable.self),
+                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 .domain(KnmiDomain.harmonie_arome_europe, KnmiVariable.self),
                 .domain(KnmiDomain.harmonie_arome_netherlands, KnmiVariable.self)
@@ -1623,9 +1623,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ], gridForBoundingBoxRequests: IconDomains.iconD2EpsEnsembleMean,
                 allowMinMaxTwoAggregations: true, prefetchAllReaders: true, smoothTransitions: false)
         case .ecmwf_ifs025_ensemble_mean:
-            return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
+            return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfIfsVariable>.self)
         case .ecmwf_aifs025_ensemble_mean:
-            return .single(EcmwfDomain.aifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
+            return .single(EcmwfDomain.aifs025_ensemble_mean, VariableOrSpread<EcmwfAifsVariable>.self)
         case .ncep_gefs025_ensemble_mean:
             return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
         case .ncep_gefs05_ensemble_mean:
@@ -1769,7 +1769,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
             ], secondary: [
                 .domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self),
-                .domain(EcmwfDomain.ifs025, EcmwfVariable.self),
+                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self)
             ], requirePrimaryCoverage: true)
         case .air_quality_best_match:
@@ -1823,7 +1823,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             )
         case .geosphere_seamless:
             return .multipleWithPrecipitationProbability([
-                .domain(EcmwfDomain.ifs025, EcmwfVariable.self),
+                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 .domain(GeoSphereDomain.arome_austria, GeoSphereVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
@@ -1961,7 +1961,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             guard
                 let gfs = gfsForecast?.hourly,
                 let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                let ifs025 = try await EcmwfDomain.ifs025.makeDerivedHourly(variableType: EcmwfVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                let ifs025 = try await EcmwfDomain.ifs025.makeDerivedHourly(variableType: EcmwfIfsVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                 let ifsHres = try await EcmwfEcpdsDomain.ifs.makeDerivedHourly(variableType: EcmwfEcdpsIfsVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
@@ -1993,7 +1993,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
                 let mapping = DomainReaderMapping.multipleWithPrecipitationProbability([
                     .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                    .domain(EcmwfDomain.ifs025, EcmwfVariable.self),
+                    .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                     .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                     .domain(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
                     .domain(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)

@@ -78,8 +78,8 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     }
 }
 
-/// Represent a ECMWF variable as available in the grib2 files
-/// Only AIFS has additional levels 100, 400 and 600
+/// Download union, including ingestion-only inputs and fields from legacy products.
+/// Use the product-specific reader schemas for modern IFS and AIFS API readers.
 enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, GenericVariableMixable {
     case precipitation
     /**
