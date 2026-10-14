@@ -493,7 +493,13 @@ struct DownloadIconCommand: AsyncCommand {
         let requestedNativeDomain = IconNativeDomains(rawValue: signature.domain)
             ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
         let nativeDomain = requestedNativeDomain?.modelLevelParent ?? (requestedNativeDomain == .iconD2RucNative15min ? .iconD2RucNative : requestedNativeDomain)
-        let domain = try nativeDomain?.sourceDomain ?? IconDomains.load(rawValue: signature.domain)
+        guard let domain = nativeDomain?.sourceDomain ?? IconDomains(rawValue: signature.domain) else {
+            let availableDomains = IconNativeDomains.allCases.filter {
+                ![.iconEpsNativeEnsembleMean, .iconEuEpsNativeEnsembleMean, .iconD2EpsNativeEnsembleMean].contains($0)
+            }
+            throw RawRepresentableError.invalidValue(value: signature.domain,
+                availableValues: [IconDomains.icon.rawValue] + availableDomains.map { $0.rawValue })
+        }
         let feed = nativeDomain?.downloadDomain ?? domain.downloadDomain
         guard !signature.skipRegridding || nativeDomain == .iconNative else {
             throw Abort(.badRequest, reason: "--skip-regridding is only supported for icon or icon-native.")
