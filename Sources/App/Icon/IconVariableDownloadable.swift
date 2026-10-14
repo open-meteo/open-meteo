@@ -6,16 +6,6 @@ protocol IconVariableDownloadable: GenericVariable, Hashable {
 }
 
 extension IconSurfaceVariable: IconVariableDownloadable {
-    var rucCorrectionDependencies: [IconSurfaceVariable] {
-        switch self {
-        case .rain: return [.temperature_2m, .snowfall_height, .snowfall_water_equivalent]
-        case .snowfall_water_equivalent: return [.temperature_2m, .snowfall_height]
-        case .snowfall_height, .freezing_level_height: return [.temperature_2m]
-        case .weather_code: return [.temperature_2m, .precipitation, .snowfall_height]
-        default: return []
-        }
-    }
-
     func hasQuarterHourlyData(domain: IconDomains) -> Bool {
         if domain == .iconD2Ruc {
             return [.direct_radiation, .diffuse_radiation, .precipitation, .rain, .snowfall_water_equivalent, .cape, .convective_inhibition, .lightning_potential, .snowfall_height, .freezing_level_height, .updraft, .visibility].contains(self)

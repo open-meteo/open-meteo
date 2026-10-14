@@ -105,15 +105,6 @@ import Testing
         #expect([Float(2), .nan, 4, 1].aggregate(type: variable.interpolation, timeOld: quarters, timeNew: hour)[0].isNaN)
     }
 
-    @Test func correctionDependenciesAreSpecificToTheRequestedField() {
-        #expect(IconSurfaceVariable.freezing_level_height.rucCorrectionDependencies == [.temperature_2m])
-        #expect(IconSurfaceVariable.snowfall_height.rucCorrectionDependencies == [.temperature_2m])
-        #expect(IconSurfaceVariable.snowfall_water_equivalent.rucCorrectionDependencies == [.temperature_2m, .snowfall_height])
-        #expect(IconSurfaceVariable.rain.rucCorrectionDependencies == [.temperature_2m, .snowfall_height, .snowfall_water_equivalent])
-        #expect(IconSurfaceVariable.weather_code.rucCorrectionDependencies == [.temperature_2m, .precipitation, .snowfall_height])
-        #expect(IconSurfaceVariable.precipitation.rucCorrectionDependencies.isEmpty)
-    }
-
     @Test func derivedVariablesUseInputsFromBothCadences() async throws {
         let options = try GenericReaderOptions(logger: Logger(label: "IconRucTests"), httpClient: nil)
         let hourly = RucRawFixture(values: ["temperature_2m": 20, "relative_humidity_2m": 50, "wind_u_component_10m": 3, "wind_v_component_10m": 4], modelDtSeconds: 3600)

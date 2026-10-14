@@ -576,20 +576,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
 
-        var variables = onlyVariables ?? groupVariables
-        if domain == .iconD2Ruc {
-            var requested = Set(variables.compactMap { $0 as? IconSurfaceVariable })
-            for variable in variables.compactMap({ $0 as? IconSurfaceVariable }) {
-                for dependency in variable.rucCorrectionDependencies where requested.insert(dependency).inserted {
-                    variables.append(dependency)
-                }
-            }
-            var pressureVariables = Set(variables.compactMap { $0 as? IconPressureVariable })
-            for variable in variables.compactMap({ $0 as? IconPressureVariable }) where variable.requiresSpecificHumidityConversion(domain: domain) {
-                let temperature = IconPressureVariable(variable: .temperature, level: variable.level)
-                if pressureVariables.insert(temperature).inserted { variables.append(temperature) }
-            }
-        }
+        let variables = onlyVariables ?? groupVariables
 
         if domain == .iconD2Ruc, let onlyVariables {
             for variable in onlyVariables where variable.getVarAndLevel(domain: domain) == nil {
