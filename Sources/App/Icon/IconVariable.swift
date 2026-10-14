@@ -417,8 +417,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return .hermite(bounds: 0...10e9)
         case .lightning_potential:
             return .linear
-        case .wind_gusts_10m:
-            return .hermite(bounds: 0...10e9)
+        // GRIB stepType=max denotes preceding-interval maxima, so backwards_max preserves their meaning.
+        case .wind_gusts_10m, .updraft:
+            return .backwards_max
         case .snowfall_height:
             return .linear
         case .freezing_level_height:
@@ -429,8 +430,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return .solar_backwards_averaged
         case .direct_radiation:
             return .solar_backwards_averaged
-        case .updraft:
-            return .hermite(bounds: nil)
         case .visibility:
             return .linear
         }
@@ -621,7 +620,8 @@ enum DwdIconEuEpsGlobalVariable: String, Hashable, GenericVariable {
         case .wind_u_component_10m: return .hermite(bounds: nil)
         case .wind_v_component_80m: return .hermite(bounds: nil)
         case .wind_u_component_80m: return .hermite(bounds: nil)
-        case .wind_gusts_10m: return .hermite(bounds: 0...10e9)
+        // GRIB stepType=max denotes preceding-interval maxima, so backwards_max preserves their meaning.
+        case .wind_gusts_10m: return .backwards_max
         case .relative_humidity_2m: return .hermite(bounds: 0...100)
         case .direct_radiation, .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...10e9)
@@ -766,7 +766,8 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .wind_u_component_120m: return .hermite(bounds: nil)
         case .wind_v_component_180m: return .hermite(bounds: nil)
         case .wind_u_component_180m: return .hermite(bounds: nil)
-        case .wind_gusts_10m: return .hermite(bounds: 0...10e9)
+        // GRIB stepType=max denotes preceding-interval maxima, so backwards_max preserves their meaning.
+        case .wind_gusts_10m: return .backwards_max
         case .relative_humidity_2m: return .hermite(bounds: 0...100)
         case .direct_radiation, .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...10e9)

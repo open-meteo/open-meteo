@@ -98,14 +98,15 @@ import Testing
         #expect(data.data == [200])
     }
 
-    @Test func intervalMaximumReaderAggregation() throws {
-        let variable = try #require(IconRucVariable(rawValue: "updraft"))
+    @Test(arguments: [IconSurfaceVariable.updraft.interpolation, IconSurfaceVariable.wind_gusts_10m.interpolation,
+                      DwdIconEuEpsGlobalVariable.wind_gusts_10m.interpolation, DwdIconD2EpsGlobalVariable.wind_gusts_10m.interpolation])
+    func intervalMaximumReaderAggregation(interpolation: ReaderInterpolation) {
         let run = Timestamp(2026, 10, 7, 12)
         let hour = TimerangeDt(start: run.add(3600), nTime: 1, dtSeconds: 3600)
-        let quarters = hour.forAggregationTo(modelDt: 900, interpolation: variable.interpolation)
+        let quarters = hour.forAggregationTo(modelDt: 900, interpolation: interpolation)
         #expect(quarters.range.lowerBound == run.add(900))
-        #expect([Float(2), 9, 4, 1].aggregate(type: variable.interpolation, timeOld: quarters, timeNew: hour) == [9])
-        #expect([Float(2), .nan, 4, 1].aggregate(type: variable.interpolation, timeOld: quarters, timeNew: hour)[0].isNaN)
+        #expect([Float(2), 9, 4, 1].aggregate(type: interpolation, timeOld: quarters, timeNew: hour) == [9])
+        #expect([Float(2), .nan, 4, 1].aggregate(type: interpolation, timeOld: quarters, timeNew: hour)[0].isNaN)
     }
 
     @Test func derivedVariablesUseInputsFromBothCadences() async throws {
@@ -158,7 +159,6 @@ import Testing
         for position in positions {
             let reader = try await GenericReader<IconNativeDomain, IconVariable>(domain: domain, position: position, options: options)
             let subhourly = try await GenericReader<IconNativeDomain, IconVariable>(domain: quarter, position: position, options: options)
-            let maxima = try await GenericReader<IconNativeDomain, IconRucVariable>(domain: quarter, position: position, options: options)
             let actualTemperature = try await reader.get(variable: .surface(.temperature_2m), time: hour).data[0]
             #expect(abs(actualTemperature - (temperature.data.data[position] - 273.15)) <= 0.11)
             let actualPrecip = try await subhourly.get(variable: .surface(.precipitation), time: hour).data[0]
@@ -168,7 +168,7 @@ import Testing
             let humidity = try await reader.get(variable: .pressure(.init(variable: .relative_humidity, level: 850)), time: hour).data[0]
             let expectedHumidity = Meteorology.specificToRelativeHumidity(specificHumidity: q850.data.data[position] * 1000, temperature: t850.data.data[position] - 273.15, pressure: 850)
             #expect(abs(humidity - expectedHumidity) <= 1)
-            let updraft = try await maxima.get(variable: #require(IconRucVariable(rawValue: "updraft")), time: hour).data[0]
+            let updraft = try await subhourly.get(variable: .surface(.updraft), time: hour).data[0]
             let quarterUpdraft = try await subhourly.get(variable: .surface(.updraft), time: quarters).data
             #expect(abs(updraft - (quarterUpdraft.max() ?? .nan)) <= 0.03)
             let endpoint = TimerangeDt(start: run.add(27 * 3600), nTime: 1, dtSeconds: 900).toSettings()
@@ -186,8 +186,8 @@ private struct RucRawFixture: GenericReaderProtocol {
     let targetElevation: Float = 40
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? { nil }
-    func prefetchData(variable: IconRucVariable, time: TimerangeDtAndSettings) async throws {}
-    func get(variable: IconRucVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+    func prefetchData(variable: IconVariable, time: TimerangeDtAndSettings) async throws {}
+    func get(variable: IconVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         DataAndUnit(Array(repeating: values[variable.rawValue] ?? .nan, count: time.time.count), variable.unit)
     }
 }

@@ -1242,7 +1242,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             try await IconNativeDomains.iconD2RucNativeModelLevel.load(),
             try await IconNativeDomains.iconD2RucNative15min.load()
         ]
-        return RawReaderDerivationGroup(domains: domains, variableType: IconRucVariable.self, derivationDomain: parent)
+        return RawReaderDerivationGroup(domains: domains, variableType: IconVariable.self, derivationDomain: parent)
     }
 
     private static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
@@ -1394,7 +1394,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 gridForBoundingBoxRequests: domain
             )
         case .dwd_icon_d2_ruc_native_15min:
-            return .single(try await IconNativeDomains.iconD2RucNative15min.load(), IconRucVariable.self)
+            return .single(try await IconNativeDomains.iconD2RucNative15min.load(), IconVariable.self)
         case .dwd_icon_d2_ruc_native_model_level:
             return .single(try await IconNativeDomains.iconD2RucNativeModelLevel.load(), IconModelLevelVariable.self)
         case .dwd_icon_d2_native:

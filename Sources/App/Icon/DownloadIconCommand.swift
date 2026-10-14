@@ -173,7 +173,6 @@ struct DownloadIconCommand: AsyncCommand {
             }
 
             @Sendable func write(member: Int, variable: any GenericVariable, data: [Float]) async throws {
-                let variable: any GenericVariable = feed == .iconD2Ruc ? IconRucVariable(rawValue: variable.rawValue)! : variable
                 if let modelLevelWriter,
                    IconModelLevelVariable(rawValue: variable.omFileName.file) != nil {
                     try await modelLevelWriter.write(member: member, variable: variable, data: data)
@@ -214,8 +213,7 @@ struct DownloadIconCommand: AsyncCommand {
                                 continue
                             }
                         }
-                        let outputVariable: any GenericVariable = feed == .iconD2Ruc ? IconRucVariable(rawValue: variable.rawValue)! : variable
-                        try await writer15Min.write(time: timestamp, member: job.member, variable: outputVariable, data: array2d.data)
+                        try await writer15Min.write(time: timestamp, member: job.member, variable: variable, data: array2d.data)
                     }
                 }
 
