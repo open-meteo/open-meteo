@@ -32,9 +32,6 @@ extension IconNativeDomain {
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
             client: .shared, logger: IconNativeDomains.logger
         )
-        if definition.downloadDomain == .iconD2Ruc && payload == nil {
-            throw IconNativeDomainError.missingElevationArtifact(definition.domainRegistryStatic!.rawValue)
-        }
         let elevations: ElevationValues?
         if let payload {
             elevations = try await ElevationValues(decoded: payload.reader.read(), expectedCount: grid.nx)
