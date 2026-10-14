@@ -52,6 +52,14 @@ enum IconNativeDomains: String, CaseIterable {
         }
     }
 
+    var quarterHourlyParent: Self? {
+        switch self {
+        case .iconD2Native15min: return .iconD2Native
+        case .iconD2RucNative15min: return .iconD2RucNative
+        default: return nil
+        }
+    }
+
     var ensembleMeanDomain: Self? {
         switch self {
         case .iconEpsNative: return .iconEpsNativeEnsembleMean
@@ -101,9 +109,8 @@ enum IconNativeDomains: String, CaseIterable {
 
     var domainRegistryStatic: DomainRegistry? {
         if let modelLevelParent { return modelLevelParent.domainRegistry }
+        if let quarterHourlyParent { return quarterHourlyParent.domainRegistry }
         switch self {
-        case .iconD2RucNative15min: return .dwd_icon_d2_ruc_native
-        case .iconD2Native15min: return .dwd_icon_d2_native
         case .iconEpsNativeEnsembleMean: return .dwd_icon_global_eps_native
         case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native
         case .iconD2EpsNativeEnsembleMean: return .dwd_icon_d2_eps_native
