@@ -1233,16 +1233,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    private static func rucDerivationGroup() async throws -> RawReaderDerivationGroup {
-        let parent = try await IconNativeDomains.iconD2RucNative.load()
-        let domains = [
-            parent,
-            try await IconNativeDomains.iconD2RucNativeModelLevel.load(),
-            try await IconNativeDomains.iconD2RucNative15min.load()
-        ]
-        return RawReaderDerivationGroup(domains: domains, variableType: IconVariable.self, derivationDomain: parent)
-    }
-
     private static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
         RawReaderDerivationGroup(
             primary: (GfsDomain.gfs013, Gfs013Variable.self),
@@ -1388,7 +1378,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dwd_icon_d2_ruc_native:
             let domain = try await IconNativeDomains.iconD2RucNative.load()
             return .init(
-                primary: [.mixedBeforeDerivation(try await Self.rucDerivationGroup())],
+                primary: [.mixedBeforeDerivation(.init(domains: [
+                    domain,
+                    try await IconNativeDomains.iconD2RucNativeModelLevel.load(),
+                    try await IconNativeDomains.iconD2RucNative15min.load()
+                ], variableType: IconVariable.self, derivationDomain: domain))],
                 gridForBoundingBoxRequests: domain
             )
         case .dwd_icon_d2_ruc_native_15min:
@@ -1543,7 +1537,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(IconDomains.iconD2, IconVariable.self),
                 .domain(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 .domain(IconDomains.iconD2_15min, IconVariable.self)
-            ] + [.mixedBeforeDerivation(try await Self.rucDerivationGroup())], secondary: [
+            ] + (try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?.primary ?? []), secondary: [
                 .domain(IconDomains.iconEps, ProbabilityVariable.self),
                 .domain(try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self),
                 .domain(IconDomains.iconEuEps, ProbabilityVariable.self),
@@ -1577,7 +1571,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(IconDomains.iconD2, IconVariable.self),
                 .domain(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 .domain(IconDomains.iconD2_15min, IconVariable.self)
-            ] + [.mixedBeforeDerivation(try await Self.rucDerivationGroup())], secondary: [
+            ] + (try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?.primary ?? []), secondary: [
                 .domain(IconDomains.iconD2Eps, ProbabilityVariable.self),
                 .domain(try await IconNativeDomains.iconD2EpsNative.load(), ProbabilityVariable.self)
             ], gridForBoundingBoxRequests: IconDomains.iconD2,
@@ -1961,10 +1955,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
             }
 
-            func makeRucReader() async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
-                return try await Self.rucDerivationGroup().makeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader
-            }
-
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1997,7 +1987,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     icon,
                     iconEu,
                     iconD2,
-                    try await makeRucReader(),
+                    try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
+                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly,
                     ifs025,
                     ifsHres,
                     knmiNetherlands
@@ -2034,7 +2025,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     iconEu,
                     iconD2,
                     include15Min ? iconD2_15min : nil,
-                    try await makeRucReader()
+                    try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
+                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly
                 ])
             }
             // For western europe, use arome models
