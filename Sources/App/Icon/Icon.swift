@@ -11,7 +11,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     case icon
     case iconEu = "icon-eu"
     case iconD2 = "icon-d2"
-    case iconD2Ruc = "icon-d2-ruc"
     case iconD2_15min = "icon-d2-15min"
     case iconEps = "icon-eps"
     case iconEuEps = "icon-eu-eps"
@@ -47,7 +46,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return .dwd_icon
         case .iconEu:
             return .dwd_icon_eu
-        case .iconD2Ruc: return .dwd_icon_d2_ruc_native
         case .iconD2:
             return .dwd_icon_d2
         case .iconD2_15min:
@@ -97,7 +95,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return 180 + 1 + 3 * 24
         case .iconEu, .iconEuEps, .iconEuEpsEnsembleMean:
             return 120 + 1 + 3 * 24
-        case .iconD2Ruc: return 27 + 1 + 3 * 24
         case .iconD2, .iconD2Eps, .iconD2EpsEnsembleMean:
             return 48 + 1 + 3 * 24
         case .iconD2_15min:
@@ -105,39 +102,23 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// All available pressure levels for the current domain
-    var levels: [Int] {
+    var downloadDomain: IconDownloadDomains {
         switch self {
-        case .icon:
-            return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
-        case .iconEu:
-            return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000] // disabled: 775, 825, 875
-        case .iconD2, .iconD2Ruc:
-            return [                      200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
-        case .iconD2_15min:
-            return []
-        case .iconEps, .iconEpsEnsembleMean:
-            return []
-        case .iconEuEps, .iconEuEpsEnsembleMean:
-            return [] // 300, 500, 850 only temperature and wind
-        case .iconD2Eps, .iconD2EpsEnsembleMean:
-            return [] // 500, 700, 850, 950, 975, 1000
+        case .icon: return .icon
+        case .iconEu: return .iconEu
+        case .iconD2, .iconD2_15min: return .iconD2
+        case .iconEps, .iconEpsEnsembleMean: return .iconEps
+        case .iconEuEps, .iconEuEpsEnsembleMean: return .iconEuEps
+        case .iconD2Eps, .iconD2EpsEnsembleMean: return .iconD2Eps
         }
     }
 
-    var updateIntervalSeconds: Int {
+    var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
+
+    var countEnsembleMember: Int {
         switch self {
-        case .icon:
-            return 6 * 3600
-        case .iconD2Ruc: return 3600
-        case .iconEu, .iconD2, .iconD2_15min:
-            return 3 * 3600
-        case .iconEps, .iconEpsEnsembleMean:
-            return 12 * 3600
-        case .iconEuEps, .iconEuEpsEnsembleMean:
-            return 6 * 3600
-        case .iconD2Eps, .iconD2EpsEnsembleMean:
-            return 3 * 3600
+        case .iconEpsEnsembleMean, .iconEuEpsEnsembleMean, .iconD2EpsEnsembleMean: return 1
+        default: return downloadDomain.countEnsembleMember
         }
     }
 
@@ -149,65 +130,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .icon: return .iconNative
         case .iconEu: return .iconEuNative
-        case .iconD2Ruc: return .iconD2RucNative
         case .iconD2: return .iconD2Native
         case .iconD2_15min: return .iconD2Native15min
         case .iconEps, .iconEpsEnsembleMean: return .iconEpsNative
         case .iconEuEps, .iconEuEpsEnsembleMean: return .iconEuEpsNative
         case .iconD2Eps, .iconD2EpsEnsembleMean: return .iconD2EpsNative
-        }
-    }
-
-    func getGribUrl(field: (variable: String, cat: String, level: Int?), run: Timestamp, leadSeconds: Int, member: Int = 0) -> String {
-        let levelPath: String
-        switch field.cat {
-        case "pressure-level": levelPath = "lvt1/100/lv1/\(field.level! * 100)/"
-        case "model-level": levelPath = "lvt1/150/lv1/\(field.level!)/"
-        case "soil-level": levelPath = "lvt1/106/lv1/\(Double(field.level!) / 100)/"
-        default: levelPath = ""
-        }
-        let model = self == .iconD2_15min ? IconDomains.iconD2 : self
-        let ensemble = countEnsembleMember > 1 ? "e/\((member + 1).zeroPadded(len: 2))/" : ""
-        let hours = (leadSeconds / 3600).zeroPadded(len: 3)
-        let minutes = ((leadSeconds % 3600) / 60).zeroPadded(len: 2)
-        return "https://opendata.dwd.de/weather/nwp/v1/m/\(model.rawValue)/p/\(field.variable.uppercased())/\(levelPath)r/\(run.iso8601_YYYY_MM_dd_HH_mm)/\(ensemble)s/PT\(hours)H\(minutes)M.grib2"
-    }
-
-    /// E.g. icon global 0z has 180 as a last value, but 6z only 120
-    func getDownloadForecastSteps(run: Int) -> [Int] {
-        switch self {
-        case .iconEps:
-            // Note ICON-EPS has only 6 hourly data for 6/18z runs, not used here
-            if run == 6 || run == 18 {
-                fatalError("ICON-EPS 06/18 UTC runs are not supported. Select a 00 or 12 UTC run.")
-            }
-            // Hourly data until 48h, 3 hourly until 72, 6 hourly until 120h (same as ICON-EU-EPS) and 12 hourly until 180h
-            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6)) + Array(stride(from: 132, through: 180, by: 12))
-        case .icon:
-            if  run == 6 || run == 18 {
-                // only up to 120
-                return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
-            } else {
-                // full 180
-                return Array(0...78) + Array(stride(from: 81, through: 180, by: 3))
-            }
-        case .iconEuEps:
-            // Hourly data until 48h, 3 hourly until 72, then 6 hourly until 120h (same as ICON-EPS)
-            // no side runs
-            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6))
-        case .iconEu:
-            if run % 6 == 0 {
-                return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
-            }
-            // side runs
-            return Array(0...30)
-        case .iconD2_15min:
-            return Array(0...48 * 4 - 1)
-        case .iconD2Ruc: return Array(0...27)
-        case .iconD2Eps, .iconD2:
-            return Array(0...48)
-        case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
-            fatalError()
         }
     }
 
@@ -217,8 +144,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
         case .iconEu:
             return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
-        case .iconD2Ruc:
-            preconditionFailure("RUC requires an initialized native domain")
         case .iconD2_15min, .iconD2:
             return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         case .iconEps, .iconEpsEnsembleMean:
@@ -234,29 +159,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// model level standard heights, full levels
-    /// icon wind level 1-90 88=98m, 87-174m
-    /// icon-eu 1-60 58,57
-    /// icon-d2 1-65.... 63=78m, 62=126m
-    var numberOfModelFullLevels: Int {
-        switch self {
-        case .iconEps, .icon, .iconEpsEnsembleMean:
-            return 120 // was 90
-        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean:
-            return 74 // was 60
-        case .iconD2Ruc, .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
-            return 65
-        }
-    }
-
     /// ICON uses 1.5°C melting point temperature: https://gitlab.dkrz.de/icon/icon-model/-/blob/release-2024.01-public/src/atm_phy_nwp/mo_nh_interface_nwp.f90?ref_type=heads#L2232
     static let tMelt = Float(1.5)
-}
-
-extension IconDomains {
-    /// Include the RUC endpoint, but never request quarter hours beyond its horizon.
-    func downloadLeadSeconds(hour: Int, quarterHourly: Bool) -> [Int] {
-        let offsets = quarterHourly ? [0, 900, 1800, 2700] : [0]
-        return offsets.map { hour * 3600 + $0 }.filter { self != .iconD2Ruc || $0 <= 27 * 3600 }
-    }
 }

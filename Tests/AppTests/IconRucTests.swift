@@ -8,7 +8,9 @@ import Testing
         let parent = IconNativeDomains.iconD2RucNative
         let quarter = IconNativeDomains.iconD2RucNative15min
         let levels = try #require(parent.modelLevelDomain)
-        #expect(parent.sourceDomain == .iconD2Ruc)
+        #expect(parent.sourceDomain == .iconD2)
+        #expect(parent.downloadDomain == .iconD2Ruc)
+        #expect(IconDomains(rawValue: "icon-d2-ruc") == nil)
         #expect(parent.dtSeconds == 3600)
         #expect(quarter.dtSeconds == 900)
         #expect(parent.updateIntervalSeconds == 3600)
@@ -27,39 +29,40 @@ import Testing
         }
     }
 
-    @Test func forecastEndpointsAndUrls() {
-        let domain = IconDomains.iconD2Ruc
+    @Test func forecastEndpointsAndUrls() throws {
+        let feed = IconDownloadDomains.iconD2Ruc
         for hour in 0..<24 {
-            #expect(domain.getDownloadForecastSteps(run: hour) == Array(0...27))
+            #expect(feed.getDownloadForecastSteps(run: hour) == Array(0...27))
         }
-        let steps = (0...27).flatMap { domain.downloadLeadSeconds(hour: $0, quarterHourly: true) }
+        let steps = (0...27).flatMap { feed.downloadLeadSeconds(hour: $0, quarterHourly: true) }
         #expect(steps == Array(stride(from: 0, through: 27 * 3600, by: 900)))
-        #expect(domain.downloadLeadSeconds(hour: 27, quarterHourly: true) == [27 * 3600])
-        #expect(domain.downloadLeadSeconds(hour: 28, quarterHourly: true).isEmpty)
-        #expect(domain.downloadLeadSeconds(hour: 0, quarterHourly: false) == [0])
+        #expect(feed.downloadLeadSeconds(hour: 27, quarterHourly: true) == [27 * 3600])
+        #expect(feed.downloadLeadSeconds(hour: 28, quarterHourly: true).isEmpty)
+        #expect(feed.downloadLeadSeconds(hour: 0, quarterHourly: false) == [0])
         let run = Timestamp(2026, 10, 7, 23)
-        let url = domain.getGribUrl(field: ("TOT_PREC", "single-level", nil), run: run, leadSeconds: 4500)
+        let url = feed.getGribUrl(field: ("TOT_PREC", "single-level", nil), run: run, leadSeconds: 4500)
         #expect(url.hasSuffix("icon-d2-ruc/p/TOT_PREC/r/2026-10-07T23:00/s/PT001H15M.grib2"))
-        #expect(domain.getGribUrl(field: ("T", "pressure-level", 850), run: run, leadSeconds: 3600).contains("/lvt1/100/lv1/85000/"))
-        #expect(domain.getGribUrl(field: ("U", "model-level", 63), run: run, leadSeconds: 3600).contains("/lvt1/150/lv1/63/"))
+        #expect(feed.getGribUrl(field: ("T", "pressure-level", 850), run: run, leadSeconds: 3600).contains("/lvt1/100/lv1/85000/"))
+        #expect(feed.getGribUrl(field: ("U", "model-level", 63), run: run, leadSeconds: 3600).contains("/lvt1/150/lv1/63/"))
     }
 
-    @Test func capabilitiesPreventUnavailableDownloads() {
-        #expect(IconSurfaceVariable.visibility.getVarAndLevel(domain: .iconD2Ruc)?.variable == "VIS")
-        #expect(IconSurfaceVariable.visibility.getVarAndLevel(domain: .iconD2) == nil)
-        #expect(IconSurfaceVariable.precipitation.hasQuarterHourlyData(domain: .iconD2Ruc))
-        #expect(IconSurfaceVariable.convective_inhibition.hasQuarterHourlyData(domain: .iconD2Ruc))
-        #expect(!IconSurfaceVariable.temperature_2m.hasQuarterHourlyData(domain: .iconD2Ruc))
-        #expect(!IconSurfaceVariable.wind_gusts_10m.hasQuarterHourlyData(domain: .iconD2Ruc))
+    @Test func capabilitiesPreventUnavailableDownloads() throws {
+        let feed = IconDownloadDomains.iconD2Ruc
+        #expect(feed.getVarAndLevel(IconSurfaceVariable.visibility)?.variable == "VIS")
+        #expect(IconDownloadDomains.iconD2.getVarAndLevel(IconSurfaceVariable.visibility) == nil)
+        #expect(feed.hasQuarterHourlyData(.precipitation))
+        #expect(feed.hasQuarterHourlyData(.convective_inhibition))
+        #expect(!feed.hasQuarterHourlyData(.temperature_2m))
+        #expect(!feed.hasQuarterHourlyData(.wind_gusts_10m))
         for variable in [IconSurfaceVariable.showers, .soil_temperature_6cm, .sensible_heat_flux, .convective_cloud_top, .snowfall_convective_water_equivalent] {
-            #expect(variable.getVarAndLevel(domain: .iconD2Ruc) == nil)
+            #expect(feed.getVarAndLevel(variable) == nil)
         }
-        for level in IconDomains.iconD2Ruc.levels {
+        for level in IconDownloadDomains.iconD2.levels {
             let humidity = IconPressureVariable(variable: .relative_humidity, level: level)
-            #expect(humidity.getVarAndLevel(domain: .iconD2Ruc)?.variable == ([500, 700].contains(level) ? "relhum" : "QV"))
-            #expect(!humidity.requiresSpecificHumidityConversion(domain: .iconD2))
+            #expect(feed.getVarAndLevel(humidity)?.variable == ([500, 700].contains(level) ? "relhum" : "QV"))
+            #expect(IconDownloadDomains.iconD2.getVarAndLevel(humidity)?.variable == "relhum")
         }
-        #expect(IconSurfaceVariable.temperature_80m.getVarAndLevel(domain: .iconD2Ruc)?.level == 63)
+        #expect(feed.getVarAndLevel(IconSurfaceVariable.temperature_80m)?.level == 63)
     }
 
     @Test func independentAccumulationsConservePrecipitation() async {

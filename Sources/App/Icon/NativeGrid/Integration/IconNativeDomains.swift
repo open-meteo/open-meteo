@@ -20,6 +20,18 @@ enum IconNativeDomains: String, CaseIterable {
     case iconEuNativeModelLevel = "icon-eu-native-model-level"
     case iconD2NativeModelLevel = "icon-d2-native-model-level"
 
+    var downloadDomain: IconDownloadDomains {
+        switch self {
+        case .iconNative, .iconNativeModelLevel: return .icon
+        case .iconEuNative, .iconEuNativeModelLevel: return .iconEu
+        case .iconD2Native, .iconD2Native15min, .iconD2NativeModelLevel: return .iconD2
+        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel: return .iconD2Ruc
+        case .iconEpsNative, .iconEpsNativeEnsembleMean: return .iconEps
+        case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean: return .iconEuEps
+        case .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return .iconD2Eps
+        }
+    }
+
     var modelLevelDomain: Self? {
         switch self {
         case .iconNative: return .iconNativeModelLevel
@@ -52,7 +64,7 @@ enum IconNativeDomains: String, CaseIterable {
     /// Shared forecast metadata and variable mappings come from the corresponding regular domain.
     var sourceDomain: IconDomains {
         switch self {
-        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel: return .iconD2Ruc
+        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel: return .iconD2
         case .iconNative, .iconNativeModelLevel: return .icon
         case .iconEuNative, .iconEuNativeModelLevel: return .iconEu
         case .iconD2Native, .iconD2NativeModelLevel: return .iconD2
@@ -100,10 +112,16 @@ enum IconNativeDomains: String, CaseIterable {
     }
 
     var dtSeconds: Int { self == .iconD2RucNative15min ? 900 : sourceDomain.dtSeconds }
-    var updateIntervalSeconds: Int { sourceDomain.updateIntervalSeconds }
+    var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
     var hasYearlyFiles: Bool { sourceDomain.hasYearlyFiles }
     var masterTimeRange: Range<Timestamp>? { sourceDomain.masterTimeRange }
-    var omFileLength: Int { self == .iconD2RucNative15min ? (27 + 72) * 4 + 1 : sourceDomain.omFileLength }
+    var omFileLength: Int {
+        switch self {
+        case .iconD2RucNative15min: return (27 + 72) * 4 + 1
+        case .iconD2RucNative, .iconD2RucNativeModelLevel: return 27 + 1 + 72
+        default: return sourceDomain.omFileLength
+        }
+    }
     var countEnsembleMember: Int { sourceDomain.countEnsembleMember }
     var generateFullRun: Bool { sourceDomain.generateFullRun }
     var generateTimeSeries: Bool { sourceDomain.generateTimeSeries }

@@ -32,7 +32,7 @@ extension IconNativeDomain {
             file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
             client: .shared, logger: IconNativeDomains.logger
         )
-        if definition.sourceDomain == .iconD2Ruc && payload == nil {
+        if definition.downloadDomain == .iconD2Ruc && payload == nil {
             throw IconNativeDomainError.missingElevationArtifact(definition.domainRegistryStatic!.rawValue)
         }
         let elevations: ElevationValues?

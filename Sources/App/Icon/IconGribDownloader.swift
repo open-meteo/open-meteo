@@ -6,7 +6,7 @@ struct IconDownloadError: Error, CustomStringConvertible {
 }
 
 struct IconGribDownloader: Sendable {
-    let domain: IconDomains
+    let domain: IconDownloadDomains
     let curl: Curl
     let remapper: IconRemapper?
 
@@ -22,9 +22,9 @@ struct IconGribDownloader: Sendable {
               domain.countEnsembleMember == 1 || message.getLong(attribute: "perturbationNumber") == member + 1 else {
             throw IconDownloadError(description: "ICON run, valid time or member mismatch at \(url)")
         }
-        let native = try IconNativeGribDecoder.decode(message: message, identity: domain.sourceGridIdentity)
+        let native = try IconNativeGribDecoder.decode(message: message, identity: domain.regularDomain.sourceGridIdentity)
         guard let remapper else { return (message, native) }
-        return (message, Array2D(data: remapper.remap(native.data), nx: domain.grid.nx, ny: domain.grid.ny))
+        return (message, Array2D(data: remapper.remap(native.data), nx: domain.regularDomain.grid.nx, ny: domain.regularDomain.grid.ny))
     }
 }
 
