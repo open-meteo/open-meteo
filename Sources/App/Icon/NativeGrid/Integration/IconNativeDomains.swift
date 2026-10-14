@@ -118,7 +118,7 @@ enum IconNativeDomains: String, CaseIterable {
         }
     }
 
-    var dtSeconds: Int { self == .iconD2RucNative15min ? 900 : sourceDomain.dtSeconds }
+    var dtSeconds: Int { quarterHourlyParent != nil ? 900 : sourceDomain.dtSeconds }
     var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
     var hasYearlyFiles: Bool { sourceDomain.hasYearlyFiles }
     var masterTimeRange: Range<Timestamp>? { sourceDomain.masterTimeRange }
