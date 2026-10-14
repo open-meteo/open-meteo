@@ -637,12 +637,6 @@ struct DomainTimeSeriesMetadata {
     let omFileLength: Int
     let updateIntervalSeconds: Int
 
-    init(_ domain: IconNativeDomains) {
-        self.dtSeconds = domain.dtSeconds
-        self.omFileLength = domain.omFileLength
-        self.updateIntervalSeconds = domain.updateIntervalSeconds
-    }
-
     init(_ domain: any GenericDomain) {
         self.dtSeconds = domain.dtSeconds
         self.omFileLength = domain.omFileLength

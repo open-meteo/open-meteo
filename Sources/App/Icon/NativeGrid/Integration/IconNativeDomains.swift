@@ -149,3 +149,11 @@ enum IconNativeDomains: String, CaseIterable {
     static let logger = Logger(label: "IconNativeDomain")
     private static let domains = IconNativeDomainCache()
 }
+
+extension DomainTimeSeriesMetadata {
+    init(_ domain: IconNativeDomains) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
+    }
+}
