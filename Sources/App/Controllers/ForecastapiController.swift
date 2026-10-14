@@ -823,8 +823,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_global_native_model_level
     case dwd_icon_eu_native
     case dwd_icon_eu_native_model_level
-    case icon_d2_ruc
-    case dwd_icon_d2_ruc
     case dwd_icon_d2_ruc_native
     case dwd_icon_d2_ruc_native_15min
     case dwd_icon_d2_ruc_native_model_level
@@ -1387,7 +1385,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(domain, IconVariable.self),
                 .domain(try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self)
             ], secondary: [.domain(try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self)], gridForBoundingBoxRequests: domain)
-        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native:
+        case .dwd_icon_d2_ruc_native:
             let domain = try await IconNativeDomains.iconD2RucNative.load()
             return .init(
                 primary: [.mixedBeforeDerivation(try await Self.rucDerivationGroup())],
@@ -2388,7 +2386,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .dwd_icon_d2_15min:
             return [] // migrated
-        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native,
+        case .dwd_icon_d2_ruc_native,
              .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
              .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
@@ -2609,7 +2607,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native,
+        case .dwd_icon_d2_ruc_native,
              .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
              .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
@@ -2853,7 +2851,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .icon_d2_ruc, .dwd_icon_d2_ruc, .dwd_icon_d2_ruc_native,
+        case .dwd_icon_d2_ruc_native,
              .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
              .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
