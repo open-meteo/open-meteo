@@ -1980,6 +1980,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native)
+                let ruc: ForecastReaderResult?
+                do {
+                    ruc = try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
+                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                } catch IconNativeDomainError.missingGridArtifact, ForecastApiError.modelRunUnavailable {
+                    ruc = nil
+                }
                 return MultiDomains.hourlyToMultiSameType([
                     iconProbabilities.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
@@ -1987,8 +1994,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     icon,
                     iconEu,
                     iconD2,
-                    try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
-                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly,
+                    ruc?.hourly,
                     ifs025,
                     ifsHres,
                     knmiNetherlands
@@ -2016,6 +2022,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native),
                let iconD2_15min = try await makeReader(domain: .iconD2_15min, native: .iconD2Native15min) {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
+                let ruc: ForecastReaderResult?
+                do {
+                    ruc = try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
+                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                } catch IconNativeDomainError.missingGridArtifact, ForecastApiError.modelRunUnavailable {
+                    ruc = nil
+                }
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities?.asOptionalReader,
                     iconProbabilities.asOptionalReader,
@@ -2025,8 +2038,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     iconEu,
                     iconD2,
                     include15Min ? iconD2_15min : nil,
-                    try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
-                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly
+                    ruc?.hourly
                 ])
             }
             // For western europe, use arome models
