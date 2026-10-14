@@ -34,11 +34,16 @@ import Testing
         for hour in 0..<24 {
             #expect(feed.getDownloadForecastSteps(run: hour) == Array(0...27))
         }
-        let steps = (0...27).flatMap { feed.downloadLeadSeconds(hour: $0, quarterHourly: true) }
+        let precipitation = IconSurfaceVariable.precipitation
+        let steps = (0...27).flatMap { feed.downloadBatch(variable: precipitation, hour: $0).steps }
         #expect(steps == Array(stride(from: 0, through: 27 * 3600, by: 900)))
-        #expect(feed.downloadLeadSeconds(hour: 27, quarterHourly: true) == [27 * 3600])
-        #expect(feed.downloadLeadSeconds(hour: 28, quarterHourly: true).isEmpty)
-        #expect(feed.downloadLeadSeconds(hour: 0, quarterHourly: false) == [0])
+        #expect(feed.downloadBatch(variable: precipitation, hour: 1) == .init(steps: [3600, 4500, 5400, 6300], output: .quarterHourly))
+        #expect(feed.downloadBatch(variable: precipitation, hour: 27) == .init(steps: [27 * 3600], output: .quarterHourly))
+        let d2 = IconDownloadDomains.iconD2
+        #expect(d2.downloadBatch(variable: precipitation, hour: 47) == .init(steps: [169200, 170100, 171000, 171900], output: .quarterHourly))
+        #expect(d2.downloadBatch(variable: precipitation, hour: 48) == .init(steps: [48 * 3600], output: .hourly))
+        #expect(feed.downloadBatch(variable: IconSurfaceVariable.temperature_2m, hour: 1) == .init(steps: [3600], output: .hourly))
+        #expect(feed.downloadBatch(variable: IconPressureVariable(variable: .temperature, level: 850), hour: 1) == .init(steps: [3600], output: .hourly))
         let run = Timestamp(2026, 10, 7, 23)
         let url = feed.getGribUrl(field: ("TOT_PREC", "single-level", nil), run: run, leadSeconds: 4500)
         #expect(url.hasSuffix("icon-d2-ruc/p/TOT_PREC/r/2026-10-07T23:00/s/PT001H15M.grib2"))
@@ -50,10 +55,10 @@ import Testing
         let feed = IconDownloadDomains.iconD2Ruc
         #expect(feed.getVarAndLevel(IconSurfaceVariable.visibility)?.variable == "VIS")
         #expect(IconDownloadDomains.iconD2.getVarAndLevel(IconSurfaceVariable.visibility) == nil)
-        #expect(feed.hasQuarterHourlyData(.precipitation))
-        #expect(feed.hasQuarterHourlyData(.convective_inhibition))
-        #expect(!feed.hasQuarterHourlyData(.temperature_2m))
-        #expect(!feed.hasQuarterHourlyData(.wind_gusts_10m))
+        #expect(feed.downloadBatch(variable: IconSurfaceVariable.precipitation, hour: 1).output == .quarterHourly)
+        #expect(feed.downloadBatch(variable: IconSurfaceVariable.convective_inhibition, hour: 1).output == .quarterHourly)
+        #expect(feed.downloadBatch(variable: IconSurfaceVariable.temperature_2m, hour: 1).output == .hourly)
+        #expect(feed.downloadBatch(variable: IconSurfaceVariable.wind_gusts_10m, hour: 1).output == .hourly)
         for variable in [IconSurfaceVariable.showers, .soil_temperature_6cm, .sensible_heat_flux, .convective_cloud_top, .snowfall_convective_water_equivalent] {
             #expect(feed.getVarAndLevel(variable) == nil)
         }

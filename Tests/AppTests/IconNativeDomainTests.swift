@@ -74,10 +74,10 @@ import Logging
 
     @Test func downloadAvailability() {
         let run = Timestamp(2026, 10, 7, 6)
-        #expect(IconDownloadDomains.iconD2.hasQuarterHourlyData(.showers))
-        #expect(!IconDownloadDomains.iconD2Ruc.hasQuarterHourlyData(.showers))
-        #expect(!IconDownloadDomains.icon.hasQuarterHourlyData(.precipitation))
-        #expect(!IconDownloadDomains.iconD2Eps.hasQuarterHourlyData(.precipitation))
+        #expect(IconDownloadDomains.iconD2.downloadBatch(variable: IconSurfaceVariable.showers, hour: 1).output == .quarterHourly)
+        #expect(IconDownloadDomains.iconD2Ruc.downloadBatch(variable: IconSurfaceVariable.showers, hour: 1).output == .hourly)
+        #expect(IconDownloadDomains.icon.downloadBatch(variable: IconSurfaceVariable.precipitation, hour: 1).output == .hourly)
+        #expect(IconDownloadDomains.iconD2Eps.downloadBatch(variable: IconSurfaceVariable.precipitation, hour: 1).output == .hourly)
 
         for feed in [IconDownloadDomains.iconD2, .iconD2Ruc] {
             #expect(!feed.skipHour(IconSurfaceVariable.precipitation, hour: 0, forDownload: true, run: run))

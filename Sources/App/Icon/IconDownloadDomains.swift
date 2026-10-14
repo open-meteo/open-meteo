@@ -50,7 +50,9 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         self == .iconD2Ruc && variable.variable == .relative_humidity && ![500, 700].contains(variable.level)
     }
 
-    func hasQuarterHourlyData(_ variable: IconSurfaceVariable) -> Bool {
+    private func hasQuarterHourlyData(_ variable: any IconVariableDownloadable, hour: Int) -> Bool {
+        guard let horizon = quarterHourlyForecastHorizon, hour * 3600 <= horizon,
+              let variable = variable as? IconSurfaceVariable else { return false }
         switch self {
         case .iconD2Ruc:
             return [.direct_radiation, .diffuse_radiation, .precipitation, .rain, .snowfall_water_equivalent, .cape, .convective_inhibition, .lightning_potential, .snowfall_height, .freezing_level_height, .updraft, .visibility].contains(variable)
@@ -103,9 +105,27 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         }
     }
 
-    func downloadLeadSeconds(hour: Int, quarterHourly: Bool) -> [Int] {
-        let offsets = quarterHourly ? [0, 900, 1800, 2700] : [0]
-        return offsets.map { hour * 3600 + $0 }.filter { self != .iconD2Ruc || $0 <= 27 * 3600 }
+    /// Last available quarter-hour forecast lead, in seconds, including the endpoint.
+    var quarterHourlyForecastHorizon: Int? {
+        switch self {
+        case .iconD2: return 48 * 3600 - 900
+        case .iconD2Ruc: return 27 * 3600
+        default: return nil
+        }
+    }
+
+    struct DownloadBatch: Sendable, Equatable {
+        enum Output: Sendable { case hourly, quarterHourly }
+        let steps: [Int]
+        let output: Output
+    }
+
+    func downloadBatch(variable: any IconVariableDownloadable, hour: Int) -> DownloadBatch {
+        guard hasQuarterHourlyData(variable, hour: hour), let horizon = quarterHourlyForecastHorizon else {
+            return DownloadBatch(steps: [hour * 3600], output: .hourly)
+        }
+        let steps = [0, 900, 1800, 2700].map { hour * 3600 + $0 }.filter { $0 <= horizon }
+        return DownloadBatch(steps: steps, output: .quarterHourly)
     }
 
     func getGribUrl(field: (variable: String, cat: String, level: Int?), run: Timestamp, leadSeconds: Int, member: Int = 0) -> String {

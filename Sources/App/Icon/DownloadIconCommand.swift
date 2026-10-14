@@ -137,6 +137,7 @@ struct DownloadIconCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         let deaverager15min = GribDeaverager()
         var quarterHourlyValidTimes = Set<Timestamp>()
+        let lastQuarterHourlyTime = feed.quarterHourlyForecastHorizon.map { run.add($0) }
         let correctWeatherCode = variables.contains { ($0 as? IconSurfaceVariable) == .weather_code }
         let humidityLevels = Set(variables.compactMap { $0 as? IconPressureVariable }.filter { feed.requiresSpecificHumidityConversion($0) }.map { $0.level })
 
@@ -148,12 +149,14 @@ struct DownloadIconCommand: AsyncCommand {
             return elevation
         }()
         
-        let jobs = variables.flatMap { variable in
-            (0..<feed.countEnsembleMember).map { (variable: variable, member: $0) }
-        }
         let timestamps = feed.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
         let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            let jobs = variables.flatMap { variable in
+                let batch = feed.downloadBatch(variable: variable, hour: hour)
+                return (0..<feed.countEnsembleMember).map { (variable: variable, member: $0, batch: batch) }
+            }
+            let quarterHourlyVariables = Set(jobs.filter { $0.batch.output == .quarterHourly }.map { $0.variable.rawValue })
             logger.info("Downloading hour \(hour)")
 
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
@@ -168,7 +171,7 @@ struct DownloadIconCommand: AsyncCommand {
                 OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
             }
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
-            let writer15Min = outputs.fifteenMinute.map {
+            let writer15Min = quarterHourlyVariables.isEmpty ? nil : outputs.fifteenMinute.map {
                 OmSpatialMultistepWriter(domain: $0, run: run, storeOnDisk: true, realm: nil, logger: logger)
             }
 
@@ -191,12 +194,10 @@ struct DownloadIconCommand: AsyncCommand {
                 let variable = job.variable
                 if feed.skipHour(variable, hour: hour, forDownload: true, run: run) { return }
                 guard let field = feed.getVarAndLevel(variable) else { return }
-                let subhourly = writer15Min != nil && (variable as? IconSurfaceVariable).map { feed.hasQuarterHourlyData($0) } == true && hour < 48
-                let steps = feed.downloadLeadSeconds(hour: hour, quarterHourly: subhourly)
-                let messages = try await steps.asyncMap { step in
+                let messages = try await job.batch.steps.asyncMap { step in
                     try await downloader.downloadAndRemap(field: field, run: run, leadSeconds: step, member: job.member)
                 }
-                if let writer15Min, subhourly {
+                if let writer15Min, job.batch.output == .quarterHourly {
                     for (message, raw) in messages {
                         var array2d = raw
                         let step = try IconStepInterval(message)
@@ -218,7 +219,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
 
                 // Only weather-code correction needs hourly copies of subhourly source values.
-                if feed == .iconD2Ruc, subhourly, let surface = variable as? IconSurfaceVariable,
+                if feed == .iconD2Ruc, job.batch.output == .quarterHourly, let surface = variable as? IconSurfaceVariable,
                    !(correctWeatherCode && [IconSurfaceVariable.precipitation, .snowfall_height].contains(surface)) {
                     return
                 }
@@ -298,7 +299,7 @@ struct DownloadIconCommand: AsyncCommand {
             /// Note: Sometimes some members for temperature are missing for a single timestep!
             try await storage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
                 // These values are retained only as weather-code correction inputs.
-                if feed == .iconD2Ruc, feed.hasQuarterHourlyData(v.variable) { return }
+                if feed == .iconD2Ruc, quarterHourlyVariables.contains(v.variable.rawValue) { return }
                 var data = data
                 if [.iconEps, .iconEuEps].contains(domain) && v.variable == .pressure_msl,
                     let t2m = await storage.get(v.with(variable: .temperature_2m)) {
@@ -465,16 +466,26 @@ struct DownloadIconCommand: AsyncCommand {
                 + (remappedWriter?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
                 + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
             
-            // RUC publishes all completed subhourly batches, including the final horizon endpoint.
-            let writtenQuarterTimes = await writer15Min?.writer.map { $0.time } ?? []
-            quarterHourlyValidTimes.formUnion(writtenQuarterTimes)
-            let quarterTimes = feed == .iconD2Ruc ? quarterHourlyValidTimes.sorted() : []
-            let handles15min = try await writer15Min?.finalise(application: application, completed: feed == .iconD2Ruc && completed, validTimes: quarterTimes, uploadS3Bucket: feed == .iconD2Ruc ? uploadS3Bucket : nil) ?? []
+            let handles15min = try await finaliseQuarterHourly(application: application, writer: writer15Min,
+                lastTime: lastQuarterHourlyTime,
+                validTimes: &quarterHourlyValidTimes, uploadS3Bucket: uploadS3Bucket)
             return (handles, handles15min)
         }
         
         await curl.printStatistics()
         return (handles.flatMap({$0.0}), handles.flatMap({$0.1}))
+    }
+
+    /// Publish each cadence independently; D2's quarter-hour output ends before its hourly output.
+    func finaliseQuarterHourly(application: Application, writer: OmSpatialMultistepWriter?, lastTime: Timestamp?, validTimes: inout Set<Timestamp>, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        guard let writer else { return [] }
+        let writtenTimes = await writer.writer.map { $0.time }
+        guard !writtenTimes.isEmpty else { return [] }
+        let publishedTimes = validTimes.union(writtenTimes)
+        let completed = lastTime.map { writtenTimes.contains($0) } ?? false
+        let handles = try await writer.finalise(application: application, completed: completed, validTimes: publishedTimes.sorted(), uploadS3Bucket: uploadS3Bucket)
+        validTimes = publishedTimes
+        return handles
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
