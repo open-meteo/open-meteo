@@ -345,11 +345,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         return
                     }
                     
-                    // Keep pressure level RH in memory for cloud cover calculation
-                    if variable.gribName == "r" && levelhPa > 10 {
-                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                    }
-                    
                     if variable == .temperature_2m {
                         try await rhCalculator.ingest(.temperature(grib2d.array), member: member, writer: writer)
                     }
