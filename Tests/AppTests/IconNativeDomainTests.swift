@@ -42,7 +42,7 @@ import Logging
         let modelLevel = try #require(parent.modelLevelDomain)
         #expect(modelLevel.modelLevelParent == parent)
         #expect(modelLevel.domainRegistry != parent.domainRegistry)
-        #expect(modelLevel.domainRegistryStatic == parent.domainRegistry)
+        #expect(modelLevel.domainRegistryStatic == parent.domainRegistryStatic)
         #expect(modelLevel.nativeGridFile.getFilePath() == parent.nativeGridFile.getFilePath())
         #expect(modelLevel.domainRegistry.nativeDefinition == modelLevel)
         let metadata = try #require(modelLevel.domainRegistry.timeSeriesMetadata)

@@ -108,14 +108,8 @@ enum IconNativeDomains: String, CaseIterable {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        if let modelLevelParent { return modelLevelParent.domainRegistry }
-        if let quarterHourlyParent { return quarterHourlyParent.domainRegistry }
-        switch self {
-        case .iconEpsNativeEnsembleMean: return .dwd_icon_global_eps_native
-        case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native
-        case .iconD2EpsNativeEnsembleMean: return .dwd_icon_d2_eps_native
-        default: return domainRegistry
-        }
+        // Domains sharing a native grid also share its elevation and other static fields.
+        nativeGridFile.registry
     }
 
     var dtSeconds: Int { quarterHourlyParent != nil ? 900 : sourceDomain.dtSeconds }
