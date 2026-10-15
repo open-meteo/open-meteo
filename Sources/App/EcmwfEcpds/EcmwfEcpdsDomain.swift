@@ -41,7 +41,14 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .ifs_europe_ensemble_mean:
+            return .ecmwf_ifs_europe_ensemble
+        case .aifs_europe_ensemble_mean:
+            return .ecmwf_aifs_europe_ensemble
+        default:
+            return domainRegistry
+        }
     }
 
     var hasYearlyFiles: Bool {
