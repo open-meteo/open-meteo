@@ -65,7 +65,8 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
 
     var deadlineHours: Double {
         switch self {
-        case .iconD2, .iconD2Ruc, .iconD2Eps: return 2
+        case .iconD2Ruc: return 1
+        case .iconD2, .iconD2Eps: return 2
         default: return 5
         }
     }
