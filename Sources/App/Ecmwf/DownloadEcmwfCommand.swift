@@ -28,7 +28,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Number of concurrent processing/conversion jobs (default: 1)")
         var concurrent: Int?
 
-        @Option(name: "download-concurrent", help: "Number of concurrent download requests (defaults to --concurrent)")
+        @Option(name: "download-concurrent", help: "Number of concurrent download requests (defaults to twice --concurrent)")
         var downloadConcurrent: Int?
 
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
@@ -78,7 +78,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let variables = onlyVariables ?? EcmwfVariable.allCases
         let nConcurrent = signature.concurrent ?? 1
-        let nDownloadConcurrent = signature.downloadConcurrent ?? nConcurrent
+        let nDownloadConcurrent = signature.downloadConcurrent ?? (2 * nConcurrent)
         guard nConcurrent > 0, nDownloadConcurrent > 0 else {
             throw Abort(.badRequest, reason: "--concurrent and --download-concurrent must be greater than zero")
         }
