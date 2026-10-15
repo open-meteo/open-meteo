@@ -285,9 +285,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         stepRange = "0-\(stepRange)"
                     }
                     
-                    // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        return
+                    // Only known instantaneous fields can bypass the deaverager actor.
+                    if stepType != "instant" {
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            return
+                        }
                     }
                     
                     if shortName == "z" {
