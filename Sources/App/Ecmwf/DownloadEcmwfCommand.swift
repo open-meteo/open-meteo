@@ -111,14 +111,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
         }
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
 
         var generateElevationFileData: (lsm: [Float]?, surfacePressure: [Float]?, sealevelPressure: [Float]?, temperature_2m: [Float]?) = (nil, nil, nil, nil)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         logger.info("Downloading height and elevation data")
         let url = domain.getUrl(base: base, run: run, hour: 0)[0]
-        let request = try await EcmwfOpenDataSource.prepareDownload(url: url, curl: curl)
+        let request = try EcmwfOpenDataSource.prepareDownload(url: url)
         for try await message in try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
             guard entry.number == nil else {
                 // ignore ensemble members, only use control
@@ -177,7 +177,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         // Retry unauthorized errors, because ECMWF servers randomly return this error code
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, retryUnauthorized: true)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, retryUnauthorized: true, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
 
@@ -213,7 +213,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
-                let request = try await EcmwfOpenDataSource.prepareDownload(url: url, curl: curl)
+                let request = try EcmwfOpenDataSource.prepareDownload(url: url)
                 try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
@@ -441,7 +441,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     /// Download ECMWF ifs open data
     func downloadEcmwfWave(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, downloadConcurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
         
@@ -462,7 +462,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil, logger: logger)
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
-            let request = try await EcmwfOpenDataSource.prepareDownload(url: url, curl: curl)
+            let request = try EcmwfOpenDataSource.prepareDownload(url: url)
             try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
