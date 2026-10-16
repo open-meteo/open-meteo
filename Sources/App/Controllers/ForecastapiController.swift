@@ -823,6 +823,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_global_native_model_level
     case dwd_icon_eu_native
     case dwd_icon_eu_native_model_level
+    case dwd_icon_d2_ruc_native
+    case dwd_icon_d2_ruc_native_15min
+    case dwd_icon_d2_ruc_native_model_level
     case dwd_icon_d2_native
     case dwd_icon_d2_native_model_level
     case dwd_icon_d2_native_15min
@@ -1372,6 +1375,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(domain, IconVariable.self),
                 .domain(try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self)
             ], secondary: [.domain(try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self)], gridForBoundingBoxRequests: domain)
+        case .dwd_icon_d2_ruc_native:
+            let domain = try await IconNativeDomains.iconD2RucNative.load()
+            return .init(
+                primary: [.mixedBeforeDerivation(.init(domains: [
+                    domain,
+                    try await IconNativeDomains.iconD2RucNativeModelLevel.load(),
+                    try await IconNativeDomains.iconD2RucNative15min.load()
+                ], variableType: IconVariable.self, derivationDomain: domain))],
+                gridForBoundingBoxRequests: domain
+            )
+        case .dwd_icon_d2_ruc_native_15min:
+            return .single(try await IconNativeDomains.iconD2RucNative15min.load(), IconVariable.self)
+        case .dwd_icon_d2_ruc_native_model_level:
+            return .single(try await IconNativeDomains.iconD2RucNativeModelLevel.load(), IconModelLevelVariable.self)
         case .dwd_icon_d2_native:
             let domain = try await IconNativeDomains.iconD2Native.load()
             return .init(primary: [
@@ -1520,7 +1537,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(IconDomains.iconD2, IconVariable.self),
                 .domain(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 .domain(IconDomains.iconD2_15min, IconVariable.self)
-            ], secondary: [
+            ] + (try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?.primary ?? []), secondary: [
                 .domain(IconDomains.iconEps, ProbabilityVariable.self),
                 .domain(try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self),
                 .domain(IconDomains.iconEuEps, ProbabilityVariable.self),
@@ -1554,7 +1571,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .domain(IconDomains.iconD2, IconVariable.self),
                 .domain(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self),
                 .domain(IconDomains.iconD2_15min, IconVariable.self)
-            ], secondary: [
+            ] + (try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?.primary ?? []), secondary: [
                 .domain(IconDomains.iconD2Eps, ProbabilityVariable.self),
                 .domain(try await IconNativeDomains.iconD2EpsNative.load(), ProbabilityVariable.self)
             ], gridForBoundingBoxRequests: IconDomains.iconD2,
@@ -1963,6 +1980,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native)
+                let ruc: ForecastReaderResult?
+                do {
+                    ruc = try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
+                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                } catch IconNativeDomainError.missingGridArtifact, ForecastApiError.modelRunUnavailable {
+                    ruc = nil
+                }
                 return MultiDomains.hourlyToMultiSameType([
                     iconProbabilities.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
@@ -1970,6 +1994,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     icon,
                     iconEu,
                     iconD2,
+                    ruc?.hourly,
                     ifs025,
                     ifsHres,
                     knmiNetherlands
@@ -1997,6 +2022,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native),
                let iconD2_15min = try await makeReader(domain: .iconD2_15min, native: .iconD2Native15min) {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
+                let ruc: ForecastReaderResult?
+                do {
+                    ruc = try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
+                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                } catch IconNativeDomainError.missingGridArtifact, ForecastApiError.modelRunUnavailable {
+                    ruc = nil
+                }
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities?.asOptionalReader,
                     iconProbabilities.asOptionalReader,
@@ -2005,7 +2037,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     icon,
                     iconEu,
                     iconD2,
-                    include15Min ? iconD2_15min : nil
+                    include15Min ? iconD2_15min : nil,
+                    ruc?.hourly
                 ])
             }
             // For western europe, use arome models
@@ -2357,7 +2390,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return [] // migrated
         case .dwd_icon_d2_15min:
             return [] // migrated
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .dwd_icon_d2_ruc_native,
+             .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return [] // migrated
@@ -2576,7 +2611,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .dwd_icon_d2_ruc_native,
+             .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated
@@ -2818,7 +2855,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil // migrated
         case .dwd_icon_d2_15min:
             return nil // migrated
-        case .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+        case .dwd_icon_d2_ruc_native,
+             .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
              .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return nil // migrated

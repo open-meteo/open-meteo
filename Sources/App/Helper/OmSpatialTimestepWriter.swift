@@ -331,6 +331,8 @@ actor OmSpatialMultistepWriter {
     /// Finalise the time step and return all handles
     /// If not validTimes are given, use all timestamps from the underlaying writer
     func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        // Queue the latest timestep's metadata upload after all other timestep files.
+        let writer = writer.sorted { $0.time < $1.time }
         let validTimes = validTimes ?? writer.map { $0.time }
         // Only upload META JSON for the last timestamp
         let lastTimestamp = writer.last?.time
