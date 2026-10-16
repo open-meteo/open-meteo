@@ -49,22 +49,15 @@ enum ProbabilityReader {
     }
 
     /// Notes: Does not use ICON-D2, because it has fewer members. It need some kind of mixing
-    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerByVariableName<ProbabilityVariable> {
-        // EPS ingestion has moved to native storage, independently of the deterministic cutover.
-        let domains: [any GenericDomain] = [
-            IconDomains.iconEps,
-            try await IconNativeDomains.iconEpsNative.load(),
-            IconDomains.iconEuEps,
-            try await IconNativeDomains.iconEuEpsNative.load()
-        ]
-        let readers = try await domains.asyncCompactMap { domain in
-            do {
-                return try await domain.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            } catch ForecastApiError.modelRunUnavailable {
-                return nil
-            }
+    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ReaderComposition {
+        let source = try await MultiDomains.iconProbabilitySource()
+        do {
+            return try await source.bind(.init(latitude: lat, longitude: lon, elevation: elevation, mode: mode, elevationPolicy: .independentSources), options: options)
+                ?? .mix([], smoothTransitions: true)
+        } catch ForecastApiError.modelRunUnavailable {
+            // Probability sources are optional even for explicitly selected runs.
+            return .mix([], smoothTransitions: true)
         }
-        return GenericReaderMixerByVariableName(reader: readers)
     }
 
     /// Reader for probabilities based on NCEP NBM
