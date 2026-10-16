@@ -77,7 +77,14 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .global_ensemble_mean_20km:
+            return .ukmo_global_ensemble_20km
+        case .uk_ensemble_mean_2km:
+            return .ukmo_uk_ensemble_2km
+        default:
+            return domainRegistry
+        }
     }
 
     var dtSeconds: Int {
