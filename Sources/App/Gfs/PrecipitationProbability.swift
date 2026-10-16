@@ -38,7 +38,7 @@ enum ProbabilityVariable: String, CaseIterable, GenericVariable, GenericVariable
 enum ProbabilityReader {
     /// Read probabilities from GFS ensemble models 0.25° and 0.5°.
     static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ReaderComposition? {
-        let source = ReaderSource.optional(.mix([
+        let source = ReaderSource.optional(.blend([
             .field(GfsDomain.gfs05_ens, .precipitation_probability, ProbabilityVariable.precipitation_probability),
             .field(GfsDomain.gfs025_ens, .precipitation_probability, ProbabilityVariable.precipitation_probability)
         ], smoothTransitions: true))

@@ -74,14 +74,14 @@ where P.MixingVar: GenericVariable, S.MixingVar: GenericVariable {
 }
 
 extension ReaderSource {
-    static func domain<D: GenericDomain, V: GenericVariable>(_ domain: D, _ schema: V.Type) -> Self {
+    static func derived<D: GenericDomain, V: GenericVariable>(_ domain: D, variables schema: V.Type) -> Self {
         .reader { binding, options in
             guard let raw = try await binding.reader(domain, schema, options) else { return nil }
             return .source(ForecastReaderLeaf(VariableHourlyDeriver(reader: raw, options: options, domainRegistry: domain.domainRegistry)))
         }
     }
 
-    /// Mix typed raw inputs with the existing mixer, then derive once.
+    /// Mix raw domains in lowest-to-highest priority order with the existing mixer, then derive once.
     /// Normal requests require the derivation domain's coverage; explicit runs may
     /// use another generation. This eligibility rule belongs to this reader factory.
     static func derive<D: GenericDomain, V: GenericVariable>(domains: [D], variable: V.Type, derivationDomain: D) -> Self {
@@ -93,7 +93,7 @@ extension ReaderSource {
             var unavailable: ForecastApiError?
             for domain in domains.reversed() {
                 do {
-                    let raw = try await next.reader(domain, variable, options)
+                    let raw = try await next.reader(domain, variable, options, shareTargetElevation: true)
                     available = true
                     guard let raw else { continue }
                     readers.append(raw)
@@ -115,12 +115,12 @@ extension ReaderSource {
         primary: (P, PV.Type), supplemental: (S, SV.Type)
     ) -> Self {
         .reader { binding, options in
-            guard let primaryReader = try await binding.reader(primary.0, primary.1, options) else { return nil }
+            guard let primaryReader = try await binding.reader(primary.0, primary.1, options, shareTargetElevation: true) else { return nil }
             var next = binding
             if next.elevation.isNaN { next.elevation = primaryReader.resolvedTargetElevation }
             let secondary: GenericReaderCached<S, SV>?
             do {
-                secondary = try await next.reader(supplemental.0, supplemental.1, options)
+                secondary = try await next.reader(supplemental.0, supplemental.1, options, shareTargetElevation: true)
             } catch ForecastApiError.modelRunUnavailable {
                 secondary = nil
             }
@@ -138,14 +138,14 @@ extension ReaderSource {
 }
 
 extension ReaderSource.Binding {
-    func reader<D: GenericDomain, V: GenericVariable>(_ domain: D, _ schema: V.Type, _ options: GenericReaderOptions) async throws -> GenericReaderCached<D, V>? {
+    func reader<D: GenericDomain, V: GenericVariable>(_ domain: D, _ schema: V.Type, _ options: GenericReaderOptions, shareTargetElevation: Bool = false) async throws -> GenericReaderCached<D, V>? {
         let raw: GenericReader<D, V>
         if let output = outputGrid {
             try await options.validateRun(domain: domain)
             let position = output.domain.domainRegistry == domain.domainRegistry
                 ? output.position : domain.grid.findPoint(lat: latitude, lon: longitude)
             guard let position else { return nil }
-            raw = try await GenericReader(domain: domain, position: position, modelCoordinates: (latitude, longitude), options: options)
+            raw = try await GenericReader(domain: domain, position: position, targetElevation: shareTargetElevation ? elevation : .nan, modelCoordinates: (latitude, longitude), options: options)
         } else {
             guard let reader = try await GenericReader<D, V>(domain: domain, lat: latitude, lon: longitude,
                 elevation: elevation, mode: mode, options: options) else { return nil }

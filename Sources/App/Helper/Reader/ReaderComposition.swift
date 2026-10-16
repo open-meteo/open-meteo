@@ -8,11 +8,11 @@ indirect enum ReaderComposition: GenericReaderOptionalProtocol {
     case source(ForecastReaderLeaf)
     case combination(children: [ReaderComposition], contributors: [ReaderComposition], prefetchAll: Bool, smoothTransitions: Bool)
 
-    static func prefer(_ children: [Self], smoothTransitions: Bool) -> Self {
+    static func alternatives(_ children: [Self], smoothTransitions: Bool) -> Self {
         combine(children, prefetchAll: false, smoothTransitions: smoothTransitions)
     }
 
-    static func mix(_ children: [Self], smoothTransitions: Bool) -> Self {
+    static func blend(_ children: [Self], smoothTransitions: Bool) -> Self {
         combine(children, prefetchAll: true, smoothTransitions: smoothTransitions)
     }
 
@@ -92,16 +92,24 @@ indirect enum ReaderComposition: GenericReaderOptionalProtocol {
     }
 }
 
-/// Forecast composition. Typed domain/derive factories are leaves; prefer and mix
+/// Forecast composition. Typed derived/derive factories are leaves; alternatives and blend
 /// combine their forecast outputs without changing their derivation order.
 indirect enum ReaderSource {
     case reference(MultiDomains)
     case reader((Binding, GenericReaderOptions) async throws -> ReaderComposition?)
-    case prefer([ReaderSource], smoothTransitions: Bool = false, requireCoverage: Bool = false)
-    case mix([ReaderSource], smoothTransitions: Bool = false, requireCoverage: Bool = false)
+    /// Alternative representations: prefetch the last supporting child, read fallbacks on demand.
+    case alternatives([ReaderSource], smoothTransitions: Bool = false, requireCoverage: Bool = false)
+    /// Complementary model coverage: prefetch every supporting child.
+    case blend([ReaderSource], smoothTransitions: Bool = false, requireCoverage: Bool = false)
     /// Optional branches contribute variables but cannot satisfy run availability.
     /// Point-only branches are omitted when binding a bounding-box output grid.
     case optional(ReaderSource, pointOnly: Bool = false)
+
+    /// Join independently derived variable sets. Raw inputs remain separate.
+    /// Derived outputs can overlap; the last supporting child retains priority.
+    static func combineVariables(_ sources: [Self], smoothTransitions: Bool = false) -> Self {
+        .alternatives(sources, smoothTransitions: smoothTransitions)
+    }
 
     struct Binding {
         enum ElevationPolicy {
@@ -144,7 +152,7 @@ indirect enum ReaderSource {
             } catch ForecastApiError.modelRunUnavailable {
                 return nil
             }
-        case .prefer(let sources, let smooth, let requireCoverage), .mix(let sources, let smooth, let requireCoverage):
+        case .alternatives(let sources, let smooth, let requireCoverage), .blend(let sources, let smooth, let requireCoverage):
             var elevation = binding.elevation
             var available = false
             var covered = false
@@ -171,8 +179,8 @@ indirect enum ReaderSource {
             guard !readers.isEmpty, !requireCoverage || covered else { return nil }
             readers.reverse()
             switch self {
-            case .prefer: return .prefer(readers, smoothTransitions: smooth)
-            default: return .mix(readers, smoothTransitions: smooth)
+            case .alternatives: return .alternatives(readers, smoothTransitions: smooth)
+            default: return .blend(readers, smoothTransitions: smooth)
             }
         }
     }

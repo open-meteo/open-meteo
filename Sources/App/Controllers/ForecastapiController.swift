@@ -1010,7 +1010,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
 
         static func single(_ domain: any GenericDomain, _ variable: any GenericVariable.Type) -> Self {
-            .init(.domain(domain, variable), grid: domain)
+            .init(.derived(domain, variables: variable), grid: domain)
         }
 
         var singleDomain: (any GenericDomain)? { gridForBoundingBoxRequests }
@@ -1043,56 +1043,76 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 variable: HrrrVariable.self, derivationDomain: .hrrr_conus)
     }
 
+    // Surface and model-level fields are complementary. Keep their derivation
+    // independent, sharing these native definitions with the explicit API endpoints.
+    static func iconGlobalNativeSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
+        .combineVariables([
+            .derived(try await IconNativeDomains.iconNative.load(), variables: IconVariable.self),
+            .reference(.dwd_icon_global_native_model_level)
+        ], smoothTransitions: smoothTransitions)
+    }
+
+    static func iconEuNativeSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
+        .combineVariables([
+            .derived(try await IconNativeDomains.iconEuNative.load(), variables: IconVariable.self),
+            .reference(.dwd_icon_eu_native_model_level)
+        ], smoothTransitions: smoothTransitions)
+    }
+
+    static func iconD2NativeHourlySource(smoothTransitions: Bool = false) async throws -> ReaderSource {
+        .combineVariables([
+            .derived(try await IconNativeDomains.iconD2Native.load(), variables: IconVariable.self),
+            .reference(.dwd_icon_d2_native_model_level)
+        ], smoothTransitions: smoothTransitions)
+    }
+
     static func iconGlobalSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .prefer([
-            .domain(try await IconNativeDomains.iconNative.load(), IconVariable.self),
-            .reference(.dwd_icon_global_native_model_level),
-            .domain(IconDomains.icon, IconVariable.self)
+        .alternatives([
+            try await Self.iconGlobalNativeSource(smoothTransitions: smoothTransitions),
+            .derived(IconDomains.icon, variables: IconVariable.self)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconEuSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .prefer([
-            .domain(try await IconNativeDomains.iconEuNative.load(), IconVariable.self),
-            .reference(.dwd_icon_eu_native_model_level),
-            .domain(IconDomains.iconEu, IconVariable.self)
+        .alternatives([
+            try await Self.iconEuNativeSource(smoothTransitions: smoothTransitions),
+            .derived(IconDomains.iconEu, variables: IconVariable.self)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconD2Source(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .mix([
-            .prefer([
-                .domain(try await IconNativeDomains.iconD2Native.load(), IconVariable.self),
-                .reference(.dwd_icon_d2_native_model_level),
-                .domain(IconDomains.iconD2, IconVariable.self)
+        .blend([
+            .alternatives([
+                try await Self.iconD2NativeHourlySource(smoothTransitions: smoothTransitions),
+                .derived(IconDomains.iconD2, variables: IconVariable.self)
             ], smoothTransitions: smoothTransitions),
             try await Self.iconD2QuarterHourlySource(smoothTransitions: smoothTransitions)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconD2QuarterHourlySource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .prefer([
+        return .alternatives([
             .reference(.dwd_icon_d2_native_15min),
-            .domain(IconDomains.iconD2_15min, IconVariable.self)
+            .derived(IconDomains.iconD2_15min, variables: IconVariable.self)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconGlobalProbabilitySource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .prefer([
+        return .alternatives([
             .field(IconDomains.iconEps, .precipitation_probability, ProbabilityVariable.precipitation_probability),
             .field(try await IconNativeDomains.iconEpsNative.load(), .precipitation_probability, ProbabilityVariable.precipitation_probability)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconEuProbabilitySource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .prefer([
+        return .alternatives([
             .field(IconDomains.iconEuEps, .precipitation_probability, ProbabilityVariable.precipitation_probability),
             .field(try await IconNativeDomains.iconEuEpsNative.load(), .precipitation_probability, ProbabilityVariable.precipitation_probability)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconD2ProbabilitySource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        return .prefer([
+        return .alternatives([
             .field(IconDomains.iconD2Eps, .precipitation_probability, ProbabilityVariable.precipitation_probability),
             .field(try await IconNativeDomains.iconD2EpsNative.load(), .precipitation_probability, ProbabilityVariable.precipitation_probability)
         ], smoothTransitions: smoothTransitions)
@@ -1100,37 +1120,37 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     static func iconProbabilitySource() async throws -> ReaderSource {
         // D2 probabilities use a smaller ensemble and are intentionally excluded.
-        return .mix([
+        return .blend([
             try await Self.iconGlobalProbabilitySource(smoothTransitions: true),
             try await Self.iconEuProbabilitySource(smoothTransitions: true)
         ], smoothTransitions: true)
     }
 
     static func iconGlobalEnsembleSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        .prefer([
-            .domain(IconDomains.iconEps, DwdIconEpsGlobalVariable.self),
+        .alternatives([
+            .derived(IconDomains.iconEps, variables: DwdIconEpsGlobalVariable.self),
             .reference(.dwd_icon_global_eps_native)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconEuEnsembleSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        .prefer([
-            .domain(IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self),
+        .alternatives([
+            .derived(IconDomains.iconEuEps, variables: DwdIconEuEpsGlobalVariable.self),
             .reference(.dwd_icon_eu_eps_native)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconGlobalEnsembleMeanSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        .prefer([
-            .domain(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
-            .domain(try await IconNativeDomains.iconEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEpsGlobalVariable>.self)
+        .alternatives([
+            .derived(IconDomains.iconEpsEnsembleMean, variables: VariableOrSpread<DwdIconEpsGlobalVariable>.self),
+            .derived(try await IconNativeDomains.iconEpsNativeEnsembleMean.load(), variables: VariableOrSpread<DwdIconEpsGlobalVariable>.self)
         ], smoothTransitions: smoothTransitions)
     }
 
     static func iconEuEnsembleMeanSource(smoothTransitions: Bool = false) async throws -> ReaderSource {
-        .prefer([
-            .domain(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
-            .domain(try await IconNativeDomains.iconEuEpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
+        .alternatives([
+            .derived(IconDomains.iconEuEpsEnsembleMean, variables: VariableOrSpread<DwdIconEuEpsGlobalVariable>.self),
+            .derived(try await IconNativeDomains.iconEuEpsNativeEnsembleMean.load(), variables: VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
         ], smoothTransitions: smoothTransitions)
     }
 
@@ -1140,9 +1160,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_ifs04:
             return .single(EcmwfDomain.ifs04, EcmwfVariable.self)
         case .ecmwf_ifs025:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: EcmwfDomain.ifs025)
         case .ecmwf_aifs025:
             return .single(EcmwfDomain.aifs025, EcmwfVariable.self)
@@ -1153,9 +1173,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025_ensemble:
             return .single(EcmwfDomain.aifs025_ensemble, EcmwfAifsVariable.self)
         case .ecmwf_ifs:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: EcmwfEcpdsDomain.ifs)
         case .era5, .copernicus_era5:
             // Mix deterministic components with ensemble uncertainties before deriving wind spreads.
@@ -1193,9 +1213,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .kma_ldps:
             return .single(KmaDomain.ldps, KmaVariable.self)
         case .kma_seamless:
-            return .init(.prefer([
-                .domain(KmaDomain.gdps, KmaVariable.self),
-                .domain(KmaDomain.ldps, KmaVariable.self)
+            return .init(.alternatives([
+                .derived(KmaDomain.gdps, variables: KmaVariable.self),
+                .derived(KmaDomain.ldps, variables: KmaVariable.self)
             ], smoothTransitions: true))
         case .gfs025, .ncep_gfs025:
             return .single(GfsDomain.gfs025, Gfs025Variable.self)
@@ -1206,21 +1226,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_hrrr_conus_15min:
             return .single(GfsDomain.hrrr_conus_15min, Hrrr15MinVariable.self)
         case .gfs_hrrr, .ncep_hrrr_conus:
-            return .init(.mix([
-                .optional(.domain(NbmDomain.nbm_conus, ProbabilityVariable.self), pointOnly: true),
+            return .init(.blend([
+                .optional(.derived(NbmDomain.nbm_conus, variables: ProbabilityVariable.self), pointOnly: true),
                 Self.hrrrSource(include15Min: include15Min)
             ], smoothTransitions: true, requireCoverage: true), grid: GfsDomain.hrrr_conus)
         case .gfs_global, .ncep_gfs_global:
-            return .init(.mix([
-                .optional(.domain(GfsDomain.gfs05_ens, ProbabilityVariable.self), pointOnly: true),
-                .optional(.domain(GfsDomain.gfs025_ens, ProbabilityVariable.self), pointOnly: true),
+            return .init(.blend([
+                .optional(.derived(GfsDomain.gfs05_ens, variables: ProbabilityVariable.self), pointOnly: true),
+                .optional(.derived(GfsDomain.gfs025_ens, variables: ProbabilityVariable.self), pointOnly: true),
                 Self.gfsGlobalSource()
             ], smoothTransitions: true, requireCoverage: true))
         case .gfs_mix, .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
-            return .init(.mix([
-                .optional(.domain(GfsDomain.gfs05_ens, ProbabilityVariable.self), pointOnly: true),
-                .optional(.domain(GfsDomain.gfs025_ens, ProbabilityVariable.self), pointOnly: true),
-                .optional(.domain(NbmDomain.nbm_conus, ProbabilityVariable.self), pointOnly: true),
+            return .init(.blend([
+                .optional(.derived(GfsDomain.gfs05_ens, variables: ProbabilityVariable.self), pointOnly: true),
+                .optional(.derived(GfsDomain.gfs025_ens, variables: ProbabilityVariable.self), pointOnly: true),
+                .optional(.derived(NbmDomain.nbm_conus, variables: ProbabilityVariable.self), pointOnly: true),
                 Self.gfsGlobalSource(),
                 Self.hrrrSource(include15Min: include15Min)
             ], smoothTransitions: true, requireCoverage: true))
@@ -1229,36 +1249,30 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gfs05, .ncep_gefs05:
             return .single(GfsDomain.gfs05_ens, Gefs05Variable.self)
         case .ncep_gefs_seamless:
-            return .init(.prefer([
-                .domain(GfsDomain.gfs05_ens, Gefs05Variable.self),
-                .domain(GfsDomain.gfs025_ens, Gefs025Variable.self)
+            return .init(.alternatives([
+                .derived(GfsDomain.gfs05_ens, variables: Gefs05Variable.self),
+                .derived(GfsDomain.gfs025_ens, variables: Gefs025Variable.self)
             ], smoothTransitions: true))
         case .ncep_nbm_conus:
             return .single(NbmDomain.nbm_conus, NbmSurfaceVariable.self)
         case .dwd_icon_global_native:
-            let domain = try await IconNativeDomains.iconNative.load()
-            return .init(.prefer([
-                .optional(.domain(try await IconNativeDomains.iconEpsNative.load(), ProbabilityVariable.self), pointOnly: true),
-                .domain(domain, IconVariable.self),
-                .domain(try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self)
-            ], smoothTransitions: true), grid: domain)
+            return .init(.alternatives([
+                .optional(.derived(try await IconNativeDomains.iconEpsNative.load(), variables: ProbabilityVariable.self), pointOnly: true),
+                try await Self.iconGlobalNativeSource(smoothTransitions: true)
+            ], smoothTransitions: true), grid: try await IconNativeDomains.iconNative.load())
         case .dwd_icon_d2_native:
-            let domain = try await IconNativeDomains.iconD2Native.load()
-            return .init(.prefer([
-                .optional(.domain(try await IconNativeDomains.iconD2EpsNative.load(), ProbabilityVariable.self), pointOnly: true),
-                .domain(domain, IconVariable.self),
-                .domain(try await IconNativeDomains.iconD2NativeModelLevel.load(), IconModelLevelVariable.self),
-                .domain(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
-            ], smoothTransitions: true), grid: domain)
+            return .init(.alternatives([
+                .optional(.derived(try await IconNativeDomains.iconD2EpsNative.load(), variables: ProbabilityVariable.self), pointOnly: true),
+                try await Self.iconD2NativeHourlySource(smoothTransitions: true),
+                .reference(.dwd_icon_d2_native_15min)
+            ], smoothTransitions: true), grid: try await IconNativeDomains.iconD2Native.load())
         case .dwd_icon_d2_native_15min:
             return .single(try await IconNativeDomains.iconD2Native15min.load(), IconVariable.self)
         case .dwd_icon_eu_native:
-            let domain = try await IconNativeDomains.iconEuNative.load()
-            return .init(.prefer([
-                .optional(.domain(try await IconNativeDomains.iconEuEpsNative.load(), ProbabilityVariable.self), pointOnly: true),
-                .domain(domain, IconVariable.self),
-                .domain(try await IconNativeDomains.iconEuNativeModelLevel.load(), IconModelLevelVariable.self)
-            ], smoothTransitions: true), grid: domain)
+            return .init(.alternatives([
+                .optional(.derived(try await IconNativeDomains.iconEuEpsNative.load(), variables: ProbabilityVariable.self), pointOnly: true),
+                try await Self.iconEuNativeSource(smoothTransitions: true)
+            ], smoothTransitions: true), grid: try await IconNativeDomains.iconEuNative.load())
         case .dwd_icon_global_native_model_level:
             return .single(try await IconNativeDomains.iconNativeModelLevel.load(), IconModelLevelVariable.self)
         case .dwd_icon_eu_native_model_level:
@@ -1272,9 +1286,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dwd_icon_d2_eps_native:
             return .single(try await IconNativeDomains.iconD2EpsNative.load(), DwdIconD2EpsGlobalVariable.self)
         case .ncep_aigfs025:
-            return .init(.prefer([
-                .optional(.domain(GfsGraphCastDomain.aigefs025, ProbabilityVariable.self), pointOnly: true),
-                .domain(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(GfsGraphCastDomain.aigefs025, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(GfsGraphCastDomain.aigfs025, variables: GfsGraphCastVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: GfsGraphCastDomain.aigfs025)
         case .ncep_hgefs025_ensemble_mean:
             return .single(GfsGraphCastDomain.hgefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
@@ -1299,9 +1313,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .google_weathernext2_ensemble:
             return .single(WeatherNextDomain.weathernext_global, WeatherNextVariable.self)
         case .bom_access_global:
-            return .init(.prefer([
-                .optional(.domain(BomDomain.access_global_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(BomDomain.access_global, BomVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(BomDomain.access_global_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(BomDomain.access_global, variables: BomVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: BomDomain.access_global)
         case .cma_grapes_global:
             return .single(CmaDomain.grapes_global, CmaVariable.self)
@@ -1314,51 +1328,51 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .italia_meteo_arpae_icon_2i:
             return .single(ItaliaMeteoArpaeDomain.icon_2i, ItaliaMeteoArpaeVariable.self)
         case .dmi_seamless:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
-                .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(DmiDomain.harmonie_arome_europe, DmiVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self),
+                .derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self),
+                .derived(DmiDomain.harmonie_arome_europe, variables: DmiVariable.self)
             ], smoothTransitions: true))
         case .metno_nordic:
             return .single(MetNoDomain.nordic_pp, MetNoVariable.self)
         case .metno_seamless:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
-                .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(MetNoDomain.nordic_pp, MetNoVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(GfsDomain.gfs013, variables: GfsUvIndexVariable.self),
+                .derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self),
+                .derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self),
+                .derived(MetNoDomain.nordic_pp, variables: MetNoVariable.self)
             ], smoothTransitions: true))
         case .knmi_seamless:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
-                .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(KnmiDomain.harmonie_arome_europe, KnmiVariable.self),
-                .domain(KnmiDomain.harmonie_arome_netherlands, KnmiVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(GfsDomain.gfs013, variables: GfsUvIndexVariable.self),
+                .derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self),
+                .derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self),
+                .derived(KnmiDomain.harmonie_arome_europe, variables: KnmiVariable.self),
+                .derived(KnmiDomain.harmonie_arome_netherlands, variables: KnmiVariable.self)
             ], smoothTransitions: true))
         case .meteofrance_seamless, .meteofrance_mix:
-            return .init(.prefer([
-                .domain(MeteoFranceDomain.arpege_world, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arpege_europe, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france_hd, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france_15min, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
+            return .init(.alternatives([
+                .derived(MeteoFranceDomain.arpege_world, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arpege_europe, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france_hd, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france_15min, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france_hd_15min, variables: MeteoFranceVariable.self)
             ], smoothTransitions: true))
         case .meteofrance_arpege_seamless, .arpege_seamless:
-            return .init(.prefer([
-                .domain(MeteoFranceDomain.arpege_world, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arpege_europe, MeteoFranceVariable.self)
+            return .init(.alternatives([
+                .derived(MeteoFranceDomain.arpege_world, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arpege_europe, variables: MeteoFranceVariable.self)
             ], smoothTransitions: true))
         case .meteofrance_arome_seamless, .arome_seamless:
-            return .init(.prefer([
-                .domain(MeteoFranceDomain.arome_france, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france_hd, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france_15min, MeteoFranceVariable.self),
-                .domain(MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
+            return .init(.alternatives([
+                .derived(MeteoFranceDomain.arome_france, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france_hd, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france_15min, variables: MeteoFranceVariable.self),
+                .derived(MeteoFranceDomain.arome_france_hd_15min, variables: MeteoFranceVariable.self)
             ], smoothTransitions: true))
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return .single(MeteoFranceDomain.arpege_world, MeteoFranceVariable.self)
@@ -1373,53 +1387,53 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_arome_france_hd_15min:
             return .single(MeteoFranceDomain.arome_france_hd_15min, MeteoFranceVariable.self)
         case .jma_seamless, .jma_mix:
-            return .init(.prefer([
-                .domain(JmaDomain.gsm, JmaVariable.self),
-                .domain(JmaDomain.msm_upper_level, JmaPressureVariable.self),
-                .domain(JmaDomain.msm, JmaSurfaceVariable.self)
+            return .init(.alternatives([
+                .derived(JmaDomain.gsm, variables: JmaVariable.self),
+                .derived(JmaDomain.msm_upper_level, variables: JmaPressureVariable.self),
+                .derived(JmaDomain.msm, variables: JmaSurfaceVariable.self)
             ], smoothTransitions: true))
         case .jma_msm:
-            return .init(.prefer([
-                .domain(JmaDomain.msm_upper_level, JmaPressureVariable.self),
-                .domain(JmaDomain.msm, JmaSurfaceVariable.self)
+            return .init(.alternatives([
+                .derived(JmaDomain.msm_upper_level, variables: JmaPressureVariable.self),
+                .derived(JmaDomain.msm, variables: JmaSurfaceVariable.self)
             ], smoothTransitions: true), grid: JmaDomain.msm)
         case .jma_msm_upper_level:
             return .single(JmaDomain.msm_upper_level, JmaPressureVariable.self)
         case .jms_gsm, .jma_gsm:
             return .single(JmaDomain.gsm, JmaVariable.self)
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
-            return .init(.prefer([
+            return .init(.alternatives([
                 .optional(try await Self.iconProbabilitySource(), pointOnly: true),
-                .mix([
+                .blend([
                     try await Self.iconGlobalSource(smoothTransitions: true),
                     try await Self.iconEuSource(smoothTransitions: true),
                     try await Self.iconD2Source(smoothTransitions: true)
                 ], smoothTransitions: true)
             ], smoothTransitions: true))
         case .icon_global, .dwd_icon_global, .dwd_icon:
-            return .init(.prefer([
+            return .init(.alternatives([
                 .optional(try await Self.iconGlobalProbabilitySource(), pointOnly: true),
                 try await Self.iconGlobalSource()
             ]), grid: IconDomains.icon)
         case .icon_eu, .dwd_icon_eu:
-            return .init(.prefer([
+            return .init(.alternatives([
                 .optional(try await Self.iconEuProbabilitySource(), pointOnly: true),
                 try await Self.iconEuSource()
             ]), grid: IconDomains.iconEu)
         case .icon_d2, .dwd_icon_d2:
-            return .init(.prefer([
+            return .init(.alternatives([
                 .optional(try await Self.iconD2ProbabilitySource(), pointOnly: true),
                 try await Self.iconD2Source()
             ]), grid: IconDomains.iconD2)
         case .dwd_icon_d2_15min:
             return .init(try await Self.iconD2QuarterHourlySource(), grid: IconDomains.iconD2_15min)
         case .icon_seamless_eps, .dwd_icon_seamless_eps:
-            return .init(.mix([
+            return .init(.blend([
                 try await Self.iconGlobalEnsembleSource(smoothTransitions: true),
                 try await Self.iconEuEnsembleSource(smoothTransitions: true)
             ], smoothTransitions: true))
         case .dwd_icon_eps_ensemble_mean_seamless:
-            return .init(.mix([
+            return .init(.blend([
                 try await Self.iconGlobalEnsembleMeanSource(smoothTransitions: true),
                 try await Self.iconEuEnsembleMeanSource(smoothTransitions: true)
             ], smoothTransitions: true))
@@ -1428,8 +1442,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_eu_eps, .dwd_icon_eu_eps:
             return .init(try await Self.iconEuEnsembleSource(), grid: IconDomains.iconEuEps)
         case .icon_d2_eps, .dwd_icon_d2_eps:
-            return .init(.prefer([
-                .domain(IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self),
+            return .init(.alternatives([
+                .derived(IconDomains.iconD2Eps, variables: DwdIconD2EpsGlobalVariable.self),
                 .reference(.dwd_icon_d2_eps_native)
             ]), grid: IconDomains.iconD2Eps)
         case .dwd_icon_eps_ensemble_mean:
@@ -1437,9 +1451,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .dwd_icon_eu_eps_ensemble_mean:
             return .init(try await Self.iconEuEnsembleMeanSource(), grid: IconDomains.iconEuEpsEnsembleMean)
         case .dwd_icon_d2_eps_ensemble_mean:
-            return .init(.prefer([
-                .domain(IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<DwdIconD2EpsGlobalVariable>.self),
-                .domain(try await IconNativeDomains.iconD2EpsNativeEnsembleMean.load(), VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
+            return .init(.alternatives([
+                .derived(IconDomains.iconD2EpsEnsembleMean, variables: VariableOrSpread<DwdIconD2EpsGlobalVariable>.self),
+                .derived(try await IconNativeDomains.iconD2EpsNativeEnsembleMean.load(), variables: VariableOrSpread<DwdIconD2EpsGlobalVariable>.self)
             ]), grid: IconDomains.iconD2EpsEnsembleMean)
         case .ecmwf_ifs025_ensemble_mean:
             return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfIfsVariable>.self)
@@ -1458,35 +1472,35 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs_europe_ensemble_mean:
             return .single(EcmwfEcpdsDomain.aifs_europe_ensemble_mean, VariableOrSpread<EcmwfEcdpsAifsEuropeEnsembleVariable>.self)
         case .ncep_gefs_ensemble_mean_seamless:
-            return .init(.prefer([
-                .domain(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<Gefs05Variable>.self),
-                .domain(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<Gefs025Variable>.self)
+            return .init(.alternatives([
+                .derived(GfsDomain.gefs05_ensemble_mean, variables: VariableOrSpread<Gefs05Variable>.self),
+                .derived(GfsDomain.gefs025_ensemble_mean, variables: VariableOrSpread<Gefs025Variable>.self)
             ], smoothTransitions: true))
         case .gem_seamless, .cmc_gem_seamless:
             // Keep both generations of GDPS/RDPS for archive and forecast fallback.
             // Derive each product independently before mixing; HRDPS West is not part of seamless.
-            return .init(.prefer([
-                .optional(.domain(GemDomain.gem_global_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(GemDomain.gem_gdps_15km_upper_level, GemVariable.self),
-                .domain(GemDomain.gem_global, GemVariable.self),
-                .domain(GemDomain.gem_gdps_15km, GemVariable.self),
-                .domain(GemDomain.gem_regional, GemVariable.self),
-                .domain(GemDomain.gem_rdps_10km, GemVariable.self),
-                .domain(GemDomain.gem_hrdps_continental, GemVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(GemDomain.gem_global_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(GemDomain.gem_gdps_15km_upper_level, variables: GemVariable.self),
+                .derived(GemDomain.gem_global, variables: GemVariable.self),
+                .derived(GemDomain.gem_gdps_15km, variables: GemVariable.self),
+                .derived(GemDomain.gem_regional, variables: GemVariable.self),
+                .derived(GemDomain.gem_rdps_10km, variables: GemVariable.self),
+                .derived(GemDomain.gem_hrdps_continental, variables: GemVariable.self)
             ], smoothTransitions: true))
         case .gem_global, .cmc_gem_gdps:
             // Use all generations, remapping gridpoint requests onto the legacy output grid.
-            return .init(.prefer([
-                .optional(.domain(GemDomain.gem_global_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(GemDomain.gem_gdps_15km_upper_level, GemVariable.self),
-                .domain(GemDomain.gem_global, GemVariable.self),
-                .domain(GemDomain.gem_gdps_15km, GemVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(GemDomain.gem_global_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(GemDomain.gem_gdps_15km_upper_level, variables: GemVariable.self),
+                .derived(GemDomain.gem_global, variables: GemVariable.self),
+                .derived(GemDomain.gem_gdps_15km, variables: GemVariable.self)
             ], smoothTransitions: true), grid: GemDomain.gem_global)
         case .gem_regional, .cmc_gem_rdps:
             // The old and new RDPS grids have different indexing.
-            return .init(.prefer([
-                .domain(GemDomain.gem_regional, GemVariable.self),
-                .domain(GemDomain.gem_rdps_10km, GemVariable.self)
+            return .init(.alternatives([
+                .derived(GemDomain.gem_regional, variables: GemVariable.self),
+                .derived(GemDomain.gem_rdps_10km, variables: GemVariable.self)
             ], smoothTransitions: true), grid: GemDomain.gem_regional)
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return .single(GemDomain.gem_hrdps_continental, GemVariable.self)
@@ -1494,8 +1508,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GemDomain.gem_hrdps_west, GemVariable.self)
         case .gem_global_ensemble, .cmc_gem_geps:
             // Preserve the coordinate-only GEPS API contract.
-            return .init(.prefer([
-                .domain(GemDomain.gem_global_ensemble, GemVariable.self)
+            return .init(.alternatives([
+                .derived(GemDomain.gem_global_ensemble, variables: GemVariable.self)
             ], smoothTransitions: true))
         case .cmc_gem_geps_ensemble_mean:
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
@@ -1512,38 +1526,38 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ukmo_uk_ensemble_mean_2km:
             return .single(UkmoDomain.uk_ensemble_mean_2km, VariableOrSpread<UkmoUkvEnsembleVariable>.self)
         case .ukmo_seamless:
-            return .init(.prefer([
-                .optional(.domain(UkmoDomain.global_ensemble_20km, ProbabilityVariable.self), pointOnly: true),
-                .optional(.domain(UkmoDomain.uk_ensemble_2km, ProbabilityVariable.self), pointOnly: true),
-                .domain(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
-                .domain(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(UkmoDomain.global_ensemble_20km, variables: ProbabilityVariable.self), pointOnly: true),
+                .optional(.derived(UkmoDomain.uk_ensemble_2km, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(UkmoDomain.global_deterministic_10km, variables: SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
+                .derived(UkmoDomain.uk_deterministic_2km, variables: UkmoVariable.self)
             ], smoothTransitions: true))
         case .ukmo_uk_deterministic_2km:
-            return .init(.prefer([
-                .optional(.domain(UkmoDomain.uk_ensemble_2km, ProbabilityVariable.self), pointOnly: true),
-                .domain(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(UkmoDomain.uk_ensemble_2km, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(UkmoDomain.uk_deterministic_2km, variables: UkmoVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: UkmoDomain.uk_deterministic_2km)
         case .ukmo_global_deterministic_10km:
-            return .init(.prefer([
-                .optional(.domain(UkmoDomain.global_ensemble_20km, ProbabilityVariable.self), pointOnly: true),
-                .domain(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self)
+            return .init(.alternatives([
+                .optional(.derived(UkmoDomain.global_ensemble_20km, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(UkmoDomain.global_deterministic_10km, variables: SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self)
             ], smoothTransitions: true, requireCoverage: true), grid: UkmoDomain.global_deterministic_10km)
         case .meteoswiss_icon_ch1:
-            return .init(.prefer([
-                .optional(.domain(MeteoSwissDomain.icon_ch1_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(MeteoSwissDomain.icon_ch1, MeteoSwissVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(MeteoSwissDomain.icon_ch1_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(MeteoSwissDomain.icon_ch1, variables: MeteoSwissVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: MeteoSwissDomain.icon_ch1)
         case .meteoswiss_icon_ch2:
-            return .init(.prefer([
-                .optional(.domain(MeteoSwissDomain.icon_ch2_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(MeteoSwissDomain.icon_ch2, MeteoSwissVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(MeteoSwissDomain.icon_ch2_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(MeteoSwissDomain.icon_ch2, variables: MeteoSwissVariable.self)
             ], smoothTransitions: true, requireCoverage: true), grid: MeteoSwissDomain.icon_ch2)
         case .meteoswiss_icon_seamless:
-            return .init(.prefer([
-                .optional(.domain(MeteoSwissDomain.icon_ch2_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .optional(.domain(MeteoSwissDomain.icon_ch1_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(MeteoSwissDomain.icon_ch2, MeteoSwissVariable.self),
-                .domain(MeteoSwissDomain.icon_ch1, MeteoSwissVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(MeteoSwissDomain.icon_ch2_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .optional(.derived(MeteoSwissDomain.icon_ch1_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(MeteoSwissDomain.icon_ch2, variables: MeteoSwissVariable.self),
+                .derived(MeteoSwissDomain.icon_ch1, variables: MeteoSwissVariable.self)
             ], smoothTransitions: true))
         case .meteoswiss_icon_ch1_ensemble:
             return .single(MeteoSwissDomain.icon_ch1_ensemble, MeteoSwissVariable.self)
@@ -1568,9 +1582,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .meteofrance_wave:
             return .single(MfWaveDomain.mfwave, MfWaveVariable.self)
         case .meteofrance_currents:
-            return .init(.prefer([
-                .domain(MfWaveDomain.mfsst, MfSSTVariable.self),
-                .domain(MfWaveDomain.mfcurrents, MfCurrentVariable.self)
+            return .init(.alternatives([
+                .derived(MfWaveDomain.mfsst, variables: MfSSTVariable.self),
+                .derived(MfWaveDomain.mfcurrents, variables: MfCurrentVariable.self)
             ], smoothTransitions: true), grid: MfWaveDomain.mfcurrents)
         case .ncep_gfswave025:
             return .single(GfsDomain.gfswave025, GfsWaveVariable.self)
@@ -1589,12 +1603,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .chmi_aladin_central_europe_2km:
             return .single(ChmiDomain.aladin_central_europe_2km, ChmiVariable.self)
         case .chmi_aladin_seamless:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .optional(.domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self), pointOnly: true),
-                .optional(.domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self), pointOnly: true),
-                .domain(ChmiDomain.aladin_central_europe_2km, ChmiVariable.self),
-                .domain(ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .optional(.derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self), pointOnly: true),
+                .optional(.derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self), pointOnly: true),
+                .derived(ChmiDomain.aladin_central_europe_2km, variables: ChmiVariable.self),
+                .derived(ChmiDomain.aladin_cz_1km, variables: ChmiSurfaceVariable.self)
             ], smoothTransitions: true, requireCoverage: true))
         case .air_quality_best_match:
             return .init(.derive(domains: [
@@ -1620,11 +1634,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 CamsDomain.cams_europe_reanalysis_validated_pre2018
             ], variable: CamsVariable.self, derivationDomain: CamsDomain.cams_europe), grid: CamsDomain.cams_europe)
         case .geosphere_seamless:
-            return .init(.prefer([
-                .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
-                .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(GeoSphereDomain.arome_austria, GeoSphereVariable.self)
+            return .init(.alternatives([
+                .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                .derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self),
+                .derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self),
+                .derived(GeoSphereDomain.arome_austria, variables: GeoSphereVariable.self)
             ], smoothTransitions: true))
         default: return nil
         }
@@ -1701,15 +1715,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .getMetaJson(client: options.httpClient, logger: options.logger)?
                 .lastRunAvailabilityTime
             var sources: [ReaderSource] = [
-                .domain(MfWaveDomain.mfcurrents, MfCurrentVariable.self),
-                .domain(MfWaveDomain.mfsst, MfSSTVariable.self),
-                .domain(IconWaveDomain.ewam, IconWaveVariable.self),
-                .domain(MfWaveDomain.mfwave, MfWaveVariable.self),
+                .derived(MfWaveDomain.mfcurrents, variables: MfCurrentVariable.self),
+                .derived(MfWaveDomain.mfsst, variables: MfSSTVariable.self),
+                .derived(IconWaveDomain.ewam, variables: IconWaveVariable.self),
+                .derived(MfWaveDomain.mfwave, variables: MfWaveVariable.self)
             ]
             if let lastRunAvailabilityTime, lastRunAvailabilityTime <= Timestamp.now().subtract(hours: 26) {
-                sources.append(.domain(EcmwfDomain.wam025, EcmwfWaveVariable.self))
+                sources.append(.derived(EcmwfDomain.wam025, variables: EcmwfWaveVariable.self))
             }
-            return try await DomainReaderMapping(.prefer(sources, smoothTransitions: true)).getReaders(
+            return try await DomainReaderMapping(.alternatives(sources, smoothTransitions: true)).getReaders(
                 lat: lat,
                 lon: lon,
                 elevation: elevation,
@@ -1720,21 +1734,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             // best_match may change its model selection over time, so native ICON intentionally takes priority here.
             // Keep these storage pairs separate from the probability and quarter-hourly companions below.
             func makeReader(domain: IconDomains, native: IconNativeDomains) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
-                var primary: [ReaderSource] = [.domain(domain, IconVariable.self)]
+                var primary: [ReaderSource] = [.derived(domain, variables: IconVariable.self)]
                 if let nativeGrid = try? await native.load() {
-                    primary.append(.domain(nativeGrid, IconVariable.self))
+                    primary.append(.derived(nativeGrid, variables: IconVariable.self))
                 }
                 let binding = ReaderSource.Binding(latitude: lat, longitude: lon, elevation: elevation, mode: mode)
-                guard let forecast = try await ReaderSource.prefer(primary).bind(binding, options: options) else { return nil }
+                guard let forecast = try await ReaderSource.alternatives(primary).bind(binding, options: options) else { return nil }
                 var readers = [forecast]
                 if let modelLevel = native.modelLevelDomain, let modelLevelGrid = try? await modelLevel.load() {
                     let supplementalBinding = ReaderSource.Binding(latitude: lat, longitude: lon, elevation: forecast.resolvedTargetElevation, mode: mode)
-                    let source = ReaderSource.optional(.domain(modelLevelGrid, IconModelLevelVariable.self))
+                    let source = ReaderSource.optional(.derived(modelLevelGrid, variables: IconModelLevelVariable.self))
                     if let supplemental = try await source.bind(supplementalBinding, options: options) {
                         readers.append(supplemental)
                     }
                 }
-                return ReaderComposition.prefer(readers, smoothTransitions: false).asOptionalReader
+                return ReaderComposition.alternatives(readers, smoothTransitions: false).asOptionalReader
             }
 
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1779,13 +1793,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
             if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
-                let mapping = DomainReaderMapping(.prefer([
-                    .optional(.domain(EcmwfDomain.ifs025_ensemble, ProbabilityVariable.self), pointOnly: true),
-                    .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                    .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
-                    .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                    .domain(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
-                    .domain(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
+                let mapping = DomainReaderMapping(.alternatives([
+                    .optional(.derived(EcmwfDomain.ifs025_ensemble, variables: ProbabilityVariable.self), pointOnly: true),
+                    .derived(GfsDomain.gfs013, variables: GfsUvIndexVariable.self),
+                    .derived(EcmwfDomain.ifs025, variables: EcmwfIfsVariable.self),
+                    .derived(EcmwfEcpdsDomain.ifs, variables: EcmwfEcdpsIfsVariable.self),
+                    .derived(UkmoDomain.global_deterministic_10km, variables: SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
+                    .derived(UkmoDomain.uk_deterministic_2km, variables: UkmoVariable.self)
                 ], smoothTransitions: true))
                 return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
@@ -2858,17 +2872,21 @@ extension MultiDomains.DomainReaderMapping {
          requirePrimaryCoverage: Bool = false) {
         let children = secondary.map { ReaderSource.optional($0, pointOnly: true) } + primary
         self.init(prefetchAllReaders
-            ? .mix(children, smoothTransitions: smoothTransitions, requireCoverage: requirePrimaryCoverage)
-            : .prefer(children, smoothTransitions: smoothTransitions, requireCoverage: requirePrimaryCoverage),
+            ? .blend(children, smoothTransitions: smoothTransitions, requireCoverage: requirePrimaryCoverage)
+            : .alternatives(children, smoothTransitions: smoothTransitions, requireCoverage: requirePrimaryCoverage),
             grid: gridForBoundingBoxRequests)
     }
 
     static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain) -> Self {
-        .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, requirePrimaryCoverage: true)
+        .init(primary: [.derived(domain, variables: variable)], secondary: [.derived(precipitationProb, variables: ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, requirePrimaryCoverage: true)
     }
 }
 
 extension ReaderSource {
+    static func domain<D: GenericDomain, V: GenericVariable>(_ domain: D, _ schema: V.Type) -> Self {
+        .derived(domain, variables: schema)
+    }
+
     struct RawGroup {
         let source: ReaderSource
         init<D: GenericDomain, V: GenericVariable>(domains: [D], variableType: V.Type, derivationDomain: D) {
