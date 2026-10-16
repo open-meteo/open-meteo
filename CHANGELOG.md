@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/open-meteo/open-meteo/compare/1.7.0...1.7.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* Update SDK for latest model identifier ([01ceed5](https://github.com/open-meteo/open-meteo/commit/01ceed5b028fb6ac19794c3310aed5a4f7aa6d4a))
+
 ## [1.7.0](https://github.com/open-meteo/open-meteo/compare/1.6.0...1.7.0) (2026-10-16)
 
 
