@@ -264,8 +264,8 @@ The downloader defines the required inputs through `CurlIndexedVariable` and cal
 
 Run the inventory, conversion and scheduling tests with `swift test --filter NcepRrfsTests`. To additionally decode an existing ensemble GRIB sample, set `RRFS_TEST_GRIB=/path/to/file.grib2` with its `.idx` alongside it. `RRFS_TEST_DOMAIN` can select another RRFS domain for another sample.
 
-### API encoding limitation
+### API encoding
 
-RRFS model identifiers are not yet available in the installed FlatBuffers SDK, so binary responses currently encode the model as `undefined`.
+FlatBuffers SDK 1.28.1 provides identifiers for all five RRFS API models, as well as `cloud_ceiling`, `freezing_rain`, `radar_reflectivity` and `categorical_freezing_rain`.
 
-The installed FlatBuffers SDK also lacks `categorical_freezing_rain`, `radar_reflectivity` and the dBZ unit. These variables encode as `undefined` in binary responses. The radar-reflectivity unit currently uses an `undefined` placeholder in all response formats, with a TODO to use dBZ when the SDK supports it. The stored values remain in dBZ.
+The SDK still lacks the dBZ unit. The radar-reflectivity unit uses an `undefined` placeholder in all response formats, with a TODO to use dBZ when the SDK supports it. The stored values remain in dBZ.

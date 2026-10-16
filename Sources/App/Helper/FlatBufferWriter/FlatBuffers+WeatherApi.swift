@@ -343,9 +343,14 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance, previousDay: previousDay)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant, previousDay: previousDay)
-        case .cloud_ceiling, .freezing_rain, .radar_reflectivity, .categorical_freezing_rain:
-            // The installed SDK has no identifiers for these fields yet.
-            return .init(variable: .undefined, previousDay: previousDay)
+        case .cloud_ceiling:
+            return .init(variable: .cloudCeiling, previousDay: previousDay)
+        case .freezing_rain:
+            return .init(variable: .freezingRain, previousDay: previousDay)
+        case .radar_reflectivity:
+            return .init(variable: .radarReflectivity, previousDay: previousDay)
+        case .categorical_freezing_rain:
+            return .init(variable: .categoricalFreezingRain, previousDay: previousDay)
         case .cloud_base:
             return .init(variable: .cloudBase, previousDay: previousDay)
         case .cloud_top:
@@ -1002,9 +1007,16 @@ extension MultiDomains {
         switch self {
         case .best_match:
             return .bestMatch
-        case .ncep_rrfs_seamless, .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
-            // The SDK does not yet define an RRFS model identifier.
-            return .undefined
+        case .ncep_rrfs_seamless:
+            return .ncepRrfsSeamless
+        case .ncep_rrfs_conus:
+            return .ncepRrfsConus
+        case .ncep_rrfs_conus_15min:
+            return .ncepRrfsConus15min
+        case .ncep_rrfs_conus_ensemble:
+            return .ncepRrfsConusEnsemble
+        case .ncep_rrfs_north_america:
+            return .ncepRrfsNorthAmerica
         case .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .gfsSeamless
         case .gfs_mix, .gfs_global, .ncep_gfs_global:

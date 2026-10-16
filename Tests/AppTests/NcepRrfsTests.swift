@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import Logging
 import OmFileIO
+import OpenMeteoSdk
 @preconcurrency import SwiftEccodes
 @testable import App
 
@@ -235,7 +236,7 @@ import OmFileIO
         }
         #expect(try await model.genericDomain() == nil)
         #expect(model.countEnsembleMember == 1)
-        #expect(model.flatBufferModel == .undefined)
+        #expect(model.flatBufferModel == .ncepRrfsSeamless)
     }
 
     @Test func individualForecastMappings() async throws {
@@ -263,7 +264,12 @@ import OmFileIO
             }
             #expect(try await model.genericDomain()?.domainRegistry == domain.domainRegistry)
             #expect(model.countEnsembleMember == domain.countEnsembleMember)
-            #expect(model.flatBufferModel == .undefined)
+            switch domain {
+            case .ncep_rrfs_conus: #expect(model.flatBufferModel == .ncepRrfsConus)
+            case .ncep_rrfs_conus_15min: #expect(model.flatBufferModel == .ncepRrfsConus15min)
+            case .ncep_rrfs_conus_ensemble: #expect(model.flatBufferModel == .ncepRrfsConusEnsemble)
+            case .ncep_rrfs_north_america: Issue.record("Unexpected domain in CONUS mappings")
+            }
         }
     }
 
@@ -363,7 +369,7 @@ import OmFileIO
         #expect(source.domainRegistry == .ncep_rrfs_north_america)
         #expect(ObjectIdentifier(variables) == ObjectIdentifier(NcepRrfsVariable.self))
         #expect(try await model.genericDomain()?.domainRegistry == .ncep_rrfs_north_america)
-        #expect(model.flatBufferModel == .undefined)
+        #expect(model.flatBufferModel == .ncepRrfsNorthAmerica)
     }
 
     @Test func hourlyInventorySelectionAndCatalogCoverage() throws {
