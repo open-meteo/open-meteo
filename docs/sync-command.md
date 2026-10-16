@@ -64,6 +64,12 @@ With Docker, you can just spawn this command and leave it running in the backgro
 The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this command. It can be enabled in `/etc/default/openmeteo-api.env` by setting `SYNC_ENABLED=true`, `SYNC_APIKEY=mykey123`, `SYNC_DOMAINS=cmc_gem_gdps,dwd_icon`, `SYNC_VARIABLES=temperature_2m,shortwave_radiation` and `SYNC_REPEAT_INTERVAL=5` followed by a restart with `systemctl restart openmeteo-sync`.
 
 
+### Syncing a region only
+
+`--bbox lat1,lon1,lat2,lon2` keeps only the data around a latitude/longitude box, e.g. `--bbox 45,5,48,11`. Every chunk of a weather variable file that holds a grid cell inside the box, widened by the search radius of the grid plus one cell, is copied with its values unchanged. All other chunks are written as NaN, so the API returns `null` outside the box, and the file keeps its dimensions, chunking and compression. Only the chunks inside the box are downloaded, using HTTP range requests. The cells inside the box are the ones the API returns for `bounding_box` with the same box, so a box must lie entirely inside the grid of a regional model, otherwise that model fails with an error.
+
+Static files, `meta.json` and files that are not a 3D array on the model grid are copied whole. Files synced with a box are compared by modification time only, because their size differs from the remote file. On reduced Gaussian grids, whose latitude rings have different numbers of points, the box is widened by the same number of rings north and south, at the point of each ring nearest in longitude, and by that many points along each ring. Native icosahedral grids are not supported and fail with an error. A file that fails is logged and the other files of the model still run; the model then fails with the first error.
+
 ## Cleanup old data
 To automatically cleanup old data, the following cronjobs can be used.
 

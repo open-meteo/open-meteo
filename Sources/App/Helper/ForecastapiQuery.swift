@@ -324,27 +324,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         guard coordinates.count > 0 else {
             return nil
         }
-        guard coordinates.count == 4 else {
-            throw ForecastApiError.generic(message: "Parameter bounding_box must have 4 values")
-        }
-        let lat1 = coordinates[0]
-        let lon1 = coordinates[1]
-        let lat2 = coordinates[2]
-        let lon2 = coordinates[3]
-
-        guard lat1 < lat2 else {
-            throw ForecastApiError.generic(message: "The first latitude must be smaller than the second latitude")
-        }
-        guard (-90...90).contains(lat1), (-90...90).contains(lat2) else {
-            throw ForecastApiError.generic(message: "Latitudes must be between -90 and 90")
-        }
-        guard lon1 < lon2 else {
-            throw ForecastApiError.generic(message: "The first longitude must be smaller than the second longitude")
-        }
-        guard (-180...180).contains(lon1), (-180...180).contains(lon2) else {
-            throw ForecastApiError.generic(message: "Longitudes must be between -180 and 180")
-        }
-        return BoundingBoxWGS84(latitude: lat1..<lat2, longitude: lon1..<lon2)
+        return try BoundingBoxWGS84(coordinates: coordinates)
     }
 
     /// Reads coordinates and timezone fields
@@ -782,5 +762,32 @@ extension TimeZone {
             return tz
         }
         throw ForecastApiError.invalidTimezone
+    }
+}
+
+extension BoundingBoxWGS84 {
+    /// Validate `lat1, lon1, lat2, lon2` as given to the `bounding_box` parameter or `sync --bbox`
+    init(coordinates: [Float]) throws {
+            guard coordinates.count == 4 else {
+                throw ForecastApiError.generic(message: "Parameter bounding_box must have 4 values")
+            }
+            let lat1 = coordinates[0]
+            let lon1 = coordinates[1]
+            let lat2 = coordinates[2]
+            let lon2 = coordinates[3]
+
+            guard lat1 < lat2 else {
+                throw ForecastApiError.generic(message: "The first latitude must be smaller than the second latitude")
+            }
+            guard (-90...90).contains(lat1), (-90...90).contains(lat2) else {
+                throw ForecastApiError.generic(message: "Latitudes must be between -90 and 90")
+            }
+            guard lon1 < lon2 else {
+                throw ForecastApiError.generic(message: "The first longitude must be smaller than the second longitude")
+            }
+            guard (-180...180).contains(lon1), (-180...180).contains(lon2) else {
+                throw ForecastApiError.generic(message: "Longitudes must be between -180 and 180")
+            }
+            self.init(latitude: lat1..<lat2, longitude: lon1..<lon2)
     }
 }
