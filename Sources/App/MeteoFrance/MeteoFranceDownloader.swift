@@ -276,7 +276,8 @@ struct MeteoFranceDownload: AsyncCommand {
                 let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
 
                 let gridRes = domain.mfApiGridName.replacingOccurrences(of: ".", with: "")
-                let urlGov = "https://object.data.gouv.fr/meteofrance-pnt/pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
+                let govServer = "https://meteofrance-pnt.s3.rbx.io.cloud.ovh.net/" // "https://object.data.gouv.fr/meteofrance-pnt/"
+                let urlGov = "\(govServer)pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
 
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 let windSpeedCalculator = WindSpeedCalculator<MeteoFranceSurfaceVariable>(trueNorth: nil)
@@ -367,20 +368,26 @@ struct MeteoFranceDownload: AsyncCommand {
                         grib2d.array.flipLatitude()
                     }
 
-                    // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd {
-                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    /// dtSeconds of the current step. Might be 3 hours for shortwave radiation after 48 hours
+                    var dtSeconds = domain.dtSeconds
+                    if stepType == "accum" {
+                        guard let (start, end) = stepRange.splitTo2Integer(), end > start else {
+                            return
+                        }
+                        let lastStep = await previous.lastStep(variable, 0)
+                        // Match GribDeaverager's subtraction, including the first field and reset windows.
+                        if let lastStep, lastStep != start, end > lastStep {
+                            dtSeconds = (end - lastStep) * 3600
+                        } else {
+                            dtSeconds = (end - start) * 3600
+                        }
                     }
-
-                    // Deaccumulate precipitation
+                    // Deaccumulate before scaling because the accumulation interval can change.
                     guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return
                     }
-
-                    // Accumulated radiation is scaled for 1 hour steps. ARPEGE World has 3 hourly steps after hour 48
-                    if let surface = variable as? MeteoFranceSurfaceVariable, surface == .shortwave_radiation, stepType == "accum", domain == .arpege_world,
-                       timestamp.timeIntervalSince1970 - run.timeIntervalSince1970 > 48 * 3600 {
-                        grib2d.array.data.multiplyAdd(multiply: 1 / 3, add: 0)
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
@@ -562,7 +569,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 } else {
                     grib2d.array.flipLatitude()
                 }
-                if let fma = variable.multiplyAdd {
+                if let fma = variable.multiplyAdd(dtSeconds: periodMinutes.map { $0 * 60 } ?? domain.dtSeconds) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 if deaggregatePrecipitation {
