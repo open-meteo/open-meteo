@@ -23,7 +23,7 @@ import Testing
     }
 
     private var time: TimerangeDtAndSettings {
-        .init(time: TimerangeDt(start: Timestamp(2026, 9, 20), nTime: 4, dtSeconds: 3600), ensembleMember: 0, ensembleMemberLevel: 0, previousDay: 0, run: nil)
+        .init(time: TimerangeDt(start: Timestamp(2026, 9, 20), nTime: 4, dtSeconds: 3600), ensembleMember: 0, ensembleMemberLevel: 0, previousDay: 0)
     }
 
     @Test func weightedRrfsLayers() async throws {

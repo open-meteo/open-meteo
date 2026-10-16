@@ -1264,14 +1264,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .singleWithPrecipitationProbability(NcepRrfsDomain.ncep_rrfs_conus_ensemble, NcepRrfsEnsembleVariable.self, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
         case .ncep_rrfs_seamless:
             // Readers are ordered from lowest to highest priority.
-            var domains: [(any GenericDomain, any GenericVariable.Type)] = [
-                (GfsDomain.gfs05_ens, Gefs05Variable.self),
-                (GfsDomain.gfs025, Gfs025Variable.self),
-                (NcepRrfsDomain.ncep_rrfs_conus, NcepRrfsVariable.self)
+            // 15 minutely data is always added because it has 1-hourly update intervals
+            let domains: [DomainReaderMapping.Source] = [
+                .domain(GfsDomain.gfs05_ens, Gefs05Variable.self),
+                .domain(GfsDomain.gfs025, Gfs025Variable.self),
+                .domain(NcepRrfsDomain.ncep_rrfs_conus, NcepRrfsVariable.self),
+                .domain(NcepRrfsDomain.ncep_rrfs_conus_15min, NcepRrfs15MinVariable.self)
             ]
-            if include15Min {
-                domains.append((NcepRrfsDomain.ncep_rrfs_conus_15min, NcepRrfs15MinVariable.self))
-            }
             return .multipleWithPrecipitationProbability(domains, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
         case .ecmwf_ifs04:
             return .single(EcmwfDomain.ifs04, EcmwfVariable.self)
