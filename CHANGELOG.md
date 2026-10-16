@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.7.0](https://github.com/open-meteo/open-meteo/compare/1.6.0...1.7.0) (2026-10-16)
+
+
+### Features
+
+* add environment variable to limit atomic block cache to pressure level files ([#2168](https://github.com/open-meteo/open-meteo/issues/2168)) ([f6e111e](https://github.com/open-meteo/open-meteo/commit/f6e111e5bad38910f36e86bc9abbe9f542a262a9))
+* continued support for icon API domains ([#2176](https://github.com/open-meteo/open-meteo/issues/2176)) ([735f488](https://github.com/open-meteo/open-meteo/commit/735f488affdb3d8332df878ac7508d12bc51a42c))
+* finish DMI migration ([#2150](https://github.com/open-meteo/open-meteo/issues/2150)) ([cc3f4e5](https://github.com/open-meteo/open-meteo/commit/cc3f4e5e956b39a56ab182faeccfd3d936ae6b4c))
+* icon v1 url migration and EPS resolution switch ([#2160](https://github.com/open-meteo/open-meteo/issues/2160)) ([e758180](https://github.com/open-meteo/open-meteo/commit/e75818015239921b194b38ee147b2c1af639b15a))
+* migrate cmc to generic structure ([#2147](https://github.com/open-meteo/open-meteo/issues/2147)) ([29c9a89](https://github.com/open-meteo/open-meteo/commit/29c9a892a3420e918d8cdc8975083130bb29ea4e))
+* migrate ecmwf providers to generic structure ([#2149](https://github.com/open-meteo/open-meteo/issues/2149)) ([a0adc5a](https://github.com/open-meteo/open-meteo/commit/a0adc5a93aab2178aa598dc3b83f640473c862fc))
+* migrate kma to generic structure ([#2146](https://github.com/open-meteo/open-meteo/issues/2146)) ([7eb1aed](https://github.com/open-meteo/open-meteo/commit/7eb1aed7429167a4533eab57ff892e74f8140cf9))
+* native icon grid domains ([#1993](https://github.com/open-meteo/open-meteo/issues/1993)) ([1cd0eaa](https://github.com/open-meteo/open-meteo/commit/1cd0eaa1ed97857772a6bd968bbe373bd23636f3))
+
+
+### Bug Fixes
+
+* bounding box requests need to know about model elevation ([#2188](https://github.com/open-meteo/open-meteo/issues/2188)) ([454d6ef](https://github.com/open-meteo/open-meteo/commit/454d6ef3ef683587afac067f31627088cd111637))
+* build failure in Swift 6.4 release build ([#2144](https://github.com/open-meteo/open-meteo/issues/2144)) ([fb7e804](https://github.com/open-meteo/open-meteo/commit/fb7e8046633bafe1244e16abf1c1491bae48ecca))
+* bump aws-actions/configure-aws-credentials from 6.2.4 to 6.3.0 ([#2142](https://github.com/open-meteo/open-meteo/issues/2142)) ([87063f8](https://github.com/open-meteo/open-meteo/commit/87063f8bba7ed741c7e6a3288aeee67683c5f4e1))
+* bump github.com/apple/swift-log from 1.15.0 to 1.15.1 in the swift-dependencies group ([#2128](https://github.com/open-meteo/open-meteo/issues/2128)) ([e669e62](https://github.com/open-meteo/open-meteo/commit/e669e6293ce2f0c70646fd61af8fe0c529fc0c53))
+* bump googleapis/release-please-action from 4 to 5 ([#2127](https://github.com/open-meteo/open-meteo/issues/2127)) ([c085b34](https://github.com/open-meteo/open-meteo/commit/c085b347f599ba7d0809b321c01b8aa9fcc90eec))
+* bump the swift-dependencies group across 1 directory with 10 updates ([#2158](https://github.com/open-meteo/open-meteo/issues/2158)) ([96e07bc](https://github.com/open-meteo/open-meteo/commit/96e07bc647819557b1e7bf4990d07d7d6c7bb9ec))
+* correct HRRR and NAM wind direction from grid relative to true north ([#2157](https://github.com/open-meteo/open-meteo/issues/2157)) ([b06f476](https://github.com/open-meteo/open-meteo/commit/b06f4760fd1f997e5559bb380f64c5e496b4a509))
+* Derive missing temperature extrema and align daily interval aggregations ([#2205](https://github.com/open-meteo/open-meteo/issues/2205)) ([4633aa1](https://github.com/open-meteo/open-meteo/commit/4633aa1250c8495539d7d988e1112281628339e5))
+* DWD SIS downloader terminates too early ([001723f](https://github.com/open-meteo/open-meteo/commit/001723f21819cc51e46f94743ea355900c5705d9))
+* ecmwf daily maximum/minimum temperatures ([#2202](https://github.com/open-meteo/open-meteo/issues/2202)) ([768e7a7](https://github.com/open-meteo/open-meteo/commit/768e7a74b0cd8eaa9712bcc9466d1d153c297dc8))
+* ecmwf download support from azure ([#2198](https://github.com/open-meteo/open-meteo/issues/2198)) ([162976d](https://github.com/open-meteo/open-meteo/commit/162976d5ac174591d28425e417973d2308d6151b))
+* icon convective snow lookups in downloader ([#2207](https://github.com/open-meteo/open-meteo/issues/2207)) ([b0ff3eb](https://github.com/open-meteo/open-meteo/commit/b0ff3ebbbafa890000ab8bc5f9598a2e4ef64dc4))
+* **Meteofrance HD 15min:** 15min precipitation and snow is not available anymore ([#2120](https://github.com/open-meteo/open-meteo/issues/2120)) ([9701689](https://github.com/open-meteo/open-meteo/commit/9701689dd81ebef2d478800366c586c8a02c0c19))
+* send acceptRanges in S3DataController ([#2175](https://github.com/open-meteo/open-meteo/issues/2175)) ([39a0b8c](https://github.com/open-meteo/open-meteo/commit/39a0b8c44b2ec2c86b26e89acaa2a7bb9340776f))
+* separate icon model-level storage domains for native domains ([#2179](https://github.com/open-meteo/open-meteo/issues/2179)) ([082f1fb](https://github.com/open-meteo/open-meteo/commit/082f1fbcc182e2145df7e0cbd38981a146a27e64))
+* static file uploading ([#2145](https://github.com/open-meteo/open-meteo/issues/2145)) ([690aa0b](https://github.com/open-meteo/open-meteo/commit/690aa0b321e4950a0dbf70a8cdf93ecd64044e47))
+* static resource path for ensemble mean domains where missing ([#2212](https://github.com/open-meteo/open-meteo/issues/2212)) ([78f2209](https://github.com/open-meteo/open-meteo/commit/78f2209665998613bca32ae2709e1559bbd618eb))
+* support bounding box requests for native grids ([#2169](https://github.com/open-meteo/open-meteo/issues/2169)) ([ad179c7](https://github.com/open-meteo/open-meteo/commit/ad179c7b39e443b579f391482c1aa41799aa9af0))
+* sync exits non-zero when a model failed ([#2171](https://github.com/open-meteo/open-meteo/issues/2171)) ([f625df2](https://github.com/open-meteo/open-meteo/commit/f625df2c2b2d29d7837b1c71660fb226b1864f9b))
+* syncing icon models synchronizes native icon models as well ([#2203](https://github.com/open-meteo/open-meteo/issues/2203)) ([b8793ea](https://github.com/open-meteo/open-meteo/commit/b8793ead9d38a7ddc3f5ff6a01440fde4c3b7b29))
+* throw 404 on fileNotFound in S3DataController ([#2181](https://github.com/open-meteo/open-meteo/issues/2181)) ([290493f](https://github.com/open-meteo/open-meteo/commit/290493ffb9b5ee66fb1336219487a346eb27d191))
+* Use actual step length to scale GEM accumulated variables ([#2180](https://github.com/open-meteo/open-meteo/issues/2180)) ([a5aac75](https://github.com/open-meteo/open-meteo/commit/a5aac75ca4aed1e1a97dd7e09564f0e06a8359f0))
+* Use backwards averages for minTwo, maxTwo and sum cases ([#2204](https://github.com/open-meteo/open-meteo/issues/2204)) ([713bed5](https://github.com/open-meteo/open-meteo/commit/713bed562292d72d92bac6b0f6349359d286bcb5))
+
 ## [1.6.0](https://github.com/open-meteo/open-meteo/compare/1.5.7...1.6.0) (2026-09-10)
 
 

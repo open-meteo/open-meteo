@@ -21,6 +21,9 @@ DATA_DIRECTORY=/Volumes/2TB_1GBs/data/ API_SYNC_APIKEYS=123 openmeteo-api
 DATA_DIRECTORY=/Volumes/2TB_1GBs/data2/ openmeteo-api sync cmc_gem_gdps,dwd_icon_d2,dwd_icon temperature_2m --server http://127.0.0.1:8080/ --apikey 123 --past-days 30 --repeat-interval 5
 */
 struct SyncCommand: AsyncCommand {
+    /// A failed model marks the process as failed, so the command ends non-zero after the other models synced
+    var exitStatus: ProcessExitStatus = .shared
+
     var help: String {
         return "Download the open-meteo weather database from a S3 server."
     }
@@ -75,7 +78,24 @@ struct SyncCommand: AsyncCommand {
             }
         }
         let modelsSet = try signature.models.split(separator: ";").map({
-            try DomainRegistry.load(commaSeparated: String($0))
+            var models = try DomainRegistry.load(commaSeparated: String($0))
+            // ICON readers also use variables stored on the native grid.
+            for (model, native) in [
+                (DomainRegistry.dwd_icon_d2, DomainRegistry.dwd_icon_d2_native),
+                (.dwd_icon_eu, .dwd_icon_eu_native),
+                (.dwd_icon, .dwd_icon_global_native),
+                (.dwd_icon_d2_eps, .dwd_icon_d2_eps_native),
+                (.dwd_icon_eu_eps, .dwd_icon_eu_eps_native),
+                (.dwd_icon_eps, .dwd_icon_global_eps_native),
+                (.dwd_icon_d2_eps_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean),
+                (.dwd_icon_eu_eps_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean),
+                (.dwd_icon_eps_ensemble_mean, .dwd_icon_global_eps_native_ensemble_mean)
+            ] {
+                if models.contains(model) && !models.contains(native) {
+                    models.append(native)
+                }
+            }
+            return models
         })
         guard Curl.cacheDirectory == nil else {
             fatalError("HTTP_CACHE enabled")
@@ -151,6 +171,7 @@ struct SyncCommand: AsyncCommand {
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
+                        exitStatus.markFailure()
                     }
                 }
                 if downloadPressureNow {
@@ -321,4 +342,3 @@ fileprivate extension Array where Element == S3List.ListV2File {
         })
     }
 }
-
