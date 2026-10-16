@@ -1729,12 +1729,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 var readers = [forecast]
                 if let modelLevel = native.modelLevelDomain, let modelLevelGrid = try? await modelLevel.load() {
                     let supplementalBinding = ReaderSource.Binding(latitude: lat, longitude: lon, elevation: forecast.resolvedTargetElevation, mode: mode)
-                    do {
-                        if let supplemental = try await ReaderSource.domain(modelLevelGrid, IconModelLevelVariable.self).bind(supplementalBinding, options: options) {
-                            readers.append(supplemental)
-                        }
-                    } catch ForecastApiError.modelRunUnavailable {
-                        // Supplemental fields cannot invalidate an available primary forecast.
+                    let source = ReaderSource.optional(.domain(modelLevelGrid, IconModelLevelVariable.self))
+                    if let supplemental = try await source.bind(supplementalBinding, options: options) {
+                        readers.append(supplemental)
                     }
                 }
                 return ReaderComposition.prefer(readers, smoothTransitions: false).asOptionalReader
@@ -1762,7 +1759,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 let iconD2 = try await makeReader(domain: .iconD2, native: .iconD2Native)
                 return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
+                    iconProbabilities?.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
                     gfsUvIndex,
                     icon,
@@ -1798,7 +1795,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 return MultiDomains.hourlyToMultiSameType([
                     ifsProbabilities?.asOptionalReader,
-                    iconProbabilities.asOptionalReader,
+                    iconProbabilities?.asOptionalReader,
                     gfs,
                     ifsHres,
                     icon,
@@ -1826,7 +1823,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                     let arpegeEurope = try await MeteoFranceDomain.arpege_europe.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
                     return MultiDomains.hourlyToMultiSameType([
                         gfsProbabilites?.asOptionalReader,
-                        iconProbabilities.asOptionalReader,
+                        iconProbabilities?.asOptionalReader,
                         gfs,
                         icon,
                         ifsHres,
@@ -1842,7 +1839,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             if (44..<66).contains(lat), let dmiEurope = try await DmiDomain.harmonie_arome_europe.makeDerivedHourly(variableType: DmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try await makeReader(domain: .iconEu, native: .iconEuNative)
                 return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
+                    iconProbabilities?.asOptionalReader,
                     gfsProbabilites?.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
                     gfs,
@@ -1858,7 +1855,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly {
                 let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
+                    iconProbabilities?.asOptionalReader,
                     gfsProbabilites?.asOptionalReader,
                     nbmProbabilities?.asOptionalReader,
                     icon,
@@ -1872,7 +1869,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                let jmaMsm = try await JmaDomain.msm.makeDerivedHourly(variableType: JmaSurfaceVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
                let jmaMsmUpper = try await JmaDomain.msm_upper_level.makeDerivedHourly(variableType: JmaPressureVariable.self, lat: lat, lon: lon, elevation: jmaMsm.resolvedTargetElevation, mode: mode, options: options) {
                 return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
+                    iconProbabilities?.asOptionalReader,
                     gfsProbabilites?.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
                     gfs,
@@ -1888,7 +1885,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return MultiDomains.hourlyToMultiSameType([
                     gfsProbabilites?.asOptionalReader,
                     ifsProbabilities?.asOptionalReader,
-                    iconProbabilities.asOptionalReader,
+                    iconProbabilities?.asOptionalReader,
                     gfs,
                     ifsHres,
                     icon,
@@ -1898,7 +1895,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
             // Remaining parts of the world
             return MultiDomains.hourlyToMultiSameType([
-                iconProbabilities.asOptionalReader,
+                iconProbabilities?.asOptionalReader,
                 gfsProbabilites?.asOptionalReader,
                 ifsProbabilities?.asOptionalReader,
                 gfs,
