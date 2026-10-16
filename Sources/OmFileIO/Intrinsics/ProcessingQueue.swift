@@ -107,8 +107,13 @@ actor ProcessingParallelQueue<T: Sendable> {
                     // Claim a task-group slot. The executor still enforces shared concurrency,
                     // but the queue no longer creates more children than it can actively run.
                     group.addTask {
-                        await executor.execute {
-                            await taskBlock()
+                        do {
+                            return try await executor.execute {
+                                await taskBlock()
+                            }
+                        } catch {
+                            onError()
+                            return nil
                         }
                     }
                     running += 1

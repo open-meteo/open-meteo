@@ -1,22 +1,37 @@
 import Collections
 
-/// Limits the number of concurrently executed tasks. More incoming tasks are queued
+/// Limits concurrently executed tasks, optionally rejecting work when the waiting queue is full.
 public actor LimitedConcurrencyExecutor {
+    public enum QueueError: Error {
+        case queueFull
+    }
+
     public nonisolated let maxConcurrency: Int
+    /// Maximum waiting tasks, excluding active work. Nil is unlimited; zero disables waiting.
+    public nonisolated let maxQueued: Int?
 
     private var activeCount = 0
 
     /// Hold suspended tasks waiting for an opening
     private var suspensionQueue = Deque<CheckedContinuation<Void, Never>>()
     
-    public init(maxConcurrency: Int) {
+    public init(maxConcurrency: Int, maxQueued: Int? = nil) {
         precondition(maxConcurrency > 0)
+        precondition(maxQueued.map { $0 >= 0 } ?? true)
         self.maxConcurrency = maxConcurrency
+        self.maxQueued = maxQueued
     }
 
-    /// Claim one execution slot, suspending if the executor is already full.
-    public func acquire() async {
+    public func statistics() -> (active: Int, queued: Int) {
+        (activeCount, suspensionQueue.count)
+    }
+
+    /// Claim a slot, suspending when busy or throwing `QueueError.queueFull` at the queue limit.
+    public func acquire() async throws {
         if activeCount >= maxConcurrency {
+            if let maxQueued, suspensionQueue.count >= maxQueued {
+                throw QueueError.queueFull
+            }
             await withCheckedContinuation { continuation in
                 suspensionQueue.append(continuation)
             }
@@ -36,8 +51,8 @@ public actor LimitedConcurrencyExecutor {
     }
 
     /// Executes a single job, suspending inside the internal queue if the ceiling is reached
-    public func execute<T>(_ job: () async throws -> T) async rethrows -> T {
-        await acquire()
+    public func execute<T>(_ job: () async throws -> T) async throws -> T {
+        try await acquire()
         do {
             let result = try await job()
             release()
@@ -66,7 +81,7 @@ public extension AsyncSequence where Element: Sendable {
     func mapEnumeratedConcurrent<T: Sendable>(
         executor: LimitedConcurrencyExecutor,
         body: @escaping @Sendable (Int, Element) async throws -> T
-    ) async rethrows -> [T] {
+    ) async throws -> [T] {
         return try await withThrowingTaskGroup(of: (Int, T).self) { group in
             var results = [(Int, T)]()
             var index = 0
@@ -82,7 +97,7 @@ public extension AsyncSequence where Element: Sendable {
                     results.append(result)
                 }
 
-                await executor.acquire()
+                try await executor.acquire()
 
                 let element: Element?
                 do {
