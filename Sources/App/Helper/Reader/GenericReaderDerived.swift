@@ -15,7 +15,7 @@ protocol GenericReaderDerived: GenericReaderProtocol {
     func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws
 }
 
-/// Parameters for tilted radiation calculation
+/// Options for reader construction and derived calculations
 struct GenericReaderOptions {
     /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical.
     var tilt: Float
@@ -27,7 +27,17 @@ struct GenericReaderOptions {
     
     let httpClient: HTTPClient?
 
-    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?) throws {
+    /// Run selected before reader construction (including an automatically resolved latest run).
+    var run: IsoDateTime?
+
+    func validateRun(domain: any GenericDomain) async throws {
+        guard let run else { return }
+        guard try await domain.isRunAvailable(run: run.toTimestamp(), client: httpClient, logger: logger) else {
+            throw ForecastApiError.modelRunUnavailable(model: domain.domainRegistry, run: run.toTimestamp())
+        }
+    }
+
+    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) throws {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
         if let tilt {
             guard tilt.isNaN || (tilt >= 0 && tilt <= 90) else {
@@ -44,6 +54,7 @@ struct GenericReaderOptions {
         self.azimuth = azimuth ?? 0
         self.logger = logger
         self.httpClient = httpClient
+        self.run = run
     }
 }
 

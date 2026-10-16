@@ -84,7 +84,7 @@ import NIO
         let index = try buffer.readEcmwfIndexEntries()
         #expect(index.count == 6)
         let range = index.indexToRange()[0]
-        #expect(range.range == "0-3857388")
+        #expect(range.range == "0-3857387")
         #expect(range.minSize == 3857388)
 
         var buffer2 = ByteBuffer()
@@ -99,7 +99,7 @@ import NIO
         let index2 = try buffer2.readEcmwfIndexEntries()
         #expect(index2.count == 6)
         let range2 = index2.indexToRange()[0]
-        #expect(range2.range == "0-812043,812044-2639250,2639249-3248317,3248319-3857388")
+        #expect(range2.range == "0-812042,812044-2639249,2639249-3248316,3248319-3857387")
         #expect(range2.minSize == 3857386)
     }
 

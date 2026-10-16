@@ -22,6 +22,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "server", help: "Root server path. Default: 'https://data.ecmwf.int/forecasts/'")
         var server: String?
 
+        @Option(name: "source", help: "Open data source: ecmwf (default), aws, azure, google. Mutually exclusive with --server")
+        var source: String?
+
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
 
@@ -72,7 +75,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let variables = onlyVariables ?? EcmwfVariable.allCases
         let nConcurrent = signature.concurrent ?? 1
-        let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
+        let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 
         let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_peak_period]
 
@@ -108,7 +111,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
         logger.info("Downloading height and elevation data")
         let url = domain.getUrl(base: base, run: run, hour: 0)[0]
-        for try await message in try await curl.downloadEcmwfIndexed(url: url, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
+        let request = try await EcmwfOpenDataSource.prepareDownload(url: url, curl: curl)
+        for try await message in try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
             guard entry.number == nil else {
                 // ignore ensemble members, only use control
                 return false
@@ -202,7 +206,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
-                try await curl.downloadEcmwfIndexed(url: url, concurrent: max(2, concurrent), downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
+                let request = try await EcmwfOpenDataSource.prepareDownload(url: url, curl: curl)
+                try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: max(2, concurrent), downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
@@ -453,7 +458,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil, logger: logger)
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
-            try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
+            let request = try await EcmwfOpenDataSource.prepareDownload(url: url, curl: curl)
+            try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: concurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
                 })
@@ -506,7 +512,7 @@ extension EcmwfDomain {
         }
     }
     /// Get download url for a given domain and timestep
-    fileprivate func getUrl(base: String, run: Timestamp, hour: Int) -> [String] {
+    func getUrl(base: String, run: Timestamp, hour: Int) -> [String] {
         let runStr = run.hour.zeroPadded(len: 2)
         let dateStr = run.format_YYYYMMdd
         switch self {

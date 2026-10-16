@@ -39,17 +39,17 @@ extension Curl {
 
     /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
     /// If `downloadFullGribFile` is set, skip inventory and perform full download. This can be faster if all variables are processed anyway
-    func downloadEcmwfIndexed(url: String, concurrent: Int, downloadFullGribFile: Bool, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
+    /// URLs must already be authenticated. The caller supplies the source's range capability.
+    func downloadEcmwfIndexed(url: String, indexURL: String, allowMultipleRanges: Bool, concurrent: Int, downloadFullGribFile: Bool, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
         if downloadFullGribFile {
             return try await getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent)
         }
         
-        let urlIndex = url.replacingOccurrences(of: ".grib2", with: ".index")
-        let index = try await downloadInMemoryAsync(url: urlIndex, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
+        let index = try await downloadInMemoryAsync(url: indexURL, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
         guard !index.isEmpty else {
             fatalError("Empty grib selection")
         }
-        let ranges = index.indexToRange()
+        let ranges = index.indexToRange(allowMultipleRanges: allowMultipleRanges)
         return ranges.mapStream(nConcurrent: 1, body: {
             range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
         }).flatMap({ $0.mapStream(nConcurrent: 1, body: { $0 }) }).eraseToAnyAsyncSequence()
@@ -190,7 +190,8 @@ extension ByteBuffer {
 extension Array where Element == Curl.EcmwfIndexEntry {
     /// Convert grib entries to http range download command
     /// Split large range downloads to multiple individual downloads to prevent `request header too large` error
-    func indexToRange() -> [(range: String, minSize: Int)] {
+    func indexToRange(allowMultipleRanges: Bool = true) -> [(range: String, minSize: Int)] {
+        guard !isEmpty else { return [] }
         var results = [(range: String, minSize: Int)]()
         var range = ""
         var i = 0
@@ -205,8 +206,8 @@ extension Array where Element == Curl.EcmwfIndexEntry {
             while i < count {
                 let entry = self[i]
                 if entry._offset != end {
-                    range += "\(end)"
-                    if range.count > 4000 || size > 64 * 1024 * 1024 {
+                    range += "\(end - 1)"
+                    if !allowMultipleRanges || range.count > 4000 || size > 64 * 1024 * 1024 {
                         results.append((range, size))
                         range = ""
                         size = 0
@@ -220,7 +221,7 @@ extension Array where Element == Curl.EcmwfIndexEntry {
                 i += 1
             }
         }
-        range += "\(end)"
+        range += "\(end - 1)"
         results.append((range, size))
         return results
     }
