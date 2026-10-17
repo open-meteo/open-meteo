@@ -5,8 +5,8 @@ struct IconDownloadError: Error, CustomStringConvertible {
     let description: String
 }
 
-struct IconGribDownloader: Sendable {
-    let domain: IconDomains
+struct DwdGribDownloader: Sendable {
+    let domain: DwdModel
     let curl: Curl
     let remapper: IconRemapper?
 
@@ -24,7 +24,10 @@ struct IconGribDownloader: Sendable {
         }
         let native = try IconNativeGribDecoder.decode(message: message, identity: domain.sourceGridIdentity)
         guard let remapper else { return (message, native) }
-        return (message, Array2D(data: remapper.remap(native.data), nx: domain.grid.nx, ny: domain.grid.ny))
+        guard let regular = domain.iconDomain?.grid else {
+            throw IconDownloadError(description: "No regular-grid output for \(domain.modelName)")
+        }
+        return (message, Array2D(data: remapper.remap(native.data), nx: regular.nx, ny: regular.ny))
     }
 }
 

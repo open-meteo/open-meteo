@@ -1,6 +1,8 @@
 import Logging
 
 enum IconNativeDomains: String, CaseIterable {
+    case aiconNative = "aicon"
+
     case iconNative = "icon-native"
     case iconEuNative = "icon-eu-native"
     case iconD2Native = "icon-d2-native"
@@ -44,24 +46,26 @@ enum IconNativeDomains: String, CaseIterable {
         }
     }
 
-    /// Shared forecast metadata and variable mappings come from the corresponding regular domain.
-    var sourceDomain: IconDomains {
+    /// Forecast metadata and field URLs do not imply a regular-grid storage domain.
+    var sourceModel: DwdModel {
         switch self {
-        case .iconNative, .iconNativeModelLevel: return .icon
-        case .iconEuNative, .iconEuNativeModelLevel: return .iconEu
-        case .iconD2Native, .iconD2NativeModelLevel: return .iconD2
-        case .iconD2Native15min: return .iconD2_15min
-        case .iconEpsNative: return .iconEps
-        case .iconEpsNativeEnsembleMean: return .iconEpsEnsembleMean
-        case .iconEuEpsNative: return .iconEuEps
-        case .iconEuEpsNativeEnsembleMean: return .iconEuEpsEnsembleMean
-        case .iconD2EpsNative: return .iconD2Eps
-        case .iconD2EpsNativeEnsembleMean: return .iconD2EpsEnsembleMean
+        case .aiconNative: return .aicon
+        case .iconNative, .iconNativeModelLevel: return .icon(.icon)
+        case .iconEuNative, .iconEuNativeModelLevel: return .icon(.iconEu)
+        case .iconD2Native, .iconD2NativeModelLevel: return .icon(.iconD2)
+        case .iconD2Native15min: return .icon(.iconD2_15min)
+        case .iconEpsNative: return .icon(.iconEps)
+        case .iconEpsNativeEnsembleMean: return .icon(.iconEpsEnsembleMean)
+        case .iconEuEpsNative: return .icon(.iconEuEps)
+        case .iconEuEpsNativeEnsembleMean: return .icon(.iconEuEpsEnsembleMean)
+        case .iconD2EpsNative: return .icon(.iconD2Eps)
+        case .iconD2EpsNativeEnsembleMean: return .icon(.iconD2EpsEnsembleMean)
         }
     }
 
     var domainRegistry: DomainRegistry {
         switch self {
+        case .aiconNative: return .dwd_aicon_global
         case .iconNative: return .dwd_icon_global_native
         case .iconNativeModelLevel: return .dwd_icon_global_native_model_level
         case .iconEuNative: return .dwd_icon_eu_native
@@ -79,6 +83,7 @@ enum IconNativeDomains: String, CaseIterable {
     }
 
     var domainRegistryStatic: DomainRegistry? {
+        if sourceModel == .aicon { return .dwd_icon_global_native }
         if let modelLevelParent { return modelLevelParent.domainRegistry }
         switch self {
         case .iconD2Native15min: return .dwd_icon_d2_native
@@ -89,18 +94,18 @@ enum IconNativeDomains: String, CaseIterable {
         }
     }
 
-    var dtSeconds: Int { sourceDomain.dtSeconds }
-    var updateIntervalSeconds: Int { sourceDomain.updateIntervalSeconds }
-    var hasYearlyFiles: Bool { sourceDomain.hasYearlyFiles }
-    var masterTimeRange: Range<Timestamp>? { sourceDomain.masterTimeRange }
-    var omFileLength: Int { sourceDomain.omFileLength }
-    var countEnsembleMember: Int { sourceDomain.countEnsembleMember }
-    var generateFullRun: Bool { sourceDomain.generateFullRun }
-    var generateTimeSeries: Bool { sourceDomain.generateTimeSeries }
+    var dtSeconds: Int { sourceModel.dtSeconds }
+    var updateIntervalSeconds: Int { sourceModel.updateIntervalSeconds }
+    var hasYearlyFiles: Bool { sourceModel.hasYearlyFiles }
+    var masterTimeRange: Range<Timestamp>? { sourceModel.masterTimeRange }
+    var omFileLength: Int { sourceModel.omFileLength }
+    var countEnsembleMember: Int { sourceModel.countEnsembleMember }
+    var generateFullRun: Bool { sourceModel.generateFullRun }
+    var generateTimeSeries: Bool { sourceModel.generateTimeSeries }
 
     var nativeGridFile: IconNativeGridFile {
         switch self {
-        case .iconNative, .iconNativeModelLevel: return Self.globalGridFile
+        case .aiconNative, .iconNative, .iconNativeModelLevel: return Self.globalGridFile
         case .iconEuNative, .iconEuNativeModelLevel: return Self.europeGridFile
         case .iconD2Native, .iconD2NativeModelLevel, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return Self.d2GridFile
         case .iconEpsNative, .iconEpsNativeEnsembleMean: return Self.globalEnsembleGridFile
@@ -113,6 +118,12 @@ enum IconNativeDomains: String, CaseIterable {
     private static let europeGridFile = IconNativeGridFile(registry: .dwd_icon_eu_native, identity: .europe)
     private static let globalEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_global_eps_native, identity: .globalEnsemble)
     private static let europeEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_eu_eps_native, identity: .europeEnsemble)
+
+    /// Definitions sharing a mesh and elevation file also share their initialized cache entry.
+    var staticResourceDomain: Self {
+        if sourceModel == .aicon { return .iconNative }
+        return modelLevelParent ?? (self == .iconD2Native15min ? .iconD2Native : self)
+    }
 
     func load() async throws -> IconNativeDomain {
         try await Self.domains.load(self)
