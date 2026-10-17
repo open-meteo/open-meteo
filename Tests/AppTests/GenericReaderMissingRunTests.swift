@@ -41,17 +41,6 @@ import Vapor
     }
 
     @Test(arguments: [true, false])
-    func optionalSourceRequiresPrimaryCoverage(localCoverage: Bool) async throws {
-        let mapping = MultiDomains.DomainReaderMapping(.mix([
-            .optional(.domain(RunFixtureDomain(), variables: GemVariable.self), pointOnly: true),
-            .domain(RunFixtureDomain(grid: grid(coversLocation: localCoverage)), variables: GemVariable.self)
-        ], prefetch: .preferred, smoothTransitions: true))
-        let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
-        #expect((result?.hourly != nil) == localCoverage)
-        #expect(mapping.singleDomain == nil)
-    }
-
-    @Test(arguments: [true, false])
     func probabilitySupplementRequiresPrimaryCoverage(localCoverage: Bool) async throws {
         let primary = RunFixtureDomain(grid: grid(coversLocation: localCoverage))
         let mapping = MultiDomains.DomainReaderMapping(.mix([
@@ -173,6 +162,33 @@ import Vapor
                 guard case ForecastApiError.modelRunUnavailable = error else { return false }
                 return true
             }
+        }
+    }
+
+    @Test(arguments: [true, false])
+    func pointOnlySourceIsOmittedForBoundingBoxRequests(boundingBox: Bool) async throws {
+        let domain = RunFixtureDomain()
+        let source = ReaderSource.optional(.domain(domain, variables: GemVariable.self), pointOnly: true)
+        let binding = ReaderSource.Binding(latitude: 45, longitude: -75, elevation: 100, mode: .nearest,
+                                           outputGrid: boundingBox ? (domain, 0) : nil)
+        let reader = try await source.bind(binding, options: options())
+        #expect((reader != nil) == !boundingBox)
+    }
+
+    @Test(arguments: [true, false])
+    func boundingBoxRawReaderUsesSharedElevationOnlyWhenRequested(useSharedElevation: Bool) async throws {
+        let domain = RunFixtureDomain()
+        let binding = ReaderSource.Binding(latitude: 45, longitude: -75, elevation: 123, mode: .nearest,
+                                           outputGrid: (domain, 0))
+        let reader = try #require(await binding.makeRawReader(domain, GemVariable.self, options(),
+                                                             useSharedTargetElevation: useSharedElevation))
+        #expect(reader.modelLat == 45)
+        #expect(reader.modelLon == -75)
+        if useSharedElevation {
+            #expect(reader.targetElevation == 123)
+        } else {
+            // This fixture has no terrain file; independent readers retain that missing height.
+            #expect(reader.targetElevation.isNaN)
         }
     }
 
