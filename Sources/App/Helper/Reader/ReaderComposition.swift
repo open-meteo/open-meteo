@@ -1,37 +1,37 @@
 import Foundation
 
-/// Executable recursive composition. Children are ordered from lowest to highest priority.
-/// Metadata follows the highest-priority bound child, independently of variable selection.
+/// Controls prefetching only; reads always fill gaps from lower-priority sources.
+enum ReaderPrefetchPolicy {
+    /// Prefetch only the last source whose variable definition supports the requested variable.
+    case preferred
+    /// Prefetch all sources whose variable definitions support the requested variable.
+    case all
+}
+
+/// Executable recursive composition. Sources are ordered from lowest to highest priority.
+/// Metadata follows the highest-priority bound source, independently of variable selection.
 indirect enum ReaderComposition: GenericReaderOptionalProtocol {
     typealias VariableOpt = ForecastVariable
 
     case source(ForecastReaderLeaf)
-    case combination(children: [ReaderComposition], contributors: [ReaderComposition], prefetchAll: Bool, smoothTransitions: Bool)
+    case combination(sources: [ReaderComposition], contributors: [ReaderComposition], prefetch: ReaderPrefetchPolicy, smoothTransitions: Bool)
 
-    static func alternatives(_ children: [Self], smoothTransitions: Bool) -> Self {
-        combine(children, prefetchAll: false, smoothTransitions: smoothTransitions)
-    }
-
-    static func blend(_ children: [Self], smoothTransitions: Bool) -> Self {
-        combine(children, prefetchAll: true, smoothTransitions: smoothTransitions)
-    }
-
-    private static func combine(_ children: [Self], prefetchAll: Bool, smoothTransitions: Bool) -> Self {
+    static func mix(_ sources: [Self], prefetch: ReaderPrefetchPolicy, smoothTransitions: Bool) -> Self {
         // Smoothing is not associative. Preserve the original contributor order,
         // computing it once while binding rather than flattening for every read.
-        let contributors = children.flatMap { child -> [Self] in
-            if case .combination(_, let contributors, _, let smooth) = child, smooth == smoothTransitions {
+        let contributors = sources.flatMap { source -> [Self] in
+            if case .combination(_, let contributors, _, let smooth) = source, smooth == smoothTransitions {
                 return contributors
             }
-            return [child]
+            return [source]
         }
-        return .combination(children: children, contributors: contributors, prefetchAll: prefetchAll, smoothTransitions: smoothTransitions)
+        return .combination(sources: sources, contributors: contributors, prefetch: prefetch, smoothTransitions: smoothTransitions)
     }
 
     private var metadata: (any GenericReaderBaseProtocol)? {
         switch self {
         case .source(let reader): return reader
-        case .combination(let children, _, _, _): return children.last
+        case .combination(let sources, _, _, _): return sources.last
         }
     }
 
@@ -50,8 +50,8 @@ indirect enum ReaderComposition: GenericReaderOptionalProtocol {
     func supports(_ variable: ForecastVariable) -> Bool {
         switch self {
         case .source(let reader): return reader.supports(variable)
-        case .combination(let children, _, _, _):
-            return children.contains { $0.supports(variable) }
+        case .combination(let sources, _, _, _):
+            return sources.contains { $0.supports(variable) }
         }
     }
 
@@ -59,10 +59,10 @@ indirect enum ReaderComposition: GenericReaderOptionalProtocol {
         switch self {
         case .source(let reader):
             return try await reader.prefetchData(variable: variable, time: time)
-        case .combination(let children, _, let prefetchAll, _):
-            for child in children.reversed() where child.supports(variable) {
-                _ = try await child.prefetchData(variable: variable, time: time)
-                if !prefetchAll { break }
+        case .combination(let sources, _, let prefetch, _):
+            for source in sources.reversed() where source.supports(variable) {
+                _ = try await source.prefetchData(variable: variable, time: time)
+                if prefetch == .preferred { break }
             }
         }
         return supports(variable)
@@ -75,8 +75,8 @@ indirect enum ReaderComposition: GenericReaderOptionalProtocol {
             result = try await reader.get(variable: variable, time: time)
         case .combination(_, let contributors, _, let smooth):
             var combined: DataAndUnit?
-            for child in contributors.reversed() where child.supports(variable) {
-                guard let data = try await child.get(variable: variable, time: time) else { continue }
+            for source in contributors.reversed() where source.supports(variable) {
+                guard let data = try await source.get(variable: variable, time: time) else { continue }
                 if !smooth, let preferred = combined {
                     var values = preferred.data
                     values.integrateIfNaN(data.data)
@@ -92,24 +92,21 @@ indirect enum ReaderComposition: GenericReaderOptionalProtocol {
     }
 }
 
-/// Forecast composition. Typed derived/derive factories are leaves; alternatives and blend
-/// combine their forecast outputs without changing their derivation order.
+/// Forecast composition. Typed domain and raw-combination factories are leaves; mix combines
+/// their forecast outputs without changing their derivation order.
 indirect enum ReaderSource {
     case reference(MultiDomains)
     case reader((Binding, GenericReaderOptions) async throws -> ReaderComposition?)
-    /// Alternative representations: prefetch the last supporting child, read fallbacks on demand.
-    case alternatives([ReaderSource], smoothTransitions: Bool = false, requireCoverage: Bool = false)
-    /// Complementary model coverage: prefetch every supporting child.
-    case blend([ReaderSource], smoothTransitions: Bool = false, requireCoverage: Bool = false)
-    /// Optional branches contribute variables but cannot satisfy run availability.
+    /// Sources ordered from lowest to highest priority. For each variable, read the last
+    /// supporting source first, then fill missing values from earlier sources.
+    /// The prefetch policy controls which sources are prepared, without changing read behavior.
+    case mix([ReaderSource], prefetch: ReaderPrefetchPolicy, smoothTransitions: Bool = false)
+    /// Supplement a composition without establishing its coverage or run availability.
+    /// At least one NON-optional sibling must cover the location; optional data alone
+    /// cannot make the composition available. Missing runs are ignored for this branch,
+    /// but other errors propagate. Used on its own, this wrapper only tolerates missing runs.
     /// Point-only branches are omitted when binding a bounding-box output grid.
     case optional(ReaderSource, pointOnly: Bool = false)
-
-    /// Join independently derived variable sets. Raw inputs remain separate.
-    /// Derived outputs can overlap; the last supporting child retains priority.
-    static func combineVariables(_ sources: [Self], smoothTransitions: Bool = false) -> Self {
-        .alternatives(sources, smoothTransitions: smoothTransitions)
-    }
 
     struct Binding {
         enum ElevationPolicy {
@@ -152,7 +149,7 @@ indirect enum ReaderSource {
             } catch ForecastApiError.modelRunUnavailable {
                 return nil
             }
-        case .alternatives(let sources, let smooth, let requireCoverage), .blend(let sources, let smooth, let requireCoverage):
+        case .mix(let sources, let prefetch, let smooth):
             var elevation = binding.elevation
             var available = false
             var covered = false
@@ -176,12 +173,9 @@ indirect enum ReaderSource {
                 }
             }
             if !available, let unavailable { throw unavailable }
-            guard !readers.isEmpty, !requireCoverage || covered else { return nil }
+            guard covered else { return nil }
             readers.reverse()
-            switch self {
-            case .alternatives: return .alternatives(readers, smoothTransitions: smooth)
-            default: return .blend(readers, smoothTransitions: smooth)
-            }
+            return .mix(readers, prefetch: prefetch, smoothTransitions: smooth)
         }
     }
 }

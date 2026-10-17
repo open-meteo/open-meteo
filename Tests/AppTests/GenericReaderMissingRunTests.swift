@@ -40,15 +40,14 @@ import Vapor
         #expect(reader == nil)
     }
 
-    @Test(arguments: [true, false], [true, false])
-    func primaryCoverageFlagControlsSecondaryFallback(localCoverage: Bool, requirePrimaryCoverage: Bool) async throws {
+    @Test(arguments: [true, false])
+    func optionalSourceRequiresPrimaryCoverage(localCoverage: Bool) async throws {
         let mapping = MultiDomains.DomainReaderMapping(
             primary: [.domain(RunFixtureDomain(grid: grid(coversLocation: localCoverage)), GemVariable.self)],
-            secondary: [.domain(RunFixtureDomain(), GemVariable.self)],
-            requirePrimaryCoverage: requirePrimaryCoverage
+            secondary: [.domain(RunFixtureDomain(), GemVariable.self)]
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
-        #expect((result?.hourly != nil) == (localCoverage || !requirePrimaryCoverage))
+        #expect((result?.hourly != nil) == localCoverage)
         #expect(mapping.singleDomain == nil)
     }
 
@@ -71,15 +70,13 @@ import Vapor
         #expect(options.run == query.run)
     }
 
-    @Test(arguments: [true, false])
-    func explicitRunAlsoRespectsPrimaryCoverage(requirePrimaryCoverage: Bool) async throws {
+    @Test func explicitRunAlsoRespectsPrimaryCoverage() async throws {
         let mapping = MultiDomains.DomainReaderMapping(
             primary: [.domain(RunFixtureDomain(grid: grid(coversLocation: false), availability: .available(run.toTimestamp())), GemVariable.self)],
-            secondary: [.domain(RunFixtureDomain(availability: .available(run.toTimestamp())), GemVariable.self)],
-            requirePrimaryCoverage: requirePrimaryCoverage
+            secondary: [.domain(RunFixtureDomain(availability: .available(run.toTimestamp())), GemVariable.self)]
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options(run: run))
-        #expect((result?.hourly != nil) == !requirePrimaryCoverage)
+        #expect(result == nil)
     }
 
     @Test func readerRetainsValidatedRun() async throws {
@@ -97,8 +94,7 @@ import Vapor
         let old = RunFixtureDomain(availability: oldAvailable ? .available(run.toTimestamp()) : .missing)
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: newAvailable ? .available(run.toTimestamp()) : .missing)
         let mapping = MultiDomains.DomainReaderMapping(
-            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
-            requirePrimaryCoverage: true
+            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))]
         )
         if oldAvailable || newAvailable {
             let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: 100, mode: .nearest, options: options(run: run))
@@ -135,8 +131,7 @@ import Vapor
         let old = RunFixtureDomain(availability: .available(run.toTimestamp()))
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: .missing)
         let mapping = MultiDomains.DomainReaderMapping(
-            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
-            requirePrimaryCoverage: true
+            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))]
         )
         let result = try await mapping.getReaders(lat: -80, lon: 100, elevation: 0, mode: .nearest, options: options(run: run))
         #expect(result == nil)

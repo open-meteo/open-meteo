@@ -74,17 +74,19 @@ where P.MixingVar: GenericVariable, S.MixingVar: GenericVariable {
 }
 
 extension ReaderSource {
-    static func derived<D: GenericDomain, V: GenericVariable>(_ domain: D, variables schema: V.Type) -> Self {
+    /// Read one domain and calculate its derived forecast variables.
+    static func domain<D: GenericDomain, V: GenericVariable>(_ domain: D, variables schema: V.Type) -> Self {
         .reader { binding, options in
-            guard let raw = try await binding.reader(domain, schema, options) else { return nil }
+            guard let raw = try await binding.makeRawReader(domain, schema, options) else { return nil }
             return .source(ForecastReaderLeaf(VariableHourlyDeriver(reader: raw, options: options, domainRegistry: domain.domainRegistry)))
         }
     }
 
-    /// Mix raw domains in lowest-to-highest priority order with the existing mixer, then derive once.
-    /// Normal requests require the derivation domain's coverage; explicit runs may
-    /// use another generation. This eligibility rule belongs to this reader factory.
-    static func derive<D: GenericDomain, V: GenericVariable>(domains: [D], variable: V.Type, derivationDomain: D) -> Self {
+    /// Mix raw values from domains ordered from lowest to highest priority, then derive once.
+    /// `deriveUsing` selects the derivation rules and the domain whose geographic coverage
+    /// is required for requests without an explicit run. Explicit runs may use another
+    /// available domain in the group, while retaining the selected derivation rules.
+    static func mixRaw<D: GenericDomain, V: GenericVariable>(domains: [D], variables schema: V.Type, deriveUsing derivationDomain: D) -> Self {
         .reader { binding, options in
             var next = binding
             var readers: [GenericReaderCached<D, V>] = []
@@ -93,7 +95,7 @@ extension ReaderSource {
             var unavailable: ForecastApiError?
             for domain in domains.reversed() {
                 do {
-                    let raw = try await next.reader(domain, variable, options, shareTargetElevation: true)
+                    let raw = try await next.makeRawReader(domain, schema, options, useSharedTargetElevation: true)
                     available = true
                     guard let raw else { continue }
                     readers.append(raw)
@@ -111,16 +113,19 @@ extension ReaderSource {
         }
     }
 
-    static func derive<P: GenericDomain, PV: GenericVariable, S: GenericDomain, SV: GenericVariable>(
+    /// Join complementary raw variable sets, then derive once using the primary domain's rules.
+    /// The primary source must be available and cover the location. The supplemental source
+    /// may be absent; both sources use the primary source's target elevation.
+    static func combineRawVariables<P: GenericDomain, PV: GenericVariable, S: GenericDomain, SV: GenericVariable>(
         primary: (P, PV.Type), supplemental: (S, SV.Type)
     ) -> Self {
         .reader { binding, options in
-            guard let primaryReader = try await binding.reader(primary.0, primary.1, options, shareTargetElevation: true) else { return nil }
+            guard let primaryReader = try await binding.makeRawReader(primary.0, primary.1, options, useSharedTargetElevation: true) else { return nil }
             var next = binding
             if next.elevation.isNaN { next.elevation = primaryReader.resolvedTargetElevation }
             let secondary: GenericReaderCached<S, SV>?
             do {
-                secondary = try await next.reader(supplemental.0, supplemental.1, options, shareTargetElevation: true)
+                secondary = try await next.makeRawReader(supplemental.0, supplemental.1, options, useSharedTargetElevation: true)
             } catch ForecastApiError.modelRunUnavailable {
                 secondary = nil
             }
@@ -129,23 +134,27 @@ extension ReaderSource {
         }
     }
 
+    /// Expose one raw variable as a forecast field without calculating derived variables.
     static func field<D: GenericDomain, V: GenericVariable>(_ domain: D, _ field: ForecastSurfaceVariable, _ variable: V) -> Self {
         .reader { binding, options in
-            guard let raw = try await binding.reader(domain, V.self, options) else { return nil }
+            guard let raw = try await binding.makeRawReader(domain, V.self, options) else { return nil }
             return .source(ForecastReaderLeaf(raw: raw, field: field, variable: variable))
         }
     }
 }
 
 extension ReaderSource.Binding {
-    func reader<D: GenericDomain, V: GenericVariable>(_ domain: D, _ schema: V.Type, _ options: GenericReaderOptions, shareTargetElevation: Bool = false) async throws -> GenericReaderCached<D, V>? {
+    /// Create a raw reader at the requested coordinate or output-grid position.
+    /// For bounding-box requests, `useSharedTargetElevation` applies the binding's elevation
+    /// to raw sources that will be combined before derivation; otherwise each uses its own terrain.
+    func makeRawReader<D: GenericDomain, V: GenericVariable>(_ domain: D, _ schema: V.Type, _ options: GenericReaderOptions, useSharedTargetElevation: Bool = false) async throws -> GenericReaderCached<D, V>? {
         let raw: GenericReader<D, V>
         if let output = outputGrid {
             try await options.validateRun(domain: domain)
             let position = output.domain.domainRegistry == domain.domainRegistry
                 ? output.position : domain.grid.findPoint(lat: latitude, lon: longitude)
             guard let position else { return nil }
-            raw = try await GenericReader(domain: domain, position: position, targetElevation: shareTargetElevation ? elevation : .nan, modelCoordinates: (latitude, longitude), options: options)
+            raw = try await GenericReader(domain: domain, position: position, targetElevation: useSharedTargetElevation ? elevation : .nan, modelCoordinates: (latitude, longitude), options: options)
         } else {
             guard let reader = try await GenericReader<D, V>(domain: domain, lat: latitude, lon: longitude,
                 elevation: elevation, mode: mode, options: options) else { return nil }
