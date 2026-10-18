@@ -27,6 +27,16 @@ import VaporTesting
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
     }
 
+    @Test func forecastStepsOutOfRangeReportsGivenValue() throws {
+        let current = Timestamp(2024, 02, 03, 12, 24)
+        do {
+            _ = try ApiQueryParameter.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: nil, forecastSteps: 30, pastStepsMax: 92, forecastStepsMax: 16, forecastStepsDefault: 7, initialStep: nil, dtSeconds: 86400)
+            Issue.record("Expected forecast_days=30 to be rejected")
+        } catch let error as ForecastApiError {
+            #expect(error.reason == "Forecast days is invalid. Allowed range 0 to 16. Given 30.")
+        }
+    }
+
     @Test func singleRunDailyRequiresLocalMidnight() throws {
         let timezone = TimezoneWithOffset(utcOffsetSeconds: -4 * 3600, identifier: "America/New_York", abbreviation: "GMT-4")
         let invalidDaily = try JSONDecoder().decode(ApiQueryParameter.self, from: Data("""
