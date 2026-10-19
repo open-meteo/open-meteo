@@ -32,7 +32,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.28.0"),
+        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.28.1"),
         .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "d8855e418e2231ae8439f0c7e840fa3f93b371e3"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),

@@ -77,7 +77,7 @@ struct DownloadIconCommand: AsyncCommand {
                 if model == .aicon {
                     return try AiconSurfaceVariable.load(rawValue: String(name))
                 }
-                if name == "visibility" {
+                if name == "visibility", model != .iconD2Ruc {
                     throw Abort(.badRequest, reason: "Visibility is not available in the DWD ICON v1 feed.")
                 }
                 if let variable = IconPressureVariable(rawValue: String(name)) { return variable }
@@ -92,10 +92,10 @@ struct DownloadIconCommand: AsyncCommand {
             surface = AiconSurfaceVariable.allCases
             modelLevel = []
             pressure = []
-        case .icon(let domain):
-            surface = IconSurfaceVariable.allCases.filter { $0.getVarAndLevel(domain: domain)?.cat != "model-level" }
-            modelLevel = IconSurfaceVariable.allCases.filter { $0.getVarAndLevel(domain: domain)?.cat == "model-level" }
-            pressure = domain.levels.reversed().flatMap { level in
+        case .icon, .iconD2Ruc:
+            surface = IconSurfaceVariable.allCases.filter { $0.getVarAndLevel(model: model)?.cat != "model-level" }
+            modelLevel = IconSurfaceVariable.allCases.filter { $0.getVarAndLevel(model: model)?.cat == "model-level" }
+            pressure = model.iconFeed!.levels.reversed().flatMap { level in
                 IconPressureVariableType.allCases.map { IconPressureVariable(variable: $0, level: level) }
             }
         }
@@ -118,7 +118,6 @@ struct DownloadIconCommand: AsyncCommand {
     func convertSurfaceElevation(application: Application, outputs: DwdDownloadDomains, remapper: IconRemapper?, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let model = outputs.source.staticSource
-        let domain = model.iconDomain
         let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
         let missingRemapped = outputs.remapped.flatMap { domain in
             FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) ? nil : domain
@@ -134,7 +133,7 @@ struct DownloadIconCommand: AsyncCommand {
         let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
-        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let deadLineHours = model.deadlineHours
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let downloader = DwdGribDownloader(domain: model, curl: curl, remapper: outputs.nativeDomain == nil ? remapper : nil)
         // AICON's side runs can bootstrap static fields from the preceding main ICON run.
@@ -178,9 +177,8 @@ struct DownloadIconCommand: AsyncCommand {
         let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
-        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: 120)
-        Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: model.deadlineHours, waitAfterLastModified: 120)
+        Process.alarm(seconds: Int(model.deadlineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
         let downloader = DwdGribDownloader(domain: model, curl: curl, remapper: outputs.nativeDomain == nil ? remapper : nil)
@@ -188,6 +186,10 @@ struct DownloadIconCommand: AsyncCommand {
 
         let deaverager = GribDeaverager()
         let deaverager15min = GribDeaverager()
+        var quarterHourlyValidTimes = Set<Timestamp>()
+        let lastQuarterHourlyTime = model.quarterHourlyForecastHorizon.map { run.add($0) }
+        let correctWeatherCode = variables.contains { ($0 as? IconSurfaceVariable) == .weather_code }
+        let humidityLevels = Set(variables.compactMap { $0 as? IconPressureVariable }.filter { model.requiresSpecificHumidityConversion($0) }.map { $0.level })
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
@@ -197,16 +199,19 @@ struct DownloadIconCommand: AsyncCommand {
             return elevation
         }()
         
-        let jobs = variables.flatMap { variable in
-            (0..<model.countEnsembleMember).map { (variable: variable, member: $0) }
-        }
         let timestamps = try model.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
         let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            let jobs = variables.flatMap { variable in
+                let batch = model.downloadBatch(variable: variable, hour: hour)
+                return (0..<model.countEnsembleMember).map { (variable: variable, member: $0, batch: batch) }
+            }
+            let quarterHourlyVariables = Set(jobs.filter { $0.batch.output == .quarterHourly }.map { $0.variable.rawValue })
             logger.info("Downloading hour \(hour)")
 
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
+            let pressureStorage = VariablePerMemberStorage<IconPressureVariable>()
             
             let writer = OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, logger: logger, ensembleMeanDomain: outputs.ensembleMean)
             let modelLevelWriter = outputs.modelLevel.map {
@@ -216,7 +221,7 @@ struct DownloadIconCommand: AsyncCommand {
                 OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: realm, logger: logger)
             }
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: outputs.primary, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
-            let writer15Min = outputs.fifteenMinute.map {
+            let writer15Min = quarterHourlyVariables.isEmpty ? nil : outputs.fifteenMinute.map {
                 OmSpatialMultistepWriter(domain: $0, run: run, storeOnDisk: true, realm: nil, logger: logger)
             }
 
@@ -239,28 +244,34 @@ struct DownloadIconCommand: AsyncCommand {
                 let variable = job.variable
                 if variable.skipHour(hour: hour, model: model, forDownload: true, run: run) { return }
                 guard let field = variable.getVarAndLevel(model: model) else { return }
-                let subhourly = writer15Min != nil && (variable as? IconSurfaceVariable)?.hasQuarterHourlyData == true && hour < 48
-                let steps = (subhourly ? [0, 900, 1800, 2700] : [0]).map { hour * 3600 + $0 }
-                let messages = try await steps.asyncMap { step in
+                let messages = try await job.batch.steps.asyncMap { step in
                     try await downloader.downloadAndRemap(field: field, run: run, leadSeconds: step, member: job.member)
                 }
-                if let writer15Min, subhourly {
+                if let writer15Min, job.batch.output == .quarterHourly {
                     for (message, raw) in messages {
                         var array2d = raw
                         let step = try IconStepInterval(message)
                         let stepType = try message.getOrThrow(attribute: "stepType")
+                        if step.end == 0,
+                           variable.skipHour(hour: 0, model: model, forDownload: false, run: run) { continue }
                         let timestamp = try message.getValidTimestamp()
                         if let fma = variable.multiplyAdd { array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add) }
                         guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: job.member, stepType: stepType, startStep: step.start, currentStep: step.end, array2d: &array2d) else { continue }
                         if let variable = variable as? IconSurfaceVariable {
                             variable.correctDownloadedValues(data: &array2d.data)
-                            if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
+                            if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .freezing_level_height].contains(variable) {
                                 await storage15min.set(variable: variable, timestamp: timestamp, member: job.member, data: array2d)
                                 continue
                             }
                         }
                         try await writer15Min.write(time: timestamp, member: job.member, variable: variable, data: array2d.data)
                     }
+                }
+
+                // Only weather-code correction needs hourly copies of subhourly source values.
+                if model == .iconD2Ruc, job.batch.output == .quarterHourly, let surface = variable as? IconSurfaceVariable,
+                   !(correctWeatherCode && [IconSurfaceVariable.precipitation, .snowfall_height].contains(surface)) {
+                    return
                 }
 
                 // Make sure to skip wind gusts hour0 which only contains `0` values
@@ -271,6 +282,11 @@ struct DownloadIconCommand: AsyncCommand {
                 // The whole-hour field is shared with the independently deaccumulated 15-minute stream.
                 let (message, raw) = messages[0]
                 var array2d = raw
+                if let pressure = variable as? IconPressureVariable, humidityLevels.contains(pressure.level),
+                   pressure.variable == .temperature || pressure.variable == .relative_humidity {
+                    await pressureStorage.set(variable: pressure, timestamp: timestamp, member: job.member, data: array2d)
+                    return
+                }
                     
                 let member = job.member
 
@@ -302,6 +318,22 @@ struct DownloadIconCommand: AsyncCommand {
                 try await write(member: member, variable: variable, data: array2d.data)
             }
 
+            // Temperature and QV jobs share their downloaded fields before humidity is converted.
+            try await pressureStorage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
+                var data = data
+                if v.variable.variable == .relative_humidity {
+                    guard let temperature = await pressureStorage.get(v.with(variable: IconPressureVariable(variable: .temperature, level: v.variable.level))) else {
+                        throw IconDownloadError(description: "Specific humidity conversion requires temperature at \(v.variable.level) hPa")
+                    }
+                    data.data = zip(data.data, temperature.data).map {
+                        Meteorology.specificToRelativeHumidity(specificHumidity: $0 * 1000, temperature: $1 - 273.15, pressure: Float(v.variable.level))
+                    }
+                } else if let fma = v.variable.multiplyAdd {
+                    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                try await write(member: v.member, variable: v.variable, data: data.data)
+            }
+
             /// Calculate precipitation >0.1mm/h probability
             if let writerProbabilities {
                 let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -316,6 +348,8 @@ struct DownloadIconCommand: AsyncCommand {
             /// Do some post processing
             /// Note: Sometimes some members for temperature are missing for a single timestep!
             try await storage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
+                // These values are retained only as weather-code correction inputs.
+                if model == .iconD2Ruc, quarterHourlyVariables.contains(v.variable.rawValue) { return }
                 var data = data
                 if (domain == .iconEps || domain == .iconEuEps) && v.variable == .pressure_msl,
                     let t2m = await storage.get(v.with(variable: .temperature_2m)) {
@@ -373,7 +407,7 @@ struct DownloadIconCommand: AsyncCommand {
                     for i in data.data.indices {
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             let snowWater = snowfallWaterEquivalent.data[i].isNaN ? 0 : snowfallWaterEquivalent.data[i]
-                            let snowConvWater = snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
+                            let snowConvWater = snowfallConvectiveWaterEquivalent?.data[i].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[i] ?? 0
                             data.data[i] += snowWater + snowConvWater
                         }
                     }
@@ -386,7 +420,7 @@ struct DownloadIconCommand: AsyncCommand {
                     let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
-                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
+                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[i].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[i] ?? 0
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             /*if (data.data[i] > 0.1 && domainElevation[i] > -100) {
                                 print("corrected case value=\(data.data[i]) t=\(t2m.data[i]) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
@@ -424,7 +458,7 @@ struct DownloadIconCommand: AsyncCommand {
                     for i in data.data.indices {
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             let snowWater = snowfallWaterEquivalent.data[i].isNaN ? 0 : snowfallWaterEquivalent.data[i]
-                            let snowConvWater = snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
+                            let snowConvWater = snowfallConvectiveWaterEquivalent?.data[i].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[i] ?? 0
                             data.data[i] += snowWater + snowConvWater
                         }
                     }
@@ -440,7 +474,7 @@ struct DownloadIconCommand: AsyncCommand {
                     let snowfallConvectiveWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
-                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
+                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[i].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[i] ?? 0
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             /*if (data.data[i] > 0.1 && domainElevation[i] > -100) {
                                 print("corrected case value=\(data.data[i]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
@@ -482,8 +516,9 @@ struct DownloadIconCommand: AsyncCommand {
                 + (remappedWriter?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
                 + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket) ?? [])
             
-            // TODO valid times and S3 upload for 15min data
-            let handles15min = try await writer15Min?.finalise(application: application, completed: false, validTimes: [], uploadS3Bucket: nil) ?? []
+            let handles15min = try await finaliseQuarterHourly(application: application, writer: writer15Min,
+                lastTime: lastQuarterHourlyTime,
+                validTimes: &quarterHourlyValidTimes, uploadS3Bucket: uploadS3Bucket)
             return (handles, handles15min)
         }
         
@@ -491,11 +526,23 @@ struct DownloadIconCommand: AsyncCommand {
         return (handles.flatMap({$0.0}), handles.flatMap({$0.1}))
     }
 
+    /// Publish each cadence independently; D2's quarter-hour output ends before its hourly output.
+    func finaliseQuarterHourly(application: Application, writer: OmSpatialMultistepWriter?, lastTime: Timestamp?, validTimes: inout Set<Timestamp>, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        guard let writer else { return [] }
+        let writtenTimes = await writer.writer.map { $0.time }
+        guard !writtenTimes.isEmpty else { return [] }
+        let publishedTimes = validTimes.union(writtenTimes)
+        let completed = lastTime.map { writtenTimes.contains($0) } ?? false
+        let handles = try await writer.finalise(application: application, completed: completed, validTimes: publishedTimes.sorted(), uploadS3Bucket: uploadS3Bucket)
+        validTimes = publishedTimes
+        return handles
+    }
+
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let requestedNativeDomain = IconNativeDomains(rawValue: signature.domain)
             ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
-        let nativeDomain = requestedNativeDomain?.modelLevelParent ?? requestedNativeDomain
+        let nativeDomain = requestedNativeDomain?.modelLevelParent ?? (requestedNativeDomain == .iconD2RucNative15min ? .iconD2RucNative : requestedNativeDomain)
         let model = try nativeDomain?.sourceModel ?? .icon(IconDomains.load(rawValue: signature.domain))
         let domain = model.iconDomain
         guard !signature.skipRegridding || nativeDomain == .iconNative else {
@@ -539,6 +586,7 @@ struct DownloadIconCommand: AsyncCommand {
         } else {
             throw Abort(.badRequest, reason: "AICON requires native storage.")
         }
+
         let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let needsRemapping = outputs.nativeDomain == nil || outputs.remapped != nil
@@ -559,44 +607,5 @@ struct DownloadIconCommand: AsyncCommand {
         try await GenericVariableHandle.convert(application: context.application, domain: outputs.primary, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
-    }
-}
-
-
-extension IconDomains {
-    /// Based on the current time , guess the current run that should be available soon on the open-data server
-    func lastRun(now t: Timestamp = .now()) -> Timestamp {
-        switch self {
-        case .iconEps:
-            return t.subtract(hours: 2).floor(toNearestHour: 12)
-        case .icon:
-            // Icon has a delay of 2-3 hours after initialisation  with 4 runs a day
-            return t.subtract(hours: 2).floor(toNearestHour: 6)
-        case .iconEuEps:
-            return t.subtract(hours: 2).floor(toNearestHour: 6)
-        case .iconEu:
-            // Icon-eu has a delay of 2:40 hours after initialisation with 8 runs a day
-            return t.subtract(hours: 2).floor(toNearestHour: 3)
-        case .iconD2Eps, .iconD2:
-            // Icon d2 has a delay of 44 minutes and runs every 3 hours
-            return t.floor(toNearestHour: 3)
-        case .iconD2_15min:
-            fatalError("ICON-D2 15minute data can not be downloaded individually")
-        case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
-            fatalError()
-        }
-    }
-
-    var countEnsembleMember: Int {
-        switch self {
-        case .iconEps:
-            return 40
-        case .iconEuEps:
-            return 40
-        case .iconD2Eps:
-            return 20
-        default:
-            return 1
-        }
     }
 }

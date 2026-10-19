@@ -38,7 +38,7 @@ struct DwdDownloadDomains: Sendable {
         self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
         self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
         self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
-        self.fifteenMinute = domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
+        self.fifteenMinute = domain == .iconD2RucNative ? IconNativeDomain(definition: .iconD2RucNative15min, nativeGrid: grid) : domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
     }
 }
 

@@ -7,13 +7,13 @@ protocol DwdVariableDownloadable: GenericVariable {
 
 extension IconVariableDownloadable {
     func getVarAndLevel(model: DwdModel) -> (variable: String, cat: String, level: Int?)? {
-        guard let domain = model.iconDomain else { return nil }
-        return getVarAndLevel(domain: domain)
+        guard let domain = model.iconFeed else { return nil }
+        return domain.getVarAndLevel(self)
     }
 
     func skipHour(hour: Int, model: DwdModel, forDownload: Bool, run: Timestamp) -> Bool {
-        guard let domain = model.iconDomain else { return true }
-        return skipHour(hour: hour, domain: domain, forDownload: forDownload, run: run)
+        guard let domain = model.iconFeed else { return true }
+        return domain.skipHour(self, hour: hour, forDownload: forDownload, run: run)
     }
 }
 
