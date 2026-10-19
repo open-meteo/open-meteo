@@ -67,6 +67,14 @@ import Testing
         #expect([Float(10), 350, 20, 300].interpolateLinearDegrees(timeOld: time, timeNew: time.with(dtSeconds: 900), scalefactor: 1) == [10.0, 5.0, 0.0, 355.0, 350.0, 358.0, 5.0, 13.0, 20.0, 0.0, 340.0, 320.0, 300.0, 300.0, 300.0, 300.0])
     }
 
+    @Test func interpolateLinearLastFrame() {
+        // A 3-hourly series whose last step is not yet available: its last finite frame must survive at fraction 0
+        let time = TimerangeDt(start: Timestamp(0), nTime: 4, dtSeconds: 3 * 3600)
+        let hourly = time.with(dtSeconds: 3600)
+        #expect(arraysEqual([Float(1), 4, 7, .nan].interpolateLinear(timeOld: time, timeNew: hourly, scalefactor: 1), [1, 2, 3, 4, 5, 6, 7, .nan, .nan, .nan, .nan, .nan], accuracy: 0.0001))
+        #expect(arraysEqual([Float(10), 40, 70, .nan].interpolateLinearDegrees(timeOld: time, timeNew: hourly, scalefactor: 1), [10, 20, 30, 40, 50, 60, 70, .nan, .nan, .nan, .nan, .nan], accuracy: 0.0001))
+    }
+
     @Test func linearInterpolateInplace() {
         var a: [Float] = [0, 1, .nan, .nan, .nan, 5]
         a.interpolateInplaceLinear(nTime: 6)
