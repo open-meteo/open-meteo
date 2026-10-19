@@ -9,8 +9,6 @@ struct OmFileSplitter {
 
     let masterTimeRange: Range<Timestamp>?
 
-    let hasYearlyFiles: Bool
-
     /// actually also in file
     var nLocations: Int { nx * ny * nMembers }
 
@@ -52,19 +50,17 @@ struct OmFileSplitter {
             nx: domain.grid.nx,
             ny: domain.grid.ny,
             nTimePerFile: domain.omFileLength,
-            hasYearlyFiles: domain.hasYearlyFiles,
             masterTimeRange: domain.masterTimeRange,
             chunknLocations: chunknLocations
         )
     }
 
-    init(domain: DomainRegistry, nMembers: Int, nx: Int, ny: Int, nTimePerFile: Int, hasYearlyFiles: Bool, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil) {
+    init(domain: DomainRegistry, nMembers: Int, nx: Int, ny: Int, nTimePerFile: Int, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil) {
         self.domain = domain
         self.nMembers = nMembers
         self.nx = nx
         self.ny = ny
         self.nTimePerFile = nTimePerFile
-        self.hasYearlyFiles = hasYearlyFiles
         self.masterTimeRange = masterTimeRange
         let nLocations = nx * ny * nMembers
         self.chunknLocations = chunknLocations ?? min(nLocations, Self.calcChunknLocations(nTimePerFile: nTimePerFile))
@@ -124,7 +120,7 @@ struct OmFileSplitter {
             return
         }
 
-        if hasYearlyFiles {
+        if !directory.yearRange.isEmpty {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
@@ -254,7 +250,7 @@ struct OmFileSplitter {
             }
         }
 
-        if hasYearlyFiles {
+        if !directory.yearRange.isEmpty {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year

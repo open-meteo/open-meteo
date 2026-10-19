@@ -21,9 +21,6 @@ protocol GenericDomain: Sendable {
     /// How often a domain is updated in seconds. `3600` for updates every hour
     var updateIntervalSeconds: Int { get }
 
-    /// If true, domain has yearly files
-    var hasYearlyFiles: Bool { get }
-
     /// If present, the timerange that is available in a master file
     var masterTimeRange: Range<Timestamp>? { get }
 

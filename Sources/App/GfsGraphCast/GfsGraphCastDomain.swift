@@ -26,10 +26,6 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         return .ncep_gfs025
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

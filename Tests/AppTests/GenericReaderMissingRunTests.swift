@@ -196,7 +196,6 @@ private struct RunFixtureDomain: GenericDomain {
     var availability: Availability = .missing
     let dtSeconds = 3600
     let updateIntervalSeconds = 21600
-    let hasYearlyFiles = false
     let masterTimeRange: Range<Timestamp>? = nil
     let omFileLength = 4
     let countEnsembleMember = 1

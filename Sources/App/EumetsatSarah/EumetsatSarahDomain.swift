@@ -20,10 +20,6 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
          return false
     }
 
-    var hasYearlyFiles: Bool {
-        return true
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

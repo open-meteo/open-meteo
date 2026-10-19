@@ -80,10 +80,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

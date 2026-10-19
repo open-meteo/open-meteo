@@ -28,10 +28,6 @@ struct Dem90: GenericDomain {
         return 0
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

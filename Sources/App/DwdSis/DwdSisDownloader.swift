@@ -239,9 +239,6 @@ enum DwdSisDomain: String, CaseIterable, GenericDomain {
         return 10*60
     }
     
-    var hasYearlyFiles: Bool {
-        return false
-    }
     
     var masterTimeRange: Range<Timestamp>? {
         return nil
