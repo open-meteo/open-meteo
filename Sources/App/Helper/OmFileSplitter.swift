@@ -156,7 +156,7 @@ struct OmFileSplitter {
         let subring = start ..< indexTime.upperBound
         for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile).clamped(to: directory.chunkRange) {
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
-            guard let offsets = indexTime.intersect(fileTime: fileTime) else {
+            guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
             let file = directory.getChunk(index: timeChunk)
