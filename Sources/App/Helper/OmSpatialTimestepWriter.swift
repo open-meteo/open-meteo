@@ -21,7 +21,19 @@ import OmFileIO
 
 /// Write multiple spatial oriented variables into one file per time-step
 actor OmSpatialTimestepWriter {
-    var variables: [VariableWithOffset] = .init()
+    private(set) var variables: [VariableWithOffset] = .init()
+    private var writtenVariables = Set<VariableMemberKey>()
+
+    /// Preserve the name-based identity used by duplicate detection.
+    private struct VariableMemberKey: Hashable {
+        let name: String
+        let member: Int
+
+        init(variable: any GenericVariable, member: Int) {
+            self.name = String(describing: variable)
+            self.member = member
+        }
+    }
     var filename: String?
     var writer: OmFileWriter<FileHandle>?
     let domain: GenericDomain
@@ -98,12 +110,13 @@ actor OmSpatialTimestepWriter {
     }
     
     func contains(member: Int, variable: any GenericVariable) -> Bool {
-        return variables.contains(where: { "\($0.variable)" == "\(variable)" && $0.member == member})
+        return writtenVariables.contains(VariableMemberKey(variable: variable, member: member))
     }
     
     /// Write a single variable to the file
     func write(member: Int, variable: any GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
-        if contains(member: member, variable: variable) {
+        let key = VariableMemberKey(variable: variable, member: member)
+        if writtenVariables.contains(key) {
             return
         }
         
@@ -126,6 +139,7 @@ actor OmSpatialTimestepWriter {
         )
         try arrayWriter.writeData(array: data)
         self.variables.append(VariableWithOffset(variable: variable, member: member, writer: arrayWriter))
+        writtenVariables.insert(key)
         
         await ensembleMean?.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data)
     }
