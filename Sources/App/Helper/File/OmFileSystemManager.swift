@@ -193,25 +193,23 @@ extension OmFileSystemManager {
         var yearRange: Range<Int> { union(local?.yearRange, remote?.yearRange) }
 
         func getFile(type: OmFileSeriesType, index: Int = 0) -> LocalOrRemoteFile? {
-            let localFile: OmFileSystemLocal.File?
             let remoteFile: OmFileSystemS3.File?
             switch type {
             case .chunk:
-                localFile = local?.chunks[index]
+                if let file = local?.chunks[index] { return .local(file) }
                 remoteFile = remote?.chunks[index]
             case .year:
-                localFile = local?.years[index]
+                if let file = local?.years[index] { return .local(file) }
                 remoteFile = remote?.years[index]
             case .master:
-                localFile = local?.master
+                if let file = local?.master { return .local(file) }
                 remoteFile = remote?.master
             case .rolling:
-                localFile = local?.rolling
+                if let file = local?.rolling { return .local(file) }
                 remoteFile = remote?.rolling
             case .linear_bias_seasonal:
                 return nil
             }
-            if let localFile { return .local(localFile) }
             if let remoteFile, let context { return .remote(context.withContext(file: remoteFile)) }
             return nil
         }
