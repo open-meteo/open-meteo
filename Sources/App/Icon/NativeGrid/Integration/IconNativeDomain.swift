@@ -17,7 +17,6 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     var domainRegistryStatic: DomainRegistry? { definition.domainRegistryStatic }
     var dtSeconds: Int { definition.dtSeconds }
     var updateIntervalSeconds: Int { definition.updateIntervalSeconds }
-    var hasYearlyFiles: Bool { definition.hasYearlyFiles }
     var masterTimeRange: Range<Timestamp>? { definition.masterTimeRange }
     var omFileLength: Int { definition.omFileLength }
     var countEnsembleMember: Int { definition.countEnsembleMember }

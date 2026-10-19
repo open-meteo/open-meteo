@@ -35,9 +35,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arpege_europe_probabilities
     case arpege_world_probabilities
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
     
     var countEnsembleMember: Int {
         return 1

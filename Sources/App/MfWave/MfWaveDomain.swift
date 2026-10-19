@@ -8,10 +8,6 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     case mfcurrents
     case mfsst
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

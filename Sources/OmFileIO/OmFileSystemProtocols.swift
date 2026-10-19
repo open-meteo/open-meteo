@@ -86,3 +86,27 @@ public extension OmFileManagable {
         return FileManager.default.fileExists(atPath: file)
     }
 }
+
+/// Immutable directory snapshot. Numeric lookups avoid constructing filenames on the read path.
+public struct OmFileSeriesIndex<File: Sendable>: Sendable {
+    public private(set) var chunks = [Int: File]()
+    public private(set) var years = [Int: File]()
+    public private(set) var chunkRange = 0..<0
+    public private(set) var yearRange = 0..<0
+    public let master: File?
+    public let rolling: File?
+
+    public init(files: [String: File]) {
+        master = files["master_0.om"]
+        rolling = files["rolling.om"]
+        for (name, file) in files where name.hasSuffix(".om") {
+            if name.hasPrefix("chunk_"), let index = Int(name.dropFirst(6).dropLast(3)), index < Int.max {
+                chunks[index] = file
+                chunkRange = chunkRange.isEmpty ? index..<index + 1 : min(chunkRange.lowerBound, index)..<max(chunkRange.upperBound, index + 1)
+            } else if name.hasPrefix("year_"), let index = Int(name.dropFirst(5).dropLast(3)), index < Int.max {
+                years[index] = file
+                yearRange = yearRange.isEmpty ? index..<index + 1 : min(yearRange.lowerBound, index)..<max(yearRange.upperBound, index + 1)
+            }
+        }
+    }
+}

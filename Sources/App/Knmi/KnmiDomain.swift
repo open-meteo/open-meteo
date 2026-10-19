@@ -40,10 +40,6 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
         return 1 * 3600
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

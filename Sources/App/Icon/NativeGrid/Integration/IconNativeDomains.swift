@@ -114,7 +114,6 @@ enum IconNativeDomains: String, CaseIterable {
 
     var dtSeconds: Int { quarterHourlyParent != nil ? 900 : sourceDomain.dtSeconds }
     var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
-    var hasYearlyFiles: Bool { sourceDomain.hasYearlyFiles }
     var masterTimeRange: Range<Timestamp>? { sourceDomain.masterTimeRange }
     var omFileLength: Int {
         switch self {
