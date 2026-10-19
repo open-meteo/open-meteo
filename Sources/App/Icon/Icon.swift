@@ -70,11 +70,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2_15min:
             return .dwd_icon_d2
         case .iconEpsEnsembleMean:
-            return .dwd_icon_eps_ensemble_mean
+            return .dwd_icon_eps
         case .iconEuEpsEnsembleMean:
-            return .dwd_icon_eu_eps_ensemble_mean
+            return .dwd_icon_eu_eps
         case .iconD2EpsEnsembleMean:
-            return .dwd_icon_d2_eps_ensemble_mean
+            return .dwd_icon_d2_eps
         default:
             return domainRegistry
         }
