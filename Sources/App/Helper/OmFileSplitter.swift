@@ -108,9 +108,8 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = directory.getFile(type: .master, index: 0)
-            if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await file?.with(payloadType: OmFileType.self) { omFile in
+            if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getFile(type: .master, index: 0) {
+                try await file.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -241,9 +240,8 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = directory.getFile(type: .master, index: 0)
-            if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await file?.with(payloadType: OmFileType.self) { omFile in
+            if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getFile(type: .master, index: 0) {
+                try await file.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
