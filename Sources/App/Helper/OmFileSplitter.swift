@@ -106,11 +106,15 @@ struct OmFileSplitter {
         }
 
 
+        guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable, ensembleMember: time.ensembleMember, previousDay: time.previousDay, client: httpClient, logger: logger) else {
+            return
+        }
+
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            let file = directory.getFile(type: .master, index: 0)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -124,15 +128,15 @@ struct OmFileSplitter {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
-            for year in startYear ... endYear {
+            for year in (startYear..<endYear + 1).clamped(to: directory.yearRange) {
                 let yeartime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year + 1, 1, 1), dtSeconds: time.dtSeconds)
                 /// as index
                 let fileTime = yeartime.toIndexTime()
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                let file = directory.getFile(type: .year, index: year)
+                try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -144,8 +148,8 @@ struct OmFileSplitter {
         
         // Rolling files for ensemble data
         if nMembers > 1 {
-            let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            if try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger, fn: { omFile -> Bool in
+            let file = directory.getFile(type: .rolling)
+            if try await file?.with(payloadType: OmFileType.self, fn: { omFile -> Bool in
                 guard let fileTime = omFile.timeRangeDt else {
                     return true
                 }
@@ -160,13 +164,13 @@ struct OmFileSplitter {
         }
         
         let subring = start ..< indexTime.upperBound
-        for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile) {
+        for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile).clamped(to: directory.chunkRange) {
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+            let file = directory.getFile(type: .chunk, index: timeChunk)
+            try await file?.with(payloadType: OmFileType.self) { omFile in
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
             }
         }
@@ -235,11 +239,15 @@ struct OmFileSplitter {
             return out
         }
 
+        guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable.omFileName.file, ensembleMember: time.ensembleMember, previousDay: time.previousDay, client: httpClient, logger: logger) else {
+            return out
+        }
+
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            let file = directory.getFile(type: .master, index: 0)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -250,15 +258,15 @@ struct OmFileSplitter {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
-            for year in startYear ... endYear {
+            for year in (startYear..<endYear + 1).clamped(to: directory.yearRange) {
                 let yeartime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year + 1, 1, 1), dtSeconds: time.dtSeconds)
                 /// as index
                 let fileTime = yeartime.toIndexTime()
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+                let file = directory.getFile(type: .year, index: year)
+                try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -271,8 +279,8 @@ struct OmFileSplitter {
         
         // Rolling files for ensemble data
         if nMembers > 1 {
-            let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .rolling, chunk: nil, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            if try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger, fn: { omFile in
+            let file = directory.getFile(type: .rolling)
+            if try await file?.with(payloadType: OmFileType.self, fn: { omFile in
                 guard let fileTime = omFile.timeRangeDt else {
                     return true
                 }
@@ -287,13 +295,13 @@ struct OmFileSplitter {
         }
         
         let subring = start ..< indexTime.upperBound
-        for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile) {
+        for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile).clamped(to: directory.chunkRange) {
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+            let file = directory.getFile(type: .chunk, index: timeChunk)
+            try await file?.with(payloadType: OmFileType.self) { omFile in
                 try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }
         }

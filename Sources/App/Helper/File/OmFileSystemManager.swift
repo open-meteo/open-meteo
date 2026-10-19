@@ -85,18 +85,6 @@ final class OmFileSystemManager: Sendable {
         return (directories, files)
     }
     
-    /// Option to traverse directory by directory for local and remote
-    /// E.g can get /data/dwd_icon/ directory and check if a variable is present at all
-    /// Or get all chunks from a directory
-    func getDirectory(path: String, client: HTTPClient, logger: Logger) async throws -> LocalAndRemoteDirectory? {
-        let local = await localFileSystem.getDirectory(fullPath: path)
-        guard let remoteFileSystem else {
-            return LocalAndRemoteDirectory(local: local, remote: nil)
-        }
-        let remote = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path)
-        return LocalAndRemoteDirectory(local: local, remote: remote)
-    }
-    
     func getFile(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> FileType? {
         if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
@@ -159,28 +147,58 @@ final class OmFileSystemManager: Sendable {
 }
 
 extension OmFileSystemManager {
-    struct LocalAndRemoteDirectory {
-        let local: OmFileSystemLocal.Directory?
-        let remote: OmFileSystemS3.DirectoryWithContext?
-        
-        /// Get a sub directory in this directory
-        func getDirectory(name: String) async throws -> LocalAndRemoteDirectory {
-            let local = await local?.getDirectory(name: name)
-            guard let remote else {
-                return LocalAndRemoteDirectory(local: local, remote: nil)
-            }
-            let remoteContents = try await remote.getDirectory(name: name)
-            return LocalAndRemoteDirectory(local: local, remote: remoteContents)
+    /// Resolve the variable directory once and retain its copy-on-write file indexes.
+    /// Returns nil when neither an accessible local nor remote directory exists.
+    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int, client: HTTPClient?, logger: Logger) async throws -> SeriesDirectory? {
+        let member = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
+        let previous = previousDay > 0 ? "_previous_day\(previousDay)" : ""
+        let path = "data/\(domain.rawValue)/\(variable)\(previous)\(member)/"
+        let local = await localFileSystem.getDirectory(fullPath: path)?.getSeriesIndex()
+        var remote: OmFileSystemS3.DirectoryWithContext?
+        if let client, !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem {
+            remote = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path)
         }
-        
-        /// Get a file in this directory
-        func getFile(name: String) async -> LocalOrRemoteFile? {
-            if let file = await local?.getFile(name: name) {
-                return .local(file)
+        guard local != nil || remote != nil else {
+            return nil
+        }
+        return SeriesDirectory(local: local, remote: await remote?.directory.getSeriesIndex(), context: remote)
+    }
+
+    struct SeriesDirectory {
+        let local: OmFileSeriesIndex<OmFileSystemLocal.File>?
+        let remote: OmFileSeriesIndex<OmFileSystemS3.File>?
+        let context: OmFileSystemS3.DirectoryWithContext?
+
+        private func union(_ lhs: Range<Int>?, _ rhs: Range<Int>?) -> Range<Int> {
+            guard let lhs, !lhs.isEmpty else { return rhs ?? 0..<0 }
+            guard let rhs, !rhs.isEmpty else { return lhs }
+            return min(lhs.lowerBound, rhs.lowerBound)..<max(lhs.upperBound, rhs.upperBound)
+        }
+
+        var chunkRange: Range<Int> { union(local?.chunkRange, remote?.chunkRange) }
+        var yearRange: Range<Int> { union(local?.yearRange, remote?.yearRange) }
+
+        func getFile(type: OmFileSeriesType, index: Int = 0) -> LocalOrRemoteFile? {
+            let localFile: OmFileSystemLocal.File?
+            let remoteFile: OmFileSystemS3.File?
+            switch type {
+            case .chunk:
+                localFile = local?.chunks[index]
+                remoteFile = remote?.chunks[index]
+            case .year:
+                localFile = local?.years[index]
+                remoteFile = remote?.years[index]
+            case .master:
+                localFile = local?.master
+                remoteFile = remote?.master
+            case .rolling:
+                localFile = local?.rolling
+                remoteFile = remote?.rolling
+            case .linear_bias_seasonal:
+                return nil
             }
-            if let remote, let file = await remote.getFile(name: name), !OpenMeteo.remotePressureLevelsOnly || file.file.objectName.contains("hPa") {
-                return .remote(file)
-            }
+            if let localFile { return .local(localFile) }
+            if let remoteFile, let context { return .remote(context.withContext(file: remoteFile)) }
             return nil
         }
     }
@@ -189,7 +207,7 @@ extension OmFileSystemManager {
         case local(OmFileSystemLocal.File)
         case remote(OmFileSystemS3.FileWithContext)
         
-        func with<R, Key: OmFileManagable>(payloadType: Key.Type, client: HTTPClient, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+        func with<R, Key: OmFileManagable>(payloadType: Key.Type, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
             switch self {
             case .local(let file):
                 return try await fn(file.getPayload(ofType: Key.Payload.self))

@@ -383,6 +383,10 @@ public struct OmFileSystemS3: Sendable {
             return .init(directory: directory, context: context)
         }
         
+        public func withContext(file: File) -> FileWithContext {
+            .init(file: file, context: context)
+        }
+
         public func getFile(name: String) async -> FileWithContext? {
             guard let file = await directory.getFile(name: name) else {
                 return nil
@@ -395,7 +399,17 @@ public struct OmFileSystemS3: Sendable {
     /// At initialisation the directory does not fetch contents, but waits until the first request arrives
     public actor Directory {
         let prefix: String
-        private var files = [String: File]()
+        private var files = [String: File]() {
+            didSet { seriesIndex = nil }
+        }
+        private var seriesIndex: OmFileSeriesIndex<File>?
+
+        public func getSeriesIndex() -> OmFileSeriesIndex<File> {
+            if let seriesIndex { return seriesIndex }
+            let index = OmFileSeriesIndex(files: files)
+            seriesIndex = index
+            return index
+        }
         private var directories = [String: Directory]()
         private var lastValidated = Timestamp(0)
         private var lastAccessed = Timestamp(0)
