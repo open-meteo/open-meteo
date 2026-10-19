@@ -108,7 +108,7 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getFile(type: .master, index: 0) {
+            if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getMaster() {
                 try await file.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
@@ -130,7 +130,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = directory.getFile(type: .year, index: year)
+                let file = directory.getYear(year: year)
                 try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
@@ -143,7 +143,7 @@ struct OmFileSplitter {
         
         // Rolling files for ensemble data
         if nMembers > 1 {
-            let file = directory.getFile(type: .rolling)
+            let file = directory.getRolling()
             if try await file?.with(payloadType: OmFileType.self, fn: { omFile -> Bool in
                 guard let fileTime = omFile.timeRangeDt else {
                     return true
@@ -164,7 +164,7 @@ struct OmFileSplitter {
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = directory.getFile(type: .chunk, index: timeChunk)
+            let file = directory.getChunk(index: timeChunk)
             try await file?.with(payloadType: OmFileType.self) { omFile in
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
             }
@@ -240,7 +240,7 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getFile(type: .master, index: 0) {
+            if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getMaster() {
                 try await file.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
@@ -259,7 +259,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = directory.getFile(type: .year, index: year)
+                let file = directory.getYear(year: year)
                 try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
@@ -273,7 +273,7 @@ struct OmFileSplitter {
         
         // Rolling files for ensemble data
         if nMembers > 1 {
-            let file = directory.getFile(type: .rolling)
+            let file = directory.getRolling()
             if try await file?.with(payloadType: OmFileType.self, fn: { omFile in
                 guard let fileTime = omFile.timeRangeDt else {
                     return true
@@ -294,7 +294,7 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = directory.getFile(type: .chunk, index: timeChunk)
+            let file = directory.getChunk(index: timeChunk)
             try await file?.with(payloadType: OmFileType.self) { omFile in
                 try await omFile.reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }

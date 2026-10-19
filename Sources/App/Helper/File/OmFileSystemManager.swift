@@ -192,25 +192,35 @@ extension OmFileSystemManager {
         var chunkRange: Range<Int> { union(local?.chunkRange, remote?.chunkRange) }
         var yearRange: Range<Int> { union(local?.yearRange, remote?.yearRange) }
 
-        func getFile(type: OmFileSeriesType, index: Int = 0) -> LocalOrRemoteFile? {
-            let remoteFile: OmFileSystemS3.File?
-            switch type {
-            case .chunk:
-                if let file = local?.chunks[index] { return .local(file) }
-                remoteFile = remote?.chunks[index]
-            case .year:
-                if let file = local?.years[index] { return .local(file) }
-                remoteFile = remote?.years[index]
-            case .master:
-                if let file = local?.master { return .local(file) }
-                remoteFile = remote?.master
-            case .rolling:
-                if let file = local?.rolling { return .local(file) }
-                remoteFile = remote?.rolling
-            case .linear_bias_seasonal:
-                return nil
+        func getChunk(index: Int) -> LocalOrRemoteFile? {
+            if let file = local?.chunks[index] { return .local(file) }
+            if let file = remote?.chunks[index], let context {
+                return .remote(context.withContext(file: file))
             }
-            if let remoteFile, let context { return .remote(context.withContext(file: remoteFile)) }
+            return nil
+        }
+
+        func getYear(year: Int) -> LocalOrRemoteFile? {
+            if let file = local?.years[year] { return .local(file) }
+            if let file = remote?.years[year], let context {
+                return .remote(context.withContext(file: file))
+            }
+            return nil
+        }
+
+        func getMaster() -> LocalOrRemoteFile? {
+            if let file = local?.master { return .local(file) }
+            if let file = remote?.master, let context {
+                return .remote(context.withContext(file: file))
+            }
+            return nil
+        }
+
+        func getRolling() -> LocalOrRemoteFile? {
+            if let file = local?.rolling { return .local(file) }
+            if let file = remote?.rolling, let context {
+                return .remote(context.withContext(file: file))
+            }
             return nil
         }
     }
