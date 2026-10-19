@@ -166,7 +166,7 @@ extension OmFileSystemManager {
             .getDirectory(name: name)?
             .getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
-        if let client, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa") || domain.rawValue.contains("hPa"), let remoteFileSystem {
+        if let client, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
             remote = try await remoteFileSystem.getRoot(client: client, logger: logger)
                 .getDirectory(name: "data")?
                 .getDirectory(name: domain.rawValue)?
