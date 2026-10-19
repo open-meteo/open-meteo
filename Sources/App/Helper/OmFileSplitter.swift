@@ -66,11 +66,6 @@ struct OmFileSplitter {
         self.chunknLocations = chunknLocations ?? min(nLocations, Self.calcChunknLocations(nTimePerFile: nTimePerFile))
     }
 
-    // optimise to use 8 MB memory, but aligned to even `chunknLocations`
-    var nLocationsPerChunk: Int {
-        min(nLocations, 8 * 1024 * 1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations)
-    }
-
     /// Prefetch all required data into memory
     func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws {
         // TODO: maybe we can keep the file handles better in scope

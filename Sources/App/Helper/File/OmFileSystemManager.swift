@@ -117,7 +117,7 @@ final class OmFileSystemManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: OmFileManagable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Payload? {
+    func get<Key: OmFileManagable>(file: Key, client: HTTPClient?, logger: Logger) async throws -> Key.Payload? {
         return try await self.with(file: file, client: client, logger: logger) {
             return $0
         }
