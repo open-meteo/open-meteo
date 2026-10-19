@@ -150,13 +150,27 @@ extension OmFileSystemManager {
     /// Resolve the variable directory once and retain its copy-on-write file indexes.
     /// Returns nil when neither an accessible local nor remote directory exists.
     func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int, client: HTTPClient?, logger: Logger) async throws -> SeriesDirectory? {
-        let member = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
-        let previous = previousDay > 0 ? "_previous_day\(previousDay)" : ""
-        let path = "data/\(domain.rawValue)/\(variable)\(previous)\(member)/"
-        let local = await localFileSystem.getDirectory(fullPath: path)?.getSeriesIndex()
+        // The common case reuses the variable string without allocating a path.
+        var name = variable
+        if previousDay > 0 {
+            name += "_previous_day"
+            name += String(previousDay)
+        }
+        if ensembleMember > 0 {
+            name += "_member"
+            name += ensembleMember.zeroPadded(len: 2)
+        }
+        let local = await localFileSystem
+            .getDirectory(name: "data")?
+            .getDirectory(name: domain.rawValue)?
+            .getDirectory(name: name)?
+            .getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
-        if let client, !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem {
-            remote = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path)
+        if let client, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa") || domain.rawValue.contains("hPa"), let remoteFileSystem {
+            remote = try await remoteFileSystem.getRoot(client: client, logger: logger)
+                .getDirectory(name: "data")?
+                .getDirectory(name: domain.rawValue)?
+                .getDirectory(name: name)
         }
         guard local != nil || remote != nil else {
             return nil
