@@ -36,46 +36,6 @@ enum ProbabilityVariable: String, CaseIterable, GenericVariable, GenericVariable
  Create readers for various models
  */
 enum ProbabilityReader {
-    /// Read probabilities from GFS ensemble models 0.25° and 0.5°
-    static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameVariableType<GenericReader<GfsDomain, ProbabilityVariable>>? {
-        let readers: [GenericReader<GfsDomain, ProbabilityVariable>] = try await [GfsDomain.gfs05_ens, .gfs025_ens].asyncCompactMap { domain in
-            do {
-                return try await GenericReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            } catch ForecastApiError.modelRunUnavailable {
-                return nil
-            }
-        }
-        return readers.isEmpty ? nil : GenericReaderMixerSameVariableType(reader: readers)
-    }
-
-    /// Notes: Does not use ICON-D2, because it has fewer members. It need some kind of mixing
-    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerByVariableName<ProbabilityVariable> {
-        // EPS ingestion has moved to native storage, independently of the deterministic cutover.
-        let domains: [any GenericDomain] = [
-            IconDomains.iconEps,
-            try await IconNativeDomains.iconEpsNative.load(),
-            IconDomains.iconEuEps,
-            try await IconNativeDomains.iconEuEpsNative.load()
-        ]
-        let readers = try await domains.asyncCompactMap { domain in
-            do {
-                return try await domain.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            } catch ForecastApiError.modelRunUnavailable {
-                return nil
-            }
-        }
-        return GenericReaderMixerByVariableName(reader: readers)
-    }
-
-    /// Reader for probabilities based on NCEP NBM
-    static func makeNbmReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<NbmDomain, ProbabilityVariable>? {
-        do {
-            return try await GenericReader<NbmDomain, ProbabilityVariable>(domain: .nbm_conus, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        } catch ForecastApiError.modelRunUnavailable {
-            return nil
-        }
-    }
-
     /// Reader for probabilities based on MeteoFrance ARPEGE Europe 0.1°
 //    static func makeMeteoFranceEuropeReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<MeteoFranceDomain, ProbabilityVariable>? {
 //        return try await GenericReader<MeteoFranceDomain, ProbabilityVariable>(domain: .arpege_europe_probabilities, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -92,15 +52,6 @@ enum ProbabilityReader {
             throw ModelError.domainInitFailed(domain: BomDomain.access_global_ensemble.rawValue)
         }
         return reader
-    }
-
-    /// Reader for probabilities based on IFS0.25 ensemble
-    static func makeEcmwfReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<EcmwfDomain, ProbabilityVariable>? {
-        do {
-            return try await GenericReader<EcmwfDomain, ProbabilityVariable>(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        } catch ForecastApiError.modelRunUnavailable {
-            return nil
-        }
     }
 }
 
