@@ -4,7 +4,7 @@ struct IconModelLevelVariable: GenericVariable {
 
     init?(rawValue: String) {
         guard let variable = IconSurfaceVariable(rawValue: rawValue),
-              variable.getVarAndLevel(domain: .icon)?.cat == "model-level" else {
+              IconDownloadDomains.icon.getVarAndLevel(variable)?.cat == "model-level" else {
             return nil
         }
         self.variable = variable

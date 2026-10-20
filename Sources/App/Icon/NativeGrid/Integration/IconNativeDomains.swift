@@ -3,6 +3,9 @@ import Logging
 enum IconNativeDomains: String, CaseIterable {
     case iconNative = "icon-native"
     case iconEuNative = "icon-eu-native"
+    case iconD2RucNative = "icon-d2-ruc-native"
+    case iconD2RucNative15min = "icon-d2-ruc-native-15min"
+    case iconD2RucNativeModelLevel = "icon-d2-ruc-native-model-level"
     case iconD2Native = "icon-d2-native"
     case iconD2Native15min = "icon-d2-native-15min"
     case iconEpsNative = "icon-eps-native"
@@ -17,10 +20,23 @@ enum IconNativeDomains: String, CaseIterable {
     case iconEuNativeModelLevel = "icon-eu-native-model-level"
     case iconD2NativeModelLevel = "icon-d2-native-model-level"
 
+    var downloadDomain: IconDownloadDomains {
+        switch self {
+        case .iconNative, .iconNativeModelLevel: return .icon
+        case .iconEuNative, .iconEuNativeModelLevel: return .iconEu
+        case .iconD2Native, .iconD2Native15min, .iconD2NativeModelLevel: return .iconD2
+        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel: return .iconD2Ruc
+        case .iconEpsNative, .iconEpsNativeEnsembleMean: return .iconEps
+        case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean: return .iconEuEps
+        case .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return .iconD2Eps
+        }
+    }
+
     var modelLevelDomain: Self? {
         switch self {
         case .iconNative: return .iconNativeModelLevel
         case .iconEuNative: return .iconEuNativeModelLevel
+        case .iconD2RucNative: return .iconD2RucNativeModelLevel
         case .iconD2Native: return .iconD2NativeModelLevel
         default: return nil
         }
@@ -30,7 +46,16 @@ enum IconNativeDomains: String, CaseIterable {
         switch self {
         case .iconNativeModelLevel: return .iconNative
         case .iconEuNativeModelLevel: return .iconEuNative
+        case .iconD2RucNativeModelLevel: return .iconD2RucNative
         case .iconD2NativeModelLevel: return .iconD2Native
+        default: return nil
+        }
+    }
+
+    var quarterHourlyParent: Self? {
+        switch self {
+        case .iconD2Native15min: return .iconD2Native
+        case .iconD2RucNative15min: return .iconD2RucNative
         default: return nil
         }
     }
@@ -47,6 +72,7 @@ enum IconNativeDomains: String, CaseIterable {
     /// Shared forecast metadata and variable mappings come from the corresponding regular domain.
     var sourceDomain: IconDomains {
         switch self {
+        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel: return .iconD2
         case .iconNative, .iconNativeModelLevel: return .icon
         case .iconEuNative, .iconEuNativeModelLevel: return .iconEu
         case .iconD2Native, .iconD2NativeModelLevel: return .iconD2
@@ -62,6 +88,9 @@ enum IconNativeDomains: String, CaseIterable {
 
     var domainRegistry: DomainRegistry {
         switch self {
+        case .iconD2RucNative: return .dwd_icon_d2_ruc_native
+        case .iconD2RucNative15min: return .dwd_icon_d2_ruc_native_15min
+        case .iconD2RucNativeModelLevel: return .dwd_icon_d2_ruc_native_model_level
         case .iconNative: return .dwd_icon_global_native
         case .iconNativeModelLevel: return .dwd_icon_global_native_model_level
         case .iconEuNative: return .dwd_icon_eu_native
@@ -79,21 +108,20 @@ enum IconNativeDomains: String, CaseIterable {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        if let modelLevelParent { return modelLevelParent.domainRegistry }
-        switch self {
-        case .iconD2Native15min: return .dwd_icon_d2_native
-        case .iconEpsNativeEnsembleMean: return .dwd_icon_global_eps_native
-        case .iconEuEpsNativeEnsembleMean: return .dwd_icon_eu_eps_native
-        case .iconD2EpsNativeEnsembleMean: return .dwd_icon_d2_eps_native
-        default: return domainRegistry
-        }
+        // Domains sharing a native grid also share its elevation and other static fields.
+        nativeGridFile.registry
     }
 
-    var dtSeconds: Int { sourceDomain.dtSeconds }
-    var updateIntervalSeconds: Int { sourceDomain.updateIntervalSeconds }
-    var hasYearlyFiles: Bool { sourceDomain.hasYearlyFiles }
+    var dtSeconds: Int { quarterHourlyParent != nil ? 900 : sourceDomain.dtSeconds }
+    var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
     var masterTimeRange: Range<Timestamp>? { sourceDomain.masterTimeRange }
-    var omFileLength: Int { sourceDomain.omFileLength }
+    var omFileLength: Int {
+        switch self {
+        case .iconD2RucNative15min: return (27 + 72) * 4 + 1
+        case .iconD2RucNative, .iconD2RucNativeModelLevel: return 27 + 1 + 72
+        default: return sourceDomain.omFileLength
+        }
+    }
     var countEnsembleMember: Int { sourceDomain.countEnsembleMember }
     var generateFullRun: Bool { sourceDomain.generateFullRun }
     var generateTimeSeries: Bool { sourceDomain.generateTimeSeries }
@@ -102,7 +130,7 @@ enum IconNativeDomains: String, CaseIterable {
         switch self {
         case .iconNative, .iconNativeModelLevel: return Self.globalGridFile
         case .iconEuNative, .iconEuNativeModelLevel: return Self.europeGridFile
-        case .iconD2Native, .iconD2NativeModelLevel, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return Self.d2GridFile
+        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel, .iconD2Native, .iconD2NativeModelLevel, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return Self.d2GridFile
         case .iconEpsNative, .iconEpsNativeEnsembleMean: return Self.globalEnsembleGridFile
         case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean: return Self.europeEnsembleGridFile
         }
@@ -120,4 +148,12 @@ enum IconNativeDomains: String, CaseIterable {
 
     static let logger = Logger(label: "IconNativeDomain")
     private static let domains = IconNativeDomainCache()
+}
+
+extension DomainTimeSeriesMetadata {
+    init(_ domain: IconNativeDomains) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
+    }
 }

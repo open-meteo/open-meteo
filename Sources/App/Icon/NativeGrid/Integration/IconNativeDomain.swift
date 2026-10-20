@@ -17,7 +17,6 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     var domainRegistryStatic: DomainRegistry? { definition.domainRegistryStatic }
     var dtSeconds: Int { definition.dtSeconds }
     var updateIntervalSeconds: Int { definition.updateIntervalSeconds }
-    var hasYearlyFiles: Bool { definition.hasYearlyFiles }
     var masterTimeRange: Range<Timestamp>? { definition.masterTimeRange }
     var omFileLength: Int { definition.omFileLength }
     var countEnsembleMember: Int { definition.countEnsembleMember }
@@ -53,8 +52,8 @@ actor IconNativeDomainCache {
     private var cache = [IconNativeDomains: State]()
 
     func load(_ definition: IconNativeDomains) async throws -> IconNativeDomain {
-        // D2's hourly and quarter-hourly domains use exactly the same static resources.
-        let resourceDefinition: IconNativeDomains = definition.modelLevelParent ?? (definition == .iconD2Native15min ? .iconD2Native : definition)
+        // Model-level and quarter-hourly domains share their parent's grid and elevations.
+        let resourceDefinition = definition.modelLevelParent ?? definition.quarterHourlyParent ?? definition
         switch cache[resourceDefinition] {
         case .loaded(let domain):
             return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)

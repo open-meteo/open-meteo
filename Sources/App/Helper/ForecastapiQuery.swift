@@ -531,7 +531,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let forecastSteps = forecastSteps ?? forecastStepsDefault
 
         if forecastSteps < 0 || forecastSteps > forecastStepsMax {
-            throw ForecastApiError.forecastDaysInvalid(given: forecastStepsMax, allowed: 0...forecastStepsMax)
+            throw ForecastApiError.forecastDaysInvalid(given: forecastSteps, allowed: 0...forecastStepsMax)
         }
         if pastSteps < 0 || pastSteps > pastStepsMax {
             throw ForecastApiError.pastDaysInvalid(given: pastSteps, allowed: 0...pastStepsMax)

@@ -1,4 +1,5 @@
 import Foundation
+import AsyncHTTPClient
 import Vapor
 import OmFileIO
 
@@ -32,10 +33,9 @@ enum EcmwfOpenDataSource: String, CaseIterable {
         return URLComponents(string: url)?.host?.lowercased() == "data.ecmwf.int"
     }
 
-    /// Resolve source-specific authentication and capabilities before handing off to the downloader.
-    static func prepareDownload(url: String, curl: Curl) async throws -> (url: String, indexURL: String, allowMultipleRanges: Bool) {
-        let signedURL = try await EcmwfAzureAccess.shared.sign(url: url, curl: curl)
-        return (signedURL, try indexURL(url: signedURL), supportsMultipleRanges(url: url))
+    /// Keep URLs unsigned: Curl signs each HTTP request, including chunk retries.
+    static func prepareDownload(url: String) throws -> (url: String, indexURL: String, allowMultipleRanges: Bool) {
+        return (url, try indexURL(url: url), supportsMultipleRanges(url: url))
     }
 
     static func indexURL(url: String) throws -> String {
@@ -51,9 +51,22 @@ enum EcmwfOpenDataSource: String, CaseIterable {
 /// Azure's public ECMWF container uses renewable Planetary Computer SAS tokens.
 actor EcmwfAzureAccess {
     static let shared = EcmwfAzureAccess()
-    private var cached: (token: String, expiry: Date)?
+    private struct Token: Sendable {
+        let token: String
+        let expiry: Date
+    }
 
-    struct TokenResponse: Decodable {
+    private var cached: Token?
+    private var refresh: (id: UUID, task: Task<Token, Error>)?
+
+    nonisolated static func prepareRequest(base: String, client: HTTPClient) -> Curl.PrepareRequest? {
+        guard base.hasPrefix(EcmwfOpenDataSource.azure.baseURL) else { return nil }
+        return { request in
+            request.url = try await shared.sign(url: request.url, client: client)
+        }
+    }
+
+    private struct TokenResponse: Decodable {
         let token: String
         let expiry: String
 
@@ -63,29 +76,49 @@ actor EcmwfAzureAccess {
         }
     }
 
-    func sign(url: String, curl: Curl) async throws -> String {
+    func sign(url: String, client: HTTPClient) async throws -> String {
         guard url.hasPrefix(EcmwfOpenDataSource.azure.baseURL),
               let components = URLComponents(string: url),
               !(components.queryItems ?? []).contains(where: { $0.name == "sig" }) else {
             return url
         }
-        let token: String
+        let token: Token
         if let cached, cached.expiry > Date().addingTimeInterval(300) {
-            token = cached.token
+            token = cached
         } else {
-            let buffer = try await curl.downloadInMemoryAsync(
-                url: "https://planetarycomputer.microsoft.com/api/sas/v1/token/ai4edataeuwest/ecmwf",
-                minSize: nil
-            )
-            guard let response = try buffer.readJSONDecodable(TokenResponse.self),
-                  !response.token.isEmpty,
-                  let expiry = ISO8601DateFormatter().date(from: response.expiry), expiry > Date() else {
-                throw Abort(.badGateway, reason: "Invalid ECMWF Azure SAS token response")
+            // Share a refresh across all concurrent chunk requests.
+            let pending: (id: UUID, task: Task<Token, Error>)
+            if let refresh {
+                pending = refresh
+            } else {
+                pending = (UUID(), Task {
+                    // Use the HTTP client directly: token requests must not pass through
+                    // the signed-download hook or the file download cache.
+                    let request = HTTPClientRequest(url: "https://planetarycomputer.microsoft.com/api/sas/v1/token/ai4edataeuwest/ecmwf")
+                    let response = try await client.execute(request, timeout: .seconds(30))
+                    try await response.throwOnError()
+                    let buffer = try await response.body.collect(upTo: 64 * 1024)
+                    guard let response = try buffer.readJSONDecodable(TokenResponse.self),
+                          !response.token.isEmpty,
+                          let expiry = ISO8601DateFormatter().date(from: response.expiry), expiry > Date() else {
+                        throw Abort(.badGateway, reason: "Invalid ECMWF Azure SAS token response")
+                    }
+                    return Token(token: response.token, expiry: expiry)
+                })
+                refresh = pending
             }
-            cached = (response.token, expiry)
-            token = response.token
+            do {
+                token = try await pending.task.value
+                if refresh?.id == pending.id {
+                    cached = token
+                    refresh = nil
+                }
+            } catch {
+                if refresh?.id == pending.id { refresh = nil }
+                throw error
+            }
         }
         // Preserve the token's percent encoding, including its signature.
-        return url + (components.percentEncodedQuery == nil ? "?" : "&") + token
+        return url + (components.percentEncodedQuery == nil ? "?" : "&") + token.token
     }
 }

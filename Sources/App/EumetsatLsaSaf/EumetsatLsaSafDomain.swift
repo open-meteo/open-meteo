@@ -15,10 +15,6 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

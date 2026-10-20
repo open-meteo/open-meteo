@@ -4,6 +4,47 @@ import Testing
 import OmTime
 
 @Suite(.serialized) struct FileSystemTests {
+    @Test func seriesIndexRangesAndMissingFiles() {
+        let index = OmFileSeriesIndex(files: [
+            "chunk_-2.om": 1, "chunk_0.om": 2,
+            "year_2020.om": 3, "year_2022.om": 4,
+            "master_0.om": 5, "rolling.om": 6,
+            "chunk_100.om~": 7, "year_invalid.om": 8
+        ])
+        #expect(index.chunkRange == -2..<1)
+        #expect(index.yearRange == 2020..<2023)
+        #expect(index.chunks[-2] == 1)
+        #expect(index.chunks[-1] == nil)
+        #expect(index.years[2021] == nil)
+        #expect(index.master == 5)
+        #expect(index.rolling == 6)
+        #expect(OmFileSeriesIndex<Int>(files: [:]).chunkRange.isEmpty)
+    }
+
+    @Test func seriesIndexRefreshAndEviction() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let chunk = url.appendingPathComponent("chunk_10.om")
+        try Data("old".utf8).write(to: chunk)
+        let directory = try OmFileSystemLocal.Directory(path: url.path)
+        await directory.updateIfRequired()
+        let old = await directory.getSeriesIndex()
+        #expect(old.chunkRange == 10..<11)
+        try Data("replacement".utf8).write(to: chunk, options: .atomic)
+        try Data().write(to: url.appendingPathComponent("year_2024.om"))
+        await directory.updateIfRequired(force: true)
+        let updated = await directory.getSeriesIndex()
+        #expect(updated.chunks[10] !== old.chunks[10])
+        #expect(updated.yearRange == 2024..<2025)
+        try FileManager.default.removeItem(at: chunk)
+        await directory.updateIfRequired(force: true)
+        #expect(await directory.getSeriesIndex().chunkRange.isEmpty)
+        #expect(old.chunks[10] != nil)
+        await directory.updateRecursivelyIfRequired(now: Timestamp.now().add(OmFileSystemLocal.revalidateBackgroundEjectInterval + 1))
+        #expect(await directory.getSeriesIndex().yearRange.isEmpty)
+    }
+
     @Test func fileSystemCache() async throws {
         let directoryUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let nestedDirectoryUrl = directoryUrl.appendingPathComponent("dir1/dir2")
