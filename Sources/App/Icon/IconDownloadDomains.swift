@@ -1,5 +1,3 @@
-import Vapor
-
 /// Upstream ICON feeds. Download metadata does not require a loaded storage grid.
 enum IconDownloadDomains: String, CaseIterable, Sendable {
     case aicon
@@ -67,11 +65,11 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
     }
 
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
-    func getDownloadForecastSteps(run: Int) throws -> [Int] {
+    func getDownloadForecastSteps(run: Int) -> [Int] {
         switch self {
         case .aicon:
             guard (0..<24).contains(run), run.isMultiple(of: 3) else {
-                throw Abort(.badRequest, reason: "AICON runs must be initialized at a multiple of three UTC hours.")
+                fatalError("AICON runs must be initialized at a multiple of three UTC hours.")
             }
             let lastHour = run.isMultiple(of: 12) ? 180 : run.isMultiple(of: 6) ? 120 : 48
             return Array(stride(from: 3, through: lastHour, by: 3))

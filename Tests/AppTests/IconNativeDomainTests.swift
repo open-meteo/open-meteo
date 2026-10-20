@@ -93,7 +93,7 @@ import Logging
         let model = IconNativeDomains.iconD2RucNative.downloadDomain
         let run = Timestamp(2026, 10, 7, 6)
         #expect(model == .iconD2Ruc)
-        #expect(try model.getDownloadForecastSteps(run: 6) == Array(0...27))
+        #expect(model.getDownloadForecastSteps(run: 6) == Array(0...27))
         #expect(model.updateIntervalSeconds == 3600)
         #expect(model.deadlineHours == 1)
         #expect(model.lastRun(now: run) == run.add(hours: -1))

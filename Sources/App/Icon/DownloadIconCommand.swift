@@ -198,7 +198,7 @@ struct DownloadIconCommand: AsyncCommand {
             return elevation
         }()
         
-        let timestamps = try feed.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
+        let timestamps = feed.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
         let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let jobs = variables.flatMap { variable in
@@ -558,7 +558,7 @@ struct DownloadIconCommand: AsyncCommand {
         }
         let nConcurrent = signature.concurrent ?? 1
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? feed.lastRun()
-        _ = try feed.getDownloadForecastSteps(run: run.hour) // Reject unsupported runs before preparing static files.
+        _ = feed.getDownloadForecastSteps(run: run.hour) // Reject unsupported runs before preparing static files.
 
         if signature.onlyVariables != nil && signature.group != nil {
             throw Abort(.badRequest, reason: "--only-variables and --group must not be used simultaneously.")
