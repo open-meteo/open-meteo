@@ -132,10 +132,9 @@ struct DownloadIconCommand: AsyncCommand {
         let deadLineHours = feedStatic.deadlineHours
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let downloader = IconGribDownloader(domain: feedStatic, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
-        let staticRun = run.floor(toNearest: feedStatic.updateIntervalSeconds)
-        let surface = try await downloader.download(field: ("HSURF", "single-level", nil), run: staticRun, leadSeconds: 0)
+        let surface = try await downloader.download(field: ("HSURF", "single-level", nil), run: run, leadSeconds: 0)
         var hsurf = surface.data.data
-        let land = try await downloader.download(field: ("FR_LAND", "single-level", nil), run: staticRun, leadSeconds: 0)
+        let land = try await downloader.download(field: ("FR_LAND", "single-level", nil), run: run, leadSeconds: 0)
         let landFraction = land.data.data
 
         // Set all sea grid points to -999
