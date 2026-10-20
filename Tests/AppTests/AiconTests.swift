@@ -44,12 +44,12 @@ import Logging
         try await surfaceWriter.write(member: 0, variable: AiconSurfaceVariable.temperature_2m, data: [10, 20, 30])
         let surfaceHandles = try await surfaceWriter.finalise()
         #expect(surfaceHandles.count == 1)
-        #expect(surfaceHandles[0].domain.domainRegistry == .dwd_aicon_global)
+        #expect(surfaceHandles[0].domain.domainRegistry == .dwd_aicon_global_native)
         #expect(try await surfaceHandles[0].reader.read() == [10, 20, 30])
     }
 
     @Test func schedulingMetadataDoesNotRequireGridFiles() throws {
-        let metadata = try #require(DomainRegistry.dwd_aicon_global.timeSeriesMetadata)
+        let metadata = try #require(DomainRegistry.dwd_aicon_global_native.timeSeriesMetadata)
         #expect(metadata.dtSeconds == 3 * 3600)
         #expect(metadata.omFileLength == 84)
         #expect(metadata.updateIntervalSeconds == 3 * 3600)

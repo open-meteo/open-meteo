@@ -74,7 +74,7 @@ enum IconNativeDomains: String, CaseIterable {
 
     var domainRegistry: DomainRegistry {
         switch self {
-        case .aiconNative: return .dwd_aicon_global
+        case .aiconNative: return .dwd_aicon_global_native
         case .iconD2RucNative: return .dwd_icon_d2_ruc_native
         case .iconD2RucNative15min: return .dwd_icon_d2_ruc_native_15min
         case .iconD2RucNativeModelLevel: return .dwd_icon_d2_ruc_native_model_level

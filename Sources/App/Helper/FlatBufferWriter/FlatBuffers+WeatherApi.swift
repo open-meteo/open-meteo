@@ -992,7 +992,7 @@ extension MultiDomains {
             return .iconSeamless
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
-        case .dwd_aicon_global:
+        case .dwd_aicon_global_native:
             return .undefined // TODO: Add AICON to the SDK model enum.
         case .dwd_icon_global_native, .dwd_icon_global_native_model_level:
             return .iconGlobal // TODO: Add to SDK
