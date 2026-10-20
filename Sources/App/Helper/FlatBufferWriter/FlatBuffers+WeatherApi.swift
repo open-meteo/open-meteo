@@ -993,23 +993,23 @@ extension MultiDomains {
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
         case .dwd_icon_global_native, .dwd_icon_global_native_model_level:
-            return .iconGlobal // TODO: Add to SDK
+            return .dwdIconGlobalNative
         case .icon_eu, .dwd_icon_eu:
             return .iconEu
         case .dwd_icon_eu_native, .dwd_icon_eu_native_model_level:
-            return .iconEu // TODO: Add to SDK
+            return .dwdIconEuNative
         case .dwd_icon_global_eps_native:
-            return .iconGlobal // TODO: Add to SDK
+            return .dwdIconGlobalEpsNative
         case .dwd_icon_eu_eps_native:
-            return .iconEu // TODO: Add to SDK
+            return .dwdIconEuEpsNative
         case .dwd_icon_d2_eps_native:
-            return .iconD2 // TODO: Add to SDK
+            return .dwdIconD2EpsNative
         case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
         case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level:
             return .iconD2Ruc
         case .dwd_icon_d2_native, .dwd_icon_d2_native_15min, .dwd_icon_d2_native_model_level:
-            return .iconD2 // TODO: Add to SDK
+            return .dwdIconD2Native
         case .ecmwf_ifs04:
             return .ecmwfIfs04
         case .metno_nordic:
@@ -1018,9 +1018,10 @@ extension MultiDomains {
             return .geosphereAromeAustria
         case .chmi_aladin_cz_1km:
             return .chmiAladinCz1km
-        case .chmi_aladin_central_europe_2km, .chmi_aladin_seamless:
-            // TODO: add chmiAladinLambert23km to flatbuffers schema
-            return .chmiAladinCz1km
+        case .chmi_aladin_central_europe_2km:
+            return .chmiAladinCentralEurope2km
+        case .chmi_aladin_seamless:
+            return .chmiAladinSeamless
         case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
         case .era5, .copernicus_era5:
