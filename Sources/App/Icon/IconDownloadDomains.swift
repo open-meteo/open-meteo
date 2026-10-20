@@ -1,5 +1,8 @@
+import Vapor
+
 /// Upstream ICON feeds. Download metadata does not require a loaded storage grid.
 enum IconDownloadDomains: String, CaseIterable, Sendable {
+    case aicon
     case icon
     case iconEu = "icon-eu"
     case iconD2 = "icon-d2"
@@ -8,28 +11,20 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
     case iconEuEps = "icon-eu-eps"
     case iconD2Eps = "icon-d2-eps"
 
-    /// Regular output domain used when remapping this feed.
-    var regularDomain: IconDomains {
-        switch self {
-        case .icon: return .icon
-        case .iconEu: return .iconEu
-        case .iconD2, .iconD2Ruc: return .iconD2
-        case .iconEps: return .iconEps
-        case .iconEuEps: return .iconEuEps
-        case .iconD2Eps: return .iconD2Eps
-        }
-    }
-
     var updateIntervalSeconds: Int {
         switch self {
         case .iconD2Ruc: return 3600
-        case .iconEu, .iconD2, .iconD2Eps: return 3 * 3600
+        case .aicon, .iconEu, .iconD2, .iconD2Eps: return 3 * 3600
         case .icon, .iconEuEps: return 6 * 3600
         case .iconEps: return 12 * 3600
         }
     }
 
     func getVarAndLevel(_ variable: any IconVariableDownloadable) -> (variable: String, cat: String, level: Int?)? {
+        if self == .aicon {
+            guard let variable = variable as? AiconSurfaceVariable else { return nil }
+            return (variable.gribVariableName, "single-level", nil)
+        }
         if let surface = variable as? IconSurfaceVariable {
             return getSurfaceVarAndLevel(surface)
         }
@@ -72,8 +67,14 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
     }
 
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
-    func getDownloadForecastSteps(run: Int) -> [Int] {
+    func getDownloadForecastSteps(run: Int) throws -> [Int] {
         switch self {
+        case .aicon:
+            guard (0..<24).contains(run), run.isMultiple(of: 3) else {
+                throw Abort(.badRequest, reason: "AICON runs must be initialized at a multiple of three UTC hours.")
+            }
+            let lastHour = run.isMultiple(of: 12) ? 180 : run.isMultiple(of: 6) ? 120 : 48
+            return Array(stride(from: 3, through: lastHour, by: 3))
         case .iconEps:
             // Note ICON-EPS has only 6 hourly data for 6/18z runs, not used here
             if run == 6 || run == 18 {
@@ -148,6 +149,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
 
     func lastRun(now t: Timestamp = .now()) -> Timestamp {
         switch self {
+        case .aicon: return t.subtract(hours: 2).floor(toNearestHour: 3)
         case .iconEps:
             return t.subtract(hours: 2).floor(toNearestHour: 12)
         case .icon:
@@ -182,6 +184,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
     /// All available pressure levels for the current domain
     var levels: [Int] {
         switch self {
+        case .aicon: return []
         case .icon:
             return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
         case .iconEu:
@@ -203,6 +206,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
     /// icon-d2 1-65.... 63=78m, 62=126m
     var numberOfModelFullLevels: Int {
         switch self {
+        case .aicon: return 0
         case .iconEps, .icon:
             return 120 // was 90
         case .iconEuEps, .iconEu:
@@ -214,6 +218,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
 
     /// Vmax and precip always are empty in the first hour. Weather codes differ a lot in hour 0.
     func skipHour(_ variable: any IconVariableDownloadable, hour: Int, forDownload: Bool, run: Timestamp) -> Bool {
+        if self == .aicon { return hour == 0 }
         guard let variable = variable as? IconSurfaceVariable else { return false }
         if variable == .direct_radiation && self == .iconEps && hour % 3 != 0 {
             // ICON-EPS only has 3-hourly data for direct radiation

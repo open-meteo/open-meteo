@@ -29,14 +29,13 @@ import Logging
         #expect(domain.domainRegistryStatic == .dwd_icon_global_native)
         #expect(domain.definition.nativeGridFile.identity == .global)
 
-        let outputs = DwdDownloadDomains(.aiconNative, grid: grid)
+        let outputs = IconDownloadOutputs(.aiconNative, grid: grid)
         #expect(outputs.modelLevel == nil)
         #expect(outputs.remapped == nil)
         #expect(outputs.ensembleMean == nil)
         #expect(outputs.fifteenMinute == nil)
         #expect(IconNativeDomains.aiconNative.staticResourceDomain == .iconNative)
-        #expect(DwdModel.aicon.staticSource == .icon(.icon))
-        #expect(!outputs.isModelLevel(AiconSurfaceVariable.temperature_2m))
+        #expect(outputs.downloadDomain.getVarAndLevel(AiconSurfaceVariable.temperature_2m)?.cat == "single-level")
 
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let run = Timestamp(2026, 10, 7)
@@ -58,7 +57,7 @@ import Logging
 
     @Test(arguments: [0, 3, 6, 9, 12, 15, 18, 21])
     func forecastStepsAndV1Urls(runHour: Int) throws {
-        let model = DwdModel.aicon
+        let model = IconDownloadDomains.aicon
         let run = Timestamp(2026, 10, 7, runHour)
         let lastHour = runHour.isMultiple(of: 12) ? 180 : runHour.isMultiple(of: 6) ? 120 : 48
         #expect(try model.getDownloadForecastSteps(run: runHour) == Array(stride(from: 3, through: lastHour, by: 3)))
@@ -68,22 +67,22 @@ import Logging
     }
 
     @Test func runSelectionCrossesMidnight() throws {
-        #expect(DwdModel.aicon.lastRun(now: Timestamp(2026, 10, 7, 1)) == Timestamp(2026, 10, 6, 21))
-        #expect(DwdModel.aicon.lastRun(now: Timestamp(2026, 10, 7, 5)) == Timestamp(2026, 10, 7, 3))
-        #expect(throws: (any Error).self) { try DwdModel.aicon.getDownloadForecastSteps(run: 1) }
+        #expect(IconDownloadDomains.aicon.lastRun(now: Timestamp(2026, 10, 7, 1)) == Timestamp(2026, 10, 6, 21))
+        #expect(IconDownloadDomains.aicon.lastRun(now: Timestamp(2026, 10, 7, 5)) == Timestamp(2026, 10, 7, 3))
+        #expect(throws: (any Error).self) { try IconDownloadDomains.aicon.getDownloadForecastSteps(run: 1) }
     }
 
     @Test func surfaceVariableSelection() throws {
-        let variables = try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: nil)
+        let variables = try DownloadIconCommand.variables(feed: .aicon, group: .all, onlyVariables: nil)
         #expect(variables.map { $0.omFileName.file } == AiconSurfaceVariable.allCases.map(\.rawValue))
-        let selected = try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: "temperature_2m,precipitation")
+        let selected = try DownloadIconCommand.variables(feed: .aicon, group: .all, onlyVariables: "temperature_2m,precipitation")
         #expect(selected.map { $0.omFileName.file } == ["temperature_2m", "precipitation"])
         #expect(throws: (any Error).self) {
-            try DownloadIconCommand.variables(model: .aicon, group: .all, onlyVariables: "t_level13")
+            try DownloadIconCommand.variables(feed: .aicon, group: .all, onlyVariables: "t_level13")
         }
         for group in [DownloadIconCommand.VariableGroup.modelLevel, .pressureLevel, .pressureLevelGt500, .pressureLevelLtE500] {
             #expect(throws: (any Error).self) {
-                try DownloadIconCommand.variables(model: .aicon, group: group, onlyVariables: nil)
+                try DownloadIconCommand.variables(feed: .aicon, group: group, onlyVariables: nil)
             }
         }
     }

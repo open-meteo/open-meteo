@@ -59,21 +59,16 @@ enum IconNativeDomains: String, CaseIterable {
         }
     }
 
-    /// Forecast metadata and field URLs do not imply a regular-grid storage domain.
-    var sourceModel: DwdModel {
+    var downloadDomain: IconDownloadDomains {
         switch self {
         case .aiconNative: return .aicon
-        case .iconNative, .iconNativeModelLevel: return .icon(.icon)
-        case .iconEuNative, .iconEuNativeModelLevel: return .icon(.iconEu)
-        case .iconD2Native, .iconD2NativeModelLevel: return .icon(.iconD2)
-        case .iconD2Native15min: return .icon(.iconD2_15min)
-        case .iconEpsNative: return .icon(.iconEps)
-        case .iconEpsNativeEnsembleMean: return .icon(.iconEpsEnsembleMean)
-        case .iconEuEpsNative: return .icon(.iconEuEps)
-        case .iconEuEpsNativeEnsembleMean: return .icon(.iconEuEpsEnsembleMean)
-        case .iconD2EpsNative: return .icon(.iconD2Eps)
-        case .iconD2EpsNativeEnsembleMean: return .icon(.iconD2EpsEnsembleMean)
+        case .iconNative, .iconNativeModelLevel: return .icon
+        case .iconEuNative, .iconEuNativeModelLevel: return .iconEu
+        case .iconD2Native, .iconD2Native15min, .iconD2NativeModelLevel: return .iconD2
         case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel: return .iconD2Ruc
+        case .iconEpsNative, .iconEpsNativeEnsembleMean: return .iconEps
+        case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean: return .iconEuEps
+        case .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return .iconD2Eps
         }
     }
 
@@ -104,20 +99,35 @@ enum IconNativeDomains: String, CaseIterable {
         nativeGridFile.registry
     }
 
-    var dtSeconds: Int { quarterHourlyParent != nil ? 900 : sourceModel.dtSeconds }
-    var updateIntervalSeconds: Int { sourceModel.updateIntervalSeconds }
-    var hasYearlyFiles: Bool { sourceModel.hasYearlyFiles }
-    var masterTimeRange: Range<Timestamp>? { sourceModel.masterTimeRange }
+    var dtSeconds: Int {
+        if self == .aiconNative { return 3 * 3600 }
+        return quarterHourlyParent != nil ? 900 : 3600
+    }
+    var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
+    var hasYearlyFiles: Bool { false }
+    var masterTimeRange: Range<Timestamp>? { nil }
     var omFileLength: Int {
         switch self {
+        case .aiconNative: return 84
+        case .iconNative, .iconNativeModelLevel, .iconEpsNative, .iconEpsNativeEnsembleMean:
+            return 180 + 1 + 3 * 24
+        case .iconEuNative, .iconEuNativeModelLevel, .iconEuEpsNative, .iconEuEpsNativeEnsembleMean:
+            return 120 + 1 + 3 * 24
+        case .iconD2Native, .iconD2NativeModelLevel, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean:
+            return 48 + 1 + 3 * 24
+        case .iconD2Native15min: return 48 * 4 + 3 * 24
         case .iconD2RucNative15min: return (27 + 72) * 4 + 1
         case .iconD2RucNative, .iconD2RucNativeModelLevel: return 27 + 1 + 72
-        default: return sourceModel.omFileLength
         }
     }
-    var countEnsembleMember: Int { sourceModel.countEnsembleMember }
-    var generateFullRun: Bool { sourceModel.generateFullRun }
-    var generateTimeSeries: Bool { sourceModel.generateTimeSeries }
+    var countEnsembleMember: Int {
+        switch self {
+        case .iconEpsNativeEnsembleMean, .iconEuEpsNativeEnsembleMean, .iconD2EpsNativeEnsembleMean: return 1
+        default: return downloadDomain.countEnsembleMember
+        }
+    }
+    var generateFullRun: Bool { countEnsembleMember == 1 }
+    var generateTimeSeries: Bool { true }
 
     var nativeGridFile: IconNativeGridFile {
         switch self {
@@ -137,7 +147,7 @@ enum IconNativeDomains: String, CaseIterable {
 
     /// Definitions sharing a mesh and elevation file also share their initialized cache entry.
     var staticResourceDomain: Self {
-        if sourceModel == .aicon { return .iconNative }
+        if self == .aiconNative { return .iconNative }
         return modelLevelParent ?? quarterHourlyParent ?? self
     }
 

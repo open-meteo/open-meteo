@@ -2,6 +2,7 @@ import Foundation
 @testable import App
 import Testing
 import Logging
+@testable import ReducedLatLon
 
 @Suite struct IconNativeDomainTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_DOMAIN_TESTS"] == "1"))
@@ -50,30 +51,49 @@ import Logging
         #expect(metadata.omFileLength == parent.omFileLength)
         for variable in IconSurfaceVariable.allCases {
             #expect((IconModelLevelVariable(rawValue: variable.rawValue) != nil)
-                    == (variable.getVarAndLevel(model: parent.sourceModel)?.cat == "model-level"))
+                    == (parent.downloadDomain.getVarAndLevel(variable)?.cat == "model-level"))
         }
         #expect(IconModelLevelVariable(rawValue: "temperature_850hPa") == nil)
         #expect(IconModelLevelVariable(rawValue: "temperature_2m") == nil)
     }
 
     @Test func d2DownloadOutputs() async throws {
-        let deterministic = try await DwdDownloadDomains(.iconD2)
-        #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: file) }
+        try ReducedLatLonArtifact.Writer.write(to: file,
+            metadata: .init(number: 26, uuid: Array(0..<16), coversWholeSphere: true),
+            points: [.init(latitudeDegrees: 0, longitudeDegrees: 0)], latitudeBandCount: 2)
+        let grid = IconNativeGrid(storage: try ReducedLatLonIndex(file: file), resolutionMeters: 2_000,
+            maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
+        let deterministic = IconDownloadOutputs(.iconD2Native, grid: grid)
+        #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_native_15min)
         #expect(deterministic.ensembleMean == nil)
 
-        let ensemble = try await DwdDownloadDomains(.iconD2Eps)
-        #expect(ensemble.ensembleMean?.domainRegistry == IconDomains.iconD2EpsEnsembleMean.domainRegistry)
+        let ensemble = IconDownloadOutputs(.iconD2EpsNative, grid: grid)
+        #expect(ensemble.ensembleMean?.domainRegistry == .dwd_icon_d2_eps_native_ensemble_mean)
         #expect(ensemble.fifteenMinute == nil)
 
+        let ruc = IconDownloadOutputs(.iconD2RucNative, grid: grid)
+        #expect(ruc.primary.domainRegistry == .dwd_icon_d2_ruc_native)
+        #expect(ruc.fifteenMinute?.domainRegistry == .dwd_icon_d2_ruc_native_15min)
+        #expect(ruc.remapped == nil)
+        #expect(deterministic.remapped == nil)
+        #expect(ensemble.remapped == nil)
+        #expect(ensemble.primary.countEnsembleMember == 20)
+        #expect(ensemble.ensembleMean?.countEnsembleMember == 1)
+        #expect(ensemble.ensembleMean?.generateFullRun == true)
+        #expect(IconDownloadOutputs(.iconNative, grid: grid).remapped == .icon)
+        #expect(IconDownloadOutputs(.iconNative, grid: grid, skipRegridding: true).remapped == nil)
+
         let run = Timestamp(2026, 10, 7, 0)
-        #expect(deterministic.source.getGribUrl(field: ("T", "pressure-level", 850), run: run, leadSeconds: 3600)
+        #expect(deterministic.downloadDomain.getGribUrl(field: ("T", "pressure-level", 850), run: run, leadSeconds: 3600)
             .hasSuffix("icon-d2/p/T/lvt1/100/lv1/85000/r/2026-10-07T00:00/s/PT001H00M.grib2"))
-        #expect(ensemble.source.getGribUrl(field: ("T_2M", "single-level", nil), run: run, leadSeconds: 0, member: 2)
+        #expect(ensemble.downloadDomain.getGribUrl(field: ("T_2M", "single-level", nil), run: run, leadSeconds: 0, member: 2)
             .hasSuffix("icon-d2-eps/p/T_2M/r/2026-10-07T00:00/e/03/s/PT000H00M.grib2"))
     }
 
-    @Test func sharedDwdDownloaderPreservesRucFeed() throws {
-        let model = IconNativeDomains.iconD2RucNative.sourceModel
+    @Test func rucFeedMetadataAndSelection() throws {
+        let model = IconNativeDomains.iconD2RucNative.downloadDomain
         let run = Timestamp(2026, 10, 7, 6)
         #expect(model == .iconD2Ruc)
         #expect(try model.getDownloadForecastSteps(run: 6) == Array(0...27))
@@ -83,13 +103,13 @@ import Logging
         #expect(model.getGribUrl(field: ("QV", "pressure-level", 850), run: run, leadSeconds: 3600)
             .hasSuffix("icon-d2-ruc/p/QV/lvt1/100/lv1/85000/r/2026-10-07T06:00/s/PT001H00M.grib2"))
         let humidity = IconPressureVariable(variable: .relative_humidity, level: 850)
-        #expect(humidity.getVarAndLevel(model: model)?.variable == "QV")
+        #expect(model.getVarAndLevel(humidity)?.variable == "QV")
         #expect(model.requiresSpecificHumidityConversion(humidity))
         let batch = model.downloadBatch(variable: IconSurfaceVariable.precipitation, hour: 27)
         #expect(batch.output == .quarterHourly)
         #expect(batch.steps == [27 * 3600])
-        let selected = try DownloadIconCommand.variables(model: model, group: .all, onlyVariables: "visibility")
-        #expect(selected.first?.getVarAndLevel(model: model)?.variable == "VIS")
+        let selected = try DownloadIconCommand.variables(feed: model, group: .all, onlyVariables: "visibility")
+        #expect(selected.first.flatMap { model.getVarAndLevel($0) }?.variable == "VIS")
         let metadata = try #require(DomainRegistry.dwd_icon_d2_ruc_native_15min.timeSeriesMetadata)
         #expect(metadata.dtSeconds == 900)
         #expect(metadata.updateIntervalSeconds == 3600)

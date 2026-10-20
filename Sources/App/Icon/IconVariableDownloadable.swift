@@ -1,5 +1,6 @@
 /// Define functions to download surface and pressure level variables for ICON
-protocol IconVariableDownloadable: DwdVariableDownloadable, Hashable {
+protocol IconVariableDownloadable: GenericVariable {
+    var multiplyAdd: (multiply: Float, add: Float)? { get }
 }
 
 extension IconSurfaceVariable: IconVariableDownloadable {
@@ -56,3 +57,5 @@ extension IconPressureVariable: IconVariableDownloadable {
     }
 
 }
+
+extension AiconSurfaceVariable: IconVariableDownloadable {}
