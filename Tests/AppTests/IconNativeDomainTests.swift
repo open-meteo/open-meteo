@@ -57,7 +57,7 @@ import Logging
         #expect(IconModelLevelVariable(rawValue: "temperature_2m") == nil)
     }
 
-    @Test func d2DownloadOutputs() async throws {
+    @Test func downloadOutputs() async throws {
         let fixture = try makeFixture(centers: [.init(latitudeDegrees: 0, longitudeDegrees: 0)])
         defer { fixture.remove() }
         let grid = IconNativeGrid(storage: fixture.index, resolutionMeters: 2_000,
