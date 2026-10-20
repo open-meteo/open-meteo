@@ -268,4 +268,4 @@ Run the inventory, conversion and scheduling tests with `swift test --filter Nce
 
 FlatBuffers SDK 1.28.1 provides identifiers for all five RRFS API models, as well as `cloud_ceiling`, `freezing_rain`, `radar_reflectivity` and `categorical_freezing_rain`.
 
-The SDK still lacks the dBZ unit. The radar-reflectivity unit uses an `undefined` placeholder in all response formats, with a TODO to use dBZ when the SDK supports it. The stored values remain in dBZ.
+SDK 1.29.0 provides the dBZ unit. `radar_reflectivity` uses this unit in all response formats; stored values remain unchanged.

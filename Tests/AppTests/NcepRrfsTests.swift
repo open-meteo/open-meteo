@@ -192,7 +192,7 @@ import OpenMeteoSdk
                 .filter { $0.variable.rawValue == "radar_reflectivity" }
             #expect(fields.count == (domain == .ncep_rrfs_conus_15min ? 4 : 1))
             for field in fields {
-                #expect(field.variable.unit == .undefined) // TODO: Expect dBZ once supported by the SDK.
+                #expect(field.variable.unit == .dbz)
                 #expect(field.variable.scalefactor == 10)
                 #expect(!field.variable.isElevationCorrectable)
                 #expect(field.interval.type == "instant")

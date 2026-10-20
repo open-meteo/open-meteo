@@ -137,7 +137,7 @@ enum NcepRrfsSurfaceVariable: String, CaseIterable, GenericVariable {
         case .aerosol_optical_depth: return .dimensionless
         case .pm2_5, .pm10: return .microgramsPerCubicMetre
         case .pm2_5_total_organic_matter: return .microgramsPerCubicMetre
-        case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
+        case .radar_reflectivity: return .dbz
         case .freezing_rain, .snow_depth_water_equivalent: return .millimetre
         case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m, .surface_temperature, .temperature_30m,
@@ -335,7 +335,7 @@ enum NcepRrfs15MinVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
-        case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
+        case .radar_reflectivity: return .dbz
         case .freezing_rain: return .millimetre
         case .cloud_base, .cloud_ceiling, .cloud_top: return .metre
         case .temperature_2m:
@@ -482,7 +482,7 @@ enum NcepRrfsEnsembleSurfaceVariable: String, CaseIterable, GenericVariable {
     var unit: SiUnit {
         switch self {
         case .aerosol_optical_depth: return .dimensionless
-        case .radar_reflectivity: return .undefined // TODO: Use dBZ once supported by the SDK.
+        case .radar_reflectivity: return .dbz
         case .freezing_rain: return .millimetre
         case .temperature_2m:
             return .celsius
