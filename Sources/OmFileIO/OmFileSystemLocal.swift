@@ -51,7 +51,17 @@ public enum OmFileSystemLocal {
         let inode: UInt64
         var lastRefresh: Timestamp
         var lastAccessed: Timestamp
-        private var files: [String: File]
+        private var files: [String: File] {
+            didSet { seriesIndex = nil }
+        }
+        private var seriesIndex: OmFileSeriesIndex<File>?
+
+        public func getSeriesIndex() -> OmFileSeriesIndex<File> {
+            if let seriesIndex { return seriesIndex }
+            let index = OmFileSeriesIndex(files: files)
+            seriesIndex = index
+            return index
+        }
         private var directories: [String: Directory]
         
         public init(fd: FileHandle, inode: UInt64) {

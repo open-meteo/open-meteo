@@ -19,17 +19,6 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        switch self {
-        case .himawari_10min:
-            return true
-        case .himawari_70e_10min:
-            return false
-        case .mtg_fci_10min:
-            return false
-        }
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

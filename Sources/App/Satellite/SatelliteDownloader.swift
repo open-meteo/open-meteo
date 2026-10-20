@@ -212,10 +212,6 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        return true
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return Timestamp(2000, 06, 01) ..< Timestamp(2023, 1, 1)
     }

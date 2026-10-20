@@ -51,10 +51,6 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         }
     }
 
-    var hasYearlyFiles: Bool {
-        return true
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

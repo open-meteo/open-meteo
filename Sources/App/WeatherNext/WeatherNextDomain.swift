@@ -92,10 +92,6 @@ enum WeatherNextDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var hasYearlyFiles: Bool {
-        false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         nil
     }
