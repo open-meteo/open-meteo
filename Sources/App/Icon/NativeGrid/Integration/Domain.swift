@@ -102,9 +102,22 @@ struct IconNativeGridIdentity: Sendable, Hashable {
     }
 }
 
-enum IconNativeDomainError: Error, Equatable, CustomStringConvertible, Sendable {
+enum IconNativeDomainError: AbortError, Equatable, CustomStringConvertible, Sendable {
     case missingGridArtifact(String)
     case invalidGridArtifact(path: String, reason: String)
+
+    var status: HTTPResponseStatus {
+        switch self {
+        case .missingGridArtifact:
+            return .badRequest
+        case .invalidGridArtifact:
+            return .internalServerError
+        }
+    }
+
+    var reason: String {
+        description
+    }
 
     var description: String {
         switch self {
