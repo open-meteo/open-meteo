@@ -191,7 +191,7 @@ private struct RunFixtureDomain: GenericDomain {
     }
 
     var domainRegistry = DomainRegistry.cmc_gem_rdps
-    let domainRegistryStatic: DomainRegistry? = nil
+    let gridRegistry = GridRegistry.synchronous(.glofas_v4)
     var grid: any Gridable = RegularGrid(nx: 1, ny: 1, latMin: 45, lonMin: -75, dx: 1, dy: 1)
     var availability: Availability = .missing
     let dtSeconds = 3600

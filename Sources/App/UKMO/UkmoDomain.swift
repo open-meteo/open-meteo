@@ -5,7 +5,7 @@ import Foundation
  https://registry.opendata.aws/met-office-global-deterministic/
  https://registry.opendata.aws/met-office-uk-deterministic/
  */
-enum UkmoDomain: String, GenericDomain, CaseIterable {
+enum UkmoDomain: String, SyncGridDomain, CaseIterable {
     case global_deterministic_10km
     case global_ensemble_20km
     case global_ensemble_mean_20km
@@ -22,40 +22,6 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return .global_ensemble_mean_20km
         default:
             return nil
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .global_deterministic_10km:
-            return RegularGrid(
-                nx: 2560,
-                ny: 1920,
-                latMin: -90,
-                lonMin: -180,
-                dx: 360 / 2560,
-                dy: 180 / 1920
-            )
-        case .global_ensemble_20km, .global_ensemble_mean_20km:
-            return RegularGrid(
-                nx: 1280,
-                ny: 960,
-                latMin: -90,
-                lonMin: -180,
-                dx: 360 / 1280,
-                dy: 180 / 960
-            )
-        case .uk_deterministic_2km, .uk_ensemble_2km, .uk_ensemble_mean_2km:
-            let projection = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
-            return ProjectionGrid(
-                nx: 1042,
-                ny: 970,
-                latitudeProjectionOrigin: -1036000,
-                longitudeProjectionOrigin: -1158000,
-                dx: 2000,
-                dy: 2000,
-                projection: projection
-            )
         }
     }
 
@@ -76,14 +42,16 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .global_ensemble_mean_20km:
+        case .global_deterministic_10km:
+            return .ukmo_global_deterministic_10km
+        case .uk_deterministic_2km:
+            return .ukmo_uk_deterministic_2km
+        case .global_ensemble_20km, .global_ensemble_mean_20km:
             return .ukmo_global_ensemble_20km
-        case .uk_ensemble_mean_2km:
+        case .uk_ensemble_2km, .uk_ensemble_mean_2km:
             return .ukmo_uk_ensemble_2km
-        default:
-            return domainRegistry
         }
     }
 

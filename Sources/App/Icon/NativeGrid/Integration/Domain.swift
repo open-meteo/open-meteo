@@ -133,7 +133,7 @@ extension IconNativeDomains {
     /// Validates/reuses the local artifact or regenerates it offline; only generated files upload.
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
         let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
-        let artifact = nativeGridFile
+        let artifact = IconNativeGridFile.forGrid(asyncGridRegistry)
         let identity = artifact.identity
         let registry = artifact.registry
         do {

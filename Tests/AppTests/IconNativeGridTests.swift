@@ -55,8 +55,8 @@ import Testing
             elevations: elevations)
         let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
         let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
-        #expect(domain.nativeGrid.storage === quarterHourly.nativeGrid.storage)
-        #expect(domain.nativeGrid.elevations === quarterHourly.nativeGrid.elevations)
+        #expect((try #require(domain.grid as? IconNativeGrid)).storage === (try #require(quarterHourly.grid as? IconNativeGrid)).storage)
+        #expect((try #require(domain.grid as? IconNativeGrid)).elevations === (try #require(quarterHourly.grid as? IconNativeGrid)).elevations)
         #expect(domain.dtSeconds == 3600)
         #expect(quarterHourly.dtSeconds == 900)
 

@@ -10,7 +10,7 @@ struct IconDownloadOutputs: Sendable {
     let nativeDomain: IconNativeDomains
 
     init(_ domain: IconNativeDomains, skipRegridding: Bool = false) async throws {
-        self.init(domain, grid: try await domain.nativeGridFile.load(), skipRegridding: skipRegridding)
+        self.init(domain, grid: try await IconNativeGridFile.forGrid(domain.asyncGridRegistry).load(), skipRegridding: skipRegridding)
     }
 
     init(_ domain: IconNativeDomains, grid: IconNativeGrid, skipRegridding: Bool = false) {

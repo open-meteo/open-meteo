@@ -7,7 +7,7 @@ import OmFileFormat
  Mailing list https://comm.collab.science.gc.ca/mailman3/hyperkitty/list/geomet-info@comm.collab.science.gc.ca/2026/5/
  Docs: https://eccc-msc.github.io/open-data/readme_en/
  */
-enum GemDomain: String, GenericDomain, CaseIterable {
+enum GemDomain: String, SyncGridDomain, CaseIterable {
     case gem_global
     case gem_gdps_15km
     /// pressure level data and some atmospheric variables use 3-hourly
@@ -51,14 +51,22 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .gem_global_ensemble_mean:
-            return .cmc_gem_geps
-        case .gem_gdps_15km_upper_level:
+        case .gem_global:
+            return .cmc_gem_gdps
+        case .gem_regional:
+            return .cmc_gem_rdps
+        case .gem_rdps_10km:
+            return .cmc_gem_rdps_10km
+        case .gem_gdps_15km, .gem_gdps_15km_upper_level:
             return .cmc_gem_gdps_15km
-        default:
-            return domainRegistry
+        case .gem_hrdps_continental:
+            return .cmc_gem_hrdps
+        case .gem_hrdps_west:
+            return .cmc_gem_hrdps_west
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
+            return .cmc_gem_geps
         }
     }
 
@@ -238,51 +246,4 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: any Gridable {
-        switch self {
-        case .gem_global, .gem_gdps_15km, .gem_gdps_15km_upper_level:
-            return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
-        case .gem_regional:
-            return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
-        case .gem_rdps_10km:
-            /**
-             Note: lat/lon coordinates are in projection space!
-             latitudeOfFirstGridPointInDegrees = -48.806;
-             longitudeOfFirstGridPointInDegrees = 306.141;
-             latitudeOfLastGridPointInDegrees = 45.4649;
-             longitudeOfLastGridPointInDegrees = 48.9906;
-             iDirectionIncrementInDegrees = 0.090298;
-             jDirectionIncrementInDegrees = 0.090298;
-             latitudeOfSouthernPoleInDegrees = -31.7583;
-             longitudeOfSouthernPoleInDegrees = 267.597;
-             */
-            return ProjectionGrid(
-                nx: 1140,
-                ny: 1045,
-                latitudeProjectionOrigin: -48.806,
-                longitudeProjectionOrigin: 306.141 - 360,
-                dx: 0.090298,
-                dy: 0.090298,
-                projection: RotatedLatLonProjection(latitude: -31.7583 * -1, longitude: 267.597 + 180 - 360)
-            )
-        case .gem_hrdps_continental:
-            return ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
-        case .gem_hrdps_west:
-            // 1km resolution BC domain: 1330x1180 grid
-            // GDAL reports southern pole: lat=-33.443381, lon=-93.536426
-            // Convert to north pole: negate lat, add 180 to lon
-            // GDAL origin is top-left with dy=-0.00899, so we flip to bottom-left
-            return ProjectionGrid(
-                nx: 1330,
-                ny: 1180,
-                latitudeProjectionOrigin: 5.308595 + (1180 * -0.00899),  // Bottom-left
-                longitudeProjectionOrigin: -22.18489,
-                dx: 0.00899,
-                dy: 0.00899,
-                projection: RotatedLatLonProjection(latitude: 33.443381, longitude: 86.463574)
-            )
-        case .gem_global_ensemble, .gem_global_ensemble_mean:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        }
-    }
 }

@@ -67,6 +67,29 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let identity: IconNativeGridIdentity
     let cache = IconNativeGridCache()
 
+    private static let files: [AsyncGridRegistry: Self] = [
+        .dwd_icon_global_native: Self(registry: .dwd_icon_global_native, identity: .global),
+        .dwd_icon_eu_native: Self(registry: .dwd_icon_eu_native, identity: .europe),
+        .dwd_icon_d2_native: Self(registry: .dwd_icon_d2_native, identity: .d2),
+        .dwd_icon_global_eps_native: Self(registry: .dwd_icon_global_eps_native, identity: .globalEnsemble),
+        .dwd_icon_eu_eps_native: Self(registry: .dwd_icon_eu_eps_native, identity: .europeEnsemble)
+    ]
+
+    static func forGrid(_ grid: AsyncGridRegistry) -> Self {
+        guard let file = files[grid] else {
+            preconditionFailure("Not a native ICON grid: \(grid)")
+        }
+        return file
+    }
+
+    static func forRemotePath(_ path: String) -> Self? {
+        let components = path.split(separator: "/", omittingEmptySubsequences: false)
+        guard components.count == 4, components[0] == "data",
+              components[2] == "static", components[3] == "grid.bin",
+              let grid = AsyncGridRegistry(rawValue: String(components[1])) else { return nil }
+        return files[grid]
+    }
+
     /// Materializes a complete backend, validating it before atomically replacing the local file.
     func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> ReducedLatLonIndex
     where Backend.DataType: DataProtocol {
@@ -93,15 +116,13 @@ struct IconNativeGridPayload: OmFilePayload {
 
     /// Loads a supported remote registry path through validated local materialization.
     init(file: OmHttpReaderBackend) async throws {
-        guard let domain = IconNativeDomains.allCases.first(where: {
-            $0.nativeGridFile.getRelativeFilePathWithData() == file.object
-        }) else {
+        guard let artifact = IconNativeGridFile.forRemotePath(file.object) else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: file.object, reason: "Unknown native grid path"
             )
         }
         let cached = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
-        storage = try await domain.nativeGridFile.load(file: cached)
+        storage = try await artifact.load(file: cached)
     }
 
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {

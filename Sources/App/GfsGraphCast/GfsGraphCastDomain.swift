@@ -1,6 +1,6 @@
 import Foundation
 
-enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
+enum GfsGraphCastDomain: String, SyncGridDomain, CaseIterable {
     case graphcast025
     case aigfs025
     case aigefs025
@@ -22,9 +22,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return .ncep_gfs025
-    }
+    var syncGridRegistry: SyncGridRegistry { .ncep_gfs025 }
 
     var masterTimeRange: Range<Timestamp>? {
         return nil
@@ -100,10 +98,6 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         return 60
     }
 
-    var grid: any Gridable {
-        return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-    }
-    
     var ensembleMeanDomain: Self? {
         switch self {
         case .aigefs025:
