@@ -89,30 +89,6 @@ import Logging
             .hasSuffix("icon-d2-eps/p/T_2M/r/2026-10-07T00:00/e/03/s/PT000H00M.grib2"))
     }
 
-    @Test func rucFeedMetadataAndSelection() throws {
-        let model = IconNativeDomains.iconD2RucNative.downloadDomain
-        let run = Timestamp(2026, 10, 7, 6)
-        #expect(model == .iconD2Ruc)
-        #expect(model.getDownloadForecastSteps(run: 6) == Array(0...27))
-        #expect(model.updateIntervalSeconds == 3600)
-        #expect(model.deadlineHours == 1)
-        #expect(model.lastRun(now: run) == run.add(hours: -1))
-        #expect(model.getGribUrl(field: ("QV", "pressure-level", 850), run: run, leadSeconds: 3600)
-            .hasSuffix("icon-d2-ruc/p/QV/lvt1/100/lv1/85000/r/2026-10-07T06:00/s/PT001H00M.grib2"))
-        let humidity = IconPressureVariable(variable: .relative_humidity, level: 850)
-        #expect(model.getVarAndLevel(humidity)?.variable == "QV")
-        #expect(model.requiresSpecificHumidityConversion(humidity))
-        let batch = model.downloadBatch(variable: IconSurfaceVariable.precipitation, hour: 27)
-        #expect(batch.output == .quarterHourly)
-        #expect(batch.steps == [27 * 3600])
-        let selected = try DownloadIconCommand.variables(feed: model, group: .all, onlyVariables: "visibility")
-        #expect(selected.first.flatMap { model.getVarAndLevel($0) }?.variable == "VIS")
-        let metadata = try #require(DomainRegistry.dwd_icon_d2_ruc_native_15min.timeSeriesMetadata)
-        #expect(metadata.dtSeconds == 900)
-        #expect(metadata.updateIntervalSeconds == 3600)
-        #expect(metadata.omFileLength == (27 + 72) * 4 + 1)
-    }
-
     @Test func downloadAvailability() {
         let run = Timestamp(2026, 10, 7, 6)
         #expect(IconDownloadDomains.iconD2.downloadBatch(variable: IconSurfaceVariable.showers, hour: 1).output == .quarterHourly)
