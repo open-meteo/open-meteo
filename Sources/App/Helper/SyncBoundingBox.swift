@@ -6,124 +6,128 @@ import Logging
 import Synchronization
 
 /// Grid cells that `sync --bbox` keeps: the cells inside the box, widened by the grid search radius plus one.
-/// Chunks of a weather variable file that hold none of them are written as NaN, so the API returns null outside the box.
+/// Compressed chunks of a weather variable file that hold none of them are written as NaN, so the API returns null outside the box.
 struct SyncBoundingBox: Sendable {
-    let ny: Int
+    /// `ny * nx` flags in grid order
+    let cells: [Bool]
     let nx: Int
-    /// Rows and columns from the first to the last kept cell
-    let rows: Range<Int>
-    let columns: Range<Int>
-    /// Kept cells, `ny * nx`, unless every cell of `rows` and `columns` is kept
-    let cells: [Bool]?
 
-    /// Values decoded per read, at most 4 chunk rows. With `io_size_max` of 2 MiB this keeps a handful of ranges in flight per read,
-    /// because the remote reader allows 10 seconds per range including the wait for a connection
-    static let bufferValues = 2 * 1024 * 1024
-
-    /// Reads in flight per file, because each waits a few round trips. Small reads, e.g. one per ring of a Gaussian grid, need many in flight
-    static let readsInFlight = 32
-
-    /// Decoded values of the reads in flight per file, so a file holds at most 72 MB of reads including the one being written
-    static let valuesInFlight = 8 * bufferValues
-
-    /// Keep the cells that the API's `bounding_box` returns for `box`, and every cell within the grid search radius plus one of them
     init(grid: any Gridable, box: BoundingBoxWGS84) throws {
-        let gaussian = grid as? GaussianGrid
         /// Native icosahedral grids store all points in one row without neighbours to widen by
-        guard grid.ny > 1 || gaussian != nil, let slice = grid.findBox(boundingBox: box) else {
+        guard grid.ny > 1 || grid is GaussianGrid else {
             throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
         }
-        ny = grid.ny
-        nx = grid.nx
-        /// The API searches around the nearest cell, which may lie one row or column outside the box, so keep one more
+        let inside = Self.cells(grid: grid, box: box)
+        guard inside.contains(true) else {
+            throw ForecastApiError.generic(message: "the box holds no cell of this grid")
+        }
+        self.init(cells: Self.widen(cells: inside, grid: grid), nx: grid.nx)
+    }
+
+    init(cells: [Bool], nx: Int) {
+        self.cells = cells
+        self.nx = nx
+    }
+
+    /// Longitude from -180 to 180, because some grids count degrees east up to 360
+    static func wrapped(longitude: Float) -> Float {
+        longitude >= 180 ? longitude - 360 : longitude < -180 ? longitude + 360 : longitude
+    }
+
+    /// Cells whose centre lies inside the box
+    static func cells(grid: any Gridable, box: BoundingBoxWGS84) -> [Bool] {
+        (0 ..< grid.nx * grid.ny).map {
+            let (lat, lon) = grid.getCoordinates(gridpoint: $0)
+            return box.latitude.contains(lat) && box.longitude.contains(wrapped(longitude: lon))
+        }
+    }
+
+    /// The API searches around the nearest cell, which may lie outside the box, so keep every cell within the search radius plus one of a kept cell
+    static func widen(cells: [Bool], grid: any Gridable) -> [Bool] {
         let r = grid.searchRadius + 1
-        if let gaussian {
-            /// A Gaussian grid stores its latitude rings one after another in one row. Rings have different point counts,
-            /// so take the point at the same longitude in each neighbouring ring, then `r` points either side
-            var cells = [Bool](repeating: false, count: nx)
-            for i in slice {
+        var wide = cells
+        for i in cells.indices where cells[i] {
+            if let gaussian = grid as? GaussianGrid {
+                /// A Gaussian grid stores its latitude rings one after another in one row. Rings have different point counts,
+                /// so take the point at the same longitude in each neighbouring ring, then `r` points either side
                 let (y, x, points) = gaussian.type.getPos(gridpoint: i)
                 for ring in max(0, y - r) ..< min(2 * gaussian.type.latitudeLines, y + r + 1) {
                     let ringPoints: Int = gaussian.nxOf(y: ring)
                     let centre = Int((Double(x) * Double(ringPoints) / Double(points)).rounded())
                     for k in 0 ..< min(2 * r + 1, ringPoints) {
-                        cells[gaussian.integral(y: ring) + ((centre + k - r) % ringPoints + ringPoints) % ringPoints] = true
+                        wide[gaussian.integral(y: ring) + ((centre + k - r) % ringPoints + ringPoints) % ringPoints] = true
+                    }
+                }
+            } else {
+                let (y, x) = i.quotientAndRemainder(dividingBy: grid.nx)
+                for yy in max(0, y - r) ..< min(grid.ny, y + r + 1) {
+                    for xx in max(0, x - r) ..< min(grid.nx, x + r + 1) {
+                        wide[yy * grid.nx + xx] = true
                     }
                 }
             }
-            guard let first = cells.firstIndex(of: true), let last = cells.lastIndex(of: true) else {
-                throw ForecastApiError.generic(message: "the box holds no cell of this grid")
-            }
-            rows = 0 ..< 1
-            columns = first ..< last + 1
-            self.cells = cells
-            return
         }
-        var y0 = Int.max, y1 = -1, x0 = Int.max, x1 = -1
-        for i in slice {
-            let (y, x) = i.quotientAndRemainder(dividingBy: nx)
-            y0 = min(y0, y); y1 = max(y1, y); x0 = min(x0, x); x1 = max(x1, x)
-        }
-        /// Like the API, a box that is not entirely inside a regional grid holds no cell
-        guard y1 >= 0 else {
-            throw ForecastApiError.generic(message: "the box holds no cell of this grid")
-        }
-        rows = max(0, y0 - r) ..< min(ny, y1 + r + 1)
-        columns = max(0, x0 - r) ..< min(nx, x1 + r + 1)
-        cells = nil
+        return wide
     }
 
-    private init(ny: Int, nx: Int, rows: Range<Int>, columns: Range<Int>, cells: [Bool]?) {
-        self.ny = ny
-        self.nx = nx
-        self.rows = rows
-        self.columns = columns
-        self.cells = cells
-    }
-
-    /// The same cells as a grid of one row, like a reduced Gaussian grid: legacy files store `[ny * nx, time]`, so a flat cell index is the position along that row
-    func flattened() -> SyncBoundingBox {
-        var cells = self.cells ?? [Bool](repeating: false, count: ny * nx)
-        if self.cells == nil {
-            for y in rows {
-                for x in columns {
-                    cells[y * nx + x] = true
-                }
-            }
-        }
-        let first = cells.firstIndex(of: true), last = cells.lastIndex(of: true)
-        let columns: Range<Int> = first.map { $0 ..< last! + 1 } ?? 0 ..< 0
-        return SyncBoundingBox(ny: 1, nx: ny * nx, rows: columns.isEmpty ? 0 ..< 0 : 0 ..< 1, columns: columns, cells: cells)
-    }
-
-    /// True if a kept cell lies in these rows and columns
-    func keeps(rows: Range<Int>, columns: Range<Int>) -> Bool {
-        let rows = rows.clamped(to: self.rows), columns = columns.clamped(to: self.columns)
-        guard let cells else {
-            return !rows.isEmpty && !columns.isEmpty
-        }
-        return rows.contains { y in columns.contains { cells[y * nx + $0] } }
-    }
-
-    /// Write `remote` to `file` with every chunk without a kept cell as NaN. Kept chunks are decoded and encoded again with the same settings.
-    /// Legacy files store a flat 2D array `[ny * nx, time]`; they are masked the same way, as a grid of one row, and keep their 2D layout.
-    /// Returns the bytes fetched from `remote`, or nil and writes nothing if the file is not a float array of one of these two layouts on this grid with scalar attributes only.
-    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, bufferValues: Int = Self.bufferValues) async throws -> Int? {
-        let remote = CountingBackend(remote)
-        let reader = try await OmFileReader(fn: remote)
-        /// Gaps up to 16 KiB are read along. A larger gap would join the chunk rows of a narrow box into whole rows of the grid
-        let array = reader.asArray(of: Float.self, io_size_max: 2 * 1024 * 1024, io_size_merge: 16 * 1024)
-        let dims = array?.getDimensions().map(Int.init) ?? []
-        let flat = dims.count == 2 && dims[0] == ny * nx
-        guard let array, flat || (dims.count == 3 && dims[0] == ny && dims[1] == nx) else {
-            logger.info("Not a float array on the model grid, dims \(dims), type \(reader.dataType), copying whole: \(file)")
+    /// One flag per chunk in chunk order (last dimension fastest): true if the chunk holds a kept cell. Nil if the dimensions are not the grid.
+    /// The grid is `[ny, nx]` among the dimensions, e.g. `[ny, nx, time]` or `[member, ny, nx, time]`, or the flat `[ny * nx, time]` of legacy files;
+    /// the other dimensions do not matter.
+    func takeChunks(dims: [Int], chunks: [Int]) -> [Bool]? {
+        let ny = cells.count / nx
+        let pair = (0 ..< max(0, dims.count - 1)).first { dims[$0] == ny && dims[$0 + 1] == nx }
+        /// Legacy files are exactly `[ny * nx, time]`; any other dimension that happens to equal the cell count is not the grid
+        let isLegacyFlat = dims.count == 2 && dims[0] == cells.count
+        guard let first = pair ?? (isLegacyFlat ? 0 : nil) else {
             return nil
         }
-        let chunks = array.getChunkDimensions().map(Int.init)
-        /// Planning works on `[rows, columns, time]` for both layouts
-        let plan = flat ? flattened() : self
-        let size = flat ? [1, dims[0], dims[1]] : dims
-        let tile = flat ? [1, chunks[0], chunks[1]] : chunks
+        let flat = pair == nil
+        let counts = zip(dims, chunks).map { ($0 + $1 - 1) / $1 }
+        /// A flat array is a grid of one row
+        let column = flat ? first : first + 1
+        let (height, width) = (flat ? 1 : chunks[first], chunks[column])
+        let chunkColumns = counts[column]
+        var hasCell = [Bool](repeating: false, count: (flat ? 1 : counts[first]) * chunkColumns)
+        for i in cells.indices where cells[i] {
+            let (y, x) = flat ? (0, i) : i.quotientAndRemainder(dividingBy: nx)
+            hasCell[y / height * chunkColumns + x / width] = true
+        }
+        let after = counts[(column + 1)...].reduce(1, *)
+        return (0 ..< counts.reduce(1, *)).map {
+            hasCell[(flat ? 0 : $0 / (after * chunkColumns) % counts[first]) * chunkColumns + $0 / after % chunkColumns]
+        }
+    }
+
+    /// Byte ranges to fetch for the chunks to take: neighbours closer than `merge` bytes are joined, as long as a run stays within `max` bytes (a larger chunk is a run on its own).
+    /// Each run has the range of chunk indices it holds. Empty chunks are NaN and need no bytes.
+    static func runs(ranges: [(offset: UInt64, count: UInt64)], take: [Bool], merge: Int, max limit: Int) -> [(chunks: Range<Int>, bytes: Range<Int>)] {
+        var runs = [(chunks: Range<Int>, bytes: Range<Int>)]()
+        for i in ranges.indices where take[i] && ranges[i].count > 0 {
+            let bytes = Int(ranges[i].offset) ..< Int(ranges[i].offset + ranges[i].count)
+            if let last = runs.last, bytes.lowerBound - last.bytes.upperBound <= merge, bytes.upperBound - last.bytes.lowerBound <= limit {
+                runs[runs.count - 1] = (last.chunks.lowerBound ..< i + 1, last.bytes.lowerBound ..< bytes.upperBound)
+            } else {
+                runs.append((i ..< i + 1, bytes))
+            }
+        }
+        return runs
+    }
+
+    /// Write `remote` to `file` with the compressed bytes of the chunks that hold a kept cell as they are, and the others as NaN.
+    /// Returns the bytes fetched from `remote`, or nil and writes nothing if the file is not a float array on this grid with scalar attributes only.
+    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, runsInFlight: Int = SyncBoundingBox.runsInFlightTotal) async throws -> Int? {
+        let remote = CountingBackend(remote)
+        let reader = try await OmFileReader(fn: remote)
+        /// A large `io_size_max` reads the lookup table of chunk offsets in few requests
+        guard let array = reader.asArray(of: Float.self, io_size_max: UInt64(Self.runBytes), io_size_merge: UInt64(Self.mergeBytes)) else {
+            logger.info("Not a float array, type \(reader.dataType), copying whole: \(file)")
+            return nil
+        }
+        let dims = array.getDimensions(), chunks = array.getChunkDimensions()
+        guard let take = takeChunks(dims: dims.map(Int.init), chunks: chunks.map(Int.init)) else {
+            logger.info("Not an array on the model grid, dims \(dims), copying whole: \(file)")
+            return nil
+        }
         var attributes = [OmFileReader<CountingBackend<Backend>>]()
         for i in 0 ..< reader.numberOfChildren {
             guard let child = try await reader.getChild(i), child.numberOfChildren == 0,
@@ -133,125 +137,44 @@ struct SyncBoundingBox: Sendable {
             }
             attributes.append(child)
         }
-        let nChunks: [Int] = (0 ..< 3).map { (size[$0] + tile[$0] - 1) / tile[$0] }
-        var kept = [Bool]()
-        /// Chunk columns from the first to the last kept chunk of each chunk row
-        var spans = [Range<Int>]()
-        for cy in 0 ..< nChunks[0] {
-            let rows: Range<Int> = cy * tile[0] ..< (cy + 1) * tile[0]
-            var first = nChunks[1], last = -1
-            for cx in 0 ..< nChunks[1] {
-                let keep = plan.keeps(rows: rows, columns: cx * tile[1] ..< (cx + 1) * tile[1])
-                kept.append(keep)
-                if keep {
-                    first = min(first, cx)
-                    last = cx
-                }
-            }
-            spans.append(last < 0 ? 0 ..< 0 : first ..< last + 1)
-        }
-        /// A read covers some kept chunks of one chunk row, or the kept chunk columns of up to 4 chunk rows. Chunks in between that are not kept are read too
-        let columnValues: Int = tile[0] * tile[1] * size[2]
-        let chunksPerRead: Int = max(1, min(4 * nChunks[1], bufferValues / columnValues))
-        /// Chunk rows and columns of each read, in the order the chunks are written: a run of kept chunks in one row,
-        /// or the kept chunks of following rows too while a row holds one run and all fit in one read
-        var reads = [(rows: Range<Int>, columns: Range<Int>)]()
-        for cy in 0 ..< nChunks[0] {
-            for cx in spans[cy] where kept[cy * nChunks[1] + cx] {
-                if let last = reads.last, last.rows.contains(cy), last.columns.contains(cx) {
-                    continue
-                }
-                var rows = cy ..< cy + 1
-                var end = cx + 1
-                while end < min(spans[cy].upperBound, cx + chunksPerRead), kept[cy * nChunks[1] + end] {
-                    end += 1
-                }
-                var columns = cx ..< end
-                let wholeRow = columns == spans[cy]
-                while wholeRow, rows.count < 4, rows.upperBound < nChunks[0], !spans[rows.upperBound].isEmpty {
-                    let next = spans[rows.upperBound]
-                    let union: Range<Int> = min(columns.lowerBound, next.lowerBound) ..< max(columns.upperBound, next.upperBound)
-                    guard (rows.count + 1) * union.count <= chunksPerRead else {
-                        break
-                    }
-                    rows = rows.lowerBound ..< rows.upperBound + 1
-                    columns = union
-                }
-                reads.append((rows, columns))
-            }
-        }
-        /// Up to `readsInFlight` reads run ahead of the writer, which takes their values in order. A failed read fails the file
-        var pending = [(task: Task<[Float], any Error>, values: Int)]()
-        defer { pending.forEach { $0.task.cancel() } }
-        var nextRead = 0, valuesInFlight = 0
-        func takeRead() async throws -> [Float] {
-            while pending.count < Self.readsInFlight, nextRead < reads.count {
-                let y: Range<Int> = reads[nextRead].rows.lowerBound * tile[0] ..< min(reads[nextRead].rows.upperBound * tile[0], plan.ny)
-                let x: Range<Int> = reads[nextRead].columns.lowerBound * tile[1] ..< min(reads[nextRead].columns.upperBound * tile[1], plan.nx)
-                let values: Int = y.count * x.count * size[2]
-                guard pending.isEmpty || valuesInFlight + values <= Self.valuesInFlight else {
-                    break
-                }
-                let xRange: Range<UInt64> = UInt64(x.lowerBound) ..< UInt64(x.upperBound), time: Range<UInt64> = 0 ..< UInt64(size[2])
-                if flat {
-                    let range: InlineArray<2, Range<UInt64>> = [xRange, time]
-                    pending.append((Task { try await array.readConcurrent(range: range) }, values))
-                } else {
-                    let range: InlineArray<3, Range<UInt64>> = [UInt64(y.lowerBound) ..< UInt64(y.upperBound), xRange, time]
-                    pending.append((Task { try await array.readConcurrent(range: range) }, values))
-                }
-                valuesInFlight += values
-                nextRead += 1
-            }
-            let read = pending.removeFirst()
-            valuesInFlight -= read.values
-            return try await read.task.value
-        }
-        /// One chunk column copied out of a read, because the encoder cannot take a column offset into a wider array
-        let column = UnsafeMutableBufferPointer<Float>.allocate(capacity: columnValues)
-        defer { column.deallocate() }
+        let ranges = try await array.chunkByteRanges()
+        let runs = Self.runs(ranges: ranges, take: take, merge: Self.mergeBytes, max: Self.runBytes)
 
+        /// Runs are fetched up to `runsInFlight` ahead of the writer, which takes them in order. A failed run fails the file
+        var pending = [Task<Backend.DataType, any Error>]()
+        var next = 0
+        defer { pending.forEach { $0.cancel() } }
         let fn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         let writer = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024)
-        let out = try writer.prepareArray(type: Float.self, dimensions: dims.map(UInt64.init), chunkDimensions: chunks.map(UInt64.init), compression: array.compression, scale_factor: array.scaleFactor, add_offset: array.addOffset)
-        /// One NaN chunk per chunk shape. Only the last chunk along a dimension may be smaller
-        var nanChunks = [[UInt8]?](repeating: nil, count: 8)
-        /// Chunk rows and columns held in `values`
-        var read = (rows: 0 ..< 0, columns: 0 ..< 0), values = [Float]()
-        for cy in 0 ..< nChunks[0] {
-            for cx in 0 ..< nChunks[1] {
-                guard kept[cy * nChunks[1] + cx] else {
-                    for ct in 0 ..< nChunks[2] {
-                        let lastRow: Int = cy == nChunks[0] - 1 ? 4 : 0
-                        let lastColumn: Int = cx == nChunks[1] - 1 ? 2 : 0
-                        let lastTime: Int = ct == nChunks[2] - 1 ? 1 : 0
-                        let shape = lastRow + lastColumn + lastTime
-                        if nanChunks[shape] == nil {
-                            let height: Int = min(tile[0], size[0] - cy * tile[0])
-                            let width: Int = min(tile[1], size[1] - cx * tile[1])
-                            let length: Int = min(tile[2], size[2] - ct * tile[2])
-                            let count = height * width * length
-                            nanChunks[shape] = try out.compressChunk(chunkIndex: (cy * nChunks[1] + cx) * nChunks[2] + ct, array: [Float](repeating: .nan, count: count))
-                        }
-                        try out.writeCompressedChunk(nanChunks[shape]!)
-                    }
-                    continue
+        let out = try writer.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: chunks, compression: array.compression, scale_factor: array.scaleFactor, add_offset: array.addOffset)
+        var run = 0 ..< 0, runStart = 0, taken = 0, data: Backend.DataType?
+        for i in take.indices {
+            guard take[i], ranges[i].count > 0 else {
+                /// The extent of chunk `i`, smaller than the chunk only at the end of a dimension
+                var extent = dims, rest = i
+                for d in dims.indices.reversed() {
+                    let count: UInt64 = (dims[d] + chunks[d] - 1) / chunks[d]
+                    let position: UInt64 = UInt64(rest) % count
+                    extent[d] = min(chunks[d], dims[d] - position * chunks[d])
+                    rest /= Int(count)
                 }
-                if !read.rows.contains(cy) || !read.columns.contains(cx) {
-                    /// The oldest read in flight, or the next one if none is
-                    read = reads[nextRead - pending.count]
-                    values = try await takeRead()
-                }
-                let y: Range<Int> = read.rows.lowerBound * tile[0] ..< min(read.rows.upperBound * tile[0], plan.ny)
-                let x: Range<Int> = read.columns.lowerBound * tile[1] ..< min(read.columns.upperBound * tile[1], plan.nx)
-                let height: Int = min(tile[0], plan.ny - cy * tile[0])
-                let width: Int = min(tile[1], plan.nx - cx * tile[1]) * size[2]
-                for row in 0 ..< height {
-                    let start: Int = ((cy * tile[0] + row - y.lowerBound) * x.count + cx * tile[1] - x.lowerBound) * size[2]
-                    values.withUnsafeBufferPointer { column.baseAddress!.advanced(by: row * width).update(from: $0.baseAddress!.advanced(by: start), count: width) }
-                }
-                try out.writeData(pointer: UnsafeBufferPointer(start: column.baseAddress, count: height * width), arrayDimensions: flat ? [UInt64(width / size[2]), UInt64(size[2])] : [UInt64(height), UInt64(width / size[2]), UInt64(size[2])])
+                try out.writeNaN(arrayDimensions: extent)
+                continue
             }
+            if !run.contains(i) {
+                while pending.count < max(1, runsInFlight), next < runs.count {
+                    let bytes = runs[next].bytes
+                    pending.append(Task { try await remote.getData(offset: bytes.lowerBound, count: bytes.count) })
+                    next += 1
+                }
+                (run, runStart) = (runs[taken].chunks, runs[taken].bytes.lowerBound)
+                taken += 1
+                data = try await pending.removeFirst().value
+                // A short body would let the slices below read past the buffer, which a release build does not check
+                guard data!.withUnsafeBytes({ $0.count }) == runs[taken - 1].bytes.count else { throw CurlErrorNonRetry.chunkSizeMismatch }
+            }
+            let start = Int(ranges[i].offset) - runStart
+            try data!.withUnsafeBytes { try out.writeCompressedChunk(UnsafeRawBufferPointer(rebasing: $0[start ..< start + Int(ranges[i].count)])) }
         }
         let children = try attributes.map { try $0.copyScalar(to: writer) }
         let root = try writer.write(array: try out.finalise(), name: reader.getName(), children: children)
@@ -265,6 +188,14 @@ struct SyncBoundingBox: Sendable {
         try fn.linkTemporary(file: file)
         return remote.fetched.load(ordering: .relaxed)
     }
+
+    /// Runs of at most 16 MiB, enough for a global file's kept band of 1 MiB-merged rows, because the remote reader allows 10 seconds per range including the wait for a connection
+    static let runBytes = 16 * 1024 * 1024
+    /// A range request costs about as much time as reading 1 MiB over one connection to a bucket in another region, so a smaller gap is cheaper to read along.
+    /// A global grid keeps one short segment per row; merging turns the kept band into one or two requests per file.
+    static let mergeBytes = 1024 * 1024
+    /// Matches the 8 connections of the shared HTTP client. Files copied at once split this between them (`SyncCommand` passes `max(1, total / concurrent)`), so with up to 8 files the 10 second timeout is not spent waiting for a connection; more files than that keep one range read each
+    static let runsInFlightTotal = 8
 }
 
 /// Sums the bytes read from the wrapped backend, for the transfer statistics

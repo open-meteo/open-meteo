@@ -269,7 +269,7 @@ struct SyncCommand: AsyncCommand {
                             if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
                                 /// The API key travels in the URL query like a whole download, because the server reads it only from there
                                 let remote = try await OmHttpReaderBackend(context: endpoint, object: download.name + (request.url.query.map { "?\($0)" } ?? ""))
-                                if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
+                                if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger, runsInFlight: max(1, SyncBoundingBox.runsInFlightTotal / max(1, concurrent))) {
                                     await progress.add(fetched)
                                     break
                                 }
@@ -302,6 +302,8 @@ struct SyncCommand: AsyncCommand {
                     }
                 }
             } catch where keep != nil {
+                /// A terminated Job cancels the files in progress, which are not failures
+                if error is CancellationError { throw error }
                 logger.error("Sync of \(download.name) failed: \(error)")
                 firstFailure.withLock { $0 = $0 ?? error }
             }
