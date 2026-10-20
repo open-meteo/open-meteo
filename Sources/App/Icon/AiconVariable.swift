@@ -1,18 +1,5 @@
-import Foundation
-
-/**
- AICON surface/single-level output variables.
-
- Available variables (from the opendata.dwd.de directory listing):
-   PMSL      - pressure reduced to mean sea level
-   PS        - surface pressure (not reduced)
-   RELHUM_2M - 2 m relative humidity
-   T_2M      - 2 m temperature
-   TOT_PREC  - total precipitation accumulated since forecast start
-   U_10M     - 10 m zonal wind component
-   V_10M     - 10 m meridional wind component
- */
-enum AiconSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable, Sendable {
+/// AICON surface and single-level output variables.
+enum AiconSurfaceVariable: String, CaseIterable, IconVariableDownloadable {
     case temperature_2m
     case relative_humidity_2m
     case pressure_msl
@@ -40,26 +27,18 @@ enum AiconSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariabl
             return 20
         case .relative_humidity_2m:
             return 1
-        case .pressure_msl, .surface_pressure:
-            return 10
-        case .precipitation:
-            return 10
-        case .wind_u_component_10m, .wind_v_component_10m:
+        case .pressure_msl, .surface_pressure, .precipitation, .wind_u_component_10m, .wind_v_component_10m:
             return 10
         }
     }
 
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m:
-            return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .pressure_msl, .surface_pressure:
-            return .hermite(bounds: nil)
         case .precipitation:
             return .backwards_sum
-        case .wind_u_component_10m, .wind_v_component_10m:
+        case .temperature_2m, .pressure_msl, .surface_pressure, .wind_u_component_10m, .wind_v_component_10m:
             return .hermite(bounds: nil)
         }
     }

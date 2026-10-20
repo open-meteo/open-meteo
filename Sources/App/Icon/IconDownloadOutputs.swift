@@ -1,11 +1,11 @@
 /// Resolved storage outputs. Only deterministic ICON global also produces regular-grid output.
 struct IconDownloadOutputs: Sendable {
-    let downloadDomain: IconDownloadDomains
-    let primary: any GenericDomain
+    var downloadDomain: IconDownloadDomains { nativeDomain.downloadDomain }
+    let primary: IconNativeDomain
     let remapped: IconDomains?
-    let ensembleMean: (any GenericDomain)?
-    let modelLevel: (any GenericDomain)?
-    let fifteenMinute: (any GenericDomain)?
+    let ensembleMean: IconNativeDomain?
+    let modelLevel: IconNativeDomain?
+    let fifteenMinute: IconNativeDomain?
 
     let nativeDomain: IconNativeDomains
 
@@ -14,13 +14,19 @@ struct IconDownloadOutputs: Sendable {
     }
 
     init(_ domain: IconNativeDomains, grid: IconNativeGrid, skipRegridding: Bool = false) {
-        self.downloadDomain = domain.downloadDomain
         self.nativeDomain = domain
         self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
         self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
         self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
         self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
-        self.fifteenMinute = domain == .iconD2RucNative ? IconNativeDomain(definition: .iconD2RucNative15min, nativeGrid: grid) : domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
+        switch domain {
+        case .iconD2RucNative:
+            self.fifteenMinute = IconNativeDomain(definition: .iconD2RucNative15min, nativeGrid: grid)
+        case .iconD2Native:
+            self.fifteenMinute = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
+        default:
+            self.fifteenMinute = nil
+        }
     }
 }
 

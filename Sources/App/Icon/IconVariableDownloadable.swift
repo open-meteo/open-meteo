@@ -57,5 +57,3 @@ extension IconPressureVariable: IconVariableDownloadable {
     }
 
 }
-
-extension AiconSurfaceVariable: IconVariableDownloadable {}

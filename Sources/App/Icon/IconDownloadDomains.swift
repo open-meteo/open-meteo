@@ -145,8 +145,6 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
     }
 
     /// Based on the current time , guess the current run that should be available soon on the open-data server
-    var lastRun: Timestamp { lastRun() }
-
     func lastRun(now t: Timestamp = .now()) -> Timestamp {
         switch self {
         case .aicon: return t.subtract(hours: 2).floor(toNearestHour: 3)

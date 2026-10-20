@@ -58,12 +58,9 @@ import Logging
     }
 
     @Test func d2DownloadOutputs() async throws {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: file) }
-        try ReducedLatLonArtifact.Writer.write(to: file,
-            metadata: .init(number: 26, uuid: Array(0..<16), coversWholeSphere: true),
-            points: [.init(latitudeDegrees: 0, longitudeDegrees: 0)], latitudeBandCount: 2)
-        let grid = IconNativeGrid(storage: try ReducedLatLonIndex(file: file), resolutionMeters: 2_000,
+        let fixture = try makeFixture(centers: [.init(latitudeDegrees: 0, longitudeDegrees: 0)])
+        defer { fixture.remove() }
+        let grid = IconNativeGrid(storage: fixture.index, resolutionMeters: 2_000,
             maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
         let deterministic = IconDownloadOutputs(.iconD2Native, grid: grid)
         #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_native_15min)
