@@ -107,7 +107,7 @@ enum IconNativeDomains: String, CaseIterable {
     var masterTimeRange: Range<Timestamp>? { nil }
     var omFileLength: Int {
         switch self {
-        case .aiconNative: return 84
+        case .aiconNative: return (180 + 72) / 3
         case .iconNative, .iconNativeModelLevel, .iconEpsNative, .iconEpsNativeEnsembleMean:
             return 180 + 1 + 3 * 24
         case .iconEuNative, .iconEuNativeModelLevel, .iconEuEpsNative, .iconEuEpsNativeEnsembleMean:

@@ -71,12 +71,15 @@ struct DownloadIconCommand: AsyncCommand {
             guard [.all, .surface, .surfaceAndPressure].contains(group) else {
                 throw Abort(.badRequest, reason: "The AICON downloader only supports surface variables.")
             }
+            if let onlyVariables {
+                return try onlyVariables.split(separator: ",").map {
+                    try AiconSurfaceVariable.load(rawValue: String($0))
+                }
+            }
+            return AiconSurfaceVariable.allCases
         }
         if let onlyVariables {
             return try onlyVariables.split(separator: ",").map { name in
-                if feed == .aicon {
-                    return try AiconSurfaceVariable.load(rawValue: String(name))
-                }
                 if name == "visibility", feed != .iconD2Ruc {
                     throw Abort(.badRequest, reason: "Visibility is not available in the DWD ICON v1 feed.")
                 }
@@ -84,20 +87,16 @@ struct DownloadIconCommand: AsyncCommand {
                 return try IconSurfaceVariable.load(rawValue: String(name))
             }
         }
-        let surface: [any IconVariableDownloadable]
-        let modelLevel: [any IconVariableDownloadable]
-        let pressure: [any IconVariableDownloadable]
-        switch feed {
-        case .aicon:
-            surface = AiconSurfaceVariable.allCases
-            modelLevel = []
-            pressure = []
-        default:
-            surface = IconSurfaceVariable.allCases.filter { feed.getVarAndLevel($0)?.cat != "model-level" }
-            modelLevel = IconSurfaceVariable.allCases.filter { feed.getVarAndLevel($0)?.cat == "model-level" }
-            pressure = feed.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { IconPressureVariable(variable: $0, level: level) }
+        let surface: [any IconVariableDownloadable] = IconSurfaceVariable.allCases.filter { feed.getVarAndLevel($0)?.cat != "model-level" }
+        let modelLevel: [any IconVariableDownloadable] = IconSurfaceVariable.allCases.filter { feed.getVarAndLevel($0)?.cat == "model-level" }
+        let pressure: [any IconVariableDownloadable] = feed.levels.reversed().filter { level in
+            switch group {
+            case .pressureLevelGt500: return level > 500
+            case .pressureLevelLtE500: return level <= 500
+            default: return true
             }
+        }.flatMap { level in
+            IconPressureVariableType.allCases.map { IconPressureVariable(variable: $0, level: level) }
         }
         switch group {
         case .all: return surface + modelLevel + pressure
@@ -105,10 +104,7 @@ struct DownloadIconCommand: AsyncCommand {
         case .surfaceAndPressure: return surface + pressure
         case .modelLevel: return modelLevel
         case .pressureLevel, .pressureLevelGt500, .pressureLevelLtE500:
-            return pressure.filter {
-                guard let level = feed.getVarAndLevel($0)?.level else { return false }
-                return group == .pressureLevel || (group == .pressureLevelGt500 ? level > 500 : level <= 500)
-            }
+            return pressure
         }
     }
 
