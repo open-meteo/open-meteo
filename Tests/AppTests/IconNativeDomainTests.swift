@@ -7,11 +7,12 @@ import Logging
 @Suite struct IconNativeDomainTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_DOMAIN_TESTS"] == "1"))
     func concurrentNativeLoadsShareResources() async throws {
-        let cache = IconNativeDomainCache()
+        let cache = IconNativeGridLoader()
         let domains = try await withThrowingTaskGroup(of: IconNativeDomain.self) { group in
             for index in 0..<20 {
                 group.addTask {
-                    try await cache.load(index.isMultiple(of: 2) ? .iconD2Native : .iconD2Native15min)
+                    let definition: IconNativeDomains = index.isMultiple(of: 2) ? .iconD2Native : .iconD2Native15min
+                    return IconNativeDomain(definition: definition, nativeGrid: try await cache.load(grid: definition.asyncGridRegistry))
                 }
             }
             var domains = [IconNativeDomain]()
@@ -19,16 +20,18 @@ import Logging
             return domains
         }
         let first = try #require(domains.first)
-        let elevations = try #require(first.nativeGrid.elevations)
+        let firstGrid = try #require(first.grid as? IconNativeGrid)
+        let elevations = try #require(firstGrid.elevations)
         for domain in domains {
-            #expect(domain.nativeGrid.storage === first.nativeGrid.storage)
-            #expect(domain.nativeGrid.elevations === elevations)
+            let grid = try #require(domain.grid as? IconNativeGrid)
+            #expect(grid.storage === firstGrid.storage)
+            #expect(grid.elevations === elevations)
             #expect(domain.dtSeconds == (domain.definition == .iconD2Native ? 3600 : 900))
         }
-        let reused = try await cache.load(.iconD2Native)
-        #expect(reused.nativeGrid.storage === first.nativeGrid.storage)
-        #expect(reused.nativeGrid.elevations === elevations)
-        #expect(elevations.count == first.nativeGrid.nx)
+        let reused = try await cache.load(grid: .dwd_icon_d2_native)
+        #expect(reused.storage === firstGrid.storage)
+        #expect(reused.elevations === elevations)
+        #expect(elevations.count == firstGrid.nx)
     }
 
     @Test func nativeMetadataDoesNotRequireStaticFiles() throws {
@@ -43,9 +46,9 @@ import Logging
         let modelLevel = try #require(parent.modelLevelDomain)
         #expect(modelLevel.modelLevelParent == parent)
         #expect(modelLevel.domainRegistry != parent.domainRegistry)
-        #expect(modelLevel.domainRegistryStatic == parent.domainRegistryStatic)
-        #expect(modelLevel.nativeGridFile.getFilePath() == parent.nativeGridFile.getFilePath())
-        #expect(modelLevel.domainRegistry.nativeDefinition == modelLevel)
+        #expect(modelLevel.gridRegistry == parent.gridRegistry)
+        #expect(IconNativeGridFile.forGrid(modelLevel.asyncGridRegistry).getFilePath() == IconNativeGridFile.forGrid(parent.asyncGridRegistry).getFilePath())
+        #expect((modelLevel.domainRegistry.definition as? IconNativeDomains) == modelLevel)
         let metadata = try #require(modelLevel.domainRegistry.timeSeriesMetadata)
         #expect(metadata.dtSeconds == parent.dtSeconds)
         #expect(metadata.omFileLength == parent.omFileLength)

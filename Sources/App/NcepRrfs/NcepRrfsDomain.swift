@@ -2,14 +2,14 @@
 
 import Foundation
 
-enum NcepRrfsDomain: String, CaseIterable, GenericDomain {
+enum NcepRrfsDomain: String, CaseIterable, SyncGridDomain {
     case ncep_rrfs_conus
     case ncep_rrfs_north_america
     case ncep_rrfs_conus_15min
     case ncep_rrfs_conus_ensemble
 
     var domainRegistry: DomainRegistry { DomainRegistry(rawValue: rawValue)! }
-    var domainRegistryStatic: DomainRegistry? { self == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus }
+    var syncGridRegistry: SyncGridRegistry { self == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus }
     var dtSeconds: Int { self == .ncep_rrfs_conus_15min ? 900 : 3600 }
     var updateIntervalSeconds: Int { self == .ncep_rrfs_conus_15min ? 3600 : 21600 }
     var hasYearlyFiles: Bool { false }

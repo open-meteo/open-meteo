@@ -332,7 +332,7 @@ import OpenMeteoSdk
         let domain = NcepRrfsDomain.ncep_rrfs_north_america
         let grid = domain.northAmericaGrid
         #expect(grid.nx == 1127 && grid.ny == 683 && grid.count == 769741)
-        #expect(domain.domainRegistryStatic == .ncep_rrfs_north_america)
+        #expect(domain.gridRegistry.staticDomain == .ncep_rrfs_north_america)
         #expect(domain.forecastHours == 0...84)
         #expect(domain.dtSeconds == 3600 && domain.updateIntervalSeconds == 21600)
         #expect(domain.countEnsembleMember == 1)
@@ -743,7 +743,7 @@ import OpenMeteoSdk
 private struct ProbabilityTestDomain: GenericDomain {
     var grid: any Gridable { RegularGrid(nx: 4, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1) }
     var domainRegistry: DomainRegistry { .ncep_rrfs_conus_ensemble }
-    var domainRegistryStatic: DomainRegistry? { nil }
+    var gridRegistry: GridRegistry { .synchronous(.ncep_rrfs_conus) }
     var dtSeconds: Int { 3600 }
     var updateIntervalSeconds: Int { 21600 }
     var hasYearlyFiles: Bool { false }

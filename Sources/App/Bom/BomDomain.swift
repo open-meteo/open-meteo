@@ -6,18 +6,9 @@ import Foundation
  
  No mesoscale model yet, only global
  */
-enum BomDomain: String, GenericDomain, CaseIterable {
+enum BomDomain: String, SyncGridDomain, CaseIterable {
     case access_global
     case access_global_ensemble
-
-    var grid: any Gridable {
-        switch self {
-        case .access_global:
-            return RegularGrid(nx: 2048, ny: 1536, latMin: -89.941406, lonMin: -179.912109, dx: 360 / 2048, dy: 180 / 1536)
-        case .access_global_ensemble:
-            return RegularGrid(nx: 800, ny: 600, latMin: -89.85, lonMin: -179.775, dx: 360 / 800, dy: 180 / 600)
-        }
-    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -37,8 +28,13 @@ enum BomDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .access_global:
+            return .bom_access_global
+        case .access_global_ensemble:
+            return .bom_access_global_ensemble
+        }
     }
 
     var dtSeconds: Int {
