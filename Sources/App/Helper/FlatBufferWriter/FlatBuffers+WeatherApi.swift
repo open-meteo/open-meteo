@@ -1007,7 +1007,7 @@ extension MultiDomains {
         case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
         case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level:
-            return .iconD2Ruc
+            return .dwdIconD2RucNative
         case .dwd_icon_d2_native, .dwd_icon_d2_native_15min, .dwd_icon_d2_native_model_level:
             return .dwdIconD2Native
         case .ecmwf_ifs04:
