@@ -113,7 +113,7 @@ struct DownloadIconCommand: AsyncCommand {
      */
     func convertSurfaceElevation(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
-        let feed = outputs.downloadDomain == .aicon ? IconDownloadDomains.icon : outputs.downloadDomain
+        let feedStatic = outputs.nativeDomain.staticResourceDomain.downloadDomain
         let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
         let missingRemapped = outputs.remapped.flatMap { domain in
             FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) ? nil : domain
@@ -129,11 +129,10 @@ struct DownloadIconCommand: AsyncCommand {
         let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
-        let deadLineHours = feed.deadlineHours
+        let deadLineHours = feedStatic.deadlineHours
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
-        let downloader = IconGribDownloader(domain: feed, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
-        // AICON's side runs can bootstrap static fields from the preceding main ICON run.
-        let staticRun = outputs.downloadDomain == .aicon ? run.floor(toNearestHour: 6) : run
+        let downloader = IconGribDownloader(domain: feedStatic, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
+        let staticRun = run.floor(toNearest: feedStatic.updateIntervalSeconds)
         let surface = try await downloader.download(field: ("HSURF", "single-level", nil), run: staticRun, leadSeconds: 0)
         var hsurf = surface.data.data
         let land = try await downloader.download(field: ("FR_LAND", "single-level", nil), run: staticRun, leadSeconds: 0)
