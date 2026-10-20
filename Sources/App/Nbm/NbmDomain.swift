@@ -4,7 +4,7 @@ import OmFileFormat
 /**
 National Blend of Models domains
  */
-enum NbmDomain: String, GenericDomain, CaseIterable {
+enum NbmDomain: String, SyncGridDomain, CaseIterable {
     case nbm_conus
     case nbm_alaska
 
@@ -17,8 +17,13 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .nbm_conus:
+            return .ncep_nbm_conus
+        case .nbm_alaska:
+            return .ncep_nbm_alaska
+        }
     }
 
     var masterTimeRange: Range<Timestamp>? {
@@ -84,47 +89,6 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
 
     var omFileLength: Int {
         return 264 + 1 + 2 * 24 // 313
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .nbm_conus:
-            /** grib dump
-             Nx = 2345;
-             Ny = 1597;
-             latitudeOfFirstGridPointInDegrees = 19.229;
-             longitudeOfFirstGridPointInDegrees = 233.723;
-             LaDInDegrees = 25;
-             LoVInDegrees = 265;    -360 => -95
-             DxInMetres = 2539.7;
-             DyInMetres = 2539.7;
-             Latin1InDegrees = 25;
-             Latin2 = 25000000;
-             Latin2InDegrees = 25;
-             */
-            let proj = LambertConformalConicProjection(λ0: 265 - 360, ϕ0: 0, ϕ1: 25, ϕ2: 25, radius: 6371200)
-            return ProjectionGrid(nx: 2345, ny: 1597, latitude: 19.229, longitude: 233.723 - 360, dx: 2539.7, dy: 2539.7, projection: proj)
-        case .nbm_alaska:
-            /**
-             Nx = 1649;
-             Ny = 1105;
-             latitudeOfFirstGridPointInDegrees = 40.53;
-             longitudeOfFirstGridPointInDegrees = 181.429;
-             LaDInDegrees = 60;
-             orientationOfTheGridInDegrees = 210;
-             DxInMetres = 2976.56;
-             DyInMetres = 2976.56;
-             iScansNegatively = 0;
-             jScansPositively = 1;
-             jPointsAreConsecutive = 0;
-             alternativeRowScanning = 1;
-             gridType = polar_stereographic;
-             */
-            let proj = StereographicProjection(latitude: 90, longitude: 210, radius: 6371200)
-            // Note dx/dy would need to be scaled, because they are defined as 60° latitude
-            // ProjectionGrid(nx: 1649, ny: 1105, latitude: 40.53, longitude: 181.429-360, dx: 2976.56, dy: 2976.56, projection: proj)
-            return ProjectionGrid(nx: 1649, ny: 1105, latitude: 40.53...63.97579, longitude: (181.429 - 360)...(-93.689514), projection: proj)
-        }
     }
 
     /// Returns two grib files, in case grib messages are split in two differnent files

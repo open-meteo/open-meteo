@@ -235,7 +235,7 @@ struct GloFasDownloader: AsyncCommand {
     }
 }
 
-enum GloFasDomain: String, GenericDomain, CaseIterable {
+enum GloFasDomain: String, SyncGridDomain, CaseIterable {
     case forecast
     case consolidated
     case seasonal
@@ -276,21 +276,17 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return nil
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .forecast, .consolidated, .seasonal, .intermediate:
+            return .glofas_v4
+        case .forecastv3, .consolidatedv3, .seasonalv3, .intermediatev3:
+            return .glofas_v3
+        }
     }
 
     var masterTimeRange: Range<Timestamp>? {
         return nil
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .consolidated, .intermediate, .seasonal, .forecast:
-            return RegularGrid(nx: 7200, ny: 3000, latMin: -59.975, lonMin: -180.025, dx: 0.05, dy: 0.05)
-        case .consolidatedv3, .intermediatev3, .seasonalv3, .forecastv3:
-            return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
-        }
     }
 
     var isForecast: Bool {

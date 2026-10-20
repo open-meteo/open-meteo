@@ -1,53 +1,8 @@
 import Foundation
 
-enum KmaDomain: String, GenericDomain, CaseIterable {
+enum KmaDomain: String, SyncGridDomain, CaseIterable {
     case gdps
     case ldps
-
-    var grid: any Gridable {
-        switch self {
-        case .gdps:
-            return RegularGrid(nx: 2560, ny: 1920, latMin: -90 + 180 / 1920 / 2, lonMin: -180 + 360 / 2560 / 2, dx: 360 / 2560, dy: 180 / 1920)
-        case .ldps:
-            /**
-             # Lambert Conformal (can be secant or tangent, conical or bipolar)  (grib2/tables/4/3.1.table)
-               gridDefinitionTemplateNumber = 30;
-               # Earth assumed spherical with radius of 6,371,229.0 m (grib2/tables/4/3.2.table)
-               shapeOfTheEarth = 6;
-               Nx = 602;
-               Ny = 781;
-               latitudeOfFirstGridPointInDegrees = 32.2569;
-               longitudeOfFirstGridPointInDegrees = 121.834;
-               LaDInDegrees = 38;
-               LoVInDegrees = 126;
-               DxInMetres = 1500;
-               DyInMetres = 1500;
-               # (1=0)  North Pole is on the projection plane;(2=0)  Only one projection centre is used:grib2/tables/4/3.5.table
-               # flags: 00000000
-               projectionCentreFlag = 0;
-               iScansNegatively = 0;
-               jScansPositively = 1;
-               jPointsAreConsecutive = 0;
-               alternativeRowScanning = 0;
-               Latin1InDegrees = 30;
-               Latin2 = 60000000;
-               Latin2InDegrees = 60;
-               latitudeOfSouthernPoleInDegrees = 0;
-               longitudeOfSouthernPoleInDegrees = 0;
-               gridType = lambert;
-               NV = 0;
-             */
-            return ProjectionGrid(
-                nx: 602,
-                ny: 781,
-                latitude: 32.2569,
-                longitude: 121.834,
-                dx: 1500,
-                dy: 1500,
-                projection: LambertConformalConicProjection(λ0: 126, ϕ0: 38, ϕ1: 30, ϕ2: 60, radius: 6371229)
-            )
-        }
-    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -58,8 +13,13 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .gdps:
+            return .kma_gdps
+        case .ldps:
+            return .kma_ldps
+        }
     }
 
     var dtSeconds: Int {

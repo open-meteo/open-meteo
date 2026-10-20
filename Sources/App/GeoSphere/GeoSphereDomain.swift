@@ -4,7 +4,7 @@ import Vapor
 
 /// GeoSphere Austria AROME 2.5km regional model
 /// Data: https://data.hub.geosphere.at/dataset/nwp-v1-1h-2500m
-enum GeoSphereDomain: String, GenericDomain, CaseIterable {
+enum GeoSphereDomain: String, SyncGridDomain, CaseIterable {
     case arome_austria
 
     var domainRegistry: DomainRegistry {
@@ -14,9 +14,7 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .geosphere_arome_austria }
 
     var countEnsembleMember: Int {
         return 1
@@ -43,14 +41,6 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
     /// 60h forecast + 2 days buffer
     var omFileLength: Int {
         return 108
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .arome_austria:
-            // lon=594, lat=492, south-to-north
-            return RegularGrid(nx: 594, ny: 492, latMin: 42.981, lonMin: 5.498, dx: 0.028, dy: 0.018)
-        }
     }
 
     var updateIntervalSeconds: Int {

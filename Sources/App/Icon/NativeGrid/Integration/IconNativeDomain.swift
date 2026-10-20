@@ -1,20 +1,21 @@
-import OmFileFormat
-import Vapor
-
 /// An initialized native domain retaining its grid mapping and decoded elevations until restart.
 struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     let definition: IconNativeDomains
-    let nativeGrid: IconNativeGrid
+    let grid: any Gridable
 
     init(definition: IconNativeDomains, nativeGrid: IconNativeGrid) {
         self.definition = definition
-        self.nativeGrid = nativeGrid
+        self.grid = nativeGrid
     }
 
-    var grid: any Gridable { nativeGrid }
+    init(definition: IconNativeDomains) async throws {
+        self.definition = definition
+        self.grid = try await definition.asyncGridRegistry.load()
+    }
+
     var description: String { definition.rawValue }
     var domainRegistry: DomainRegistry { definition.domainRegistry }
-    var domainRegistryStatic: DomainRegistry? { definition.domainRegistryStatic }
+    var gridRegistry: GridRegistry { definition.gridRegistry }
     var dtSeconds: Int { definition.dtSeconds }
     var updateIntervalSeconds: Int { definition.updateIntervalSeconds }
     var masterTimeRange: Range<Timestamp>? { definition.masterTimeRange }
@@ -22,73 +23,4 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     var countEnsembleMember: Int { definition.countEnsembleMember }
     var generateFullRun: Bool { definition.generateFullRun }
     var generateTimeSeries: Bool { definition.generateTimeSeries }
-}
-
-extension IconNativeDomain {
-    init(definition: IconNativeDomains) async throws {
-        var grid = try await definition.nativeGridFile.load()
-        let payload = try? await OmFileSystemManager.instance.get(
-            file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
-            client: .shared, logger: IconNativeDomains.logger
-        )
-        let elevations: ElevationValues?
-        if let payload {
-            elevations = try await ElevationValues(decoded: payload.reader.read(), expectedCount: grid.nx)
-        } else {
-            elevations = nil
-        }
-        grid.elevations = elevations
-        self.init(definition: definition, nativeGrid: grid)
-    }
-}
-
-actor IconNativeDomainCache {
-    private enum State {
-        case loading([CheckedContinuation<IconNativeDomain, any Error>])
-        case loaded(IconNativeDomain)
-        case error(any Error)
-    }
-
-    private var cache = [IconNativeDomains: State]()
-
-    func load(_ definition: IconNativeDomains) async throws -> IconNativeDomain {
-        // Model-level and quarter-hourly domains share their parent's grid and elevations.
-        let resourceDefinition = definition.modelLevelParent ?? definition.quarterHourlyParent ?? definition
-        switch cache[resourceDefinition] {
-        case .loaded(let domain):
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
-        case .loading(var continuations):
-            let domain = try await withCheckedThrowingContinuation { continuation in
-                continuations.append(continuation)
-                cache[resourceDefinition] = .loading(continuations)
-            }
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
-        case .error(let error):
-            throw error
-        case nil:
-            cache[resourceDefinition] = .loading([])
-        }
-        do {
-            let domain = try await IconNativeDomain(definition: resourceDefinition)
-            guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
-                fatalError("Expected loading state")
-            }
-
-            cache[resourceDefinition] = .loaded(domain)
-           
-            for continuation in continuations {
-                continuation.resume(returning: domain)
-            }
-            return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)
-        } catch {
-            guard case .loading(let continuations) = cache.removeValue(forKey: resourceDefinition) else {
-                fatalError("Expected loading state")
-            }
-            for continuation in continuations {
-                continuation.resume(throwing: error)
-            }
-            cache[resourceDefinition] = .error(error)
-            throw error
-        }
-    }
 }

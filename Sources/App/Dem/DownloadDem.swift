@@ -11,37 +11,10 @@ import OmFileFormat
 
  Total size after conversion `10.48 GB`
  */
-struct Dem90: GenericDomain {
-    var grid: any Gridable {
-        fatalError("Dem90 does not offer a grid")
-    }
+struct Dem90: DatasetDefinition {
 
     var domainRegistry: DomainRegistry {
         return .copernicus_dem90
-    }
-
-    var domainRegistryStatic: DomainRegistry? {
-        return .copernicus_dem90
-    }
-
-    var dtSeconds: Int {
-        return 0
-    }
-
-    var masterTimeRange: Range<Timestamp>? {
-        return nil
-    }
-
-    var omFileLength: Int {
-        return 0
-    }
-    
-    var countEnsembleMember: Int {
-        return 1
-    }
-
-    var updateIntervalSeconds: Int {
-        return 0
     }
 
     /// Get elevation for coordinate. Access to om files is cached.

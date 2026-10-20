@@ -647,7 +647,7 @@ struct IconDownloadOutputs: Sendable {
     init(_ domain: IconNativeDomains, skipRegridding: Bool = false) async throws {
         self.downloadDomain = domain.downloadDomain
         self.nativeDomain = domain
-        let grid = try await domain.nativeGridFile.load()
+        let grid = try await IconNativeGridFile.forGrid(domain.asyncGridRegistry).load()
         self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
         self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
         self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil

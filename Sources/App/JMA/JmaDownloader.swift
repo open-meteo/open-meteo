@@ -482,7 +482,7 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
  */
 typealias JmaVariable = SurfaceAndPressureVariable<JmaSurfaceVariable, JmaPressureVariable>
 
-enum JmaDomain: String, GenericDomain, CaseIterable {
+enum JmaDomain: String, SyncGridDomain, CaseIterable {
     case gsm
     case msm
     case msm_upper_level
@@ -498,8 +498,15 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .gsm:
+            return .jma_gsm
+        case .msm:
+            return .jma_msm
+        case .msm_upper_level:
+            return .jma_msm_upper_level
+        }
     }
 
     var countEnsembleMember: Int {
@@ -589,16 +596,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: any Gridable {
-        switch self {
-        case .gsm:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .msm:
-            return RegularGrid(nx: 481, ny: 505, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
-        case .msm_upper_level:
-            return RegularGrid(nx: 241, ny: 253, latMin: 22.4, lonMin: 120, dx: 0.125, dy: 0.1)
-        }
-    }
 }
 
 extension Timestamp {

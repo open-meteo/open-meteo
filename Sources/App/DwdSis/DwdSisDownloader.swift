@@ -214,22 +214,14 @@ struct DwdSisDownloader: AsyncCommand {
     }
 }
 
-enum DwdSisDomain: String, CaseIterable, GenericDomain {
+enum DwdSisDomain: String, CaseIterable, SyncGridDomain {
     case europe_africa_v4
-    
-    var grid: any Gridable {
-        // latitude = -38 ... 65
-        // longitude = -20 ... 60
-        return RegularGrid(nx: 3201, ny: 4121, latMin: -38, lonMin: -20, dx: 0.025, dy: 0.025)
-    }
-    
+
     var domainRegistry: DomainRegistry {
         return .dwd_sis_europe_africa_v4
     }
     
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .dwd_sis_europe_africa_v4 }
     
     var dtSeconds: Int {
         return 10*60
