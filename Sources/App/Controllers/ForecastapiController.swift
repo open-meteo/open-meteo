@@ -1233,14 +1233,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 
-    private static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
+    static var gfsGlobalDerivationGroup: RawReaderDerivationGroup {
         RawReaderDerivationGroup(
             primary: (GfsDomain.gfs013, Gfs013Variable.self),
             supplemental: (GfsDomain.gfs025, Gfs025Variable.self)
         )
     }
 
-    private static func hrrrDerivationGroup(include15Min: Bool) -> RawReaderDerivationGroup {
+    static func hrrrDerivationGroup(include15Min: Bool) -> RawReaderDerivationGroup {
         RawReaderDerivationGroup(
             domains: include15Min ? [GfsDomain.hrrr_conus, .hrrr_conus_15min] : [.hrrr_conus],
             variableType: HrrrVariable.self,
@@ -1903,35 +1903,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         return hourlyToMultiSameType(readers.compactMap { $0 }, prefetchAllReaders: prefetchAllReaders)
     }
 
-    // best_match may change its model selection over time, so native ICON intentionally takes priority here.
-    // Keep these storage pairs separate from the probability and quarter-hourly companions in best_match.
-    private static func makeBestMatchIconReader(
-        domain: IconDomains, native: IconNativeDomains,
-        lat: Float, lon: Float, elevation: Float,
-        mode: GridSelectionMode, options: GenericReaderOptions
-    ) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
-        let primary: [DomainReaderMapping.Source]
-        if let nativeGrid = try? await native.load() {
-            primary = [.domain(domain, IconVariable.self), .domain(nativeGrid, IconVariable.self)]
-        } else {
-            primary = [.domain(domain, IconVariable.self)]
-        }
-        let forecast = try await DomainReaderMapping.makeDomainReaders(sources: primary, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        guard !forecast.readers.isEmpty else {
-            if let error = forecast.unavailableRun { throw error }
-            return nil
-        }
-        var secondary: [DomainReaderMapping.Source] = []
-        if let modelLevel = native.modelLevelDomain {
-            if let modelLevelGrid = try? await modelLevel.load() {
-                secondary.append(.domain(modelLevelGrid, IconModelLevelVariable.self))
-            }
-        }
-        let supplemental = try await DomainReaderMapping.makeDomainReaders(sources: secondary, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode, options: options)
-        let readers = forecast.readers + supplemental.readers
-        return GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: true, smoothTransitions: false)
-    }
-
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool, include15Min: Bool) async throws -> ForecastReaderResult? {
         if let d = try await getDomainAndVariable(include15Min: include15Min) {
             return try await d.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1959,195 +1930,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 options: options
             )
         case .best_match:
-            let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ifsProbabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let gfsForecast = try await DomainReaderMapping(
-                    primary: [
-                        .mixedBeforeDerivation(Self.gfsGlobalDerivationGroup)
-                    ],
-                    prefetchAllReaders: true, requirePrimaryCoverage: true
-                ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-
-            // do not fail a request because people did not synchronize icon-native grid.bin file in the best_match branch
-            let icon = try await Self.makeBestMatchIconReader(domain: .icon, native: .iconNative, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                
-            guard
-                let gfs = gfsForecast?.hourly,
-                let gfsUvIndex = try await GfsDomain.gfs013.makeDerivedHourly(variableType: GfsUvIndexVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                let ifs025 = try await EcmwfDomain.ifs025.makeDerivedHourly(variableType: EcmwfIfsVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                let ifsHres = try await EcmwfEcpdsDomain.ifs.makeDerivedHourly(variableType: EcmwfEcdpsIfsVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            else {
-                throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-            }
-            // For Netherlands and Belgium use KNMI, IFS and ICON
-            if (49.35..<53.79).contains(lat), (2.19..<7.66).contains(lon), let knmiNetherlands = try await KnmiDomain.harmonie_arome_netherlands.makeDerivedHourly(variableType: KnmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await Self.makeBestMatchIconReader(domain: .iconEu, native: .iconEuNative, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let iconD2 = try await Self.makeBestMatchIconReader(domain: .iconD2, native: .iconD2Native, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let ruc: ForecastReaderResult?
-                do {
-                    ruc = try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
-                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                } catch IconNativeDomainError.missingGridArtifact, ForecastApiError.modelRunUnavailable {
-                    ruc = nil
-                }
-                return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
-                    ifsProbabilities?.asOptionalReader,
-                    gfsUvIndex,
-                    icon,
-                    iconEu,
-                    iconD2,
-                    ruc?.hourly,
-                    ifs025,
-                    ifsHres,
-                    knmiNetherlands
-                ])
-            }
-            // Scandinavian region, combine MetNo Nordic with IFS HRES
-            if lat >= 54.9, let _ = try await MetNoDomain.nordic_pp.makeHourlyReader(variableType: MetNoVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                guard let mapping = try await Self.metno_seamless.getDomainAndVariable() else {
-                    throw ModelError.domainInitFailed(domain: Self.metno_seamless.rawValue)
-                }
-                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            }
-            // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
-            if RegionGeometry.isInUKVArea(lat: lat, lon: lon) {
-                let mapping = DomainReaderMapping.multipleWithPrecipitationProbability([
-                    .domain(GfsDomain.gfs013, GfsUvIndexVariable.self),
-                    .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
-                    .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                    .domain(UkmoDomain.global_deterministic_10km, SurfaceAndPressureVariable<UkmoGlobalDeterministicSurfaceVariable, UkmoPressureVariable>.self),
-                    .domain(UkmoDomain.uk_deterministic_2km, UkmoVariable.self)
-                ], precipitationProb: EcmwfDomain.ifs025_ensemble)
-                return try await mapping.getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            }
-            // If Icon-d2 is available, use icon domains
-            if let iconD2 = try await Self.makeBestMatchIconReader(domain: .iconD2, native: .iconD2Native, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-               let iconD2_15min = try await Self.makeBestMatchIconReader(domain: .iconD2_15min, native: .iconD2Native15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await Self.makeBestMatchIconReader(domain: .iconEu, native: .iconEuNative, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let ruc: ForecastReaderResult?
-                do {
-                    ruc = try await Self.dwd_icon_d2_ruc_native.getDomainAndVariable()?
-                        .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                } catch IconNativeDomainError.missingGridArtifact, ForecastApiError.modelRunUnavailable {
-                    ruc = nil
-                }
-                return MultiDomains.hourlyToMultiSameType([
-                    ifsProbabilities?.asOptionalReader,
-                    iconProbabilities.asOptionalReader,
-                    gfs,
-                    ifsHres,
-                    icon,
-                    iconEu,
-                    iconD2,
-                    include15Min ? iconD2_15min : nil,
-                    ruc?.hourly
-                ])
-            }
-            // For western europe, use arome models
-            if (42.10..<51.32).contains(lat), (-6.18..<8.35).contains(lon) {
-                var meteofranceElevation = elevation
-                let aromeFranceHd15Min = try await MeteoFranceDomain.arome_france_hd_15min.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
-                if meteofranceElevation.isNaN, let aromeFranceHd15Min {
-                    meteofranceElevation = aromeFranceHd15Min.resolvedTargetElevation
-                }
-                let aromeFrance15Min = try await MeteoFranceDomain.arome_france_15min.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
-                if meteofranceElevation.isNaN, let aromeFrance15Min {
-                    meteofranceElevation = aromeFrance15Min.resolvedTargetElevation
-                }
-                if let aromeFranceHd = try await MeteoFranceDomain.arome_france_hd.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options) {
-                    if meteofranceElevation.isNaN {
-                        meteofranceElevation = aromeFranceHd.resolvedTargetElevation
-                    }
-                    let aromeFrance = try await MeteoFranceDomain.arome_france.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
-                    let arpegeEurope = try await MeteoFranceDomain.arpege_europe.makeDerivedHourly(variableType: MeteoFranceVariable.self, lat: lat, lon: lon, elevation: meteofranceElevation, mode: mode, options: options)
-                    return MultiDomains.hourlyToMultiSameType([
-                        gfsProbabilites?.asOptionalReader,
-                        iconProbabilities.asOptionalReader,
-                        gfs,
-                        icon,
-                        ifsHres,
-                        arpegeEurope,
-                        aromeFrance,
-                        aromeFranceHd,
-                        aromeFrance15Min,
-                        aromeFranceHd15Min
-                    ])
-                }
-            }
-            // For Northern Europe and Iceland use DMI Harmonie
-            if (44..<66).contains(lat), let dmiEurope = try await DmiDomain.harmonie_arome_europe.makeDerivedHourly(variableType: DmiVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let iconEu = try await Self.makeBestMatchIconReader(domain: .iconEu, native: .iconEuNative, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
-                    gfsProbabilites?.asOptionalReader,
-                    ifsProbabilities?.asOptionalReader,
-                    gfs,
-                    icon,
-                    iconEu,
-                    ifs025,
-                    ifsHres,
-                    dmiEurope
-                ])
-            }
-            // For North America, use HRRR
-            if let hrrr = try await DomainReaderMapping(
-                primary: [
-                    .mixedBeforeDerivation(Self.hrrrDerivationGroup(include15Min: include15Min))
-                ],
-                gridForBoundingBoxRequests: GfsDomain.hrrr_conus,
-                prefetchAllReaders: true, requirePrimaryCoverage: true
-            ).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.hourly {
-                let nbmProbabilities = try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
-                    gfsProbabilites?.asOptionalReader,
-                    nbmProbabilities?.asOptionalReader,
-                    icon,
-                    gfs,
-                    hrrr
-                ])
-            }
-            // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
-            if (22.4 + 5..<47.65 - 5).contains(lat),
-               (120 + 5..<150 - 5).contains(lon),
-               let jmaMsm = try await JmaDomain.msm.makeDerivedHourly(variableType: JmaSurfaceVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-               let jmaMsmUpper = try await JmaDomain.msm_upper_level.makeDerivedHourly(variableType: JmaPressureVariable.self, lat: lat, lon: lon, elevation: jmaMsm.resolvedTargetElevation, mode: mode, options: options) {
-                return MultiDomains.hourlyToMultiSameType([
-                    iconProbabilities.asOptionalReader,
-                    gfsProbabilites?.asOptionalReader,
-                    ifsProbabilities?.asOptionalReader,
-                    gfs,
-                    icon,
-                    ifsHres,
-                    jmaMsmUpper,
-                    jmaMsm
-                ])
-            }
-
-            // Remaining eastern europe
-            if let iconEu = try await Self.makeBestMatchIconReader(domain: .iconEu, native: .iconEuNative, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return MultiDomains.hourlyToMultiSameType([
-                    gfsProbabilites?.asOptionalReader,
-                    ifsProbabilities?.asOptionalReader,
-                    iconProbabilities.asOptionalReader,
-                    gfs,
-                    ifsHres,
-                    icon,
-                    iconEu
-                ])
-            }
-
-            // Remaining parts of the world
-            return MultiDomains.hourlyToMultiSameType([
-                iconProbabilities.asOptionalReader,
-                gfsProbabilites?.asOptionalReader,
-                ifsProbabilities?.asOptionalReader,
-                gfs,
-                icon,
-                ifsHres
-            ])
+            return try await Self.bestMatchMapping(lat: lat, lon: lon, include15Min: include15Min)
+                .getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             
         case .ecmwf_seasonal_seamless, .ecmwf_seasonal_ensemble_mean_seamless:
             let isEnsembleMean = self == .ecmwf_seasonal_ensemble_mean_seamless
