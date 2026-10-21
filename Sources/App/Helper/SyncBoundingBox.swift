@@ -94,8 +94,7 @@ struct SyncBoundingBox: Sendable {
         try Task.checkCancellation()
         let startTime = DispatchTime.now()
         let remote = CountingBackend(remote)
-        let reader = try await OmFileReader(fn: remote)
-        /// `chunkIndex()` reads the complete lookup table in one request.
+        let reader = try await OmFileReader(fn: OmReaderMemoryCache(backend: remote))
         guard let array = reader.asArray(of: Float.self) else {
             logger.info("Not a float array, type \(reader.dataType), copying whole: \(file)")
             return nil
@@ -106,7 +105,7 @@ struct SyncBoundingBox: Sendable {
             logger.info("Not an array on the model grid, dims \(dims), copying whole: \(file)")
             return nil
         }
-        var attributes = [OmFileReader<CountingBackend<Backend>>]()
+        var attributes = [OmFileReader<OmReaderMemoryCache<CountingBackend<Backend>>>]()
         for i in 0 ..< reader.numberOfChildren {
             guard let child = try await reader.getChild(i), child.numberOfChildren == 0,
                   (OmDataType.int8.rawValue ... OmDataType.string.rawValue).contains(child.dataType.rawValue) else {
