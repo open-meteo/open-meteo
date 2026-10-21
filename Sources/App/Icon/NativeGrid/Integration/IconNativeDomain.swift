@@ -22,6 +22,8 @@ struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     var countEnsembleMember: Int { definition.countEnsembleMember }
     var generateFullRun: Bool { definition.generateFullRun }
     var generateTimeSeries: Bool { definition.generateTimeSeries }
+    // Dedicated model-level domains have no surface variables to trigger metadata updates.
+    var updateMetaRequiresRepresentativeVariable: Bool { definition.modelLevelParent == nil }
 }
 
 extension IconNativeDomain {
