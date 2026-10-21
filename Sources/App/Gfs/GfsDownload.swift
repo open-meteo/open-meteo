@@ -254,6 +254,8 @@ struct GfsDownload: AsyncCommand {
             return elevation
         }()
 
+        let solarConverter = InstantaneousSolarRadiationConverter<GfsSurfaceField>()
+
         // Download HRRR 15 minutes data
         if domain == .hrrr_conus_15min {
             let handles = try await (0...(maxForecastHour ?? 18)).asyncFlatMap { forecastHour in
@@ -271,7 +273,9 @@ struct GfsDownload: AsyncCommand {
                 let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0, useAws: downloadFromAws)
-                for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
+                let messages = try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing)
+                // Inventories need not order the four subhourly samples chronologically.
+                for (variable, message) in messages.sorted(by: { ($0.variable.timestep ?? 0) < ($1.variable.timestep ?? 0) }) {
                     var grib2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                     guard let timestep = variable.timestep else {
                         continue
@@ -292,13 +296,10 @@ struct GfsDownload: AsyncCommand {
 
                     // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
                     if variable.variable.downloadField == .surface(.diffuse_radiation) {
-                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                        for i in grib2d.array.data.indices {
-                            if factor.data[i] < 0.05 {
-                                continue
-                            }
-                            grib2d.array.data[i] /= factor.data[i]
-                        }
+                        grib2d.array.data = await solarConverter.convert(data: grib2d.array.data, variable: .diffuse_radiation, member: 0,
+                            grid: domain.grid, time: timestamp, dtSeconds: domain.dtSeconds)
+                        // Analysis seeds KT but has no preceding forecast interval to store.
+                        if timestamp == run { continue }
                     }
                     try await writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data)
                 }
@@ -432,13 +433,10 @@ struct GfsDownload: AsyncCommand {
                     // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
                     if case .surface(let surface) = variable.variable.downloadField {
                         if domain == .hrrr_conus && [GfsSurfaceField.shortwave_radiation, .diffuse_radiation].contains(surface) {
-                            let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                            for i in grib2d.array.data.indices {
-                                if factor.data[i] < 0.05 {
-                                    continue
-                                }
-                                grib2d.array.data[i] /= factor.data[i]
-                            }
+                            grib2d.array.data = await solarConverter.convert(data: grib2d.array.data, variable: surface, member: member,
+                                grid: domain.grid, time: timestamp, dtSeconds: domain.dtSeconds)
+                            // Analysis seeds KT but has no preceding forecast interval to store.
+                            if timestamp == run { continue }
                         }
                     }
                     

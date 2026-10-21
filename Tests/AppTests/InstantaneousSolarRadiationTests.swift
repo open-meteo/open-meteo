@@ -6,6 +6,42 @@ import Testing
     let grid = RegularGrid(nx: 1, ny: 1, latMin: 47, lonMin: 4.5, dx: 1, dy: 1)
 
     @Test(arguments: [900, 3600, 10800])
+    func downloaderHistorySeparatesFieldsAndMembers(dtSeconds: Int) async {
+        let converter = InstantaneousSolarRadiationConverter<String>()
+        let previousTime = Timestamp(2022, 8, 17, 16)
+        let sunset = Timestamp(2022, 8, 17, 18).add(45 * 60)
+        let instant = Zensun.calculateRadiationInstant(grid: grid,
+            timerange: TimerangeDt(start: previousTime, nTime: 1, dtSeconds: 3600))[0]
+        let fields: [(String, Int, Float)] = [("shortwave", 0, 0.6), ("diffuse", 0, 0.3), ("shortwave", 1, 0.15)]
+        for (variable, member, kt) in fields {
+            _ = await converter.convert(data: [kt * instant * Zensun.solarConstant], variable: variable,
+                member: member, grid: grid, time: previousTime, dtSeconds: 3600)
+        }
+        let mean = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1,
+            timerange: TimerangeDt(start: sunset, nTime: 1, dtSeconds: dtSeconds)).data[0]
+        for (variable, member, kt) in fields {
+            // The last sample is 2h45m earlier, independently of the output averaging interval.
+            let data = await converter.convert(data: [0], variable: variable, member: member,
+                grid: grid, time: sunset, dtSeconds: dtSeconds)
+            #expect(data[0] > 0)
+            #expect(abs(data[0] - kt * Zensun.solarConstant * mean) < 0.001)
+            if dtSeconds == 900 && variable == "shortwave" && member == 0 {
+                #expect((data[0] * 100).rounded() / 100 == 15.85)
+            }
+            let missing = await converter.convert(data: [.nan], variable: variable, member: member,
+                grid: grid, time: sunset.add(60), dtSeconds: dtSeconds)
+            #expect(missing[0].isNaN)
+            let afterMissing = await converter.convert(data: [0], variable: variable, member: member,
+                grid: grid, time: sunset.add(120), dtSeconds: dtSeconds)
+            #expect(afterMissing == [0])
+        }
+        let newRun = InstantaneousSolarRadiationConverter<String>()
+        let unseeded = await newRun.convert(data: [0], variable: "shortwave", member: 0,
+            grid: grid, time: sunset, dtSeconds: dtSeconds)
+        #expect(unseeded == [0])
+    }
+
+    @Test(arguments: [900, 3600, 10800])
     func combinedGeometryMatchesSeparateCalculations(dtSeconds: Int) {
         // Include the date line and polar day/night in both hemispheres.
         let grid = RegularGrid(nx: 37, ny: 17, latMin: -80, lonMin: -180, dx: 10, dy: 10)

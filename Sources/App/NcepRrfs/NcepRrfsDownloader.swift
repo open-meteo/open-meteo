@@ -70,8 +70,8 @@ struct NcepRrfsDownloader: AsyncCommand {
         let trueNorth = domain == .ncep_rrfs_north_america
             ? domain.northAmericaGrid.getTrueNorthDirection() : domain.conusGrid.getTrueNorthDirection()
         let deaverager = GribDeaverager()
-        let previousSolarKt = VariablePerMemberStorage<String>()
-        let previousDiffuseRatio = VariablePerMemberStorage<String>()
+        let solarConverter = InstantaneousSolarRadiationConverter<String>()
+        let diffuseConverter = InstantaneousDiffuseRadiationConverter<String>()
         /// Uses instant and avg solar radiation to transfer this ratio to diffuse and clear sky radiation
         let usesSolarRatio = domain == .ncep_rrfs_conus || domain == .ncep_rrfs_north_america
         let lastHour = maxForecastHour ?? domain.forecastHours.upperBound
@@ -148,36 +148,27 @@ struct NcepRrfsDownloader: AsyncCommand {
                             var array = raw
                             if input.requiresSolarBackwardsConversion {
                                 let time = run.add(input.minute * 60)
-                                let previousTime = time.add(-domain.dtSeconds)
                                 if usesSolarRatio && variable.rawValue == "diffuse_radiation" {
                                     guard let totalInstant = await solarTotals.get(variable: .instant, timestamp: time, member: member) else {
                                         throw NcepRrfsError.missingSolarTotal
                                     }
                                     if input.minute == 0 {
                                         // Analysis has no averaged flux: only seed the ratio, never convert or write it.
-                                        var ratio = raw
-                                        ratio.data = Zensun.instantaneousDiffuseRadiationRatio(data: raw.data, shortwaveInstant: totalInstant.data)
-                                        await previousDiffuseRatio.set(variable: variable.rawValue, timestamp: time, member: member, data: ratio)
+                                        await diffuseConverter.seed(data: raw.data, shortwaveInstant: totalInstant.data,
+                                            variable: variable.rawValue, member: member, time: time)
                                         continue
                                     }
                                     guard let totalAverage = await solarTotals.get(variable: .average, timestamp: time, member: member) else {
                                         throw NcepRrfsError.missingSolarTotal
                                     }
-                                    let previous = await previousDiffuseRatio.remove(variable: variable.rawValue, timestamp: previousTime, member: member)
-                                    var ratio = raw
-                                    ratio.data = Zensun.instantaneousDiffuseRadiationToBackwardsAverage(data: &array.data,
+                                    array.data = await diffuseConverter.convert(data: array.data,
                                         shortwaveInstant: totalInstant.data, shortwaveAverage: totalAverage.data,
-                                        previous: previous.map { (time: previousTime, ratio: $0.data) }, grid: grid, time: time)
-                                    await previousDiffuseRatio.set(variable: variable.rawValue, timestamp: time, member: member, data: ratio)
+                                        variable: variable.rawValue, member: member, grid: grid, time: time)
                                     try await writer.write(time: time, member: member, variable: variable, data: array.data)
                                     continue
                                 }
-                                let previous = await previousSolarKt.remove(variable: variable.rawValue, timestamp: previousTime, member: member)
-                                var kt = raw
-                                kt.data = Zensun.instantaneousSolarRadiationToBackwardsAverage(data: &array.data,
-                                    previous: previous.map { (time: previousTime, clearnessIndex: $0.data) },
+                                array.data = await solarConverter.convert(data: array.data, variable: variable.rawValue, member: member,
                                     grid: grid, time: time, dtSeconds: domain.dtSeconds)
-                                await previousSolarKt.set(variable: variable.rawValue, timestamp: time, member: member, data: kt)
                                 // Analysis seeds KT but has no preceding forecast interval to store.
                                 guard input.minute > 0 else { continue }
                                 try await writer.write(time: time, member: member, variable: variable, data: array.data)

@@ -80,3 +80,23 @@ extension Zensun {
         return clearnessIndex
     }
 }
+
+/// One run's latest KT per field/member. Call in chronological order for each key.
+/// The history timestamp is independent of the output interval, including across missing steps.
+actor InstantaneousSolarRadiationConverter<Variable: Hashable & Sendable> {
+    private struct Key: Hashable {
+        let variable: Variable
+        let member: Int
+    }
+    private var history = [Key: (time: Timestamp, clearnessIndex: [Float])]()
+
+    func convert(data: [Float], variable: Variable, member: Int, grid: any Gridable,
+                 time: Timestamp, dtSeconds: Int) -> [Float] {
+        let key = Key(variable: variable, member: member)
+        var converted = data
+        let kt = Zensun.instantaneousSolarRadiationToBackwardsAverage(data: &converted,
+            previous: history[key], grid: grid, time: time, dtSeconds: dtSeconds)
+        history[key] = (time, kt)
+        return converted
+    }
+}

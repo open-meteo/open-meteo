@@ -3,6 +3,42 @@ import Testing
 @testable import App
 
 @Suite struct InstantaneousDiffuseRadiationTests {
+    @Test func converterKeepsIndependentHistoryAcrossIrregularSteps() async {
+        let converter = InstantaneousDiffuseRadiationConverter<String>()
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 47, lonMin: 4.5, dx: 1, dy: 1)
+        let analysis = Timestamp(2022, 8, 17, 12)
+        let sunset = Timestamp(2022, 8, 17, 19)
+        let fields: [(String, Int, Float)] = [("diffuse", 0, 100), ("diffuse", 1, 200), ("other", 0, 300)]
+        for (variable, member, flux) in fields {
+            await converter.seed(data: [flux], shortwaveInstant: [400], variable: variable, member: member, time: analysis)
+        }
+        for (variable, member, flux) in fields {
+            let averaged = await converter.convert(data: [0], shortwaveInstant: [0], shortwaveAverage: [80],
+                variable: variable, member: member, grid: grid, time: sunset)
+            #expect(averaged == [flux / 5]) // 20, 40 and 60 W/m² from independent cached ratios.
+        }
+        // A missing input clears only its own history.
+        let missing = await converter.convert(data: [.nan], shortwaveInstant: [0], shortwaveAverage: [40],
+            variable: "diffuse", member: 0, grid: grid, time: sunset.add(900))
+        #expect(missing[0].isNaN)
+        let afterMissing = await converter.convert(data: [0], shortwaveInstant: [0], shortwaveAverage: [40],
+            variable: "diffuse", member: 0, grid: grid, time: sunset.add(1800))
+        #expect(afterMissing[0].isNaN)
+        let otherMember = await converter.convert(data: [0], shortwaveInstant: [0], shortwaveAverage: [40],
+            variable: "diffuse", member: 1, grid: grid, time: sunset.add(1800))
+        #expect(otherMember == [20])
+        let night = await converter.convert(data: [0], shortwaveInstant: [0], shortwaveAverage: [0],
+            variable: "diffuse", member: 1, grid: grid, time: sunset.add(10800))
+        #expect(night == [0])
+        let afterNight = await converter.convert(data: [0], shortwaveInstant: [0], shortwaveAverage: [40],
+            variable: "diffuse", member: 1, grid: grid, time: sunset.add(14400))
+        #expect(afterNight[0].isNaN)
+        let newRun = InstantaneousDiffuseRadiationConverter<String>()
+        let unseeded = await newRun.convert(data: [0], shortwaveInstant: [0], shortwaveAverage: [80],
+            variable: "other", member: 0, grid: grid, time: sunset)
+        #expect(unseeded[0].isNaN)
+    }
+
     @Test func ratioSeedingHandlesMissingAndZeroTotals() {
         let ratio = Zensun.instantaneousDiffuseRadiationRatio(
             data: [100, 700, -10, .nan, 100, 0], shortwaveInstant: [400, 400, 400, 400, .nan, 0])

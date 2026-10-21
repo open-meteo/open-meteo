@@ -56,3 +56,30 @@ extension Zensun {
         return ratios
     }
 }
+
+/// One run's latest diffuse-to-total ratio per field/member, with actual sample timestamps.
+/// Call in chronological order for each key. Analysis can seed history without a total average.
+actor InstantaneousDiffuseRadiationConverter<Variable: Hashable & Sendable> {
+    private struct Key: Hashable {
+        let variable: Variable
+        let member: Int
+    }
+    private var history = [Key: (time: Timestamp, ratio: [Float])]()
+
+    func seed(data: [Float], shortwaveInstant: [Float], variable: Variable, member: Int, time: Timestamp) {
+        let key = Key(variable: variable, member: member)
+        precondition(history[key] == nil || history[key]!.time < time)
+        history[key] = (time, Zensun.instantaneousDiffuseRadiationRatio(data: data, shortwaveInstant: shortwaveInstant))
+    }
+
+    func convert(data: [Float], shortwaveInstant: [Float], shortwaveAverage: [Float],
+                 variable: Variable, member: Int, grid: any Gridable, time: Timestamp) -> [Float] {
+        let key = Key(variable: variable, member: member)
+        var converted = data
+        let ratio = Zensun.instantaneousDiffuseRadiationToBackwardsAverage(data: &converted,
+            shortwaveInstant: shortwaveInstant, shortwaveAverage: shortwaveAverage,
+            previous: history[key], grid: grid, time: time)
+        history[key] = (time, ratio)
+        return converted
+    }
+}
