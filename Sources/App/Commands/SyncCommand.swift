@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OmFileIO
 
 /**
 Download the open-meteo weather database from a S3 server.
@@ -20,6 +21,9 @@ DATA_DIRECTORY=/Volumes/2TB_1GBs/data/ API_SYNC_APIKEYS=123 openmeteo-api
 DATA_DIRECTORY=/Volumes/2TB_1GBs/data2/ openmeteo-api sync cmc_gem_gdps,dwd_icon_d2,dwd_icon temperature_2m --server http://127.0.0.1:8080/ --apikey 123 --past-days 30 --repeat-interval 5
 */
 struct SyncCommand: AsyncCommand {
+    /// A failed model marks the process as failed, so the command ends non-zero after the other models synced
+    var exitStatus: ProcessExitStatus = .shared
+
     var help: String {
         return "Download the open-meteo weather database from a S3 server."
     }
@@ -74,7 +78,24 @@ struct SyncCommand: AsyncCommand {
             }
         }
         let modelsSet = try signature.models.split(separator: ";").map({
-            try DomainRegistry.load(commaSeparated: String($0))
+            var models = try DomainRegistry.load(commaSeparated: String($0))
+            // ICON readers also use variables stored on the native grid.
+            for (model, native) in [
+                (DomainRegistry.dwd_icon_d2, DomainRegistry.dwd_icon_d2_native),
+                (.dwd_icon_eu, .dwd_icon_eu_native),
+                (.dwd_icon, .dwd_icon_global_native),
+                (.dwd_icon_d2_eps, .dwd_icon_d2_eps_native),
+                (.dwd_icon_eu_eps, .dwd_icon_eu_eps_native),
+                (.dwd_icon_eps, .dwd_icon_global_eps_native),
+                (.dwd_icon_d2_eps_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean),
+                (.dwd_icon_eu_eps_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean),
+                (.dwd_icon_eps_ensemble_mean, .dwd_icon_global_eps_native_ensemble_mean)
+            ] {
+                if models.contains(model) && !models.contains(native) {
+                    models.append(native)
+                }
+            }
+            return models
         })
         guard Curl.cacheDirectory == nil else {
             fatalError("HTTP_CACHE enabled")
@@ -123,7 +144,6 @@ struct SyncCommand: AsyncCommand {
             let (models, variablesSig) = arg1
             
             return models.map { model in
-                let server = server.replacing("MODEL", with: model.bucketName)
                 return (server, model, variablesSig)
             }
         }.grouped(by: { $0.server }).flatMap( { $0.value })
@@ -151,6 +171,7 @@ struct SyncCommand: AsyncCommand {
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
+                        exitStatus.markFailure()
                     }
                 }
                 if downloadPressureNow {
@@ -183,7 +204,7 @@ struct SyncCommand: AsyncCommand {
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
         /// Get a list of all variables from all models
-        let remoteDirectories = try await S3List.s3list(client: client, server: server, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
+        let remoteDirectories = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
         
         /// Filter variables to download
         let toDownload: [S3List.ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3List.ListV2File] in
@@ -202,7 +223,7 @@ struct SyncCommand: AsyncCommand {
                     variables.contains(where: { $0 == variable }) else {
                 return []
             }
-            let remote = try await S3List.s3list(client: client, server: server, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
+            let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
             let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
             return Array(filtered)
         }.flatMap({$0})
@@ -217,7 +238,7 @@ struct SyncCommand: AsyncCommand {
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
             var request = ClientRequest(url: URI("\(server)\(download.name)"))
             if apikey != nil {
-                try request.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
+                try request.query.encode(S3DataController.DownloadParams(apikey: apikey))
             }
             let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
             let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
@@ -242,7 +263,7 @@ struct SyncCommand: AsyncCommand {
                         try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
                         await progress.add(try response.contentLength() ?? 0)
                         break
-                    } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
+                    } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                         /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
                         try FileManager.default.removeItemIfExists(at: localFile)
                     }
@@ -274,7 +295,7 @@ fileprivate extension URL {
 fileprivate extension Array where Element == S3List.ListV2File {
     /// Only include files with data newer than a given timestamp. This is based on evaluating the time-chunk in the filename and is not based on the modification time
     func includeFiles(timeRange: Range<Timestamp>, domain registry: DomainRegistry) -> [Element] {
-        guard let domain = registry.getDomain() else {
+        guard let domain = registry.timeSeriesMetadata else {
             return []
         }
         let omFileLength = domain.omFileLength
@@ -314,11 +335,10 @@ fileprivate extension Array where Element == S3List.ListV2File {
             if remoteFile.name.contains("meta.json") {
                 /// meta.json is modified during sync to replace the `last_run_availability_time`.
                 /// Size might be different. Only check for modification time.
-                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
             }
             // Add one seconds delay due to inaccuracy in timestamps
-            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
         })
     }
 }
-

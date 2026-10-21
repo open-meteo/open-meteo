@@ -6,6 +6,51 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         let previousDay = Int16(previousDay)
         switch variable {
+        case .soil_moisture_0cm:
+            return .init(variable: .soilMoisture, depth: 0, previousDay: previousDay)
+        case .soil_moisture_100cm:
+            return .init(variable: .soilMoisture, depth: 100, previousDay: previousDay)
+        case .soil_moisture_10cm:
+            return .init(variable: .soilMoisture, depth: 10, previousDay: previousDay)
+        case .soil_moisture_160cm:
+            return .init(variable: .soilMoisture, depth: 160, previousDay: previousDay)
+        case .soil_moisture_1cm:
+            return .init(variable: .soilMoisture, depth: 1, previousDay: previousDay)
+        case .soil_moisture_300cm:
+            return .init(variable: .soilMoisture, depth: 300, previousDay: previousDay)
+        case .soil_moisture_30cm:
+            return .init(variable: .soilMoisture, depth: 30, previousDay: previousDay)
+        case .soil_moisture_4cm:
+            return .init(variable: .soilMoisture, depth: 4, previousDay: previousDay)
+        case .soil_moisture_60cm:
+            return .init(variable: .soilMoisture, depth: 60, previousDay: previousDay)
+        case .soil_temperature_100cm:
+            return .init(variable: .soilTemperature, depth: 100, previousDay: previousDay)
+        case .soil_temperature_10cm:
+            return .init(variable: .soilTemperature, depth: 10, previousDay: previousDay)
+        case .soil_temperature_160cm:
+            return .init(variable: .soilTemperature, depth: 160, previousDay: previousDay)
+        case .soil_temperature_1cm:
+            return .init(variable: .soilTemperature, depth: 1, previousDay: previousDay)
+        case .soil_temperature_300cm:
+            return .init(variable: .soilTemperature, depth: 300, previousDay: previousDay)
+        case .soil_temperature_30cm:
+            return .init(variable: .soilTemperature, depth: 30, previousDay: previousDay)
+        case .soil_temperature_4cm:
+            return .init(variable: .soilTemperature, depth: 4, previousDay: previousDay)
+        case .soil_temperature_60cm:
+            return .init(variable: .soilTemperature, depth: 60, previousDay: previousDay)
+        case .temperature_160m:
+            return .init(variable: .temperature, altitude: 160, previousDay: previousDay)
+        case .temperature_30m:
+            return .init(variable: .temperature, altitude: 30, previousDay: previousDay)
+        case .temperature_320m:
+            return .init(variable: .temperature, altitude: 320, previousDay: previousDay)
+        case .wind_direction_320m:
+            return .init(variable: .windDirection, altitude: 320, previousDay: previousDay)
+        case .wind_speed_320m:
+            return .init(variable: .windSpeed, altitude: 320, previousDay: previousDay)
+
         case .temperature:
             return .init(variable: .temperature, altitude: 2, previousDay: previousDay)
         case .windspeed:
@@ -121,15 +166,15 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .soil_moisture_9_to_27cm:
             return .init(variable: .soilMoisture, depth: 9, depthTo: 27, previousDay: previousDay)
         case .soil_moisture_index_0_to_100cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 100, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 0, depthTo: 100, previousDay: previousDay)
         case .soil_moisture_index_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 0, depthTo: 7, previousDay: previousDay)
         case .soil_moisture_index_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 100, depthTo: 255, previousDay: previousDay)
         case .soil_moisture_index_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 28, depthTo: 100, previousDay: previousDay)
         case .soil_moisture_index_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28, previousDay: previousDay)
+            return .init(variable: .soilMoistureIndex, depth: 7, depthTo: 28, previousDay: previousDay)
         case .soil_temperature_0_to_100cm:
             return .init(variable: .soilTemperature, depth: 0, depthTo: 100, previousDay: previousDay)
         case .soil_temperature_0_to_10cm:
@@ -298,6 +343,14 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance, previousDay: previousDay)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant, previousDay: previousDay)
+        case .cloud_ceiling:
+            return .init(variable: .cloudCeiling, previousDay: previousDay)
+        case .freezing_rain:
+            return .init(variable: .freezingRain, previousDay: previousDay)
+        case .radar_reflectivity:
+            return .init(variable: .radarReflectivity, previousDay: previousDay)
+        case .categorical_freezing_rain:
+            return .init(variable: .categoricalFreezingRain, previousDay: previousDay)
         case .cloud_base:
             return .init(variable: .cloudBase, previousDay: previousDay)
         case .cloud_top:
@@ -397,9 +450,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .snow_depth_water_equivalent:
             return .init(variable: .snowDepthWaterEquivalent, previousDay: previousDay)
         case .temperature_2m_max:
-            return .init(variable: .temperature, aggregation: .max, altitude: 2, previousDay: previousDay)
+            return .init(variable: .temperature, aggregation: .maximum, altitude: 2, previousDay: previousDay)
         case .temperature_2m_min:
-            return .init(variable: .temperature, aggregation: .min, altitude: 2, previousDay: previousDay)
+            return .init(variable: .temperature, aggregation: .minimum, altitude: 2, previousDay: previousDay)
         case .soil_moisture_81_to_243cm:
             return .init(variable: .soilMoisture, depth: 81, depthTo: 243, previousDay: previousDay)
         case .soil_moisture_243_to_729cm:
@@ -449,7 +502,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .ocean_current_direction:
             return .init(variable: .oceanCurrentDirection)
         case .wave_peak_period:
-            return .init(variable: .wavePeriod)
+            return .init(variable: .wavePeakPeriod)
         case .sea_level_height_msl:
             return .init(variable: .seaLevelHeightMsl)
         case .invert_barometer_height:
@@ -819,6 +872,12 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .sunrise)
         case .sunset:
             return .init(variable: .sunset)
+        case .moonrise:
+            return .init(variable: .moonrise)
+        case .moonset:
+            return .init(variable: .moonset)
+        case .moon_phase:
+            return .init(variable: .moonPhase)
         case .surface_pressure_max:
             return .init(variable: .surfacePressure, aggregation: .maximum)
         case .surface_pressure_mean:
@@ -948,7 +1007,17 @@ extension MultiDomains {
         switch self {
         case .best_match:
             return .bestMatch
-        case .gfs_seamless, .ncep_seamless:
+        case .ncep_rrfs_seamless:
+            return .ncepRrfsSeamless
+        case .ncep_rrfs_conus:
+            return .ncepRrfsConus
+        case .ncep_rrfs_conus_15min:
+            return .ncepRrfsConus15min
+        case .ncep_rrfs_conus_ensemble:
+            return .ncepRrfsConusEnsemble
+        case .ncep_rrfs_north_america:
+            return .ncepRrfsNorthAmerica
+        case .gfs_seamless, .ncep_seamless, .ncep_gfs_seamless:
             return .gfsSeamless
         case .gfs_mix, .gfs_global, .ncep_gfs_global:
             return .gfsGlobal
@@ -972,7 +1041,7 @@ extension MultiDomains {
             return .jmaMsm
         case .jms_gsm, .jma_gsm:
             return .jmaGsm
-        case .gem_seamless:
+        case .gem_seamless, .cmc_gem_seamless:
             return .gemSeamless
         case .gem_global, .cmc_gem_gdps:
             return .gemGlobal
@@ -986,10 +1055,26 @@ extension MultiDomains {
             return .iconSeamless
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
+        case .dwd_aicon_global_native:
+            return .dwdAiconGlobalNative
+        case .dwd_icon_global_native, .dwd_icon_global_native_model_level:
+            return .dwdIconGlobalNative
         case .icon_eu, .dwd_icon_eu:
             return .iconEu
+        case .dwd_icon_eu_native, .dwd_icon_eu_native_model_level:
+            return .dwdIconEuNative
+        case .dwd_icon_global_eps_native:
+            return .dwdIconGlobalEpsNative
+        case .dwd_icon_eu_eps_native:
+            return .dwdIconEuEpsNative
+        case .dwd_icon_d2_eps_native:
+            return .dwdIconD2EpsNative
         case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
+        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level:
+            return .dwdIconD2RucNative
+        case .dwd_icon_d2_native, .dwd_icon_d2_native_15min, .dwd_icon_d2_native_model_level:
+            return .dwdIconD2Native
         case .ecmwf_ifs04:
             return .ecmwfIfs04
         case .metno_nordic:
@@ -998,6 +1083,10 @@ extension MultiDomains {
             return .geosphereAromeAustria
         case .chmi_aladin_cz_1km:
             return .chmiAladinCz1km
+        case .chmi_aladin_central_europe_2km:
+            return .chmiAladinCentralEurope2km
+        case .chmi_aladin_seamless:
+            return .chmiAladinSeamless
         case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
         case .era5, .copernicus_era5:
@@ -1116,17 +1205,17 @@ extension MultiDomains {
             return .meteoswissIconSeamless
         case .ncep_nam_conus:
             return .ncepNamConus
-        case .icon_seamless_eps:
+        case .icon_seamless_eps, .dwd_icon_seamless_eps:
             return .iconSeamless
-        case .icon_global_eps:
+        case .icon_global_eps, .dwd_icon_global_eps:
             return .iconGlobal
-        case .icon_eu_eps:
+        case .icon_eu_eps, .dwd_icon_eu_eps:
             return .iconEu
-        case .icon_d2_eps:
+        case .icon_d2_eps, .dwd_icon_d2_eps:
             return .iconD2
         case .ecmwf_ifs025_ensemble:
             return .ecmwfIfs025
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .cmc_gem_geps:
             return .gemGlobal
         case .ncep_gefs_seamless:
             return .gfsSeamless
@@ -1158,9 +1247,9 @@ extension MultiDomains {
             return .ecmwfEc46
         case .marine_best_match:
             return .bestMatch
-        case .gwam:
+        case .gwam, .dwd_gwam:
             return .gwam
-        case .ewam:
+        case .ewam, .dwd_ewam:
             return .ewam
         case .era5_ocean:
             return .era5Ocean

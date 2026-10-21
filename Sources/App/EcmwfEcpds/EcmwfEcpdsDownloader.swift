@@ -290,7 +290,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                                     continue
                                 }
                                 // Scaling before compression with scalefactor
-                                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds, domain: domain) {
                                     data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                                 }
                                 let count = await inMemoryAccumulated.data.count
@@ -301,7 +301,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         }
                         
                         // Scaling before compression with scalefactor. Note: does not set dtSeconds because aggregated data is processed above
-                        if let fma = variable.multiplyAdd(dtSeconds: 0) {
+                        if let fma = variable.multiplyAdd(dtSeconds: 0, domain: domain) {
                             grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         
@@ -398,10 +398,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         logger.info("Got \(shortName)")
                         var d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                         if shortName == "lsm" {
-                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain)
+                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
                         } else {
                             d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain)
+                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
                         }
                         return
                     }
@@ -444,7 +444,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     }
                     
                     // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds, domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     

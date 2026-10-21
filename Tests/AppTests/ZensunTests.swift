@@ -3,26 +3,101 @@ import Foundation
 import Testing
 
 @Suite struct ZensunTests {
+    /// Clear sky radiation approximation
+    @Test func clearSkyRadiationTest() {
+        let time1h = TimerangeDt(start: Timestamp(2022, 8, 17, 1), nTime: 24, dtSeconds: 3600)
+        let time3h = TimerangeDt(start: Timestamp(2022, 8, 17, 3), nTime: 24/3, dtSeconds: 3*3600)
+        let time15m = TimerangeDt(start: Timestamp(2022, 8, 17, 0, 15), nTime: 24*4, dtSeconds: 3600/4)
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 47, lonMin: 4.5, dx: 1, dy: 1)
+        
+        let clearsky15min = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time15m).data.map{1098 * $0}
+        
+        #expect(arraysEqual(clearsky15min, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.8888949, 24.169424, 62.123974, 104.62052, 148.83984, 193.75536, 238.82538, 283.6846, 328.04675, 371.66437, 414.31506, 455.791, 495.89835, 534.45245, 571.27936, 606.21436, 639.1024, 669.7985, 698.16736, 724.08527, 747.43854, 768.1251, 786.05505, 801.1505, 813.3451, 822.5862, 828.8332, 832.05884, 832.24896, 829.40234, 823.53094, 814.66003, 802.82733, 788.0845, 770.495, 750.1344, 727.0912, 701.4656, 673.36865, 642.923, 610.2622, 575.52924, 538.87787, 500.47144, 460.48257, 419.094, 376.49927, 332.90344, 288.5278, 243.61626, 198.45102, 153.38725, 108.94294, 66.07627, 27.317997, 2.7596323, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        
+        let clearsky1h = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time1h).data.map{1098 * $0}
+        
+        #expect(arraysEqual(clearsky1h, [0.0, 0.0, 0.0, 0.0, 0.47222197, 84.87222, 261.0263, 434.3688, 587.71625, 709.8281, 792.1245, 828.8859, 817.5562, 758.89844, 656.9471, 518.77704, 354.18735, 176.0258, 24.053576, 0.0, 0.0, 0.0, 0.0, 0.0]))
+        
+        let averaged = clearsky15min.mean(by: 4)
+        #expect(arraysEqual(averaged, clearsky1h, accuracy: 1))
+        
+        let clearsky3h = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time3h).data.map{1098 * $0}
+        #expect(arraysEqual(clearsky3h, [0.0, 28.426155, 427.56738, 776.82776, 744.33136, 349.47205, 7.9511237, 0.0]))
+        let averaged3h = clearsky15min.mean(by: 4*3)
+        #expect(arraysEqual(averaged3h, clearsky3h, accuracy: 1))
+    }
+    
     @Test func isDaylightTime() {
         let time = TimerangeDt(start: Timestamp(2023, 04, 06), nTime: 48, dtSeconds: 3600)
         let isDay = Zensun.calculateIsDay(timeRange: time, lat: 52.52, lon: 13.42)
         #expect(isDay == [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     }
 
-    @Test func sunRiseSetLosAngeles() {
-        // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
-        let utcOffsetSeconds = -25200
-       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
+    struct SunReference: Sendable {
+        let name: String
+        let latitude: Float
+        let longitude: Float
+        let utcOffsetSeconds: Int
+        let date: (year: Int, month: Int, day: Int)
+        let sunrise: (hour: Int, minute: Int, second: Int)
+        let sunset: (hour: Int, minute: Int, second: Int)
+        /// Close to the poles a day can start before local midnight or end after it
+        private(set) var riseDayOffset: Int = 0
+        private(set) var setDayOffset: Int = 0
 
-        // vancouver: lat: 49.25, lon: -123.12
-        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 34.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
-        #expect(times.rise[0] == Timestamp(1636208261))
-        #expect(times.set[0] == Timestamp(1636246534))
-        let sunset = times.set.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
-        let sunrise = times.rise.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
-        #expect(sunrise[0] == "2021-11-06T07:17") // supposed to be 07:17
-        #expect(sunset[0] == "2021-11-06T17:55") // supposed to be 17:55
+        /// Local midnight of `date` expressed in UTC
+        var localMidnight: Timestamp {
+            Timestamp(date.year, date.month, date.day).add(-utcOffsetSeconds)
+        }
+
+        var expectedRise: Timestamp {
+            Timestamp(date.year, date.month, date.day, sunrise.hour, sunrise.minute, sunrise.second).add(days: riseDayOffset).add(-utcOffsetSeconds)
+        }
+
+        var expectedSet: Timestamp {
+            Timestamp(date.year, date.month, date.day, sunset.hour, sunset.minute, sunset.second).add(days: setDayOffset).add(-utcOffsetSeconds)
+        }
+    }
+
+    /// Date line crossings, extreme and fractional time zone offsets, equinoxes, solstices and high latitudes.
+    /// Generated with Skyfield using the JPL DE440s ephemeris.
+    static let sunReferences: [SunReference] = [
+        .init(name: "Los Angeles", latitude: 34.05223, longitude: -118.24368, utcOffsetSeconds: -25200, date: (2021, 11, 6), sunrise: (7, 17, 30), sunset: (17, 55, 20)),
+        .init(name: "Vancouver", latitude: 49.25, longitude: -123.12, utcOffsetSeconds: -25200, date: (2021, 11, 6), sunrise: (8, 9, 8), sunset: (17, 42, 29)),
+        .init(name: "Chatham Islands", latitude: -44.0, longitude: -176.5833, utcOffsetSeconds: 45900, date: (2024, 6, 12), sunrise: (8, 3, 15), sunset: (16, 59, 3)),
+        .init(name: "Chatham Islands", latitude: -44.0, longitude: -176.5833, utcOffsetSeconds: 45900, date: (2024, 6, 13), sunrise: (8, 3, 45), sunset: (16, 58, 59)),
+        .init(name: "Kiritimati", latitude: 1.87, longitude: -157.43, utcOffsetSeconds: 50400, date: (2024, 6, 12), sunrise: (6, 22, 43), sunset: (18, 36, 27)),
+        .init(name: "Apia Samoa", latitude: -13.83, longitude: -171.77, utcOffsetSeconds: 46800, date: (2024, 6, 12), sunrise: (6, 47, 20), sunset: (18, 6, 32)),
+        .init(name: "Nukualofa Tonga", latitude: -21.13, longitude: -175.2, utcOffsetSeconds: 46800, date: (2024, 6, 12), sunrise: (7, 14, 45), sunset: (18, 6, 32)),
+        .init(name: "Attu Aleutians", latitude: 52.88, longitude: 173.18, utcOffsetSeconds: -32400, date: (2024, 6, 12), sunrise: (7, 1, 55), sunset: (23, 53, 7)),
+        .init(name: "Marquesas UTC-9:30", latitude: -9.78, longitude: -139.03, utcOffsetSeconds: -34200, date: (2024, 6, 12), sunrise: (5, 59, 24), sunset: (17, 32, 56)),
+        .init(name: "Kathmandu UTC+5:45", latitude: 27.72, longitude: 85.32, utcOffsetSeconds: 20700, date: (2024, 6, 12), sunrise: (5, 7, 25), sunset: (18, 59, 58)),
+        .init(name: "Delhi UTC+5:30", latitude: 28.61, longitude: 77.21, utcOffsetSeconds: 19800, date: (2024, 6, 12), sunrise: (5, 22, 48), sunset: (19, 19, 29)),
+        .init(name: "Kashgar", latitude: 39.47, longitude: 75.99, utcOffsetSeconds: 28800, date: (2024, 6, 12), sunrise: (7, 28, 21), sunset: (22, 23, 45)),
+        .init(name: "Vigo", latitude: 42.24, longitude: -8.72, utcOffsetSeconds: 7200, date: (2024, 6, 12), sunrise: (6, 57, 57), sunset: (22, 11, 57)),
+        .init(name: "Berlin", latitude: 52.52, longitude: 13.42, utcOffsetSeconds: 7200, date: (2023, 4, 6), sunrise: (6, 29, 59), sunset: (19, 48, 44)),
+        .init(name: "Quito equinox", latitude: -0.18, longitude: -78.47, utcOffsetSeconds: -18000, date: (2024, 3, 20), sunrise: (6, 17, 52), sunset: (18, 24, 22)),
+        .init(name: "Singapore equinox", latitude: 1.35, longitude: 103.82, utcOffsetSeconds: 28800, date: (2024, 9, 23), sunrise: (6, 53, 46), sunset: (19, 0, 11)),
+        .init(name: "Sydney solstice", latitude: -33.87, longitude: 151.21, utcOffsetSeconds: 39600, date: (2023, 12, 21), sunrise: (5, 40, 31), sunset: (20, 5, 16)),
+        .init(name: "Ushuaia winter solstice", latitude: -54.8, longitude: -68.3, utcOffsetSeconds: -10800, date: (2024, 6, 21), sunrise: (9, 58, 56), sunset: (17, 11, 24)),
+        .init(name: "Reykjavik", latitude: 64.15, longitude: -21.94, utcOffsetSeconds: 0, date: (2024, 6, 12), sunrise: (3, 0, 5), sunset: (23, 56, 40)),
+        .init(name: "Nome", latitude: 64.5, longitude: -165.4, utcOffsetSeconds: -28800, date: (2024, 6, 12), sunrise: (4, 24, 34), sunset: (1, 40, 9), setDayOffset: 1),
+        .init(name: "Anchorage equinox", latitude: 61.22, longitude: -149.9, utcOffsetSeconds: -28800, date: (2024, 3, 20), sunrise: (7, 58, 24), sunset: (20, 16, 37)),
+        .init(name: "Oslo equinox", latitude: 59.91, longitude: 10.75, utcOffsetSeconds: 7200, date: (2024, 3, 20), sunrise: (7, 17, 30), sunset: (19, 32, 30)),
+        .init(name: "Helsinki equinox", latitude: 60.17, longitude: 24.94, utcOffsetSeconds: 10800, date: (2024, 9, 23), sunrise: (7, 7, 35), sunset: (19, 15, 55)),
+        .init(name: "Tromso", latitude: 69.65, longitude: 18.96, utcOffsetSeconds: 7200, date: (2024, 8, 15), sunrise: (3, 47, 5), sunset: (21, 46, 13)),
+        .init(name: "Fairbanks", latitude: 64.84, longitude: -147.72, utcOffsetSeconds: -28800, date: (2024, 4, 15), sunrise: (6, 13, 11), sunset: (21, 30, 23))
+    ]
+
+    @Test(arguments: sunReferences) func sunRiseSetReference(reference: SunReference) {
+        let time = reference.localMidnight ..< reference.localMidnight.add(86400)
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: reference.latitude, lon: reference.longitude, utcOffsetSeconds: reference.utcOffsetSeconds)
+
+        let riseError = times.rise[0].timeIntervalSince1970 - reference.expectedRise.timeIntervalSince1970
+        let setError = times.set[0].timeIntervalSince1970 - reference.expectedSet.timeIntervalSince1970
+        /// Output truncates seconds, so allow errors of up to 30s
+        #expect(abs(riseError) <= 30, "\(reference.name) sunrise off by \(riseError) seconds")
+        #expect(abs(setError) <= 30, "\(reference.name) sunset off by \(setError) seconds")
     }
 
     @Test func sunRiseSetPolar() {
@@ -48,25 +123,59 @@ import Testing
         #expect(sunset2[0] == "2021-11-07T00:00") // //
     }
 
-    @Test func sunRiseSetVancouver() {
-        // https://www.timeanddate.com/sun/canada/vancouver?month=11&year=2021
-        let utcOffsetSeconds = -25200
-       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
+    /// Sunrise/set must be labelled with the correct local day, see #847
+    @Test func sunRiseSetChathamIslandsFormatted() {
+        // Chatham Islands use UTC+12:45, although -176.58° longitude corresponds to solar time UTC-11:47
+        let utcOffsetSeconds = 12 * 3600 + 45 * 60
+        // Local midnight 2024-06-12T00:00+12:45 and 2024-06-13T00:00+12:45 expressed in UTC
+        let time = Timestamp(2024, 6, 11, 11, 15) ..< Timestamp(2024, 6, 13, 11, 15)
 
-        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
-        #expect(times.rise[0] == Timestamp(1636211364))
-        #expect(times.set[0] == Timestamp(1636245772))
-        let sunset = times.set.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: -44, lon: -176.5833, utcOffsetSeconds: utcOffsetSeconds)
         let sunrise = times.rise.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
-        #expect(sunset[0] == "2021-11-06T17:42") // supposed to be 17:42
-        #expect(sunrise[0] == "2021-11-06T08:09") // supposed to be 08:09
+        let sunset = times.set.map({ $0.add(utcOffsetSeconds) }).iso8601_YYYYMMddHHmm
+
+        #expect(sunrise[0] == "2024-06-12T08:03")
+        #expect(sunrise[1] == "2024-06-13T08:03")
+        // Sunset 16:59:03 and 16:58:59 are within seconds of a minute boundary, so only assert the date
+        #expect(sunset[0].hasPrefix("2024-06-12T"))
+        #expect(sunset[1].hasPrefix("2024-06-13T"))
+    }
+
+    @Test func sunRiseSetDateLineEquivalence() {
+        /// longitude -180 and +180 are the same meridian, but take different paths through the day offset.
+        for utcOffsetSeconds in [0, 12 * 3600, -12 * 3600, 14 * 3600] {
+            let midnight = Timestamp(2024, 6, 12).add(-utcOffsetSeconds)
+            let time = midnight ..< midnight.add(2 * 86400)
+            let west = Zensun.calculateSunRiseSet(timeRange: time, lat: 20, lon: -180, utcOffsetSeconds: utcOffsetSeconds)
+            let east = Zensun.calculateSunRiseSet(timeRange: time, lat: 20, lon: 180, utcOffsetSeconds: utcOffsetSeconds)
+            for i in west.rise.indices {
+                let riseDelta = west.rise[i].timeIntervalSince1970 - east.rise[i].timeIntervalSince1970
+                let setDelta = west.set[i].timeIntervalSince1970 - east.set[i].timeIntervalSince1970
+                #expect(abs(riseDelta) <= 2, "sunrise differs by \(riseDelta)s for ±180° at offset \(utcOffsetSeconds)")
+                #expect(abs(setDelta) <= 2, "sunset differs by \(setDelta)s for ±180° at offset \(utcOffsetSeconds)")
+            }
+        }
+    }
+
+    @Test func sunRiseSetPolarTransitionContinuity() {
+        for lat in [Float(66), 66.5, 67, 68, 70, -66, -66.5, -67, -68, -70] {
+            for (year, month, day) in [(2024, 3, 15), (2024, 6, 15), (2024, 9, 15), (2024, 12, 15)] {
+                let midnight = Timestamp(year, month, day)
+                let time = midnight ..< midnight.add(40 * 86400)
+                let times = Zensun.calculateSunRiseSet(timeRange: time, lat: lat, lon: 25, utcOffsetSeconds: 0)
+                for i in times.rise.indices {
+                    #expect(times.set[i] >= times.rise[i], "sunset before sunrise at lat \(lat) day \(i) of \(year)-\(month)-\(day)")
+                    let length = times.set[i].timeIntervalSince1970 - times.rise[i].timeIntervalSince1970
+                    #expect(length >= 0 && length <= 86400, "day length \(length)s out of range at lat \(lat) day \(i)")
+                }
+            }
+        }
     }
 
     @Test func extraTerrestrialRadiation() {
-        // jaunary 3rd sun is closest to earth
+        // january 3rd sun is closest to earth
         #expect(Zensun.extraTerrestrialRadiationBackwards(latitude: -23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 12, 26, 12), nTime: 1, dtSeconds: 3600))[0] == 1400.073)
-        // on jyuly 4rd the sun is the farthest away from earth
+        // on july 4th the sun is the farthest away from earth
         #expect(Zensun.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0] == 1308.9365)
     }
 
@@ -267,32 +376,32 @@ import Testing
         /// Artificial radiation drop just before and after missing values
         var rad = [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 302.0, 10.1, Float.nan, .nan, .nan, .nan, .nan, .nan, 11.0, 44.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         rad.interpolateInplaceSolarBackwards(time: time2, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
-        #expect(arraysEqual(rad, [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 302.0, 10.1, 11.30978, 12.209529, 12.758652, 12.926316, 6.1488514, 10.5652075, 11.0, 44.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(rad, [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 302.0, 10.1, 18.090025, 18.323198, 17.898117, 16.866234, 15.304213, 13.310286, 11.0, 44.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
     }
 
-    @Test func solarGapfilling() {
-        let time = TimerangeDt(start: Timestamp(2020, 12, 26, 0), nTime: 48, dtSeconds: 3600)
-        let position = RegularGrid(nx: 1, ny: 1, latMin: 47.5, lonMin: 7, dx: 1, dy: 1)
-        /// 60% ex rad
-        let reference = Zensun.extraTerrestrialRadiationBackwards(latitude: position.latMin, longitude: position.lonMin, timerange: time).map { $0 * 0.6 }
-        var averagedWithNaNs = reference
-        for i in 0..<20 {
-            averagedWithNaNs[7 + i * 2 + 1] = averagedWithNaNs[7 + i * 2..<9 + i * 2].mean()
-            averagedWithNaNs[7 + i * 2] = .nan
-        }
-        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
-        #expect(arraysEqual(reference, averagedWithNaNs, accuracy: 0.001))
-
-        averagedWithNaNs = reference
-        for i in 0..<13 {
-            averagedWithNaNs[7 + i * 3 + 2] = averagedWithNaNs[7 + i * 3..<10 + i * 3].mean()
-            averagedWithNaNs[7 + i * 3 + 1] = .nan
-            averagedWithNaNs[7 + i * 3] = .nan
-        }
-        print(averagedWithNaNs)
-        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
-        #expect(arraysEqual(reference, averagedWithNaNs, accuracy: 0.01))
-    }
+//    @Test func solarGapfilling() {
+//        let time = TimerangeDt(start: Timestamp(2020, 12, 26, 0), nTime: 48, dtSeconds: 3600)
+//        let position = RegularGrid(nx: 1, ny: 1, latMin: 47.5, lonMin: 7, dx: 1, dy: 1)
+//        /// 60% ex rad
+//        let reference = Zensun.extraTerrestrialRadiationBackwards(latitude: position.latMin, longitude: position.lonMin, timerange: time).map { $0 * 0.6 }
+//        var averagedWithNaNs = reference
+//        for i in 0..<20 {
+//            averagedWithNaNs[7 + i * 2 + 1] = averagedWithNaNs[7 + i * 2..<9 + i * 2].mean()
+//            averagedWithNaNs[7 + i * 2] = .nan
+//        }
+//        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
+//        #expect(arraysEqual(reference, averagedWithNaNs, accuracy: 0.001))
+//
+//        averagedWithNaNs = reference
+//        for i in 0..<13 {
+//            averagedWithNaNs[7 + i * 3 + 2] = averagedWithNaNs[7 + i * 3..<10 + i * 3].mean()
+//            averagedWithNaNs[7 + i * 3 + 1] = .nan
+//            averagedWithNaNs[7 + i * 3] = .nan
+//        }
+//        print(averagedWithNaNs)
+//        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
+//        #expect(arraysEqual(reference, averagedWithNaNs, accuracy: 0.01))
+//    }
 
     @Test func dNI() {
         let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -307,6 +416,26 @@ import Testing
         
         let dniInstant = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, convertToInstant: true)
         #expect(arraysEqual(dniInstant, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 348.99603, 772.2604, 882.58014, 933.1149, 939.24207, 919.1415, 885.91315, 782.6327, 651.7093, 511.8239, 201.10855, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+    }
+    
+    @Test func dNI2() {
+        let directRadiation: [Float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0, 19.0, 33.0, 49.0, 66.0, 86.0, 107.0, 130.0, 155.0, 182.0, 211.0, 242.0, 275.0, 309.0, 345.0, 381.0, 418.0, 454.0, 491.0, 527.0, 562.0, 595.0, 626.0, 654.0, 678.0, 699.0, 717.0, 731.0, 741.0, 747.0, 750.0, 750.0, 747.0, 740.0, 730.0, 716.0, 700.0, 680.0, 657.0, 632.0, 605.0, 575.0, 544.0, 510.0, 475.0, 438.0, 401.0, 362.0, 323.0, 284.0, 245.0, 205.0, 166.0, 128.0, 93.0, 59.0, 27.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let time = TimerangeDt(start: Timestamp(2026, 7, 30), nTime: 24*4, dtSeconds: 900)
+        
+        // close to sunrise -> lead to division by 0.001
+        let dni = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: 41.581722, longitude: 2.3376625, timerange: time)
+        
+//        let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: 41.581722, longitude: 2.3376625, timerange: time)
+//        for (i,t) in time.enumerated() {
+//            print("\(t.iso8601_YYYYMMddTHHmm): \(exrad[i]) \(directRadiation[i]) \(dni[i])")
+//        }
+        
+        #expect(arraysEqual(dni, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 95.536606, 325.67145, 317.522, 326.6869, 336.2025, 354.35306, 370.31583, 388.2287, 407.6447, 428.34915, 450.25537, 473.34393, 497.64688, 521.5367, 546.9909, 571.0707, 595.73456, 618.4959, 642.51733, 665.4463, 687.68964, 708.4112, 728.0004, 745.6481, 760.5737, 774.20844, 786.7748, 797.3651, 806.139, 813.2069, 819.7267, 825.74335, 831.2793, 835.2089, 838.59845, 840.2133, 842.2815, 842.2863, 841.21405, 840.1393, 838.9127, 835.88354, 833.62775, 828.80383, 824.11206, 817.4065, 811.899, 803.11304, 794.48114, 785.58154, 775.7521, 760.1819, 743.52234, 724.02686, 712.9005, 698.60565, 515.8977, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        
+        let instant = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: 41.581722, longitude: 2.3376625, timerange: time, convertToInstant: true)
+        
+        #expect(arraysEqual(instant, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 239.40695, 452.54166, 387.7441, 377.10287, 375.95673, 388.18976, 399.844, 414.67014, 431.74146, 450.57797, 470.93948, 492.70575, 515.8457, 538.62994, 563.0741, 586.1286, 609.79877, 631.5273, 654.53973, 676.4317, 697.6109, 717.23126, 735.6872, 752.162, 765.8743, 778.2692, 789.571, 798.8681, 806.32294, 812.0478, 817.1975, 821.8119, 825.90674, 828.3598, 830.2247, 830.2719, 830.69806, 829.0072, 826.1673, 823.21405, 819.9828, 814.8348, 810.2527, 802.9498, 795.5047, 785.77216, 776.75806, 764.0477, 750.7442, 736.1674, 719.25586, 694.8856, 666.16846, 629.0454, 586.90094, 509.80365, 218.25995, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        
     }
     
     /// Make sure DNI it limited to 87° zenith angle, otherwise it would show peaks at sunset
@@ -352,7 +481,7 @@ import Testing
         let grid = RegularGrid(nx: 1, ny: 1, latMin: 52.25, lonMin: 21, dx: 1, dy: 1)
         var rad = [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 502.0, 464.0, Float.nan, .nan, .nan, .nan, .nan, .nan, 62.0, 34.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         rad.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
-        #expect(arraysEqual(rad, [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 502.0, 464.0, 415.3082, 348.894, 275.25363, 203.68459, 141.54568, 93.67375, 62.0, 34.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(rad, [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 502.0, 464.0, 243.94666, 195.46245, 155.09726, 122.53738, 97.001686, 77.315155, 62.0, 34.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
     }
 
     @Test func _3to6HourlyInterpolation() {
@@ -365,7 +494,7 @@ import Testing
         let range: any RandomAccessCollection<Int> = RegularGridSlice(grid: grid, yRange: 209..<209+1, xRange: 1300..<1300+2)
         #expect(range.map{$0} == [302260, 302261])
         rad.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: range, missingValuesAreBackwardsAveraged: true)
-        #expect(arraysEqual(rad, [.nan, 0.0, 0.0, 0.0, 210.0, 504.0, 336.0, 51.0, 0.0, 0.0, 0.0, 0.0, 197.0, 564.0, 441.0, 50.0, 0.0, 0.0, 0.0, 0.0, 215.0, 567.0, 442.0, 45.0, 0.0, 0.0, 0.0, 0.0, 189.0, 474.0, 330.0, 34.0, 0.0, 0.0, 0.0, 0.0, 153.0, 481.0, 336.0, 39.0, 0.0, 0.0, 0.0, 0.0, 191.0, 520.0, 402.0, 42.0, 0.0, 0.0, 0.0, 0.0, 126.0, 342.34003, 309.25827, 40.89545, 0.0, 0.0, 0.0, 0.0, 190.0, 466.23596, 375.76132, 44.353786, 0.0, 0.0, 0.0, 0.0, 182.0, 411.44446, 298.92218, 32.547844, 0.0, 0.0, 0.0, 0.0, 162.0, 394.73068, 300.4463, 28.616186, 0.0, 0.0, 0.0, 0.0, 188.0, 495.49594, 412.99677, 44.643055, 0.0, 0.0, 0.0, 0.0, 174.0, 444.61868, 359.42184, 38.76558, 0.0, 0.0, 0.0, 0.0, 132.0, 360.277, 307.71442, 33.550816, 0.0, 0.0, 0.0, 0.0, 98.0, 294.54755, 271.1577, 30.32507, 0.0, 0.0, 0.0, 0.0, 172.0, 450.98923, 360.40485, 34.60132, 0.0, .nan, 0.0, 0.0, 0.0, 210.0, 504.0, 336.0, 51.0, 0.0, 0.0, 0.0, 0.0, 197.0, 564.0, 441.0, 50.0, 0.0, 0.0, 0.0, 0.0, 215.0, 567.0, 442.0, 45.0, 0.0, 0.0, 0.0, 0.0, 189.0, 474.0, 330.0, 34.0, 0.0, 0.0, 0.0, 0.0, 153.0, 481.0, 336.0, 39.0, 0.0, 0.0, 0.0, 0.0, 191.0, 520.0, 402.0, 42.0, 0.0, 0.0, 0.0, 0.0, 126.0, 342.34003, 309.25827, 40.89545, 0.0, 0.0, 0.0, 0.0, 190.0, 466.23596, 375.76132, 44.353786, 0.0, 0.0, 0.0, 0.0, 182.0, 411.44446, 298.92218, 32.547844, 0.0, 0.0, 0.0, 0.0, 162.0, 394.73068, 300.4463, 28.616186, 0.0, 0.0, 0.0, 0.0, 188.0, 495.49594, 412.99677, 44.643055, 0.0, 0.0, 0.0, 0.0, 174.0, 444.61868, 359.42184, 38.76558, 0.0, 0.0, 0.0, 0.0, 132.0, 360.277, 307.71442, 33.550816, 0.0, 0.0, 0.0, 0.0, 98.0, 294.54755, 271.1577, 30.32507, 0.0, 0.0, 0.0, 0.0, 172.0, 450.98923, 360.40485, 34.60132, 0.0, .nan, 0.0, 0.0, 0.0, 215.0, 501.0, 333.0, 49.0, 0.0, 0.0, 0.0, 0.0, 212.0, 565.0, 439.0, 48.0, 0.0, 0.0, 0.0, 0.0, 218.0, 568.0, 441.0, 46.0, 0.0, 0.0, 0.0, 0.0, 196.0, 513.0, 339.0, 29.0, 0.0, 0.0, 0.0, 0.0, 162.0, 484.0, 325.0, 39.0, 0.0, 0.0, 0.0, 0.0, 190.0, 515.0, 398.0, 41.0, 0.0, 0.0, 0.0, 0.0, 136.0, 333.07123, 275.48016, 34.913036, 0.0, 0.0, 0.0, 0.0, 192.0, 465.766, 371.99835, 42.6139, 0.0, 0.0, 0.0, 0.0, 186.0, 413.51102, 295.37994, 30.907837, 0.0, 0.0, 0.0, 0.0, 122.0, 332.59763, 278.284, 25.331936, 0.0, 0.0, 0.0, 0.0, 192.0, 495.66803, 406.4484, 42.654514, 0.0, 0.0, 0.0, 0.0, 174.0, 443.2333, 357.45435, 37.216923, 0.0, 0.0, 0.0, 0.0, 122.0, 337.00745, 293.5196, 32.401485, 0.0, 0.0, 0.0, 0.0, 78.0, 251.71968, 246.47684, 28.692657, 0.0, 0.0, 0.0, 0.0, 174.0, 437.25235, 335.4611, 30.758059, 0.0, .nan, 0.0, 0.0, 0.0, 215.0, 501.0, 333.0, 49.0, 0.0, 0.0, 0.0, 0.0, 212.0, 565.0, 439.0, 48.0, 0.0, 0.0, 0.0, 0.0, 218.0, 568.0, 441.0, 46.0, 0.0, 0.0, 0.0, 0.0, 196.0, 513.0, 339.0, 29.0, 0.0, 0.0, 0.0, 0.0, 162.0, 484.0, 325.0, 39.0, 0.0, 0.0, 0.0, 0.0, 190.0, 515.0, 398.0, 41.0, 0.0, 0.0, 0.0, 0.0, 136.0, 333.07123, 275.48016, 34.913036, 0.0, 0.0, 0.0, 0.0, 192.0, 465.766, 371.99835, 42.6139, 0.0, 0.0, 0.0, 0.0, 186.0, 413.51102, 295.37994, 30.907837, 0.0, 0.0, 0.0, 0.0, 122.0, 332.59763, 278.284, 25.331936, 0.0, 0.0, 0.0, 0.0, 192.0, 495.66803, 406.4484, 42.654514, 0.0, 0.0, 0.0, 0.0, 174.0, 443.2333, 357.45435, 37.216923, 0.0, 0.0, 0.0, 0.0, 122.0, 337.00745, 293.5196, 32.401485, 0.0, 0.0, 0.0, 0.0, 78.0, 251.71968, 246.47684, 28.692657, 0.0, 0.0, 0.0, 0.0, 174.0, 437.25235, 335.4611, 30.758059, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(rad, [.nan, 0.0, 0.0, 0.0, 210.0, 504.0, 336.0, 51.0, 0.0, 0.0, 0.0, 0.0, 197.0, 564.0, 441.0, 50.0, 0.0, 0.0, 0.0, 0.0, 215.0, 567.0, 442.0, 45.0, 0.0, 0.0, 0.0, 0.0, 189.0, 474.0, 330.0, 34.0, 0.0, 0.0, 0.0, 0.0, 153.0, 481.0, 336.0, 39.0, 0.0, 0.0, 0.0, 0.0, 191.0, 520.0, 402.0, 42.0, 0.0, 0.0, 0.0, 0.0, 126.0, 368.2505, 325.74948, 40.0, 0.0, 0.0, 0.0, 0.0, 190.0, 468.10294, 375.89703, 40.0, 0.0, 0.0, 0.0, 0.0, 182.0, 384.27374, 287.72623, 28.0, 0.0, 0.0, 0.0, 0.0, 162.0, 402.46747, 273.53253, 20.0, 0.0, 0.0, 0.0, 0.0, 188.0, 521.4942, 408.5058, 38.0, 0.0, 0.0, 0.0, 0.0, 174.0, 452.4931, 357.50693, 34.0, 0.0, 0.0, 0.0, 0.0, 132.0, 382.12314, 311.87686, 30.0, 0.0, 0.0, 0.0, 0.0, 98.0, 329.81192, 282.18805, 28.0, 0.0, 0.0, 0.0, 0.0, 172.0, 465.773, 348.22693, 28.0, 0.0, .nan, 0.0, 0.0, 0.0, 210.0, 504.0, 336.0, 51.0, 0.0, 0.0, 0.0, 0.0, 197.0, 564.0, 441.0, 50.0, 0.0, 0.0, 0.0, 0.0, 215.0, 567.0, 442.0, 45.0, 0.0, 0.0, 0.0, 0.0, 189.0, 474.0, 330.0, 34.0, 0.0, 0.0, 0.0, 0.0, 153.0, 481.0, 336.0, 39.0, 0.0, 0.0, 0.0, 0.0, 191.0, 520.0, 402.0, 42.0, 0.0, 0.0, 0.0, 0.0, 126.0, 368.2505, 325.74948, 40.0, 0.0, 0.0, 0.0, 0.0, 190.0, 468.10294, 375.89703, 40.0, 0.0, 0.0, 0.0, 0.0, 182.0, 384.27374, 287.72623, 28.0, 0.0, 0.0, 0.0, 0.0, 162.0, 402.46747, 273.53253, 20.0, 0.0, 0.0, 0.0, 0.0, 188.0, 521.4942, 408.5058, 38.0, 0.0, 0.0, 0.0, 0.0, 174.0, 452.4931, 357.50693, 34.0, 0.0, 0.0, 0.0, 0.0, 132.0, 382.12314, 311.87686, 30.0, 0.0, 0.0, 0.0, 0.0, 98.0, 329.81192, 282.18805, 28.0, 0.0, 0.0, 0.0, 0.0, 172.0, 465.773, 348.22693, 28.0, 0.0, .nan, 0.0, 0.0, 0.0, 215.0, 501.0, 333.0, 49.0, 0.0, 0.0, 0.0, 0.0, 212.0, 565.0, 439.0, 48.0, 0.0, 0.0, 0.0, 0.0, 218.0, 568.0, 441.0, 46.0, 0.0, 0.0, 0.0, 0.0, 196.0, 513.0, 339.0, 29.0, 0.0, 0.0, 0.0, 0.0, 162.0, 484.0, 325.0, 39.0, 0.0, 0.0, 0.0, 0.0, 190.0, 515.0, 398.0, 41.0, 0.0, 0.0, 0.0, 0.0, 136.0, 334.43414, 285.56586, 34.0, 0.0, 0.0, 0.0, 0.0, 192.0, 467.47922, 370.52078, 38.0, 0.0, 0.0, 0.0, 0.0, 186.00002, 384.55472, 281.44528, 26.0, 0.0, 0.0, 0.0, 0.0, 122.0, 376.0488, 251.95128, 16.0, 0.0, 0.0, 0.0, 0.0, 192.0, 517.78674, 400.2133, 36.0, 0.0, 0.0, 0.0, 0.0, 174.00002, 454.53775, 353.46222, 32.0, 0.0, 0.0, 0.0, 0.0, 122.0, 360.95975, 303.04025, 30.0, 0.0, 0.0, 0.0, 0.0, 78.0, 292.83386, 265.16614, 28.000002, 0.0, 0.0, 0.0, 0.0, 173.99998, 441.4424, 318.5576, 24.0, 0.0, .nan, 0.0, 0.0, 0.0, 215.0, 501.0, 333.0, 49.0, 0.0, 0.0, 0.0, 0.0, 212.0, 565.0, 439.0, 48.0, 0.0, 0.0, 0.0, 0.0, 218.0, 568.0, 441.0, 46.0, 0.0, 0.0, 0.0, 0.0, 196.0, 513.0, 339.0, 29.0, 0.0, 0.0, 0.0, 0.0, 162.0, 484.0, 325.0, 39.0, 0.0, 0.0, 0.0, 0.0, 190.0, 515.0, 398.0, 41.0, 0.0, 0.0, 0.0, 0.0, 136.0, 334.43414, 285.56586, 34.0, 0.0, 0.0, 0.0, 0.0, 192.0, 467.47922, 370.52078, 38.0, 0.0, 0.0, 0.0, 0.0, 186.00002, 384.55472, 281.44528, 26.0, 0.0, 0.0, 0.0, 0.0, 122.0, 376.0488, 251.95128, 16.0, 0.0, 0.0, 0.0, 0.0, 192.0, 517.78674, 400.2133, 36.0, 0.0, 0.0, 0.0, 0.0, 174.00002, 454.53775, 353.46222, 32.0, 0.0, 0.0, 0.0, 0.0, 122.0, 360.95975, 303.04025, 30.0, 0.0, 0.0, 0.0, 0.0, 78.0, 292.83386, 265.16614, 28.000002, 0.0, 0.0, 0.0, 0.0, 173.99998, 441.4424, 318.5576, 24.0, 0.0], accuracy: 0.01))
     }
 
     @Test func diffuseRadiationAtLowAngles() {

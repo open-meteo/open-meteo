@@ -124,6 +124,10 @@ extension ApiSectionString {
                         b.buffer.writeString(",NaN")
                     }
                 case .timestamp(let a):
+                    if a[i].isNoData {
+                        b.buffer.writeString(",")
+                        break
+                    }
                     switch timeformat {
                     case .iso8601:
                         b.buffer.writeString(",\(a[i].add(utc_offset_seconds).iso8601_YYYY_MM_dd_HH_mm)")

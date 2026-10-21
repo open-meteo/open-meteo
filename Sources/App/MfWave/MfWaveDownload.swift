@@ -230,7 +230,7 @@ struct MfWaveDownload: AsyncCommand {
                                     return $0.isNaN ? Float(0) : -999
                                 }
                                 try domain.surfaceElevationFileOm.createDirectory()
-                                try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+                                try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
                             }
                             try await writer.write(time: timestamp, member: 0, variable: variable, data: data)
                         }
@@ -261,7 +261,7 @@ struct MfWaveDownload: AsyncCommand {
                                 return $0.isNaN ? Float(0) : -999
                             }
                             try domain.surfaceElevationFileOm.createDirectory()
-                            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+                            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
                         }
                         try await writer.write(time: timestamp, member: 0, variable: variable, data: data)
                     }

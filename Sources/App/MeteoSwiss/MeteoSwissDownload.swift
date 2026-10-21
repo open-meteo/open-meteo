@@ -3,6 +3,7 @@ import Foundation
 import Vapor
 import AsyncHTTPClient
 import OmFileFormat
+import OmFileIO
 
 /**
  https://opendatadocs.meteoswiss.ch/e-forecast-data/e2-e3-numerical-weather-forecasting-model?download-options=restapi
@@ -32,6 +33,9 @@ struct MeteoSwissDownload: AsyncCommand {
         
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
     
     var help: String {
@@ -52,7 +56,7 @@ struct MeteoSwissDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -87,7 +91,7 @@ struct MeteoSwissDownload: AsyncCommand {
                     elevationRemapped[i] = -999
                 }
             }
-            try elevationRemapped.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+            try await elevationRemapped.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
         }
         let mapping: [Int] = try await OmFileReader(mmapFile: weightsFile).expectArray(of: Int.self).read()
         //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")

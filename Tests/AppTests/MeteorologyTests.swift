@@ -5,9 +5,20 @@ import Testing
 
 @Suite struct MeteorologyTests {
     @Test func thunderstormProbability() {
-        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 3, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 70.7493)
-        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 53.099743)
-        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 31.831455)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 3, precipitation: 3, cloudcover: 100, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 70.7493)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, precipitation: 1, cloudcover: 100, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 53.099743)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, precipitation: 1, cloudcover: 100, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 31.831455)
+        
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 3, precipitation: 3, cloudcover: 40, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 51.88282)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, precipitation: 1, cloudcover: 40, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 38.93981)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 1, precipitation: 1, cloudcover: 40, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 23.343067)
+        
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: nil, precipitation: 3, cloudcover: 100, gusts: 6.1, cape: 550, liftedIndex: nil, convectiveInhibition: 9, pblHeight: 310, modelDtSeconds: 3600, latitude: 45) == 46.572186)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: nil, precipitation: 1, cloudcover: 100, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 45) == 35.520382)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: nil, precipitation: 1, cloudcover: 100, gusts: 2, cape: 450, liftedIndex: nil, convectiveInhibition: 22, pblHeight: 980, modelDtSeconds: 3600, latitude: 0) == 24.41227)
+        
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 0, precipitation: 0, cloudcover: 54, gusts: 2, cape: 2810, liftedIndex: -8.6, convectiveInhibition: 5, pblHeight: 1760, modelDtSeconds: 3600, latitude: 39) == 47.352947)
+        #expect(WeatherCode.calculateThunderstormProbability(convectivePrecipitation: 0, precipitation: 0, cloudcover: 75, gusts: 2, cape: 2280, liftedIndex: -8.1, convectiveInhibition: 7, pblHeight: 2050, modelDtSeconds: 3600, latitude: 39) == 49.411762)
     }
     
     @Test func wetbulbTemperature() {
@@ -59,6 +70,14 @@ import Testing
         #expect(arraysEqual(Meteorology.windirectionFast(u: [-4, 4, 0, 0], v: [0, 0, -4, 4]), [90, 270, 360, 180], accuracy: 0.0001))
         #expect(arraysEqual(Meteorology.windirectionFast(u: [.nan, 0, 1, -1, 1, -1], v: [1, 0, -1, -1, 1, 1]), [.nan, 270, 315.00012, 44.999893, 224.99991, 135.00009], accuracy: 0.0001))
         #expect(Meteorology.windirectionFast(u: [-1, -0, 0, 1, 2, 3, 4, 5, 6], v: [-3, -2, -1, -0, 0, 1, 2, 3, 4]) == [18.435053, 360.0, 360.0, 270.0, 270.0, 251.56496, 243.43501, 239.0363, 236.3099])
+
+        #expect(Meteorology.oppositeDirection(0) == 180)
+        #expect(Meteorology.oppositeDirection(90) == 270)
+        #expect(Meteorology.oppositeDirection(180) == 0)
+        #expect(Meteorology.oppositeDirection(270) == 90)
+        #expect(Meteorology.oppositeDirection(360) == 180)
+        #expect(Meteorology.oppositeDirection(.nan).isNaN)
+        #expect(arraysEqual(Meteorology.oceanCurrentDirection(u: [-4, 4, 0, 0, .nan], v: [0, 0, -4, 4, 1]), [270, 90, 180, 0, .nan], accuracy: 0.0001))
     }
 
     @Test func evapotranspiration() {
@@ -70,18 +89,18 @@ import Testing
         #expect(et0 == 0.23535295)
 
         let et0night = Meteorology.et0Evapotranspiration(temperature2mCelsius: 25, windspeed10mMeterPerSecond: 2, dewpointCelsius: 13.8, shortwaveRadiationWatts: 0, elevation: 250, extraTerrestrialRadiation: 0, dtSeconds: 3600)
-        #expect(et0night == 0.05091571)
+        #expect(et0night == 0.05084415)
 
         #expect(Meteorology.et0Evapotranspiration(temperature2mCelsius: .nan, windspeed10mMeterPerSecond: 2, dewpointCelsius: 13.8, shortwaveRadiationWatts: 0, elevation: 250, extraTerrestrialRadiation: 0, dtSeconds: 3600).isNaN)
 
-        var et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: 20, elevation: 100, extraTerrestrialRadiationSum: 28, relativeHumidity: .maxmin(max: 78, min: 54))
-        #expect(et0day == 2.7935097)
+        var et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: 20, elevation: 100, extraTerrestrialRadiationMJSum: 28, relativeHumidity: .maxmin(max: 78, min: 54))
+        #expect(et0day == 7.095501)
 
-        et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: 20, elevation: 100, extraTerrestrialRadiationSum: 28, relativeHumidity: .mean(mean: 66))
-        #expect(et0day == 2.7744882)
+        et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: 20, elevation: 100, extraTerrestrialRadiationMJSum: 28, relativeHumidity: .mean(mean: 66))
+        #expect(et0day == 6.5863943)
 
-        et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: .nan, elevation: 100, extraTerrestrialRadiationSum: 28, relativeHumidity: .mean(mean: 66))
-        #expect(et0day == 2.351875)
+        et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: .nan, elevation: 100, extraTerrestrialRadiationMJSum: 28, relativeHumidity: .mean(mean: 66))
+        #expect(et0day == 6.116824)
     }
 
     @Test func vaporPressureDeficit() {

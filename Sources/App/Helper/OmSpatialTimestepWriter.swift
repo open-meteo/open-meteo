@@ -4,6 +4,7 @@ import Foundation
 import AsyncHTTPClient
 import NIOCore
 import Vapor
+import OmFileIO
 
 /**
  multiple files
@@ -18,11 +19,21 @@ import Vapor
  data_spatial/<domain>/<run>/<timestamp>_model-levels.om (only late icon runs)
  */
 
-
-
 /// Write multiple spatial oriented variables into one file per time-step
 actor OmSpatialTimestepWriter {
-    var variables: [VariableWithOffset] = .init()
+    private(set) var variables: [VariableWithOffset] = .init()
+    private var writtenVariables = Set<VariableMemberKey>()
+
+    /// Preserve the name-based identity used by duplicate detection.
+    private struct VariableMemberKey: Hashable {
+        let name: String
+        let member: Int
+
+        init(variable: any GenericVariable, member: Int) {
+            self.name = String(describing: variable)
+            self.member = member
+        }
+    }
     var filename: String?
     var writer: OmFileWriter<FileHandle>?
     let domain: GenericDomain
@@ -64,7 +75,7 @@ actor OmSpatialTimestepWriter {
     }
     
     var variableString: [String] {
-        variables.map(\.omFileNameWithMember).sorted()
+        variables.map { $0.omFileNameWithMember }.sorted()
     }
     
     
@@ -99,12 +110,13 @@ actor OmSpatialTimestepWriter {
     }
     
     func contains(member: Int, variable: any GenericVariable) -> Bool {
-        return variables.contains(where: { "\($0.variable)" == "\(variable)" && $0.member == member})
+        return writtenVariables.contains(VariableMemberKey(variable: variable, member: member))
     }
     
     /// Write a single variable to the file
     func write(member: Int, variable: any GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
-        if contains(member: member, variable: variable) {
+        let key = VariableMemberKey(variable: variable, member: member)
+        if writtenVariables.contains(key) {
             return
         }
         
@@ -127,6 +139,7 @@ actor OmSpatialTimestepWriter {
         )
         try arrayWriter.writeData(array: data)
         self.variables.append(VariableWithOffset(variable: variable, member: member, writer: arrayWriter))
+        writtenVariables.insert(key)
         
         await ensembleMean?.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data)
     }
@@ -142,8 +155,8 @@ actor OmSpatialTimestepWriter {
     }
     
     /// Note: Meta JSON files are now uploaded using in-memory data. It is now safe to call this function out of sync with model downloading. Ideally one queue per bucket.
-    func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true, forceAllTimestampUpload: Bool = false) async throws {
-        try await ensembleMean?.writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: forceAllTimestampUpload)
+    func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
+        try await ensembleMean?.writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta)
         
         // Upload to AWS S3
         // The single OM file will be uploaded + meta JSON files
@@ -156,15 +169,15 @@ actor OmSpatialTimestepWriter {
             reference_time: run.toDate(),
             last_modified_time: Date(),
             completed: completed,
-            valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
+            valid_times: validTimes.map { $0.iso8601_YYYY_MM_dd_HH_mmZ },
             variables: self.variableString,
             crs_wkt: domain.grid.crsWkt2
         )
-        let realm = realm.map { "_\($0)" } ?? ""
+        let realmSuffix = realm.map { "_\($0)" } ?? ""
         let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
-        let metaRunMeta = "\(path)meta\(realm).json"
-        let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
-        let metaLatest = "\(directorySpatial)latest\(realm).json"
+        let metaRunMeta = "\(path)meta\(realmSuffix).json"
+        let metaInProgress = "\(directorySpatial)in-progress\(realmSuffix).json"
+        let metaLatest = "\(directorySpatial)latest\(realmSuffix).json"
         
         /// Note: ByteBuffer+readableBytesView fixes a release build issue
         let metaData = ByteBuffer(data: try meta.jsonEncodedData()).readableBytesView
@@ -183,49 +196,54 @@ actor OmSpatialTimestepWriter {
         guard let uploadS3Bucket else {
             return
         }
-        let domain = domain
-        let run = run
-        let time = time
-        for (bucket, profile) in domain.domainRegistry.parseBucket(uploadS3Bucket) {
-            if /*bucket == "openmeteo" &&*/ profile == "ceph" {
-                continue // skip upload to ceph storage for now
+        let uploadS3Endpoints = S3BucketEndpointList(uploadS3Bucket)
+        let domainRegistry = domain.domainRegistry
+//        if forceAllTimestampUpload {
+//            let basePath = "data_spatial/\(domainRegistry.rawValue)/"
+//            for endpoint in uploadS3Endpoints where endpoint.profile != "ceph" {
+//                await application.s3SyncManager.sync(endpoint: endpoint, localDirectory: directorySpatial, basePath: basePath)
+//                logger.info("Queued AWS spatial sync to \(endpoint) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+//            }
+//            return
+//        }
+
+        let remoteFile = "data_spatial/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYY_MM_dd_HHmm)\(realmSuffix).om"
+        var metaUploads: [(objectName: String, data: ByteBufferView)] = []
+        if uploadMeta {
+            metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta\(realmSuffix).json", metaData))
+            if canUpdateInProgress {
+                metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/in-progress\(realmSuffix).json", metaData))
             }
-            let start = DispatchTime.now()
-            let bucketPrefixed = bucket.starts(with: "s3") ? bucket : "s3://\(bucket)/"
-            let destDomain = "\(bucketPrefixed)data_spatial/\(domain.domainRegistry.rawValue)/"
-            let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
-            let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
-            
-            if forceAllTimestampUpload {
-                await application.s3UploadManager.sync(
-                    client: application.http1Client,
-                    bucketEndpoint: bucket,
-                    localDirectory: directorySpatial,
-                    server: bucket,
-                    basePath: "data_spatial/\(domain.domainRegistry.rawValue)/"
-                )
-            } else {
-                await application.s3UploadManager.uploadMultipart(
-                    client: application.http1Client,
-                    bucketEndpoint: bucket,
+            if completed {
+                metaUploads.append(("data_spatial/\(domainRegistry.rawValue)/latest\(realmSuffix).json", metaData))
+            }
+        }
+        let metadataUploads = metaUploads
+        let logger = logger
+        for endpoint in uploadS3Endpoints where endpoint.profile != "ceph" {
+            let uploadQueue = await application.s3SyncManager.getQueue(endpoint: endpoint)
+            await uploadQueue.enqueueUpload("spatial \(remoteFile)") { client, endpoint in
+                let uploadStart = DispatchTime.now()
+                let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
+                let prepared = try await S3Uploader.uploadMultipart(
+                    client: client,
                     file: filename,
-                    url: destFile
+                    url: endpoint.uploadURL(remotePath: remoteFile),
+                    lastModified: .now(),
+                    executor: executor
                 )
-            }
-            
-            if uploadMeta {
-                let destMeta = "\(destRun)meta\(realm).json"
-                await application.s3UploadManager.upload(client: application.http1Client, bucketEndpoint: bucket, data: metaData, url: destMeta)
-                if canUpdateInProgress {
-                    let destInProgress = "\(destDomain)in-progress\(realm).json"
-                    await application.s3UploadManager.upload(client: application.http1Client, bucketEndpoint: bucket, data: metaData, url: destInProgress)
+                try await prepared.commit(client: client)
+                for metaUpload in metadataUploads {
+                    try await S3Uploader.upload(
+                        client: client,
+                        data: metaUpload.data,
+                        url: endpoint.uploadURL(remotePath: metaUpload.objectName),
+                        contentType: "application/json",
+                        lastModified: .now()
+                    )
                 }
-                if completed {
-                    let destLatest = "\(destDomain)latest\(realm).json"
-                    await application.s3UploadManager.upload(client: application.http1Client, bucketEndpoint: bucket, data: metaData, url: destLatest)
-                }
+                logger.info("AWS spatial upload to \(endpoint) took \(uploadStart.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
-            self.logger.info("AWS Upload to \(bucket.stripHttpPassword()) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
     
@@ -327,7 +345,9 @@ actor OmSpatialMultistepWriter {
     /// Finalise the time step and return all handles
     /// If not validTimes are given, use all timestamps from the underlaying writer
     func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
-        let validTimes = validTimes ?? writer.map(\.time)
+        // Queue the latest timestep's metadata upload after all other timestep files.
+        let writer = writer.sorted { $0.time < $1.time }
+        let validTimes = validTimes ?? writer.map { $0.time }
         // Only upload META JSON for the last timestamp
         let lastTimestamp = writer.last?.time
         let handles = try await writer.asyncFlatMap({
@@ -346,8 +366,7 @@ actor OmSpatialMultistepWriter {
     }
     
     // Upload om files to AWS from mutliple timesteps
-    func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
+    /*func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
         try await writer.last?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: true)
-    }
+    }*/
 }
-

@@ -49,6 +49,9 @@ struct UkmoDownload: AsyncCommand {
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -93,17 +96,17 @@ struct UkmoDownload: AsyncCommand {
 
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadS3Bucket: nil)
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
             }
             return
         }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -152,7 +155,7 @@ struct UkmoDownload: AsyncCommand {
         }
     }*/
 
-    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
+    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadS3Bucket: String?) async throws {
         // UKMO Global data has been manually converted from GRIB files
         /*try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: ["/Users/patrick/Downloads/UKMO_static/uk2km_ground_land-cover+model-terrain-height_00.grib2"], createNetCdf: createNetcdf, shift180LongitudeAndFlipLatitude: false)
         fatalError()*/
@@ -186,7 +189,7 @@ struct UkmoDownload: AsyncCommand {
                     elevation[i] = -999 // mask sea grid points
                 }
             }
-            try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: createNetcdf)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetcdf)
             return
         }
 
@@ -226,7 +229,7 @@ struct UkmoDownload: AsyncCommand {
                 elevation[i] = -999 // mask sea grid points
             }
         }
-        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: createNetcdf)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetcdf)
     }
 
     /**
@@ -261,6 +264,7 @@ struct UkmoDownload: AsyncCommand {
         let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
 
+        let solarConverter = InstantaneousSolarRadiationConverter<UkmoSurfaceVariable>()
         let timestamps = domain.forecastSteps(run: run)
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
@@ -285,40 +289,37 @@ struct UkmoDownload: AsyncCommand {
                 let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
                 let data = try memory.readUkmoNetCDF()
                 logger.info("Processing \(data.name) [\(data.unit)]")
-                for (level, member, array2d) in data.data {
-                    var data = array2d.data
+                for (level, member, downloadedArray2d) in data.data {
+                    var array2d = downloadedArray2d
                     if let scaling = variable.multiplyAdd {
-                        data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+                        array2d.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                     }
                     if let variable = variable as? UkmoSurfaceVariable {
                         if variable == .cloud_base {
-                            for i in data.indices {
-                                if data[i].isNaN {
-                                    data[i] = 0
+                            for i in array2d.data.indices {
+                                if array2d.data[i].isNaN {
+                                    array2d.data[i] = 0
                                 }
                             }
                         }
                         /// UKMO provides solar radiation as instant values. Convert to backwards averaged data.
                         if variable == .direct_radiation || variable == .shortwave_radiation {
-                            let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                            for i in data.indices {
-                                if factor.data[i] < 0.05 {
-                                    continue
-                                }
-                                data[i] /= factor.data[i]
-                            }
+                            array2d.data = await solarConverter.convert(data: array2d.data, variable: variable, member: member,
+                                grid: domain.grid, time: timestamp, dtSeconds: domain.dtSeconds)
+                            // Analysis seeds KT but has no preceding forecast interval to store.
+                            if timestamp == run { continue }
                         }
                         // UKMO provides freezing level as AGL. Convert to ASL
                         if variable == .freezing_level_height {
-                            for i in data.indices {
-                                data[i] += domainElevation[i]
+                            for i in array2d.data.indices {
+                                array2d.data[i] += domainElevation[i]
                             }
                         }
                         /// CIN is set to -1000 for no convection. Set to 0.
                         if variable == .convective_inhibition {
-                            for i in data.indices {
-                                if data[i] <= -999 {
-                                    data[i] = 0
+                            for i in array2d.data.indices {
+                                if array2d.data[i] <= -999 {
+                                    array2d.data[i] = 0
                                 }
                             }
                         }
@@ -328,7 +329,7 @@ struct UkmoDownload: AsyncCommand {
                         }
                     }
                     let variable = variable.withLevel(level: level)
-                    try await writer.write(member: member, variable: variable, data: data)
+                    try await writer.write(member: member, variable: variable, data: array2d.data)
                 }
             }
             if let writerProbabilities {

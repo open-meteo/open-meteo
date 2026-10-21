@@ -48,6 +48,9 @@ struct NbmDownload: AsyncCommand {
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -59,7 +62,7 @@ struct NbmDownload: AsyncCommand {
         disableIdleSleep()
 
         if let lsm = signature.lsmFile, let hgt = signature.hgtFile {
-            try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [lsm, hgt], createNetCdf: true)
+            try await DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [lsm, hgt], createNetCdf: true, application: context.application, uploadS3Bucket: signature.uploadS3Bucket)
             return
         }
 
@@ -104,7 +107,7 @@ struct NbmDownload: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let handles = try await downloadNbm(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -133,6 +136,7 @@ struct NbmDownload: AsyncCommand {
             return elevation
         }()
 
+        let solarConverter = InstantaneousSolarRadiationConverter<NbmSurfaceVariable>()
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading forecastHour \(forecastHour)")
@@ -171,13 +175,10 @@ struct NbmDownload: AsyncCommand {
 
                 // NBM contains instantanous values for solar flux. Convert it to backwards averaged.
                 if let variable = variable.variable as? NbmSurfaceVariable, variable == .shortwave_radiation {
-                    let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                    for i in grib2d.array.data.indices {
-                        if factor.data[i] < 0.05 {
-                            continue
-                        }
-                        grib2d.array.data[i] /= factor.data[i]
-                    }
+                    grib2d.array.data = await solarConverter.convert(data: grib2d.array.data, variable: variable, member: 0,
+                        grid: domain.grid, time: timestamp, dtSeconds: domain.dtSeconds)
+                    // Analysis seeds KT but has no preceding forecast interval to store.
+                    if timestamp == run { continue }
                 }
 
                 // Scaling before compression with scalefactor

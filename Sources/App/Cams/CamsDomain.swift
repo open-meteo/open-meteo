@@ -72,10 +72,6 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
@@ -491,6 +487,23 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return ("methane", massMixingToUgm3, "ch4")
         default:
             return nil
+        }
+    }
+}
+
+enum CamsApiDomain: String, Codable, Sendable, RawRepresentableString {
+    case auto
+    case cams_global
+    case cams_europe
+
+    var multiDomain: MultiDomains {
+        switch self {
+        case .auto:
+            return .air_quality_best_match
+        case .cams_global:
+            return .cams_global
+        case .cams_europe:
+            return .cams_europe
         }
     }
 }

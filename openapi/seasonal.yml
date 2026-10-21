@@ -392,7 +392,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                     additionalProperties:
                       type: array
                       items:
@@ -411,7 +411,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                     additionalProperties:
                       type: array
                       items:
@@ -430,7 +430,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       wind_speed_10m_mean:
                         type: array
                         items:
@@ -890,7 +890,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       wind_gusts_10m_anomaly:
                         type: array
                         items:

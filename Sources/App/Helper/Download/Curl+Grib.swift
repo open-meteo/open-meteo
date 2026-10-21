@@ -1,6 +1,7 @@
 import Foundation
 @preconcurrency import SwiftEccodes
 import CHelper
+import OmFileIO
 
 
 extension Curl {

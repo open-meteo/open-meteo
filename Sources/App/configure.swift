@@ -1,8 +1,12 @@
 import Vapor
 import OmFileFormat
-// import Leaf
+import Synchronization
+@_exported import OmTime
+import OmFileIO
 
 enum OpenMeteo {
+    static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
+
     /// Data directory with trailing slash
     static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
@@ -14,37 +18,43 @@ enum OpenMeteo {
         return  "./data/"
     }()
     
-    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
-    static let remoteDataDirectory: String? = {
-        if let dir = Environment.get("REMOTE_DATA_DIRECTORY") {
-            guard dir.starts(with: "http") else {
+    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`. If multiple servers separated by coma are given, requests are hashed between them
+    static let remoteDataDirectory: [S3BucketEndpoint]? = {
+        return Environment.get("REMOTE_DATA_DIRECTORY")?.split(separator: ",").map { dir in
+            guard dir.starts(with: "http") || dir.starts(with: "s3://") else {
                 fatalError("REMOTE_DATA_DIRECTORY must start with 'http'")
             }
             guard dir.last == "/" else {
                 fatalError("REMOTE_DATA_DIRECTORY must end with a trailing slash")
             }
-            return dir
+            guard dir.hasSuffix("/data/") else {
+                fatalError("REMOTE_DATA_DIRECTORY must end with '/data/'")
+            }
+            return S3BucketEndpoint(rawEndpoint: String(dir.dropLast(5)), profile: nil)
         }
-        return nil
     }()
     
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
+    static let dataBlockCacheInitialized = Atomic(false)
+
     static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
         let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
-        return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        let cache = AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        dataBlockCacheInitialized.store(true, ordering: .relaxed)
+        return cache
     }()
     
     /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
-    static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
+    /*static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
         let cacheFile = Environment.get("CACHE_META_FILE") ?? "\(dataDirectory)/cache_file_meta.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_META_SIZE") ?? "1MB")
         let blockSize = MemoryLayout<HttpMetaCache.Entry>.stride
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
         return try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount)
-    }()
+    }()*/
     
     /// Data directory with trailing slash
     static let dataSpatialDirectory: String? = {
@@ -171,15 +181,17 @@ public func configure(_ app: Application) throws {
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
         allowedMethods: [.GET, .POST, /*.PUT,*/ .OPTIONS /*, .DELETE, .PATCH*/],
-        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin]
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin, .range, .ifMatch, .ifUnmodifiedSince]
     )
     app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
     app.middleware.use(ErrorMiddleware.custom(environment: app.environment))
-    app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    //app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
+    app.commands.use(VersionCommand(), as: "version")
     app.asyncCommands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
+    app.asyncCommands.use(DownloadIconCommand(), as: "download-dwd")
     app.asyncCommands.use(DownloadCmaCommand(), as: "download-cma")
     app.asyncCommands.use(DownloadBomCommand(), as: "download-bom")
     app.asyncCommands.use(DownloadIconWaveCommand(), as: "download-iconwave")
@@ -200,6 +212,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")
     app.asyncCommands.use(GfsGraphCastDownload(), as: "download-gfs-graphcast")
     app.asyncCommands.use(NbmDownload(), as: "download-nbm")
+    app.asyncCommands.use(NcepRrfsDownloader(), as: "download-ncep-rrfs")
     app.asyncCommands.use(JmaDownload(), as: "download-jma")
     app.asyncCommands.use(MetNoDownloader(), as: "download-metno")
     app.asyncCommands.use(GeoSphereDownloader(), as: "download-geosphere")
@@ -211,6 +224,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(SatelliteDownloadCommand(), as: "download-satellite")
     app.asyncCommands.use(MeteoSwissDownload(), as: "download-meteoswiss")
     app.asyncCommands.use(SyncCommand(), as: "sync")
+    app.asyncCommands.use(S3SyncCommand(), as: "s3-sync")
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
@@ -221,9 +235,6 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(EumetnetDownloader(), as: "download-eumetnet")
 
     app.http.server.configuration.hostname = "0.0.0.0"
-
-    // https://github.com/vapor/vapor/pull/2677
-    app.http.server.configuration.supportPipelining = false
 
     app.http.server.configuration.responseCompression = .enabled(initialByteBufferCapacity: 4096)
 
@@ -251,8 +262,18 @@ public func configure(_ app: Application) throws {
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
+        delay: .seconds(1), { _ in
+            guard OmFileSystemManager.isInitialized else { return }
+            await OmFileSystemManager.instance.backgroundTaskRemote()
+        }
+    )
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(0),
         delay: .seconds(1),
-        RemoteFileManager.instance.backgroundTask
+        { _ in
+            guard OmFileSystemManager.isInitialized else { return }
+            await OmFileSystemManager.instance.backgroundTaskLocal()
+        }
     )
 
     app.lifecycle.repeatedTask(
@@ -283,6 +304,9 @@ extension ErrorMiddleware {
 
             // Inspect the error type and extract what data we can.
             switch error {
+            case let decodingError as DecodingError:
+                (reason, status, headers, source) = (decodingError.readableDescription, .badRequest, [:], .capture())
+
             case let debugAbort as (DebuggableError & AbortError):
                 (reason, status, headers, source) = (debugAbort.reason, debugAbort.status, debugAbort.headers, debugAbort.source ?? .capture())
                 
@@ -299,9 +323,14 @@ extension ErrorMiddleware {
             }
             
             switch error {
+            case _ as DecodingError:
+                req.logger.info("\(reason)",
+                                metadata: ["method" : "\(req.method.rawValue)",
+                                           "url" : "\(req.url.string)",
+                                           "userAgent" : .array(req.headers["User-Agent"].map { "\($0)" })])
             case _ as RateLimitError:
                 fallthrough
-            case _ as ApiKeyManagerError:
+            case _ as ApiKeyManagerError, _ as TimeError, _ as ForecastApiError:
                 // Do not log errors
                 break
             default:
@@ -334,6 +363,47 @@ extension ErrorMiddleware {
             
             // create a Response with appropriate status
             return Response(status: status, headers: headers, body: body)
+        }
+    }
+}
+
+extension DecodingError {
+    /// A concise description suitable for API responses and request logs.
+    var readableDescription: String {
+        let context: Context
+        let summary: String
+
+        switch self {
+        case .dataCorrupted(let errorContext):
+            context = errorContext
+            summary = "Invalid value"
+        case .keyNotFound(let key, let errorContext):
+            context = errorContext
+            summary = "Missing required field '\(key.stringValue)'"
+        case .typeMismatch(let type, let errorContext):
+            context = errorContext
+            summary = "Expected \(type)"
+        case .valueNotFound(let type, let errorContext):
+            context = errorContext
+            summary = "Missing \(type) value"
+        @unknown default:
+            return "Could not decode the request."
+        }
+
+        let path = context.codingPath.readablePath
+        let location = path.isEmpty ? "" : " at '\(path)'"
+        return "\(summary)\(location): \(context.debugDescription)"
+    }
+}
+
+private extension Array where Element == any CodingKey {
+    var readablePath: String {
+        reduce(into: "") { path, key in
+            if let index = key.intValue {
+                path += "[\(index)]"
+            } else {
+                path += path.isEmpty ? key.stringValue : ".\(key.stringValue)"
+            }
         }
     }
 }

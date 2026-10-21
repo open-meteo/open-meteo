@@ -15,10 +15,6 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
@@ -28,6 +24,10 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
         case .msg, .iodc:
             return 15 * 60
         }
+    }
+    
+    var generateFullRun: Bool {
+         return false
     }
     
     var countEnsembleMember: Int {

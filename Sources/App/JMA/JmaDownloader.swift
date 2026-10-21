@@ -17,14 +17,8 @@ struct JmaDownload: AsyncCommand {
         @Option(name: "run")
         var run: String?
 
-        @Option(name: "past-days")
-        var pastDays: Int?
-
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
-
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        var upperLevel: Bool
 
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
@@ -34,6 +28,9 @@ struct JmaDownload: AsyncCommand {
 
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -52,14 +49,14 @@ struct JmaDownload: AsyncCommand {
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: nil, createNetCdf: signature.createNetcdf)
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
             }
             return
         }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, createNetCdf: signature.createNetcdf)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -115,7 +112,7 @@ struct JmaDownload: AsyncCommand {
                 Meteorology.elevation(sealevelPressure: $1.0 / 100, surfacePressure: $0 / 100, temperature_2m: $1.1 - 273.15)
             }
             try domain.surfaceElevationFileOm.createDirectory()
-            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetCdf)
         }
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
@@ -464,7 +461,9 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
         case .geopotential_height:
             return .metre
         case .vertical_velocity:
-            return .metrePerSecond
+            // Stored in the provider-native pressure coordinate unit Pa/s and
+            // converted to geometric m/s by VariableHourlyDeriver.
+            return .undefined
         case .relative_humidity:
             return .percentage
         }
@@ -505,10 +504,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
 
     var countEnsembleMember: Int {
         return 1
-    }
-
-    var hasYearlyFiles: Bool {
-        return false
     }
 
     var masterTimeRange: Range<Timestamp>? {
@@ -579,7 +574,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         case .msm:
             return []
         case .msm_upper_level:
-            return [1000, 975, 950, 529, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
+            return [1000, 975, 950, 925, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
         }
     }
 

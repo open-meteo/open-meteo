@@ -2,8 +2,9 @@ import Foundation
 import Vapor
 import OmFileFormat
 import SwiftNetCDF
+import OmFileIO
 
-/// Download MetNo domains from OpenDAP server
+/// Download MetNo domains as NetCDF files over HTTPS
 /// https://github.com/metno/NWPdocs/wiki
 /// Nordic dataset (same as yr.no API) https://github.com/metno/NWPdocs/wiki/MET-Nordic-dataset
 struct MetNoDownloader: AsyncCommand {
@@ -25,6 +26,9 @@ struct MetNoDownloader: AsyncCommand {
 
         @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -44,7 +48,7 @@ struct MetNoDownloader: AsyncCommand {
 
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -58,11 +62,17 @@ struct MetNoDownloader: AsyncCommand {
         let useArchive = run.olderThan(days: 2)
 
         let file = "met_forecast_1_0km_nordic_\(run.format_YYYYMMdd)T\(run.hour.zeroPadded(len: 2))Z.nc"
-        let server = "https://thredds.met.no/thredds/dodsC"
-        let openDap = useArchive ? "\(server)/metpparchive/\(run.format_directoriesYYYYMMdd)/\(file)" : "\(server)/metpplatest/\(file)"
+        let server = "https://thredds.met.no/thredds/fileServer"
+        let url = useArchive ? "\(server)/metpparchive/\(run.format_directoriesYYYYMMdd)/\(file)" : "\(server)/metpplatest/\(file)"
 
-        // Wait up to 30 minutes until data is availble
-        let ncFile = try NetCDF.openOrWait(path: openDap, deadline: Date().addingTimeInterval(30 * 60), logger: logger)
+        let localFile = "\(domain.downloadDirectory)\(file)"
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItemIfExists(at: localFile)
+        }
+
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 0.5)
+        let ncFile = try await curl.downloadNetCdf(url: url, file: localFile, ncVariable: "air_temperature_2m", bzip2Decode: false)
         let dimensions = ncFile.getDimensions()
         guard dimensions.count == 3 else {
             fatalError("Expected 3 dimensions, got \(dimensions.count)")
@@ -97,7 +107,7 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
             logger.info("Writing elevation file")
-            try altitude.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
+            try await altitude.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
         }
 
         /// Verify projection and grid coordinates
@@ -128,7 +138,7 @@ struct MetNoDownloader: AsyncCommand {
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
         
         for variable in variables {
-            logger.info("Download \(variable)")
+            logger.info("Process \(variable)")
 
             guard let ncVar = ncFile.getVariable(name: variable.netCdfName) else {
                 fatalError("Could not open nc variable \(variable) \(variable.netCdfName)")

@@ -664,7 +664,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             let tempmean = try await get(raw: .temperature_2m_mean, time: time).data
             let wind = try await get(raw: .wind_speed_10m_mean, time: time).data
             let radiation = try await get(raw: .shortwave_radiation_sum, time: time).data
-            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time.with(dtSeconds: 3600)).sum(by: 24)
+            let exradMJSum = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time.with(dtSeconds: 3600)).map { $0 * 0.0036 }.sum(by: 24)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             let rhmin = hasRhMinMax ? try await get(raw: .relative_humidity_2m_min, time: time).data : nil
             let rhmaxOrMean = hasRhMinMax ? try await get(raw: .relative_humidity_2m_max, time: time).data : try await get(raw: .relative_humidity_2m_mean, time: time).data
@@ -686,7 +686,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                     windspeed10mMeterPerSecondMean: wind[i],
                     shortwaveRadiationMJSum: radiation[i],
                     elevation: elevation.isNaN ? 0 : elevation,
-                    extraTerrestrialRadiationSum: exrad[i] * 0.0036,
+                    extraTerrestrialRadiationMJSum: exradMJSum[i],
                     relativeHumidity: rh))
             }
             return DataAndUnit(et0, .millimetre)

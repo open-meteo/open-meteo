@@ -58,7 +58,7 @@ cd open-meteo
 
 # Install Xcode from the App store
 # Install brew
-brew install netcdf bzip2
+brew install netcdf eccodes
 open Package.swift
 # `swift run` works as well
 ```

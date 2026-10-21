@@ -280,15 +280,6 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         return nil
     }
 
-    var hasYearlyFiles: Bool {
-        switch self {
-        case .consolidated, .consolidatedv3:
-            return true
-        default:
-            return false
-        }
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
@@ -374,6 +365,10 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         case .intermediatev3:
             return 0
         }
+    }
+    
+    var generateFullRun: Bool {
+         return false
     }
 }
 

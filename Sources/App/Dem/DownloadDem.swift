@@ -28,10 +28,6 @@ struct Dem90: GenericDomain {
         return 0
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
@@ -53,15 +49,15 @@ struct Dem90: GenericDomain {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }
-        let lati = lat < 0 ? Int(lat) - 1 : Int(lat)
+        let lati = Int(lat.rounded(.down))
         let latrow = UInt64(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
         let lonrow = UInt64((lon + 180) * Float(px))
         var value: Float = .nan
         
         let file = OmFileType.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
-        try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _, _) in
-            try await reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
+        try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+            try await omFile.reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
         }
         return value
     }

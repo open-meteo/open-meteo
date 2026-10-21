@@ -35,10 +35,6 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
         return 3 * 3600
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

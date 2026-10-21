@@ -19,6 +19,9 @@ struct KnmiDownload: AsyncCommand {
 
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -38,7 +41,7 @@ struct KnmiDownload: AsyncCommand {
 
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -301,7 +304,7 @@ struct KnmiDownload: AsyncCommand {
             }
 
             if generateElevationFile {
-                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
             }
             return try await writerMultistep.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         }
@@ -354,6 +357,8 @@ struct KnmiDownload: AsyncCommand {
             return KnmiSurfaceVariable.temperature_300m
         case (65, "heightAboveGround", "0"):
             return KnmiSurfaceVariable.snow_depth_water_equivalent
+        case (66, "heightAboveGround", "0"):
+            return KnmiSurfaceVariable.snow_depth
         default:
             break
         }

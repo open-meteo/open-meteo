@@ -8,10 +8,6 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
     case gwam
     case ewam
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
@@ -252,6 +248,3 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
         }
     }
 }
-
-
-typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>

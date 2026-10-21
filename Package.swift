@@ -32,8 +32,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.27.2"),
-        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "71f422b2706d8a81f1cecf52ae3073990de1ddbe"), // Because unsafe C flags are set, tagged releases cannot be used
+        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.29.0"),
+        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "d8855e418e2231ae8439f0c7e840fa3f93b371e3"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/curl-swift.git", from: "1.0.1"),
@@ -50,8 +50,21 @@ let package = Package(
     ] : []),
     targets: [
         .target(
+            name: "ReducedLatLon",
+            dependencies: [.product(name: "OmFileFormat", package: "om-file-format")],
+            swiftSettings: swiftFlags
+        ),
+        .testTarget(
+            name: "ReducedLatLonTests",
+            dependencies: [
+                .target(name: "ReducedLatLon"),
+                .product(name: "OmFileFormat", package: "om-file-format")
+            ]
+        ),
+        .target(
             name: "App",
             dependencies: [
+                .target(name: "ReducedLatLon"),
                 .product(name: "SwiftZarr", package: "swift-zarr"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Crypto", package: "swift-crypto"),
@@ -69,25 +82,54 @@ let package = Package(
                 .product(name: "curl-swift", package: "curl-swift"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 "CZlib",
+                "OmFileIO",
+                "OmTime",
             ] + (enableParquet ? [
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
             cSettings: cFlags,
-            swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
+            swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : []),
+            plugins: [
+                .plugin(name: "GitVersionPlugin")
+            ]
             //plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
+        .target(
+            name: "OmFileIO",
+            dependencies: [
+                //.product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
+                .product(name: "OmFileFormat", package: "om-file-format"),
+                .product(name: "Vapor", package: "vapor"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                "OmTime"
+            ]
+        ),
+        .target(name: "OmTime"),
         .target(
             name: "Lbzip2"
         ),
         .systemLibrary(
             name: "CZlib",
-            pkgConfig: "z",
-            providers: [.brew(["zlib"]), .apt(["libz-dev"])]
+            pkgConfig: "zlib",
+            providers: [.brew(["zlib"]), .apt(["libz-dev"]), .yum(["zlib-devel"])]
         ),
         .target(
             name: "CHelper",
             cSettings: cFlags,
             swiftSettings: swiftFlags
+        ),
+        .executableTarget(
+            name: "GitVersionGenerator",
+            path: "Tools/GitVersionGenerator"
+        ),
+        .plugin(
+            name: "GitVersionPlugin",
+            capability: .buildTool(),
+            dependencies: [
+                "GitVersionGenerator"
+            ]
         ),
         .executableTarget(
             name: "openmeteo-api",
@@ -96,9 +138,24 @@ let package = Package(
         .testTarget(
             name: "AppTests",
             dependencies: [
+                .target(name: "ReducedLatLon"),
                 .target(name: "App"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "VaporTesting", package: "vapor")
+            ]
+        ),
+        .testTarget(
+            name: "OmFileIOTests",
+            dependencies: [
+                .target(name: "OmFileIO"),
+                .product(name: "OmFileFormat", package: "om-file-format"),
+                .product(name: "Vapor", package: "vapor")
+            ]
+        ),
+        .testTarget(
+            name: "OmTimeTests",
+            dependencies: [
+                .target(name: "OmTime")
             ]
         ),
     ]

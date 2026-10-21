@@ -67,6 +67,10 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_nbm_conus
     case ncep_nbm_alaska
     case ncep_nam_conus
+    case ncep_rrfs_conus
+    case ncep_rrfs_north_america
+    case ncep_rrfs_conus_15min
+    case ncep_rrfs_conus_ensemble
     case ncep_aigefs025
     case ncep_aigfs025
     case ncep_hgefs025_ensemble_mean
@@ -86,6 +90,22 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_icon_global_native
+    case dwd_icon_global_native_model_level
+    case dwd_icon_eu_native
+    case dwd_icon_eu_native_model_level
+    case dwd_icon_d2_ruc_native
+    case dwd_icon_d2_ruc_native_15min
+    case dwd_icon_d2_ruc_native_model_level
+    case dwd_icon_d2_native
+    case dwd_icon_d2_native_model_level
+    case dwd_icon_d2_native_15min
+    case dwd_icon_global_eps_native
+    case dwd_icon_global_eps_native_ensemble_mean
+    case dwd_icon_eu_eps_native
+    case dwd_icon_eu_eps_native_ensemble_mean
+    case dwd_icon_d2_eps_native
+    case dwd_icon_d2_eps_native_ensemble_mean
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
@@ -95,6 +115,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_ewam
     case dwd_gwam
     case dwd_sis_europe_africa_v4
+    case dwd_aicon_global_native
 
     case ecmwf_ifs
     case ecmwf_ifs_europe_ensemble
@@ -137,6 +158,7 @@ enum DomainRegistry: String, CaseIterable {
     case geosphere_arome_austria
 
     case chmi_aladin_cz_1km
+    case chmi_aladin_central_europe_2km
 
     case nasa_imerg_daily
 
@@ -199,26 +221,13 @@ enum DomainRegistry: String, CaseIterable {
         return OpenMeteo.dataSpatialDirectory.map { "\($0)\(rawValue)/" }
     }
     
-    var remoteDataDirectory: String? {
-        guard let remote = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: bucketName) else {
-            return nil
-        }
-        return "\(remote)\(rawValue)/"
-    }
-    
-    var remoteDataRunDirectory: String? {
-        guard let remote = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: bucketName) else {
-            return nil
-        }
-        return "\(remote)\(rawValue)/".replacingOccurrences(of: "data/", with: "data_run/")
-    }
-    
     /// Instead of generating time chunks, use a single rolling files and retain a certain number of days inside
     var useRollingDays: Int? {
         switch self {
         case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
-        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps:
+        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return 3
         case .ncep_gefs05, .ncep_gefs025, .ncep_aigefs025, .ncep_gefswave025:
             return 3
@@ -241,8 +250,48 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 
-    func getDomain() -> GenericDomain? {
+    var nativeDefinition: IconNativeDomains? {
         switch self {
+        case .dwd_aicon_global_native: return .aiconNative
+        case .dwd_icon_global_native: return .iconNative
+        case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
+        case .dwd_icon_eu_native: return .iconEuNative
+        case .dwd_icon_eu_native_model_level: return .iconEuNativeModelLevel
+        case .dwd_icon_d2_ruc_native: return .iconD2RucNative
+        case .dwd_icon_d2_ruc_native_15min: return .iconD2RucNative15min
+        case .dwd_icon_d2_ruc_native_model_level: return .iconD2RucNativeModelLevel
+        case .dwd_icon_d2_native: return .iconD2Native
+        case .dwd_icon_d2_native_model_level: return .iconD2NativeModelLevel
+        case .dwd_icon_d2_native_15min: return .iconD2Native15min
+        case .dwd_icon_global_eps_native: return .iconEpsNative
+        case .dwd_icon_global_eps_native_ensemble_mean: return .iconEpsNativeEnsembleMean
+        case .dwd_icon_eu_eps_native: return .iconEuEpsNative
+        case .dwd_icon_eu_eps_native_ensemble_mean: return .iconEuEpsNativeEnsembleMean
+        case .dwd_icon_d2_eps_native: return .iconD2EpsNative
+        case .dwd_icon_d2_eps_native_ensemble_mean: return .iconD2EpsNativeEnsembleMean
+        default: return nil
+        }
+    }
+
+    func getDomain() async throws -> (any GenericDomain)? {
+        if let nativeDefinition {
+            return try await nativeDefinition.load()
+        }
+        return regularDomain
+    }
+
+    /// Used by file scheduling and synchronization without opening grid or elevation files.
+    var timeSeriesMetadata: DomainTimeSeriesMetadata? {
+        if let nativeDefinition {
+            return DomainTimeSeriesMetadata(nativeDefinition)
+        }
+        return regularDomain.map { DomainTimeSeriesMetadata($0) }
+    }
+
+    private var regularDomain: (any GenericDomain)? {
+        switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
+            return NcepRrfsDomain(rawValue: rawValue)!
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
         case .meteofrance_arome_france_hd:
@@ -351,12 +400,20 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.hrrr_conus
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
+        case .dwd_aicon_global_native:
+            return nil
         case .dwd_icon:
             return IconDomains.icon
         case .dwd_icon_d2:
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
+        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
+             .dwd_icon_global_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
+            return nil
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
         case .dwd_icon_eps:
@@ -409,6 +466,8 @@ enum DomainRegistry: String, CaseIterable {
             return GeoSphereDomain.arome_austria
         case .chmi_aladin_cz_1km:
             return ChmiDomain.aladin_cz_1km
+        case .chmi_aladin_central_europe_2km:
+            return ChmiDomain.aladin_central_europe_2km
         case .nasa_imerg_daily:
             return SatelliteDomain.imerg_daily
         case .cmip_CMCC_CM2_VHR4:
@@ -555,7 +614,7 @@ enum DomainRegistry: String, CaseIterable {
     
     /// Get meta information of a specific run
     func getFullRunMeta(client: HTTPClient?, logger: Logger, run: Timestamp) async throws -> FullRunMetaJson? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: FullRunMetaFile.run(self, run),
             client: client,
             logger: logger
@@ -586,137 +645,15 @@ enum DomainRegistry: String, CaseIterable {
 //    }
 //}
 
-extension DomainRegistry {
-    var bucketName: String {
-        switch self {
-        case .cmc_gem_geps_ensemble_mean:
-            return "cmc-gem-geps"
-        case .ncep_gefswave025_ensemble_mean:
-            return "ncep-gefswave025"
-        case .ncep_gefs025_ensemble_mean:
-            return "ncep-gefs025"
-        case .ncep_gefs05_ensemble_mean:
-            return "ncep-gefs05"
-        case .dwd_icon_eps_ensemble_mean:
-            return "dwd-icon-eps"
-        case .dwd_icon_eu_eps_ensemble_mean:
-            return "dwd-icon-eu-eps"
-        case .dwd_icon_d2_eps_ensemble_mean:
-            return "dwd-icon-d2-eps"
-        case .ukmo_global_ensemble_mean_20km:
-            return "ukmo-global-ensemble-20km"
-        case .ukmo_uk_ensemble_mean_2km:
-            return "ukmo-uk-ensemble-2km"
-        case .ncep_aigefs025_ensemble_mean:
-            return "ncep-aigefs025"
-        case .ecmwf_ifs025_ensemble_mean:
-            return "ecmwf-ifs025-ensemble"
-        case .ecmwf_aifs025_ensemble_mean:
-            return "ecmwf-aifs025-ensemble"
-        case .ecmwf_wam025_ensemble_mean:
-            return "ecmwf-wam025-ensemble"
-        case .meteoswiss_icon_ch1_ensemble_mean:
-            return "meteoswiss-icon-ch1-ensemble"
-        case .meteoswiss_icon_ch2_ensemble_mean:
-            return "meteoswiss-icon-ch2-ensemble"
-        default:
-            return rawValue.replacing("_", with: "-").lowercased()
-        }
-    }
-    
-    func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
-        return buckets.split(separator: ",").map { bucket in
-            let bucketSplit = bucket.split(separator: "@")
-            if bucketSplit.count == 3 {
-                // http://user:pw@something.com/@profile
-                return (bucketSplit[0]+"@"+bucketSplit[1], String(bucketSplit[2]))
-            }
-            let bucket = String(bucketSplit[0].replacing("MODEL", with: bucketName))
-            let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
-            let profileUpper = profile.map {"_\($0.uppercased())"} ?? ""
-            
-            // An environment variable may overwrite the S3 credentials
-            if let credentials = Environment.get("S3_CREDENTIALS_\(bucket.uppercased())\(profileUpper)") {
-                return (credentials, profile)
-            }
-            
-            return (bucket, profile)
-        }
-    }
-    
-    /// Upload all data to a specified S3 bucket
-    func syncToS3(application: Application, bucket: String, variables: [any GenericVariable]?) async throws {
-        let logger = application.logger
-        let dir = rawValue
-        if let variables {
-            let vDirectories = variables.map { $0.omFileName.file } + ["static"]
-            for variable in vDirectories {
-                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
-                if !FileManager.default.fileExists(atPath: src) {
-                    continue
-                }
-                for (bucket, profile) in parseBucket(bucket) {
-                    if variable.contains("_previous_day") && ((bucket == "openmeteo" && profile == nil) || profile == "aws") {
-                        // do not upload data from past days yet
-                        continue
-                    }
-                    logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                    await application.s3UploadManager.sync(
-                        client: application.http1Client,
-                        bucketEndpoint: bucket,
-                        localDirectory: src,
-                        server: bucket,
-                        basePath: "data/\(dir)/\(variable)"
-                    )
-                    logger.info("AWS upload queued [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                }
-            }
 
-        } else {
-            let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            for (bucket, profile) in parseBucket(bucket) {
-                logger.info("AWS upload [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-                let exclude = (bucket == "openmeteo" && profile == nil) || profile == "aws" ? ["*~", "*_previous_day*", "*rolling.om"] : self == .google_weathernext2_ensemble ? ["*~"] : ["*~", "*rolling.om"]
-                logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
-                await application.s3UploadManager.sync(
-                    client: application.http1Client,
-                    bucketEndpoint: bucket,
-                    localDirectory: src,
-                    server: bucket,
-                    basePath: "data/\(dir)",
-                    exclude: exclude
-                )
-                logger.info("AWS upload queued [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-            }
-        }
-    }
-    
-    /// Upload time-series optimised per RUN files to S3 `/data_run/<domain>/<run>/<variable>.om`
-    func syncToS3PerRun(application: Application, bucket: String, run: Timestamp, skipMeta: Bool) async throws {
-        let logger = application.logger
-        let dir = rawValue
-        guard let directory = OpenMeteo.dataRunDirectory else {
-            return
-        }
-        let timeFormatted = run.format_directoriesYYYYMMddhhmm
-        for (bucket, profile) in parseBucket(bucket) {
-            let src = "\(directory)\(dir)/\(timeFormatted)/"
-            let destRel = "data_run/\(dir)/\(timeFormatted)/"
-            
-            if !FileManager.default.fileExists(atPath: src) {
-                continue
-            }
-            logger.info("AWS upload to bucket \(bucket.stripHttpPassword())")
-            
-            /// Only one sync required, because JSON files are committed last and on error, the process would die
-            await application.s3UploadManager.sync(
-                client: application.http1Client,
-                bucketEndpoint: bucket,
-                localDirectory: src,
-                server: bucket,
-                basePath: destRel
-            )
-            logger.info("AWS upload queued [Bucket \(bucket.stripHttpPassword()), profile \(profile ?? ""), time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
-        }
+struct DomainTimeSeriesMetadata {
+    let dtSeconds: Int
+    let omFileLength: Int
+    let updateIntervalSeconds: Int
+
+    init(_ domain: any GenericDomain) {
+        self.dtSeconds = domain.dtSeconds
+        self.omFileLength = domain.omFileLength
+        self.updateIntervalSeconds = domain.updateIntervalSeconds
     }
 }

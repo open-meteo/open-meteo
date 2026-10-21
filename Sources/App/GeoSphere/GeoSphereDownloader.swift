@@ -25,6 +25,9 @@ struct GeoSphereDownloader: AsyncCommand {
 
         @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -43,13 +46,13 @@ struct GeoSphereDownloader: AsyncCommand {
 
         let handles = try await download(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// Download elevation data from GeoSphere DEM file
-    func downloadElevation(application: Application, domain: GeoSphereDomain) async throws {
+    func downloadElevation(application: Application, domain: GeoSphereDomain, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -80,7 +83,7 @@ struct GeoSphereDownloader: AsyncCommand {
         }
 
         logger.info("Writing elevation file (\(elevation.count) grid points)")
-        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
     }
 
     /// Download forecast data and return variable handles
@@ -90,7 +93,7 @@ struct GeoSphereDownloader: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        try await downloadElevation(application: application, domain: domain)
+        try await downloadElevation(application: application, domain: domain, uploadS3Bucket: uploadS3Bucket)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
 

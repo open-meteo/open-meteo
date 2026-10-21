@@ -2,6 +2,7 @@ import Foundation
 import AsyncHTTPClient
 @preconcurrency import SwiftEccodes
 import NIOCore
+import OmFileIO
 
 /**
  CDS APIv2 flow:

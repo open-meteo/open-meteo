@@ -21,9 +21,6 @@ protocol GenericDomain: Sendable {
     /// How often a domain is updated in seconds. `3600` for updates every hour
     var updateIntervalSeconds: Int { get }
 
-    /// If true, domain has yearly files
-    var hasYearlyFiles: Bool { get }
-
     /// If present, the timerange that is available in a master file
     var masterTimeRange: Range<Timestamp>? { get }
 
@@ -38,9 +35,16 @@ protocol GenericDomain: Sendable {
     
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
+
+    /// Whether metadata exists for the requested run. Invalid metadata must throw.
+    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool
 }
 
 extension GenericDomain {
+    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool {
+        try await domainRegistry.getFullRunMeta(client: client, logger: logger, run: run) != nil
+    }
+
     var generateFullRun: Bool {
         return countEnsembleMember == 1
     }
@@ -71,13 +75,13 @@ extension GenericDomain {
         }
         switch type {
         case .soilType:
-            return try? await RemoteFileManager.instance.get(
+            return try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
         case .elevation:
-            return try? await RemoteFileManager.instance.get(
+            return try? await OmFileSystemManager.instance.get(
                 file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger
@@ -87,7 +91,7 @@ extension GenericDomain {
 
     /// Meta JSON for time-series data
     func getMetaJson(client: HTTPClient?, logger: Logger) async throws -> ModelUpdateMetaJson? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: ModelUpdateMetaFile(domain: self.domainRegistry),
             client: client,
             logger: logger
@@ -95,7 +99,7 @@ extension GenericDomain {
     }
     
     func getLatestFullRun(client: HTTPClient?, logger: Logger) async throws -> Timestamp? {
-        return try await RemoteFileManager.instance.get(
+        return try await OmFileSystemManager.instance.get(
             file: FullRunMetaFile.latest(self.domainRegistry),
             client: client,
             logger: logger
@@ -157,6 +161,9 @@ enum ReaderInterpolation {
     /// Take the next hour, and devide by `dt` to preserve sums like precipitation
     case backwards_sum
 
+    /// Maximum over preceding intervals; replicate backwards when interpolating finer output.
+    case backwards_max
+
     /// Replicate value backwards. E.g. min/max of previous hours
     case backwards
 
@@ -169,7 +176,7 @@ enum ReaderInterpolation {
             return 2
         case .solar_backwards_averaged, .solar_backwards_missing_not_averaged:
             return 2
-        case .backwards_sum, .backwards:
+        case .backwards_sum, .backwards_max, .backwards:
             return 1
         }
     }

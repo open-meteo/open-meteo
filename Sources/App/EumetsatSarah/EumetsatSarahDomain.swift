@@ -15,9 +15,9 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
     var countEnsembleMember: Int {
         return 1
     }
-
-    var hasYearlyFiles: Bool {
-        return true
+    
+    var generateFullRun: Bool {
+         return false
     }
 
     var masterTimeRange: Range<Timestamp>? {

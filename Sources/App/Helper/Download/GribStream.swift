@@ -15,7 +15,7 @@ extension AsyncSequence where Element == ByteBuffer {
 enum GribAsyncStreamHelper {
     /// Detect a range of bytes in a byte stream if there is a grib header and returns it
     /// Note: The required length to decode a GRIB message is not checked of the input buffer
-    static func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int, gribVersion: Int)? {
+    static func seekGrib(memory: UnsafeRawBufferPointer) throws -> (offset: Int, length: Int, gribVersion: Int)? {
         let search = "GRIB"
         guard let base = memory.baseAddress else {
             return nil
@@ -87,7 +87,7 @@ enum GribAsyncStreamHelper {
             }
             return (offset, Int(length), 2)
         default:
-            fatalError("Unknown GRIB version \(edition)")
+            throw GribAsyncStreamError.invalidGribVersion(given: edition)
         }
     }
 }
@@ -103,6 +103,7 @@ fileprivate extension UnsafeRawPointer {
 enum GribAsyncStreamError: Error {
     case didNotFindGibHeader
     case unexpectedEndOfFile
+    case invalidGribVersion(given: UInt8)
 }
 
 /**
@@ -135,7 +136,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
 
             while true {
                 // repeat until GRIB header is found
-                guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
+                guard let seek = try buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         guard buffer.readableBytes < 64 * 1024 else {
                             throw GribAsyncStreamError.didNotFindGibHeader

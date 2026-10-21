@@ -157,6 +157,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
 
     /// Convective available potential energy
     case cape
+
+    /// Convective inhibition
+    case convective_inhibition
     // case tke
 
     /// LPI Lightning Potential Index . Only available in icon-d2. Scales form 0 to ~120
@@ -252,6 +255,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return 10
         case .cape:
             return 0.1
+        case .convective_inhibition:
+            return 1
         case .lightning_potential:
             return 10
         case .snowfall_height:
@@ -311,6 +316,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .temperature_180m:
             return .celsius
         case .cape:
+            return .joulePerKilogram
+        case .convective_inhibition:
             return .joulePerKilogram
         case .lightning_potential:
             return .joulePerKilogram
@@ -406,10 +413,13 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return .backwards_sum
         case .cape:
             return .hermite(bounds: 0...10e9)
+        case .convective_inhibition:
+            return .hermite(bounds: 0...10e9)
         case .lightning_potential:
             return .linear
-        case .wind_gusts_10m:
-            return .hermite(bounds: 0...10e9)
+        // GRIB stepType=max denotes preceding-interval maxima, so backwards_max preserves their meaning.
+        case .wind_gusts_10m, .updraft:
+            return .backwards_max
         case .snowfall_height:
             return .linear
         case .freezing_level_height:
@@ -420,8 +430,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return .solar_backwards_averaged
         case .direct_radiation:
             return .solar_backwards_averaged
-        case .updraft:
-            return .hermite(bounds: nil)
         case .visibility:
             return .linear
         }
@@ -439,6 +447,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
 enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
     case precipitation
     case shortwave_radiation
+    // Historical total shortwave values used the `diffuse_radiation` filename.
+    // No corresponding legacy `diffuse_radiation_spread` archive exists.
+    case legacy_shortwave_radiation
     case direct_radiation
     case pressure_msl
     case wind_v_component_10m
@@ -461,7 +472,12 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
     }
 
     var omFileName: (file: String, level: Int) {
-        return (rawValue, 0)
+        switch self {
+        case .legacy_shortwave_radiation:
+            return ("diffuse_radiation", 0)
+        default:
+            return (rawValue, 0)
+        }
     }
 
     var unit: SiUnit {
@@ -475,7 +491,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation, .legacy_shortwave_radiation, .direct_radiation:
             return .wattPerSquareMetre
         }
     }
@@ -489,7 +505,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return 1
         case .relative_humidity_2m:
             return 1
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation, .legacy_shortwave_radiation, .direct_radiation:
             return 1
         case .wind_v_component_10m:
             return 10
@@ -514,9 +530,7 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .shortwave_radiation:
-            return .solar_backwards_averaged
-        case .direct_radiation:
+        case .shortwave_radiation, .legacy_shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
         }
     }
@@ -606,7 +620,8 @@ enum DwdIconEuEpsGlobalVariable: String, Hashable, GenericVariable {
         case .wind_u_component_10m: return .hermite(bounds: nil)
         case .wind_v_component_80m: return .hermite(bounds: nil)
         case .wind_u_component_80m: return .hermite(bounds: nil)
-        case .wind_gusts_10m: return .hermite(bounds: 0...10e9)
+        // GRIB stepType=max denotes preceding-interval maxima, so backwards_max preserves their meaning.
+        case .wind_gusts_10m: return .backwards_max
         case .relative_humidity_2m: return .hermite(bounds: 0...100)
         case .direct_radiation, .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...10e9)
@@ -637,6 +652,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
     case cloud_cover
     case relative_humidity_2m
     case cape
+    case convective_inhibition
     case snowfall_water_equivalent
     case geopotential_height_850hPa
     case geopotential_height_500hPa
@@ -688,6 +704,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .relative_humidity_2m: return .percentage
         case .direct_radiation, .diffuse_radiation: return .wattPerSquareMetre
         case .cape: return .joulePerKilogram
+        case .convective_inhibition: return .joulePerKilogram
         case .geopotential_height_850hPa: return .metre
         case .geopotential_height_500hPa: return .metre
         }
@@ -720,6 +737,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .wind_u_component_180m: return 10
         case .wind_gusts_10m: return 10
         case .cape: return 0.1
+        case .convective_inhibition: return 1
         case .geopotential_height_850hPa: return 0.1
         case .geopotential_height_500hPa: return 0.05
         }
@@ -748,10 +766,12 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .wind_u_component_120m: return .hermite(bounds: nil)
         case .wind_v_component_180m: return .hermite(bounds: nil)
         case .wind_u_component_180m: return .hermite(bounds: nil)
-        case .wind_gusts_10m: return .hermite(bounds: 0...10e9)
+        // GRIB stepType=max denotes preceding-interval maxima, so backwards_max preserves their meaning.
+        case .wind_gusts_10m: return .backwards_max
         case .relative_humidity_2m: return .hermite(bounds: 0...100)
         case .direct_radiation, .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...10e9)
+        case .convective_inhibition: return .hermite(bounds: 0...10e9)
         case .geopotential_height_850hPa: return .hermite(bounds: nil)
         case .geopotential_height_500hPa: return .hermite(bounds: nil)
         }

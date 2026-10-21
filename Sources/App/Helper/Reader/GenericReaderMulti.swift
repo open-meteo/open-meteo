@@ -36,42 +36,28 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
-        for reader in reader {
+        for reader in reader.reversed() {
             if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
-                break
+                return true
             }
         }
-        return true
+        return false
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data: [Float]?
-        var unit: SiUnit?
+        var result: DataAndUnit?
         for r in reader.reversed() {
             guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
                 continue
             }
-            if data == nil {
-                // first iteration
-                data = d.data
-                unit = d.unit
-            } else {
-                if let unit, [.wmoCode, .dimensionless].contains(unit) {
-                    data?.integrateIfNaN(d.data)
-                } else {
-                    data?.integrateIfNaNSmooth(d.data)
-                }
-            }
-            if data?.containsNaN() == false {
+            result = result?.combined(withLowerPriority: d) ?? d
+            if result?.data.containsNaN() == false {
                 break
             }
         }
-        guard let data, let unit else {
-            return nil
-        }
-        return DataAndUnit(data, unit)
+        return result
     }
 }
 
@@ -96,6 +82,18 @@ extension GenericReaderProtocol {
 /// Combine multiple independent weather models, that may not have given forecast variable
 struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
     let reader: [any GenericReaderOptionalProtocol<Variable>]
+    let prefetchAllReaders: Bool
+    let smoothTransitions: Bool
+
+    init(
+        reader: [any GenericReaderOptionalProtocol<Variable>],
+        prefetchAllReaders: Bool = false,
+        smoothTransitions: Bool = true
+    ) {
+        self.reader = reader
+        self.prefetchAllReaders = prefetchAllReaders
+        self.smoothTransitions = smoothTransitions
+    }
 
     var modelLat: Float {
         reader.last?.modelLat ?? .nan
@@ -118,12 +116,15 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
-        for reader in reader {
-            if try await reader.prefetchData(variable: variable, time: time) {
-                return true
+        var prefetched = false
+        for reader in reader.reversed() {
+            let accepted = try await reader.prefetchData(variable: variable, time: time)
+            prefetched = prefetched || accepted
+            if accepted && !prefetchAllReaders {
+                break
             }
         }
-        return false
+        return prefetched
     }
 
     func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
@@ -135,30 +136,22 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data: [Float]?
-        var unit: SiUnit?
+        var result: DataAndUnit?
         for r in reader.reversed() {
             guard let d = try await r.get(variable: variable, time: time) else {
                 continue
             }
-            if data == nil {
-                // first iteration
-                data = d.data
-                unit = d.unit
+            if !smoothTransitions, let preferred = result {
+                var data = preferred.data
+                data.integrateIfNaN(d.data)
+                result = DataAndUnit(data, preferred.unit)
             } else {
-                if let unit, [.wmoCode, .dimensionless].contains(unit) {
-                    data?.integrateIfNaN(d.data)
-                } else {
-                    data?.integrateIfNaNSmooth(d.data)
-                }
-                if data?.containsNaN() == false {
-                    break
-                }
+                result = result?.combined(withLowerPriority: d) ?? d
+            }
+            if result?.data.containsNaN() == false {
+                break
             }
         }
-        guard let data, let unit else {
-            return nil
-        }
-        return DataAndUnit(data, unit)
+        return result
     }
 }

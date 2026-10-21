@@ -1,6 +1,6 @@
 /// Required additions to a MeteoFrance variable to make it downloadable
 protocol MeteoFranceVariableDownloadable: GenericVariable, Hashable {
-    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     func skipHour0(domain: MeteoFranceDomain) -> Bool
 
     /// AROME france HD has very few variables
@@ -232,16 +232,17 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         }
     }
 
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m, .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)
         case .shortwave_radiation:
-            /// Note: This is actually wrong. Correct value would be `1/3600`.
-            /// Data is corrected in the reader afterwards
-            return (3600 / 10_000_000, 0)
+            // Preserve the historically incorrect archive conversion for compatibility.
+            // Readers apply `shortwaveRadiationArchiveCorrectionFactor` to recover
+            // physical W/m² values.
+            return (Self.shortwaveRadiationArchiveStorageFactor * 3600 / Float(dtSeconds), 0)
         default:
             return nil
         }
@@ -282,7 +283,7 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         return false
     }
 
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:
             return (1, -273.15)

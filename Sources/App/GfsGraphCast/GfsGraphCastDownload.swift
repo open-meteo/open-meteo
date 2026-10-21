@@ -25,9 +25,18 @@ struct GfsGraphCastDownload: AsyncCommand {
 
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
+
+        @Option(name: "server", help: "Root server path")
+        var server: String?
+
+        @Flag(name: "download-from-aws", help: "Download GRIB files from AWS where available")
+        var downloadFromAws: Bool
         
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -38,6 +47,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         disableIdleSleep()
 
         let domain = try GfsGraphCastDomain.load(rawValue: signature.domain)
+        try validateSourceOptions(signature: signature)
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 try await downloadRun(using: context, signature: signature, run: run, domain: domain)
@@ -54,10 +64,10 @@ struct GfsGraphCastDownload: AsyncCommand {
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, server: signature.server, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
         
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: true)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
     func getCmaVariable(logger: Logger, message: GribMessage) -> (any GfsGraphCastVariableDownloadable)? {
@@ -121,7 +131,13 @@ struct GfsGraphCastDownload: AsyncCommand {
         return nil
     }
 
-    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    private func validateSourceOptions(signature: Signature) throws {
+        if signature.server != nil && signature.downloadFromAws {
+            throw CommandError.unknownInput("Options '--server' and '--download-from-aws' cannot be used together")
+        }
+    }
+
+    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, server: String?, downloadFromAws: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = domain == .aigefs025 ? 6 : 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -139,7 +155,7 @@ struct GfsGraphCastDownload: AsyncCommand {
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
             
             try await members.foreachConcurrent(nConcurrent: 2) { member in
-                let urls = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
+                let urls = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member, server: server, useAws: downloadFromAws)
                 let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
                 
                 for url in urls {

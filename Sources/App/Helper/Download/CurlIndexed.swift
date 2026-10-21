@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 @preconcurrency import SwiftEccodes
+import OmFileIO
 
 protocol CurlIndexedVariable {
     /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`
@@ -9,6 +10,13 @@ protocol CurlIndexedVariable {
 
     /// If true, the exact string needs to match at the end
     var exactMatch: Bool { get }
+}
+
+extension CurlIndexedVariable {
+    func matches(indexLine: Substring) -> Bool {
+        guard let gribIndexName else { return false }
+        return exactMatch ? indexLine.hasSuffix(gribIndexName) : indexLine.contains(gribIndexName)
+    }
 }
 
 extension Curl {
@@ -38,17 +46,17 @@ extension Curl {
 
     /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
     /// If `downloadFullGribFile` is set, skip inventory and perform full download. This can be faster if all variables are processed anyway
-    func downloadEcmwfIndexed(url: String, concurrent: Int, downloadFullGribFile: Bool, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
+    /// URLs must already be authenticated. The caller supplies the source's range capability.
+    func downloadEcmwfIndexed(url: String, indexURL: String, allowMultipleRanges: Bool, concurrent: Int, downloadFullGribFile: Bool, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
         if downloadFullGribFile {
             return try await getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent)
         }
         
-        let urlIndex = url.replacingOccurrences(of: ".grib2", with: ".index")
-        let index = try await downloadInMemoryAsync(url: urlIndex, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
+        let index = try await downloadInMemoryAsync(url: indexURL, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
         guard !index.isEmpty else {
             fatalError("Empty grib selection")
         }
-        let ranges = index.indexToRange()
+        let ranges = index.indexToRange(allowMultipleRanges: allowMultipleRanges)
         return ranges.mapStream(nConcurrent: 1, body: {
             range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
         }).flatMap({ $0.mapStream(nConcurrent: 1, body: { $0 }) }).eraseToAnyAsyncSequence()
@@ -70,22 +78,22 @@ extension Curl {
             indices.append(index)
         }
 
+        return try Self.decodeGribIndices(indices: indices, variables: variables, errorOnMissing: errorOnMissing, logger: logger)
+    }
+
+    /// Match already fetched inventories without making HTTP requests.
+    static func decodeGribIndices<Variable: CurlIndexedVariable>(indices: [String], variables: [Variable], errorOnMissing: Bool, logger: Logger) throws -> [(matches: [Variable], range: String, minSize: Int)] {
+        let count = variables.reduce(0, { $0 + ($1.gribIndexName == nil ? 0 : 1) })
+        guard count > 0 else { return [] }
         var result = [(matches: [Variable], range: String, minSize: Int)]()
-        result.reserveCapacity(url.count)
+        result.reserveCapacity(indices.count)
 
         for index in indices {
+            let lines = index.split(separator: "\n")
             var matches = [Variable]()
             matches.reserveCapacity(count)
-            guard let range = index.split(separator: "\n").indexToRange(include: { idx in
-                guard let match = variables.first(where: {
-                    guard let gribIndexName = $0.gribIndexName else {
-                        return false
-                    }
-                    if $0.exactMatch {
-                        return idx.hasSuffix(gribIndexName)
-                    }
-                    return idx.contains(gribIndexName)
-                }) else {
+            guard let range = lines.indexToRange(include: { idx in
+                guard let match = variables.first(where: { $0.matches(indexLine: idx) }) else {
                     return false
                 }
                 guard !matches.contains(where: { $0.gribIndexName == match.gribIndexName }) else {
@@ -189,7 +197,8 @@ extension ByteBuffer {
 extension Array where Element == Curl.EcmwfIndexEntry {
     /// Convert grib entries to http range download command
     /// Split large range downloads to multiple individual downloads to prevent `request header too large` error
-    func indexToRange() -> [(range: String, minSize: Int)] {
+    func indexToRange(allowMultipleRanges: Bool = true) -> [(range: String, minSize: Int)] {
+        guard !isEmpty else { return [] }
         var results = [(range: String, minSize: Int)]()
         var range = ""
         var i = 0
@@ -204,8 +213,8 @@ extension Array where Element == Curl.EcmwfIndexEntry {
             while i < count {
                 let entry = self[i]
                 if entry._offset != end {
-                    range += "\(end)"
-                    if range.count > 4000 || size > 64 * 1024 * 1024 {
+                    range += "\(end - 1)"
+                    if !allowMultipleRanges || range.count > 4000 || size > 64 * 1024 * 1024 {
                         results.append((range, size))
                         range = ""
                         size = 0
@@ -219,7 +228,7 @@ extension Array where Element == Curl.EcmwfIndexEntry {
                 i += 1
             }
         }
-        range += "\(end)"
+        range += "\(end - 1)"
         results.append((range, size))
         return results
     }

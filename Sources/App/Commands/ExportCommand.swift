@@ -2,6 +2,7 @@ import Foundation
 import OmFileFormat
 import Vapor
 import SwiftNetCDF
+import OmFileIO
 
 #if ENABLE_PARQUET
 import SwiftArrowParquet
@@ -226,7 +227,7 @@ struct ExportCommand: AsyncCommand {
         try ncVariable.write(data)
         return*/
 
-        guard let genericDomain = domain.genericDomain else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
         
@@ -287,11 +288,11 @@ struct ExportCommand: AsyncCommand {
             return variable
         }
         
-        guard let genericDomain = domain.genericDomain else {
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
 
-        let grid = /*targetGridDomain?.genericDomain.grid ??*/ genericDomain.grid
+        let grid = genericDomain.grid
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
@@ -388,12 +389,12 @@ struct ExportCommand: AsyncCommand {
                     return try await points.asyncMap { (gridpoint, elevation) in
                         let coords = grid.getCoordinates(gridpoint: gridpoint)
                         // Read data
-                        guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                        guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                             fatalError("Could not get reader for domain \(domain)")
                         }
                         let rows = try await variables.asyncMap { variable in
                             let (v, previousDay) = variable.variableAndPreviousDay
-                            guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
+                            guard let data = try await reader.get(variable: v, time: time.toSettings(previousDay: previousDay)) else {
                                 fatalError("Invalid variable \(variable)")
                             }
                             return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
@@ -467,12 +468,12 @@ struct ExportCommand: AsyncCommand {
                 return try await points.asyncMap { (gridpoint, elevation) in
                     let coords = grid.getCoordinates(gridpoint: gridpoint)
                     // Read data
-                    guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                    guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                         fatalError("Could not create reader for domain \(domain)")
                     }
                     let rows = try await variables.asyncMap { variable in
                         let (v, previousDay) = variable.variableAndPreviousDay
-                        guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
+                        guard let data = try await reader.get(variable: v, time: time.toSettings(previousDay: previousDay)) else {
                             fatalError("Invalid variable \(variable)")
                         }
                         return data
@@ -500,17 +501,23 @@ struct ExportCommand: AsyncCommand {
     }
 
     func generateNetCdf(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, compressionLevel: Int?, /*targetGridDomain: TargetGridDomain?,*/ outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
-        guard let genericDomain = domain.genericDomain else {
+        let variables = variables.map {
+            guard let variable = ForecastVariable(rawValue: $0) else {
+                fatalError("Could not parse variable name \($0)")
+            }
+            return variable
+        }
+        guard let genericDomain = try await domain.genericDomain() else {
             fatalError("Export not supported for domain \(domain)")
         }
-        let grid = genericDomain.grid //targetGridDomain?.genericDomain.grid ?? domain.grid
+        let grid = genericDomain.grid
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
-        try ncFile.setAttribute("TITLE", "\(domain) \(variables.joined(separator: ", "))")
+        try ncFile.setAttribute("TITLE", "\(domain) \(variables.map(\.rawValue).joined(separator: ", "))")
         let latDimension = try ncFile.createDimension(name: "LAT", length: grid.ny)
         let lonDimension = try ncFile.createDimension(name: "LON", length: grid.nx)
 
@@ -525,7 +532,7 @@ struct ExportCommand: AsyncCommand {
         if outputElevation {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
-            let targetDomain = /*targetGridDomain?.genericDomain ??*/ domain.genericDomain!
+            let targetDomain = /*targetGridDomain?.genericDomain ??*/ genericDomain
             guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
@@ -571,13 +578,13 @@ struct ExportCommand: AsyncCommand {
                 // Loop over locations, read and write
                 for gridpoint in 0..<grid.count {
                     // Read data
-                    guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                    guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                         fatalError("Could not create reader for domain \(domain)")
                     }
-                    guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
+                    guard let data = try await reader.get(variable: variable, time: time.toSettings())?.data else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
+                    let normals = normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                     try ncVariable.write(normals, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                     await progress.add(time.count * 4)
                 }
@@ -588,7 +595,7 @@ struct ExportCommand: AsyncCommand {
 
         let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
         for variable in variables {
-            var ncVariable = try ncFile.createVariable(name: variable, type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
+            var ncVariable = try ncFile.createVariable(name: variable.rawValue, type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
 
             if let compressionLevel, compressionLevel > 0 {
                 try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
@@ -624,10 +631,10 @@ struct ExportCommand: AsyncCommand {
             // Loop over locations, read and write
             for gridpoint in 0..<grid.count {
                 // Read data
-                guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
                     fatalError("Could not create reader for domain \(domain)")
                 }
-                guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                guard let data = try await reader.get(variable: variable, time: time.toSettings()) else {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
@@ -908,50 +915,6 @@ enum ExportFormat: String, RawRepresentableString, CaseIterable {
 
     var grid: Gridable {
         return genericDomain.grid
-    }
-
-    func getReader(position: Int, options: GenericReaderOptions) async throws -> any GenericReaderProtocol {
-        switch self {
-        case .CMCC_CM2_VHR4:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position, options: options), domain: Cmip6Domain.CMCC_CM2_VHR4), domain: Cmip6Domain.CMCC_CM2_VHR4)
-        case .MRI_AGCM3_2_S:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position, options: options), domain: .MRI_AGCM3_2_S), domain: .MRI_AGCM3_2_S)
-        case .FGOALS_f3_H:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position, options: options), domain: .FGOALS_f3_H), domain: .FGOALS_f3_H)
-        case .HiRAM_SIT_HR:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position, options: options), domain: .HiRAM_SIT_HR), domain: .HiRAM_SIT_HR)
-        case .EC_Earth3P_HR:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position, options: options), domain: .EC_Earth3P_HR), domain: .EC_Earth3P_HR)
-        case .MPI_ESM1_2_XR:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position, options: options), domain: .MPI_ESM1_2_XR), domain: .MPI_ESM1_2_XR)
-        case .NICAM16_8S:
-            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position, options: options), domain: .NICAM16_8S), domain: .NICAM16_8S)
-        case .glofas_v3_consolidated:
-            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position, options: options)
-        case .glofas_v4_consolidated:
-            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position, options: options)
-        case .glofas_v3_forecast:
-            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position, options: options)
-        case .glofas_v3_seasonal:
-            return try await GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position, options: options)
-        case .era5_land:
-            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position, options: options)), options: options)
-        case .era5:
-            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position, options: options)), options: options)
-        case .ecmwf_ifs:
-            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, position: position, options: options)), options: options)
-        case .ecmwf_ifs025:
-            return try await EcmwfReader(domain: .ifs025, gridpoint: position, options: options)
-        case .era5_seamless:
-            let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position, options: options)
-            guard
-                let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
-            else {
-                // Not possible
-                throw ForecastapiError.noDataAvailableForThisLocation
-            }
-            return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
-        }
     }
 
     func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> any GenericReaderProtocol {

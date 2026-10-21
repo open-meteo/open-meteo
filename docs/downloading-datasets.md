@@ -1,3 +1,48 @@
+# Downloading Weather Models
+Open-Meteo fetches raw weather data from national weather services and transforms it into a highly optimized time-series database. The Open-Meteo database is distributed as open-data through an [AWS Open-Data Sponsorship](https://github.com/open-meteo/open-data). For details on downloading raw weather forecasts from national weather services, refer to the [downloading datasets documentation](./downloading-datasets.md).
+
+As illustrated earlier, the `sync` command enables the direct download of the Open-Meteo weather database from AWS S3. It requires two arguments:
+1. One or more weather model, such as `ecmwf_ifs025` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
+2. A list of weather variables, for example, `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
+
+Please refer to the [Weather API tutorial](https://github.com/open-meteo/open-data/tree/main/tutorial_weather_api) for more more information.
+
+
+### Automatic Data Synchronization  
+
+The prebuilt Ubuntu images automatically install a synchronization service. Modify the configuration in /etc/default/openmeteo-api.env:
+```
+[...]
+
+SYNC_ENABLED=true
+SYNC_APIKEY=
+SYNC_SERVER=
+SYNC_PAST_DAYS=3
+SYNC_DOMAINS=dwd_icon,ncep_gfs013,...
+SYNC_VARIABLES=temperature_2m,dew_point_2m,relative_humidity_2m,...
+SYNC_REPEAT_INTERVAL=5
+```
+
+Restart and monitor the sync service with:
+```bash
+sudo systemctl status openmeteo-sync
+sudo systemctl restart openmeteo-sync
+sudo journalctl -u openmeteo-sync.service
+```
+
+To automate the removal of older data, use the following cronjobs:
+
+```
+# Remove pressure level data after 10 days
+0 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -wholename "*hPa*" -mtime +10 -delete
+
+# Remove surface level data after 90 days
+5 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -mtime +90 -delete
+```
+
+
+
+
 ## Downloading datasets
 Because data is consumed from different national weather services with different open-data servers and update times, many different downloaders are available.
 
@@ -8,29 +53,51 @@ Please note, that only the command arguments are listed below. Whether you are u
 Usage: /usr/local/bin/openmeteo-api <command>
 
 Commands:
-                   benchmark Benchmark Open-Meteo core functions like data manipulation and compression
-                        boot Boots the application's providers.
-                  convert-om Convert an om file to to NetCDF
-                     cronjob Emits the cronjob definition
-                    download Download a specified icon model run
-               download-cams Download global and european CAMS air quality forecasts
-              download-cmip6 Download CMIP6 data and convert
-                download-dem Convert digital elevation model
-              download-ecmwf Download a specified ecmwf model run
-               download-era5 Download ERA5 from the ECMWF climate data store and convert
-                download-gem Download Gem models
-                download-gfs Download GFS from NOAA NCEP
-             download-glofas Download river discharge data from GloFAS
-           download-iconwave Download a specified wave model run
-                download-jma Download JMA models
-        download-meteofrance Download MeteoFrance models
-              download-metno Download MetNo models
-          download-satellite Download satellite datasets
-  download-seasonal-forecast Download seasonal forecasts from Copernicus
-                      export Export to dataset to NetCDF
-                      routes Displays all registered routes.
-                       serve Begins serving the app over HTTP.
-                        sync Synchronise weather database from a remote server
+                    benchmark Benchmark Open-Meteo core functions like data manipulation and compression
+                   convert-om Convert between om file format version or convert to NetCDF
+                     download Download a specified DWD ICON or AICON model run
+                 download-dwd Alias for the DWD downloader
+                 download-bom Download a specified Bom model run
+                download-cams Download global and european CAMS air quality forecasts
+                download-chmi Download ČHMÚ ALADIN Czech model
+                 download-cma Download a specified CMA model run
+               download-cmip6 Download CMIP6 data and convert
+                 download-dem Convert digital elevation model
+                 download-dmi Download Dmi models
+             download-dwd-sis Download DWD satellite radiation data
+               download-ecmwf Download a specified ecmwf model run
+         download-ecmwf-ecpds Download a specified ecmwf model run
+          download-ecmwf-seas Download a specified ecmwf model run
+                download-era5 Download ERA5 from the ECMWF climate data store and convert
+    download-eumetsat-lsa-saf Download Eumetsat Sarah data
+      download-eumetsat-sarah Download Eumetsat Sarah data
+                 download-gem Download Gem models
+           download-geosphere Download GeoSphere Austria models
+                 download-gfs Download GFS from NOAA NCEP
+       download-gfs-graphcast Download a specified GFS GraphCast model run
+              download-glofas Download river discharge data from GloFAS
+            download-iconwave Download a specified wave model run
+  download-italia-meteo-arpae Download ItaliaMeteo Arpae models
+       download-jaxa-himawari Download Jaxa Himawari satellite data download
+                 download-jma Download JMA models
+                 download-kma Download Kma models
+                download-knmi Download KNMI models
+         download-meteofrance Download MeteoFrance models
+          download-meteoswiss Download MeteoSwiss ICON CH models
+               download-metno Download MetNo models
+              download-mfwave Download a specified wave model run
+                 download-nbm Download GFS from NOAA NCEP
+           download-satellite Download satellite datasets
+                download-ukmo Download UKMO models
+         download-weathernext Download a specified WeatherNext-2 model run
+                       export Export to dataset to NetCDF
+                 merge-yearly Merge database chunks into yearly files
+                    migration Perform database migration
+                       routes Displays all registered routes.
+                        serve Begins serving the app over HTTP.
+                         sync Download the open-meteo weather database from a S3 server.
+            validate-om-files Recursively read the data variable of all .om files in DATA_DIRECTORY.
+                      version Print the Open-Meteo build version
 
 Use `/usr/local/bin/openmeteo-api <command> [--help,-h]` for more information on a command.
 ```
@@ -76,10 +143,17 @@ Flags:
   skip-existing
 ```
 
-### ECMWF IFS
-For the ECMWF API, only one domain is available with runs at `00,06,12,18`. Currently it is not supported to only download a subset of weather variables, but all variables need to be downloaded.
+### ECMWF IFS and AIFS
+To download ECMWF forecasts, run `<exe> download-ecmwf --domain ifs025 --run 00`. Ensemble domains include `ifs025_ensemble` and `aifs025_ensemble`, with runs at `00,06,12,18`. Use `--only-variables temperature_2m,precipitation` to select variables.
 
-To download ECMWF forecasts, run the binary with arguments `<exe> download-ecmwf --domain ifs025 --run 00`.
+Select an [ECMWF Open Data cloud mirror](https://www.ecmwf.int/en/forecasts/datasets/open-data) with `--source ecmwf|aws|azure|google` (default: `ecmwf`):
+
+```sh
+<exe> download-ecmwf --domain ifs025_ensemble --source azure --run 00 --concurrent 4
+<exe> download-ecmwf --domain aifs025_ensemble --source google --run 00 --concurrent 4
+```
+
+Use `--server https://example.com/forecasts/` for a custom root URL instead of `--source`. Only `data.ecmwf.int` uses multiple ranges per request; all other servers use separate range requests. Direct URLs to the public ECMWF Azure container also obtain tokens automatically.
 
 
 ### ERA5

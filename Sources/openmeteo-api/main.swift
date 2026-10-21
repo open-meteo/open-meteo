@@ -21,6 +21,7 @@ do {
     try configure(app)
     try await app.execute()
     try await app.asyncShutdown()
+    ProcessExitStatus.shared.exitIfFailure()
 } catch let error as CommandError {
     fputs("\(error)\n", stderr)
 } catch {
@@ -29,5 +30,5 @@ do {
         "type": "\(type(of: error))",
         "message": "\(error)"
     ])
-    exit(1)
+    exit(EXIT_FAILURE)
 }

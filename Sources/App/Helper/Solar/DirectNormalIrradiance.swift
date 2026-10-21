@@ -67,6 +67,12 @@ extension Zensun {
 
     /// Calculate DNI based on zenith angle
     public static func calculateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, convertToInstant: Bool = false) -> [Float] {
+        
+        /// Limit DNI to 87° zenith, as it is very unstable close to sunrise/set, and usually not useful for solar applications. Can get close to 0 if limited by sunrise/set
+        let zenithCutOff = Float(3).degreesToRadians
+        let zenithCutOffSin = sin(zenithCutOff)
+        
+        //print(directRadiation, latitude, longitude, timerange.prettyString())
         // return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
 
         return zip(directRadiation, timerange).map { dhi, timestamp in
@@ -76,9 +82,6 @@ extension Zensun {
             if dhi <= 0 {
                 return 0
             }
-
-            /// Limit DNI to 87° zenith, as it is very unstable close to sunrise/set, and usually not useful for solar applications. Can get close to 0 if limited by sunrise/set
-            let zenithCutOff = Float(3).degreesToRadians
 
             let decang = timestamp.getSunDeclination()
             let eqtime = timestamp.getSunEquationOfTime()
@@ -127,13 +130,11 @@ extension Zensun {
             /// Only consider sun angle during sunshine time, because DNI is only available during sunshine time. Can get close to 0 if limited by sunrise/set
             let pDelta = p1_l - p10_l
             let zzDaylight = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
-            let dni = dhi / zzDaylight
+            
+            //print("dni \(dhi / zzDaylight) zzDaylight \(zzDaylight) exrad=\(zzDaylight*Zensun.solarConstant) pDelta \(pDelta) (left - right) \((left - right))")
+            //print("t: \(timestamp.iso8601_YYYY_MM_dd_HH_mm), sunrise: \(sunrise.radiansToDegrees), sunset: \(sunset.radiansToDegrees), p1: \(p1.radiansToDegrees), p10: \(p10.radiansToDegrees), p1_l: \(p1_l.radiansToDegrees), p10_l: \(p10_l.radiansToDegrees), left: \(left), right: \(right))")
 
-            // Prevent possible division by zero
-            // See https://github.com/open-meteo/open-meteo/discussions/395
-            if zzDaylight <= 0.0001 {
-                return dhi
-            }
+            let dni = dhi / max(zzDaylight, zenithCutOffSin)
             
             if convertToInstant {
                 // limit p1 and p10 to sunrise/set

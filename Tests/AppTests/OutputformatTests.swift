@@ -15,25 +15,12 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
     typealias WeeklyVariable = ForecastVariableDaily
     typealias MonthlyVariable = ForecastVariableDaily
 
-    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
-        .bestMatch
-    }
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model = .bestMatch
+    var modelName: String = "beest_match"
 
-    var modelName: String {
-        "beest_match"
-    }
-
-    var latitude: Float {
-        41
-    }
-
-    var longitude: Float {
-        2
-    }
-
-    var elevation: Float? {
-        nil
-    }
+    var latitude: Float = 41
+    var longitude: Float = 2
+    var elevation: Float? = nil
 
     func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [App.ForecastVariableDaily]?) async throws {
         
@@ -74,10 +61,9 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         return nil
     }
 
-    static func makeData(timeformat: Timeformat, locationCount: Int) -> ForecastapiResult<Self>  {
-        let res = DummyDataProvider()
+    static func makeData(timeformat: Timeformat, locationCount: Int, firstLocation: Self = .init()) -> ForecastapiResult<Self>  {
         let locations = (0..<locationCount).map {
-            ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: $0, results: [res])
+            ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: $0, results: [$0 == 0 ? firstLocation : .init()])
         }
         let data = ForecastapiResult<DummyDataProvider>(
             timeformat: timeformat,
@@ -113,43 +99,70 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         })
     }*/
 
+    @Test func hourlyMinMaxFlatBufferAggregation() {
+        let minimum = VariableAndPreviousDay(.temperature_2m_min, 0).getFlatBuffersMeta()
+        let maximum = VariableAndPreviousDay(.temperature_2m_max, 0).getFlatBuffersMeta()
+
+        #expect(minimum.aggregation == .minimum)
+        #expect(maximum.aggregation == .maximum)
+    }
+
     /// Test adjustment of API call weights
     /// "Heavy" API calls are counted more than just 1 API call
     ///
     /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
-    /*@Test func apiWeight() {
+    @Test func apiWeight() {
+        func makeResult(ranges: [Range<Timestamp>], nVariablesTimesDomains: Int) -> ForecastapiResult<DummyDataProvider> {
+            let locations = ranges.enumerated().map { index, range in
+                ForecastapiResult<DummyDataProvider>.PerLocation(
+                    timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+                    time: TimerangeLocal(range: range, utcOffsetSeconds: 3600),
+                    locationId: index,
+                    results: []
+                )
+            }
+            return ForecastapiResult<DummyDataProvider>(
+                timeformat: .iso8601,
+                results: locations,
+                currentVariables: nil,
+                minutely15Variables: nil,
+                hourlyVariables: nil,
+                dailyVariables: nil,
+                weeklyVariables: nil,
+                monthlyVariables: nil,
+                nVariablesTimesDomains: nVariablesTimesDomains
+            )
+        }
 
-        let location20year = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
-        let result20year = ForecastapiResult<MultiDomainsReader>(timeformat: .iso8601, results: [location20year])
+        let range20year = Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1)
         // 20 year data, one location, one variable
-        #expect(result20year.calculateQueryWeight(nVariablesModels: 1) == 54.79286)
+        #expect(makeResult(ranges: [range20year], nVariablesTimesDomains: 1).calculateQueryWeight() == 54.79286)
         // 20 year data, one location, two variables
-        #expect(result20year.calculateQueryWeight(nVariablesModels: 2) == 109.58572)
+        #expect(makeResult(ranges: [range20year], nVariablesTimesDomains: 2).calculateQueryWeight() == 109.58572)
 
-        let location7day = ForecastapiResult<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 3600), locationId: 0, results: [])
-
-        let result7day = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location7day])
+        let range7day = Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8)
         // 7 day data, one location, one variable
-        #expect(result7day.calculateQueryWeight(nVariablesModels: 1) == 1)
+        #expect(makeResult(ranges: [range7day], nVariablesTimesDomains: 1).calculateQueryWeight() == 1)
         // 7 day data, one location, two variables
-        #expect(result7day.calculateQueryWeight(nVariablesModels: 2) == 1)
+        #expect(makeResult(ranges: [range7day], nVariablesTimesDomains: 2).calculateQueryWeight() == 1)
         // 7 day data, one location, 15 variables
-        #expect(result7day.calculateQueryWeight(nVariablesModels: 15) == 1.5)
+        #expect(makeResult(ranges: [range7day], nVariablesTimesDomains: 15).calculateQueryWeight() == 1.5)
         // 7 day data, one location, 30 variables
-        #expect(result7day.calculateQueryWeight(nVariablesModels: 30) == 3)
+        #expect(makeResult(ranges: [range7day], nVariablesTimesDomains: 30).calculateQueryWeight() == 3)
 
-        let location1month = ForecastapiResult<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
-
-        let result1month = ForecastapiResult<MultiDomainsReader>(timeformat: .iso8601, results: [location1month, location1month])
+        let ranges1month = [
+            Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1),
+            Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1)
+        ]
         // 1 month data, two locations, one variable
-        #expect(result1month.calculateQueryWeight(nVariablesModels: 1) == 2.0)
+        #expect(makeResult(ranges: ranges1month, nVariablesTimesDomains: 1).calculateQueryWeight() == 2.0)
         // 1 month data, two locations, two variables
-        #expect(result1month.calculateQueryWeight(nVariablesModels: 2) == 2.0)
+        #expect(makeResult(ranges: ranges1month, nVariablesTimesDomains: 2).calculateQueryWeight() == 2.0)
         // 1 month data, two locations, 15 variables
-        #expect(result1month.calculateQueryWeight(nVariablesModels: 15) == 6.6428566)
+        #expect(makeResult(ranges: ranges1month, nVariablesTimesDomains: 15).calculateQueryWeight() == 6.6428566)
         // 1 month data, two locations, 30 variables
-        #expect(result1month.calculateQueryWeight(nVariablesModels: 30) == 13.285713)
-    }*/
+        #expect(makeResult(ranges: ranges1month, nVariablesTimesDomains: 30).calculateQueryWeight() == 13.285713)
+    }
 
     private func drainString(_ response: Response) async -> String {
         try! await withApp { app in
@@ -175,12 +188,19 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         }
     }
 
+    @Test(arguments: [Float.nan, -Float.nan, Float.infinity, -Float.infinity], [1, 2])
+    func jsonNonfiniteCoordinates(value: Float, locationCount: Int) async throws {
+        let data = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: locationCount, firstLocation: .init(latitude: value, longitude: value))
+        let json = await drainString(try data.response(format: .json(fixedGenerationTime: 12), logger: Logger(label: "OutputformatTests")))
+        #expect(json.contains("\"latitude\":null,\"longitude\":null,\"generationtime_ms\":12.0,"))
+        if locationCount == 2 {
+            #expect(json.contains("},{\"latitude\":41.0,\"longitude\":2.0,\"generationtime_ms\":12.0,"))
+        }
+    }
+
     @Test func formats() async throws {
         let logger = Logger(label: "OutputformatTests")
         let data = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1)
-        #expect(data.calculateQueryWeight(nVariablesModels: 2) == 1)
-        #expect(data.calculateQueryWeight(nVariablesModels: 15) == 1.5)
-        #expect(data.calculateQueryWeight(nVariablesModels: 20) == 2)
 
         let json = await drainString(try data.response(format: .json(fixedGenerationTime: 12), logger: logger))
         #expect(json == """
@@ -411,10 +431,6 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
     @Test func formatsMultiLocation() async throws {
         let logger = Logger(label: "OutputformatTests")
         let data = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 2)
-
-        #expect(data.calculateQueryWeight(nVariablesModels: 2) == 2)
-        #expect(data.calculateQueryWeight(nVariablesModels: 15) == 3)
-        #expect(data.calculateQueryWeight(nVariablesModels: 20) == 4)
 
         let json = await drainString(try data.response(format: .json(fixedGenerationTime: 12), logger: logger))
         #expect(json == """

@@ -1,4 +1,5 @@
 import Foundation
+import Vapor
 import NIOConcurrencyHelpers
 import OmFileFormat
 
@@ -69,18 +70,14 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2_15min:
             return .dwd_icon_d2
         case .iconEpsEnsembleMean:
-            return .dwd_icon_eps_ensemble_mean
+            return .dwd_icon_eps
         case .iconEuEpsEnsembleMean:
-            return .dwd_icon_eu_eps_ensemble_mean
+            return .dwd_icon_eu_eps
         case .iconD2EpsEnsembleMean:
-            return .dwd_icon_d2_eps_ensemble_mean
+            return .dwd_icon_d2_eps
         default:
             return domainRegistry
         }
-    }
-
-    var hasYearlyFiles: Bool {
-        return false
     }
 
     var masterTimeRange: Range<Timestamp>? {
@@ -101,73 +98,39 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    /// All available pressure levels for the current domain
-    var levels: [Int] {
+    var downloadDomain: IconDownloadDomains {
         switch self {
-        case .icon:
-            return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
-        case .iconEu:
-            return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000] // disabled: 775, 825, 875
-        case .iconD2:
-            return [                      200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
-        case .iconD2_15min:
-            return []
-        case .iconEps, .iconEpsEnsembleMean:
-            return []
-        case .iconEuEps, .iconEuEpsEnsembleMean:
-            return [] // 300, 500, 850 only temperature and wind
-        case .iconD2Eps, .iconD2EpsEnsembleMean:
-            return [] // 500, 700, 850, 950, 975, 1000
+        case .icon: return .icon
+        case .iconEu: return .iconEu
+        case .iconD2, .iconD2_15min: return .iconD2
+        case .iconEps, .iconEpsEnsembleMean: return .iconEps
+        case .iconEuEps, .iconEuEpsEnsembleMean: return .iconEuEps
+        case .iconD2Eps, .iconD2EpsEnsembleMean: return .iconD2Eps
         }
     }
 
-    var updateIntervalSeconds: Int {
+    var updateIntervalSeconds: Int { downloadDomain.updateIntervalSeconds }
+
+    var countEnsembleMember: Int {
         switch self {
-        case .icon:
-            return 6 * 3600
-        case .iconEu, .iconD2, .iconD2_15min:
-            return 3 * 3600
-        case .iconEps, .iconEpsEnsembleMean:
-            return 12 * 3600
-        case .iconEuEps, .iconEuEpsEnsembleMean:
-            return 6 * 3600
-        case .iconD2Eps, .iconD2EpsEnsembleMean:
-            return 3 * 3600
+        case .iconEpsEnsembleMean, .iconEuEpsEnsembleMean, .iconD2EpsEnsembleMean: return 1
+        default: return downloadDomain.countEnsembleMember
         }
     }
 
-    /// Number of available forecast steps differs from run
-    /// E.g. icon global 0z has 180 as a last value, but 6z only 120
-    func getDownloadForecastSteps(run: Int) -> [Int] {
+    var sourceGridIdentity: IconNativeGridIdentity {
+        nativeDomain.nativeGridFile.identity
+    }
+
+    var nativeDomain: IconNativeDomains {
         switch self {
-        case .iconEps:
-            // Note ICON-EPS has only 6 hourly data for 6/18z runs, not used here
-            // Hourly data until 48h, 3 hourly until 72, 6 hourly until 120h (same as ICON-EU-EPS) and 12 hourly until 180h
-            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6)) + Array(stride(from: 132, through: 180, by: 12))
-        case .icon:
-            if  run == 6 || run == 18 {
-                // only up to 120
-                return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
-            } else {
-                // full 180
-                return Array(0...78) + Array(stride(from: 81, through: 180, by: 3))
-            }
-        case .iconEuEps:
-            // Hourly data until 48h, 3 hourly until 72, then 6 hourly until 120h (same as ICON-EPS)
-            // no side runs
-            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6))
-        case .iconEu:
-            if run % 6 == 0 {
-                return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
-            }
-            // side runs
-            return Array(0...30)
-        case .iconD2_15min:
-            return Array(0...48 * 4 - 1)
-        case .iconD2Eps, .iconD2:
-            return Array(0...48)
-        case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
-            fatalError()
+        case .icon: return .iconNative
+        case .iconEu: return .iconEuNative
+        case .iconD2: return .iconD2Native
+        case .iconD2_15min: return .iconD2Native15min
+        case .iconEps, .iconEpsEnsembleMean: return .iconEpsNative
+        case .iconEuEps, .iconEuEpsEnsembleMean: return .iconEuEpsNative
+        case .iconD2Eps, .iconD2EpsEnsembleMean: return .iconD2EpsNative
         }
     }
 
@@ -187,32 +150,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 689, ny: 329, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
         case .iconD2Eps, .iconD2EpsEnsembleMean:
             // R19B07 avg 2 km
-            // Note: 1px difference to use the same weights as official
+            // Retain the existing extent, one point smaller per axis than deterministic D2.
             return RegularGrid(nx: 1214, ny: 745, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
-        }
-    }
-
-    /// name in the filenames
-    var region: String {
-        switch self {
-        case .iconEps, .icon, .iconEpsEnsembleMean: return "global"
-        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean: return "europe"
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean: return "germany"
-        }
-    }
-
-    /// model level standard heights, full levels
-    /// icon wind level 1-90 88=98m, 87-174m
-    /// icon-eu 1-60 58,57
-    /// icon-d2 1-65.... 63=78m, 62=126m
-    var numberOfModelFullLevels: Int {
-        switch self {
-        case .iconEps, .icon, .iconEpsEnsembleMean:
-            return 120 // was 90
-        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean:
-            return 74 // was 60
-        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
-            return 65
         }
     }
 

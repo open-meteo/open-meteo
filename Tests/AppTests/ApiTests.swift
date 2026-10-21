@@ -27,6 +27,41 @@ import VaporTesting
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
     }
 
+    @Test func forecastStepsOutOfRangeReportsGivenValue() throws {
+        let current = Timestamp(2024, 02, 03, 12, 24)
+        do {
+            _ = try ApiQueryParameter.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: nil, forecastSteps: 30, pastStepsMax: 92, forecastStepsMax: 16, forecastStepsDefault: 7, initialStep: nil, dtSeconds: 86400)
+            Issue.record("Expected forecast_days=30 to be rejected")
+        } catch let error as ForecastApiError {
+            #expect(error.reason == "Forecast days is invalid. Allowed range 0 to 16. Given 30.")
+        }
+    }
+
+    @Test func singleRunDailyRequiresLocalMidnight() throws {
+        let timezone = TimezoneWithOffset(utcOffsetSeconds: -4 * 3600, identifier: "America/New_York", abbreviation: "GMT-4")
+        let invalidDaily = try JSONDecoder().decode(ApiQueryParameter.self, from: Data("""
+        {"run":"2026-06-01T00:00","daily":["temperature_2m_mean"]}
+        """.utf8))
+
+        #expect(throws: ForecastApiError.self) {
+            try invalidDaily.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+        }
+
+        let valid = try JSONDecoder().decode(ApiQueryParameter.self, from: Data("""
+        {"run":"2026-06-01T04:00","forecast_days":3,"daily":["temperature_2m_mean"]}
+        """.utf8))
+        try valid.validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: timezone)
+
+        let current = Timestamp(2026, 6, 24)
+        let allowedRange = Timestamp(2023, 1, 1)..<Timestamp(2026, 7, 1)
+        let time = try valid.getTimerange2(timezone: timezone, current: current, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: 3650)
+        let dailyDates = Array(time.dailyDisplay.iterate(format: .iso8601, utc_offset_seconds: timezone.utcOffsetSeconds, quotedString: false, onlyDate: true))
+
+        #expect(dailyDates == ["2026-06-01", "2026-06-02", "2026-06-03"])
+        #expect(time.dailyRead.range.lowerBound == Timestamp(2026, 6, 1, 4))
+        #expect(time.hourlyRead.range.lowerBound == Timestamp(2026, 6, 1, 4))
+    }
+
     @Test func timeAlignmentMinutely15() throws {
         // Test that unaligned timestamps are properly rounded to 15-minute boundaries
         let start = Timestamp(2025, 12, 03, 0, 20)  // 00:20 should round down to 00:15
@@ -82,6 +117,29 @@ import VaporTesting
             #expect(params2.latitude == [52.52, 45.1])
             #expect(params2.longitude == [13.41, 14.2])
             #expect(params2.elevation == [23.0, 45.0])
+        }
+    }
+
+    @Test func ensembleApiRejectsBestMatchModel() async throws {
+        try await withApp { app in
+            let request = Request(
+                application: app,
+                method: .GET,
+                url: URI(string: "/v1/ensemble?latitude=52.52&longitude=13.41&hourly=temperature_2m&models=best_match"),
+                on: app.eventLoopGroup.next()
+            )
+            let controller = WeatherApiController(
+                defaultModel: .best_match,
+                subdomain: "ensemble-api",
+                type: .ensemble
+            )
+
+            do {
+                _ = try await controller.query(request)
+                Issue.record("Expected the Ensemble API to reject models=best_match")
+            } catch let error as ForecastApiError {
+                #expect(error.reason == "Model 'best_match' is not supported by the Ensemble API. Please select a specific ensemble model.")
+            }
         }
     }
 

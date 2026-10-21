@@ -156,7 +156,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       river_discharge:
                         type: array
                         items:

@@ -32,7 +32,7 @@ extension MarineVariable: FlatBuffersVariable {
         case .ocean_current_direction:
             return .init(variable: .oceanCurrentDirection)
         case .wave_peak_period:
-            return .init(variable: .wavePeriod)
+            return .init(variable: .wavePeakPeriod)
         case .sea_level_height_msl:
             return .init(variable: .seaLevelHeightMsl)
         case .invert_barometer_height:

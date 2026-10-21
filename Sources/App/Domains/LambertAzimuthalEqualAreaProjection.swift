@@ -55,6 +55,10 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
         let x = x / R
         let y = y / R
         let p = sqrtf(x * x + y * y)
+        // At the projection origin, the inverse formulas would divide by zero.
+        if p == 0 {
+            return (ϕ1.radiansToDegrees, λ0_dec)
+        }
         let c = 2 * asinf(0.5 * p)
         let ϕ = asinf(cosf(c) * sinf(ϕ1) + (y * sinf(c) * cosf(ϕ1)) / p)
         let λ = λ0 + atanf((x * sinf(c) / (p * cosf(ϕ1) * cosf(c) - y * sinf(ϕ1) * sinf(c))))

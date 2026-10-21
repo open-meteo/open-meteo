@@ -45,6 +45,9 @@ struct MeteoFranceDownload: AsyncCommand {
 
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -89,18 +92,18 @@ struct MeteoFranceDownload: AsyncCommand {
         let useGribPackagesDownload = signature.useGribPackages && !domain.mfApiPackagesSurface.isEmpty
         let gribPackages: [String]? = signature.gribPackages.map{$0.split(separator: ",").map(String.init)}
 
-        try await downloadElevation2(application: context.application, domain: domain, run: run)
+        try await downloadElevation2(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
         try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, packages: gribPackages) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp) async throws {
+    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if domain == .arome_france_15min || domain == .arome_france_hd_15min || domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities {
@@ -130,7 +133,7 @@ struct MeteoFranceDownload: AsyncCommand {
         // try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         // message.dumpAttributes()
 
-        try grib2d.array.data.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
+        try await grib2d.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
     }
 
     /// Temporarily keep those varibles to derive others
@@ -273,7 +276,8 @@ struct MeteoFranceDownload: AsyncCommand {
                 let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
 
                 let gridRes = domain.mfApiGridName.replacingOccurrences(of: ".", with: "")
-                let urlGov = "https://object.data.gouv.fr/meteofrance-pnt/pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
+                let govServer = "https://meteofrance-pnt.s3.rbx.io.cloud.ovh.net/" // "https://object.data.gouv.fr/meteofrance-pnt/"
+                let urlGov = "\(govServer)pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
 
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 let windSpeedCalculator = WindSpeedCalculator<MeteoFranceSurfaceVariable>(trueNorth: nil)
@@ -364,14 +368,26 @@ struct MeteoFranceDownload: AsyncCommand {
                         grib2d.array.flipLatitude()
                     }
 
-                    // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd {
-                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    /// dtSeconds of the current step. Might be 3 hours for shortwave radiation after 48 hours
+                    var dtSeconds = domain.dtSeconds
+                    if stepType == "accum" {
+                        guard let (start, end) = stepRange.splitTo2Integer(), end > start else {
+                            return
+                        }
+                        let lastStep = await previous.lastStep(variable, 0)
+                        // Match GribDeaverager's subtraction, including the first field and reset windows.
+                        if let lastStep, lastStep != start, end > lastStep {
+                            dtSeconds = (end - lastStep) * 3600
+                        } else {
+                            dtSeconds = (end - start) * 3600
+                        }
                     }
-
-                    // Deaccumulate precipitation
+                    // Deaccumulate before scaling because the accumulation interval can change.
                     guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return
+                    }
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
@@ -506,6 +522,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let subsetGrid = domain.mfSubsetGrid
 
         let timestamps = domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true).map { run.add($0) }
+        var precipitationDeaggregator = MeteoFrancePrecipitationDeaggregator()
+        var snowfallDeaggregator = MeteoFrancePrecipitationDeaggregator()
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let seconds = timestamp.timeIntervalSince1970 - run.timeIntervalSince1970
@@ -518,13 +536,20 @@ struct MeteoFranceDownload: AsyncCommand {
                 if seconds == 0 && variable.skipHour0(domain: domain) {
                     continue
                 }
+                // Temporary workaround (2026-09-11): PT15M precipitation and snowfall are missing at +75, +135, +195, ... minutes.
+                // Use rolling hourly totals from +75 minutes and subtract the preceding three 15-minute amounts.
+                // The MF API incorrectly lists 15minutes periods as available.
+                // Hopefully this workaround can be removed at some point
+                let deaggregatePrecipitation = domain == .arome_france_hd_15min && (variable as? MeteoFranceSurfaceVariable) == .precipitation
+                let deaggregateSnowfall = domain == .arome_france_hd_15min && (variable as? MeteoFranceSurfaceVariable) == .snowfall_water_equivalent
                 let coverage = variable.getCoverageId(domain: domain)
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
                 let subsetPressure = coverage.pressure.map { "&subset=pressure(\($0))" } ?? ""
                 let subsetTime = "&subset=time(\(seconds))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
                 // let is3H = domain == .arpege_world && (seconds/3600) >= 51
-                let period = coverage.periodMinutes.map { $0 >= 60 ? "_PT\($0 / 60)H" : "_PT\($0)M" } ?? ""
+                let periodMinutes = (deaggregatePrecipitation || deaggregateSnowfall) && seconds >= 4500 ? 60 : coverage.periodMinutes
+                let period = periodMinutes.map { $0 >= 60 ? "_PT\($0 / 60)H" : "_PT\($0)M" } ?? ""
 
                 let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetPressure)\(subsetTime)&format=application%2Fwmo-grib"
 
@@ -544,8 +569,14 @@ struct MeteoFranceDownload: AsyncCommand {
                 } else {
                     grib2d.array.flipLatitude()
                 }
-                if let fma = variable.multiplyAdd {
+                if let fma = variable.multiplyAdd(dtSeconds: periodMinutes.map { $0 * 60 } ?? domain.dtSeconds) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                if deaggregatePrecipitation {
+                    precipitationDeaggregator.process(data: &grib2d.array.data, forecastSecond: seconds)
+                }
+                if deaggregateSnowfall {
+                    snowfallDeaggregator.process(data: &grib2d.array.data, forecastSecond: seconds)
                 }
                 try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
@@ -555,5 +586,28 @@ struct MeteoFranceDownload: AsyncCommand {
         }
         // await curl.printStatistics()
         return handles
+    }
+}
+
+/// Retains uncompressed 15-minute amounts for recovering each interval from a rolling one-hour total.
+struct MeteoFrancePrecipitationDeaggregator {
+    private var previous: [[Float]] = []
+    private var lastForecastSecond = 0
+
+    mutating func process(data: inout [Float], forecastSecond: Int) {
+        precondition(forecastSecond == lastForecastSecond + 900, "Precipitation must be processed in consecutive 15-minute steps")
+        if forecastSecond >= 4500 {
+            precondition(previous.count == 3 && previous.allSatisfy { $0.count == data.count })
+            for index in data.indices {
+                let precedingSum = previous[0][index] + previous[1][index] + previous[2][index]
+                // Independent GRIB packing can produce small negative differences. Preserve NaNs.
+                data[index] = max(data[index] - precedingSum, 0)
+            }
+        }
+        if previous.count == 3 {
+            previous.removeFirst()
+        }
+        previous.append(data)
+        lastForecastSecond = forecastSecond
     }
 }

@@ -209,10 +209,6 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         switch self {
         case .EC_Earth3P_HR:
@@ -298,7 +294,7 @@ extension GenericDomain {
     }
 
     func openBiasCorrectionFile(for variable: String, client: HTTPClient?, logger: Logger) async throws -> (any OmFileReaderArrayProtocol<Float>)? {
-        return try await RemoteFileManager.instance.get(file: getBiasCorrectionFile(for: variable), client: client, logger: logger)?.reader
+        return try await OmFileSystemManager.instance.get(file: getBiasCorrectionFile(for: variable), client: client, logger: logger)?.reader
     }
 }
 

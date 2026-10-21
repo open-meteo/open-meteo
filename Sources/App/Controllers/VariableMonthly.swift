@@ -151,7 +151,7 @@ enum ForecastVariableMonthly: String, GenericVariableMixable, RawRepresentableSt
         case .temperature_2m_anomaly:
             return .init(variable: .temperature, aggregation: .anomaly, altitude: 2)
         case .dew_point_2m_mean:
-            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .mean, altitude: 2)
         case .dew_point_2m_anomaly:
             return .init(variable: .dewPoint, aggregation: .anomaly, altitude: 2)
         case .pressure_msl_mean:

@@ -33,6 +33,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
+        
+        @Flag(name: "skip-timeseries")
+        var skipTimeseries: Bool
     }
 
     var help: String {
@@ -53,7 +56,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             fatalError("Parameter server is required")
         }
         
-        try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
+        try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
         logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let handles: [GenericVariableHandle]
         switch domain {
@@ -64,10 +67,10 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
             fatalError()
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: true)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
     }
     
-    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool) async throws {
+    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadS3Bucket: String?) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
@@ -112,7 +115,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
         }
 
-        try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile], createNetCdf: createNetCdf)
+        try await DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile], createNetCdf: createNetCdf, application: application, uploadS3Bucket: uploadS3Bucket)
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
     

@@ -223,7 +223,3 @@ struct NbmPressureVariable: PressureVariableRespresentable, GenericVariable, Has
         return false
     }
 }
-/**
- Combined surface and pressure level variables with all definitions for downloading and API
- */
-typealias NbmVariable = SurfaceAndPressureVariable<NbmSurfaceVariable, NbmPressureVariable>

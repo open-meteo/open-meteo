@@ -1,6 +1,7 @@
 import Vapor
 import SwiftHDF5
 import AsyncHTTPClient
+import OmFileIO
 
 /// Download data from openradar-24h/ bucket at https://s3.waw3-1.cloudferro.com/
 /// The data is organized in by days in directories such as

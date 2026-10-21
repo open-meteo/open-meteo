@@ -1,0 +1,9 @@
+[Unit]
+Description=Open-Meteo API services
+
+[Slice]
+MemoryAccounting=yes
+MemoryMax=90%
+
+[Install]
+WantedBy=slices.target

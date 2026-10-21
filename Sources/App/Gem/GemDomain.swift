@@ -62,10 +62,6 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

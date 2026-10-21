@@ -1,4 +1,5 @@
 import Foundation
+import OmFileIO
 
 struct FullRunMetaJson: Codable {
     let reference_time: Date
@@ -30,54 +31,51 @@ struct FullRunMetaJson: Codable {
         self.valid_times = validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ)
     }
     
-    static func write(domain: GenericDomain, run: Timestamp, validTimes: [Timestamp]) throws {
+    static func write(domain: GenericDomain, run: Timestamp, validTimes: [Timestamp]) throws -> [(file: FullRunMetaFile, data: Data)] {
         guard let meta = try FullRunMetaJson(domain: domain, run: run, validTimes: validTimes) else {
-            return
+            return []
         }
+        let data = try meta.jsonEncodedData()
         let path = FullRunMetaFile.run(domain.domainRegistry, run)
-        try meta.writeTo(path: path.getFilePath())
+        try data.writeAtomic(path: path.getFilePath())
         let pathLatest = FullRunMetaFile.latest(domain.domainRegistry)
-        try meta.writeTo(path: pathLatest.getFilePath())
+        try data.writeAtomic(path: pathLatest.getFilePath())
+        return [
+            (path, data),
+            (pathLatest, data)
+        ]
     }
 }
 
-enum FullRunMetaFile: RemoteFileManageableJson {
+enum FullRunMetaFile/*: RemoteFileManageableJson*/ {
     typealias Value = FullRunMetaJson
     
     case latest(DomainRegistry)
     case run(DomainRegistry, Timestamp)
     
-    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+    /*func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         switch self {
         case .latest(_):
             return 30
         case .run(_, let run):
             return modificationTime == nil ? 30 : run > now.subtract(hours: 24) ? 5*60 : 24*3600
         }
-    }
-    
-    func getFilePath() -> String {
-        let directory = OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
+    }*/
+}
+
+extension FullRunMetaFile: OmFileManagable {
+    func getRelativeFilePathWithData() -> String {
         switch self {
         case .latest(let domainRegistry):
-            return "\(directory)\(domainRegistry.rawValue)/latest.json"
+            return "data_run/\(domainRegistry.rawValue)/latest.json"
         case .run(let domainRegistry, let run):
-            return "\(directory)\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta.json"
+            return "data_run/\(domainRegistry.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/meta.json"
         }
     }
     
-    func getRemoteUrl() -> String? {
-        switch self {
-        case .latest(let domain):
-            guard let directory = domain.remoteDataRunDirectory else {
-                return nil
-            }
-            return "\(directory)latest.json"
-        case .run(let domain, let run):
-            guard let directory = domain.remoteDataRunDirectory else {
-                return nil
-            }
-            return "\(directory)\(run.format_directoriesYYYYMMddhhmm)/meta.json"
-        }
-    }
+    typealias Payload = FullRunMetaJson
+}
+
+extension FullRunMetaJson: OmFilePayloadCodable {
+
 }

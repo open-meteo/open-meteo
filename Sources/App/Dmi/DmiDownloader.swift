@@ -202,6 +202,11 @@ struct DmiDownload: AsyncCommand {
                     if stepType == "accum" && timestamp == run {
                         return // skip precipitation at timestep 0
                     }
+                    
+                    if timestamp == run, let variable = variable as? DmiSurfaceVariable, [DmiSurfaceVariable.direct_radiation, .shortwave_radiation, .precipitation, .snowfall_water_equivalent].contains(variable) {
+                        /// Make absolutely sure to skip accumulated variables. Direct radiation was not skipped correctly using `stepType == "accum"`
+                        return
+                    }
 
                     var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
@@ -286,7 +291,7 @@ struct DmiDownload: AsyncCommand {
                 previous = previousScoped
                 
                 if generateElevationFile {
-                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
                 }
                 let completed = i == timestamps.count - 1
                 return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)

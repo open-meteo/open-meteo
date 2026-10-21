@@ -27,6 +27,10 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var generateFullRun: Bool {
+         return false
+    }
+    
     var countEnsembleMember: Int {
         return 1
     }
@@ -88,10 +92,6 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         case .ecmwf_ifs_analysis:
             return .ecmwf_ifs_analysis
         }
-    }
-
-    var hasYearlyFiles: Bool {
-        return true
     }
 
     var masterTimeRange: Range<Timestamp>? {

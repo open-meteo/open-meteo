@@ -20,7 +20,24 @@ extension Sequence where Element == Float {
     }
 }
 
+extension Collection where Element == Float {
+    /// Calculate a linearly interpolated percentile. `percentile` must be between 0 and 1.
+    @inlinable func percentile(_ percentile: Float) -> Float {
+        assert(!isEmpty)
+        assert(0...1 ~= percentile)
+        let position = Float(count - 1) * percentile
+        return self.sorted().interpolateLinear(Int(position), position.truncatingRemainder(dividingBy: 1))
+    }
+}
+
 extension Array where Element == Float {
+    /// Return trailing means after the initial lookback window, optionally keeping every nth result.
+    func slidingAverageDroppingFirstDt(dt: Int, outputStride: Int = 1) -> [Float] {
+        return stride(from: 0, to: Swift.max(count - dt, 0), by: outputStride).map { i in
+            return self[i ..< Swift.min(i + dt, count)].reduce(0, +) / Float(dt)
+        }
+    }
+
     func max(by: Int) -> [Float] {
         return stride(from: 0, through: count - by, by: by).map { i in
             // Note: `.max()` ignores NaN values

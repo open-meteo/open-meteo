@@ -9,6 +9,31 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
     case winddirection
 
+    // Additional native RRFS surface fields. Soil depths are point levels in centimetres.
+    case categorical_freezing_rain
+    case soil_moisture_0cm
+    case soil_moisture_100cm
+    case soil_moisture_10cm
+    case soil_moisture_160cm
+    case soil_moisture_1cm
+    case soil_moisture_300cm
+    case soil_moisture_30cm
+    case soil_moisture_4cm
+    case soil_moisture_60cm
+    case soil_temperature_100cm
+    case soil_temperature_10cm
+    case soil_temperature_160cm
+    case soil_temperature_1cm
+    case soil_temperature_300cm
+    case soil_temperature_30cm
+    case soil_temperature_4cm
+    case soil_temperature_60cm
+    case temperature_160m
+    case temperature_30m
+    case temperature_320m
+    case wind_direction_320m
+    case wind_speed_320m
+
     case wet_bulb_temperature_2m
     case apparent_temperature
     case cape
@@ -21,7 +46,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_2m
+    /// Lowest detected cloud base, including scattered clouds, in metres above ground.
     case cloud_base
+    /// Lowest broken/overcast cloud base (ceiling diagnostic), in metres above ground.
+    case cloud_ceiling
+    /// Upper cloud boundary in metres above ground, not the ceiling/base.
     case cloud_top
     case convective_cloud_base
     case convective_cloud_top
@@ -47,6 +76,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case lightning_potential
     case mass_density_8m
     case precipitation
+    case freezing_rain
     case precipitation_probability
     case precipitation_type
     case pressure_msl
@@ -138,6 +168,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case uv_index_clear_sky
     case vapor_pressure_deficit
     case vapour_pressure_deficit
+    /// Instantaneous column-maximum simulated radar reflectivity, in dBZ.
+    case radar_reflectivity
     case visibility
     case weathercode
     case weather_code
@@ -405,8 +437,26 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
             return .wind_speed_10m
         case .winddirection:
             return .wind_direction_10m
+        case .weathercode:
+            return .weather_code
         case .surface_air_pressure:
             return .surface_pressure
+        case .snow_height:
+            return .snow_depth
+        case .sensible_heatflux:
+            return .sensible_heat_flux
+        case .latent_heatflux:
+            return .latent_heat_flux
+        case .soil_moisture_0_1cm:
+            return .soil_moisture_0_to_1cm
+        case .soil_moisture_1_3cm:
+            return .soil_moisture_1_to_3cm
+        case .soil_moisture_3_9cm:
+            return .soil_moisture_3_to_9cm
+        case .soil_moisture_9_27cm:
+            return .soil_moisture_9_to_27cm
+        case .soil_moisture_27_81cm:
+            return .soil_moisture_27_to_81cm
         default:
             return self
         }
@@ -430,6 +480,24 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
     case cloudcover
     case cloud_cover
     case vertical_velocity
+
+    /// Normalize compatibility aliases after first giving readers a chance to serve the exact requested name.
+    var remapped: Self {
+        switch self {
+        case .relativehumidity:
+            return .relative_humidity
+        case .windspeed:
+            return .wind_speed
+        case .winddirection:
+            return .wind_direction
+        case .dewpoint:
+            return .dew_point
+        case .cloudcover:
+            return .cloud_cover
+        default:
+            return self
+        }
+    }
 }
 
 struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariableMixable {
@@ -480,7 +548,7 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
     
     func makeWeeklyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
@@ -503,9 +571,9 @@ extension GenericDomain {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        return VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
-    
+
     /// Make a default reader for a single domain with hourly data
     func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -513,31 +581,30 @@ extension GenericDomain {
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
     func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
-        
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
-        let hourly = VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
+        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
+        return (hourly, hourly.makeDailyAggregator(), nil, nil)
     }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
-    func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
+    func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
-        let reader = try await GenericReader<Self, Variable>(domain: self, position: position, options: options)
-        let hourly = VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
-        return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true), nil, nil)
+        let reader = try await GenericReader<Self, Variable>(domain: self, position: position, modelCoordinates: modelCoordinates, options: options)
+        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
+        return (hourly, hourly.makeDailyAggregator(), nil, nil)
     }
 }
 
 extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariable {
-    func makeDailyAggregator(allowMinMaxTwoAggregations: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
-        return .init(reader: self, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
+    func makeDailyAggregator() -> DailyReaderConverter<Self, ForecastVariableDaily> {
+        return .init(reader: self)
     }
 }
 
 extension GenericReaderProtocol {
-    var asOptionalReader: some GenericReaderOptionalProtocol<ForecastVariable> {
+    var asOptionalReader: any GenericReaderOptionalProtocol<ForecastVariable> {
         return GenericReaderProtocolOptionally(reader: self)
     }
 }
@@ -580,54 +647,378 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
     }
 }
 
+private typealias SurroundingPressureLevels = (lowerLevel: Int, upperLevel: Int)
+
+/// API pressure levels that must be interpolated because a domain does not store them directly.
+private let pressureLevelInterpolationTable: [DomainRegistry: [Int: SurroundingPressureLevels]] = [
+    .dwd_icon: [975: (950, 1000)],
+    .dwd_icon_global_native: [975: (950, 1000)],
+    .dwd_icon_eu: [975: (950, 1000)],
+    .dwd_icon_eu_native: [975: (950, 1000)],
+    .dwd_icon_d2: [
+        800: (700, 850),
+        900: (850, 950),
+        925: (850, 950),
+    ],
+    .dwd_icon_d2_ruc_native: [
+        800: (700, 850), 
+        900: (850, 950), 
+        925: (850, 950)
+    ],
+    .dwd_icon_d2_native: [
+        800: (700, 850),
+        900: (850, 950),
+        925: (850, 950),
+    ],
+]
+
+private struct VariableHourlyDerivationCompatibility {
+    enum ConvectivePrecipitation: Equatable {
+        case storedShowers
+        case zeroWherePrecipitationIsAvailable
+    }
+
+    let aliasesSoilTemperature0To10cmTo0To7cm: Bool
+    let supportsEra5SoilMoistureIndices: Bool
+    let convectivePrecipitation: ConvectivePrecipitation
+    let omitsConvectivePrecipitationFromWeatherCode: Bool
+    let shortwaveRadiationScale: Float?
+    let pressureLevelGeopotentialHeightScale: Float?
+    let convertsPressureLevelVerticalVelocity: Bool
+    let usesLegacyIconEpsRadiationStorage: Bool
+    let allowsSoilDepthCompatibilityAliases: Bool
+    let reversesWaveDirections: Bool
+    let estimatesDiffuseRadiationFromShortwave: Bool
+    let derivesCloudLayersFromPressureHumidity: Bool
+
+    private init(
+        aliasesSoilTemperature0To10cmTo0To7cm: Bool = false,
+        supportsEra5SoilMoistureIndices: Bool = false,
+        convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
+        omitsConvectivePrecipitationFromWeatherCode: Bool = false,
+        shortwaveRadiationScale: Float? = nil,
+        pressureLevelGeopotentialHeightScale: Float? = nil,
+        convertsPressureLevelVerticalVelocity: Bool = false,
+        usesLegacyIconEpsRadiationStorage: Bool = false,
+        allowsSoilDepthCompatibilityAliases: Bool = true,
+        reversesWaveDirections: Bool = false,
+        estimatesDiffuseRadiationFromShortwave: Bool = false,
+        derivesCloudLayersFromPressureHumidity: Bool = false
+    ) {
+        self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
+        self.supportsEra5SoilMoistureIndices = supportsEra5SoilMoistureIndices
+        self.convectivePrecipitation = convectivePrecipitation
+        self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
+        self.shortwaveRadiationScale = shortwaveRadiationScale
+        self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
+        self.convertsPressureLevelVerticalVelocity = convertsPressureLevelVerticalVelocity
+        self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
+        self.allowsSoilDepthCompatibilityAliases = allowsSoilDepthCompatibilityAliases
+        self.reversesWaveDirections = reversesWaveDirections
+        self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
+        self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
+    }
+
+    private static func gfs(
+        convectivePrecipitation: ConvectivePrecipitation = .storedShowers
+    ) -> Self {
+        return .init(
+            convectivePrecipitation: convectivePrecipitation,
+            allowsSoilDepthCompatibilityAliases: false
+        )
+    }
+
+    init(domain: DomainRegistry) {
+        switch domain {
+        case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
+            self = .init(
+                aliasesSoilTemperature0To10cmTo0To7cm: true,
+                supportsEra5SoilMoistureIndices: true,
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true
+            )
+        case .ecmwf_ifs, .ecmwf_aifs025_single, .ecmwf_aifs025_ensemble:
+            self = .init(
+                aliasesSoilTemperature0To10cmTo0To7cm: true,
+                supportsEra5SoilMoistureIndices: true
+            )
+        case .copernicus_era5, .copernicus_era5_land, .copernicus_era5_ensemble,
+             .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
+            self = .init(
+                supportsEra5SoilMoistureIndices: true,
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable
+            )
+        case .cmc_gem_gdps, .cmc_gem_gdps_15km, .cmc_gem_gdps_15km_upper_level,
+             .cmc_gem_rdps, .cmc_gem_rdps_10km, .cmc_gem_hrdps, .cmc_gem_hrdps_west,
+             .cmc_gem_geps:
+            self = .init(derivesCloudLayersFromPressureHumidity: true)
+        case .kma_gdps:
+            self = .init(estimatesDiffuseRadiationFromShortwave: true)
+        case .kma_ldps:
+            self = .init(
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true,
+                estimatesDiffuseRadiationFromShortwave: true
+            )
+        case .ncep_gfs013:
+            self = .gfs()
+        case .ncep_gfs025:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_nam_conus,
+             .ncep_gefs025,
+             .ncep_gefs05,
+             .ncep_gefs025_ensemble_mean,
+             .ncep_gefs05_ensemble_mean:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_hrrr_conus:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_hrrr_conus_15min:
+            self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
+        case .ncep_nbm_conus:
+            self = .init(
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                omitsConvectivePrecipitationFromWeatherCode: true,
+                allowsSoilDepthCompatibilityAliases: false
+            )
+        case .meteofrance_arome_france0025,
+             .meteofrance_arome_france_hd,
+             .meteofrance_arome_france0025_15min,
+             .meteofrance_arome_france_hd_15min,
+             .meteofrance_arpege_europe,
+             .meteofrance_arpege_world025:
+            self = .init(shortwaveRadiationScale: MeteoFranceSurfaceVariable.shortwaveRadiationArchiveCorrectionFactor)
+        case .jma_gsm, .jma_msm_upper_level:
+            self = .init(
+                pressureLevelGeopotentialHeightScale: 9.80665,
+                convertsPressureLevelVerticalVelocity: true
+            )
+        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level:
+            self = .init(convectivePrecipitation: .zeroWherePrecipitationIsAvailable, omitsConvectivePrecipitationFromWeatherCode: true)
+        case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
+            self = .init(usesLegacyIconEpsRadiationStorage: true)
+        case .meteofrance_wave:
+            self = .init(reversesWaveDirections: true)
+        default:
+            self = .init()
+        }
+    }
+}
+
 struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
     typealias VariableOpt = ForecastVariable
-    
+
     let reader: Reader
     let options: GenericReaderOptions
-    
-    func getDeriverMap(variable: VariableOrSpread<ForecastPressureVariable>) -> DerivedMapping<Reader.MixingVar>? {
-        if let variable = Reader.variableFromString(variable.rawValue) {
-            return .direct(variable)
+    private let compatibility: VariableHourlyDerivationCompatibility
+    private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
+    /// Correct wind direction for HRRR and NAM models on the demand
+    private let trueNorth: Float?
+
+    init(
+        reader: Reader,
+        options: GenericReaderOptions,
+        domainRegistry: DomainRegistry
+    ) {
+        self.reader = reader
+        self.options = options
+        self.compatibility = .init(domain: domainRegistry)
+        self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
+        let windGridDomain: GfsDomain?
+        switch domainRegistry {
+        case .ncep_hrrr_conus: windGridDomain = .hrrr_conus
+        case .ncep_hrrr_conus_15min: windGridDomain = .hrrr_conus_15min
+        case .ncep_nam_conus: windGridDomain = .nam_conus
+        default: windGridDomain = nil
         }
-        guard variable.isSpread == false else {
-            // TODO implement derived spread variables
+        if let grid = windGridDomain?.grid as? ProjectionGrid<LambertConformalConicProjection> {
+            // Stored U/V are grid-relative. HRRR models need to be corrected for true north
+            trueNorth = -grid.projection.n * (reader.modelLon - grid.projection.λ0_dec)
+        } else {
+            trueNorth = nil
+        }
+    }
+
+    private func convectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        switch compatibility.convectivePrecipitation {
+        case .zeroWherePrecipitationIsAvailable:
+            guard let precipitation = Reader.variableFromString("precipitation") else {
+                return nil
+            }
+            return .mapped(.one(.raw(precipitation)) { precipitation, _ in
+                return Self.zeroPrecipitationComponent(precipitation)
+            })
+        case .storedShowers:
+            return Reader.variableFromString("showers").map { .raw($0) }
+        }
+    }
+
+    private func weatherCodeConvectivePrecipitationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        // NBM and KMA LDPS deliberately pass nil here, which is not equivalent to a zero
+        // value in the thunderstorm confidence calculation.
+        guard !compatibility.omitsConvectivePrecipitationFromWeatherCode else {
             return nil
         }
-        let v = variable.variable
-        switch v.variable {
-        case .windspeed:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .wind_speed, level: v.level), isSpread: false))
+        return convectivePrecipitationInput()
+    }
+
+    static func zeroPrecipitationComponent(_ precipitation: DataAndUnit) -> DataAndUnit {
+        return DataAndUnit(precipitation.data.map { $0 * 0 }, precipitation.unit)
+    }
+
+    private func shortwaveRadiationInput() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        guard let shortwave = Reader.variableFromString("shortwave_radiation") else {
+            return nil
+        }
+
+        if let scale = compatibility.shortwaveRadiationScale {
+            return .mapped(.one(.raw(shortwave)) { shortwave, _ in
+                return DataAndUnit(shortwave.data.map { $0 * scale }, shortwave.unit)
+            })
+        }
+
+        return .raw(shortwave)
+    }
+
+    private func maximum(
+        _ lhs: DerivedMapping<Reader.MixingVar>,
+        _ rhs: DerivedMapping<Reader.MixingVar>
+    ) -> DerivedMapping<Reader.MixingVar> {
+        return .two(.mapped(lhs), .mapped(rhs)) { lhs, rhs, _ in
+            return DataAndUnit(zip(lhs.data, rhs.data).map(Swift.max), lhs.unit)
+        }
+    }
+
+    /// Resolve a pressure-level field to either its stored raw variable or a finite interpolation graph (only ICON).
+    /// This function never calls `getDeriverMap`, keeping pressure-level derivations acyclic.
+    private func pressureLevelInput(_ variable: ForecastPressureVariableType, at level: Int) -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+        func raw() -> DerivedMapping<Reader.MixingVar>.RawOrMapped? {
+            return Reader.variableFromString("\(variable.rawValue)_\(level)hPa").map { .raw($0) }
+        }
+
+        guard let interpolation = pressureLevelInterpolations[level] else {
+            return raw()
+        }
+
+        // `variableFromString` validates the name, not whether the domain stores the requested level.
+        // Interpolate known missing ICON levels before falling back to the structurally valid raw name.
+        let calculate: (DataAndUnit, DataAndUnit) -> DataAndUnit
+        switch variable {
+        case .temperature, .wind_u_component, .wind_v_component:
+            // linear interpolation
+            let fraction = Float(level - interpolation.lowerLevel) / Float(interpolation.upperLevel - interpolation.lowerLevel)
+            calculate = { lower, upper in
+                return DataAndUnit(zip(lower.data, upper.data).map { $0 + fraction * ($1 - $0) }, lower.unit)
+            }
+        case .relative_humidity:
+            // mean interpolation???
+            calculate = { lower, upper in
+                return DataAndUnit(zip(lower.data, upper.data).map { ($0 + $1) / 2 }, lower.unit)
+            }
+        case .geopotential_height:
+            let fraction = Float(level - interpolation.lowerLevel) / Float(interpolation.upperLevel - interpolation.lowerLevel)
+            calculate = { lower, upper in
+                let height = zip(lower.data, upper.data).map { lower, upper -> Float in
+                    let lowerPressure = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: lower)
+                    let upperPressure = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: upper)
+                    return Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: lowerPressure + fraction * (upperPressure - lowerPressure))
+                }
+                return DataAndUnit(height, lower.unit)
+            }
+        case .relativehumidity,
+             .windspeed, .wind_speed,
+             .winddirection, .wind_direction,
+             .dewpoint, .dew_point,
+             .cloudcover, .cloud_cover,
+             .vertical_velocity:
+            return raw()
+        }
+
+        guard
+            let lower = Reader.variableFromString("\(variable.rawValue)_\(interpolation.lowerLevel)hPa"),
+            let upper = Reader.variableFromString("\(variable.rawValue)_\(interpolation.upperLevel)hPa")
+        else {
+            return nil
+        }
+
+        return .mapped(.two(.raw(lower), .raw(upper)) { lower, upper, _ in
+            return calculate(lower, upper)
+        })
+    }
+
+    func getDeriverMap(variable: VariableOrSpread<ForecastPressureVariable>) -> DerivedMapping<Reader.MixingVar>? {
+        guard variable.isSpread == false else {
+            // TODO implement derived spread variables
+            return .direct(Reader.variableFromString(variable.rawValue))
+        }
+
+        let pressure = variable.variable
+        // Preserve exact stored fields such as ECMWF's legacy `windspeed_*` variables.
+        if let input = pressureLevelInput(pressure.variable, at: pressure.level) {
+            if compatibility.convertsPressureLevelVerticalVelocity,
+               pressure.variable == .vertical_velocity {
+                guard let temperature = pressureLevelInput(.temperature, at: pressure.level) else {
+                    return nil
+                }
+                // JMA archives store pressure vertical velocity (omega) in Pa/s.
+                // Convert at read time so historical and newly downloaded files use
+                // the same on-disk representation.
+                return .two(input, temperature) { omega, temperature, _ in
+                    let verticalVelocity = Meteorology.verticalVelocityPressureToGeometric(
+                        omega: omega.data,
+                        temperature: temperature.data,
+                        pressureLevel: Float(pressure.level)
+                    )
+                    return DataAndUnit(verticalVelocity, .metrePerSecondNotUnitConverted)
+                }
+            }
+            if let scale = compatibility.pressureLevelGeopotentialHeightScale,
+               pressure.variable == .geopotential_height {
+                // Preserve the legacy JMA API conversion applied after download-time scaling.
+                return .one(input) { geopotentialHeight, _ in
+                    return DataAndUnit(geopotentialHeight.data.map { $0 * scale }, geopotentialHeight.unit)
+                }
+            }
+            return .from(input: input)
+        }
+
+        // Only normalize aliases when the exact requested field is unavailable.
+        let remapped = pressure.variable.remapped
+        if remapped != pressure.variable, let input = pressureLevelInput(remapped, at: pressure.level) {
+            return .from(input: input)
+        }
+
+        switch remapped {
         case .wind_speed:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_\(v.level)hPa"), v: Reader.variableFromString("wind_v_component_\(v.level)hPa"))
-        case .winddirection:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .wind_direction, level: v.level), isSpread: false))
+            return .windSpeed(
+                u: pressureLevelInput(.wind_u_component, at: pressure.level),
+                v: pressureLevelInput(.wind_v_component, at: pressure.level)
+            )
         case .wind_direction:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_\(v.level)hPa"), v: Reader.variableFromString("wind_v_component_\(v.level)hPa"))
-        case .dewpoint:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .dew_point, level: v.level), isSpread: false))
+            return .windDirection(
+                u: pressureLevelInput(.wind_u_component, at: pressure.level),
+                v: pressureLevelInput(.wind_v_component, at: pressure.level),
+                trueNorth: trueNorth
+            )
         case .dew_point:
             guard
-                let temperature = Reader.variableFromString("temperature_\(v.level)hPa"),
-                let rh = Reader.variableFromString("relative_humidity_\(v.level)hPa")
+                let temperature = pressureLevelInput(.temperature, at: pressure.level),
+                let relativeHumidity = pressureLevelInput(.relative_humidity, at: pressure.level)
             else {
                 return nil
             }
-            return .two(.raw(temperature), .raw(rh)) { temperature, rh, _ in
-                let dewpoint = zip(temperature.data, rh.data).map(Meteorology.dewpoint)
+            return .two(temperature, relativeHumidity) { temperature, relativeHumidity, _ in
+                let dewpoint = zip(temperature.data, relativeHumidity.data).map(Meteorology.dewpoint)
                 return DataAndUnit(dewpoint, .celsius)
             }
-        case .cloudcover:
-            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .cloud_cover, level: v.level), isSpread: false))
         case .cloud_cover:
-            guard
-                let rh = Reader.variableFromString("relative_humidity_\(v.level)hPa")
-            else {
+            guard let relativeHumidity = pressureLevelInput(.relative_humidity, at: pressure.level) else {
                 return nil
             }
-            return .one(.raw(rh)) { rh, _ in
-                let c = rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) })
-                return DataAndUnit(c, .percentage)
+            return .one(relativeHumidity) { relativeHumidity, _ in
+                let cloudCover = relativeHumidity.data.map {
+                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))
+                }
+                return DataAndUnit(cloudCover, .percentage)
             }
         default:
             return nil
@@ -641,12 +1032,267 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         return nil
     }
     
-    func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
-        if let variable = Reader.variableFromString(variable.rawValue) {
-            return .direct(variable)
+    /// Integrate a piecewise-linear soil profile over a layer. The weights below are
+    /// trapezoidal integration weights divided by layer thickness; see docs/ncep-rrfs/README.md.
+    private func soilLayerAverage(_ variables: [ForecastSurfaceVariable], weights: [Float]) -> DerivedMapping<Reader.MixingVar>? {
+        precondition(variables.count == weights.count && !variables.isEmpty)
+        var result: DerivedMapping<Reader.MixingVar>?
+        for (variable, weight) in zip(variables, weights) {
+            guard let input = Reader.variableFromString(variable.rawValue) else { return nil }
+            if let previous = result {
+                result = .two(.mapped(previous), .raw(input)) { sum, value, _ in
+                    DataAndUnit(zip(sum.data, value.data).map { $0 + $1 * weight }, sum.unit)
+                }
+            } else {
+                result = .one(.raw(input)) { value, _ in
+                    DataAndUnit(value.data.map { $0 * weight }, value.unit)
+                }
+            }
         }
-        
+        return result
+    }
+
+    func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
+        // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
+        if compatibility.usesLegacyIconEpsRadiationStorage {
+            switch variable {
+            case .shortwave_radiation:
+                guard
+                    let shortwave = Reader.variableFromString("shortwave_radiation"),
+                    let legacyShortwave = Reader.variableFromString("legacy_shortwave_radiation")
+                else {
+                    return nil
+                }
+                return .two(.raw(shortwave), .raw(legacyShortwave)) { shortwave, legacyShortwave, _ in
+                    var data = shortwave.data
+                    data.integrateIfNaN(legacyShortwave.data)
+                    return DataAndUnit(data, shortwave.unit)
+                }
+            case .diffuse_radiation:
+                guard
+                    let shortwave = getDeriverMap(variable: .shortwave_radiation),
+                    let direct = getDeriverMap(variable: .direct_radiation)
+                else {
+                    return nil
+                }
+                return .two(.mapped(shortwave), .mapped(direct)) { shortwave, direct, _ in
+                    return DataAndUnit(zip(shortwave.data, direct.data).map { max($0 - $1, 0) }, shortwave.unit)
+                }
+            case .diffuse_radiation_spread:
+                // Cannot derive a difference spread without covariance or member-level data.
+                return nil
+            default:
+                break
+            }
+        }
+
+        let rawVariable = Reader.variableFromString(variable.rawValue)
+
+        if variable == .diffuse_radiation, compatibility.estimatesDiffuseRadiationFromShortwave {
+            guard let shortwave = shortwaveRadiationInput() else { return nil }
+            return .one(shortwave) { shortwave, time in
+                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: shortwave.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                return DataAndUnit(diffuse, shortwave.unit)
+            }
+        }
+
+        if compatibility.reversesWaveDirections, let rawVariable {
+            switch variable {
+            case .wave_direction, .wind_wave_direction, .swell_wave_direction, .secondary_swell_wave_direction:
+                return .one(.raw(rawVariable)) { direction, _ in
+                    return DataAndUnit(direction.data.map(Meteorology.oppositeDirection), .degreeDirection)
+                }
+            default:
+                break
+            }
+        }
+
+        // corrections if elevation difference exceeds 100m
+        if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
+            switch variable {
+            case .snowfall_water_equivalent:
+                if let snowfall = rawVariable,
+                   let temperature = Reader.variableFromString("temperature_2m") {
+                    return .two(.raw(snowfall), .raw(temperature)) { snowfall, temperature, _ in
+                        let corrected = zip(snowfall.data, temperature.data).map { $0 * ($1 >= 0 ? 0 : 1) }
+                        return DataAndUnit(corrected, snowfall.unit)
+                    }
+                }
+            case .rain:
+                if let rain = rawVariable,
+                   let snowfall = Reader.variableFromString("snowfall_water_equivalent"),
+                   let temperature = Reader.variableFromString("temperature_2m") {
+                    return .three(.raw(rain), .raw(snowfall), .raw(temperature)) { rain, snowfall, temperature, _ in
+                        let corrected = zip(zip(rain.data, snowfall.data), temperature.data).map {
+                            $0.0 + max(0, $0.1 * ($1 >= 0 ? 1 : 0))
+                        }
+                        return DataAndUnit(corrected, rain.unit)
+                    }
+                }
+            case .weather_code:
+                if let weatherCode = rawVariable,
+                   let temperature = Reader.variableFromString("temperature_2m") {
+                    return .two(.raw(weatherCode), .raw(temperature)) { weatherCode, temperature, _ in
+                        let corrected = zip(weatherCode.data, temperature.data).map { value, temperature -> Float in
+                            guard value.isFinite, let code = WeatherCode(rawValue: Int(value)) else {
+                                return value
+                            }
+                            return Float(code.correctSnowRainHardCutOff(temperature_2m: temperature).rawValue)
+                        }
+                        return DataAndUnit(corrected, weatherCode.unit)
+                    }
+                }
+            default:
+                break
+            }
+        }
+
+        // Some domains do not store showers; use their precipitation-component policy.
+        if variable == .showers, compatibility.convectivePrecipitation != .storedShowers,
+           let convectivePrecipitation = convectivePrecipitationInput() {
+            return .from(input: convectivePrecipitation)
+        }
+
+        if let rawVariable {
+            // variable dependent corrections of raw data
+            switch variable {
+            case .shortwave_radiation:
+                guard let shortwave = shortwaveRadiationInput() else {
+                    return nil
+                }
+                return .from(input: shortwave)
+            case .direct_radiation, .diffuse_radiation:
+                return .one(.raw(rawVariable)) { radiation, _ in
+                    return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)
+                }
+            default:
+                return .direct(rawVariable)
+            }
+        }
+
         switch variable {
+        case .mass_density_8m:
+            // RRFS stores fine organic aerosol under its descriptive API name.
+            // Native fields (including HRRR mass_density_8m) take precedence above.
+            return .direct(Reader.variableFromString("pm2_5_total_organic_matter"))
+        case .temperature_2m_min, .temperature_2m_max:
+            guard let temperature = Reader.variableFromString("temperature_2m") else { return nil }
+            return .hermiteIntervalExtrema(temperature, minimum: variable == .temperature_2m_min)
+        case .european_aqi_pm2_5:
+            guard let pm2_5 = Reader.variableFromString("pm2_5") else {
+                return nil
+            }
+            return .one(.raw(pm2_5)) { pm2_5, _ in
+                return DataAndUnit(pm2_5.data.map(EuropeanAirQuality.indexPm2_5), .europeanAirQualityIndex)
+            }
+        case .european_aqi_pm10:
+            guard let pm10 = Reader.variableFromString("pm10") else {
+                return nil
+            }
+            return .one(.raw(pm10)) { pm10, _ in
+                return DataAndUnit(pm10.data.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
+            }
+        case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
+            guard let nitrogenDioxide = Reader.variableFromString("nitrogen_dioxide") else {
+                return nil
+            }
+            return .one(.raw(nitrogenDioxide)) { nitrogenDioxide, _ in
+                return DataAndUnit(nitrogenDioxide.data.map(EuropeanAirQuality.indexNo2), .europeanAirQualityIndex)
+            }
+        case .european_aqi_ozone, .european_aqi_o3:
+            guard let ozone = Reader.variableFromString("ozone") else {
+                return nil
+            }
+            return .one(.raw(ozone)) { ozone, _ in
+                return DataAndUnit(ozone.data.map(EuropeanAirQuality.indexO3), .europeanAirQualityIndex)
+            }
+        case .european_aqi_sulphur_dioxide, .european_aqi_so2:
+            guard let sulphurDioxide = Reader.variableFromString("sulphur_dioxide") else {
+                return nil
+            }
+            return .one(.raw(sulphurDioxide)) { sulphurDioxide, _ in
+                return DataAndUnit(sulphurDioxide.data.map(EuropeanAirQuality.indexSo2), .europeanAirQualityIndex)
+            }
+        case .european_aqi:
+            guard
+                let pm2_5 = getDeriverMap(variable: .european_aqi_pm2_5),
+                let pm10 = getDeriverMap(variable: .european_aqi_pm10),
+                let nitrogenDioxide = getDeriverMap(variable: .european_aqi_no2),
+                let ozone = getDeriverMap(variable: .european_aqi_o3),
+                let sulphurDioxide = getDeriverMap(variable: .european_aqi_so2)
+            else {
+                return nil
+            }
+            return maximum(maximum(maximum(maximum(pm2_5, pm10), nitrogenDioxide), ozone), sulphurDioxide)
+        case .us_aqi_pm2_5:
+            guard let pm2_5 = Reader.variableFromString("pm2_5") else {
+                return nil
+            }
+            return .one(.mapped(.runningMean(pm2_5, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { pm2_5, _ in
+                return DataAndUnit(pm2_5.data.map(UnitedStatesAirQuality.indexPm2_5), .usAirQualityIndex)
+            }
+        case .us_aqi_pm10:
+            guard let pm10 = Reader.variableFromString("pm10") else {
+                return nil
+            }
+            return .one(.mapped(.runningMean(pm10, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { pm10, _ in
+                return DataAndUnit(pm10.data.map(UnitedStatesAirQuality.indexPm10), .usAirQualityIndex)
+            }
+        case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
+            guard let nitrogenDioxide = Reader.variableFromString("nitrogen_dioxide") else {
+                return nil
+            }
+            return .one(.raw(nitrogenDioxide)) { nitrogenDioxide, _ in
+                return DataAndUnit(nitrogenDioxide.data.map { UnitedStatesAirQuality.indexNo2(no2: $0 / 1.88) }, .usAirQualityIndex)
+            }
+        case .us_aqi_ozone, .us_aqi_o3:
+            guard let ozone = Reader.variableFromString("ozone") else {
+                return nil
+            }
+            return .two(.raw(ozone), .mapped(.runningMean(ozone, windowSeconds: 8 * 3600, maximumStepSeconds: 3600))) { ozone, ozoneMean, _ in
+                return DataAndUnit(zip(ozone.data, ozoneMean.data).map {
+                    UnitedStatesAirQuality.indexO3(o3: $0 / 1.96, o3_8h_mean: $1 / 1.96)
+                }, .usAirQualityIndex)
+            }
+        case .us_aqi_sulphur_dioxide, .us_aqi_so2:
+            guard let sulphurDioxide = Reader.variableFromString("sulphur_dioxide") else {
+                return nil
+            }
+            return .two(.raw(sulphurDioxide), .mapped(.runningMean(sulphurDioxide, windowSeconds: 24 * 3600, maximumStepSeconds: 3600))) { sulphurDioxide, sulphurDioxideMean, _ in
+                return DataAndUnit(zip(sulphurDioxide.data, sulphurDioxideMean.data).map {
+                    UnitedStatesAirQuality.indexSo2(so2: $0 / 2.62, so2_24h_mean: $1 / 2.62)
+                }, .usAirQualityIndex)
+            }
+        case .us_aqi_carbon_monoxide, .us_aqi_co:
+            guard let carbonMonoxide = Reader.variableFromString("carbon_monoxide") else {
+                return nil
+            }
+            return .one(.mapped(.runningMean(carbonMonoxide, windowSeconds: 8 * 3600, maximumStepSeconds: 3600))) { carbonMonoxide, _ in
+                return DataAndUnit(carbonMonoxide.data.map {
+                    UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)
+                }, .usAirQualityIndex)
+            }
+        case .us_aqi:
+            guard
+                let pm2_5 = getDeriverMap(variable: .us_aqi_pm2_5),
+                let pm10 = getDeriverMap(variable: .us_aqi_pm10),
+                let nitrogenDioxide = getDeriverMap(variable: .us_aqi_no2),
+                let ozone = getDeriverMap(variable: .us_aqi_o3),
+                let sulphurDioxide = getDeriverMap(variable: .us_aqi_so2),
+                let carbonMonoxide = getDeriverMap(variable: .us_aqi_co)
+            else {
+                return nil
+            }
+            return maximum(
+                maximum(
+                    maximum(
+                        maximum(pm2_5, maximum(pm10, carbonMonoxide)),
+                        nitrogenDioxide
+                    ),
+                    ozone
+                ),
+                sulphurDioxide
+            )
         case .windspeed_10m:
             return getDeriverMap(variable: .wind_speed_10m)
         case .wind_speed_10m:
@@ -654,7 +1300,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_10m:
             return getDeriverMap(variable: .wind_direction_10m)
         case .wind_direction_10m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), trueNorth: trueNorth)
         case .windspeed_20m:
             return getDeriverMap(variable: .wind_speed_20m)
         case .wind_speed_20m:
@@ -662,11 +1308,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_20m:
             return getDeriverMap(variable: .wind_direction_20m)
         case .wind_direction_20m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_20m"), v: Reader.variableFromString("wind_v_component_20m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_20m"), v: Reader.variableFromString("wind_v_component_20m"), trueNorth: trueNorth)
         case .wind_speed_30m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_30m"), v: Reader.variableFromString("wind_v_component_30m"))
         case .wind_direction_30m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_30m"), v: Reader.variableFromString("wind_v_component_30m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_30m"), v: Reader.variableFromString("wind_v_component_30m"), trueNorth: trueNorth)
         case .windspeed_40m:
             return getDeriverMap(variable: .wind_speed_40m)
         case .wind_speed_40m:
@@ -674,7 +1320,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_40m:
             return getDeriverMap(variable: .wind_direction_40m)
         case .wind_direction_40m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"), trueNorth: trueNorth)
         case .windspeed_50m:
             return getDeriverMap(variable: .wind_speed_50m)
         case .wind_speed_50m:
@@ -682,11 +1328,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_50m:
             return getDeriverMap(variable: .wind_direction_50m)
         case .wind_direction_50m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_50m"), v: Reader.variableFromString("wind_v_component_50m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_50m"), v: Reader.variableFromString("wind_v_component_50m"), trueNorth: trueNorth)
         case .wind_speed_70m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"))
         case .wind_direction_70m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), trueNorth: trueNorth)
         case .windspeed_80m:
             return getDeriverMap(variable: .wind_speed_80m)
         case .wind_speed_80m:
@@ -694,14 +1340,16 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return
                 .windSpeed(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m")) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_75m"), levelFrom: 75, levelTo: 80) ??
+                .windSpeed(speed: Reader.variableFromString("wind_speed_100m"), levelFrom: 100, levelTo: 80) ??
                 .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 80)
         case .winddirection_80m:
             return getDeriverMap(variable: .wind_direction_80m)
         case .wind_direction_80m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_75m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"))
+                .direct(Reader.variableFromString("wind_direction_100m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth)
         case .windspeed_100m:
             return getDeriverMap(variable: .wind_speed_100m)
         case .wind_speed_100m:
@@ -713,9 +1361,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_100m)
         case .wind_direction_100m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"), trueNorth: trueNorth)
         case .windspeed_120m:
             return getDeriverMap(variable: .wind_speed_120m)
         case .wind_speed_120m:
@@ -723,20 +1371,22 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return
                 .windSpeed(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_125m"), levelFrom: 125, levelTo: 120) ??
-                .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 120) ??
-                .windSpeed(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), levelFrom: 150, levelTo: 120)
+                .windSpeed(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), levelFrom: 150, levelTo: 120) ??
+                .windSpeed(speed: Reader.variableFromString("wind_speed_100m"), levelFrom: 100, levelTo: 120) ??
+                .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 120)
         case .winddirection_120m:
             return getDeriverMap(variable: .wind_direction_120m)
         case .wind_direction_120m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_125m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), trueNorth: trueNorth) ??
+                .direct(Reader.variableFromString("wind_direction_100m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth)
         case .wind_speed_140m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"))
         case .wind_direction_140m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_140m"), v: Reader.variableFromString("wind_v_component_140m"), trueNorth: trueNorth)
         case .windspeed_150m:
             return getDeriverMap(variable: .wind_speed_150m)
         case .wind_speed_150m:
@@ -744,11 +1394,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_150m:
             return getDeriverMap(variable: .wind_direction_150m)
         case .wind_direction_150m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), trueNorth: trueNorth)
         case .wind_speed_160m:
             return .windSpeed(u: Reader.variableFromString("wind_u_component_160m"), v: Reader.variableFromString("wind_v_component_160m"))
         case .wind_direction_160m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_160m"), v: Reader.variableFromString("wind_v_component_160m"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_160m"), v: Reader.variableFromString("wind_v_component_160m"), trueNorth: trueNorth)
         case .windspeed_180m:
             return getDeriverMap(variable: .wind_speed_180m)
         case .wind_speed_180m:
@@ -756,14 +1406,18 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return
                 .windSpeed(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ??
                 .windSpeed(speed: Reader.variableFromString("wind_speed_175m"), levelFrom: 175, levelTo: 180) ??
-                .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), levelFrom: 200, levelTo: 180)
+                .windSpeed(speed: Reader.variableFromString("wind_speed_200m"), levelFrom: 200, levelTo: 180) ??
+                .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), levelFrom: 200, levelTo: 180) ??
+                .windSpeed(speed: Reader.variableFromString("wind_speed_150m"), levelFrom: 150, levelTo: 180)
         case .winddirection_180m:
             return getDeriverMap(variable: .wind_direction_180m)
         case .wind_direction_180m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"), trueNorth: trueNorth) ??
                 .direct(Reader.variableFromString("wind_direction_175m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"))
+                .direct(Reader.variableFromString("wind_direction_200m")) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), trueNorth: trueNorth) ??
+                .direct(Reader.variableFromString("wind_direction_150m"))
         case .windspeed_200m:
             return getDeriverMap(variable: .wind_speed_200m)
         case .wind_speed_200m:
@@ -775,9 +1429,11 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_200m)
         case .wind_direction_200m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m")) ??
-                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"))
+                .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"), trueNorth: trueNorth)
+        case .windgusts_10m:
+            return getDeriverMap(variable: .wind_gusts_10m)
         case .wind_speed_10m_spread:
             return .windSpeedSpread(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), uSpread: Reader.variableFromString("wind_u_component_10m_spread"), vSpread: Reader.variableFromString("wind_v_component_10m_spread"))
         case .wind_speed_40m_spread:
@@ -884,19 +1540,19 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .four(.mapped(radiation), .raw(temp), .mapped(wind), .mapped(dew)) { swrad, temperature, windspeed, dewpoint, time in
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let et0 = swrad.data.indices.map { i in
-                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature.data[i], windspeed10mMeterPerSecond: windspeed.data[i], dewpointCelsius: dewpoint.data[i], shortwaveRadiationWatts: swrad.data[i], elevation: reader.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
+                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature.data[i], windspeed10mMeterPerSecond: windspeed.data[i], dewpointCelsius: dewpoint.data[i], shortwaveRadiationWatts: swrad.data[i], elevation: reader.resolvedTargetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
                 }
                 return DataAndUnit(et0, .millimetre)
             }
         case .shortwave_radiation:
             // DWD ICON models store direct_radiation and diffuse_radiation
             guard
-                let direct = Reader.variableFromString("direct_radiation"),
-                let diffuse = Reader.variableFromString("diffuse_radiation")
+                let direct = getDeriverMap(variable: ForecastSurfaceVariable.direct_radiation),
+                let diffuse = getDeriverMap(variable: ForecastSurfaceVariable.diffuse_radiation)
             else {
                 return nil
             }
-            return .two(.raw(direct), .raw(diffuse)) { direct, diffuse, _ in
+            return .two(.mapped(direct), .mapped(diffuse)) { direct, diffuse, _ in
                 let ghi = zip(direct.data, diffuse.data).map(+)
                 return DataAndUnit(ghi, direct.unit)
             }
@@ -913,31 +1569,31 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(ghi, direct.unit)
             }
         case .diffuse_radiation:
-            guard let swrad = Reader.variableFromString("shortwave_radiation") else {
+            guard let swrad = shortwaveRadiationInput() else {
                 return nil
             }
             if let direct = Reader.variableFromString("direct_radiation") {
-                return .two(.raw(swrad), .raw(direct)) { swrad, direct, _ in
+                return .two(swrad, .raw(direct)) { swrad, direct, _ in
                     return DataAndUnit(zip(swrad.data, direct.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
-            return .one(.raw(swrad)) { swrad, time in
+            return .one(swrad) { swrad, time in
                 let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(diffuse, .wattPerSquareMetre)
+                return DataAndUnit(diffuse, swrad.unit)
             }
         case .direct_radiation:
-            guard let swrad = Reader.variableFromString("shortwave_radiation") else {
+            guard let swrad = shortwaveRadiationInput() else {
                 return nil
             }
             if let diffuse = Reader.variableFromString("diffuse_radiation") {
-                return .two(.raw(swrad), .raw(diffuse)) { swrad, diffuse, _ in
+                return .two(swrad, .raw(diffuse)) { swrad, diffuse, _ in
                     return DataAndUnit(zip(swrad.data, diffuse.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
-            return .one(.raw(swrad)) { swrad, time in
+            return .one(swrad) { swrad, time in
                 let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                let direct = zip(swrad.data, diffuse).map(-)
-                return DataAndUnit(direct, .wattPerSquareMetre)
+                let direct = zip(swrad.data, diffuse).map { max($0 - $1, 0) }
+                return DataAndUnit(direct, swrad.unit)
             }
         case .sunshine_duration:
             guard let directRadiation = getDeriverMap(variable: .direct_radiation) else {
@@ -959,6 +1615,35 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         case .cloudcover:
             return getDeriverMap(variable: .cloud_cover)
+        case .cloud_cover:
+            guard let low = Reader.variableFromString("cloud_cover_low"),
+                  let mid = Reader.variableFromString("cloud_cover_mid"),
+                  let high = Reader.variableFromString("cloud_cover_high") else { return nil }
+            return .three(.raw(low), .raw(mid), .raw(high)) { low, mid, high, _ in
+                DataAndUnit(Meteorology.cloudCoverTotal(low: low.data, mid: mid.data, high: high.data), .percentage)
+            }
+        case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            guard compatibility.derivesCloudLayersFromPressureHumidity else {
+                return nil
+            }
+            let levels: [Int]
+            switch variable {
+            case .cloud_cover_low: levels = [1000, 950, 850]
+            case .cloud_cover_mid: levels = [700, 600, 500]
+            default: levels = [400, 300, 200]
+            }
+            // Preserve GEM's pressure samples and maximum order, including sparse GEPS files.
+            // Missing levels stay missing; do not interpolate or substitute other levels.
+            let clouds = levels.compactMap { level in
+                getDeriverMap(variable: VariableOrSpread<ForecastPressureVariable>(
+                    variable: ForecastPressureVariable(variable: .cloud_cover, level: level),
+                    isSpread: false
+                ))
+            }
+            guard clouds.count == 3 else {
+                return nil
+            }
+            return maximum(maximum(clouds[0], clouds[1]), clouds[2])
         case .cloudcover_low:
             return getDeriverMap(variable: .cloud_cover_low)
         case .cloudcover_mid:
@@ -982,17 +1667,27 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(dni, .wattPerSquareMetre)
             }
         case .snowfall_water_equivalent:
-            // If now snowfall water is not available, use precipitation and temperature below 0°C
-            guard
-                let t2m = Reader.variableFromString("temperature_2m"),
-                let precip = Reader.variableFromString("precipitation")
-            else {
-                return nil
+            if let snowline = Reader.variableFromString("snowfall_height"),
+               let precip = Reader.variableFromString("precipitation") {
+                return .two(.raw(snowline), .raw(precip)) { snowline, precip, _ in
+                    let snowWater = zip(snowline.data, precip.data).map {
+                        guard $0.isFinite, $1.isFinite else {
+                            return Float.nan
+                        }
+                        return $0 < reader.targetElevation ? $1 : 0
+                    }
+                    return DataAndUnit(snowWater, precip.unit)
+                }
             }
-            return .two(.raw(precip), .raw(t2m)) { precip, t2m, _ in
-                let rain = zip(t2m.data, precip.data).map({ $1 * ($0 >= 0 ? 0 : 1) })
-                return DataAndUnit(rain, precip.unit)
+            // If no snowfall water is available, use precipitation and temperature below 0°C
+            if let t2m = Reader.variableFromString("temperature_2m"),
+               let precip = Reader.variableFromString("precipitation") {
+                return .two(.raw(precip), .raw(t2m)) { precip, t2m, _ in
+                    let snowWater = zip(t2m.data, precip.data).map({ $1 * ($0 >= 0 ? 0 : 1) })
+                    return DataAndUnit(snowWater, precip.unit)
+                }
             }
+            return nil
         case .rain:
             guard
                 let snowwater = getDeriverMap(variable: .snowfall_water_equivalent),
@@ -1000,8 +1695,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             else {
                 return nil
             }
-            if let showers = Reader.variableFromString("showers") {
-                return .three(.raw(precip), .mapped(snowwater), .raw(showers)) { precip, snowwater, showers, _ in
+            if let showers = convectivePrecipitationInput() {
+                // ECPDS archives before October 2025 may lack showers; missing values contribute zero.
+                return .three(.raw(precip), .mapped(snowwater), showers) { precip, snowwater, showers, _ in
                     let rain = zip(precip.data, zip(snowwater.data, showers.data)).map({
                         return max($0.0 - $0.1.0 - ($0.1.1.isNaN ? 0 : $0.1.1), 0)
                     })
@@ -1015,7 +1711,21 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 })
                 return DataAndUnit(rain, precip.unit)
             }
-        case .weather_code, .weathercode:
+        case .showers:
+            guard
+                let precip = Reader.variableFromString("precipitation"),
+                let rain = getDeriverMap(variable: .rain),
+                let snowwater = getDeriverMap(variable: .snowfall_water_equivalent)
+            else {
+                return nil
+            }
+            return .three(.raw(precip), .mapped(rain), .mapped(snowwater)) { precip, rain, snowwater, _ in
+                let showers = zip(zip(precip.data, rain.data), snowwater.data).map {
+                    max($0.0 - $0.1 - $1, 0)
+                }
+                return DataAndUnit(showers, precip.unit)
+            }
+        case .weather_code:
             guard
                 let cloudCover = getDeriverMap(variable: .cloud_cover),
                 let snowfall = getDeriverMap(variable: .snowfall),
@@ -1026,7 +1736,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .weatherCode(
                 cloudcover: .mapped(cloudCover),
                 precipitation: precipitation,
-                convectivePrecipitation: Reader.variableFromString("showers"),
+                convectivePrecipitation: weatherCodeConvectivePrecipitationInput(),
                 snowfallCentimeters: .mapped(snowfall),
                 gusts: Reader.variableFromString("wind_gusts_10m"),
                 cape: Reader.variableFromString("cape"),
@@ -1087,6 +1797,15 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
 
             }
+        case .temperature_80m:
+            return .direct(Reader.variableFromString("temperature_100m"))
+        case .temperature_120m:
+            return
+                .direct(Reader.variableFromString("temperature_150m")) ??
+                .direct(Reader.variableFromString("temperature_100m"))
+        case .temperature_180m:
+            return .direct(Reader.variableFromString("temperature_200m")) ??
+                .direct(Reader.variableFromString("temperature_150m"))
         case .global_tilted_irradiance:
             guard
                 let directRadiation = getDeriverMap(variable: .direct_radiation),
@@ -1110,32 +1829,65 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation.data, diffuseRadiation: diffuseRadiation.data, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             }
+        case .surface_temperature:
+            return getDeriverMap(variable: .soil_temperature_0cm)
         case .freezinglevel_height:
             return getDeriverMap(variable: .freezing_level_height)
             
         case .ocean_current_velocity:
             return .windSpeed(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
         case .ocean_current_direction:
-            return .windDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
+            return .oceanCurrentDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
+        case .soil_temperature_0_to_10cm:
+            return soilLayerAverage([.soil_temperature_0cm, .soil_temperature_1cm, .soil_temperature_4cm, .soil_temperature_10cm], weights: [0.05, 0.2, 0.45, 0.3])
+        case .soil_temperature_10_to_40cm:
+            return soilLayerAverage([.soil_temperature_10cm, .soil_temperature_30cm, .soil_temperature_60cm], weights: [1.0 / 3, 11.0 / 18, 1.0 / 18])
+        case .soil_temperature_40_to_100cm:
+            return soilLayerAverage([.soil_temperature_30cm, .soil_temperature_60cm, .soil_temperature_100cm], weights: [1.0 / 9, 5.0 / 9, 1.0 / 3])
+        case .soil_temperature_100_to_200cm:
+            return soilLayerAverage([.soil_temperature_100cm, .soil_temperature_160cm, .soil_temperature_300cm], weights: [0.3, 9.0 / 14, 2.0 / 35])
+        case .soil_moisture_0_to_10cm:
+            return soilLayerAverage([.soil_moisture_0cm, .soil_moisture_1cm, .soil_moisture_4cm, .soil_moisture_10cm], weights: [0.05, 0.2, 0.45, 0.3])
+        case .soil_moisture_10_to_40cm:
+            return soilLayerAverage([.soil_moisture_10cm, .soil_moisture_30cm, .soil_moisture_60cm], weights: [1.0 / 3, 11.0 / 18, 1.0 / 18])
+        case .soil_moisture_40_to_100cm:
+            return soilLayerAverage([.soil_moisture_30cm, .soil_moisture_60cm, .soil_moisture_100cm], weights: [1.0 / 9, 5.0 / 9, 1.0 / 3])
+        case .soil_moisture_100_to_200cm:
+            return soilLayerAverage([.soil_moisture_100cm, .soil_moisture_160cm, .soil_moisture_300cm], weights: [0.3, 9.0 / 14, 2.0 / 35])
+
+        case .skin_temperature:
+            return .direct(Reader.variableFromString("surface_temperature")) ?? .direct(Reader.variableFromString("soil_temperature_0cm"))
+        case .soil_temperature_0_to_10cm:
+            guard compatibility.aliasesSoilTemperature0To10cmTo0To7cm else { return nil }
+            return .direct(Reader.variableFromString("soil_temperature_0_to_7cm"))
         case .soil_temperature_0cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))
         case .soil_temperature_6cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_0_to_10cm.rawValue))
         case .soil_temperature_18cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_10_to_40cm.rawValue))
         case .soil_temperature_54cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_temperature_40_to_100cm.rawValue))
             
         case .soil_moisture_0_to_1cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
         case .soil_moisture_1_to_3cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
         case .soil_moisture_3_to_9cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_7cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_0_to_10cm.rawValue))
         case .soil_moisture_9_to_27cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_7_to_28cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_10_to_40cm.rawValue))
         case .soil_moisture_27_to_81cm:
+            guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_28_to_100cm.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.soil_moisture_40_to_100cm.rawValue))
             
         case .soil_moisture_0_to_100cm:
@@ -1180,14 +1932,20 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                     return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
                 }), .percentage)
             }
-//        case .soil_moisture_index_0_to_7cm:
-//            guard let soilMoisture = getDeriverMap(variable: .soil_moisture_0_to_7cm) else {
-//                return nil
-//            }
-//            return .one(.mapped(soilMoisture)) { soilMoisture, _ in
-//                let soilMoisture = try await get(raw: .soil_moisture_7_to_28cm, time: time)
-//                return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
-//            }
+        case .growing_degree_days_base_0_limit_50:
+            guard let temperature = Reader.variableFromString("temperature_2m") else { return nil }
+            return .one(.raw(temperature)) { temperature, time in
+                let fractionOfDay = Float(time.dtSeconds) / 86400
+                return DataAndUnit(temperature.data.map { max(min($0, 50), 0) * fractionOfDay }, .gddCelsius)
+            }
+        case .soil_moisture_index_0_to_7cm, .soil_moisture_index_7_to_28cm,
+             .soil_moisture_index_28_to_100cm, .soil_moisture_index_100_to_255cm,
+             .soil_moisture_index_0_to_100cm:
+            guard compatibility.supportsEra5SoilMoistureIndices else { return nil }
+            let moistureName = variable.rawValue.replacingOccurrences(of: "soil_moisture_index_", with: "soil_moisture_")
+            guard let moistureVariable = ForecastSurfaceVariable(rawValue: moistureName),
+                  let moisture = getDeriverMap(variable: moistureVariable) else { return nil }
+            return .soilMoistureIndex(.mapped(moisture))
         case .snow_depth_water_equivalent:
             // snow depth in metre
             // water equivalent in millimetre, density in kg/m3
@@ -1209,7 +1967,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     func getDeriverMap(variable: ForecastVariable) -> DerivedMapping<Reader.MixingVar>? {
         switch variable {
         case .surface(let variable):
-            return getDeriverMap(variable: variable.variable)
+            return getDeriverMap(variable: variable.variable.remapped)
         case .pressure(let variable):
             return getDeriverMap(variable: variable)
         case .height(let variable):

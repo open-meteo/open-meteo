@@ -2,7 +2,7 @@
 /// This data is used for faster process startup. Files are are unlikely to be modified, do not need to be revalidated immediately
 /// Revalidation will still happen in the background
 /// The size of meta data is fixed
-enum HttpMetaCache {
+/*enum HttpMetaCache {
     enum State {
         case missing(lastValidated: Timestamp)
         case available(lastValidated: Timestamp, contentLength: Int, lastModified: Timestamp?, eTag: String?)
@@ -102,3 +102,4 @@ struct CString48 {
         self.value = value
     }
 }
+*/

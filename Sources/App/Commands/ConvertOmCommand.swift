@@ -49,7 +49,7 @@ struct ConvertOmCommand: AsyncCommand {
                 logger.warning("Transpose flag is currently not supported for OM3 conversion")
             }
             logger.info("Converting OM file to v3 with domain: \(domain). Outfile will be: \(outfile)")
-            guard let grid = domainObj.getDomain()?.grid else {
+            guard let grid = try await domainObj.getDomain()?.grid else {
                 fatalError("Did not get domain grid")
             }
             try await convertOmv3(src: signature.infile, dest: outfile, grid: grid)
@@ -64,7 +64,7 @@ struct ConvertOmCommand: AsyncCommand {
             let data = try await om.read()
             let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".nc"
             logger.info("Converting to NetCDF: \(outfile)")
-            try convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, domain: signature.domain, logger: logger)
+            try await convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, domain: signature.domain, logger: logger)
             return
         } else {
             throw ConvertOmError("Unsupported conversion target: \(format)")
@@ -72,13 +72,13 @@ struct ConvertOmCommand: AsyncCommand {
     }
 
     /// Convert data to NetCDF format
-    private func convertToNetCDF(data: [Float], dimensions: [UInt64], outfile: String, transpose: Bool, domain: String?, logger: Logger) throws {
+    private func convertToNetCDF(data: [Float], dimensions: [UInt64], outfile: String, transpose: Bool, domain: String?, logger: Logger) async throws {
         let ncFile = try NetCDF.create(path: outfile, overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "open-meteo data")
 
         switch dimensions.count {
         case 2:
-            try convertToNetCDF2D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose, domain: domain, logger: logger)
+            try await convertToNetCDF2D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose, domain: domain, logger: logger)
         case 3:
             try convertToNetCDF3D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose)
         default:
@@ -90,10 +90,10 @@ struct ConvertOmCommand: AsyncCommand {
     }
 
     /// Handle 2D data conversion to NetCDF
-    private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, domain: String?, logger: Logger) throws {
+    private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, domain: String?, logger: Logger) async throws {
         if let domain = domain {
             let domainObj = try DomainRegistry.load(rawValue: domain)
-            guard let grid = domainObj.getDomain()?.grid else {
+            guard let grid = try await domainObj.getDomain()?.grid else {
                 fatalError("Did not get domain grid")
             }
             let ny = grid.ny

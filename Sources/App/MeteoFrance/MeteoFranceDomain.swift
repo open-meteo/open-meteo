@@ -35,9 +35,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arpege_europe_probabilities
     case arpege_world_probabilities
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
     
     var countEnsembleMember: Int {
         return 1
@@ -357,6 +354,15 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
  List of all surface MeteoFrance variables
  */
 enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    /// Compensates for the historically incorrect archive conversion factor.
+    /// Archives use `3600 / 10_000_000`, while converting J/m² to W/m²
+    /// requires `1 / 3600`.
+    static let shortwaveRadiationArchiveCorrectionFactor = Float(10_000_000) / Float(3600 * 3600)
+
+    /// The historically incorrect conversion retained for archive compatibility.
+    static let shortwaveRadiationArchiveStorageFactor =
+        (1 / Float(3600)) / shortwaveRadiationArchiveCorrectionFactor
+
     case temperature_2m
     case cloud_cover
     case cloud_cover_low
@@ -410,6 +416,13 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .cape: return true
+        case .wind_gusts_10m: return true
+        case .wind_u_component_10m, .wind_v_component_10m: return true
+        case .wind_u_component_20m, .wind_v_component_20m: return true
+        case .wind_u_component_50m, .wind_v_component_50m: return true
+        case .wind_u_component_100m, .wind_v_component_100m: return true
+        case .wind_u_component_150m, .wind_v_component_150m: return true
+        case .wind_u_component_200m, .wind_v_component_200m: return true
         default: return false
         }
     }
@@ -466,7 +479,7 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         case .cloud_cover_mid:
             return .hermite(bounds: 0...100)
         case .cloud_cover_high:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:

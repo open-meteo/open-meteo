@@ -5,23 +5,7 @@ import CHelper
 import NIOCore
 import NIOFileSystem
 import Synchronization
-
-enum CurlError: Error {
-    // case noGribMessagesMatch
-    case didNotFindAllVariablesInGribIndex
-    case gribIndexMatchedTwice
-    case sizeTooSmall
-    case didNotGetAllGribMessages(got: Int, expected: Int)
-    case downloadFailed(code: HTTPStatus)
-    case fileNotFound
-    case timeoutReached
-    case timeoutPerChunkReached(httpRange: Range<Int>)
-    case futimes(error: String)
-    case contentLengthHeaderTooLarge(got: Int)
-    case couldNotGetContentLengthForConcurrentDownload
-    case invalidURL(String)
-}
-
+import OmFileIO
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
 final class Curl: Sendable {
@@ -57,13 +41,15 @@ final class Curl: Sendable {
     
     /// Default throw if unauthorized error occures
     let retryUnauthorized: Bool
+    typealias PrepareRequest = @Sendable (inout HTTPClientRequest) async throws -> Void
+    let prepareRequest: PrepareRequest?
 
     /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 8, retryUnauthorized: Bool = false) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 8, retryUnauthorized: Bool = false, prepareRequest: PrepareRequest? = nil) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
@@ -74,6 +60,7 @@ final class Curl: Sendable {
         self.headers = headers
         self.chunkSize = chunkSizeMB * (2 << 19)
         self.retryUnauthorized = retryUnauthorized
+        self.prepareRequest = prepareRequest
     }
 
     public func printStatistics() async {
@@ -138,9 +125,11 @@ final class Curl: Sendable {
                 }
                 if let range = range {
                     request.headers.add(name: "range", value: "bytes=\(range)")
+                    request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
                 }
                 request.headers.add(contentsOf: self.headers)
                 request.headers.add(contentsOf: headers)
+                try await prepareRequest?(&request)
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     // await print(try response.body.collect(upTo: 10000000).readStringImmutable())
@@ -408,18 +397,6 @@ extension AsyncSequence where Element == ByteBuffer {
 }
 
 extension HTTPClientResponse {
-    /// Content length in bytes forom the http header
-    func contentLength() throws -> Int? {
-        guard let length = headers["Content-Length"].first.flatMap(Int.init), length >= 0 else {
-            return nil
-        }
-        // Yes, we are downloading 250GB GRIB files....
-        if length > 512 * (1 << 30) {
-            throw CurlError.contentLengthHeaderTooLarge(got: length)
-        }
-        return length
-    }
-
     /// Optionally wait to stay delayed a fixed time amount after last modified header
     func waitAfterLastModified(logger: Logger, wait: TimeInterval?) async throws {
         guard let wait else {

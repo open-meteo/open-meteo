@@ -112,7 +112,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let ensemble: Bool // Glofas
 
     /// In Air Quality API
-    let domains: CamsQuery.Domain? // sams
+    let domains: CamsApiDomain?
 
     /// iso starting date `2022-02-01`
     let start_date: [IsoDate]
@@ -187,7 +187,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         tilt = try c.decodeIfPresent(Float.self, forKey: .tilt)
         azimuth = try c.decodeIfPresent(Float.self, forKey: .azimuth)
         disable_bias_correction = try c.decodeIfPresent(Bool.self, forKey: .disable_bias_correction)
-        domains = try c.decodeIfPresent(CamsQuery.Domain.self, forKey: .domains)
+        domains = try c.decodeIfPresent(CamsApiDomain.self, forKey: .domains)
         run = try c.decodeIfPresent(IsoDateTime.self, forKey: .run)
 
         bounding_box = try (try? c.decodeIfPresent([Float].self, forKey: .bounding_box)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .bounding_box)) ?? []
@@ -222,11 +222,11 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     }
 
     func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient, run: run)
     }
 
     func readerOptions(for request: Request, allowRemoteArchive: Bool) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil)
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil, run: run)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps
@@ -419,7 +419,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         // If a single run is selected, start time-range from run
         if let run {
             let current = run.toTimestamp()
-            let daily = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_days ?? forecastDaysDefault, initialStep: 0, dtSeconds: 86400)
+            let daily = TimerangeDt(start: current, nTime: forecast_days ?? forecastDaysDefault, dtSeconds: 86400)
 
             let defaultForecastHours = (forecast_days ?? forecastDaysDefault)*24
             let hourly = Self.forecastTimeRange2(currentTime: current, utcOffset: 0, pastSteps: 0, forecastSteps: forecast_hours ?? defaultForecastHours, initialStep: run.hour, dtSeconds: 3600)
@@ -488,6 +488,24 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         )
     }
 
+    func validateSingleRunAggregationsAlignWithLocalPeriodStart(timezone: TimezoneWithOffset) throws {
+        guard let run else {
+            return
+        }
+        let localRun = run.toTimestamp().add(timezone.utcOffsetSeconds)
+        let localRunDate = localRun.toComponents()
+        let isLocalMidnight = localRun.hour == 0 && localRun.minute == 0 && localRun.second == 0
+        if daily?.isEmpty == false && !isLocalMidnight {
+            throw ForecastApiError.generic(message: "Parameter 'daily' is only supported for single-runs-api if 'run' starts at 00:00 in the requested timezone")
+        }
+        if weekly?.isEmpty == false && (!isLocalMidnight || localRun.weekday != .monday) {
+            throw ForecastApiError.generic(message: "Parameter 'weekly' is only supported for single-runs-api if 'run' starts at Monday 00:00 in the requested timezone")
+        }
+        if monthly?.isEmpty == false && (!isLocalMidnight || localRunDate.day != 1) {
+            throw ForecastApiError.generic(message: "Parameter 'monthly' is only supported for single-runs-api if 'run' starts on day 1 at 00:00 in the requested timezone")
+        }
+    }
+
     /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time. UTC offset has not been subtracted.
     public static func forecastTimeRange2(currentTime: Timestamp, utcOffset: Int, pastSteps: Int, forecastSteps: Int, initialStep: Int?, dtSeconds: Int) -> TimerangeDt {
         let pastSeconds = pastSteps * dtSeconds
@@ -513,7 +531,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let forecastSteps = forecastSteps ?? forecastStepsDefault
 
         if forecastSteps < 0 || forecastSteps > forecastStepsMax {
-            throw ForecastApiError.forecastDaysInvalid(given: forecastStepsMax, allowed: 0...forecastStepsMax)
+            throw ForecastApiError.forecastDaysInvalid(given: forecastSteps, allowed: 0...forecastStepsMax)
         }
         if pastSteps < 0 || pastSteps > pastStepsMax {
             throw ForecastApiError.pastDaysInvalid(given: pastSteps, allowed: 0...pastStepsMax)

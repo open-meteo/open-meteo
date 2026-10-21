@@ -310,7 +310,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       temperature_2m:
                         type: array
                         items:
@@ -733,7 +733,7 @@ paths:
                       time:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       weather_code:
                         type: array
                         items:
@@ -771,11 +771,11 @@ paths:
                       sunrise:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       sunset:
                         type: array
                         items:
-                          type: string
+                          type: [string, integer]
                       daylight_duration:
                         type: array
                         items:

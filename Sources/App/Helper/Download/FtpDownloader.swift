@@ -1,5 +1,6 @@
 @preconcurrency import curl_swift
 import Vapor
+import OmFileIO
 
 /// Simple helper to download files from a FTP server using CURL
 public final class FtpDownloader: Sendable {
@@ -73,18 +74,5 @@ public final class FtpDownloader: Sendable {
             }
             return data
         }
-    }
-}
-
-extension String {
-    /// Remove the auth part from a HTTP or FTP resource
-    func stripHttpPassword() -> String {
-        guard
-            let slashIndex = self.firstRange(of: "://")?.lowerBound,
-            let atIndex = self[slashIndex...].firstIndex(of: "@")
-        else {
-            return self
-        }
-        return "\(self[..<slashIndex])://\(self[self.index(after: atIndex)...])"
     }
 }
