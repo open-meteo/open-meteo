@@ -9,19 +9,19 @@ import Synchronization
 /// Compressed chunks of a weather variable file that hold none of them are written as NaN, so the API returns null for those chunks.
 struct SyncBoundingBox: Sendable {
     /// `ny * nx` flags in grid order
-    let cells: [Bool]
+    let selectedCells: [Bool]
     let nx: Int
 
     init(grid: any Gridable, box: BoundingBoxWGS84) throws {
-        let inside = Self.cells(grid: grid, box: box)
+        let inside = Self.selectedCells(grid: grid, box: box)
         guard inside.contains(true) else {
             throw ForecastApiError.generic(message: "the box holds no cell of this grid")
         }
-        self.init(cells: inside, nx: grid.nx)
+        self.init(selectedCells: inside, nx: grid.nx)
     }
 
-    init(cells: [Bool], nx: Int) {
-        self.cells = cells
+    init(selectedCells: [Bool], nx: Int) {
+        self.selectedCells = selectedCells
         self.nx = nx
     }
 
@@ -31,7 +31,7 @@ struct SyncBoundingBox: Sendable {
     }
 
     /// Cells whose centre lies inside the box
-    static func cells(grid: any Gridable, box: BoundingBoxWGS84) -> [Bool] {
+    static func selectedCells(grid: any Gridable, box: BoundingBoxWGS84) -> [Bool] {
         (0 ..< grid.nx * grid.ny).map {
             let (lat, lon) = grid.getCoordinates(gridpoint: $0)
             return box.latitude.contains(lat) && box.longitude.contains(wrapped(longitude: lon))
@@ -42,25 +42,24 @@ struct SyncBoundingBox: Sendable {
     /// The grid is `[ny, nx]` among the dimensions, e.g. `[ny, nx, time]` or `[member, ny, nx, time]`, or the flat `[ny * nx, time]` of legacy files;
     /// the other dimensions do not matter.
     func takeChunks(layout: OmFileChunkLayout) -> [Bool]? {
-        guard let dims = layout.first?.arrayDimensions else { return nil }
-        let ny = UInt64(cells.count / nx)
+        let dims = layout.dimensions
+        let ny = UInt64(selectedCells.count / nx)
         let pairs = (0 ..< max(0, dims.count - 1)).filter { dims[$0] == ny && dims[$0 + 1] == UInt64(nx) }
         // Dimension sizes alone cannot distinguish multiple matching spatial axes.
         guard pairs.count <= 1 else { return nil }
         let pair = pairs.first
         /// Legacy files are exactly `[ny * nx, time]`; any other dimension that happens to equal the cell count is not the grid
-        let isLegacyFlat = dims.count == 2 && dims[0] == UInt64(cells.count)
+        let isLegacyFlat = dims.count == 2 && dims[0] == UInt64(selectedCells.count)
         guard pair != nil || isLegacyFlat else { return nil }
         let xDimension = pair.map { $0 + 1 } ?? 0
-        // Time and member chunks share spatial extents. Scan each extent only once.
-        var spatial = [UInt64: Bool]()
-        return layout.map { chunk in
-            let firstCell = (pair.map { chunk.offset[$0] * UInt64(nx) } ?? 0) + chunk.offset[xDimension]
-            if let take = spatial[firstCell] { return take }
-            let take = chunk.containsCell(yDimension: pair, xDimension: xDimension) { cells[$0] }
-            spatial[firstCell] = take
-            return take
+        // Spatial chunks repeat across time and member dimensions. Evaluate only the first copy.
+        let counts = zip(dims, layout.chunkDimensions).map { Int(($0 - 1) / $1 + 1) }
+        let trailingChunks = counts[(xDimension + 1)...].reduce(1, *)
+        let spatialCount = (pair.map { counts[$0] } ?? 1) * counts[xDimension]
+        let spatial = (0..<spatialCount).map { index in
+            layout[index * trailingChunks].containsCell(yDimension: pair, xDimension: xDimension) { selectedCells[$0] }
         }
+        return layout.indices.map { spatial[$0 / trailingChunks % spatialCount] }
     }
 
     /// Byte ranges to fetch for the chunks to take: neighbours closer than `merge` bytes are joined, as long as a run stays within `max` bytes (a larger chunk is a run on its own).
@@ -89,8 +88,9 @@ struct SyncBoundingBox: Sendable {
             logger.info("Not a float array, type \(reader.dataType), copying whole: \(file)")
             return nil
         }
-        let dims = array.getDimensions(), chunks = array.getChunkDimensions()
-        guard let take = try takeChunks(layout: array.chunkLayout()) else {
+        let layout = try array.chunkLayout()
+        let dims = layout.dimensions, chunks = layout.chunkDimensions
+        guard let take = takeChunks(layout: layout) else {
             logger.info("Not an array on the model grid, dims \(dims), copying whole: \(file)")
             return nil
         }

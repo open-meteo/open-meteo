@@ -25,19 +25,19 @@ import ReducedLatLon
 
     /// Rows and columns of the kept cells
     func bounds(_ keep: SyncBoundingBox) -> (rows: ClosedRange<Int>, columns: ClosedRange<Int>) {
-        let kept = keep.cells.indices.filter { keep.cells[$0] }.map { $0.quotientAndRemainder(dividingBy: keep.nx) }
+        let kept = keep.selectedCells.indices.filter { keep.selectedCells[$0] }.map { $0.quotientAndRemainder(dividingBy: keep.nx) }
         return (kept.map(\.quotient).min()! ... kept.map(\.quotient).max()!, kept.map(\.remainder).min()! ... kept.map(\.remainder).max()!)
     }
 
     @Test func keepsOnlyCellsInsideTheBox() throws {
         let box = BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5)
-        let inside = SyncBoundingBox.cells(grid: grid, box: box)
+        let inside = SyncBoundingBox.selectedCells(grid: grid, box: box)
         #expect(inside.filter { $0 }.count == 4)
         let keep = try SyncBoundingBox(grid: grid, box: box)
         /// Rows 5 and 6, columns 7 and 8, regardless of the grid search radius
         let (rows, columns) = bounds(keep)
         #expect(rows == 5 ... 6 && columns == 7 ... 8)
-        #expect(keep.cells.filter { $0 }.count == 4)
+        #expect(keep.selectedCells.filter { $0 }.count == 4)
     }
 
     @Test func boxPartlyOutsideKeepsTheCellsInside() throws {
@@ -60,13 +60,13 @@ import ReducedLatLon
         let grid = IconNativeGrid(storage: fixture.index, resolutionMeters: 1000,
             maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 0..<10, longitude: 0..<10))
-        #expect(keep.cells == [false, true, false, true])
+        #expect(keep.selectedCells == [false, true, false, true])
         try await copyAndCheck(keep: keep, dims: [1, 4, 5], chunks: [1, 1, 2], cell: { $0[1] })
         try await copyAndCheck(keep: keep, dims: [4, 5], chunks: [1, 2], cell: { $0[0] })
     }
 
     @Test func takeChunksFollowsTheGridWhateverTheOtherDimensions() async throws {
-        let keep = SyncBoundingBox(cells: (0 ..< 12 * 15).map { $0 == 4 * 15 + 7 }, nx: 15)
+        let keep = SyncBoundingBox(selectedCells: (0 ..< 12 * 15).map { $0 == 4 * 15 + 7 }, nx: 15)
         func takeChunks(dims: [Int], chunks: [Int]) async throws -> [Bool]? {
             let source = try fixture([Float](repeating: 0, count: dims.reduce(1, *)), dimensions: dims.map(UInt64.init), chunks: chunks.map(UInt64.init))
             let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
@@ -78,6 +78,9 @@ import ReducedLatLon
         /// Members first, or between the grid and time
         #expect(try await takeChunks(dims: [3, 12, 15, 5], chunks: [1, 2, 3, 5]) == (0 ..< 3).flatMap { _ in spatial })
         #expect(try await takeChunks(dims: [12, 15, 3, 5], chunks: [2, 3, 2, 5]) == spatial.flatMap { [Bool](repeating: $0, count: 2) })
+        // Partial member/time chunks repeat the same spatial selection.
+        #expect(try await takeChunks(dims: [3, 12, 15, 5], chunks: [2, 2, 3, 2]) == (0..<2).flatMap { _ in spatial.flatMap { [Bool](repeating: $0, count: 3) } })
+        #expect(try await takeChunks(dims: [12, 15, 3, 5], chunks: [2, 3, 2, 2]) == spatial.flatMap { [Bool](repeating: $0, count: 6) })
         /// The flat array of legacy files: cell 67 is in chunk 9 of 7 cells
         let flat = try #require(try await takeChunks(dims: [180, 5], chunks: [7, 3]))
         #expect(flat.indices.filter { flat[$0] } == [18, 19])
@@ -172,7 +175,7 @@ import ReducedLatLon
         for i in values.indices {
             let index = position(i), chunk = zip(index, chunks).map { $0 / $1 }
             allChunks.insert(chunk)
-            if keep.cells[cell(index)] {
+            if keep.selectedCells[cell(index)] {
                 keptChunks.insert(chunk)
             }
         }
@@ -202,7 +205,7 @@ import ReducedLatLon
         // Syncing a file that already contains zero-byte chunks preserves its values.
         let secondFile = "\(file).copy"
         defer { try? FileManager.default.removeItem(atPath: secondFile) }
-        let keepAll = SyncBoundingBox(cells: [Bool](repeating: true, count: keep.cells.count), nx: keep.nx)
+        let keepAll = SyncBoundingBox(selectedCells: [Bool](repeating: true, count: keep.selectedCells.count), nx: keep.nx)
         #expect(try await keepAll.write(remote: DataAsClass(data: copiedData), to: secondFile, modificationTime: nil, logger: Logger(label: "test")) != nil)
         let second = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: secondFile)))).expectArray(of: Float.self).read()
         #expect(zip(copy, second).allSatisfy { $0.bitPattern == $1.bitPattern || ($0.isNaN && $1.isNaN) })

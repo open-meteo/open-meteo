@@ -198,7 +198,8 @@ struct SyncCommand: AsyncCommand {
         let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
         let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
         
-        // Preserve HTTP/1.1 for Ceph endpoints when listing or downloading whole files.
+        // Note: Ceph S3 has issues with HTTP2 and API actions with empty body payloads. Fallback to HTTP1.1
+        // See: https://github.com/swift-server/async-http-client/issues/602
         let client = server.contains(".your-objectstorage.com") || server.contains("s3.open-meteo.com") || server.contains("127.0.0.1:7480") ? application.http1Client : application.dedicatedHttpClient
         
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
