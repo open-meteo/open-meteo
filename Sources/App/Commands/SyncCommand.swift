@@ -225,38 +225,37 @@ struct SyncCommand: AsyncCommand {
         
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
-        let toDownload: [S3List.ListV2File]
+        /// Static jobs select their directory directly; weather jobs discover variable directories.
+        let remoteDirectories: [String]
         if staticOnly {
-            let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/static/", apikey: apikey, deadLineHours: 0.1)
-            toDownload = remote.files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+            remoteDirectories = ["data/\(model.rawValue)/static/"]
         } else {
-            /// Get a list of all variables from all models
-            let remoteDirectories = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
-
-            /// Filter variables to download
-            toDownload = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3List.ListV2File] in
-                guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
-                    fatalError("could not get variable from string")
-                }
-                let variable = remoteDirectory[remoteDirectory.index(after: variablePos)..<remoteDirectory.index(before: remoteDirectory.endIndex)]
-                // Static folders are handled once by independent jobs, regardless of shortcuts.
-                guard variable != "static" else { return [] }
-                let isPreviousDay = variable.contains("_previous_day")
-                let isPressureLevel = variable.contains("hPa")
-                let isSurface = !isPressureLevel && !variable.contains("_previous_day")
-                guard downloadAllVariables ||
-                        (downloadAllButPressureOncePerDay && (!isPressureLevel || downloadPressureNow)) ||
-                        (downloadAllPressureLevel && isPressureLevel) ||
-                        (downloadAllSurface && isSurface) ||
-                        (downloadAllPreviousDay && isPreviousDay) ||
-                        variables.contains(where: { $0 == variable }) else {
-                    return []
-                }
-                let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
-                let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                return Array(filtered)
-            }.flatMap({$0})
+            remoteDirectories = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
         }
+
+        /// Filter variables to download
+        let toDownload: [S3List.ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3List.ListV2File] in
+            guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
+                fatalError("could not get variable from string")
+            }
+            let variable = remoteDirectory[remoteDirectory.index(after: variablePos)..<remoteDirectory.index(before: remoteDirectory.endIndex)]
+            // Static folders are handled once by independent jobs, regardless of shortcuts.
+            guard staticOnly || variable != "static" else { return [] }
+            let isPreviousDay = variable.contains("_previous_day")
+            let isPressureLevel = variable.contains("hPa")
+            let isSurface = !isPressureLevel && !variable.contains("_previous_day")
+            guard staticOnly || downloadAllVariables ||
+                    (downloadAllButPressureOncePerDay && (!isPressureLevel || downloadPressureNow)) ||
+                    (downloadAllPressureLevel && isPressureLevel) ||
+                    (downloadAllSurface && isSurface) ||
+                    (downloadAllPreviousDay && isPreviousDay) ||
+                    variables.contains(where: { $0 == variable }) else {
+                return []
+            }
+            let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
+            let files = staticOnly ? remote.files : remote.files.includeFiles(timeRange: timeRange, domain: model)
+            return files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+        }.flatMap({$0})
 
         guard toDownload.count > 0 else {
             return
