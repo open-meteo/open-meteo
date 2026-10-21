@@ -139,7 +139,10 @@ enum IconNativeDomains: String, CaseIterable, DomainDefinition {
     var gridRegistry: GridRegistry { .asynchronous(asyncGridRegistry) }
 
     func load() async throws -> IconNativeDomain {
-        try await IconNativeDomain(definition: self)
+        IconNativeDomain(
+            definition: self,
+            grid: try await asyncGridRegistry.load()
+        )
     }
 
     func loadDomain() async throws -> any GenericDomain {

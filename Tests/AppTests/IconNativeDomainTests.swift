@@ -11,7 +11,7 @@ import Logging
             for index in 0..<20 {
                 group.addTask {
                     let definition: IconNativeDomains = index.isMultiple(of: 2) ? .iconD2Native : .iconD2Native15min
-                    return IconNativeDomain(definition: definition, nativeGrid: try await cache.load(grid: definition.asyncGridRegistry))
+                    return IconNativeDomain(definition: definition, grid: try await cache.load(grid: definition.asyncGridRegistry))
                 }
             }
             var domains = [IconNativeDomain]()

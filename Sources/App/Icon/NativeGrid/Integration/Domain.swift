@@ -125,8 +125,9 @@ extension IconNativeDomains {
         let registry = artifact.registry
         do {
             // Downloader preparation deliberately validates the on-disk artifact. API lookups use
-            // the atomically pinned mapping and never enter this disk-maintenance path.
-            try artifact.validateFileAndInstall()
+            // the loader’s pinned mapping and never enter this disk-maintenance path.
+            let storage = try artifact.validateFile()
+            await IconNativeGridLoader.shared.installGeometry(storage, for: asyncGridRegistry)
             // Valid existing artifacts are reused without uploading. Delete grid.bin locally to
             // force regeneration, and supply --upload-s3-bucket to upload the regenerated artifact.
             return
@@ -182,7 +183,7 @@ extension IconNativeDomains {
             )
         }
 
-        artifact.cache.install(generated.grid.storage)
+        await IconNativeGridLoader.shared.installGeometry(generated.grid.storage, for: asyncGridRegistry)
         application.logger.info("Generated native ICON grid artifact at \(artifactPath)")
         if generated.coordinatesGenerated {
             application.logger.info("Generated native ICON coordinates at \(coordinatesFile.getFilePath())")
