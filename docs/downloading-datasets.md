@@ -55,7 +55,8 @@ Usage: /usr/local/bin/openmeteo-api <command>
 Commands:
                     benchmark Benchmark Open-Meteo core functions like data manipulation and compression
                    convert-om Convert between om file format version or convert to NetCDF
-                     download Download a specified icon model run
+                     download Download a specified DWD ICON or AICON model run
+                 download-dwd Alias for the DWD downloader
                  download-bom Download a specified Bom model run
                 download-cams Download global and european CAMS air quality forecasts
                 download-chmi Download ČHMÚ ALADIN Czech model

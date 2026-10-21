@@ -52,8 +52,7 @@ actor IconNativeDomainCache {
     private var cache = [IconNativeDomains: State]()
 
     func load(_ definition: IconNativeDomains) async throws -> IconNativeDomain {
-        // Model-level and quarter-hourly domains share their parent's grid and elevations.
-        let resourceDefinition = definition.modelLevelParent ?? definition.quarterHourlyParent ?? definition
+        let resourceDefinition = definition.staticResourceDomain
         switch cache[resourceDefinition] {
         case .loaded(let domain):
             return IconNativeDomain(definition: definition, nativeGrid: domain.nativeGrid)

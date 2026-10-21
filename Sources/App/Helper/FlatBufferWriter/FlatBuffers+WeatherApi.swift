@@ -1055,6 +1055,8 @@ extension MultiDomains {
             return .iconSeamless
         case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
+        case .dwd_aicon_global_native:
+            return .dwdAiconGlobalNative
         case .dwd_icon_global_native, .dwd_icon_global_native_model_level:
             return .dwdIconGlobalNative
         case .icon_eu, .dwd_icon_eu:

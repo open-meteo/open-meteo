@@ -63,7 +63,49 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     var help: String {
-        "Download a specified icon model run"
+        "Download a specified DWD ICON or AICON model run"
+    }
+
+    static func variables(feed: IconDownloadDomains, group: VariableGroup, onlyVariables: String?) throws -> [any IconVariableDownloadable] {
+        if feed == .aicon {
+            guard [.all, .surface, .surfaceAndPressure].contains(group) else {
+                throw Abort(.badRequest, reason: "The AICON downloader only supports surface variables.")
+            }
+            if let onlyVariables {
+                return try onlyVariables.split(separator: ",").map {
+                    try AiconSurfaceVariable.load(rawValue: String($0))
+                }
+            }
+            return AiconSurfaceVariable.allCases
+        }
+        if let onlyVariables {
+            return try onlyVariables.split(separator: ",").map { name in
+                if name == "visibility", feed != .iconD2Ruc {
+                    throw Abort(.badRequest, reason: "Visibility is not available in the DWD ICON v1 feed.")
+                }
+                if let variable = IconPressureVariable(rawValue: String(name)) { return variable }
+                return try IconSurfaceVariable.load(rawValue: String(name))
+            }
+        }
+        let surface: [any IconVariableDownloadable] = IconSurfaceVariable.allCases.filter { feed.getVarAndLevel($0)?.cat != "model-level" }
+        let modelLevel: [any IconVariableDownloadable] = IconSurfaceVariable.allCases.filter { feed.getVarAndLevel($0)?.cat == "model-level" }
+        let pressure: [any IconVariableDownloadable] = feed.levels.reversed().filter { level in
+            switch group {
+            case .pressureLevelGt500: return level > 500
+            case .pressureLevelLtE500: return level <= 500
+            default: return true
+            }
+        }.flatMap { level in
+            IconPressureVariableType.allCases.map { IconPressureVariable(variable: $0, level: level) }
+        }
+        switch group {
+        case .all: return surface + modelLevel + pressure
+        case .surface: return surface
+        case .surfaceAndPressure: return surface + pressure
+        case .modelLevel: return modelLevel
+        case .pressureLevel, .pressureLevelGt500, .pressureLevelLtE500:
+            return pressure
+        }
     }
 
     /**
@@ -71,6 +113,7 @@ struct DownloadIconCommand: AsyncCommand {
      */
     func convertSurfaceElevation(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, uploadS3Bucket: String?) async throws {
         let logger = application.logger
+        let feedStatic = outputs.nativeDomain.staticResourceDomain.downloadDomain
         let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
         let missingRemapped = outputs.remapped.flatMap { domain in
             FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) ? nil : domain
@@ -86,11 +129,12 @@ struct DownloadIconCommand: AsyncCommand {
         let downloadDirectory = outputs.primary.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: outputs.downloadDomain.deadlineHours)
-        let downloader = IconGribDownloader(domain: outputs.downloadDomain, curl: curl, remapper: outputs.nativeDomain == nil ? remapper : nil)
-        let surface = try await downloader.downloadAndRemap(field: ("HSURF", "single-level", nil), run: run, leadSeconds: 0)
+        let deadLineHours = feedStatic.deadlineHours
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let downloader = IconGribDownloader(domain: feedStatic, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
+        let surface = try await downloader.download(field: ("HSURF", "single-level", nil), run: run, leadSeconds: 0)
         var hsurf = surface.data.data
-        let land = try await downloader.downloadAndRemap(field: ("FR_LAND", "single-level", nil), run: run, leadSeconds: 0)
+        let land = try await downloader.download(field: ("FR_LAND", "single-level", nil), run: run, leadSeconds: 0)
         let landFraction = land.data.data
 
         // Set all sea grid points to -999
@@ -117,11 +161,10 @@ struct DownloadIconCommand: AsyncCommand {
         }
     }
 
-    /// Download native ICON v1 fields and adapt them to the selected outputs.
+    /// Download native DWD v1 fields and adapt them to the selected storage outputs.
     func downloadIcon(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
-        let domain = outputs.source
         let feed = outputs.downloadDomain
         let remappedDomain = outputs.remapped
         let downloadDirectory = outputs.primary.downloadDirectory
@@ -131,7 +174,7 @@ struct DownloadIconCommand: AsyncCommand {
         Process.alarm(seconds: Int(feed.deadlineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let downloader = IconGribDownloader(domain: outputs.downloadDomain, curl: curl, remapper: outputs.nativeDomain == nil ? remapper : nil)
+        let downloader = IconGribDownloader(domain: feed, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
         let isEnsemble = feed.countEnsembleMember > 1
 
         let deaverager = GribDeaverager()
@@ -144,7 +187,7 @@ struct DownloadIconCommand: AsyncCommand {
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
             guard let elevation = try? await outputs.primary.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
-                fatalError("cannot read elevation for domain \(domain)")
+                fatalError("cannot read elevation for feed \(feed.rawValue)")
             }
             return elevation
         }()
@@ -195,7 +238,7 @@ struct DownloadIconCommand: AsyncCommand {
                 if feed.skipHour(variable, hour: hour, forDownload: true, run: run) { return }
                 guard let field = feed.getVarAndLevel(variable) else { return }
                 let messages = try await job.batch.steps.asyncMap { step in
-                    try await downloader.downloadAndRemap(field: field, run: run, leadSeconds: step, member: job.member)
+                    try await downloader.download(field: field, run: run, leadSeconds: step, member: job.member)
                 }
                 if let writer15Min, job.batch.output == .quarterHourly {
                     for (message, raw) in messages {
@@ -258,7 +301,7 @@ struct DownloadIconCommand: AsyncCommand {
                     }
 
                     // ICON EPS downloads shortwave radiation under the name of diffuse radiation
-                    if variable == .diffuse_radiation, domain == .iconEps {
+                    if variable == .diffuse_radiation, feed == .iconEps {
                         try await write(member: member, variable: DwdIconEpsGlobalVariable.shortwave_radiation, data: array2d.data)
                         return
                     }
@@ -301,13 +344,13 @@ struct DownloadIconCommand: AsyncCommand {
                 // These values are retained only as weather-code correction inputs.
                 if feed == .iconD2Ruc, quarterHourlyVariables.contains(v.variable.rawValue) { return }
                 var data = data
-                if [.iconEps, .iconEuEps].contains(domain) && v.variable == .pressure_msl,
+                if (feed == .iconEps || feed == .iconEuEps) && v.variable == .pressure_msl,
                     let t2m = await storage.get(v.with(variable: .temperature_2m)) {
                     // ICON EPC is actually downloading surface level pressure
                     // calculate sea level pressure using temperature and elevation
                     data.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: data.data, elevation: domainElevation)
                 }
-                if domain == .iconEps && v.variable == .relative_humidity_2m,
+                if feed == .iconEps && v.variable == .relative_humidity_2m,
                    let t2m = await storage.get(v.with(variable: .temperature_2m)) {
                     // ICON EPS is using dewpoint, convert to relative humidity
                     data.data.multiplyAdd(multiply: 1, add: -273.15)
@@ -492,117 +535,53 @@ struct DownloadIconCommand: AsyncCommand {
         let start = DispatchTime.now()
         let requestedNativeDomain = IconNativeDomains(rawValue: signature.domain)
             ?? (signature.domain == IconDomains.icon.rawValue ? .iconNative : nil)
-        let nativeDomain = requestedNativeDomain?.modelLevelParent ?? (requestedNativeDomain == .iconD2RucNative15min ? .iconD2RucNative : requestedNativeDomain)
-        guard let domain = nativeDomain?.sourceDomain ?? IconDomains(rawValue: signature.domain) else {
-            let availableDomains = IconNativeDomains.allCases.filter {
-                ![.iconEpsNativeEnsembleMean, .iconEuEpsNativeEnsembleMean, .iconD2EpsNativeEnsembleMean].contains($0)
-            }
+        let ensembleMeanDomains: [IconNativeDomains] = [.iconEpsNativeEnsembleMean, .iconEuEpsNativeEnsembleMean, .iconD2EpsNativeEnsembleMean]
+        guard let requestedNativeDomain else {
+            let availableDomains = IconNativeDomains.allCases.filter { !ensembleMeanDomains.contains($0) }
             throw RawRepresentableError.invalidValue(value: signature.domain,
                 availableValues: [IconDomains.icon.rawValue] + availableDomains.map { $0.rawValue })
         }
-        let feed = nativeDomain?.downloadDomain ?? domain.downloadDomain
+        let nativeDomain = requestedNativeDomain.modelLevelParent
+            ?? (requestedNativeDomain == .iconD2RucNative15min ? .iconD2RucNative : requestedNativeDomain)
+        let feed = nativeDomain.downloadDomain
         guard !signature.skipRegridding || nativeDomain == .iconNative else {
             throw Abort(.badRequest, reason: "--skip-regridding is only supported for icon or icon-native.")
         }
-        if nativeDomain == nil && [.iconEu, .iconD2, .iconD2_15min, .iconEps, .iconEuEps, .iconD2Eps].contains(domain) {
-            throw Abort(.badRequest, reason: "Regular-grid downloads for \(domain.rawValue) are no longer supported. Use \(domain.nativeDomain.rawValue) instead.")
-        }
-        if [.iconEpsEnsembleMean, .iconEuEpsEnsembleMean, .iconD2EpsEnsembleMean].contains(domain) {
-            throw Abort(.badRequest, reason: "Ensemble means are generated by downloading \(domain.nativeDomain.rawValue).")
+        guard !ensembleMeanDomains.contains(nativeDomain) else {
+            throw Abort(.badRequest, reason: "Ensemble means are generated by downloading their ensemble domain.")
         }
         let nConcurrent = signature.concurrent ?? 1
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? feed.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? feed.lastRun()
+        _ = feed.getDownloadForecastSteps(run: run.hour) // Reject unsupported runs before preparing static files.
 
         if signature.onlyVariables != nil && signature.group != nil {
-            fatalError("Parameter 'onlyVariables' and 'groups' must not be used simultaneously")
+            throw Abort(.badRequest, reason: "--only-variables and --group must not be used simultaneously.")
         }
 
         let group = try VariableGroup.load(rawValueOptional: signature.group)
-            ?? (requestedNativeDomain?.modelLevelParent != nil ? .modelLevel : .all)
-        if requestedNativeDomain?.modelLevelParent != nil && (group != .modelLevel || signature.onlyVariables != nil) {
+            ?? (requestedNativeDomain.modelLevelParent != nil ? .modelLevel : .all)
+        if requestedNativeDomain.modelLevelParent != nil && (group != .modelLevel || signature.onlyVariables != nil) {
             throw Abort(.badRequest, reason: "Model-level domains only support --group modelLevel. Use the parent domain for --only-variables.")
         }
 
-        let onlyVariables: [any IconVariableDownloadable]? = try signature.onlyVariables.map {
-            try $0.split(separator: ",").map {
-                if let variable = IconPressureVariable(rawValue: String($0)) {
-                    return variable
-                }
-                return try IconSurfaceVariable.load(rawValue: String($0))
-            }
-        }
-
-        /// 3 different variables sets to optimise download time:
-        /// - surface variables with soil
-        /// - model-level e.g. for 180m wind, they have a much larger dalay and sometimes are aborted
-        /// - pressure level which take forever to download because it is too much data
-        var groupVariables: [any IconVariableDownloadable]
-        switch group {
-        case .all:
-            groupVariables = IconSurfaceVariable.allCases + feed.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .surface:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                !(feed.getVarAndLevel($0)?.cat == "model-level")
-            }
-        case .surfaceAndPressure:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                !(feed.getVarAndLevel($0)?.cat == "model-level")
-            } + feed.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .modelLevel:
-            groupVariables = IconSurfaceVariable.allCases.filter {
-                feed.getVarAndLevel($0)?.cat == "model-level"
-            }
-        case .pressureLevel:
-            groupVariables = feed.levels.reversed().flatMap { level in
-                IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .pressureLevelGt500:
-            groupVariables = feed.levels.reversed().flatMap { level in
-                return level > 500 ? IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                } : []
-            }
-        case .pressureLevelLtE500:
-            groupVariables = feed.levels.reversed().flatMap { level in
-                return level <= 500 ? IconPressureVariableType.allCases.map { variable in
-                    IconPressureVariable(variable: variable, level: level)
-                } : []
-            }
-        }
-
-        let variables = onlyVariables ?? groupVariables
+        let variables = try Self.variables(feed: feed, group: group, onlyVariables: signature.onlyVariables)
 
         let logger = context.application.logger
         let generateFullRun = feed.countEnsembleMember == 1
-        if let nativeDomain {
-            try await nativeDomain.prepareNativeGrid(
-                application: context.application,
-                uploadS3Bucket: signature.uploadS3Bucket
-            )
-        }
-        let outputs: IconDownloadOutputs
-        if let nativeDomain {
-            outputs = try await IconDownloadOutputs(nativeDomain, skipRegridding: signature.skipRegridding)
-        } else {
-            outputs = try await IconDownloadOutputs(domain)
-        }
+        try await nativeDomain.prepareNativeGrid(
+            application: context.application,
+            uploadS3Bucket: signature.uploadS3Bucket
+        )
+        let outputs = try await IconDownloadOutputs(nativeDomain, skipRegridding: signature.skipRegridding)
 
-        let outputNames = [outputs.primary, outputs.remapped].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
+        let outputNames = [outputs.primary, outputs.remapped as (any GenericDomain)?].compactMap { $0 }.map { String(describing: $0) }.joined(separator: "' and '")
         logger.info("Downloading domain '\(outputNames)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        let needsRemapping = outputs.nativeDomain == nil || outputs.remapped != nil
-        let remapper = needsRemapping ? try await IconRemapper(
-            curl: Curl(logger: logger, client: context.application.dedicatedHttpClient), domain: outputs.source
-        ) : nil
+        let remapper: IconRemapper?
+        if let domain = outputs.remapped {
+            remapper = try await IconRemapper(curl: Curl(logger: logger, client: context.application.dedicatedHttpClient), domain: domain)
+        } else {
+            remapper = nil
+        }
         try await convertSurfaceElevation(application: context.application, outputs: outputs, remapper: remapper, run: run, uploadS3Bucket: signature.uploadS3Bucket)
 
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, outputs: outputs, remapper: remapper, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
@@ -614,44 +593,5 @@ struct DownloadIconCommand: AsyncCommand {
         try await GenericVariableHandle.convert(application: context.application, domain: outputs.primary, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
-    }
-}
-
-/// Resolved output roles for one ICON download. Native global also produces remapped output
-/// unless regridding is explicitly disabled.
-struct IconDownloadOutputs: Sendable {
-    let downloadDomain: IconDownloadDomains
-    var source: IconDomains { downloadDomain.regularDomain }
-    let primary: any GenericDomain
-    let remapped: (any GenericDomain)?
-    let ensembleMean: (any GenericDomain)?
-    let modelLevel: (any GenericDomain)?
-    let fifteenMinute: (any GenericDomain)?
-
-    let nativeDomain: IconNativeDomains?
-
-    init(_ domain: IconDomains) async throws {
-        if domain == .icon {
-            self = try await Self(IconNativeDomains.iconNative)
-            return
-        }
-        self.downloadDomain = domain.downloadDomain
-        self.nativeDomain = nil
-        self.primary = domain
-        self.remapped = nil
-        self.ensembleMean = domain.ensembleMeanDomain
-        self.modelLevel = nil
-        self.fifteenMinute = domain == .iconD2 ? IconDomains.iconD2_15min : nil
-    }
-
-    init(_ domain: IconNativeDomains, skipRegridding: Bool = false) async throws {
-        self.downloadDomain = domain.downloadDomain
-        self.nativeDomain = domain
-        let grid = try await domain.nativeGridFile.load()
-        self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
-        self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
-        self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
-        self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
-        self.fifteenMinute = domain == .iconD2RucNative ? IconNativeDomain(definition: .iconD2RucNative15min, nativeGrid: grid) : domain == .iconD2Native ? IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid) : nil
     }
 }
