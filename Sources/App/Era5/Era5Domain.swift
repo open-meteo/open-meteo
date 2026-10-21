@@ -66,10 +66,8 @@ enum CdsDomain: String, SyncGridDomain, CaseIterable {
             return .copernicus_era5_ensemble
         case .cerra:
             return .copernicus_cerra
-        case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
+        case .ecmwf_ifs, .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
             return .ecmwf_ifs
-        case .ecmwf_ifs_analysis:
-            return .ecmwf_ifs_analysis
         }
     }
 
