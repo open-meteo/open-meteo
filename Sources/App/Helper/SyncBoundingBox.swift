@@ -100,10 +100,10 @@ struct SyncBoundingBox: Sendable {
 
     /// Byte ranges to fetch for the chunks to take: neighbours closer than `merge` bytes are joined, as long as a run stays within `max` bytes (a larger chunk is a run on its own).
     /// Each run has the range of chunk indices it holds. Empty chunks are NaN and need no bytes.
-    static func runs(ranges: [(offset: UInt64, count: UInt64)], take: [Bool], merge: Int, max limit: Int) -> [(chunks: Range<Int>, bytes: Range<Int>)] {
+    static func runs<Ranges: RandomAccessCollection>(ranges: Ranges, take: [Bool], merge: Int, max limit: Int) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
         var runs = [(chunks: Range<Int>, bytes: Range<Int>)]()
-        for i in ranges.indices where take[i] && ranges[i].count > 0 {
-            let bytes = Int(ranges[i].offset) ..< Int(ranges[i].offset + ranges[i].count)
+        for i in ranges.indices where take[i] && !ranges[i].isEmpty {
+            let bytes = Int(ranges[i].lowerBound) ..< Int(ranges[i].upperBound)
             if let last = runs.last, bytes.lowerBound - last.bytes.upperBound <= merge, bytes.upperBound - last.bytes.lowerBound <= limit {
                 runs[runs.count - 1] = (last.chunks.lowerBound ..< i + 1, last.bytes.lowerBound ..< bytes.upperBound)
             } else {
@@ -118,8 +118,8 @@ struct SyncBoundingBox: Sendable {
     func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, runsInFlight: Int = SyncBoundingBox.runsInFlightTotal) async throws -> Int? {
         let remote = CountingBackend(remote)
         let reader = try await OmFileReader(fn: remote)
-        /// A large `io_size_max` reads the lookup table of chunk offsets in few requests
-        guard let array = reader.asArray(of: Float.self, io_size_max: UInt64(Self.runBytes), io_size_merge: UInt64(Self.mergeBytes)) else {
+        /// `chunkIndex()` reads the complete lookup table in one request.
+        guard let array = reader.asArray(of: Float.self) else {
             logger.info("Not a float array, type \(reader.dataType), copying whole: \(file)")
             return nil
         }
@@ -137,7 +137,7 @@ struct SyncBoundingBox: Sendable {
             }
             attributes.append(child)
         }
-        let ranges = try await array.chunkByteRanges()
+        let ranges = try await array.chunkIndex()
         let runs = Self.runs(ranges: ranges, take: take, merge: Self.mergeBytes, max: Self.runBytes)
 
         /// Runs are fetched up to `runsInFlight` ahead of the writer, which takes them in order. A failed run fails the file
@@ -149,16 +149,9 @@ struct SyncBoundingBox: Sendable {
         let out = try writer.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: chunks, compression: array.compression, scale_factor: array.scaleFactor, add_offset: array.addOffset)
         var run = 0 ..< 0, runStart = 0, taken = 0, data: Backend.DataType?
         for i in take.indices {
-            guard take[i], ranges[i].count > 0 else {
-                /// The extent of chunk `i`, smaller than the chunk only at the end of a dimension
-                var extent = dims, rest = i
-                for d in dims.indices.reversed() {
-                    let count: UInt64 = (dims[d] + chunks[d] - 1) / chunks[d]
-                    let position: UInt64 = UInt64(rest) % count
-                    extent[d] = min(chunks[d], dims[d] - position * chunks[d])
-                    rest /= Int(count)
-                }
-                try out.writeNaN(arrayDimensions: extent)
+            guard take[i], !ranges[i].isEmpty else {
+                /// An empty payload appends one zero-byte NaN chunk, including smaller edge chunks.
+                try out.writeCompressedChunk(UnsafeRawBufferPointer(start: nil, count: 0))
                 continue
             }
             if !run.contains(i) {
@@ -173,7 +166,7 @@ struct SyncBoundingBox: Sendable {
                 // A short body would let the slices below read past the buffer, which a release build does not check
                 guard data!.withUnsafeBytes({ $0.count }) == runs[taken - 1].bytes.count else { throw CurlErrorNonRetry.chunkSizeMismatch }
             }
-            let start = Int(ranges[i].offset) - runStart
+            let start = Int(ranges[i].lowerBound) - runStart
             try data!.withUnsafeBytes { try out.writeCompressedChunk(UnsafeRawBufferPointer(rebasing: $0[start ..< start + Int(ranges[i].count)])) }
         }
         let children = try attributes.map { try $0.copyScalar(to: writer) }

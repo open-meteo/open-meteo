@@ -96,7 +96,7 @@ import Logging
     }
 
     @Test func runsJoinCloseChunksAndCapTheirSize() {
-        let ranges: [(offset: UInt64, count: UInt64)] = [(100, 50), (150, 50), (0, 0), (210, 40), (100_000, 10), (100_010, 100), (200_000, 10)]
+        let ranges: [Range<UInt64>] = [100..<150, 150..<200, 200..<200, 210..<250, 100_000..<100_010, 100_010..<100_110, 200_000..<200_010]
         let take = [true, false, true, true, true, true, true]
         let runs = SyncBoundingBox.runs(ranges: ranges, take: take, merge: 16, max: 150)
         /// The chunk that is not taken is a gap of 50 bytes, the empty one is skipped, and the last run would exceed 150 bytes
@@ -165,6 +165,27 @@ import Logging
                 #expect(copy[i].isNaN)
             }
         }
+        let sourceArray = try await OmFileReader(fn: source).expectArray(of: Float.self)
+        let sourceIndex = try await sourceArray.chunkIndex()
+        let copiedIndex = try await array.chunkIndex()
+        let take = try #require(keep.takeChunks(dims: dims, chunks: chunks))
+        let copiedData = try Data(contentsOf: URL(fileURLWithPath: file))
+        for i in take.indices {
+            if take[i] {
+                let bytes = sourceIndex[i]
+                let originalBytes = try await source.getData(offset: Int(bytes.lowerBound), count: Int(bytes.count))
+                #expect(originalBytes.withUnsafeBytes { Data($0) } == copiedData.subdata(in: Int(copiedIndex[i].lowerBound)..<Int(copiedIndex[i].upperBound)))
+            } else {
+                #expect(copiedIndex[i].isEmpty)
+            }
+        }
+        // Syncing a file that already contains zero-byte chunks preserves its values.
+        let secondFile = "\(file).copy"
+        defer { try? FileManager.default.removeItem(atPath: secondFile) }
+        let keepAll = SyncBoundingBox(cells: [Bool](repeating: true, count: keep.cells.count), nx: keep.nx)
+        #expect(try await keepAll.write(remote: DataAsClass(data: copiedData), to: secondFile, modificationTime: nil, logger: Logger(label: "test")) != nil)
+        let second = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: secondFile)))).expectArray(of: Float.self).read()
+        #expect(zip(copy, second).allSatisfy { $0.bitPattern == $1.bitPattern || ($0.isNaN && $1.isNaN) })
         /// The chunks left out are not downloaded
         #expect(keptChunks.count < allChunks.count && fetched < source.count)
         return keptChunks.count
