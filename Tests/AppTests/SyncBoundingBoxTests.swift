@@ -92,40 +92,14 @@ import ReducedLatLon
         #expect(try await takeChunks(dims: [12, 15, 12, 15], chunks: [2, 3, 2, 3]) == nil)
     }
 
-    @Test func chunkCellsUseGlobalIndicesAndStopAtFirstMatch() async throws {
-        let source = try fixture([Float](repeating: 0, count: 3 * 5 * 2 * 3), dimensions: [3, 5, 2, 3], chunks: [2, 3, 1, 2])
-        let layout = try await OmFileReader(fn: source).expectArray(of: Float.self).chunkLayout()
-        let edge = try #require(layout.last)
-        var visited = [Int]()
-        #expect(!edge.containsCell(yDimension: 0, xDimension: 1) { visited.append($0); return false })
-        #expect(visited == [13, 14])
-        visited.removeAll()
-        #expect(edge.containsCell(yDimension: 0, xDimension: 1) { visited.append($0); return true })
-        #expect(visited == [13])
-        enum Failure: Error { case predicate }
-        #expect(throws: Failure.self) {
-            try edge.containsCell(yDimension: 0, xDimension: 1) { _ in throw Failure.predicate }
-        }
-        visited.removeAll()
-        #expect(!layout[0].containsCell(yDimension: 0, xDimension: 1) { visited.append($0); return false })
-        #expect(visited == [0, 1, 2, 5, 6, 7])
-
-        let flatSource = try fixture([Float](repeating: 0, count: 7 * 3), dimensions: [7, 3], chunks: [3, 2])
-        let flatLayout = try await OmFileReader(fn: flatSource).expectArray(of: Float.self).chunkLayout()
-        let flatEdge = try #require(flatLayout.last)
-        visited.removeAll()
-        #expect(!flatEdge.containsCell(yDimension: nil, xDimension: 0) { visited.append($0); return false })
-        #expect(visited == [6])
-    }
-
-    @Test func runsJoinCloseChunksAndCapTheirSize() {
+    @Test func coalescedReadRangesJoinCloseChunksAndCapTheirSize() {
         let ranges: [Range<UInt64>] = [100..<150, 150..<200, 200..<200, 210..<250, 100_000..<100_010, 100_010..<100_110, 200_000..<200_010]
         let take = [true, false, true, true, true, true, true]
-        let runs = SyncBoundingBox.runs(ranges: ranges, take: take, merge: 16, max: 150)
+        let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: 16, max: 150)
         /// The chunk that is not taken is a gap of 50 bytes, the empty one is skipped, and the last run would exceed 150 bytes
         #expect(runs.map(\.chunks) == [0 ..< 1, 3 ..< 4, 4 ..< 6, 6 ..< 7])
         #expect(runs.map(\.bytes) == [100 ..< 150, 210 ..< 250, 100_000 ..< 100_110, 200_000 ..< 200_010])
-        #expect(SyncBoundingBox.runs(ranges: ranges, take: take, merge: 100, max: 1000).map(\.chunks) == [0 ..< 4, 4 ..< 6, 6 ..< 7])
+        #expect(SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: 100, max: 1000).map(\.chunks) == [0 ..< 4, 4 ..< 6, 6 ..< 7])
     }
 
     /// Write `values` as a file with one attribute, and serve it from memory
@@ -266,7 +240,7 @@ import ReducedLatLon
         let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let ranges = try await array.chunkIndex()
         let take = try #require(try keep.takeChunks(layout: array.chunkLayout()))
-        let firstRun = try #require(SyncBoundingBox.runs(ranges: ranges, take: take, merge: SyncBoundingBox.mergeBytes, max: SyncBoundingBox.runBytes).first)
+        let firstRun = try #require(SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: SyncBoundingBox.mergeBytes, max: SyncBoundingBox.runBytes).first)
         let backend = ShortReadBackend(data: source.data, shortReadOffset: firstRun.bytes.lowerBound)
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }

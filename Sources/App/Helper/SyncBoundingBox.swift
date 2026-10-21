@@ -38,35 +38,45 @@ struct SyncBoundingBox: Sendable {
         }
     }
 
-    /// One flag per chunk in chunk order (last dimension fastest): true if the chunk holds a kept cell. Nil if the dimensions are not the grid.
-    /// The grid is `[ny, nx]` among the dimensions, e.g. `[ny, nx, time]` or `[member, ny, nx, time]`, or the flat `[ny * nx, time]` of legacy files;
-    /// the other dimensions do not matter.
+    /// Select every chunk containing a selected grid cell, across all times and ensemble members.
+    /// Returns nil when the spatial dimensions cannot be identified unambiguously.
     func takeChunks(layout: OmFileChunkLayout) -> [Bool]? {
-        let dims = layout.dimensions
+        let dimensions = layout.dimensions
         let ny = UInt64(selectedCells.count / nx)
-        let pairs = (0 ..< max(0, dims.count - 1)).filter { dims[$0] == ny && dims[$0 + 1] == UInt64(nx) }
-        // Dimension sizes alone cannot distinguish multiple matching spatial axes.
-        guard pairs.count <= 1 else { return nil }
-        let pair = pairs.first
-        /// Legacy files are exactly `[ny * nx, time]`; any other dimension that happens to equal the cell count is not the grid
-        let isLegacyFlat = dims.count == 2 && dims[0] == UInt64(selectedCells.count)
-        guard pair != nil || isLegacyFlat else { return nil }
-        let xDimension = pair.map { $0 + 1 } ?? 0
-        // Spatial chunks repeat across time and member dimensions. Evaluate only the first copy.
-        let counts = zip(dims, layout.chunkDimensions).map { Int(($0 - 1) / $1 + 1) }
-        let trailingChunks = counts[(xDimension + 1)...].reduce(1, *)
-        let spatialCount = (pair.map { counts[$0] } ?? 1) * counts[xDimension]
-        let spatial = (0..<spatialCount).map { index in
-            layout[index * trailingChunks].containsCell(yDimension: pair, xDimension: xDimension) { selectedCells[$0] }
+
+        // Find adjacent [ny, nx] dimensions. Legacy [location, time] files use only a location axis.
+        let possibleYDimensions = (0..<dimensions.count - 1).filter { dimension in
+            dimensions[dimension] == ny && dimensions[dimension + 1] == UInt64(nx)
         }
-        return layout.indices.map { spatial[$0 / trailingChunks % spatialCount] }
+        guard possibleYDimensions.count <= 1 else { return nil }
+        let yDimension = possibleYDimensions.first
+        let xDimension: Int
+        if let yDimension {
+            xDimension = yDimension + 1
+        } else if dimensions.count == 2 && dimensions[0] == UInt64(selectedCells.count) {
+            xDimension = 0
+        } else {
+            return nil
+        }
+
+        return layout.map { chunk in
+            let columns = chunk.range(in: xDimension)
+            guard let yDimension else {
+                return columns.contains { location in selectedCells[Int(location)] }
+            }
+            return chunk.range(in: yDimension).contains { row in
+                columns.contains { column in
+                    selectedCells[Int(row) * nx + Int(column)]
+                }
+            }
+        }
     }
 
     /// Byte ranges to fetch for the chunks to take: neighbours closer than `merge` bytes are joined, as long as a run stays within `max` bytes (a larger chunk is a run on its own).
     /// Each run has the range of chunk indices it holds. Empty chunks are NaN and need no bytes.
-    static func runs<Ranges: RandomAccessCollection>(ranges: Ranges, take: [Bool], merge: Int, max limit: Int) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
+    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], merge: Int, max limit: Int) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
         var runs = [(chunks: Range<Int>, bytes: Range<Int>)]()
-        for i in ranges.indices where take[i] && !ranges[i].isEmpty {
+        for i in ranges.indices where takeChunks[i] && !ranges[i].isEmpty {
             let bytes = Int(ranges[i].lowerBound) ..< Int(ranges[i].upperBound)
             if let last = runs.last, bytes.lowerBound - last.bytes.upperBound <= merge, bytes.upperBound - last.bytes.lowerBound <= limit {
                 runs[runs.count - 1] = (last.chunks.lowerBound ..< i + 1, last.bytes.lowerBound ..< bytes.upperBound)
@@ -104,7 +114,7 @@ struct SyncBoundingBox: Sendable {
             attributes.append(child)
         }
         let ranges = try await array.chunkIndex()
-        let runs = Self.runs(ranges: ranges, take: take, merge: Self.mergeBytes, max: Self.runBytes)
+        let runs = Self.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: Self.mergeBytes, max: Self.runBytes)
 
         /// Runs are fetched up to `runsInFlight` ahead of the writer, which takes them in order. A failed run fails the file
         var pending = [Task<Backend.DataType, any Error>]()
