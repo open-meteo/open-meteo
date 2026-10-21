@@ -9,7 +9,14 @@ enum NcepRrfsDomain: String, CaseIterable, SyncGridDomain {
     case ncep_rrfs_conus_ensemble
 
     var domainRegistry: DomainRegistry { DomainRegistry(rawValue: rawValue)! }
-    var syncGridRegistry: SyncGridRegistry { self == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus }
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
+            return .ncep_rrfs_conus
+        case .ncep_rrfs_north_america:
+            return .ncep_rrfs_north_america
+        }
+    }
     var dtSeconds: Int { self == .ncep_rrfs_conus_15min ? 900 : 3600 }
     var updateIntervalSeconds: Int { self == .ncep_rrfs_conus_15min ? 3600 : 21600 }
     var hasYearlyFiles: Bool { false }
@@ -32,25 +39,6 @@ enum NcepRrfsDomain: String, CaseIterable, SyncGridDomain {
     var lastRun: Timestamp { lastRun(now: .now()) }
     func lastRun(now: Timestamp) -> Timestamp {
         now.add(-3 * 3600 - 45 * 60).floor(toNearestHour: updateIntervalSeconds / 3600)
-    }
-    var grid: any Gridable {
-        switch self {
-        case .ncep_rrfs_north_america: return northAmericaGrid
-        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble: return conusGrid
-        }
-    }
-    var conusGrid: ProjectionGrid<LambertConformalConicProjection> {
-        ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.1381, longitude: -122.72,
-                       dx: 3000, dy: 3000,
-                       projection: LambertConformalConicProjection(λ0: -97.5, ϕ0: 38.5, ϕ1: 38.5, ϕ2: 38.5, radius: 6371229))
-    }
-
-    /// GRIB coordinates are in rotated space; the projection uses the opposite pole convention.
-    var northAmericaGrid: ProjectionGrid<RotatedLatLonProjection> {
-        ProjectionGrid(nx: 1127, ny: 683,
-                       latitudeProjectionOrigin: -36.9303, longitudeProjectionOrigin: -61,
-                       dx: 0.1083, dy: 0.1083,
-                       projection: RotatedLatLonProjection(latitude: 35, longitude: 67))
     }
 
     func gribUrls(run: Timestamp, forecastHour: Int, member: Int, server: String) -> [String] {

@@ -68,7 +68,7 @@ struct NcepRrfsDownloader: AsyncCommand {
         }
         let grid = domain.grid
         let trueNorth = domain == .ncep_rrfs_north_america
-            ? domain.northAmericaGrid.getTrueNorthDirection() : domain.conusGrid.getTrueNorthDirection()
+            ? SyncGridRegistry.ncepRrfsNorthAmericaGrid.getTrueNorthDirection() : SyncGridRegistry.ncepRrfsConusGrid.getTrueNorthDirection()
         let deaverager = GribDeaverager()
         let solarConverter = InstantaneousSolarRadiationConverter<String>()
         let diffuseConverter = InstantaneousDiffuseRadiationConverter<String>()
