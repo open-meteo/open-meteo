@@ -13,6 +13,19 @@ import Darwin
 #endif
 
 @Suite(.serialized) struct DownloaderTests {
+    @Test func chunkedDownloadUsesListingMetadataWithoutHead() async throws {
+        let client = HTTPClient(eventLoopGroupProvider: .singleton)
+        defer { let _ = client.shutdown() }
+        let file = S3List.ListV2File(name: "test.om", modificationTime: .init(1_700_000_000), fileSize: 10 * 1024 * 1024, eTag: "\"listed-etag\"")
+        // Preparing the lazy body must succeed without contacting this unreachable server.
+        let response = try await client.executeRetryChunked(
+            .init(url: "http://127.0.0.1:1/test.om"), logger: Logger(label: "test"), file: file, deadline: .distantPast
+        )
+        #expect(try response.contentLength() == file.fileSize)
+        #expect(response.headers.first(name: "ETag") == file.eTag)
+        #expect(response.headers.lastModified?.value == Date(timeIntervalSince1970: 1_700_000_000))
+    }
+
     @Test func testAwsSign() async throws {
         let url = "https://examplebucket.s3.amazonaws.com/test.txt"
         var request = HTTPClientRequest(url: url)

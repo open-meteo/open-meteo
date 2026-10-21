@@ -225,13 +225,14 @@ public extension HTTPClient {
         )
     }
     
-    /// Download a file and chunk it into 8 MB parts. If HTTP range is set, use this. Otherwise perform a head request, get the content size and divide it info 8MB parts
+    /// Download a file in 8 MB parts. Use the supplied range or listing metadata; otherwise fetch metadata with HEAD.
     /// Returns a HTTPClientResponse with a body stream. The stream does not need to be retried, because each chunk is retried individually
     ///
     /// IMPORTANT: iIt may throw `CurlErrorNonRetry.fileModifiedSinceLastDownload` if the remote file was modified during download
     func executeRetryChunked(
         _ request: HTTPClientRequest,
         logger: Logger,
+        file: S3List.ListV2File? = nil,
         chunkSize: Int = 8*1024*1024,
         nConcurrent: Int = 4,
         range: String? = nil,
@@ -241,7 +242,7 @@ public extension HTTPClient {
         error404WaitTime: TimeAmount? = nil
     ) async throws -> HTTPClientResponse {
         let chunks: [Range<Int>]
-        let responseHeaders: HTTPHeaders
+        let metadata: (lastModified: String?, eTag: String?)
         let length: Int
         if let range = range {
             let parts = range.split(separator: ",")
@@ -255,16 +256,24 @@ public extension HTTPClient {
                 }
             }
             length = chunks.reduce(0, { $0 + $1.count })
-            responseHeaders = HTTPHeaders([("content-length", "\(length)")])
+            metadata = (file?.modificationTime.lastModifiedHttpDateFormat, file?.eTag)
         } else {
-            var request = request
-            request.method = .HEAD
-            let head = try await executeMapRetry(request, logger: logger, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) {$0}
-            responseHeaders = head.headers
-            guard let lengthHeader = try head.contentLength(), lengthHeader >= nConcurrent else {
+            if let file {
+                length = file.fileSize
+                metadata = (file.modificationTime.lastModifiedHttpDateFormat, file.eTag)
+            } else {
+                var request = request
+                request.method = .HEAD
+                let head = try await executeMapRetry(request, logger: logger, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) {$0}
+                metadata = (head.headers.first(name: "Last-Modified"), head.headers.first(name: "ETag"))
+                guard let lengthHeader = try head.contentLength() else {
+                    throw CurlError.couldNotGetContentLengthForConcurrentDownload
+                }
+                length = lengthHeader
+            }
+            guard length >= nConcurrent else {
                 throw CurlError.couldNotGetContentLengthForConcurrentDownload
             }
-            length = lengthHeader
             chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
                 return $0 * chunkSize ..< min(($0 + 1) * chunkSize, length)
             }
@@ -278,10 +287,10 @@ public extension HTTPClient {
             var request = request
             request.headers.add(name: "range", value: "bytes=\(range)")
             request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
-            if let lastModified = responseHeaders.first(name: "Last-Modified") {
-                request.headers.replaceOrAdd(name: "Last-Modified", value: lastModified)
+            if let lastModified = metadata.lastModified {
+                request.headers.replaceOrAdd(name: "If-Unmodified-Since", value: lastModified)
             }
-            if let etag = responseHeaders.first(name: "ETag") {
+            if let etag = metadata.eTag {
                 request.headers.replaceOrAdd(name: "If-Match", value: etag)
             }
             return try await self.executeMapRetry(request, logger: logger, deadline: deadline, timeoutPerRequest: timeoutPerRequest, backOffSettings: backOffSettings) { response in
@@ -312,9 +321,16 @@ public extension HTTPClient {
             }
         }
         
+        var headers = HTTPHeaders([("Content-Length", "\(length)")])
+        if let lastModified = metadata.lastModified {
+            headers.add(name: "Last-Modified", value: lastModified)
+        }
+        if let eTag = metadata.eTag {
+            headers.add(name: "ETag", value: eTag)
+        }
         return HTTPClientResponse(
             status: .ok,
-            headers: responseHeaders,
+            headers: headers,
             body: .stream(stream)
         )
     }

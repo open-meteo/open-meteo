@@ -266,7 +266,7 @@ struct SyncCommand: AsyncCommand {
                         return
                     }
                 }
-                let fetched = try await downloadWholeFile(client: client, url: request.url.string, localFile: localFile, logger: logger)
+                let fetched = try await downloadWholeFile(client: client, url: request.url.string, download: download, localFile: localFile, logger: logger)
                 await progress.add(fetched)
             }
         }
@@ -274,16 +274,17 @@ struct SyncCommand: AsyncCommand {
     }
 
     /// Restart the complete download if the remote file changes between range requests.
-    private func downloadWholeFile(client: HTTPClient, url: String, localFile: String, logger: Logger) async throws -> Int {
+    private func downloadWholeFile(client: HTTPClient, url: String, download: S3List.ListV2File, localFile: String, logger: Logger) async throws -> Int {
         var attempts = 0
         while true {
             try Task.checkCancellation()
             attempts += 1
             do {
-                let response = try await client.executeRetryChunked(.init(url: url), logger: logger)
+                let response = try await client.executeRetryChunked(.init(url: url), logger: logger, file: attempts == 1 ? download : nil)
+                let size = try response.contentLength()
                 // Download in 8 MiB parts, with four requests in parallel.
-                try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
-                return try response.contentLength() ?? 0
+                try await response.body.saveTo(file: localFile, size: size, modificationDate: response.headers.lastModified?.value, logger: logger)
+                return size ?? 0
             } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                 try FileManager.default.removeItemIfExists(at: localFile)
                 guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }
