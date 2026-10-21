@@ -55,7 +55,8 @@ Usage: /usr/local/bin/openmeteo-api <command>
 Commands:
                     benchmark Benchmark Open-Meteo core functions like data manipulation and compression
                    convert-om Convert between om file format version or convert to NetCDF
-                     download Download a specified icon model run
+                     download Download a specified DWD ICON or AICON model run
+                 download-dwd Alias for the DWD downloader
                  download-bom Download a specified Bom model run
                 download-cams Download global and european CAMS air quality forecasts
                 download-chmi Download ČHMÚ ALADIN Czech model
@@ -142,10 +143,17 @@ Flags:
   skip-existing
 ```
 
-### ECMWF IFS
-For the ECMWF API, only one domain is available with runs at `00,06,12,18`. Currently it is not supported to only download a subset of weather variables, but all variables need to be downloaded.
+### ECMWF IFS and AIFS
+To download ECMWF forecasts, run `<exe> download-ecmwf --domain ifs025 --run 00`. Ensemble domains include `ifs025_ensemble` and `aifs025_ensemble`, with runs at `00,06,12,18`. Use `--only-variables temperature_2m,precipitation` to select variables.
 
-To download ECMWF forecasts, run the binary with arguments `<exe> download-ecmwf --domain ifs025 --run 00`.
+Select an [ECMWF Open Data cloud mirror](https://www.ecmwf.int/en/forecasts/datasets/open-data) with `--source ecmwf|aws|azure|google` (default: `ecmwf`):
+
+```sh
+<exe> download-ecmwf --domain ifs025_ensemble --source azure --run 00 --concurrent 4
+<exe> download-ecmwf --domain aifs025_ensemble --source google --run 00 --concurrent 4
+```
+
+Use `--server https://example.com/forecasts/` for a custom root URL instead of `--source`. Only `data.ecmwf.int` uses multiple ranges per request; all other servers use separate range requests. Direct URLs to the public ECMWF Azure container also obtain tokens automatically.
 
 
 ### ERA5

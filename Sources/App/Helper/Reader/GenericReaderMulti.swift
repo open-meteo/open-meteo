@@ -36,12 +36,12 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
-        for reader in reader {
+        for reader in reader.reversed() {
             if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
-                break
+                return true
             }
         }
-        return true
+        return false
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
@@ -83,13 +83,16 @@ extension GenericReaderProtocol {
 struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
     let reader: [any GenericReaderOptionalProtocol<Variable>]
     let prefetchAllReaders: Bool
+    let smoothTransitions: Bool
 
     init(
         reader: [any GenericReaderOptionalProtocol<Variable>],
-        prefetchAllReaders: Bool = false
+        prefetchAllReaders: Bool = false,
+        smoothTransitions: Bool = true
     ) {
         self.reader = reader
         self.prefetchAllReaders = prefetchAllReaders
+        self.smoothTransitions = smoothTransitions
     }
 
     var modelLat: Float {
@@ -114,7 +117,7 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
         var prefetched = false
-        for reader in reader {
+        for reader in reader.reversed() {
             let accepted = try await reader.prefetchData(variable: variable, time: time)
             prefetched = prefetched || accepted
             if accepted && !prefetchAllReaders {
@@ -138,7 +141,13 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
             guard let d = try await r.get(variable: variable, time: time) else {
                 continue
             }
-            result = result?.combined(withLowerPriority: d) ?? d
+            if !smoothTransitions, let preferred = result {
+                var data = preferred.data
+                data.integrateIfNaN(d.data)
+                result = DataAndUnit(data, preferred.unit)
+            } else {
+                result = result?.combined(withLowerPriority: d) ?? d
+            }
             if result?.data.containsNaN() == false {
                 break
             }

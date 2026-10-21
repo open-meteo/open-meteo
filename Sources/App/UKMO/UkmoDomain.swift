@@ -77,7 +77,14 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .global_ensemble_mean_20km:
+            return .ukmo_global_ensemble_20km
+        case .uk_ensemble_mean_2km:
+            return .ukmo_uk_ensemble_2km
+        default:
+            return domainRegistry
+        }
     }
 
     var dtSeconds: Int {
@@ -85,10 +92,6 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         case .global_deterministic_10km, .uk_deterministic_2km, .global_ensemble_20km, .uk_ensemble_2km, .global_ensemble_mean_20km, .uk_ensemble_mean_2km:
             return 3600
         }
-    }
-
-    var hasYearlyFiles: Bool {
-        return false
     }
 
     var masterTimeRange: Range<Timestamp>? {

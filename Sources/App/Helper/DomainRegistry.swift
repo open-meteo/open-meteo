@@ -67,6 +67,10 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_nbm_conus
     case ncep_nbm_alaska
     case ncep_nam_conus
+    case ncep_rrfs_conus
+    case ncep_rrfs_north_america
+    case ncep_rrfs_conus_15min
+    case ncep_rrfs_conus_ensemble
     case ncep_aigefs025
     case ncep_aigfs025
     case ncep_hgefs025_ensemble_mean
@@ -87,8 +91,21 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_d2
     case dwd_icon_d2_15min
     case dwd_icon_global_native
+    case dwd_icon_global_native_model_level
+    case dwd_icon_eu_native
+    case dwd_icon_eu_native_model_level
+    case dwd_icon_d2_ruc_native
+    case dwd_icon_d2_ruc_native_15min
+    case dwd_icon_d2_ruc_native_model_level
     case dwd_icon_d2_native
+    case dwd_icon_d2_native_model_level
     case dwd_icon_d2_native_15min
+    case dwd_icon_global_eps_native
+    case dwd_icon_global_eps_native_ensemble_mean
+    case dwd_icon_eu_eps_native
+    case dwd_icon_eu_eps_native_ensemble_mean
+    case dwd_icon_d2_eps_native
+    case dwd_icon_d2_eps_native_ensemble_mean
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
@@ -98,6 +115,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_ewam
     case dwd_gwam
     case dwd_sis_europe_africa_v4
+    case dwd_aicon_global_native
 
     case ecmwf_ifs
     case ecmwf_ifs_europe_ensemble
@@ -206,7 +224,8 @@ enum DomainRegistry: String, CaseIterable {
         switch self {
         case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
-        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps:
+        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
             return 3
         case .ncep_gefs05, .ncep_gefs025, .ncep_aigefs025, .ncep_gefswave025:
             return 3
@@ -231,9 +250,23 @@ enum DomainRegistry: String, CaseIterable {
 
     var nativeDefinition: IconNativeDomains? {
         switch self {
+        case .dwd_aicon_global_native: return .aiconNative
         case .dwd_icon_global_native: return .iconNative
+        case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
+        case .dwd_icon_eu_native: return .iconEuNative
+        case .dwd_icon_eu_native_model_level: return .iconEuNativeModelLevel
+        case .dwd_icon_d2_ruc_native: return .iconD2RucNative
+        case .dwd_icon_d2_ruc_native_15min: return .iconD2RucNative15min
+        case .dwd_icon_d2_ruc_native_model_level: return .iconD2RucNativeModelLevel
         case .dwd_icon_d2_native: return .iconD2Native
+        case .dwd_icon_d2_native_model_level: return .iconD2NativeModelLevel
         case .dwd_icon_d2_native_15min: return .iconD2Native15min
+        case .dwd_icon_global_eps_native: return .iconEpsNative
+        case .dwd_icon_global_eps_native_ensemble_mean: return .iconEpsNativeEnsembleMean
+        case .dwd_icon_eu_eps_native: return .iconEuEpsNative
+        case .dwd_icon_eu_eps_native_ensemble_mean: return .iconEuEpsNativeEnsembleMean
+        case .dwd_icon_d2_eps_native: return .iconD2EpsNative
+        case .dwd_icon_d2_eps_native_ensemble_mean: return .iconD2EpsNativeEnsembleMean
         default: return nil
         }
     }
@@ -248,13 +281,15 @@ enum DomainRegistry: String, CaseIterable {
     /// Used by file scheduling and synchronization without opening grid or elevation files.
     var timeSeriesMetadata: DomainTimeSeriesMetadata? {
         if let nativeDefinition {
-            return DomainTimeSeriesMetadata(nativeDefinition.sourceDomain)
+            return DomainTimeSeriesMetadata(nativeDefinition)
         }
         return regularDomain.map { DomainTimeSeriesMetadata($0) }
     }
 
     private var regularDomain: (any GenericDomain)? {
         switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
+            return NcepRrfsDomain(rawValue: rawValue)!
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
         case .meteofrance_arome_france_hd:
@@ -363,17 +398,19 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.hrrr_conus
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
+        case .dwd_aicon_global_native:
+            return nil
         case .dwd_icon:
             return IconDomains.icon
         case .dwd_icon_d2:
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .dwd_icon_global_native:
-            return nil
-        case .dwd_icon_d2_native:
-            return nil
-        case .dwd_icon_d2_native_15min:
+        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
+             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
+             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
+             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
+             .dwd_icon_global_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
             return nil
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps

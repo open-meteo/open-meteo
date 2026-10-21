@@ -10,9 +10,6 @@ enum OmFileSeriesType: String {
 }
 
 enum OmFileType {
-    /// Timestamps are set for "data_run" files, timerangeDt is set for ensemble "rolling" files
-    typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?)
-    
     case domainChunk(domain: DomainRegistry, variable: String, type: OmFileSeriesType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
     
@@ -98,17 +95,7 @@ enum OmFileType {
         }
     }
     
-    /// `./data/` or `./data_run/`
-    func getDataDirectoryPath() -> String {
-        switch self {
-        case .domainChunk(_, _, _, _, _, _):
-            return OpenMeteo.dataDirectory
-        case .staticFile(_, _, _):
-            return OpenMeteo.dataDirectory
-        case .run(_, _, _):
-            return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
-        }
-    }
+
 }
 
 extension OmFileType: OmFileManagable {

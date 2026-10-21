@@ -209,10 +209,6 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         return domainRegistry
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         switch self {
         case .EC_Earth3P_HR:

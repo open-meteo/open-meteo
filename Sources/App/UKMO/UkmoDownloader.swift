@@ -264,6 +264,7 @@ struct UkmoDownload: AsyncCommand {
         let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
 
+        let solarConverter = InstantaneousSolarRadiationConverter<UkmoSurfaceVariable>()
         let timestamps = domain.forecastSteps(run: run)
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
@@ -303,13 +304,10 @@ struct UkmoDownload: AsyncCommand {
                         }
                         /// UKMO provides solar radiation as instant values. Convert to backwards averaged data.
                         if variable == .direct_radiation || variable == .shortwave_radiation {
-                            let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                            for i in array2d.data.indices {
-                                if factor.data[i] < 0.05 {
-                                    continue
-                                }
-                                array2d.data[i] /= factor.data[i]
-                            }
+                            array2d.data = await solarConverter.convert(data: array2d.data, variable: variable, member: member,
+                                grid: domain.grid, time: timestamp, dtSeconds: domain.dtSeconds)
+                            // Analysis seeds KT but has no preceding forecast interval to store.
+                            if timestamp == run { continue }
                         }
                         // UKMO provides freezing level as AGL. Convert to ASL
                         if variable == .freezing_level_height {

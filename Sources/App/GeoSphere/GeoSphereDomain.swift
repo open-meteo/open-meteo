@@ -22,10 +22,6 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
         return 1
     }
 
-    var hasYearlyFiles: Bool {
-        return false
-    }
-
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }

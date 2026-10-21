@@ -53,6 +53,7 @@ struct DwdSisDownloader: AsyncCommand {
         let lastTimestampFile = timestampFile
         logger.info("Downloading \(availableRuns.count) available steps from \(availableRuns.first!.iso8601_YYYY_MM_dd_HH_mm) to \(availableRuns.last!.iso8601_YYYY_MM_dd_HH_mm)")
         let handles = try await availableRuns.asyncFlatMap { run -> [GenericVariableHandle] in
+            Process.alarm(seconds: 10*60 - 5)
             return try await downloadRun(application: context.application, run: run, domain: domain)
         }
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
@@ -238,9 +239,6 @@ enum DwdSisDomain: String, CaseIterable, GenericDomain {
         return 10*60
     }
     
-    var hasYearlyFiles: Bool {
-        return false
-    }
     
     var masterTimeRange: Range<Timestamp>? {
         return nil

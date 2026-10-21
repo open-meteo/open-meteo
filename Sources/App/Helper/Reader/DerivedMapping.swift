@@ -10,7 +10,12 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
     
     case direct(Variable)
+    /// Resolve soil type lazily; prefetch only the moisture dependency.
+    /// Requires static soil types encoded using the ERA5 classification.
+    case soilMoistureIndex(RawOrMapped)
     case directShift24Hour(Variable)
+    /// Analytical extrema over each backwards-looking output interval.
+    case hermiteIntervalExtrema(Variable, minimum: Bool)
     /// Read additional samples before the requested range and return a trailing mean aligned to the request.
     case runningMean(Variable, windowSeconds: Int, maximumStepSeconds: Int)
     //case independent((TimerangeDtAndSettings) -> DataAndUnit)
@@ -166,6 +171,16 @@ extension TimerangeDt {
     }
 }
 
+private extension GenericReaderBaseProtocol {
+    func getEra5SoilType() async throws -> SoilTypeEra5? {
+        guard let soilType = try await getStatic(type: .soilType) else {
+            throw ForecastApiError.generic(message: "Could not read soil type")
+        }
+        guard soilType.isFinite else { return nil }
+        return SoilTypeEra5(rawValue: Int(soilType))
+    }
+}
+
 protocol GenericDeriverProtocol: GenericReaderOptionalProtocol {
     associatedtype Reader: GenericReaderProtocol
     
@@ -238,10 +253,20 @@ extension GenericDeriverProtocol {
     
     fileprivate func get(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
+        case .soilMoistureIndex(let input):
+            guard let type = try await reader.getEra5SoilType() else {
+                return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
+            }
+            let moisture = try await get(mapping: input, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(moisture.data), .fraction)
         case .direct(let variable):
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, let minimum):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            let input = try await reader.get(variable: variable, time: time.with(time: readTime))
+            return DataAndUnit(HermiteIntervalExtrema.calculate(data: input.data, time: readTime, output: time.time, minimum: minimum), input.unit)
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             let input = try await reader.get(variable: input, time: time.with(time: readTime))
@@ -312,10 +337,15 @@ extension GenericDeriverProtocol {
     
     fileprivate func prefetchData(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws {
         switch variable {
+        case .soilMoistureIndex(let input):
+            try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, _):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            try await prefetchData(variable: variable, time: time.with(time: readTime))
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             try await prefetchData(variable: input, time: time.with(time: readTime))
@@ -424,10 +454,20 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func get(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         switch variable {
+        case .soilMoistureIndex(let input):
+            guard let type = try await reader.getEra5SoilType() else {
+                return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
+            }
+            guard let moisture = try await get(mapping: input, time: time) else { return nil }
+            return DataAndUnit(type.calculateSoilMoistureIndex(moisture.data), .fraction)
         case .direct(let variable):
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, let minimum):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            guard let input = try await reader.get(variable: variable, time: time.with(time: readTime)) else { return nil }
+            return DataAndUnit(HermiteIntervalExtrema.calculate(data: input.data, time: readTime, output: time.time, minimum: minimum), input.unit)
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             guard let input = try await get(variable: input, time: time.with(time: readTime)) else {
@@ -514,10 +554,15 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func prefetchData(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> Bool {
         switch variable {
+        case .soilMoistureIndex(let input):
+            return try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .hermiteIntervalExtrema(let variable, _):
+            let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
+            return try await prefetchData(variable: variable, time: time.with(time: readTime))
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
             return try await prefetchData(variable: input, time: time.with(time: readTime))

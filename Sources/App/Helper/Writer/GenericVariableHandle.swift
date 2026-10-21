@@ -69,8 +69,7 @@ struct GenericVariableHandle: Sendable {
                 logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
 
-            /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
-            if generateTimeSeries, writeUpdateJson, let run, handles.contains(where: { ["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane", "shortwave_radiation"].contains($0.variable.omFileName.file) }) {
+            if generateTimeSeries, writeUpdateJson, let run {
                 let end = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.add(domain.dtSeconds) ?? Timestamp(0)
 
                 // let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
@@ -491,9 +490,16 @@ actor GribDeaverager {
     
     /// Returns false if step should be skipped
     func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, array2d: inout Array2D) async -> Bool {
+        if stepType != "accum" && stepType != "avg" { return true }
+        guard let (start, end) = stepRange.splitTo2Integer() else { return false }
+        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, startStep: start, currentStep: end, array2d: &array2d)
+    }
+
+    /// Numeric intervals must use the same unit for every step of a variable/member stream.
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, startStep: Int, currentStep: Int, array2d: inout Array2D) async -> Bool {
         // Deaccumulate precipitation
         if stepType == "accum" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
+            guard startStep != currentStep else {
                 return false
             }
             // Store data for next timestep
@@ -508,7 +514,7 @@ actor GribDeaverager {
 
         // Deaverage data
         if stepType == "avg" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
+            guard startStep != currentStep else {
                 return false
             }
             // Store data for next timestep

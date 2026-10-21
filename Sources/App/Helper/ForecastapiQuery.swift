@@ -222,11 +222,11 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     }
 
     func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient, run: run)
     }
 
     func readerOptions(for request: Request, allowRemoteArchive: Bool) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil)
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil, run: run)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps
@@ -511,7 +511,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let forecastSteps = forecastSteps ?? forecastStepsDefault
 
         if forecastSteps < 0 || forecastSteps > forecastStepsMax {
-            throw ForecastApiError.forecastDaysInvalid(given: forecastStepsMax, allowed: 0...forecastStepsMax)
+            throw ForecastApiError.forecastDaysInvalid(given: forecastSteps, allowed: 0...forecastStepsMax)
         }
         if pastSteps < 0 || pastSteps > pastStepsMax {
             throw ForecastApiError.pastDaysInvalid(given: pastSteps, allowed: 0...pastStepsMax)

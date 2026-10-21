@@ -136,6 +136,7 @@ struct NbmDownload: AsyncCommand {
             return elevation
         }()
 
+        let solarConverter = InstantaneousSolarRadiationConverter<NbmSurfaceVariable>()
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading forecastHour \(forecastHour)")
@@ -174,13 +175,10 @@ struct NbmDownload: AsyncCommand {
 
                 // NBM contains instantanous values for solar flux. Convert it to backwards averaged.
                 if let variable = variable.variable as? NbmSurfaceVariable, variable == .shortwave_radiation {
-                    let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                    for i in grib2d.array.data.indices {
-                        if factor.data[i] < 0.05 {
-                            continue
-                        }
-                        grib2d.array.data[i] /= factor.data[i]
-                    }
+                    grib2d.array.data = await solarConverter.convert(data: grib2d.array.data, variable: variable, member: 0,
+                        grid: domain.grid, time: timestamp, dtSeconds: domain.dtSeconds)
+                    // Analysis seeds KT but has no preceding forecast interval to store.
+                    if timestamp == run { continue }
                 }
 
                 // Scaling before compression with scalefactor
