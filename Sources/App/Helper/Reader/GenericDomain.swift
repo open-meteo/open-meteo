@@ -36,9 +36,6 @@ protocol GenericDomain: Sendable {
     /// Whether to generate regular database ./data
     var generateTimeSeries: Bool { get }
 
-    /// Require a representative variable before updating time-series metadata, excluding partial upper-level runs.
-    var updateMetaRequiresRepresentativeVariable: Bool { get }
-
     /// Whether metadata exists for the requested run. Invalid metadata must throw.
     func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool
 }
@@ -56,8 +53,6 @@ extension GenericDomain {
         return true
     }
 
-    var updateMetaRequiresRepresentativeVariable: Bool { true }
-    
     var dtHours: Int { dtSeconds / 3600 }
 
     /// Temporary directory to download data

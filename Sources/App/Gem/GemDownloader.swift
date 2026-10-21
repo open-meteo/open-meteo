@@ -86,12 +86,14 @@ struct GemDownload: AsyncCommand {
         let variablesDefault = domain == .gem_global_ensemble ? (signature.upperLevel ? variablesPressure : variablesSurface) : (variablesSurface + variablesPressure)
 
         let variables = onlyVariables ?? variablesDefault
+        // The surface job owns metadata for the ensemble and its generated mean.
+        let writeUpdateJson = domain != .gem_global_ensemble || variables.contains { $0 is GemSurfaceVariable }
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadS3Bucket: signature.uploadS3Bucket, concurrent: signature.concurrent)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
