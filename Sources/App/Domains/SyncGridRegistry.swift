@@ -49,7 +49,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case ecmwf_ifs025
     case ecmwf_ifs04
     case ecmwf_ifs04_ensemble
-    case ecmwf_ifs_analysis
     case ecmwf_ifs_europe_ensemble
     case ecmwf_seas5
     case ecmwf_seas5_12hourly
@@ -84,7 +83,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case nasa_imerg_daily
     case ncep_gefs025
     case ncep_gefs05
-    case ncep_gefswave025
     case ncep_gfs013
     case ncep_gfs025
     case ncep_gfswave016
@@ -194,8 +192,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return .ecmwf_ifs04
         case .ecmwf_ifs04_ensemble:
             return .ecmwf_ifs04_ensemble
-        case .ecmwf_ifs_analysis:
-            return .ecmwf_ifs_analysis
         case .ecmwf_ifs_europe_ensemble:
             return .ecmwf_ifs_europe_ensemble
         case .ecmwf_seas5:
@@ -260,8 +256,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return .ncep_gefs025
         case .ncep_gefs05:
             return .ncep_gefs05
-        case .ncep_gefswave025:
-            return .ncep_gefswave025
         case .ncep_gfs013:
             return .ncep_gfs013
         case .ncep_gfs025:
@@ -355,13 +349,13 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360 / 900, dy: 180 / 450)
         case .ecmwf_ifs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360 / 1440, dy: 180 / (721 - 1))
-        case .copernicus_era5, .ncep_gfs025, .ncep_gefs025, .ncep_gefswave025, .meteofrance_arpege_world025:
+        case .copernicus_era5, .ncep_gfs025, .ncep_gefs025, .meteofrance_arpege_world025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .copernicus_era5_ocean, .copernicus_era5_ensemble, .cmc_gem_geps, .ncep_gefs05, .jma_gsm:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .copernicus_cerra:
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50, radius: 6371229))
-        case .ecmwf_ifs, .ecmwf_ifs_analysis, .ecmwf_wam:
+        case .ecmwf_ifs, .ecmwf_wam:
             return GaussianGrid(type: .o1280)
         case .cmc_gem_gdps, .cmc_gem_gdps_15km:
             return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
