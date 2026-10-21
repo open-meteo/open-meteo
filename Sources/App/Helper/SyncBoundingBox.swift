@@ -5,23 +5,19 @@ import OmFileIO
 import Logging
 import Synchronization
 
-/// Grid cells that `sync --bbox` keeps: the cells inside the box, widened by the grid search radius plus one.
-/// Compressed chunks of a weather variable file that hold none of them are written as NaN, so the API returns null outside the box.
+/// Grid cells that `sync --bbox` keeps: the cells whose centres lie inside the box.
+/// Compressed chunks of a weather variable file that hold none of them are written as NaN, so the API returns null for those chunks.
 struct SyncBoundingBox: Sendable {
     /// `ny * nx` flags in grid order
     let cells: [Bool]
     let nx: Int
 
     init(grid: any Gridable, box: BoundingBoxWGS84) throws {
-        /// Native icosahedral grids store all points in one row without neighbours to widen by
-        guard grid.ny > 1 || grid is GaussianGrid else {
-            throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
-        }
         let inside = Self.cells(grid: grid, box: box)
         guard inside.contains(true) else {
             throw ForecastApiError.generic(message: "the box holds no cell of this grid")
         }
-        self.init(cells: Self.widen(cells: inside, grid: grid), nx: grid.nx)
+        self.init(cells: inside, nx: grid.nx)
     }
 
     init(cells: [Bool], nx: Int) {
@@ -40,34 +36,6 @@ struct SyncBoundingBox: Sendable {
             let (lat, lon) = grid.getCoordinates(gridpoint: $0)
             return box.latitude.contains(lat) && box.longitude.contains(wrapped(longitude: lon))
         }
-    }
-
-    /// The API searches around the nearest cell, which may lie outside the box, so keep every cell within the search radius plus one of a kept cell
-    static func widen(cells: [Bool], grid: any Gridable) -> [Bool] {
-        let r = grid.searchRadius + 1
-        var wide = cells
-        for i in cells.indices where cells[i] {
-            if let gaussian = grid as? GaussianGrid {
-                /// A Gaussian grid stores its latitude rings one after another in one row. Rings have different point counts,
-                /// so take the point at the same longitude in each neighbouring ring, then `r` points either side
-                let (y, x, points) = gaussian.type.getPos(gridpoint: i)
-                for ring in max(0, y - r) ..< min(2 * gaussian.type.latitudeLines, y + r + 1) {
-                    let ringPoints: Int = gaussian.nxOf(y: ring)
-                    let centre = Int((Double(x) * Double(ringPoints) / Double(points)).rounded())
-                    for k in 0 ..< min(2 * r + 1, ringPoints) {
-                        wide[gaussian.integral(y: ring) + ((centre + k - r) % ringPoints + ringPoints) % ringPoints] = true
-                    }
-                }
-            } else {
-                let (y, x) = i.quotientAndRemainder(dividingBy: grid.nx)
-                for yy in max(0, y - r) ..< min(grid.ny, y + r + 1) {
-                    for xx in max(0, x - r) ..< min(grid.nx, x + r + 1) {
-                        wide[yy * grid.nx + xx] = true
-                    }
-                }
-            }
-        }
-        return wide
     }
 
     /// One flag per chunk in chunk order (last dimension fastest): true if the chunk holds a kept cell. Nil if the dimensions are not the grid.

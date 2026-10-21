@@ -63,7 +63,7 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "year", help: "Download one year or a range of years (e.g. 2000-2005)")
         var year: String?
 
-        @Option(name: "bbox", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks outside the box widened by the grid search radius plus one cell are written as NaN")
+        @Option(name: "bbox", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
         var bbox: String?
     }
 
@@ -181,7 +181,7 @@ struct SyncCommand: AsyncCommand {
         /// The digital elevation model has no grid and only static files, which are copied whole
         let keep: SyncBoundingBox?
         if let bbox, model != .copernicus_dem90 {
-            guard model.nativeDefinition == nil, let grid = try await model.getDomain()?.grid else {
+            guard let grid = try await model.getDomain()?.grid else {
                 throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
             }
             keep = try SyncBoundingBox(grid: grid, box: bbox)

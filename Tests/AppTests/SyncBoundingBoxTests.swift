@@ -3,6 +3,7 @@ import Foundation
 import OmFileFormat
 import Testing
 import Logging
+import ReducedLatLon
 
 @Suite struct SyncBoundingBoxTests {
     /// 15 x 12 cells of one degree, south-west corner at 0N 0E
@@ -27,54 +28,40 @@ import Logging
         return (kept.map(\.quotient).min()! ... kept.map(\.quotient).max()!, kept.map(\.remainder).min()! ... kept.map(\.remainder).max()!)
     }
 
-    @Test func cellsInsideAreWidenedByTheSearchRadiusPlusOne() throws {
+    @Test func keepsOnlyCellsInsideTheBox() throws {
         let box = BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5)
         let inside = SyncBoundingBox.cells(grid: grid, box: box)
         #expect(inside.filter { $0 }.count == 4)
         let keep = try SyncBoundingBox(grid: grid, box: box)
-        /// Rows 5 and 6, columns 7 and 8, two cells further each way
+        /// Rows 5 and 6, columns 7 and 8, regardless of the grid search radius
         let (rows, columns) = bounds(keep)
-        #expect(rows == 3 ... 8 && columns == 5 ... 10)
-        #expect(keep.cells.filter { $0 }.count == 36)
+        #expect(rows == 5 ... 6 && columns == 7 ... 8)
+        #expect(keep.cells.filter { $0 }.count == 4)
     }
 
     @Test func boxPartlyOutsideKeepsTheCellsInside() throws {
         let edges = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: -20 ..< 0.5, longitude: 13.5 ..< 40))
         let (rows, columns) = bounds(edges)
-        #expect(rows == 0 ... 2 && columns == 12 ... 14)
+        #expect(rows == 0 ... 0 && columns == 14 ... 14)
         #expect(throws: (any Error).self) {
             try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 50 ..< 60, longitude: 50 ..< 60))
         }
-        /// Native grids hold all points in one row
-        #expect(throws: (any Error).self) {
-            try SyncBoundingBox(grid: RegularGrid(nx: 100, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1), box: BoundingBoxWGS84(latitude: 0 ..< 1, longitude: 0 ..< 1))
-        }
     }
 
-    /// Rings of the n160 Gaussian grid, the smallest one, have different point counts
-    @Test func gaussianCellsWidenAlongRings() throws {
-        let gaussian = GaussianGrid(type: .n160)
-        let box = BoundingBoxWGS84(latitude: 45 ..< 48, longitude: 5 ..< 11)
-        let inside = SyncBoundingBox.cells(grid: gaussian, box: box)
-        let cells = try SyncBoundingBox(grid: gaussian, box: box).cells
-        var found = [Int: ClosedRange<Int>](), kept = [Int: ClosedRange<Int>]()
-        for i in inside.indices {
-            let (y, x, _) = gaussian.type.getPos(gridpoint: i)
-            if inside[i] {
-                #expect(cells[i])
-                found[y] = min(found[y]?.lowerBound ?? x, x) ... max(found[y]?.upperBound ?? x, x)
-            }
-            if cells[i] {
-                kept[y] = min(kept[y]?.lowerBound ?? x, x) ... max(kept[y]?.upperBound ?? x, x)
-            }
-        }
-        /// Two rings north and south, and at least two points either side along each ring. Neighbouring rings may widen a ring further
-        let rings = try #require(found.keys.min()) ... (try #require(found.keys.max()))
-        #expect(Set(kept.keys) == Set(rings.lowerBound - 2 ... rings.upperBound + 2))
-        for (y, x) in found {
-            let keptX = try #require(kept[y])
-            #expect(keptX.lowerBound <= x.lowerBound - 2 && keptX.upperBound >= x.upperBound + 2)
-        }
+    @Test func nativeGridKeepsOnlyCellsInsideTheBox() async throws {
+        let fixture = try makeFixture(centers: [
+            ReducedLatLonPoint(latitudeDegrees: 20, longitudeDegrees: 20),
+            ReducedLatLonPoint(latitudeDegrees: 5, longitudeDegrees: 5),
+            ReducedLatLonPoint(latitudeDegrees: -20, longitudeDegrees: -20),
+            ReducedLatLonPoint(latitudeDegrees: 6, longitudeDegrees: 6)
+        ])
+        defer { fixture.remove() }
+        let grid = IconNativeGrid(storage: fixture.index, resolutionMeters: 1000,
+            maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
+        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 0..<10, longitude: 0..<10))
+        #expect(keep.cells == [false, true, false, true])
+        try await copyAndCheck(keep: keep, dims: [1, 4, 5], chunks: [1, 1, 2], cell: { $0[1] })
+        try await copyAndCheck(keep: keep, dims: [4, 5], chunks: [1, 2], cell: { $0[0] })
     }
 
     @Test func takeChunksFollowsTheGridWhateverTheOtherDimensions() throws {
@@ -193,9 +180,9 @@ import Logging
 
     @Test func keepsChunksInsideBoxAndNaNElsewhere() async throws {
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
-        /// Time chunks of 2 over 5 values: the last chunk is smaller. Rows 3..<9 and columns 5..<11 widen to chunk rows 1..<5 and chunk columns 1..<4
+        /// Time chunks of 2 over 5 values: the last chunk is smaller. Rows 5 and 6 occupy chunk rows 2 and 3; columns 7 and 8 share chunk column 2
         let kept = try await copyAndCheck(keep: keep, dims: [12, 15, 5], chunks: [2, 3, 2], cell: { $0[0] * 15 + $0[1] }, modificationTime: Timestamp(1_600_000_000))
-        #expect(kept == 4 * 3 * 3)
+        #expect(kept == 2 * 1 * 3)
     }
 
     @Test func ensembleFilesKeepTheirMembers() async throws {
@@ -209,7 +196,7 @@ import Logging
         let keep = try SyncBoundingBox(grid: gaussian, box: BoundingBoxWGS84(latitude: 45 ..< 48, longitude: 5 ..< 11))
         /// One run of kept chunks per ring, far apart in the file
         let kept = try await copyAndCheck(keep: keep, dims: [1, gaussian.nx, 2], chunks: [1, 100, 2], cell: { $0[1] })
-        #expect(kept > 7 && kept < 40)
+        #expect(kept > 0 && kept < 40)
     }
 
     /// Legacy files store `[ny * nx, time]` as a flat 2D array
