@@ -52,7 +52,7 @@ extension GenericDomain {
     var generateTimeSeries: Bool {
         return true
     }
-
+    
     var dtHours: Int { dtSeconds / 3600 }
 
     /// Temporary directory to download data

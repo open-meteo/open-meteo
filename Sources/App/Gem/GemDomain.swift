@@ -18,7 +18,6 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_hrdps_west
     case gem_global_ensemble
     case gem_global_ensemble_mean
-
     
     var ensembleMeanDomain: Self? {
         switch self {

@@ -487,7 +487,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     case msm
     case msm_upper_level
 
-
     var domainRegistry: DomainRegistry {
         switch self {
         case .gsm:
