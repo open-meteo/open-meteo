@@ -1,17 +1,7 @@
-/// An initialized native domain retaining its grid mapping and decoded elevations until restart.
+/// Weather-domain metadata paired with an already loaded native grid.
 struct IconNativeDomain: GenericDomain, CustomStringConvertible {
     let definition: IconNativeDomains
     let grid: any Gridable
-
-    init(definition: IconNativeDomains, nativeGrid: IconNativeGrid) {
-        self.definition = definition
-        self.grid = nativeGrid
-    }
-
-    init(definition: IconNativeDomains) async throws {
-        self.definition = definition
-        self.grid = try await definition.asyncGridRegistry.load()
-    }
 
     var description: String { definition.rawValue }
     var domainRegistry: DomainRegistry { definition.domainRegistry }

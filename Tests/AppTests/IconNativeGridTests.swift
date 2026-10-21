@@ -53,8 +53,8 @@ import Testing
             maximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
             nearbyMaximumChordDistanceSquared: fixture.maximumChordDistanceSquared,
             elevations: elevations)
-        let domain = IconNativeDomain(definition: .iconD2Native, nativeGrid: grid)
-        let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
+        let domain = IconNativeDomain(definition: .iconD2Native, grid: grid)
+        let quarterHourly = IconNativeDomain(definition: .iconD2Native15min, grid: grid)
         #expect((try #require(domain.grid as? IconNativeGrid)).storage === (try #require(quarterHourly.grid as? IconNativeGrid)).storage)
         #expect((try #require(domain.grid as? IconNativeGrid)).elevations === (try #require(quarterHourly.grid as? IconNativeGrid)).elevations)
         #expect(domain.dtSeconds == 3600)
@@ -89,19 +89,22 @@ import Testing
         }
     }
 
-    @Test func installedGridSurvivesFailedRevalidation() throws {
+    @Test func installedGridSurvivesFailedRevalidation() async throws {
         let fixture = try makeGlobalFixture()
         defer { fixture.remove() }
         let file = IconNativeGridFile(localFile: fixture.file.path, identity: makeIdentity(fixture))
-        #expect(file.cache.get() == nil)
-        try file.validateFileAndInstall()
-        let installed = try #require(file.cache.get())
+        let loader = IconNativeGridLoader()
+        let installed = try file.validateFile()
+        await loader.installGeometry(installed, for: .dwd_icon_global_native)
 
         try Data(Data(contentsOf: fixture.file).dropLast()).write(to: fixture.file, options: .atomic)
         #expect(throws: IconNativeDomainError.self) {
-            try file.validateFileAndInstall()
+            _ = try file.validateFile()
         }
-        #expect(file.cache.get() === installed)
+        let grid = try await loader.loadGeometry(grid: .dwd_icon_global_native)
+        #expect(grid.storage === installed)
+        await loader.installGeometry(fixture.grid.storage, for: .dwd_icon_global_native)
+        #expect(try await loader.loadGeometry(grid: .dwd_icon_global_native).storage === installed)
         #expect(installed.point(at: 0) == fixture.centers[0])
     }
 
@@ -129,7 +132,6 @@ import Testing
                 _ = try await file.load(file: DataAsClass(data: bytes))
             }
             #expect(try Data(contentsOf: published) == bytes)
-            #expect(file.cache.get() == nil)
         }
     }
 
