@@ -66,7 +66,7 @@ struct EumetnetDownloader: AsyncCommand {
         }
 
         if let runStr = signature.run {
-            let run = try Timestamp.fromRunHourOrYYYYMMDD(runStr)
+            let run = try Timestamp.fromRunHourOrYYYYMMDD(runStr.replacingOccurrences(of: "T", with: ""))
             let handles = try await downloadRun(application: context.application, run: run, domain: domain, uploadS3Bucket: nil)
             try await GenericVariableHandle.convert(
                 application: context.application,
