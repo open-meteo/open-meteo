@@ -317,7 +317,7 @@ import OpenMeteoSdk
     }
 
     @Test func exactGridAndRotation() {
-        let grid = NcepRrfsDomain.ncep_rrfs_conus.conusGrid
+        let grid = SyncGridRegistry.ncepRrfsConusGrid
         #expect(grid.nx == 1799 && grid.ny == 1059)
         #expect(grid.dx == 3000 && grid.dy == 3000)
         let origin = grid.getCoordinates(gridpoint: 0)
@@ -330,7 +330,7 @@ import OpenMeteoSdk
 
     @Test func northAmericaGridAndMapping() async throws {
         let domain = NcepRrfsDomain.ncep_rrfs_north_america
-        let grid = domain.northAmericaGrid
+        let grid = SyncGridRegistry.ncepRrfsNorthAmericaGrid
         #expect(grid.nx == 1127 && grid.ny == 683 && grid.count == 769741)
         #expect(domain.gridRegistry.staticDomain == .ncep_rrfs_north_america)
         #expect(domain.forecastHours == 0...84)
