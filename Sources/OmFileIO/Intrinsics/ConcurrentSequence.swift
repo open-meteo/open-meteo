@@ -1,5 +1,19 @@
 import Collections
 
+/// Shared ownership makes dropping an iterator cancel its unconsumed work.
+private final class PendingTasks<R: Sendable> {
+    var tasks = Deque<Task<R, any Error>>()
+
+    func cancelAll() {
+        for task in tasks { task.cancel() }
+        tasks.removeAll()
+    }
+
+    deinit {
+        for task in tasks { task.cancel() }
+    }
+}
+
 /// Execute an async mapping function over a Sequence concurrently
 public struct ConcurrentAsyncMapSequence<T: Sequence, R>: AsyncSequence where T.Element: Sendable, R: Sendable {
     public typealias Element = R
@@ -9,47 +23,40 @@ public struct ConcurrentAsyncMapSequence<T: Sequence, R>: AsyncSequence where T.
     let nConcurrent: Int
 
     public struct AsyncIterator: AsyncIteratorProtocol {
-        /// Collect enough bytes to decompress a single message
         var iterator: T.Iterator
-        /// nil on startup, empty if all tasks have been completed
-        var tasks: Deque<Task<R, any Error>>? = nil
-        let fn: @Sendable (T.Element) async throws -> (R)
+        private let pending = PendingTasks<R>()
+        let fn: @Sendable (T.Element) async throws -> R
         let nConcurrent: Int
 
-        fileprivate init(iterator: T.Iterator, nConcurrent: Int, fn: @Sendable @escaping (T.Element) async throws -> (R)) {
+        fileprivate init(iterator: T.Iterator, nConcurrent: Int, fn: @Sendable @escaping (T.Element) async throws -> R) {
             self.iterator = iterator
             self.fn = fn
             self.nConcurrent = nConcurrent
         }
 
         mutating public func next() async throws -> R? {
-            if tasks == nil {
-                // fill initial task list
-                var tasks = Deque<Task<R, any Error>>(minimumCapacity: nConcurrent)
-                for _ in 0..<nConcurrent {
-                    guard let next = iterator.next() else {
-                        break
-                    }
-                    tasks.append(Task { [fn] in
-                        return try await fn(next)
+            do {
+                try Task.checkCancellation()
+                // Refill when the consumer asks for a result, not before yielding the previous one.
+                // This bounds pending results plus the consumer's current result to nConcurrent.
+                while pending.tasks.count < nConcurrent, let element = iterator.next() {
+                    pending.tasks.append(Task { [fn] in
+                        try Task.checkCancellation()
+                        return try await fn(element)
                     })
                 }
-                self.tasks = tasks
-            }
-            guard tasks?.isEmpty == false else {
-                return nil // all tasks completed
-            }
-            let result = try await tasks?.removeFirst().value
-            if tasks?.count == nConcurrent - 1 {
-                guard let next = iterator.next() else {
-                    return result
+                guard let task = pending.tasks.popFirst() else { return nil }
+                let result = try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
                 }
-                let task = Task { [fn] in
-                    return try await fn(next)
-                }
-                tasks?.append(task)
+                try Task.checkCancellation()
+                return result
+            } catch {
+                pending.cancelAll()
+                throw error
             }
-            return result
         }
     }
 
@@ -83,47 +90,40 @@ public struct ConcurrentMapSequence<T: Sequence, R>: AsyncSequence where T.Eleme
     let nConcurrent: Int
 
     public struct AsyncIterator: AsyncIteratorProtocol {
-        /// Collect enough bytes to decompress a single message
         var iterator: T.Iterator
-        /// nil on startup, empty if all tasks have been completed
-        var tasks: Deque<Task<R, any Error>>? = nil
-        let fn: @Sendable (T.Element) throws -> (R)
+        private let pending = PendingTasks<R>()
+        let fn: @Sendable (T.Element) throws -> R
         let nConcurrent: Int
 
-        fileprivate init(iterator: T.Iterator, nConcurrent: Int, fn: @Sendable @escaping (T.Element) throws -> (R)) {
+        fileprivate init(iterator: T.Iterator, nConcurrent: Int, fn: @Sendable @escaping (T.Element) throws -> R) {
             self.iterator = iterator
             self.fn = fn
             self.nConcurrent = nConcurrent
         }
 
         mutating public func next() async throws -> R? {
-            if tasks == nil {
-                // fill initial task list
-                var tasks = Deque<Task<R, any Error>>(minimumCapacity: nConcurrent)
-                for _ in 0..<nConcurrent {
-                    guard let next = iterator.next() else {
-                        break
-                    }
-                    tasks.append(Task { [fn] in
-                        return try fn(next)
+            do {
+                try Task.checkCancellation()
+                // Refill when the consumer asks for a result, not before yielding the previous one.
+                // This bounds pending results plus the consumer's current result to nConcurrent.
+                while pending.tasks.count < nConcurrent, let element = iterator.next() {
+                    pending.tasks.append(Task { [fn] in
+                        try Task.checkCancellation()
+                        return try fn(element)
                     })
                 }
-                self.tasks = tasks
-            }
-            guard tasks?.isEmpty == false else {
-                return nil // all tasks completed
-            }
-            let result = try await tasks?.removeFirst().value
-            if tasks?.count == nConcurrent - 1 {
-                guard let next = iterator.next() else {
-                    return result
+                guard let task = pending.tasks.popFirst() else { return nil }
+                let result = try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
                 }
-                let task = Task { [fn] in
-                    return try fn(next)
-                }
-                tasks?.append(task)
+                try Task.checkCancellation()
+                return result
+            } catch {
+                pending.cancelAll()
+                throw error
             }
-            return result
         }
     }
 
