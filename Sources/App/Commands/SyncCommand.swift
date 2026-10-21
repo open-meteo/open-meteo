@@ -1,7 +1,7 @@
 import Foundation
+import AsyncHTTPClient
 import Vapor
 import OmFileIO
-import Synchronization
 
 /**
 Download the open-meteo weather database from a S3 server.
@@ -236,87 +236,84 @@ struct SyncCommand: AsyncCommand {
         let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
         logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
         let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
-        /// With a mask, a failed file is logged and the other files of the model still run. The model then fails with the first error
-        let firstFailure = Mutex<(any Error)?>(nil)
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
-            do {
-                var request = ClientRequest(url: URI("\(server)\(download.name)"))
-                if apikey != nil {
-                    try request.query.encode(S3DataController.DownloadParams(apikey: apikey))
+            var request = ClientRequest(url: URI("\(server)\(download.name)"))
+            if apikey != nil {
+                try request.query.encode(S3DataController.DownloadParams(apikey: apikey))
+            }
+            let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
+            let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
+            let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
+            try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
+            // Another process might be updating this file right now. E.g. Second sync operation
+            FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
+            if localFile.hasSuffix("/meta.json") {
+                let body = try await client.executeRetryAndCollect(.init(url: request.url.string), logger: logger, upTo: 2*1024*1024, deadline: .minutes(5))
+                await progress.add(body.readableBytes)
+                guard let json = try body.readJSONDecodable(ModelUpdateMetaJson.self) else {
+                    logger.error("Not a valid ModelUpdateMetaJson \(pathNoData)")
+                    return
                 }
-                let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
-                let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
-                let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
-                try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-                // Another process might be updating this file right now. E.g. Second sync operation
-                FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
-                if localFile.hasSuffix("/meta.json") {
-                    let body = try await client.executeRetryAndCollect(.init(url: request.url.string), logger: logger, upTo: 2*1024*1024, deadline: .minutes(5))
-                    await progress.add(body.readableBytes)
-                    guard let json = try body.readJSONDecodable(ModelUpdateMetaJson.self) else {
-                        logger.error("Not a valid ModelUpdateMetaJson \(pathNoData)")
+                /// Update the `last_run_availability_time` within meta.json
+                try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
+            } else {
+                // Static files are copied whole and skip the remote metadata reads.
+                if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
+                    // The server reads the API key from the URL query.
+                    let object = download.name + (request.url.query.map { "?\($0)" } ?? "")
+                    if let fetched = try await downloadBoundingBox(keep: keep, endpoint: endpoint, object: object, download: download, localFile: localFile, logger: logger) {
+                        await progress.add(fetched)
                         return
                     }
-                    /// Update the `last_run_availability_time` within meta.json
-                    try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
-                } else {
-                    var loggedTimeout = false
-                    var lastFailure: (any Error)?
-                    for attempt in 0..<10 {
-                        try Task.checkCancellation()
-                        lastFailure = nil
-                        var wholeDownload = false
-                        do {
-                            /// Static files are 2D and copied whole, so they skip the remote header read
-                            if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
-                                /// The API key travels in the URL query like a whole download, because the server reads it only from there
-                                let object = download.name + (request.url.query.map { "?\($0)" } ?? "")
-                                // The listing already contains the metadata. Refresh it only on retries.
-                                let remote = attempt == 0
-                                    ? OmHttpReaderBackend(context: endpoint, object: object, count: download.fileSize, eTag: download.eTag, lastModified: download.modificationTime)
-                                    : try await OmHttpReaderBackend(context: endpoint, object: object)
-                                if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
-                                    await progress.add(fetched)
-                                    break
-                                }
-                            }
-                            wholeDownload = true
-                            let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
-                            /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
-                            try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
-                            await progress.add(try response.contentLength() ?? 0)
-                            break
-                        } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
-                            /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
-                            /// A read with a bounding box has not touched the local file yet, so the API keeps serving it
-                            if wholeDownload {
-                                try FileManager.default.removeItemIfExists(at: localFile)
-                            }
-                            lastFailure = CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
-                        } catch CurlError.timeoutReached where !wholeDownload {
-                            lastFailure = CurlError.timeoutReached
-                            /// A slow range read fails this attempt only, so one slow file does not stop the model
-                            if !loggedTimeout {
-                                logger.warning("Timeout reading \(download.name) with a bounding box, retrying the file")
-                                loggedTimeout = true
-                            }
-                        }
-                    }
-                    if let lastFailure {
-                        throw lastFailure
-                    }
                 }
-            } catch where keep != nil {
-                /// A terminated Job cancels the files in progress, which are not failures
-                try Task.checkCancellation()
-                if error is CancellationError { throw error }
-                logger.error("Sync of \(download.name) failed: \(error)")
-                firstFailure.withLock { $0 = $0 ?? error }
+                let fetched = try await downloadWholeFile(client: client, url: request.url.string, localFile: localFile, logger: logger)
+                await progress.add(fetched)
             }
         }
         await progress.finish()
-        if let failure = firstFailure.withLock({ $0 }) {
-            throw failure
+    }
+
+    /// Restart the complete download if the remote file changes between range requests.
+    private func downloadWholeFile(client: HTTPClient, url: String, localFile: String, logger: Logger) async throws -> Int {
+        var attempts = 0
+        while true {
+            try Task.checkCancellation()
+            attempts += 1
+            do {
+                let response = try await client.executeRetryChunked(.init(url: url), logger: logger)
+                // Download in 8 MiB parts, with four requests in parallel.
+                try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
+                return try response.contentLength() ?? 0
+            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                try FileManager.default.removeItemIfExists(at: localFile)
+                guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }
+            }
+        }
+    }
+
+    /// Returns nil for unsupported files so the caller can download them whole.
+    private func downloadBoundingBox(keep: SyncBoundingBox, endpoint: S3ServerHealth, object: String, download: S3List.ListV2File, localFile: String, logger: Logger) async throws -> Int? {
+        var attempts = 0
+        var loggedTimeout = false
+        while true {
+            try Task.checkCancellation()
+            attempts += 1
+            do {
+                // Use listing metadata initially; refresh it when restarting a failed attempt.
+                let remote = attempts == 1
+                    ? OmHttpReaderBackend(context: endpoint, object: object, count: download.fileSize, eTag: download.eTag, lastModified: download.modificationTime)
+                    : try await OmHttpReaderBackend(context: endpoint, object: object)
+                return try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger)
+            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                // Bbox writes leave the existing local file untouched until they succeed.
+                guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }
+            } catch CurlError.timeoutReached {
+                guard attempts < 10 else { throw CurlError.timeoutReached }
+                if !loggedTimeout {
+                    logger.warning("Timeout reading \(download.name) with a bounding box, retrying the file")
+                    loggedTimeout = true
+                }
+            }
         }
     }
 }
