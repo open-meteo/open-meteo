@@ -119,7 +119,7 @@ import Synchronization
         let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40)
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
-        _ = try await keep.write(remote: backend, to: file, modificationTime: nil, logger: Logger(label: "test"))
+        _ = try await keep.write(remote: backend, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test"))
 
         #expect(await backend.peakConcurrentReads == SyncBoundingBox.maxConcurrentReads)
         #expect(await backend.readsBeforeFirstCompleted == SyncBoundingBox.maxConcurrentReads)
@@ -173,7 +173,7 @@ import Synchronization
         let source = try fixture(values, dimensions: dims.map(UInt64.init), chunks: chunks.map(UInt64.init))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
-        let fetched = try #require(try await keep.write(remote: source, to: file, modificationTime: modificationTime, logger: Logger(label: "test")))
+        let fetched = try #require(try await keep.write(remote: source, url: "https://example.com/test.om", to: file, modificationTime: modificationTime, logger: Logger(label: "test")))
 
         let reader = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: file))))
         let array = try reader.expectArray(of: Float.self)
@@ -232,7 +232,7 @@ import Synchronization
         let secondFile = "\(file).copy"
         defer { try? FileManager.default.removeItem(atPath: secondFile) }
         let keepAll = SyncBoundingBox(selectedCells: [Bool](repeating: true, count: keep.selectedCells.count), nx: keep.nx)
-        #expect(try await keepAll.write(remote: DataAsClass(data: copiedData), to: secondFile, modificationTime: nil, logger: Logger(label: "test")) != nil)
+        #expect(try await keepAll.write(remote: DataAsClass(data: copiedData), url: "https://example.com/test.om", to: secondFile, modificationTime: nil, logger: Logger(label: "test")) != nil)
         let second = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: secondFile)))).expectArray(of: Float.self).read()
         #expect(zip(copy, second).allSatisfy { $0.bitPattern == $1.bitPattern || ($0.isNaN && $1.isNaN) })
         // Metadata block rounding can include payload bytes in small files.
@@ -301,7 +301,7 @@ import Synchronization
         let previous = Data("existing file".utf8)
         try previous.write(to: URL(fileURLWithPath: file))
         await #expect(throws: CurlErrorNonRetry.self) {
-            try await keep.write(remote: backend, to: file, modificationTime: nil, logger: Logger(label: "test"))
+            try await keep.write(remote: backend, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test"))
         }
         #expect(try Data(contentsOf: URL(fileURLWithPath: file)) == previous)
     }
@@ -315,7 +315,7 @@ import Synchronization
         try previous.write(to: URL(fileURLWithPath: file))
         let task = Task {
             withUnsafeCurrentTask { $0?.cancel() }
-            return try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test"))
+            return try await keep.write(remote: source, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test"))
         }
         await #expect(throws: CancellationError.self) { try await task.value }
         #expect(try Data(contentsOf: URL(fileURLWithPath: file)) == previous)
@@ -325,7 +325,7 @@ import Synchronization
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         let other = try fixture([Float](repeating: 1, count: 10 * 15), dimensions: [10, 15], chunks: [4, 5])
-        #expect(try await keep.write(remote: other, to: file, modificationTime: nil, logger: Logger(label: "test")) == nil)
+        #expect(try await keep.write(remote: other, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test")) == nil)
         #expect(FileManager.default.fileExists(atPath: file) == false)
     }
 }

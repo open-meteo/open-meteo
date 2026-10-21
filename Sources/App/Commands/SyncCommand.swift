@@ -261,7 +261,7 @@ struct SyncCommand: AsyncCommand {
                 if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
                     // The server reads the API key from the URL query.
                     let object = download.name + (request.url.query.map { "?\($0)" } ?? "")
-                    if let fetched = try await downloadBoundingBox(keep: keep, endpoint: endpoint, object: object, download: download, localFile: localFile, logger: logger) {
+                    if let fetched = try await downloadBoundingBox(keep: keep, url: request.url.string, endpoint: endpoint, object: object, download: download, localFile: localFile, logger: logger) {
                         await progress.add(fetched)
                         return
                     }
@@ -293,7 +293,7 @@ struct SyncCommand: AsyncCommand {
     }
 
     /// Returns nil for unsupported files so the caller can download them whole.
-    private func downloadBoundingBox(keep: SyncBoundingBox, endpoint: S3ServerHealth, object: String, download: S3List.ListV2File, localFile: String, logger: Logger) async throws -> Int? {
+    private func downloadBoundingBox(keep: SyncBoundingBox, url: String, endpoint: S3ServerHealth, object: String, download: S3List.ListV2File, localFile: String, logger: Logger) async throws -> Int? {
         var attempts = 0
         var loggedTimeout = false
         while true {
@@ -304,7 +304,7 @@ struct SyncCommand: AsyncCommand {
                 let remote = attempts == 1
                     ? OmHttpReaderBackend(context: endpoint, object: object, count: download.fileSize, eTag: download.eTag, lastModified: download.modificationTime)
                     : try await OmHttpReaderBackend(context: endpoint, object: object)
-                return try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger)
+                return try await keep.write(remote: remote, url: url, to: localFile, modificationTime: remote.lastModified, logger: logger)
             } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                 // Bbox writes leave the existing local file untouched until they succeed.
                 guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }

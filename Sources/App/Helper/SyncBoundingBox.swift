@@ -90,7 +90,7 @@ struct SyncBoundingBox: Sendable {
 
     /// Write `remote` to `file` with the compressed bytes of the chunks that hold a kept cell as they are, and the others as NaN.
     /// Returns the bytes fetched from `remote`, or nil and writes nothing if the file is not a float array on this grid with scalar attributes only.
-    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger) async throws -> Int? {
+    func write<Backend: OmFileReaderBackend>(remote: Backend, url: String, to file: String, modificationTime: Timestamp?, logger: Logger) async throws -> Int? {
         try Task.checkCancellation()
         let startTime = DispatchTime.now()
         let remote = CountingBackend(remote)
@@ -164,7 +164,7 @@ struct SyncBoundingBox: Sendable {
         let rate = Int(Double(fetched) / max(elapsed, 0.001))
         let percent = String(format: "%.1f", 100 * Double(fetched) / Double(remote.count))
         let keptChunks = take.reduce(0) { $0 + ($1 ? 1 : 0) }
-        logger.info("Downloaded bbox \(file) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
+        logger.info("Downloaded bbox \(url.stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
         return fetched
     }
 
