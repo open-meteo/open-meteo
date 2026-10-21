@@ -44,13 +44,22 @@ struct SyncBoundingBox: Sendable {
     func takeChunks(layout: OmFileChunkLayout) -> [Bool]? {
         guard let dims = layout.first?.arrayDimensions else { return nil }
         let ny = UInt64(cells.count / nx)
-        let pair = (0 ..< max(0, dims.count - 1)).first { dims[$0] == ny && dims[$0 + 1] == UInt64(nx) }
+        let pairs = (0 ..< max(0, dims.count - 1)).filter { dims[$0] == ny && dims[$0 + 1] == UInt64(nx) }
+        // Dimension sizes alone cannot distinguish multiple matching spatial axes.
+        guard pairs.count <= 1 else { return nil }
+        let pair = pairs.first
         /// Legacy files are exactly `[ny * nx, time]`; any other dimension that happens to equal the cell count is not the grid
         let isLegacyFlat = dims.count == 2 && dims[0] == UInt64(cells.count)
         guard pair != nil || isLegacyFlat else { return nil }
         let xDimension = pair.map { $0 + 1 } ?? 0
+        // Time and member chunks share spatial extents. Scan each extent only once.
+        var spatial = [UInt64: Bool]()
         return layout.map { chunk in
-            chunk.containsCell(yDimension: pair, xDimension: xDimension) { cells[$0] }
+            let firstCell = (pair.map { chunk.offset[$0] * UInt64(nx) } ?? 0) + chunk.offset[xDimension]
+            if let take = spatial[firstCell] { return take }
+            let take = chunk.containsCell(yDimension: pair, xDimension: xDimension) { cells[$0] }
+            spatial[firstCell] = take
+            return take
         }
     }
 
@@ -72,6 +81,7 @@ struct SyncBoundingBox: Sendable {
     /// Write `remote` to `file` with the compressed bytes of the chunks that hold a kept cell as they are, and the others as NaN.
     /// Returns the bytes fetched from `remote`, or nil and writes nothing if the file is not a float array on this grid with scalar attributes only.
     func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, runsInFlight: Int = SyncBoundingBox.runsInFlightTotal) async throws -> Int? {
+        try Task.checkCancellation()
         let remote = CountingBackend(remote)
         let reader = try await OmFileReader(fn: remote)
         /// `chunkIndex()` reads the complete lookup table in one request.
@@ -105,6 +115,7 @@ struct SyncBoundingBox: Sendable {
         let out = try writer.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: chunks, compression: array.compression, scale_factor: array.scaleFactor, add_offset: array.addOffset)
         var run = 0 ..< 0, runStart = 0, taken = 0, data: Backend.DataType?
         for i in take.indices {
+            try Task.checkCancellation()
             guard take[i], !ranges[i].isEmpty else {
                 /// An empty payload appends one zero-byte NaN chunk, including smaller edge chunks.
                 try out.writeCompressedChunk(UnsafeRawBufferPointer(start: nil, count: 0))
@@ -118,7 +129,12 @@ struct SyncBoundingBox: Sendable {
                 }
                 (run, runStart) = (runs[taken].chunks, runs[taken].bytes.lowerBound)
                 taken += 1
-                data = try await pending.removeFirst().value
+                let task = pending.removeFirst()
+                data = try await withTaskCancellationHandler {
+                    try await task.value
+                } onCancel: {
+                    task.cancel()
+                }
                 // A short body would let the slices below read past the buffer, which a release build does not check
                 guard data!.withUnsafeBytes({ $0.count }) == runs[taken - 1].bytes.count else { throw CurlErrorNonRetry.chunkSizeMismatch }
             }
@@ -134,16 +150,16 @@ struct SyncBoundingBox: Sendable {
                 throw CurlError.futimes(error: String(cString: strerror(errno)))
             }
         }
+        try Task.checkCancellation()
         try fn.linkTemporary(file: file)
         return remote.fetched.load(ordering: .relaxed)
     }
 
-    /// Runs of at most 16 MiB, enough for a global file's kept band of 1 MiB-merged rows, because the remote reader allows 10 seconds per range including the wait for a connection
+    /// Bound each read-ahead buffer to 16 MiB, unless a single chunk is larger.
     static let runBytes = 16 * 1024 * 1024
-    /// A range request costs about as much time as reading 1 MiB over one connection to a bucket in another region, so a smaller gap is cheaper to read along.
-    /// A global grid keeps one short segment per row; merging turns the kept band into one or two requests per file.
+    /// Read small gaps between selected chunks to reduce HTTP request overhead.
     static let mergeBytes = 1024 * 1024
-    /// Matches the 8 connections of the shared HTTP client. Files copied at once split this between them (`SyncCommand` passes `max(1, total / concurrent)`), so with up to 8 files the 10 second timeout is not spent waiting for a connection; more files than that keep one range read each
+    /// Read-ahead budget per model, shared between concurrently copied files.
     static let runsInFlightTotal = 8
 }
 

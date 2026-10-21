@@ -24,9 +24,10 @@ extension OmFileChunkLayout.Chunk {
             precondition(width <= UInt64(Int.max), "Grid cell count is out of bounds")
             rows = 0..<1
         }
+        let columns = range(in: xDimension)
         for y in rows {
             let row = y * width
-            for x in range(in: xDimension) {
+            for x in columns {
                 if try predicate(Int(row + x)) {
                     return true
                 }

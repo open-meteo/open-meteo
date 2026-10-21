@@ -4,6 +4,7 @@ import OmFileFormat
 import Testing
 import Logging
 import ReducedLatLon
+@testable import OmFileIO
 
 @Suite struct SyncBoundingBoxTests {
     /// 15 x 12 cells of one degree, south-west corner at 0N 0E
@@ -85,6 +86,7 @@ import ReducedLatLon
         /// A dimension that only equals the cell count is not the grid: time first, or a third dimension
         #expect(try await takeChunks(dims: [5, 180], chunks: [2, 7]) == nil)
         #expect(try await takeChunks(dims: [3, 180, 5], chunks: [1, 7, 3]) == nil)
+        #expect(try await takeChunks(dims: [12, 15, 12, 15], chunks: [2, 3, 2, 3]) == nil)
     }
 
     @Test func chunkCellsUseGlobalIndicesAndStopAtFirstMatch() async throws {
@@ -218,8 +220,8 @@ import ReducedLatLon
 
     @Test func ensembleFilesKeepTheirMembers() async throws {
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
-        try await copyAndCheck(keep: keep, dims: [3, 12, 15, 5], chunks: [1, 2, 3, 5], cell: { $0[1] * 15 + $0[2] })
-        try await copyAndCheck(keep: keep, dims: [12, 15, 3, 5], chunks: [2, 3, 2, 5], cell: { $0[0] * 15 + $0[1] })
+        try await copyAndCheck(keep: keep, dims: [3, 12, 15, 5], chunks: [2, 2, 3, 2], cell: { $0[1] * 15 + $0[2] })
+        try await copyAndCheck(keep: keep, dims: [12, 15, 3, 5], chunks: [2, 3, 2, 2], cell: { $0[0] * 15 + $0[1] })
     }
 
     @Test func gaussianFileKeepsChunksWithAKeptCell() async throws {
@@ -237,11 +239,78 @@ import ReducedLatLon
         #expect(kept > 0)
     }
 
+    @Test func regionalSyncStillChecksSizesOfWholeFiles() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("sync-bbox-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("static"), withIntermediateDirectories: true)
+        let modified = Date(timeIntervalSince1970: 1_700_000_000)
+        let names = ["weather.om", "static/elevation.om", "meta.json", "other.json"]
+        let remote = try names.map { name in
+            let file = directory.appendingPathComponent(name)
+            try Data([1]).write(to: file)
+            try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: file.path)
+            return S3List.ListV2File(name: "data/\(name)", modificationTime: Timestamp(1_700_000_000), fileSize: 2, eTag: "\"etag\"")
+        }
+        let regional = remote.includeFiles(compareLocalDirectory: directory.path + "/", modificationTimeOnly: true)
+        #expect(regional.map(\.name) == ["data/static/elevation.om", "data/other.json"])
+        let whole = remote.includeFiles(compareLocalDirectory: directory.path + "/", modificationTimeOnly: false)
+        #expect(whole.map(\.name) == ["data/weather.om", "data/static/elevation.om", "data/other.json"])
+    }
+
+    @Test func shortChunkReadPreservesExistingFile() async throws {
+        let source = try fixture((0..<900).map(Float.init), dimensions: [12, 15, 5], chunks: [2, 3, 2])
+        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5..<6.5, longitude: 7..<8.5))
+        let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
+        let ranges = try await array.chunkIndex()
+        let take = try #require(try keep.takeChunks(layout: array.chunkLayout()))
+        let firstRun = try #require(SyncBoundingBox.runs(ranges: ranges, take: take, merge: SyncBoundingBox.mergeBytes, max: SyncBoundingBox.runBytes).first)
+        let backend = ShortReadBackend(data: source.data, shortReadOffset: firstRun.bytes.lowerBound)
+        let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        let previous = Data("existing file".utf8)
+        try previous.write(to: URL(fileURLWithPath: file))
+        await #expect(throws: CurlErrorNonRetry.self) {
+            try await keep.write(remote: backend, to: file, modificationTime: nil, logger: Logger(label: "test"))
+        }
+        #expect(try Data(contentsOf: URL(fileURLWithPath: file)) == previous)
+    }
+
+    @Test func cancelledCopyPreservesExistingFile() async throws {
+        let source = try fixture([Float](repeating: 1, count: 900), dimensions: [12, 15, 5], chunks: [2, 3, 2])
+        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5..<6.5, longitude: 7..<8.5))
+        let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        let previous = Data("existing file".utf8)
+        try previous.write(to: URL(fileURLWithPath: file))
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await keep.write(remote: source, to: file, modificationTime: nil, logger: Logger(label: "test"))
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(try Data(contentsOf: URL(fileURLWithPath: file)) == previous)
+    }
+
     @Test func otherLayoutsAreNotWritten() async throws {
         let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         let other = try fixture([Float](repeating: 1, count: 10 * 15), dimensions: [10, 15], chunks: [4, 5])
         #expect(try await keep.write(remote: other, to: file, modificationTime: nil, logger: Logger(label: "test")) == nil)
         #expect(FileManager.default.fileExists(atPath: file) == false)
+    }
+}
+
+private struct ShortReadBackend: OmFileReaderBackend {
+    let data: Data
+    let shortReadOffset: Int
+    var count: Int { data.count }
+
+    func prefetchData(offset: Int, count: Int) async throws {}
+
+    func getData(offset: Int, count: Int) async throws -> Data {
+        data.subdata(in: offset..<(offset + count - (offset == shortReadOffset ? 1 : 0)))
+    }
+
+    func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
+        try await getData(offset: offset, count: count).withUnsafeBytes(fn)
     }
 }

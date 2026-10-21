@@ -198,7 +198,8 @@ struct SyncCommand: AsyncCommand {
         let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
         let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
         
-        let client = HTTPClient.shared
+        // Preserve HTTP/1.1 for Ceph endpoints when listing or downloading whole files.
+        let client = server.contains(".your-objectstorage.com") || server.contains("s3.open-meteo.com") || server.contains("127.0.0.1:7480") ? application.http1Client : application.dedicatedHttpClient
         
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
@@ -259,16 +260,20 @@ struct SyncCommand: AsyncCommand {
                     try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
                 } else {
                     var loggedTimeout = false
-                    /// Error of the last try if it was a masked read. Whole downloads keep falling through after 10 tries as before
-                    var maskedFailure: (any Error)?
-                    for _ in 0..<10 {
-                        maskedFailure = nil
+                    var lastFailure: (any Error)?
+                    for attempt in 0..<10 {
+                        try Task.checkCancellation()
+                        lastFailure = nil
                         var wholeDownload = false
                         do {
                             /// Static files are 2D and copied whole, so they skip the remote header read
                             if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
                                 /// The API key travels in the URL query like a whole download, because the server reads it only from there
-                                let remote = try await OmHttpReaderBackend(context: endpoint, object: download.name + (request.url.query.map { "?\($0)" } ?? ""))
+                                let object = download.name + (request.url.query.map { "?\($0)" } ?? "")
+                                // The listing already contains the metadata. Refresh it only on retries.
+                                let remote = attempt == 0
+                                    ? OmHttpReaderBackend(context: endpoint, object: object, count: download.fileSize, eTag: download.eTag, lastModified: download.modificationTime)
+                                    : try await OmHttpReaderBackend(context: endpoint, object: object)
                                 if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger, runsInFlight: max(1, SyncBoundingBox.runsInFlightTotal / max(1, concurrent))) {
                                     await progress.add(fetched)
                                     break
@@ -285,11 +290,10 @@ struct SyncCommand: AsyncCommand {
                             /// A read with a bounding box has not touched the local file yet, so the API keeps serving it
                             if wholeDownload {
                                 try FileManager.default.removeItemIfExists(at: localFile)
-                            } else {
-                                maskedFailure = CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
                             }
+                            lastFailure = CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
                         } catch CurlError.timeoutReached where !wholeDownload {
-                            maskedFailure = CurlError.timeoutReached
+                            lastFailure = CurlError.timeoutReached
                             /// A slow range read fails this attempt only, so one slow file does not stop the model
                             if !loggedTimeout {
                                 logger.warning("Timeout reading \(download.name) with a bounding box, retrying the file")
@@ -297,12 +301,13 @@ struct SyncCommand: AsyncCommand {
                             }
                         }
                     }
-                    if let maskedFailure {
-                        throw maskedFailure
+                    if let lastFailure {
+                        throw lastFailure
                     }
                 }
             } catch where keep != nil {
                 /// A terminated Job cancels the files in progress, which are not failures
+                try Task.checkCancellation()
                 if error is CancellationError { throw error }
                 logger.error("Sync of \(download.name) failed: \(error)")
                 firstFailure.withLock { $0 = $0 ?? error }
@@ -333,7 +338,7 @@ fileprivate extension URL {
     }
 }
 
-fileprivate extension Array where Element == S3List.ListV2File {
+extension Array where Element == S3List.ListV2File {
     /// Only include files with data newer than a given timestamp. This is based on evaluating the time-chunk in the filename and is not based on the modification time
     func includeFiles(timeRange: Range<Timestamp>, domain registry: DomainRegistry) -> [Element] {
         guard let domain = registry.timeSeriesMetadata else {
@@ -374,7 +379,7 @@ fileprivate extension Array where Element == S3List.ListV2File {
                   let modificationTime = resourceValues.contentModificationDate else {
                 return true
             }
-            if remoteFile.name.contains("meta.json") || modificationTimeOnly {
+            if remoteFile.name.contains("meta.json") || (modificationTimeOnly && remoteFile.name.hasSuffix(".om") && !remoteFile.name.contains("/static/")) {
                 /// meta.json is modified during sync to replace the `last_run_availability_time`.
                 /// Size might be different. Only check for modification time.
                 return remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()
