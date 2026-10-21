@@ -69,8 +69,7 @@ struct GenericVariableHandle: Sendable {
                 logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
 
-            /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
-            if generateTimeSeries, writeUpdateJson, let run, handles.contains(where: { ["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane", "shortwave_radiation"].contains($0.variable.omFileName.file) }) {
+            if generateTimeSeries, writeUpdateJson, let run {
                 let end = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.add(domain.dtSeconds) ?? Timestamp(0)
 
                 // let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)

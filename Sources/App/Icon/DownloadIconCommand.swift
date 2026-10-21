@@ -568,6 +568,10 @@ struct DownloadIconCommand: AsyncCommand {
 
         let logger = context.application.logger
         let generateFullRun = feed.countEnsembleMember == 1
+        // Separate ensemble pressure downloads must not replace surface-run metadata.
+        let isPressureOnlyEnsembleDownload = feed.countEnsembleMember > 1
+            && variables.allSatisfy { $0 is IconPressureVariable }
+        let writeUpdateJson = !isPressureOnlyEnsembleDownload
         try await nativeDomain.prepareNativeGrid(
             application: context.application,
             uploadS3Bucket: signature.uploadS3Bucket
@@ -588,9 +592,9 @@ struct DownloadIconCommand: AsyncCommand {
 
         if let fifteenMinuteDomain = outputs.fifteenMinute {
             // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(application: context.application, domain: fifteenMinuteDomain, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: fifteenMinuteDomain, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: outputs.primary, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: outputs.primary, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }

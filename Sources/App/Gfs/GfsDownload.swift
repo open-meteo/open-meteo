@@ -107,10 +107,17 @@ struct GfsDownload: AsyncCommand {
                 preconditionFailure("Unhandled atmospheric GFS-family domain")
             }
 
+            // The surface job owns GEFS metadata, including the generated ensemble mean.
+            let isPressureOnlyEnsembleDownload = domain == .gfs05_ens && variables.allSatisfy {
+                if case .pressure = $0.downloadField { return true }
+                return false
+            }
+            let writeUpdateJson = !isPressureOnlyEnsembleDownload
+
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
 
             let nConcurrent = signature.concurrent ?? 4
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             let variables: [any GfsVariableDownloadable] = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
