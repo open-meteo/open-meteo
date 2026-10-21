@@ -64,22 +64,53 @@ import ReducedLatLon
         try await copyAndCheck(keep: keep, dims: [4, 5], chunks: [1, 2], cell: { $0[0] })
     }
 
-    @Test func takeChunksFollowsTheGridWhateverTheOtherDimensions() throws {
+    @Test func takeChunksFollowsTheGridWhateverTheOtherDimensions() async throws {
         let keep = SyncBoundingBox(cells: (0 ..< 12 * 15).map { $0 == 4 * 15 + 7 }, nx: 15)
+        func takeChunks(dims: [Int], chunks: [Int]) async throws -> [Bool]? {
+            let source = try fixture([Float](repeating: 0, count: dims.reduce(1, *)), dimensions: dims.map(UInt64.init), chunks: chunks.map(UInt64.init))
+            let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
+            return try keep.takeChunks(layout: array.chunkLayout())
+        }
         /// Chunks of 2 rows and 3 columns: the cell is in chunk row 2 and chunk column 2
         let spatial = (0 ..< 6 * 5).map { $0 == 2 * 5 + 2 }
-        #expect(keep.takeChunks(dims: [12, 15, 5], chunks: [2, 3, 2]) == spatial.flatMap { [Bool](repeating: $0, count: 3) })
+        #expect(try await takeChunks(dims: [12, 15, 5], chunks: [2, 3, 2]) == spatial.flatMap { [Bool](repeating: $0, count: 3) })
         /// Members first, or between the grid and time
-        #expect(keep.takeChunks(dims: [3, 12, 15, 5], chunks: [1, 2, 3, 5]) == (0 ..< 3).flatMap { _ in spatial })
-        #expect(keep.takeChunks(dims: [12, 15, 3, 5], chunks: [2, 3, 2, 5]) == spatial.flatMap { [Bool](repeating: $0, count: 2) })
+        #expect(try await takeChunks(dims: [3, 12, 15, 5], chunks: [1, 2, 3, 5]) == (0 ..< 3).flatMap { _ in spatial })
+        #expect(try await takeChunks(dims: [12, 15, 3, 5], chunks: [2, 3, 2, 5]) == spatial.flatMap { [Bool](repeating: $0, count: 2) })
         /// The flat array of legacy files: cell 67 is in chunk 9 of 7 cells
-        let flat = try #require(keep.takeChunks(dims: [180, 5], chunks: [7, 3]))
+        let flat = try #require(try await takeChunks(dims: [180, 5], chunks: [7, 3]))
         #expect(flat.indices.filter { flat[$0] } == [18, 19])
-        #expect(keep.takeChunks(dims: [12, 14, 5], chunks: [2, 3, 2]) == nil)
-        #expect(keep.takeChunks(dims: [5], chunks: [2]) == nil)
+        #expect(try await takeChunks(dims: [12, 14, 5], chunks: [2, 3, 2]) == nil)
+        #expect(try await takeChunks(dims: [5], chunks: [2]) == nil)
         /// A dimension that only equals the cell count is not the grid: time first, or a third dimension
-        #expect(keep.takeChunks(dims: [5, 180], chunks: [2, 7]) == nil)
-        #expect(keep.takeChunks(dims: [3, 180, 5], chunks: [1, 7, 3]) == nil)
+        #expect(try await takeChunks(dims: [5, 180], chunks: [2, 7]) == nil)
+        #expect(try await takeChunks(dims: [3, 180, 5], chunks: [1, 7, 3]) == nil)
+    }
+
+    @Test func chunkCellsUseGlobalIndicesAndStopAtFirstMatch() async throws {
+        let source = try fixture([Float](repeating: 0, count: 3 * 5 * 2 * 3), dimensions: [3, 5, 2, 3], chunks: [2, 3, 1, 2])
+        let layout = try await OmFileReader(fn: source).expectArray(of: Float.self).chunkLayout()
+        let edge = try #require(layout.last)
+        var visited = [Int]()
+        #expect(!edge.containsCell(yDimension: 0, xDimension: 1) { visited.append($0); return false })
+        #expect(visited == [13, 14])
+        visited.removeAll()
+        #expect(edge.containsCell(yDimension: 0, xDimension: 1) { visited.append($0); return true })
+        #expect(visited == [13])
+        enum Failure: Error { case predicate }
+        #expect(throws: Failure.self) {
+            try edge.containsCell(yDimension: 0, xDimension: 1) { _ in throw Failure.predicate }
+        }
+        visited.removeAll()
+        #expect(!layout[0].containsCell(yDimension: 0, xDimension: 1) { visited.append($0); return false })
+        #expect(visited == [0, 1, 2, 5, 6, 7])
+
+        let flatSource = try fixture([Float](repeating: 0, count: 7 * 3), dimensions: [7, 3], chunks: [3, 2])
+        let flatLayout = try await OmFileReader(fn: flatSource).expectArray(of: Float.self).chunkLayout()
+        let flatEdge = try #require(flatLayout.last)
+        visited.removeAll()
+        #expect(!flatEdge.containsCell(yDimension: nil, xDimension: 0) { visited.append($0); return false })
+        #expect(visited == [6])
     }
 
     @Test func runsJoinCloseChunksAndCapTheirSize() {
@@ -155,7 +186,7 @@ import ReducedLatLon
         let sourceArray = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let sourceIndex = try await sourceArray.chunkIndex()
         let copiedIndex = try await array.chunkIndex()
-        let take = try #require(keep.takeChunks(dims: dims, chunks: chunks))
+        let take = try #require(try keep.takeChunks(layout: array.chunkLayout()))
         let copiedData = try Data(contentsOf: URL(fileURLWithPath: file))
         for i in take.indices {
             if take[i] {

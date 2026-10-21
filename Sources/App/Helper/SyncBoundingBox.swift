@@ -41,28 +41,16 @@ struct SyncBoundingBox: Sendable {
     /// One flag per chunk in chunk order (last dimension fastest): true if the chunk holds a kept cell. Nil if the dimensions are not the grid.
     /// The grid is `[ny, nx]` among the dimensions, e.g. `[ny, nx, time]` or `[member, ny, nx, time]`, or the flat `[ny * nx, time]` of legacy files;
     /// the other dimensions do not matter.
-    func takeChunks(dims: [Int], chunks: [Int]) -> [Bool]? {
-        let ny = cells.count / nx
-        let pair = (0 ..< max(0, dims.count - 1)).first { dims[$0] == ny && dims[$0 + 1] == nx }
+    func takeChunks(layout: OmFileChunkLayout) -> [Bool]? {
+        guard let dims = layout.first?.arrayDimensions else { return nil }
+        let ny = UInt64(cells.count / nx)
+        let pair = (0 ..< max(0, dims.count - 1)).first { dims[$0] == ny && dims[$0 + 1] == UInt64(nx) }
         /// Legacy files are exactly `[ny * nx, time]`; any other dimension that happens to equal the cell count is not the grid
-        let isLegacyFlat = dims.count == 2 && dims[0] == cells.count
-        guard let first = pair ?? (isLegacyFlat ? 0 : nil) else {
-            return nil
-        }
-        let flat = pair == nil
-        let counts = zip(dims, chunks).map { ($0 + $1 - 1) / $1 }
-        /// A flat array is a grid of one row
-        let column = flat ? first : first + 1
-        let (height, width) = (flat ? 1 : chunks[first], chunks[column])
-        let chunkColumns = counts[column]
-        var hasCell = [Bool](repeating: false, count: (flat ? 1 : counts[first]) * chunkColumns)
-        for i in cells.indices where cells[i] {
-            let (y, x) = flat ? (0, i) : i.quotientAndRemainder(dividingBy: nx)
-            hasCell[y / height * chunkColumns + x / width] = true
-        }
-        let after = counts[(column + 1)...].reduce(1, *)
-        return (0 ..< counts.reduce(1, *)).map {
-            hasCell[(flat ? 0 : $0 / (after * chunkColumns) % counts[first]) * chunkColumns + $0 / after % chunkColumns]
+        let isLegacyFlat = dims.count == 2 && dims[0] == UInt64(cells.count)
+        guard pair != nil || isLegacyFlat else { return nil }
+        let xDimension = pair.map { $0 + 1 } ?? 0
+        return layout.map { chunk in
+            chunk.containsCell(yDimension: pair, xDimension: xDimension) { cells[$0] }
         }
     }
 
@@ -92,7 +80,7 @@ struct SyncBoundingBox: Sendable {
             return nil
         }
         let dims = array.getDimensions(), chunks = array.getChunkDimensions()
-        guard let take = takeChunks(dims: dims.map(Int.init), chunks: chunks.map(Int.init)) else {
+        guard let take = try takeChunks(layout: array.chunkLayout()) else {
             logger.info("Not an array on the model grid, dims \(dims), copying whole: \(file)")
             return nil
         }
