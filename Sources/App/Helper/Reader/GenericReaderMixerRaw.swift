@@ -11,12 +11,6 @@ protocol GenericReaderMixerRaw: GenericReaderProtocol {
     init(reader: [Reader])
 }
 
-protocol GenericReaderMixer: GenericReaderMixerRaw {
-    associatedtype Domain: GenericDomain
-
-    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Reader?
-}
-
 struct GenericReaderMixerSameVariableType<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {
     typealias MixingVar = Reader.MixingVar
 
@@ -58,28 +52,6 @@ struct GenericReaderMixerByVariableName<Variable: GenericVariable>: GenericReade
             }
         }
         return result ?? DataAndUnit(Array(repeating: .nan, count: time.time.count), variable.unit)
-    }
-}
-
-extension GenericReaderMixer {
-    /// Initialises highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        var elevation = elevation
-
-        let reader: [Reader] = try await domains.reversed().asyncCompactMap { domain -> (Reader?) in
-            guard let domain = try await Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return nil
-            }
-            if elevation.isNaN {
-                elevation = domain.modelElevation.numeric
-            }
-            return domain
-        }.reversed()
-
-        guard !reader.isEmpty else {
-            return nil
-        }
-        self.init(reader: reader)
     }
 }
 
