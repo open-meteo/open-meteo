@@ -49,7 +49,7 @@ import Vapor
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
         #expect((result?.hourly != nil) == (localCoverage || !requirePrimaryCoverage))
-        #expect(mapping.singleDomain == nil)
+        #expect(mapping.outputGridDomain == nil)
     }
 
     @Test(arguments: [true, false])
@@ -161,7 +161,7 @@ import Vapor
                 .domain(old, GemVariable.self),
                 .mixedBeforeDerivation(.init(domains: [new], variableType: GemVariable.self, derivationDomain: new))
             ],
-            gridForBoundingBoxRequests: old,
+            outputGridDomain: old,
             prefetchAllReaders: true, smoothTransitions: false
         )
         if newAvailable {
