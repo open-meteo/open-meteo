@@ -49,7 +49,7 @@ import Vapor
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
         #expect((result?.hourly != nil) == (localCoverage || !requirePrimaryCoverage))
-        #expect(mapping.singleDomain == nil)
+        #expect(mapping.outputGridDomain == nil)
     }
 
     @Test(arguments: [true, false])
@@ -161,7 +161,7 @@ import Vapor
                 .domain(old, GemVariable.self),
                 .mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [new], variableType: GemVariable.self, derivationDomain: new))
             ],
-            gridForBoundingBoxRequests: old,
+            outputGridDomain: old,
             prefetchAllReaders: true, smoothTransitions: false
         )
         if newAvailable {
@@ -192,7 +192,7 @@ import Vapor
                 .domain(output, GemVariable.self),
                 .mixedBeforeDerivation(group)
             ], 
-            gridForBoundingBoxRequests: output
+            outputGridDomain: output
         )
         for position in 0..<3 {
             let result = try await MultiDomains.dwd_icon_d2.getReaders(gridpoint: position, mapping: mapping, options: options())
