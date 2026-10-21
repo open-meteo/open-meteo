@@ -67,6 +67,10 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_nbm_conus
     case ncep_nbm_alaska
     case ncep_nam_conus
+    case ncep_rrfs_conus
+    case ncep_rrfs_north_america
+    case ncep_rrfs_conus_15min
+    case ncep_rrfs_conus_ensemble
     case ncep_aigefs025
     case ncep_aigfs025
     case ncep_hgefs025_ensemble_mean
@@ -111,6 +115,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_ewam
     case dwd_gwam
     case dwd_sis_europe_africa_v4
+    case dwd_aicon_global_native
 
     case ecmwf_ifs
     case ecmwf_ifs_europe_ensemble
@@ -264,6 +269,8 @@ enum DomainRegistry: String, CaseIterable {
 
     var definition: (any DatasetDefinition)? {
         switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
+            return NcepRrfsDomain(rawValue: rawValue)!
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
         case .meteofrance_arome_france_hd:
@@ -372,6 +379,8 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.hrrr_conus
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
+        case .dwd_aicon_global_native:
+            return IconNativeDomains.aiconNative
         case .dwd_icon:
             return IconDomains.icon
         case .dwd_icon_d2:

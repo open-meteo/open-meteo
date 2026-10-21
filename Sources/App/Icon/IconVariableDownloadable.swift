@@ -1,5 +1,5 @@
 /// Define functions to download surface and pressure level variables for ICON
-protocol IconVariableDownloadable: GenericVariable, Hashable {
+protocol IconVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
 }
 

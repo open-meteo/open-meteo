@@ -90,6 +90,8 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case ncep_nam_conus
     case ncep_nbm_alaska
     case ncep_nbm_conus
+    case ncep_rrfs_conus
+    case ncep_rrfs_north_america
     case ukmo_global_deterministic_10km
     case ukmo_global_ensemble_20km
     case ukmo_uk_deterministic_2km
@@ -270,6 +272,10 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return .ncep_nbm_alaska
         case .ncep_nbm_conus:
             return .ncep_nbm_conus
+        case .ncep_rrfs_conus:
+            return .ncep_rrfs_conus
+        case .ncep_rrfs_north_america:
+            return .ncep_rrfs_north_america
         case .ukmo_global_deterministic_10km:
             return .ukmo_global_deterministic_10km
         case .ukmo_global_ensemble_20km:
@@ -284,6 +290,10 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     /// Geometry that can be constructed without loading external files.
     var grid: any Gridable {
         switch self {
+        case .ncep_rrfs_conus:
+            return Self.ncepRrfsConusGrid
+        case .ncep_rrfs_north_america:
+            return Self.ncepRrfsNorthAmericaGrid
         case .bom_access_global:
             return RegularGrid(nx: 2048, ny: 1536, latMin: -89.941406, lonMin: -179.912109, dx: 360 / 2048, dy: 180 / 1536)
         case .bom_access_global_ensemble:
@@ -650,5 +660,21 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
                 projection: LambertConformalConicProjection(λ0: 17, ϕ0: 46.244, ϕ1: 46.244, ϕ2: 46.244, radius: 6371229)
             )
         }
+    }
+}
+
+extension SyncGridRegistry {
+    static var ncepRrfsConusGrid: ProjectionGrid<LambertConformalConicProjection> {
+        ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.1381, longitude: -122.72,
+                       dx: 3000, dy: 3000,
+                       projection: LambertConformalConicProjection(λ0: -97.5, ϕ0: 38.5, ϕ1: 38.5, ϕ2: 38.5, radius: 6371229))
+    }
+
+    /// GRIB coordinates are in rotated space; the projection uses the opposite pole convention.
+    static var ncepRrfsNorthAmericaGrid: ProjectionGrid<RotatedLatLonProjection> {
+        ProjectionGrid(nx: 1127, ny: 683,
+                       latitudeProjectionOrigin: -36.9303, longitudeProjectionOrigin: -61,
+                       dx: 0.1083, dy: 0.1083,
+                       projection: RotatedLatLonProjection(latitude: 35, longitude: 67))
     }
 }

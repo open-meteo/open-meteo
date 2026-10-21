@@ -61,3 +61,20 @@ struct RotatedLatLonProjection: Projectable {
         return (lat2.radiansToDegrees, (lon2.radiansToDegrees + 180).truncatingRemainder(dividingBy: 360) - 180)
     }
 }
+
+
+extension ProjectionGrid where Projection == RotatedLatLonProjection {
+    /// Bearing of geographic north in the rotated grid, in degrees clockwise from grid north.
+    /// Rotated coordinates are spherical, so the planar projection formula does not apply.
+    func getTrueNorthDirection() -> [Float] {
+        let pole = projection.forward(latitude: 90, longitude: 0)
+        let poleLatitude = pole.y.degreesToRadians
+        return (0..<count).map { point in
+            let latitude = (origin.y + Float(point / nx) * dy).degreesToRadians
+            let longitude = origin.x + Float(point % nx) * dx
+            let deltaLongitude = (pole.x - longitude).degreesToRadians
+            return atan2(sin(deltaLongitude) * cos(poleLatitude),
+                         cos(latitude) * sin(poleLatitude) - sin(latitude) * cos(poleLatitude) * cos(deltaLongitude)).radiansToDegrees
+        }
+    }
+}

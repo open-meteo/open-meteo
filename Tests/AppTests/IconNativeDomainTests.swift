@@ -2,6 +2,7 @@ import Foundation
 @testable import App
 import Testing
 import Logging
+@testable import ReducedLatLon
 
 @Suite struct IconNativeDomainTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ICON_NATIVE_DOMAIN_TESTS"] == "1"))
@@ -59,14 +60,40 @@ import Logging
         #expect(IconModelLevelVariable(rawValue: "temperature_2m") == nil)
     }
 
-    @Test func d2DownloadOutputs() async throws {
-        let deterministic = try await IconDownloadOutputs(.iconD2)
-        #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_15min)
+    @Test func aiconSharesIconGridAndStaticFields() throws {
+        let definition = try #require(DomainRegistry.dwd_aicon_global_native.definition as? IconNativeDomains)
+        #expect(definition == .aiconNative)
+        #expect(definition.gridRegistry == IconNativeDomains.iconNative.gridRegistry)
+        #expect(definition.staticFileDependency == .dwd_icon_global_native)
+        #expect(definition.dtSeconds == 3 * 3600)
+        #expect(definition.omFileLength == 84)
+        #expect(definition.staticResourceDomain == .iconNative)
+    }
+
+    @Test func downloadOutputs() async throws {
+        let fixture = try makeFixture(centers: [.init(latitudeDegrees: 0, longitudeDegrees: 0)])
+        defer { fixture.remove() }
+        let grid = IconNativeGrid(storage: fixture.index, resolutionMeters: 2_000,
+            maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
+        let deterministic = IconDownloadOutputs(.iconD2Native, grid: grid)
+        #expect(deterministic.fifteenMinute?.domainRegistry == .dwd_icon_d2_native_15min)
         #expect(deterministic.ensembleMean == nil)
 
-        let ensemble = try await IconDownloadOutputs(.iconD2Eps)
-        #expect(ensemble.ensembleMean?.domainRegistry == IconDomains.iconD2EpsEnsembleMean.domainRegistry)
+        let ensemble = IconDownloadOutputs(.iconD2EpsNative, grid: grid)
+        #expect(ensemble.ensembleMean?.domainRegistry == .dwd_icon_d2_eps_native_ensemble_mean)
         #expect(ensemble.fifteenMinute == nil)
+
+        let ruc = IconDownloadOutputs(.iconD2RucNative, grid: grid)
+        #expect(ruc.primary.domainRegistry == .dwd_icon_d2_ruc_native)
+        #expect(ruc.fifteenMinute?.domainRegistry == .dwd_icon_d2_ruc_native_15min)
+        #expect(ruc.remapped == nil)
+        #expect(deterministic.remapped == nil)
+        #expect(ensemble.remapped == nil)
+        #expect(ensemble.primary.countEnsembleMember == 20)
+        #expect(ensemble.ensembleMean?.countEnsembleMember == 1)
+        #expect(ensemble.ensembleMean?.generateFullRun == true)
+        #expect(IconDownloadOutputs(.iconNative, grid: grid).remapped == .icon)
+        #expect(IconDownloadOutputs(.iconNative, grid: grid, skipRegridding: true).remapped == nil)
 
         let run = Timestamp(2026, 10, 7, 0)
         #expect(deterministic.downloadDomain.getGribUrl(field: ("T", "pressure-level", 850), run: run, leadSeconds: 3600)
