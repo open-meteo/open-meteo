@@ -590,9 +590,7 @@ import OpenMeteoSdk
         #expect(ForecastSurfaceVariable(rawValue: "freezing_rain") != nil)
         for domain in NcepRrfsDomain.allCases {
             let inputs = domain.downloadVariables(forecastHour: 3, pressureFile: false)
-            let freezingRain = inputs.filter { $0.variable.rawValue == "freezing_rain" }
-            #expect(freezingRain.count == (domain == .ncep_rrfs_conus_15min ? 4 : 1))
-            #expect(freezingRain.allSatisfy { $0.interval.start == 0 && $0.interval.type == "accum" && $0.variable.skipHour0 })
+            #expect(!inputs.contains { $0.variable.rawValue == "freezing_rain" })
             #expect(inputs.filter { $0.variable.isCloudHeight }.count == (domain == .ncep_rrfs_conus_ensemble ? 0 : domain == .ncep_rrfs_conus_15min ? 12 : 3))
         }
         for variable in [NcepRrfsSurfaceVariable.cloud_base, .cloud_ceiling, .cloud_top] {
@@ -607,10 +605,7 @@ import OpenMeteoSdk
             default: Issue.record("Unexpected cloud variable")
             }
         }
-        let freezingRain = NcepRrfsDownloadVariable(variable: NcepRrfsSurfaceVariable.freezing_rain, minute: 180)
-        let decoded = try Curl.decodeGribIndices(indices: ["1:0:d=2026092400:FRZR:surface:0-3 hour acc fcst:\n2:100:d=2026092400:FRZR:surface:2-3 hour acc fcst:"], variables: [freezingRain], errorOnMissing: true, logger: Logger(label: "freezing-rain-test"))
-        #expect(decoded[0].matches.count == 1)
-        #expect(decoded[0].range == "0-99")
+
     }
 
     @Test func conversionsAndMetadata() {
@@ -661,7 +656,7 @@ import OpenMeteoSdk
             }
         }
         // Day-based index strings must not alter internal minute-based deaccumulation.
-        for variable in [NcepRrfsSurfaceVariable.freezing_rain, .snowfall_water_equivalent, .snowfall] {
+        for variable in [NcepRrfsSurfaceVariable.snowfall_water_equivalent, .snowfall] {
             let deaverager = GribDeaverager()
             for hour in [23, 24, 25] {
                 let field = NcepRrfsDownloadVariable(variable: variable, minute: hour * 60)
@@ -679,7 +674,7 @@ import OpenMeteoSdk
             try self.records("rrfs.t00z.2dfld.3km.subh.f00\(hour).conus.grib2.idx", domain: .ncep_rrfs_conus_15min)
         }
         let deaverager = GribDeaverager()
-        for variable in ["precipitation", "snowfall_water_equivalent", "freezing_rain"] {
+        for variable in ["precipitation", "snowfall_water_equivalent"] {
             let accumulated = records.filter { $0.variable.rawValue == variable }
             #expect(accumulated.count == 8)
             for (i, record) in accumulated.enumerated() {

@@ -129,7 +129,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
         switch self {
         case .aerosol_optical_depth: return ("AOTK", "entire atmosphere (considered as a single layer)")
         case .pm2_5_total_organic_matter, .pm2_5, .pm10: return ("MASSDEN", "8 m above ground")
-        case .freezing_rain: return ("FRZR", "surface")
         case .snow_depth_water_equivalent: return ("WEASD", "surface")
         case .cloud_base: return ("HGT", "cloud base")
         case .cloud_ceiling: return ("HGT", "cloud ceiling")
@@ -205,7 +204,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
     var gribStep: NcepRrfsGribStep {
         switch self {
         case .pm2_5, .pm10: return .hourlyAverage
-        case .freezing_rain: return .accumulation
         case .precipitation:
             return .hourlyAccumulation
         case .snowfall_water_equivalent,
@@ -223,7 +221,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
     var skipHour0: Bool {
         switch self {
         case .pm2_5, .pm10: return true
-        case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall, .sensible_heat_flux, .latent_heat_flux: return true
         default: return false
         }
@@ -290,7 +287,6 @@ extension NcepRrfsSurfaceVariable: NcepRrfsVariableDownloadable {
 extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
     var gribInput: (parameter: String, level: String) {
         switch self {
-        case .freezing_rain: return ("FRZR", "surface")
         case .cloud_base: return ("HGT", "cloud base")
         case .cloud_ceiling: return ("HGT", "cloud ceiling")
         case .cloud_top: return ("HGT", "cloud top")
@@ -315,7 +311,6 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
 
     var gribStep: NcepRrfsGribStep {
         switch self {
-        case .freezing_rain: return .accumulation
         case .precipitation,
              .snowfall_water_equivalent,
              .snowfall:
@@ -327,7 +322,6 @@ extension NcepRrfs15MinVariable: NcepRrfsVariableDownloadable {
 
     var skipHour0: Bool {
         switch self {
-        case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall: return true
         default: return false
         }
@@ -372,7 +366,6 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
     var gribInput: (parameter: String, level: String) {
         switch self {
         case .aerosol_optical_depth: return ("AOTK", "entire atmosphere (considered as a single layer)")
-        case .freezing_rain: return ("FRZR", "surface")
         case .temperature_2m: return ("TMP", "2 m above ground")
         case .relative_humidity_2m: return ("RH", "2 m above ground")
         case .pressure_msl: return ("MSLET", "mean sea level")
@@ -404,7 +397,6 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var gribStep: NcepRrfsGribStep {
         switch self {
-        case .freezing_rain: return .accumulation
         case .precipitation:
             return .hourlyAccumulation
         case .snowfall:
@@ -418,7 +410,6 @@ extension NcepRrfsEnsembleSurfaceVariable: NcepRrfsVariableDownloadable {
 
     var skipHour0: Bool {
         switch self {
-        case .freezing_rain: return true
         case .precipitation, .snowfall_water_equivalent, .snowfall: return true
         default: return false
         }
