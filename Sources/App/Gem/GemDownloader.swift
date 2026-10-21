@@ -87,7 +87,9 @@ struct GemDownload: AsyncCommand {
 
         let variables = onlyVariables ?? variablesDefault
         // The surface job owns metadata for the ensemble and its generated mean.
-        let writeUpdateJson = domain != .gem_global_ensemble || variables.contains { $0 is GemSurfaceVariable }
+        let isPressureOnlyEnsembleDownload = domain == .gem_global_ensemble
+            && variables.allSatisfy { $0 is GemPressureVariable }
+        let writeUpdateJson = !isPressureOnlyEnsembleDownload
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 

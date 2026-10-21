@@ -108,10 +108,11 @@ struct GfsDownload: AsyncCommand {
             }
 
             // The surface job owns GEFS metadata, including the generated ensemble mean.
-            let writeUpdateJson = domain != .gfs05_ens || variables.contains {
-                if case .surface = $0.downloadField { return true }
+            let isPressureOnlyEnsembleDownload = domain == .gfs05_ens && variables.allSatisfy {
+                if case .pressure = $0.downloadField { return true }
                 return false
             }
+            let writeUpdateJson = !isPressureOnlyEnsembleDownload
 
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
 
