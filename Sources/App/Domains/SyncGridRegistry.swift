@@ -318,6 +318,8 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
         case .cmip_CMCC_CM2_VHR4:
             return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180 / 768)
         case .cmip_FGOALS_f3_H:
+            // fallthrough
+        // case .FGOALS_f3_H_highresSST:
             return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .cmip_HiRAM_SIT_HR:
             return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360 / 1536, dy: 180 / 768)
@@ -325,6 +327,8 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return RegularGrid(nx: 1920, ny: 960, latMin: -90, lonMin: -180, dx: 0.1875, dy: 0.1875)
         case .cmip_EC_Earth3P_HR:
             return RegularGrid(nx: 1024, ny: 512, latMin: -90, lonMin: -180, dx: 360 / 1024, dy: 180 / 512)
+        // case .HadGEM3_GC31_HM:
+        //    return RegularGrid(nx: 1024, ny: 768, latMin: -90, lonMin: -180, dx: 360/1024, dy: 180/768)
         case .cmip_MPI_ESM1_2_XR:
             return RegularGrid(nx: 768, ny: 384, latMin: -90, lonMin: -180, dx: 360 / 768, dy: 180 / 384)
         case .cmip_NICAM16_8S:
@@ -410,6 +414,7 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536 - 1) / 2, lonMin: -180, dx: 360 / 3072, dy: 0.11714935)
         case .ncep_hrrr_conus, .ncep_nam_conus:
+            /// labert conformal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
             /*
              (key: "Nx", value: "1799")
              (key: "Ny", value: "1059")
@@ -472,6 +477,7 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
         case .meteofrance_arome_france_hd:
             return RegularGrid(nx: 2801, ny: 1791, latMin: 37.5, lonMin: -12.0, dx: 0.01, dy: 0.01)
         case .meteofrance_wave, .meteofrance_currents, .meteofrance_sea_surface_temperature:
+            /// Note: sea land mask is slighly differnet for each model
             // Important: GRID needs to be aligned to center points by dx/2 and dy/2
             return RegularGrid(nx: 4320, ny: 2041, latMin: -80 + 1 / 24, lonMin: -180 + 1 / 24, dx: 1 / 12, dy: 1 / 12, searchRadius: 2)
         case .ncep_nbm_conus:
