@@ -88,7 +88,7 @@ enum GfsDomain: String, SyncGridDomain, CaseIterable {
             return .ncep_gfs025
         case .hrrr_conus, .hrrr_conus_15min:
             return .ncep_hrrr_conus
-        case .gfs025_ens, .gfswave025, .gfswave025_ens, .gefs025_ensemble_mean:
+        case .gfs025_ens, .gfswave025, .gfswave025_ens, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
             return .ncep_gefs025
         case .gfs05_ens, .gefs05_ensemble_mean:
             return .ncep_gefs05
@@ -96,8 +96,6 @@ enum GfsDomain: String, SyncGridDomain, CaseIterable {
             return .ncep_gfswave016
         case .nam_conus:
             return .ncep_nam_conus
-        case .gefswave025_ensemble_mean:
-            return .ncep_gefswave025
         }
     }
 
