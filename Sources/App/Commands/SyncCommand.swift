@@ -275,7 +275,7 @@ struct SyncCommand: AsyncCommand {
                                 let remote = attempt == 0
                                     ? OmHttpReaderBackend(context: endpoint, object: object, count: download.fileSize, eTag: download.eTag, lastModified: download.modificationTime)
                                     : try await OmHttpReaderBackend(context: endpoint, object: object)
-                                if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger, runsInFlight: max(1, SyncBoundingBox.runsInFlightTotal / max(1, concurrent))) {
+                                if let fetched = try await keep.write(remote: remote, to: localFile, modificationTime: remote.lastModified, logger: logger) {
                                     await progress.add(fetched)
                                     break
                                 }

@@ -4,6 +4,7 @@ import OmFileFormat
 import Testing
 import Logging
 import ReducedLatLon
+import Synchronization
 @testable import OmFileIO
 
 @Suite struct SyncBoundingBoxTests {
@@ -92,14 +93,65 @@ import ReducedLatLon
         #expect(try await takeChunks(dims: [12, 15, 12, 15], chunks: [2, 3, 2, 3]) == nil)
     }
 
-    @Test func coalescedReadRangesJoinCloseChunksAndCapTheirSize() {
-        let ranges: [Range<UInt64>] = [100..<150, 150..<200, 200..<200, 210..<250, 100_000..<100_010, 100_010..<100_110, 200_000..<200_010]
+    @Test func coalescedReadRangesOnlyJoinAdjacentSelectedChunks() {
+        let ranges: [Range<UInt64>] = [100..<150, 150..<200, 200..<200, 210..<250, 250..<300, 300..<400, 400..<410]
         let take = [true, false, true, true, true, true, true]
-        let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: 16, max: 150)
-        /// The chunk that is not taken is a gap of 50 bytes, the empty one is skipped, and the last run would exceed 150 bytes
-        #expect(runs.map(\.chunks) == [0 ..< 1, 3 ..< 4, 4 ..< 6, 6 ..< 7])
-        #expect(runs.map(\.bytes) == [100 ..< 150, 210 ..< 250, 100_000 ..< 100_110, 200_000 ..< 200_010])
-        #expect(SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: 100, max: 1000).map(\.chunks) == [0 ..< 4, 4 ..< 6, 6 ..< 7])
+        let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, max: 150)
+        #expect(runs.map(\.chunks) == [0..<1, 3..<5, 5..<7])
+        #expect(runs.map(\.bytes) == [100..<150, 210..<300, 300..<410])
+        // Even a one-byte gap must not be fetched.
+        let gap = SyncBoundingBox.coalescedReadRanges(ranges: [0..<10, 11..<20] as [Range<UInt64>], takeChunks: [true, true])
+        #expect(gap.map(\.bytes) == [0..<10, 11..<20])
+        let capped = SyncBoundingBox.coalescedReadRanges(ranges: [0..<100, 100..<150, 150..<151] as [Range<UInt64>], takeChunks: [true, true, true], max: 150)
+        #expect(capped.map(\.bytes) == [0..<150, 150..<151])
+    }
+
+    @Test func concurrentReadsKeepChunkOrderAndNeverFetchGaps() async throws {
+        let values = (0..<120).map { Float($0) / 20 }
+        let source = try fixture(values, dimensions: [1, 40, 3], chunks: [1, 1, 3])
+        let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
+        let ranges = try await array.chunkIndex()
+        let selectedCells = (0..<40).map { $0 % 2 == 1 }
+        let selectedRanges = ranges.indices.filter { selectedCells[$0] }.map {
+            Int(ranges[$0].lowerBound)..<Int(ranges[$0].upperBound)
+        }
+        let backend = RecordingReadBackend(data: source.data, delayedOffsets: Set(selectedRanges.map(\.lowerBound)))
+        let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40)
+        let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        _ = try await keep.write(remote: backend, to: file, modificationTime: nil, logger: Logger(label: "test"))
+
+        #expect(await backend.peakConcurrentReads == SyncBoundingBox.maxConcurrentReads)
+        #expect(await backend.readsBeforeFirstCompleted == SyncBoundingBox.maxConcurrentReads)
+        let retained = backend.liveBuffers.state.withLock { $0 }
+        #expect(retained.peak <= SyncBoundingBox.maxConcurrentReads)
+        #expect(retained.current == 0)
+        let payloadReads = await backend.requests.filter { selectedRanges.contains($0) }
+        #expect(payloadReads.sorted { $0.lowerBound < $1.lowerBound } == selectedRanges)
+        let payloadStart = Int(ranges[0].lowerBound)
+        let payloadEnd = Int(ranges[ranges.count - 1].upperBound)
+        let allPayloadReads = await backend.requests.filter { $0.overlaps(payloadStart..<payloadEnd) }
+        #expect(allPayloadReads.count == selectedRanges.count)
+        let copied = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: file)))).expectArray(of: Float.self).read()
+        for i in copied.indices {
+            if selectedCells[i / 3] {
+                #expect(copied[i] == values[i])
+            } else {
+                #expect(copied[i].isNaN)
+            }
+        }
+    }
+
+    @Test func oversizedChunkRemainsOneRange() {
+        let oversizedEnd = UInt64(2 * SyncBoundingBox.runBytes + 10)
+        let ranges: [Range<UInt64>] = [0..<3, 3..<oversizedEnd, oversizedEnd..<(oversizedEnd + 3)]
+        let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, true, true])
+        #expect(runs.map(\.bytes) == ranges.map { Int($0.lowerBound)..<Int($0.upperBound) })
+    }
+
+    @Test func noSelectedChunksProducesOnlyNaNs() async throws {
+        let keep = SyncBoundingBox(selectedCells: [Bool](repeating: false, count: 180), nx: 15)
+        try await copyAndCheck(keep: keep, dims: [12, 15, 5], chunks: [2, 3, 2], cell: { $0[0] * 15 + $0[1] })
     }
 
     /// Write `values` as a file with one attribute, and serve it from memory
@@ -240,7 +292,7 @@ import ReducedLatLon
         let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let ranges = try await array.chunkIndex()
         let take = try #require(try keep.takeChunks(layout: array.chunkLayout()))
-        let firstRun = try #require(SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: SyncBoundingBox.mergeBytes, max: SyncBoundingBox.runBytes).first)
+        let firstRun = try #require(SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take).first)
         let backend = ShortReadBackend(data: source.data, shortReadOffset: firstRun.bytes.lowerBound)
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
@@ -289,5 +341,69 @@ private struct ShortReadBackend: OmFileReaderBackend {
 
     func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
         try await getData(offset: offset, count: count).withUnsafeBytes(fn)
+    }
+}
+
+private actor RecordingReadBackend: OmFileReaderBackend {
+    nonisolated let data: Data
+    nonisolated var count: Int { data.count }
+    let delayedOffsets: Set<Int>
+    var requests = [Range<Int>]()
+    var activeReads = 0
+    var peakConcurrentReads = 0
+    var firstCompleted = false
+    var readsBeforeFirstCompleted = 0
+    nonisolated let liveBuffers = LiveReadBuffers()
+
+    init(data: Data, delayedOffsets: Set<Int> = []) {
+        self.data = data
+        self.delayedOffsets = delayedOffsets
+    }
+
+    func prefetchData(offset: Int, count: Int) async throws {}
+
+    func getData(offset: Int, count: Int) async throws -> TrackedReadBuffer {
+        requests.append(offset..<(offset + count))
+        activeReads += 1
+        peakConcurrentReads = max(peakConcurrentReads, activeReads)
+        defer { activeReads -= 1 }
+        if delayedOffsets.contains(offset) {
+            if !firstCompleted { readsBeforeFirstCompleted += 1 }
+            let isFirst = offset == delayedOffsets.min()
+            // A slow first read must not let the remaining file accumulate in memory.
+            try await Task.sleep(for: .milliseconds(isFirst ? 100 : 20))
+            if isFirst { firstCompleted = true }
+        }
+        return TrackedReadBuffer(data: data.subdata(in: offset..<(offset + count)), lifetime: delayedOffsets.contains(offset) ? liveBuffers : nil)
+    }
+
+    nonisolated func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
+        try await getData(offset: offset, count: count).withUnsafeBytes(fn)
+    }
+}
+
+private final class LiveReadBuffers: Sendable {
+    let state = Mutex((current: 0, peak: 0))
+}
+
+private final class TrackedReadBuffer: ContiguousBytes, Sendable {
+    let data: Data
+    let lifetime: LiveReadBuffers?
+
+    init(data: Data, lifetime: LiveReadBuffers?) {
+        self.data = data
+        self.lifetime = lifetime
+        lifetime?.state.withLock {
+            $0.current += 1
+            $0.peak = max($0.peak, $0.current)
+        }
+    }
+
+    deinit {
+        lifetime?.state.withLock { $0.current -= 1 }
+    }
+
+    func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try data.withUnsafeBytes(body)
     }
 }

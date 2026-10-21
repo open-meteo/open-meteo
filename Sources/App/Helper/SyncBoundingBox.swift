@@ -72,13 +72,14 @@ struct SyncBoundingBox: Sendable {
         }
     }
 
-    /// Byte ranges to fetch for the chunks to take: neighbours closer than `merge` bytes are joined, as long as a run stays within `max` bytes (a larger chunk is a run on its own).
-    /// Each run has the range of chunk indices it holds. Empty chunks are NaN and need no bytes.
-    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], merge: Int, max limit: Int) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
+    /// Combine consecutive selected chunks only when their bytes are adjacent and fit within the limit.
+    /// Empty chunks need no read. A single oversized chunk is fetched in one request.
+    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], max limit: Int = runBytes) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
         var runs = [(chunks: Range<Int>, bytes: Range<Int>)]()
         for i in ranges.indices where takeChunks[i] && !ranges[i].isEmpty {
             let bytes = Int(ranges[i].lowerBound) ..< Int(ranges[i].upperBound)
-            if let last = runs.last, bytes.lowerBound - last.bytes.upperBound <= merge, bytes.upperBound - last.bytes.lowerBound <= limit {
+            if let last = runs.last, last.chunks.upperBound == i, last.bytes.upperBound == bytes.lowerBound,
+               bytes.upperBound - last.bytes.lowerBound <= limit {
                 runs[runs.count - 1] = (last.chunks.lowerBound ..< i + 1, last.bytes.lowerBound ..< bytes.upperBound)
             } else {
                 runs.append((i ..< i + 1, bytes))
@@ -89,8 +90,9 @@ struct SyncBoundingBox: Sendable {
 
     /// Write `remote` to `file` with the compressed bytes of the chunks that hold a kept cell as they are, and the others as NaN.
     /// Returns the bytes fetched from `remote`, or nil and writes nothing if the file is not a float array on this grid with scalar attributes only.
-    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger, runsInFlight: Int = SyncBoundingBox.runsInFlightTotal) async throws -> Int? {
+    func write<Backend: OmFileReaderBackend>(remote: Backend, to file: String, modificationTime: Timestamp?, logger: Logger) async throws -> Int? {
         try Task.checkCancellation()
+        let startTime = DispatchTime.now()
         let remote = CountingBackend(remote)
         let reader = try await OmFileReader(fn: remote)
         /// `chunkIndex()` reads the complete lookup table in one request.
@@ -114,42 +116,38 @@ struct SyncBoundingBox: Sendable {
             attributes.append(child)
         }
         let ranges = try await array.chunkIndex()
-        let runs = Self.coalescedReadRanges(ranges: ranges, takeChunks: take, merge: Self.mergeBytes, max: Self.runBytes)
+        let runs = Self.coalescedReadRanges(ranges: ranges, takeChunks: take)
 
-        /// Runs are fetched up to `runsInFlight` ahead of the writer, which takes them in order. A failed run fails the file
-        var pending = [Task<Backend.DataType, any Error>]()
-        var next = 0
-        defer { pending.forEach { $0.cancel() } }
         let fn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         let writer = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024)
         let out = try writer.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: chunks, compression: array.compression, scale_factor: array.scaleFactor, add_offset: array.addOffset)
-        var run = 0 ..< 0, runStart = 0, taken = 0, data: Backend.DataType?
-        for i in take.indices {
+        var nextChunk = 0
+
+        let reads = runs.mapStream(nConcurrent: Self.maxConcurrentReads) { run in
             try Task.checkCancellation()
-            guard take[i], !ranges[i].isEmpty else {
-                /// An empty payload appends one zero-byte NaN chunk, including smaller edge chunks.
+            let data = try await remote.getData(offset: run.bytes.lowerBound, count: run.bytes.count)
+            guard data.withUnsafeBytes({ $0.count }) == run.bytes.count else { throw CurlErrorNonRetry.chunkSizeMismatch }
+            return (run, data)
+        }
+        // mapStream yields in file order and retains only a bounded number of reads.
+        for try await (run, buffer) in reads {
+            for _ in nextChunk..<run.chunks.lowerBound {
+                try Task.checkCancellation()
                 try out.writeCompressedChunk(UnsafeRawBufferPointer(start: nil, count: 0))
-                continue
             }
-            if !run.contains(i) {
-                while pending.count < max(1, runsInFlight), next < runs.count {
-                    let bytes = runs[next].bytes
-                    pending.append(Task { try await remote.getData(offset: bytes.lowerBound, count: bytes.count) })
-                    next += 1
+            try buffer.withUnsafeBytes { bytes in
+                for chunkIndex in run.chunks {
+                    try Task.checkCancellation()
+                    let start = Int(ranges[chunkIndex].lowerBound) - run.bytes.lowerBound
+                    let end = Int(ranges[chunkIndex].upperBound) - run.bytes.lowerBound
+                    try out.writeCompressedChunk(UnsafeRawBufferPointer(rebasing: bytes[start..<end]))
                 }
-                (run, runStart) = (runs[taken].chunks, runs[taken].bytes.lowerBound)
-                taken += 1
-                let task = pending.removeFirst()
-                data = try await withTaskCancellationHandler {
-                    try await task.value
-                } onCancel: {
-                    task.cancel()
-                }
-                // A short body would let the slices below read past the buffer, which a release build does not check
-                guard data!.withUnsafeBytes({ $0.count }) == runs[taken - 1].bytes.count else { throw CurlErrorNonRetry.chunkSizeMismatch }
             }
-            let start = Int(ranges[i].lowerBound) - runStart
-            try data!.withUnsafeBytes { try out.writeCompressedChunk(UnsafeRawBufferPointer(rebasing: $0[start ..< start + Int(ranges[i].count)])) }
+            nextChunk = run.chunks.upperBound
+        }
+        for _ in nextChunk..<ranges.count {
+            try Task.checkCancellation()
+            try out.writeCompressedChunk(UnsafeRawBufferPointer(start: nil, count: 0))
         }
         let children = try attributes.map { try $0.copyScalar(to: writer) }
         let root = try writer.write(array: try out.finalise(), name: reader.getName(), children: children)
@@ -162,15 +160,18 @@ struct SyncBoundingBox: Sendable {
         }
         try Task.checkCancellation()
         try fn.linkTemporary(file: file)
-        return remote.fetched.load(ordering: .relaxed)
+        let fetched = remote.fetched.load(ordering: .relaxed)
+        let elapsed = startTime.timeElapsedSeconds()
+        let rate = Int(Double(fetched) / max(elapsed, 0.001))
+        let percent = String(format: "%.1f", 100 * Double(fetched) / Double(remote.count))
+        let keptChunks = take.reduce(0) { $0 + ($1 ? 1 : 0) }
+        logger.info("Downloaded bbox \(file) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
+        return fetched
     }
 
-    /// Bound each read-ahead buffer to 16 MiB, unless a single chunk is larger.
-    static let runBytes = 16 * 1024 * 1024
-    /// Read small gaps between selected chunks to reduce HTTP request overhead.
-    static let mergeBytes = 1024 * 1024
-    /// Read-ahead budget per model, shared between concurrently copied files.
-    static let runsInFlightTotal = 8
+    static let runBytes = 8 * 1024 * 1024
+    /// Maximum concurrent range requests per file.
+    static let maxConcurrentReads = 8
 }
 
 /// Sums the bytes read from the wrapped backend, for the transfer statistics
