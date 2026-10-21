@@ -569,7 +569,9 @@ struct DownloadIconCommand: AsyncCommand {
         let logger = context.application.logger
         let generateFullRun = feed.countEnsembleMember == 1
         // Separate ensemble pressure downloads must not replace surface-run metadata.
-        let writeUpdateJson = generateFullRun || variables.contains { $0 is IconSurfaceVariable }
+        let isPressureOnlyEnsembleDownload = feed.countEnsembleMember > 1
+            && variables.allSatisfy { $0 is IconPressureVariable }
+        let writeUpdateJson = !isPressureOnlyEnsembleDownload
         try await nativeDomain.prepareNativeGrid(
             application: context.application,
             uploadS3Bucket: signature.uploadS3Bucket
