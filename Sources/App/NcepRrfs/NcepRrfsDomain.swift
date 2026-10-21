@@ -9,7 +9,14 @@ enum NcepRrfsDomain: String, CaseIterable, SyncGridDomain {
     case ncep_rrfs_conus_ensemble
 
     var domainRegistry: DomainRegistry { DomainRegistry(rawValue: rawValue)! }
-    var syncGridRegistry: SyncGridRegistry { self == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus }
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble:
+            return .ncep_rrfs_conus
+        case .ncep_rrfs_north_america:
+            return .ncep_rrfs_north_america
+        }
+    }
     var dtSeconds: Int { self == .ncep_rrfs_conus_15min ? 900 : 3600 }
     var updateIntervalSeconds: Int { self == .ncep_rrfs_conus_15min ? 3600 : 21600 }
     var hasYearlyFiles: Bool { false }
@@ -32,13 +39,6 @@ enum NcepRrfsDomain: String, CaseIterable, SyncGridDomain {
     var lastRun: Timestamp { lastRun(now: .now()) }
     func lastRun(now: Timestamp) -> Timestamp {
         now.add(-3 * 3600 - 45 * 60).floor(toNearestHour: updateIntervalSeconds / 3600)
-    }
-    var conusGrid: ProjectionGrid<LambertConformalConicProjection> {
-        SyncGridRegistry.ncepRrfsConusGrid
-    }
-
-    var northAmericaGrid: ProjectionGrid<RotatedLatLonProjection> {
-        SyncGridRegistry.ncepRrfsNorthAmericaGrid
     }
 
     func gribUrls(run: Timestamp, forecastHour: Int, member: Int, server: String) -> [String] {
