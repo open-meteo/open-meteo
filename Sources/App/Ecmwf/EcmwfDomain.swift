@@ -77,13 +77,18 @@ enum EcmwfDomain: String, SyncGridDomain {
         case .ifs04:
             return .ecmwf_ifs04
         case .ifs04_ensemble:
+            // Elevation comes from the ensemble enfo file, while IFS04 uses oper/scda.
+            // Keep separate until their elevation and land-sea fields are verified equivalent.
             return .ecmwf_ifs04_ensemble
-        case .ifs025, .aifs025, .aifs025_single, .wam025, .aifs025_ensemble, .ifs025_ensemble_mean, .wam025_ensemble_mean, .aifs025_ensemble_mean:
+        case .ifs025, .ifs025_ensemble, .ifs025_ensemble_mean,
+            .aifs025, .aifs025_single, .aifs025_ensemble, .aifs025_ensemble_mean:
+            // IFS025 ensemble uses the deterministic IFS025 file for elevation.
+            // WAM025 also uses IFS025 static fields; wave downloads do not generate elevation.
             return .ecmwf_ifs025
-        case .ifs025_ensemble:
-            return .ecmwf_ifs025_ensemble
-        case .wam025_ensemble:
-            return .ecmwf_wam025_ensemble
+        case .wam025, .wam025_ensemble, .wam025_ensemble_mean:
+            // TODO: Verify whether this should share IFS025 static fields!
+            // neither wave downloader generates elevation files.
+            return .ecmwf_ifs025
         }
     }
 

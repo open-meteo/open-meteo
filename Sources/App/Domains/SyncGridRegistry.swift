@@ -47,7 +47,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case ecmwf_aifs_europe_ensemble
     case ecmwf_ifs
     case ecmwf_ifs025
-    case ecmwf_ifs025_ensemble
     case ecmwf_ifs04
     case ecmwf_ifs04_ensemble
     case ecmwf_ifs_analysis
@@ -55,7 +54,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case ecmwf_seas5
     case ecmwf_seas5_12hourly
     case ecmwf_wam
-    case ecmwf_wam025_ensemble
     case eumetsat_lsa_saf_iodc_15min
     case eumetsat_lsa_saf_msg_15min
     case eumetsat_sarah3_30min
@@ -194,8 +192,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return .ecmwf_ifs
         case .ecmwf_ifs025:
             return .ecmwf_ifs025
-        case .ecmwf_ifs025_ensemble:
-            return .ecmwf_ifs025_ensemble
         case .ecmwf_ifs04:
             return .ecmwf_ifs04
         case .ecmwf_ifs04_ensemble:
@@ -210,8 +206,6 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return .ecmwf_seas5_12hourly
         case .ecmwf_wam:
             return .ecmwf_wam
-        case .ecmwf_wam025_ensemble:
-            return .ecmwf_wam025_ensemble
         case .eumetsat_lsa_saf_iodc_15min:
             return .eumetsat_lsa_saf_iodc_15min
         case .eumetsat_lsa_saf_msg_15min:
@@ -365,7 +359,7 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             )
         case .ecmwf_ifs04, .ecmwf_ifs04_ensemble:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360 / 900, dy: 180 / 450)
-        case .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_wam025_ensemble:
+        case .ecmwf_ifs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360 / 1440, dy: 180 / (721 - 1))
         case .copernicus_era5, .ncep_gfs025, .ncep_gefs025, .ncep_gefswave025, .meteofrance_arpege_world025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
