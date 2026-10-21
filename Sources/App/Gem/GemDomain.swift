@@ -18,6 +18,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_hrdps_west
     case gem_global_ensemble
     case gem_global_ensemble_mean
+
+    var updateMetaRequiresRepresentativeVariable: Bool { self != .gem_gdps_15km_upper_level }
     
     var ensembleMeanDomain: Self? {
         switch self {
