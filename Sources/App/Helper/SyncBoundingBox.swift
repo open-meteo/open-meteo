@@ -94,7 +94,11 @@ struct SyncBoundingBox: Sendable {
         try Task.checkCancellation()
         let startTime = DispatchTime.now()
         let remote = CountingBackend(remote)
-        let reader = try await OmFileReader(fn: OmReaderMemoryCache(backend: remote))
+        // Prefetch the last 8 KiB which should contain most metadata
+        let metadata = OmReaderMemoryCache(backend: remote)
+        let prefetchSize = min(remote.count, 8 * 1024)
+        try await metadata.prefetchData(offset: remote.count - prefetchSize, count: prefetchSize)
+        let reader = try await OmFileReader(fn: metadata)
         guard let array = reader.asArray(of: Float.self) else {
             logger.info("Not a float array, type \(reader.dataType), copying whole: \(file)")
             return nil
@@ -160,11 +164,12 @@ struct SyncBoundingBox: Sendable {
         try Task.checkCancellation()
         try fn.linkTemporary(file: file)
         let fetched = remote.fetched.load(ordering: .relaxed)
+        let requests = remote.requests.load(ordering: .relaxed)
         let elapsed = startTime.timeElapsedSeconds()
         let rate = Int(Double(fetched) / max(elapsed, 0.001))
         let percent = String(format: "%.1f", 100 * Double(fetched) / Double(remote.count))
         let keptChunks = take.reduce(0) { $0 + ($1 ? 1 : 0) }
-        logger.info("Downloaded bbox \(url.stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
+        logger.info("Downloaded bbox \(url.stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) requests=\(requests) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
         return fetched
     }
 
@@ -173,10 +178,12 @@ struct SyncBoundingBox: Sendable {
     static let maxConcurrentReads = 8
 }
 
-/// Sums the bytes read from the wrapped backend, for the transfer statistics
+/// Counts read requests and bytes from the wrapped backend for transfer statistics.
 final class CountingBackend<Backend: OmFileReaderBackend>: OmFileReaderBackend {
     let backend: Backend
     let fetched = Atomic(0)
+    /// Counts backend reads, excluding cache hits and retries internal to the backend.
+    let requests = Atomic(0)
 
     init(_ backend: Backend) {
         self.backend = backend
@@ -189,11 +196,13 @@ final class CountingBackend<Backend: OmFileReaderBackend>: OmFileReaderBackend {
     }
 
     func getData(offset: Int, count: Int) async throws -> Backend.DataType {
+        requests.add(1, ordering: .relaxed)
         fetched.add(count, ordering: .relaxed)
         return try await backend.getData(offset: offset, count: count)
     }
 
     func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
+        requests.add(1, ordering: .relaxed)
         fetched.add(count, ordering: .relaxed)
         return try await backend.withData(offset: offset, count: count, fn: fn)
     }
