@@ -3,9 +3,10 @@ import Vapor
 import OmFileFormat
 import SwiftNetCDF
 
-/// Download GeoSphere Austria AROME model
-/// URL: https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_{YYYYMMDDHH}.nc
-/// DEM: https://public.hub.geosphere.at/public/resources/misc/NWP_DEM.nc
+/// Download GeoSphere Austria models
+/// AROME: https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_{YYYYMMDDHH}.nc
+/// AROME DEM: https://public.hub.geosphere.at/public/resources/misc/NWP_DEM.nc
+/// C-LAEF: https://public.hub.geosphere.at/datahub/resources/nwp-v2-1h-1km/filelisting/nwp_{YYYYMMDDHH}.nc
 struct GeoSphereDownloader: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -88,6 +89,26 @@ struct GeoSphereDownloader: AsyncCommand {
 
     /// Download forecast data and return variable handles
     func download(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        switch domain {
+        case .arome_austria:
+            return try await downloadArome(application: application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: uploadS3Bucket)
+        case .claef_austria:
+            return try await downloadClaef(application: application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: uploadS3Bucket)
+        }
+    }
+
+    /// GeoSphere weather symbol codes 1-32 mapped to WMO weather codes
+    /// https://github.com/Geosphere-Austria/dataset-api-docs/issues/30
+    static let symbolToWmo: [Float] = [.nan ,0,1,2,3,3,45,45,61,63,65,66,66,66,71,73,75,81,81,82,85,85,85,85,85,86,95,95,95,96,99,96,99]
+
+    static func weatherCode(symbol: Float) -> Float {
+        guard symbol.isFinite, let index = Int(exactly: symbol.rounded()), symbolToWmo.indices.contains(index) else {
+            return .nan
+        }
+        return symbolToWmo[index]
+    }
+
+    func downloadArome(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
@@ -269,18 +290,152 @@ struct GeoSphereDownloader: AsyncCommand {
 
         // Weather code converted from SYMBOL GeoSphere-specific codes, not WMO
         logger.info("Converting weather code")
-        /// https://github.com/Geosphere-Austria/dataset-api-docs/issues/30
-        let symbolToWmo = [Float.nan ,0,1,2,3,3,45,45,61,63,65,66,66,66,71,73,75,81,81,82,85,85,85,85,85,86,95,95,95,96,99,96,99]
         guard let symbol = try ncFile.getVariable(name: "SYMBOL")?.readAndScale() else {
-            fatalError("Could not read U10M")
+            fatalError("Could not read SYMBOL")
         }
         let spatial = Array2DFastSpace(
-            data: symbol.map({symbolToWmo[Int(round($0))]}),
+            data: symbol.map(Self.weatherCode),
             nLocations: nLocations,
             nTime: nTime
         )
         for t in 0..<nTime {
             try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.weather_code, data: Array(spatial[t, 0..<nLocations]))
+        }
+
+        await curl.printStatistics()
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+    }
+
+    /// Download C-LAEF AlpeAdria. Amounts are per hour and radiation is an hourly mean, so nothing is deaccumulated.
+    /// Values of the first step are missing for all interval variables.
+    func downloadClaef(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        let logger = application.logger
+        let deadLineHours: Double = 4
+        Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
+        defer { Process.alarm(seconds: 0) }
+
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+
+        // About 9.4 GB per run, most of it pressure levels
+        let runStr = run.format_YYYYMMddHH
+        let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v2-1h-1km/filelisting/nwp_\(runStr).nc"
+        logger.info("Downloading forecast from \(url)")
+
+        let forecastFile = "\(domain.downloadDirectory)nwp_\(runStr).nc"
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItemIfExists(at: forecastFile)
+        }
+
+        let ncFile = try await curl.downloadNetCdf(
+            url: url,
+            file: forecastFile,
+            ncVariable: "2t",
+            bzip2Decode: false
+        )
+
+        let dimensions = ncFile.getDimensions()
+        let ncNx = dimensions.first(where: { $0.name == "longitude" })?.length ?? 0
+        let ncNy = dimensions.first(where: { $0.name == "latitude" })?.length ?? 0
+        let nx = domain.grid.nx
+        let ny = domain.grid.ny
+        guard ncNx == nx, ncNy == ny else {
+            fatalError("Grid dimension mismatch: NetCDF has \(ncNx)x\(ncNy), expected \(nx)x\(ny)")
+        }
+        let nLocations = nx * ny
+        guard let nTime = dimensions.first(where: { $0.name == "time" })?.length, nTime > 0 else {
+            fatalError("Could not determine time dimension")
+        }
+        logger.info("Forecast has \(nTime) timesteps, grid \(nx)x\(ny) = \(nLocations) locations")
+
+        /// Read a float32 surface variable and flip it from north-to-south to the south-to-north grid
+        func read(_ ncName: String) throws -> Array2DFastSpace {
+            guard let data = try ncFile.getVariable(name: ncName)?.asType(Float.self)?.read() else {
+                fatalError("Could not read \(ncName)")
+            }
+            var spatial = Array2DFastSpace(data: data, nLocations: nLocations, nTime: nTime)
+            spatial.data.flipLatitude(nt: nTime, ny: ny, nx: nx)
+            return spatial
+        }
+
+        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            logger.info("Writing elevation from surface geopotential")
+            try domain.surfaceElevationFileOm.createDirectory()
+            guard var elevation = try ncFile.getVariable(name: "zsurf")?.asType(Float.self)?.read(offset: [0, 0, 0], count: [1, ny, nx]) else {
+                fatalError("Could not read zsurf")
+            }
+            elevation.flipLatitude(nt: 1, ny: ny, nx: nx)
+            elevation.multiplyAdd(multiply: 1 / 9.80665, add: 0)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        }
+
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
+
+        func write(_ variable: GeoSphereVariable, _ spatial: Array2DFastSpace) async throws {
+            for t in 0..<nTime {
+                try await writer.write(time: run.add(hours: t), member: 0, variable: variable, data: Array(spatial[t, 0..<nLocations]))
+            }
+        }
+
+        /// `snowlmt` is above sea level, although its description says above ground
+        let simpleVariables: [(ncName: String, omVar: GeoSphereVariable, multiply: Float?)] = [
+            ("2t", .temperature_2m, nil),
+            ("min_2t", .temperature_2m_min, nil),
+            ("max_2t", .temperature_2m_max, nil),
+            ("tsurf", .surface_temperature, nil),
+            ("2r", .relative_humidity_2m, nil),
+            ("tcc", .cloud_cover, nil),
+            ("lcc", .cloud_cover_low, nil),
+            ("mcc", .cloud_cover_mid, nil),
+            ("hcc", .cloud_cover_high, nil),
+            ("ssrd", .shortwave_radiation, nil),
+            ("cape", .cape, nil),
+            ("cin", .convective_inhibition, nil),
+            ("tp", .precipitation, nil),
+            ("rain", .rain, nil),
+            ("sf", .snowfall_water_equivalent, nil),
+            ("sd", .snow_depth_water_equivalent, nil),
+            ("sund", .sunshine_duration, nil),
+            ("10fg", .wind_gusts_10m, nil),
+            ("snowlmt", .snowfall_height, nil),
+            ("msl", .pressure_msl, 0.01), // Pa -> hPa
+        ]
+
+        for (ncName, omVar, multiply) in simpleVariables {
+            if let onlyVariables, !onlyVariables.contains(omVar) {
+                continue
+            }
+            logger.info("Processing \(omVar)")
+            var spatial = try read(ncName)
+            if let multiply {
+                spatial.data.multiplyAdd(multiply: multiply, add: 0)
+            }
+            try await write(omVar, spatial)
+        }
+
+        let writeWindSpeed = onlyVariables?.contains(.wind_speed_10m) ?? true
+        let writeWindDirection = onlyVariables?.contains(.wind_direction_10m) ?? true
+        if writeWindSpeed || writeWindDirection {
+            logger.info("Processing wind speed and direction")
+            let u = try read("10u")
+            let v = try read("10v")
+            for t in 0..<nTime {
+                let uStep = Array(u[t, 0..<nLocations])
+                let vStep = Array(v[t, 0..<nLocations])
+                if writeWindSpeed {
+                    try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_speed_10m, data: zip(uStep, vStep).map(Meteorology.windspeed))
+                }
+                if writeWindDirection {
+                    try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_direction_10m, data: Meteorology.windirectionFast(u: uStep, v: vStep))
+                }
+            }
+        }
+
+        if onlyVariables?.contains(.weather_code) ?? true {
+            logger.info("Converting weather code")
+            var symbol = try read("sy")
+            symbol.data = symbol.data.map(Self.weatherCode)
+            try await write(.weather_code, symbol)
         }
 
         await curl.printStatistics()
