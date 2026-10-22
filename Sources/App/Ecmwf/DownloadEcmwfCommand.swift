@@ -31,6 +31,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "download-concurrent", help: "Number of concurrent download requests (defaults to twice --concurrent)")
         var downloadConcurrent: Int?
 
+        @Option(name: "download-buffer-mb", help: "Compressed download buffer in MiB for single-range sources (default: 256)")
+        var downloadBufferMB: Int?
+
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
 
@@ -82,6 +85,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
         guard nConcurrent > 0, nDownloadConcurrent > 0 else {
             throw Abort(.badRequest, reason: "--concurrent and --download-concurrent must be greater than zero")
         }
+        let downloadBufferMB = signature.downloadBufferMB ?? 256
+        guard downloadBufferMB > 0, downloadBufferMB <= Int.max / (1024 * 1024) else {
+            throw Abort(.badRequest, reason: "--download-buffer-mb must be a positive size in MiB")
+        }
+        let downloadBufferBytes = downloadBufferMB * 1024 * 1024
         let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 
         let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_peak_period]
@@ -89,7 +97,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile)
+                let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile, downloadBufferBytes: downloadBufferBytes) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile, downloadBufferBytes: downloadBufferBytes)
                 try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
@@ -100,7 +108,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         }
         let generateFullRun = domain.countEnsembleMember == 1
-        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile)
+        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile, downloadBufferBytes: downloadBufferBytes) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile, downloadBufferBytes: downloadBufferBytes)
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
@@ -174,7 +182,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool, downloadBufferBytes: Int = 256 * 1024 * 1024) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         // Retry unauthorized errors, because ECMWF servers randomly return this error code
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, retryUnauthorized: true, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
@@ -214,7 +222,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
                 let request = try EcmwfOpenDataSource.prepareDownload(url: url)
-                try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
+                try await curl.foreachEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, processingConcurrent: concurrent, downloadFullGribFile: downloadFullGribFile, bufferBytes: downloadBufferBytes, isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
@@ -235,7 +243,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         }
                         return entry.param == variable.gribName
                     })
-                }).foreachConcurrent(nConcurrent: concurrent) { message in
+                }) { message in
                     guard let shortName = message.get(attribute: "shortName"),
                           var stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType") else {
@@ -439,7 +447,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwfWave(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, downloadConcurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool) async throws -> [GenericVariableHandle] {
+    func downloadEcmwfWave(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, downloadConcurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool, downloadBufferBytes: Int = 256 * 1024 * 1024) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
         Process.alarm(seconds: 6 * 3600)
@@ -463,11 +471,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
             let request = try EcmwfOpenDataSource.prepareDownload(url: url)
-            try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
+            try await curl.foreachEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, processingConcurrent: concurrent, downloadFullGribFile: downloadFullGribFile, bufferBytes: downloadBufferBytes, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
                 })
-            }).foreachConcurrent(nConcurrent: concurrent) { message in
+            }) { message in
                 guard let shortName = message.get(attribute: "shortName") else {
                     fatalError("could not get step range or type")
                 }
