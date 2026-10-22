@@ -44,6 +44,13 @@ extension Curl {
         }
     }
 
+    /// Share one request budget between independent ranges and chunks within each range.
+    static func indexedDownloadConcurrency(rangeCount: Int, concurrent: Int) -> (ranges: Int, chunks: Int) {
+        precondition(rangeCount > 0 && concurrent > 0)
+        let ranges = min(concurrent, rangeCount)
+        return (ranges, max(1, concurrent / ranges))
+    }
+
     /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
     /// If `downloadFullGribFile` is set, skip inventory and perform full download. This can be faster if all variables are processed anyway
     /// URLs must already be authenticated. The caller supplies the source's range capability.
@@ -57,8 +64,9 @@ extension Curl {
             fatalError("Empty grib selection")
         }
         let ranges = index.indexToRange(allowMultipleRanges: allowMultipleRanges)
-        return ranges.mapStream(nConcurrent: 1, body: {
-            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
+        let concurrency = Self.indexedDownloadConcurrency(rangeCount: ranges.count, concurrent: concurrent)
+        return ranges.mapStream(nConcurrent: concurrency.ranges, body: {
+            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrency.chunks)
         }).flatMap({ $0.mapStream(nConcurrent: 1, body: { $0 }) }).eraseToAnyAsyncSequence()
     }
 
