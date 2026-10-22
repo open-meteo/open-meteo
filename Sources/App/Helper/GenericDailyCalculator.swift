@@ -125,14 +125,15 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             guard let data = try await reader.get(variable: variable, time: timeInterval) else {
                 return nil
             }
-            return DataAndUnit(data.data.sum(by: stepsModel), data.unit)
+            // ERA5 may not yet provide the interval ending at the next midnight.
+            return DataAndUnit(data.data.sum(by: stepsModel, allowMissingLast: true), data.unit)
         case .radiationSum(let variable):
             let timeInterval = timeModel.with(time: timeModel.time.add(modelDtSeconds))
             guard let data = try await reader.get(variable: variable, time: timeInterval) else {
                 return nil
             }
             // 3600s only for hourly data of source
-            return DataAndUnit(data.data.map({ $0 * Float(modelDtSeconds) / 1000000 }).sum(by: stepsModel).round(digits: 2), .megajoulePerSquareMetre)
+            return DataAndUnit(data.data.map({ $0 * Float(modelDtSeconds) / 1000000 }).sum(by: stepsModel, allowMissingLast: true).round(digits: 2), .megajoulePerSquareMetre)
         case .precipitationHours(let variable):
             guard let data = try await reader.get(variable: variable, time: timeModel) else {
                 return nil

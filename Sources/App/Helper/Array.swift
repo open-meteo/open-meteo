@@ -50,9 +50,12 @@ extension Array where Element == Float {
             return self[i..<i + by].reduce(Float.greatestFiniteMagnitude, {$1 > $0 ? $0 : $1})
         }
     }
-    func sum(by: Int) -> [Float] {
+    /// Optionally tolerate a missing final value in each block; earlier NaNs still propagate.
+    func sum(by: Int, allowMissingLast: Bool = false) -> [Float] {
         return stride(from: 0, through: count - by, by: by).map { i in
-            return self[i..<i + by].reduce(0, +)
+            let end = i + by
+            let omitLast = allowMissingLast && by > 1 && self[end - 1].isNaN
+            return self[i..<(omitLast ? end - 1 : end)].reduce(0, +)
         }
     }
     func sum(by: Float) -> [Float] {
