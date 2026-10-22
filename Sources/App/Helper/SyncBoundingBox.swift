@@ -5,7 +5,7 @@ import OmFileIO
 import Logging
 import Synchronization
 
-/// Grid cells that `sync --bbox` keeps: the cells whose centres lie inside the box.
+/// Grid cells that `sync --bounding-box` keeps: the cells whose centres lie inside the box.
 /// Compressed chunks of a weather variable file that hold none of them are written as NaN, so the API returns null for those chunks.
 struct SyncBoundingBox: Sendable {
     /// `ny * nx` flags in grid order

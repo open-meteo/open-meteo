@@ -766,7 +766,7 @@ extension TimeZone {
 }
 
 extension BoundingBoxWGS84 {
-    /// Validate `lat1, lon1, lat2, lon2` as given to the `bounding_box` parameter or `sync --bbox`
+    /// Validate `lat1, lon1, lat2, lon2` as given to the `bounding_box` parameter or `sync --bounding-box`
     init(coordinates: [Float]) throws {
         guard coordinates.count == 4 else {
             throw ForecastApiError.generic(message: "Parameter bounding_box must have 4 values")

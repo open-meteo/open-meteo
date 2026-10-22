@@ -63,8 +63,8 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "year", help: "Download one year or a range of years (e.g. 2000-2005)")
         var year: String?
 
-        @Option(name: "bbox", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
-        var bbox: String?
+        @Option(name: "bounding-box", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
+        var boundingBox: String?
     }
 
     /// All weather variables that may be available for `previous days API`
@@ -120,7 +120,7 @@ struct SyncCommand: AsyncCommand {
         let pastDays = signature.pastDays ?? 7
         let concurrent = signature.concurrent ?? 2
         let concurrentModels = signature.concurrentModels ?? 2
-        let bbox = try signature.bbox.map { try BoundingBoxWGS84(commaSeparated: $0) }
+        let bbox = try signature.boundingBox.map { try BoundingBoxWGS84(commaSeparated: $0) }
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
