@@ -79,7 +79,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let isWave = domain == .wam025 || domain == .wam025_ensemble
 
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
-        let variables = onlyVariables ?? EcmwfVariable.allCases
+        let variables = (onlyVariables ?? EcmwfVariable.allCases).filter { domain.includes(variable: $0) }
+        if domain.isIfs01 && variables.isEmpty {
+            throw Abort(.badRequest, reason: "No selected variables belong to \(domain.rawValue)")
+        }
         let nConcurrent = signature.concurrent ?? 1
         let nDownloadConcurrent = signature.downloadConcurrent ?? (2 * nConcurrent)
         guard nConcurrent > 0, nDownloadConcurrent > 0 else {
@@ -125,7 +128,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         logger.info("Downloading height and elevation data")
-        let url = domain.getUrl(base: base, run: run, hour: 0)[0]
+        let url = domain.elevationDomain.getUrl(base: base, run: run, hour: 0)[0]
         let request = try EcmwfOpenDataSource.prepareDownload(url: url)
         for try await message in try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
             guard entry.number == nil else {
@@ -196,7 +199,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let timestamps = forecastHours.map { run.add(hours: $0) }
         let deaverager = GribDeaverager()
         
-        let storeOnDisk = domain == .ifs025 || domain == .aifs025_single || domain == .wam025
+        let storeOnDisk = domain == .ifs01 || domain == .ifs01_pressure_levels || domain == .ifs025 || domain == .aifs025_single || domain == .wam025
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -206,7 +209,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
             
-            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writerProbabilities = domain.countEnsembleMember > 1 && !domain.isPressureLevels ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
 
             if variables.isEmpty {
@@ -309,8 +312,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    // Keep relative humidity in memory to generate total cloud cover files
-                    if variable.gribName == "r" {
+                    // IFS 0.1° has native surface clouds; do not buffer its pressure humidity.
+                    if variable.gribName == "r" && domain.requiresCloudCoverFromHumidity {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
@@ -379,54 +382,56 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
-            for member in 0..<domain.countEnsembleMember {
-                if await writer.contains(member: member, variable: EcmwfVariable.cloud_cover_low) {
-                    continue
-                }
-                logger.info("Calculating cloud cover")
-                // 2025-10-13: added 100/150/600/400 hPa levels
-                guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
-                      let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
-                      let rh850 = await inMemory.get(variable: .relative_humidity_850hPa, timestamp: timestamp, member: member)?.data,
-                      let rh700 = await inMemory.get(variable: .relative_humidity_700hPa, timestamp: timestamp, member: member)?.data,
-                      let rh600 = await inMemory.get(variable: .relative_humidity_600hPa, timestamp: timestamp, member: member)?.data,
-                      let rh500 = await inMemory.get(variable: .relative_humidity_500hPa, timestamp: timestamp, member: member)?.data,
-                      let rh400 = await inMemory.get(variable: .relative_humidity_400hPa, timestamp: timestamp, member: member)?.data,
-                      let rh300 = await inMemory.get(variable: .relative_humidity_300hPa, timestamp: timestamp, member: member)?.data,
-                      let rh250 = await inMemory.get(variable: .relative_humidity_250hPa, timestamp: timestamp, member: member)?.data,
-                      let rh200 = await inMemory.get(variable: .relative_humidity_200hPa, timestamp: timestamp, member: member)?.data,
-                      let rh150 = await inMemory.get(variable: .relative_humidity_150hPa, timestamp: timestamp, member: member)?.data,
-                      let rh100 = await inMemory.get(variable: .relative_humidity_100hPa, timestamp: timestamp, member: member)?.data,
-                      let rh50 = await inMemory.get(variable: .relative_humidity_50hPa, timestamp: timestamp, member: member)?.data else {
-                    logger.warning("Pressure level relative humidity unavailable")
-                    continue
-                }
+            if domain.requiresCloudCoverFromHumidity {
+                for member in 0..<domain.countEnsembleMember {
+                    if await writer.contains(member: member, variable: EcmwfVariable.cloud_cover_low) {
+                        continue
+                    }
+                    logger.info("Calculating cloud cover")
+                    // 2025-10-13: added 100/150/600/400 hPa levels
+                    guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
+                          let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
+                          let rh850 = await inMemory.get(variable: .relative_humidity_850hPa, timestamp: timestamp, member: member)?.data,
+                          let rh700 = await inMemory.get(variable: .relative_humidity_700hPa, timestamp: timestamp, member: member)?.data,
+                          let rh600 = await inMemory.get(variable: .relative_humidity_600hPa, timestamp: timestamp, member: member)?.data,
+                          let rh500 = await inMemory.get(variable: .relative_humidity_500hPa, timestamp: timestamp, member: member)?.data,
+                          let rh400 = await inMemory.get(variable: .relative_humidity_400hPa, timestamp: timestamp, member: member)?.data,
+                          let rh300 = await inMemory.get(variable: .relative_humidity_300hPa, timestamp: timestamp, member: member)?.data,
+                          let rh250 = await inMemory.get(variable: .relative_humidity_250hPa, timestamp: timestamp, member: member)?.data,
+                          let rh200 = await inMemory.get(variable: .relative_humidity_200hPa, timestamp: timestamp, member: member)?.data,
+                          let rh150 = await inMemory.get(variable: .relative_humidity_150hPa, timestamp: timestamp, member: member)?.data,
+                          let rh100 = await inMemory.get(variable: .relative_humidity_100hPa, timestamp: timestamp, member: member)?.data,
+                          let rh50 = await inMemory.get(variable: .relative_humidity_50hPa, timestamp: timestamp, member: member)?.data else {
+                        logger.warning("Pressure level relative humidity unavailable")
+                        continue
+                    }
                 
-                let lowCC = Meteorology.cloudCoverFromRH([
-                    (rh: rh1000, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
-                    (rh: rh925,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
-                    (rh: rh850,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
-                ])
-                let midCC = Meteorology.cloudCoverFromRH([
-                    (rh: rh700,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
-                    (rh: rh600,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
-                    (rh: rh500,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
-                    (rh: rh400,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
-                ])
-                let highCC = Meteorology.cloudCoverFromRH([
-                    (rh: rh300,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
-                    (rh: rh250,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
-                    (rh: rh200,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
-                    (rh: rh150,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
-                    (rh: rh100,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
-                    (rh: rh50,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
-                ])
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: lowCC)
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: midCC)
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: highCC)
-                if await !writer.contains(member: member, variable: EcmwfVariable.cloud_cover) {
-                    let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
-                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
+                    let lowCC = Meteorology.cloudCoverFromRH([
+                        (rh: rh1000, rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 1000)),
+                        (rh: rh925,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 925)),
+                        (rh: rh850,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 850))
+                    ])
+                    let midCC = Meteorology.cloudCoverFromRH([
+                        (rh: rh700,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 700)),
+                        (rh: rh600,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 600)),
+                        (rh: rh500,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 500)),
+                        (rh: rh400,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 400))
+                    ])
+                    let highCC = Meteorology.cloudCoverFromRH([
+                        (rh: rh300,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 300)),
+                        (rh: rh250,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 250)),
+                        (rh: rh200,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 200)),
+                        (rh: rh150,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 150)),
+                        (rh: rh100,  rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 100)),
+                        (rh: rh50,   rhCrit: Meteorology.relativeHumidityThreshold(pressureHPa: 50))
+                    ])
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: lowCC)
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: midCC)
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: highCC)
+                    if await !writer.contains(member: member, variable: EcmwfVariable.cloud_cover) {
+                        let cloudcover = Meteorology.cloudCoverTotal(low: lowCC, mid: midCC, high: highCC)
+                        try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
+                    }
                 }
             }
 
@@ -513,13 +518,16 @@ extension EcmwfDomain {
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .ifs01, .ifs01_pressure_levels, .ifs01_ensemble, .ifs01_ensemble_pressure_levels:
+            // IFS 0.1° open data is published two hours later than IFS 0.25°.
+            return t.subtract(hours: 8).floor(toNearestHour: 6)
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return t.subtract(hours: 6).floor(toNearestHour: 6)
         case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
             return t.subtract(hours: 4).floor(toNearestHour: 6)
-        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             fatalError()
         }
     }
@@ -528,6 +536,12 @@ extension EcmwfDomain {
         let runStr = run.hour.zeroPadded(len: 2)
         let dateStr = run.format_YYYYMMdd
         switch self {
+        case .ifs01, .ifs01_pressure_levels, .ifs01_ensemble, .ifs01_ensemble_pressure_levels:
+            let levelType = isPressureLevels ? "pl" : "sfc"
+            let root = "\(base)\(dateStr)/\(runStr)z/ifs/0p1/"
+            let prefix = "\(dateStr)\(runStr)0000-\(hour)h"
+            let control = "\(root)oper/\(prefix)-oper-fc-\(levelType).grib2"
+            return isEnsemble ? [control, "\(root)enfo/\(prefix)-enfo-ef-\(levelType).grib2"] : [control]
         case .ifs04:
             let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
@@ -558,7 +572,7 @@ extension EcmwfDomain {
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-cf.grib2",
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-pf.grib2"
             ]
-        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             fatalError()
         }
     }
