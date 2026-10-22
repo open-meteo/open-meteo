@@ -1127,6 +1127,12 @@ extension MultiDomains {
             return .arpaeCosmo2iRuc
         case .arpae_cosmo_5m:
             return .arpaeCosmo5m
+        case .ecmwf_ifs01, .ecmwf_ifs01_ensemble:
+            // TODO: add to sdk — use an IFS 0.1° model identifier.
+            return .ecmwfIfs025
+        case .ecmwf_ifs01_ensemble_mean:
+            // TODO: add to sdk — use an IFS 0.1° ensemble mean identifier.
+            return .ecmwfIfs025EnsembleMean
         case .ecmwf_ifs025:
             return .ecmwfIfs025
         case .ecmwf_aifs025:
