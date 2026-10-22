@@ -2183,7 +2183,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let seas5Domain: EcmwfSeasDomain = isEnsembleMean ? .seas5_ensemble_mean : .seas5
             let seas5DailyDomain: EcmwfSeasDomain = isEnsembleMean ? .seas5_daily_ensemble_mean : .seas5_daily
             
-            let seas5daily = try await VariableDailyDeriver(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: seas5DailyDomain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas5daily = try await seas5DailyDomain.makeDerivedDaily(variableType: EcmwfSeasVariableDailySingleLevel.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             let seas6hourly = try await seas5Domain.makeDerivedHourly(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
@@ -2204,7 +2204,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let seas5Domain: EcmwfSeasDomain = isEnsembleMean ? .seas5_ensemble_mean : .seas5
             let seas5DailyDomain: EcmwfSeasDomain = isEnsembleMean ? .seas5_daily_ensemble_mean : .seas5_daily
             
-            let seas5daily = try await VariableDailyDeriver(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: seas5DailyDomain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas5daily = try await seas5DailyDomain.makeDerivedDaily(variableType: EcmwfSeasVariableDailySingleLevel.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             let seas6hourly = try await seas5Domain.makeDerivedHourly(variableType: VariableOrSpread<EcmwfSeasVariableSingleLevel>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             let seas6hourlyToDaily = seas6hourly.makeDailyAggregator()
             
