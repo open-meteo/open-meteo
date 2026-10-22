@@ -62,6 +62,45 @@ extension Curl {
         }).flatMap({ $0.mapStream(nConcurrent: 1, body: { $0 }) }).eraseToAnyAsyncSequence()
     }
 
+    /// Single-range cloud downloads prefetch compressed bytes independently of GRIB processing.
+    func foreachEcmwfIndexed(
+        url: String, indexURL: String, allowMultipleRanges: Bool, concurrent: Int,
+        processingConcurrent: Int, downloadFullGribFile: Bool, bufferBytes: Int = 256 * 1024 * 1024,
+        isIncluded: (EcmwfIndexEntry) -> Bool,
+        body: @escaping @Sendable (GribMessage) async throws -> Void
+    ) async throws {
+        if allowMultipleRanges || downloadFullGribFile {
+            try await downloadEcmwfIndexed(url: url, indexURL: indexURL, allowMultipleRanges: allowMultipleRanges,
+                concurrent: concurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: isIncluded)
+                .foreachConcurrent(nConcurrent: processingConcurrent, body: body)
+            return
+        }
+        let index = try await downloadInMemoryAsync(url: indexURL, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
+        guard !index.isEmpty else { throw CurlError.didNotFindAllVariablesInGribIndex }
+        let ranges = try index.downloadBatches(targetBytes: min(8 * 1024 * 1024, bufferBytes))
+        logger.info("Prefetching \(ranges.count) GRIB batches with \(concurrent) download workers and \(bufferBytes.bytesHumanReadable) compressed buffer")
+        try await BufferedDownloadSequence.withDownloads(
+            ranges: ranges, concurrent: concurrent, byteLimit: bufferBytes,
+            download: { range in
+                try await self.downloadInMemoryAsync(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)",
+                    minSize: range.count, nConcurrent: 1, maxSize: range.count, expectedRange: range)
+            }
+        ) { downloads in
+            try await BufferedGribSequence(downloads: downloads).foreachConcurrent(nConcurrent: processingConcurrent) { item in
+                // ecCodes may reference the compressed message memory while processing.
+                defer { withExtendedLifetime(item.download) {} }
+                do {
+                    try await body(item.message)
+                } catch {
+                    await downloads.fail(error)
+                    throw error
+                }
+            }
+            let peak = await downloads.peakCost
+            self.logger.info("Compressed download buffer peak: \(peak.bytesHumanReadable)")
+        }
+    }
+
     /// Download index file and match against curl variable
     func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: [String], variables: [Variable], errorOnMissing: Bool) async throws -> [(matches: [Variable], range: String, minSize: Int)] {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
@@ -195,6 +234,25 @@ extension ByteBuffer {
 }
 
 extension Array where Element == Curl.EcmwfIndexEntry {
+    /// Group selected adjacent messages, without splitting messages or fetching excluded gaps.
+    func downloadBatches(targetBytes: Int) throws -> [Range<Int>] {
+        precondition(targetBytes > 0)
+        var batches = [Range<Int>]()
+        for entry in self {
+            let (end, overflow) = entry._offset.addingReportingOverflow(entry._length)
+            guard entry._offset >= 0, entry._length > 0, !overflow else {
+                throw CurlMemoryDownloadError.invalidRangeResponse
+            }
+            if let last = batches.last, last.upperBound == entry._offset,
+               entry._length <= targetBytes - last.count {
+                batches[batches.count - 1] = last.lowerBound..<end
+            } else {
+                batches.append(entry._offset..<end)
+            }
+        }
+        return batches
+    }
+
     /// Convert grib entries to http range download command
     /// Split large range downloads to multiple individual downloads to prevent `request header too large` error
     func indexToRange(allowMultipleRanges: Bool = true) -> [(range: String, minSize: Int)] {
