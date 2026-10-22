@@ -51,6 +51,7 @@ Apps:
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [BusyRunner](https://busyrunner.com/) Allows users to plan their weekly runs based on the weather.
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
+- [Calendrier Tempo](https://www.calendrier-tempo.fr/) Forecasts the EDF Tempo day colour (blue, white or red), which sets the electricity price for Tempo customers in France, up to 15 days ahead, using Open-Meteo forecasts for 9 French cities. Free, French-language site.
 - [Calima Canarias](https://calimacanarias.com) Real-time Saharan dust (calima) forecast and air quality monitoring for the Canary Islands and the rest of Spain.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
