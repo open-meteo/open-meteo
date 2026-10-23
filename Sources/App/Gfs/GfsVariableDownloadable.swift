@@ -150,6 +150,17 @@ enum NamDownloadSurfaceVariable: String, CaseIterable, GfsSurfaceVariableDownloa
     case visibility, wind_gusts_10m, categorical_freezing_rain
     case convective_inhibition, cape
 
+    /// Historical NAM files have U/V labels swapped by the former GRIB submessage decoder.
+    /// Preserve that storage layout; VariableHourlyDeriver restores the components on read.
+    var legacyStorageVariable: Self {
+        switch self {
+        case .wind_u_component_10m: return .wind_v_component_10m
+        case .wind_v_component_10m: return .wind_u_component_10m
+        case .wind_u_component_80m: return .wind_v_component_80m
+        case .wind_v_component_80m: return .wind_u_component_80m
+        default: return self
+        }
+    }
 
     func gribIndexName(timestep: Int?) -> String? {
         switch self {

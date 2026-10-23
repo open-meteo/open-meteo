@@ -70,13 +70,13 @@ struct KmaDownload: AsyncCommand {
         let urlLand = "\(server)\(domain.filePrefix)_v070_land_unis_h000.\(run.format_YYYYMMddHH).gb2"
         /// fraction 0=sea, 1=land
         let landmask = try await ftp.get404Retry(logger: logger, url: urlLand).withUnsafeBytes({
-            let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
+            let message = try GribAsyncStreamHelper.decodeMessages(memory: $0)[0]
             return try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
         })
 
         let urlElevation = "\(server)\(domain.filePrefix)_v070_dist_unis_h000.\(run.format_YYYYMMddHH).gb2"
         var elevation = try await ftp.get404Retry(logger: logger, url: urlElevation).withUnsafeBytes({
-            let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
+            let message = try GribAsyncStreamHelper.decodeMessages(memory: $0)[0]
             return try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
         })
 
@@ -126,7 +126,7 @@ struct KmaDownload: AsyncCommand {
                 let url = "\(server)\(domain.filePrefix)_v070_\(kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
                 let data = try await ftp.get404Retry(logger: logger, url: url)
                 let array2d = try data.withUnsafeBytes({
-                    let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
+                    let message = try GribAsyncStreamHelper.decodeMessages(memory: $0)[0]
                     // try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
                     // fatalError()
                     var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
