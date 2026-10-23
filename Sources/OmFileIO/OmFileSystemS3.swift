@@ -31,7 +31,7 @@ enum OmFileSystemS3Error: Error {
  - Each contains a list of modified files
  */
 public struct OmFileSystemS3: Sendable {
-    let server: S3ServerHealth
+    public let server: S3ServerHealth
     let root = Directory(prefix: "")
     
     public init(server: S3ServerHealth) {
@@ -443,7 +443,7 @@ public struct OmFileSystemS3: Sendable {
             revalidationQueue = []
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
-                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: .shared, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: context.client, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))

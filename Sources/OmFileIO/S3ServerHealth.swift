@@ -9,6 +9,7 @@ public enum S3ServerHealthError: Error {
 /// Wraps `S3ServerHealth` into a vapor usable service that does not allow an async init
 public actor S3ServerHealth {
     public nonisolated let logger: Logger
+    public nonisolated let client: HTTPClient
     var states: [ServerState]
     var monitor: Task<Void, Never>?
     var initialWaitQueue: [CheckedContinuation<Void, Never>]?
@@ -20,8 +21,9 @@ public actor S3ServerHealth {
         var isOnline: Bool
     }
     
-    public init(logger: Logger, servers: [S3BucketEndpoint], checksHealth: Bool = true) {
+    public init(logger: Logger, servers: [S3BucketEndpoint], client: HTTPClient = .shared, checksHealth: Bool = true) {
         self.logger = logger
+        self.client = client
         self.states = servers.map({ .init(server: $0, isOnline: true) })
         self.initialWaitQueue = []
         self.checksHealth = checksHealth
@@ -84,7 +86,6 @@ public actor S3ServerHealth {
     }
     
     private func performHealthChecks() async {
-        let client = HTTPClient.shared
         for i in states.indices {
             let server = states[i].server
             do {
@@ -112,5 +113,10 @@ public actor S3ServerHealth {
             initialWaitQueue.forEach({ $0.resume() })
             self.initialWaitQueue = nil
         }
+    }
+
+    public func stopMonitoring() {
+        monitor?.cancel()
+        monitor = nil
     }
 }
