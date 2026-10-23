@@ -3,24 +3,43 @@ import Foundation
 
 /** Actor isolation to calculate ensemble mean and spread for a single timestep */
 actor EnsembleMeanCalculator {
-    fileprivate var variablesAndStats: [(any GenericVariable, (any GenericVariable)?, ArrayMeanStdDevSampler)] = []
-    
-    func ingest(variable: any GenericVariable, spreadVariable: (any GenericVariable)?, data: [Float]) async {
-        guard let stats = variablesAndStats.first(where: {$0.0.omFileName == variable.omFileName}) else {
-            let stats = ArrayMeanStdDevSampler()
-            await stats.ingest(data)
-            variablesAndStats.append((variable, spreadVariable, stats))
-            return
+    struct Statistics: Sendable {
+        let variable: any GenericVariable
+        let spreadVariable: (any GenericVariable)?
+        fileprivate let sampler: ArrayMeanStdDevSampler
+
+        func write(to writer: OmSpatialTimestepWriter) async throws {
+            try await writer.write(member: 0, variable: variable, data: sampler.means)
+            if let spreadVariable {
+                try await writer.write(member: 0, variable: spreadVariable, data: sampler.standardDeviation)
+            }
         }
-        await stats.2.ingest(data)
+    }
+
+    private var variablesAndStats: [Statistics] = []
+    var pendingVariableCount: Int { variablesAndStats.count }
+    
+    /// Remove completed statistics for immediate writing; incomplete variables remain for finalisation.
+    @discardableResult
+    func ingest(variable: any GenericVariable, spreadVariable: (any GenericVariable)?, data: [Float], expectedMemberCount: Int? = nil) async -> Statistics? {
+        let stats: Statistics
+        if let existing = variablesAndStats.first(where: { $0.variable.omFileName == variable.omFileName }) {
+            stats = existing
+        } else {
+            stats = Statistics(variable: variable, spreadVariable: spreadVariable, sampler: ArrayMeanStdDevSampler())
+            // Register before suspending so concurrent members share the same sampler.
+            variablesAndStats.append(stats)
+        }
+        let count = await stats.sampler.ingest(data)
+        guard count == expectedMemberCount else { return nil }
+        variablesAndStats.removeAll { $0.variable.omFileName == variable.omFileName }
+        return stats
     }
     
     func calculateAndWrite(to writer: OmSpatialTimestepWriter) async throws {
-        for (variable, spreadVariable, sampler) in variablesAndStats {
-            try await writer.write(member: 0, variable: variable, data: sampler.means)
-            if let spreadVariable = spreadVariable {
-                try await writer.write(member: 0, variable: spreadVariable, data: sampler.standardDeviation)
-            }
+        while !variablesAndStats.isEmpty {
+            let stats = variablesAndStats.removeFirst()
+            try await stats.write(to: writer)
         }
     }
 }
@@ -57,7 +76,7 @@ fileprivate actor ArrayMeanStdDevSampler {
     /// Sum of squares of differences from the current mean
     private var m2s: [Float] = []
 
-    func ingest(_ values: [Float]) {
+    func ingest(_ values: [Float]) -> Int {
         if means.count == 0 {
             means = Array(repeating: 0.0, count: values.count )
             m2s = Array(repeating: 0.0, count: values.count )
@@ -72,6 +91,7 @@ fileprivate actor ArrayMeanStdDevSampler {
             let delta2 = x - means[i]
             m2s[i] += delta * delta2
         }
+        return count
     }
 
     /// Per-element variance (sample variance, n - 1)
