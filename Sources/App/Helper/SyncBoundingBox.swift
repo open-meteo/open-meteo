@@ -73,13 +73,13 @@ struct SyncBoundingBox: Sendable {
         }
     }
 
-    /// Combine consecutive selected chunks only when their bytes are adjacent and fit within the limit.
+    /// Combine selected chunks across gaps up to 1 MiB, keeping the full read within the limit.
     /// Empty chunks need no read. A single oversized chunk is fetched in one request.
-    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], max limit: Int = runBytes) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
+    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], max limit: Int = maxReadBytes) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
         var runs = [(chunks: Range<Int>, bytes: Range<Int>)]()
         for i in ranges.indices where takeChunks[i] && !ranges[i].isEmpty {
             let bytes = Int(ranges[i].lowerBound) ..< Int(ranges[i].upperBound)
-            if let last = runs.last, last.chunks.upperBound == i, last.bytes.upperBound == bytes.lowerBound,
+            if let last = runs.last, bytes.lowerBound - last.bytes.upperBound <= maxMergeGapBytes,
                bytes.upperBound - last.bytes.lowerBound <= limit {
                 runs[runs.count - 1] = (last.chunks.lowerBound ..< i + 1, last.bytes.lowerBound ..< bytes.upperBound)
             } else {
@@ -142,6 +142,10 @@ struct SyncBoundingBox: Sendable {
             try buffer.withUnsafeBytes { bytes in
                 for chunkIndex in run.chunks {
                     try Task.checkCancellation()
+                    guard take[chunkIndex] else {
+                        try out.writeCompressedChunk(UnsafeRawBufferPointer(start: nil, count: 0))
+                        continue
+                    }
                     let start = Int(ranges[chunkIndex].lowerBound) - run.bytes.lowerBound
                     let end = Int(ranges[chunkIndex].upperBound) - run.bytes.lowerBound
                     try out.writeCompressedChunk(UnsafeRawBufferPointer(rebasing: bytes[start..<end]))
@@ -170,11 +174,17 @@ struct SyncBoundingBox: Sendable {
         let rate = Int(Double(fetched) / max(elapsed, 0.001))
         let percent = String(format: "%.1f", 100 * Double(fetched) / Double(remote.count))
         let keptChunks = take.reduce(0) { $0 + ($1 ? 1 : 0) }
-        logger.info("Downloaded bbox \(String(url.prefix { $0 != "?" }).stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) requests=\(requests) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
+        let selectedBytes = ranges.indices.reduce(0) { $0 + (take[$1] ? Int(ranges[$1].count) : 0) }
+        // Only merged gaps count as excess; metadata reads are excluded.
+        let mergeOverhead = runs.reduce(0) { $0 + $1.bytes.count } - selectedBytes
+        logger.info("Downloaded bbox \(String(url.prefix { $0 != "?" }).stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) requests=\(requests) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%) mergeOverhead=\(mergeOverhead.bytesHumanReadable)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
         return fetched
     }
 
-    static let runBytes = 8 * 1024 * 1024
+    /// Maximum size of a merged HTTP read; a single oversized chunk is fetched whole.
+    static let maxReadBytes = 8 * 1024 * 1024
+    /// Maximum gap between selected chunks to include in a single HTTP read; gap bytes are discarded.
+    static let maxMergeGapBytes = 1024 * 1024
     /// Maximum concurrent range requests per file.
     static let maxConcurrentReads = 8
 }

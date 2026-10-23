@@ -93,42 +93,52 @@ import Synchronization
         #expect(try await takeChunks(dims: [12, 15, 12, 15], chunks: [2, 3, 2, 3]) == nil)
     }
 
-    @Test func coalescedReadRangesOnlyJoinAdjacentSelectedChunks() {
+    @Test func coalescedReadRangesMergeSmallGapsWithinReadLimit() {
         let ranges: [Range<UInt64>] = [100..<150, 150..<200, 200..<200, 210..<250, 250..<300, 300..<400, 400..<410]
         let take = [true, false, true, true, true, true, true]
         let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: take, max: 150)
-        #expect(runs.map(\.chunks) == [0..<1, 3..<5, 5..<7])
-        #expect(runs.map(\.bytes) == [100..<150, 210..<300, 300..<410])
-        // Even a one-byte gap must not be fetched.
+        #expect(runs.map(\.chunks) == [0..<4, 4..<6, 6..<7])
+        #expect(runs.map(\.bytes) == [100..<250, 250..<400, 400..<410])
+        // Small gaps are included in the HTTP read.
         let gap = SyncBoundingBox.coalescedReadRanges(ranges: [0..<10, 11..<20] as [Range<UInt64>], takeChunks: [true, true])
-        #expect(gap.map(\.bytes) == [0..<10, 11..<20])
+        #expect(gap.map(\.bytes) == [0..<20])
         let capped = SyncBoundingBox.coalescedReadRanges(ranges: [0..<100, 100..<150, 150..<151] as [Range<UInt64>], takeChunks: [true, true, true], max: 150)
         #expect(capped.map(\.bytes) == [0..<150, 150..<151])
     }
 
-    @Test func concurrentReadsKeepChunkOrderAndNeverFetchGaps() async throws {
+    @Test(arguments: [1024 * 1024, 1024 * 1024 + 1])
+    func mergeGapLimit(gap: Int) {
+        let start = UInt64(10 + gap)
+        let ranges: [Range<UInt64>] = [0..<10, 10..<start, start..<(start + 10)]
+        let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, false, true])
+        let expected = gap == 1024 * 1024 ? [0..<(20 + gap)] : [0..<10, (10 + gap)..<(20 + gap)]
+        #expect(runs.map(\.bytes) == expected)
+        let capped = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, false, true], max: gap + 19)
+        #expect(capped.count == 2)
+    }
+
+    @Test func mergedReadsOnlyWriteSelectedChunks() async throws {
         let values = (0..<120).map { Float($0) / 20 }
         let source = try fixture(values, dimensions: [1, 40, 3], chunks: [1, 1, 3])
         let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let ranges = try await array.chunkIndex()
         let selectedCells = (0..<40).map { $0 % 2 == 1 }
-        let selectedRanges = ranges.indices.filter { selectedCells[$0] }.map {
-            Int(ranges[$0].lowerBound)..<Int(ranges[$0].upperBound)
-        }
+        let selectedRanges = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: selectedCells).map(\.bytes)
+        #expect(selectedRanges.count == 1)
         let backend = RecordingReadBackend(data: source.data, delayedOffsets: Set(selectedRanges.map(\.lowerBound)))
         let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40)
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
         _ = try await keep.write(remote: backend, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test"))
 
-        #expect(await backend.peakConcurrentReads == SyncBoundingBox.maxConcurrentReads)
-        #expect(await backend.readsBeforeFirstCompleted == SyncBoundingBox.maxConcurrentReads)
+        #expect(await backend.peakConcurrentReads == 1)
+        #expect(await backend.readsBeforeFirstCompleted == 1)
         let retained = backend.liveBuffers.state.withLock { $0 }
         #expect(retained.peak <= SyncBoundingBox.maxConcurrentReads)
         #expect(retained.current == 0)
         let payloadReads = await backend.requests.filter { selectedRanges.contains($0) }
         #expect(payloadReads.sorted { $0.lowerBound < $1.lowerBound } == selectedRanges)
-        // This small fixture fits in one metadata block. Only selected payload ranges are read afterwards.
+        // This small fixture fits in one metadata block, followed by one merged payload read.
         #expect(source.count <= 4096)
         #expect(await backend.requests.first == 0..<source.count)
         #expect(await backend.requests.count == selectedRanges.count + 1)
@@ -143,7 +153,7 @@ import Synchronization
     }
 
     @Test func oversizedChunkRemainsOneRange() {
-        let oversizedEnd = UInt64(2 * SyncBoundingBox.runBytes + 10)
+        let oversizedEnd = UInt64(2 * SyncBoundingBox.maxReadBytes + 10)
         let ranges: [Range<UInt64>] = [0..<3, 3..<oversizedEnd, oversizedEnd..<(oversizedEnd + 3)]
         let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, true, true])
         #expect(runs.map(\.bytes) == ranges.map { Int($0.lowerBound)..<Int($0.upperBound) })
@@ -236,7 +246,7 @@ import Synchronization
         let second = try await OmFileReader(fn: DataAsClass(data: Data(contentsOf: URL(fileURLWithPath: secondFile)))).expectArray(of: Float.self).read()
         #expect(zip(copy, second).allSatisfy { $0.bitPattern == $1.bitPattern || ($0.isNaN && $1.isNaN) })
         // Metadata block rounding can include payload bytes in small files.
-        let payloadBytes = sourceIndex.indices.filter { take[$0] }.reduce(0) { $0 + Int(sourceIndex[$1].count) }
+        let payloadBytes = SyncBoundingBox.coalescedReadRanges(ranges: sourceIndex, takeChunks: take).reduce(0) { $0 + $1.bytes.count }
         #expect(keptChunks.count < allChunks.count)
         #expect(fetched <= source.count + payloadBytes)
         return keptChunks.count
