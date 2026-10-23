@@ -278,8 +278,8 @@ struct SyncCommand: AsyncCommand {
                 if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
                     // The server reads the API key from the URL query.
                     let object = download.name + (request.url.query.map { "?\($0)" } ?? "")
-                    if let fetched = try await downloadBoundingBox(keep: keep, url: request.url.string, endpoint: endpoint, object: object, download: download, localFile: localFile, logger: logger) {
-                        await progress.add(fetched)
+                    if try await downloadBoundingBox(keep: keep, url: request.url.string, endpoint: endpoint, object: object, download: download, localFile: localFile, logger: logger) != nil {
+                        await progress.add(download.fileSize)
                         return
                     }
                 }
