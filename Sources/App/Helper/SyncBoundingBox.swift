@@ -169,7 +169,7 @@ struct SyncBoundingBox: Sendable {
         let rate = Int(Double(fetched) / max(elapsed, 0.001))
         let percent = String(format: "%.1f", 100 * Double(fetched) / Double(remote.count))
         let keptChunks = take.reduce(0) { $0 + ($1 ? 1 : 0) }
-        logger.info("Downloaded bbox \(url.stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) requests=\(requests) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
+        logger.info("Downloaded bbox \(String(url.prefix { $0 != "?" }).stripHttpPassword()) [chunks=\(keptChunks)/\(take.count) ranges=\(runs.count) requests=\(requests) transferred=\(fetched.bytesHumanReadable)/\(remote.count.bytesHumanReadable) (\(percent)%)] in \(elapsed.asSecondsPrettyPrint), \(rate.bytesHumanReadable)/s")
         return fetched
     }
 
