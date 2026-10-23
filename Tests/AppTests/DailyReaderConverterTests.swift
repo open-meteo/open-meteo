@@ -29,24 +29,41 @@ import Testing
         #expect(reader.prefetches.map(\.time) == [expectedTime, dailyTime.with(dtSeconds: modelDt)])
     }
 
-    @Test(arguments: [3600, 10800, 21600])
-    func precipitationSumUsesIntervalsEndingWithinDay(modelDt: Int) async throws {
+    @Test(arguments: [3600, 10800, 21600], [ForecastVariableDaily.precipitation_sum, .shortwave_radiation_sum])
+    func sumsUseUnshiftedHoursForBackwardsCompatibility(modelDt: Int, variable: ForecastVariableDaily) async throws {
         let reader = FixtureReader(modelDtSeconds: modelDt, start: start)
         let converter = DailyReaderConverter<FixtureReader, ForecastVariableDaily>(reader: reader)
-
-        let result = try #require(await converter.get(variable: .precipitation_sum, time: dailyTime))
-        // Each day has 1 mm per interval, except its final interval (7 and 11 mm).
-        // The 100 mm at the starting midnight must never enter either daily total.
         let steps = Float(86400 / modelDt)
-        #expect(result.data == [steps + 6, steps + 10])
-        #expect(result.unit == .millimetre)
-        #expect(reader.reads.map(\.variable) == ["precipitation"])
-        let expectedTime = dailyTime.with(time: TimerangeDt(start: start.add(modelDt), to: start.add(hours: 48).add(modelDt), dtSeconds: modelDt))
-        #expect(reader.reads.map(\.time) == [expectedTime])
+        let isRadiation = variable == .shortwave_radiation_sum
+        let factor: Float = isRadiation ? Float(modelDt) / 1000000 : 1
+        let expectedUnit: SiUnit = isRadiation ? .megajoulePerSquareMetre : .millimetre
 
-        _ = try await converter.prefetchData(variable: .precipitation_sum, time: dailyTime)
-        #expect(reader.prefetches.map(\.variable) == ["precipitation"])
+        let complete = try #require(await converter.get(variable: variable, time: dailyTime))
+        #expect(complete.data == [steps + 99, steps + 6].map { $0 * factor }.round(digits: 2))
+        #expect(complete.unit == expectedUnit)
+
+        let expectedTime = dailyTime.with(dtSeconds: modelDt)
+        #expect(reader.reads.map(\.time) == [expectedTime])
+        _ = try await converter.prefetchData(variable: variable, time: dailyTime)
         #expect(reader.prefetches.map(\.time) == [expectedTime])
+        #expect(reader.prefetches.map(\.variable) == reader.reads.map(\.variable))
+
+        // The next midnight is outside the aggregation window and may be unavailable.
+        reader.missingTimes = [start.add(hours: 48)]
+        let missingLast = try #require(await converter.get(variable: variable, time: dailyTime))
+        #expect(missingLast.data == complete.data)
+        #expect(missingLast.unit == expectedUnit)
+
+        // A missing interval inside the day, including its last interval, invalidates the total.
+        reader.missingTimes = [start.add(hours: 48), start.add(hours: 48).add(-modelDt)]
+        let missingEarlier = try #require(await converter.get(variable: variable, time: dailyTime))
+        #expect(missingEarlier.data[0] == complete.data[0])
+        #expect(missingEarlier.data[1].isNaN)
+
+        reader.missingTimes = Array(expectedTime.time)
+        let missingAll = try #require(await converter.get(variable: variable, time: dailyTime))
+        #expect(missingAll.data.count == 2)
+        #expect(missingAll.data.allSatisfy { $0.isNaN })
     }
 
     private final class FixtureReader: GenericReaderOptionalProtocol {
@@ -58,6 +75,7 @@ import Testing
         let start: Timestamp
         var reads: [(variable: String, time: TimerangeDtAndSettings)] = []
         var prefetches: [(variable: String, time: TimerangeDtAndSettings)] = []
+        var missingTimes: [Timestamp] = []
 
         init(modelDtSeconds: Int, start: Timestamp) {
             self.modelDtSeconds = modelDtSeconds
@@ -77,14 +95,15 @@ import Testing
                     return 10
                 }
                 return DataAndUnit(values, .celsius)
-            case "precipitation":
+            case "precipitation", "shortwave_radiation":
                 let values: [Float] = time.time.map { timestamp in
+                    if missingTimes.contains(timestamp) { return .nan }
                     if timestamp == start { return 100 }
                     if timestamp == start.add(hours: 24) { return 7 }
                     if timestamp == start.add(hours: 48) { return 11 }
                     return 1
                 }
-                return DataAndUnit(values, .millimetre)
+                return DataAndUnit(values, variable.rawValue == "precipitation" ? .millimetre : .wattPerSquareMetre)
             default:
                 Issue.record("Unexpected variable: \(variable.rawValue)")
                 return nil
