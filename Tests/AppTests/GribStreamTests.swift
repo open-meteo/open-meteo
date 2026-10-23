@@ -1,33 +1,22 @@
 import Foundation
 import NIOCore
 import Testing
+@preconcurrency import SwiftEccodes
 @testable import App
 
 @Suite struct GribStreamTests {
     private static let windFixture = "R1JJQv//AAIAAAAAAAAA9QAAABUBAGIAAAQAAQfXAxcMAAAAAgAAAEgDAAAAAAQAAAAABv///////////////////wAAAAIAAAACAAAAAP////8Dk4cAAAAAADAAAAAAAcnDgAAehIAAHoSAAAAAACIEAAAAAAICAP+AAAAAAQAAAAAB//////////////8AAAAVBQAAAAQAAEBAAAAAAAAAAAAAAAAGBv8AAAAFBwAAACIEAAAAAAIDAP+AAAAAAQAAAAAB//////////////8AAAAVBQAAAAQAAECAAAAAAAAAAAAAAAAGBv8AAAAFBzc3Nzc="
 
-    @Test func concurrentBufferedAndStreamingSubmessagesStaySeparate() async throws {
-        let packed = try #require(Data(base64Encoded: Self.windFixture))
-        let buffer = ByteBuffer(bytes: packed + packed)
+    @Test(arguments: [false, true])
+    func concurrentWindSubmessagesStayInTheirStreams(mixedDecoders: Bool) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for index in 0..<64 {
+                let chunkSize = [1, 17, 245, 490][index % 4]
                 group.addTask {
-                    if index.isMultiple(of: 2) {
-                        try await preservesWindSubmessageOrder(chunkSize: 17)
-                        return
-                    }
-                    try await BufferedDownloadSequence.withDownloads(
-                        ranges: [0..<buffer.readableBytes], concurrent: 1,
-                        byteLimit: buffer.readableBytes, download: { _ in buffer }
-                    ) { downloads in
-                        var parameters = [Int]()
-                        for try await item in BufferedGribSequence(downloads: downloads) {
-                            defer { withExtendedLifetime(item.download) {} }
-                            let parameter = try #require(item.message.get(attribute: "parameterNumber").flatMap(Int.init))
-                            parameters.append(parameter)
-                            #expect(try item.message.getDouble() == Array(repeating: Double(parameter + 1), count: 4))
-                        }
-                        #expect(parameters.sorted() == [2, 2, 3, 3])
+                    if mixedDecoders && index.isMultiple(of: 2) {
+                        try await preservesBufferedWindSubmessageOrder()
+                    } else {
+                        try await preservesWindSubmessageOrder(chunkSize: chunkSize)
                     }
                 }
             }
@@ -35,15 +24,34 @@ import Testing
         }
     }
 
-    @Test func concurrentWindSubmessagesStayInTheirStreams() async throws {
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for index in 0..<64 {
-                let chunkSize = [1, 17, 245, 490][index % 4]
-                group.addTask {
-                    try await preservesWindSubmessageOrder(chunkSize: chunkSize)
-                }
+    private func preservesBufferedWindSubmessageOrder() async throws {
+        let packed = try #require(Data(base64Encoded: Self.windFixture))
+        let buffer = ByteBuffer(bytes: packed + packed)
+        try await BufferedDownloadSequence.withDownloads(
+            ranges: [0..<buffer.readableBytes], concurrent: 1,
+            byteLimit: buffer.readableBytes, download: { _ in buffer }
+        ) { downloads in
+            var wind = WindMessages()
+            for try await item in BufferedGribSequence(downloads: downloads) {
+                defer { withExtendedLifetime(item.download) {} }
+                try wind.append(item.message)
             }
-            try await group.waitForAll()
+            wind.check()
+        }
+    }
+
+    private struct WindMessages {
+        var parameters = [Int]()
+        var values = [[Double]]()
+
+        mutating func append(_ message: GribMessage) throws {
+            parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
+            values.append(try message.getDouble())
+        }
+
+        func check() {
+            #expect(parameters == [2, 3, 2, 3])
+            #expect(values == [[3, 3, 3, 3], [4, 4, 4, 4], [3, 3, 3, 3], [4, 4, 4, 4]])
         }
     }
 
@@ -62,13 +70,10 @@ import Testing
             }
             continuation.finish()
         }
-        var parameters = [Int]()
-        var values = [[Double]]()
+        var wind = WindMessages()
         for try await message in stream.decodeGrib() {
-            parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
-            values.append(try message.getDouble())
+            try wind.append(message)
         }
-        #expect(parameters == [2, 3, 2, 3])
-        #expect(values == [[3, 3, 3, 3], [4, 4, 4, 4], [3, 3, 3, 3], [4, 4, 4, 4]])
+        wind.check()
     }
 }

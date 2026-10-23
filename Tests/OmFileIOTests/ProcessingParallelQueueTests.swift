@@ -81,11 +81,11 @@ struct ProcessingParallelQueueTests {
         #expect(await queue.collect().sorted() == [1, 3])
     }
 
-    @Test(arguments: [4, 100])
-    func streamingRetainsCapacityUntilResultReleased(capacity: Int) async throws {
+    @Test(arguments: [(capacity: 4, maxPending: 2), (capacity: 100, maxPending: 1)])
+    func streamingRetainsCapacityUntilResultReleased(limits: (capacity: Int, maxPending: Int)) async throws {
         let started = Signal()
         try await ProcessingParallelQueue<Int>.withResults(
-            inputs: [1, 2], concurrent: 2, capacity: capacity, maxPending: 1,
+            inputs: [1, 2], concurrent: 2, capacity: limits.capacity, maxPending: limits.maxPending,
             cost: { _ in 4 }, work: { value in
                 await started.increment()
                 return value
@@ -127,6 +127,77 @@ struct ProcessingParallelQueueTests {
         }
         #expect(value == 1)
         #expect(await slowStopped.count == 1)
+    }
+
+    @Test func boundedPipelineCompletes() async throws {
+        let count = try await ProcessingParallelQueue<Int>.withResults(
+            inputs: Array(0..<100), concurrent: 12, capacity: 16, maxPending: 2,
+            cost: { _ in 4 }, work: { $0 }
+        ) { results in
+            var count = 0
+            for try await _ in results { count += 1 }
+            #expect(await results.peakCost <= 8)
+            return count
+        }
+        #expect(count == 100)
+    }
+
+    @Test func earlyReturnWakesCapacityWaiters() async throws {
+        try await ProcessingParallelQueue<Int>.withResults(
+            inputs: [0, 1, 2], concurrent: 3, capacity: 4,
+            cost: { _ in 4 }, work: { $0 }
+        ) { results in
+            var iterator = results.makeAsyncIterator()
+            _ = try #require(await iterator.next())
+        }
+    }
+
+    enum Failure: Error { case injected }
+
+    @Test func workerFailureWakesConsumer() async {
+        await #expect(throws: Failure.self) {
+            try await ProcessingParallelQueue<Int>.withResults(
+                inputs: [0, 1], concurrent: 2, capacity: 4,
+                cost: { _ in 4 }, work: { _ in throw Failure.injected }
+            ) { results in
+                for try await _ in results { }
+            }
+        }
+    }
+
+    @Test func cancellationWakesConsumerAndCapacityWaiters() async throws {
+        let started = Signal()
+        let stopped = Signal()
+        let task = Task {
+            try await ProcessingParallelQueue<Int>.withResults(
+                inputs: [0, 1], concurrent: 2, capacity: 4,
+                cost: { _ in 4 }, work: { value in
+                    await started.increment()
+                    do { try await Task.sleep(for: .seconds(120)) } catch {
+                        await stopped.increment()
+                        throw error
+                    }
+                    return value
+                }
+            ) { results in
+                for try await _ in results { }
+            }
+        }
+        await started.wait()
+        task.cancel()
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(await stopped.count == 1)
+    }
+
+    @Test func consumerFailureWakesCapacityWaiters() async {
+        await #expect(throws: Failure.self) {
+            try await ProcessingParallelQueue<Int>.withResults(
+                inputs: [0, 1], concurrent: 2, capacity: 4,
+                cost: { _ in 4 }, work: { $0 }
+            ) { results in
+                for try await _ in results { throw Failure.injected }
+            }
+        }
     }
 
     @Test func invalidCostFailsBeforeWork() async {
