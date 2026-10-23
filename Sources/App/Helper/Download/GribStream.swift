@@ -1,5 +1,6 @@
 import Foundation
 import NIO
+import NIOConcurrencyHelpers
 @preconcurrency import SwiftEccodes
 import Logging
 import AsyncAlgorithms
@@ -13,6 +14,16 @@ extension AsyncSequence where Element == ByteBuffer {
 
 
 enum GribAsyncStreamHelper {
+    private static let memoryDecodeLock = NIOLock()
+
+    /// Drain all submessages under one lock: ecCodes shares pending memory fields
+    /// between callers, while SwiftEccodes only locks individual reads.
+    static func decodeMessages(memory: UnsafeRawBufferPointer) throws -> [GribMessage] {
+        try memoryDecodeLock.withLock {
+            try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
+        }
+    }
+
     /// Detect a range of bytes in a byte stream if there is a grib header and returns it
     /// Note: The required length to decode a GRIB message is not checked of the input buffer
     static func seekGrib(memory: UnsafeRawBufferPointer) throws -> (offset: Int, length: Int, gribVersion: Int)? {
@@ -163,7 +174,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 messages = try buffer.readWithUnsafeReadableBytes({
                     let range = seek.offset ..< Swift.min(seek.offset + seek.length, $0.count)
                     let memory = UnsafeRawBufferPointer(rebasing: $0[range])
-                    let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
+                    let messages = try GribAsyncStreamHelper.decodeMessages(memory: memory)
                     // popLast() must yield submessages in inventory order (e.g. NAM U then V).
                     return (seek.offset + seek.length, Array(messages.reversed()))
                 })

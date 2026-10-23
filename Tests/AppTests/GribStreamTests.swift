@@ -4,6 +4,18 @@ import Testing
 @testable import App
 
 @Suite struct GribStreamTests {
+    @Test func concurrentWindSubmessagesStayInTheirStreams() async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<64 {
+                let chunkSize = [1, 17, 245, 490][index % 4]
+                group.addTask {
+                    try await preservesWindSubmessageOrder(chunkSize: chunkSize)
+                }
+            }
+            try await group.waitForAll()
+        }
+    }
+
     @Test(arguments: [1, 17, 245, 490])
     func preservesWindSubmessageOrder(chunkSize: Int) async throws {
         // Synthetic ecCodes regular_ll_sfc_grib2 fixture: one message containing
