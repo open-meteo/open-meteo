@@ -42,6 +42,7 @@ struct SyncBoundingBox: Sendable {
     /// Returns nil when the spatial dimensions cannot be identified unambiguously.
     func takeChunks(layout: OmFileChunkLayout) -> [Bool]? {
         let dimensions = layout.dimensions
+        guard dimensions.count > 0 else { return nil }
         let ny = UInt64(selectedCells.count / nx)
 
         // Find adjacent [ny, nx] dimensions. Legacy [location, time] files use only a location axis.
