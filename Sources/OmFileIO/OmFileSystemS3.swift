@@ -169,6 +169,7 @@ public struct OmFileSystemS3: Sendable {
                     queued.forEach {
                         $0.resume(with: .success(new))
                     }
+                    await new.remotePublished()
                 } catch {
                     guard case .updating(_, let queued) = payload else {
                         fatalError("State was not .updating()")
@@ -297,6 +298,7 @@ public struct OmFileSystemS3: Sendable {
                     queued.forEach({
                         $0.resume(returning: new)
                     })
+                    await new.remotePublished()
                     return new
                 } catch {
                     guard case .updating(old: _, let queued) = self.payload else {

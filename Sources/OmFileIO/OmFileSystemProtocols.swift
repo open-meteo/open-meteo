@@ -33,7 +33,12 @@ public protocol OmRemotePayload: Sendable {
     /// Initialise from remote source
     init(file: OmHttpReaderBackend) async throws
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self
+    func remotePublished() async
     func remoteDeleted() async throws
+}
+
+public extension OmRemotePayload {
+    func remotePublished() async {}
 }
 
 public protocol OmLocalPayload: Sendable {
