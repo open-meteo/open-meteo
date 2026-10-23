@@ -238,6 +238,7 @@ extension BoundingBoxWGS84 {
     /// Parse `lat1,lon1,lat2,lon2`. A part that is not a number fails like a wrong number of values
     init(commaSeparated: String) throws {
         let values = commaSeparated.split(separator: ",", omittingEmptySubsequences: false).map { Float($0.trimmingCharacters(in: .whitespaces)) }
-        try self.init(coordinates: values.contains(nil) ? [] : values.compactMap { $0 })
+        guard values.count == 4, !values.contains(nil) else { throw ForecastApiError.generic(message: "--bounding-box must be 4 comma separated numbers: lat1,lon1,lat2,lon2") }
+        try self.init(coordinates: values.compactMap { $0 })
     }
 }
