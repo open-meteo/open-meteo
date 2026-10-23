@@ -64,38 +64,34 @@ extension Curl {
 
     /// Single-range cloud downloads prefetch compressed bytes independently of GRIB processing.
     func foreachEcmwfIndexed(
-        url: String, indexURL: String, allowMultipleRanges: Bool, concurrent: Int,
+        url: String, indexURL: String, allowMultipleRanges: Bool, downloadConcurrent: Int,
         processingConcurrent: Int, downloadFullGribFile: Bool, bufferBytes: Int = 256 * 1024 * 1024,
         isIncluded: (EcmwfIndexEntry) -> Bool,
         body: @escaping @Sendable (GribMessage) async throws -> Void
     ) async throws {
+        // full grib files or multi range requests
         if allowMultipleRanges || downloadFullGribFile {
             try await downloadEcmwfIndexed(url: url, indexURL: indexURL, allowMultipleRanges: allowMultipleRanges,
-                concurrent: concurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: isIncluded)
+                concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: isIncluded)
                 .foreachConcurrent(nConcurrent: processingConcurrent, body: body)
             return
         }
+
+        // single range requests, e.g. from AWS S3
         let index = try await downloadInMemoryAsync(url: indexURL, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
         guard !index.isEmpty else { throw CurlError.didNotFindAllVariablesInGribIndex }
         let ranges = try index.downloadBatches(targetBytes: min(8 * 1024 * 1024, bufferBytes))
-        logger.info("Prefetching \(ranges.count) GRIB batches with \(concurrent) download workers and \(bufferBytes.bytesHumanReadable) compressed buffer")
+
+        logger.info("Prefetching \(ranges.count) GRIB batches with \(downloadConcurrent) download workers and \(bufferBytes.bytesHumanReadable) compressed buffer")
         try await BufferedDownloadSequence.withDownloads(
-            ranges: ranges, concurrent: concurrent, byteLimit: bufferBytes,
+            ranges: ranges, concurrent: downloadConcurrent, byteLimit: bufferBytes,
             download: { range in
                 try await self.downloadInMemoryAsync(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)",
                     minSize: range.count, nConcurrent: 1, maxSize: range.count, expectedRange: range)
             }
         ) { downloads in
-            try await BufferedGribSequence(downloads: downloads).foreachConcurrent(nConcurrent: processingConcurrent) { item in
-                // ecCodes may reference the compressed message memory while processing.
-                defer { withExtendedLifetime(item.download) {} }
-                do {
-                    try await body(item.message)
-                } catch {
-                    await downloads.fail(error)
-                    throw error
-                }
-            }
+            try await BufferedGribSequence(downloads: downloads)
+                .process(concurrent: processingConcurrent, body: body)
             let peak = await downloads.peakCost
             self.logger.info("Compressed download buffer peak: \(peak.bytesHumanReadable)")
         }

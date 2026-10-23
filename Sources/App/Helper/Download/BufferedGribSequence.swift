@@ -12,6 +12,20 @@ struct BufferedGribSequence: AsyncSequence, Sendable {
     typealias Element = BufferedGribMessage
     let downloads: ProcessingParallelQueue<ByteBuffer>.Results
 
+    /// Retain each compressed batch through processing and wake the input waiter on failure.
+    func process(concurrent: Int, body: @escaping @Sendable (GribMessage) async throws -> Void) async throws {
+        try await foreachConcurrent(nConcurrent: concurrent) { item in
+            defer { withExtendedLifetime(item.download) {} }
+            do {
+                try await body(item.message)
+            } catch {
+                // foreachConcurrent may be awaiting input before observing this child error.
+                await downloads.fail(error)
+                throw error
+            }
+        }
+    }
+
     struct AsyncIterator: AsyncIteratorProtocol {
         var downloads: ProcessingParallelQueue<ByteBuffer>.Results.AsyncIterator
         var current: BufferedDownload?
