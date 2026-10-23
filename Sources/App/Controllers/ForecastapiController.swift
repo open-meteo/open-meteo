@@ -860,6 +860,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case metno_nordic
 
     case geosphere_arome_austria
+    case geosphere_claef_austria
     case geosphere_seamless
 
     case chmi_aladin_cz_1km
@@ -1796,6 +1797,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GfsDomain.gefswave025_ensemble_mean, VariableOrSpread<GfsWaveVariable>.self)
         case .geosphere_arome_austria:
             return .single(GeoSphereDomain.arome_austria, GeoSphereVariable.self)
+        case .geosphere_claef_austria:
+            return .single(GeoSphereDomain.claef_austria, GeoSphereVariable.self)
         case .chmi_aladin_cz_1km:
             return .single(ChmiDomain.aladin_cz_1km, ChmiSurfaceVariable.self)
         case .chmi_aladin_central_europe_2km:
@@ -1862,7 +1865,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .multipleWithPrecipitationProbability([
                 .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(GeoSphereDomain.arome_austria, GeoSphereVariable.self)
+                .domain(GeoSphereDomain.arome_austria, GeoSphereVariable.self),
+                .domain(GeoSphereDomain.claef_austria, GeoSphereVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         default:
             return nil
