@@ -53,7 +53,28 @@ struct MetricsController: RouteCollection {
 
         let monitored_ips = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
 
+        var downloadMetrics = ""
+        if OmFileSystemManager.isInitialized, let server = OmFileSystemManager.instance.remoteFileSystem?.server {
+            for (origin, stats) in await server.downloadMetrics().sorted(by: { $0.0 < $1.0 }) {
+                for (priority, active, queued, wait) in [
+                    ("foreground", stats.activeForeground, stats.queuedForeground, stats.foregroundWaitSeconds),
+                    ("background", stats.activeBackground, stats.queuedBackground, stats.backgroundWaitSeconds)
+                ] {
+                    let labels = "upstream=\"\(origin)\",priority=\"\(priority)\""
+                    downloadMetrics += "om_remote_downloads_active{\(labels)} \(active)\n"
+                    downloadMetrics += "om_remote_downloads_queued{\(labels)} \(queued)\n"
+                    downloadMetrics += "om_remote_download_queue_wait_seconds_total{\(labels)} \(wait)\n"
+                }
+                downloadMetrics += "om_remote_download_promotions_total{upstream=\"\(origin)\"} \(stats.promotions)\n"
+            }
+        }
+
         let body = """
+# TYPE om_remote_downloads_active gauge
+# TYPE om_remote_downloads_queued gauge
+# TYPE om_remote_download_queue_wait_seconds_total counter
+# TYPE om_remote_download_promotions_total counter
+\(downloadMetrics)
 # TYPE om_file_local_open gauge
 # HELP om_file_local_open Number of open local files
 om_file_local_open \(OmFileSystemMetrics.fileLocalOpen.load(ordering: .relaxed))
