@@ -222,7 +222,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
                 let request = try EcmwfOpenDataSource.prepareDownload(url: url)
-                try await curl.foreachEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, processingConcurrent: concurrent, downloadFullGribFile: downloadFullGribFile, bufferBytes: downloadBufferBytes, isIncluded: { entry in
+                try await curl.foreachEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, downloadConcurrent: downloadConcurrent, processingConcurrent: concurrent, downloadFullGribFile: downloadFullGribFile, bufferBytes: downloadBufferBytes, isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
@@ -471,7 +471,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
             let request = try EcmwfOpenDataSource.prepareDownload(url: url)
-            try await curl.foreachEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: downloadConcurrent, processingConcurrent: concurrent, downloadFullGribFile: downloadFullGribFile, bufferBytes: downloadBufferBytes, isIncluded: { entry in
+            try await curl.foreachEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, downloadConcurrent: downloadConcurrent, processingConcurrent: concurrent, downloadFullGribFile: downloadFullGribFile, bufferBytes: downloadBufferBytes, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
                 })
