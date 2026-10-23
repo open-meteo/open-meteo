@@ -20,6 +20,9 @@ final class Curl: Sendable {
     /// Retry 4xx errors
     let retryError4xx: Bool
 
+    /// Stop retrying HTTP 404 responses after this many seconds per request.
+    let missingFileTimeout: TimeInterval?
+
     /// Number of bytes of how much data was transferred
     let totalBytesTransfered = Atomic(0)
     
@@ -49,10 +52,11 @@ final class Curl: Sendable {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 8, retryUnauthorized: Bool = false, prepareRequest: PrepareRequest? = nil) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, missingFileTimeout: TimeInterval? = nil, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 8, retryUnauthorized: Bool = false, prepareRequest: PrepareRequest? = nil) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
+        self.missingFileTimeout = missingFileTimeout
         self.readTimeout = readTimeout
         self.waitAfterLastModified = waitAfterLastModified
         self.waitAfterLastModifiedBeforeDownload = waitAfterLastModifiedBeforeDownload
@@ -107,6 +111,7 @@ final class Curl: Sendable {
             }
         }
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
+        let missingFileDeadline = missingFileTimeout.map { Date().addingTimeInterval($0) }
 
         var i = 0
         while true {
@@ -143,6 +148,10 @@ final class Curl: Sendable {
                 }
                 return response
             } catch {
+                if case CurlError.downloadFailed(code: .notFound) = error,
+                   let missingFileDeadline, Date() >= missingFileDeadline {
+                    throw CurlError.fileNotFound
+                }
                 if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code), status.code != 401 {
                     if status.code == 404 {
                         throw CurlError.fileNotFound
