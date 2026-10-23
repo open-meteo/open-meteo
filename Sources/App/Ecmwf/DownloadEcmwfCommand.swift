@@ -217,6 +217,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             let inMemory = VariablePerMemberStorage<EcmwfVariable>()
             let inMemory2 = VariablePerMemberStorage<ShortNameLevel>()
+            let precipitationProbability = writerProbabilities.map { _ in
+                PrecipitationProbabilityCalculator(dtHours: hour - previousHour)
+            }
             
             let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
             let verticalVelocityCalculator = VerticalVelocityCalculator<EcmwfVariable>()
@@ -369,9 +372,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         return // do not store dewpoint on disk
                     }
 
-                    // Keep precip in memory for probability
-                    if domain.countEnsembleMember > 1 && variable == .precipitation {
-                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    // Count threshold exceedances without retaining each member's field.
+                    if variable == .precipitation {
+                        try await precipitationProbability?.ingest(member: member, data: grib2d.array.data)
                     }
                     //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     // Note: skipHour0 needs still to be set for solar interpolation
@@ -435,13 +438,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 }
             }
 
-            if let writerProbabilities {
+            if let writerProbabilities, let probabilities = await precipitationProbability?.probabilities() {
                 logger.info("Calculating precipitation probability")
-                try await inMemory.calculatePrecipitationProbability(
-                    precipitationVariable: .precipitation,
-                    dtHoursOfCurrentStep: hour - previousHour,
-                    writer: writerProbabilities
-                )
+                try await writerProbabilities.write(member: 0, variable: ProbabilityVariable.precipitation_probability, data: probabilities)
             }
             
             let completed = i == timestamps.count - 1
