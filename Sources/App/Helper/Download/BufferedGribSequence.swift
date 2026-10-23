@@ -32,7 +32,8 @@ struct BufferedGribSequence: AsyncSequence, Sendable {
                         throw GribAsyncStreamError.unexpectedEndOfFile
                     }
                     messages = try remaining.withUnsafeReadableBytes {
-                        try GribAsyncStreamHelper.decodeMessages(memory: UnsafeRawBufferPointer(rebasing: $0[seek.offset..<seek.offset + seek.length]))
+                        // popLast() must yield submessages in inventory order.
+                        Array(try GribAsyncStreamHelper.decodeMessages(memory: UnsafeRawBufferPointer(rebasing: $0[seek.offset..<seek.offset + seek.length])).reversed())
                     }
                     // Only move indices; the leased buffer must remain immutable for ecCodes.
                     remaining.moveReaderIndex(forwardBy: seek.offset + seek.length)
