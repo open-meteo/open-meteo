@@ -3,6 +3,13 @@ import Vapor
 
 /// Owns the remote filesystem client's configuration and application shutdown.
 struct RemoteDataHttpClient: LifecycleHandler {
+    static func positiveLimit(_ name: String, default value: Int) -> Int {
+        guard let limit = Int(Environment.get(name) ?? String(value)), limit > 0 else {
+            fatalError("\(name) must be a positive integer")
+        }
+        return limit
+    }
+
     static func makeClient() -> HTTPClient {
         let rawLimit = Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "8"
         guard let limit = Int(rawLimit), limit > 0 else {
@@ -19,6 +26,7 @@ struct RemoteDataHttpClient: LifecycleHandler {
               let server = OmFileSystemManager.instance.remoteFileSystem?.server else {
             return
         }
+        await server.cacheWarmer.shutdown()
         await server.stopMonitoring()
         do {
             try await server.client.shutdown()
