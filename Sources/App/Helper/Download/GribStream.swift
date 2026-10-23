@@ -164,7 +164,8 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     let range = seek.offset ..< Swift.min(seek.offset + seek.length, $0.count)
                     let memory = UnsafeRawBufferPointer(rebasing: $0[range])
                     let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
-                    return (seek.offset + seek.length, messages)
+                    // popLast() must yield submessages in inventory order (e.g. NAM U then V).
+                    return (seek.offset + seek.length, Array(messages.reversed()))
                 })
 
                 buffer.discardReadBytes()
