@@ -120,20 +120,20 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .sum(let variable):
-            // Accumulations describe the preceding model timestep.
-            let timeInterval = timeModel.with(time: timeModel.time.add(modelDtSeconds))
-            guard let data = try await reader.get(variable: variable, time: timeInterval) else {
+            // Keep aggregating hours 00–23 for backwards compatibility with historical results,
+            // even though accumulations describe the preceding model timestep.
+            guard let data = try await reader.get(variable: variable, time: timeModel) else {
                 return nil
             }
-            // ERA5 may not yet provide the interval ending at the next midnight.
-            return DataAndUnit(data.data.sum(by: stepsModel, allowMissingLast: true), data.unit)
+            return DataAndUnit(data.data.sum(by: stepsModel), data.unit)
         case .radiationSum(let variable):
-            let timeInterval = timeModel.with(time: timeModel.time.add(modelDtSeconds))
-            guard let data = try await reader.get(variable: variable, time: timeInterval) else {
+            // Keep aggregating hours 00–23 for backwards compatibility with historical results,
+            // even though solar radiation describes the preceding model timestep.
+            guard let data = try await reader.get(variable: variable, time: timeModel) else {
                 return nil
             }
             // 3600s only for hourly data of source
-            return DataAndUnit(data.data.map({ $0 * Float(modelDtSeconds) / 1000000 }).sum(by: stepsModel, allowMissingLast: true).round(digits: 2), .megajoulePerSquareMetre)
+            return DataAndUnit(data.data.map({ $0 * Float(modelDtSeconds) / 1000000 }).sum(by: stepsModel).round(digits: 2), .megajoulePerSquareMetre)
         case .precipitationHours(let variable):
             guard let data = try await reader.get(variable: variable, time: timeModel) else {
                 return nil
@@ -162,7 +162,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         if let v0 = variable.aggregation.variables.0 {
             switch variable.aggregation {
-            case .minTwo, .maxTwo, .sum, .radiationSum:
+            case .minTwo, .maxTwo:
                 let timeInterval = time.with(time: time.time.add(modelDtSeconds))
                 let _ = try await reader.prefetchData(variable: v0, time: timeInterval)
             default:
