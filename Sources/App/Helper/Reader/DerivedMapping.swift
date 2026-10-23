@@ -88,18 +88,19 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
     
     /// Optionally rotate grid-relative wind direction to true north using an angle in degrees.
-    static func windDirection(u: Variable?, v: Variable?, trueNorth: Float? = nil) -> Self? {
+    /// Swap legacy storage labels before calculating direction when `swapUVComponents` is set.
+    static func windDirection(u: Variable?, v: Variable?, trueNorth: Float? = nil, swapUVComponents: Bool = false) -> Self? {
         guard let u, let v else {
             return nil
         }
-        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v), trueNorth: trueNorth)
+        return windDirection(u: RawOrMapped.raw(u), v: RawOrMapped.raw(v), trueNorth: trueNorth, swapUVComponents: swapUVComponents)
     }
 
-    static func windDirection(u: RawOrMapped?, v: RawOrMapped?, trueNorth: Float? = nil) -> Self? {
+    static func windDirection(u: RawOrMapped?, v: RawOrMapped?, trueNorth: Float? = nil, swapUVComponents: Bool = false) -> Self? {
         guard let u, let v else {
             return nil
         }
-        return .two(u, v, {u, v, _ in
+        return .two(swapUVComponents ? v : u, swapUVComponents ? u : v, {u, v, _ in
             var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             if let trueNorth {
                 // Correct for true north in HRRR and NAM

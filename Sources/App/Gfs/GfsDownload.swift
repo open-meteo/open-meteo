@@ -501,7 +501,14 @@ struct GfsDownload: AsyncCommand {
                         // do not write pressure to disk
                         continue
                     }
-                    try await writer.write(member: member, variable: variable.variable, data: grib2d.array.data)
+                    // Keep new NAM downloads compatible with historical files containing swapped U/V.
+                    let storageVariable: any GenericVariable
+                    if let namVariable = variable.variable as? NamDownloadSurfaceVariable {
+                        storageVariable = namVariable.legacyStorageVariable
+                    } else {
+                        storageVariable = variable.variable
+                    }
+                    try await writer.write(member: member, variable: storageVariable, data: grib2d.array.data)
                 }
                 if let snowfallOutputVariable {
                     try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: snowfallOutputVariable, writer: writer)
