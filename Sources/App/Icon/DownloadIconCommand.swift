@@ -131,7 +131,7 @@ struct DownloadIconCommand: AsyncCommand {
 
         let deadLineHours = feedStatic.deadlineHours
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
-        let downloader = IconGribDownloader(domain: feedStatic, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
+        let downloader = IconGribDownloader(domain: feedStatic, curl: curl, gridIdentity: IconNativeGridFile.forGrid(outputs.nativeDomain.asyncGridRegistry).identity)
         let surface = try await downloader.download(field: ("HSURF", "single-level", nil), run: run, leadSeconds: 0)
         var hsurf = surface.data.data
         let land = try await downloader.download(field: ("FR_LAND", "single-level", nil), run: run, leadSeconds: 0)
@@ -174,7 +174,7 @@ struct DownloadIconCommand: AsyncCommand {
         Process.alarm(seconds: Int(feed.deadlineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let downloader = IconGribDownloader(domain: feed, curl: curl, gridIdentity: outputs.nativeDomain.nativeGridFile.identity)
+        let downloader = IconGribDownloader(domain: feed, curl: curl, gridIdentity: IconNativeGridFile.forGrid(outputs.nativeDomain.asyncGridRegistry).identity)
         let isEnsemble = feed.countEnsembleMember > 1
 
         let deaverager = GribDeaverager()

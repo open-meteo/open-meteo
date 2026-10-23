@@ -1,6 +1,6 @@
 import Logging
 
-enum IconNativeDomains: String, CaseIterable {
+enum IconNativeDomains: String, CaseIterable, DomainDefinition {
     case aiconNative = "aicon"
 
     case iconNative = "icon-native"
@@ -94,11 +94,6 @@ enum IconNativeDomains: String, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        // Domains sharing a native grid also share its elevation and other static fields.
-        nativeGridFile.registry
-    }
-
     var dtSeconds: Int {
         if self == .aiconNative { return 3 * 3600 }
         return quarterHourlyParent != nil ? 900 : 3600
@@ -128,40 +123,39 @@ enum IconNativeDomains: String, CaseIterable {
     var generateFullRun: Bool { countEnsembleMember == 1 }
     var generateTimeSeries: Bool { true }
 
-    var nativeGridFile: IconNativeGridFile {
+    var asyncGridRegistry: AsyncGridRegistry {
         switch self {
-        case .aiconNative, .iconNative, .iconNativeModelLevel: return Self.globalGridFile
-        case .iconEuNative, .iconEuNativeModelLevel: return Self.europeGridFile
-        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel, .iconD2Native, .iconD2NativeModelLevel, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean: return Self.d2GridFile
-        case .iconEpsNative, .iconEpsNativeEnsembleMean: return Self.globalEnsembleGridFile
-        case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean: return Self.europeEnsembleGridFile
+        case .aiconNative, .iconNative, .iconNativeModelLevel:
+            return .dwd_icon_global_native
+        case .iconEuNative, .iconEuNativeModelLevel:
+            return .dwd_icon_eu_native
+        case .iconD2RucNative, .iconD2RucNative15min, .iconD2RucNativeModelLevel, .iconD2Native, .iconD2NativeModelLevel, .iconD2Native15min, .iconD2EpsNative, .iconD2EpsNativeEnsembleMean:
+            return .dwd_icon_d2_native
+        case .iconEpsNative, .iconEpsNativeEnsembleMean:
+            return .dwd_icon_global_eps_native
+        case .iconEuEpsNative, .iconEuEpsNativeEnsembleMean:
+            return .dwd_icon_eu_eps_native
         }
     }
 
-    private static let globalGridFile = IconNativeGridFile(registry: .dwd_icon_global_native, identity: .global)
-    private static let d2GridFile = IconNativeGridFile(registry: .dwd_icon_d2_native, identity: .d2)
-    private static let europeGridFile = IconNativeGridFile(registry: .dwd_icon_eu_native, identity: .europe)
-    private static let globalEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_global_eps_native, identity: .globalEnsemble)
-    private static let europeEnsembleGridFile = IconNativeGridFile(registry: .dwd_icon_eu_eps_native, identity: .europeEnsemble)
+    var gridRegistry: GridRegistry { .asynchronous(asyncGridRegistry) }
 
-    /// Definitions sharing a mesh and elevation file also share their initialized cache entry.
+    /// Download feed supplying static fields; AICON reuses deterministic ICON fields.
     var staticResourceDomain: Self {
         if self == .aiconNative { return .iconNative }
         return modelLevelParent ?? quarterHourlyParent ?? self
     }
 
     func load() async throws -> IconNativeDomain {
-        try await Self.domains.load(self)
+        IconNativeDomain(
+            definition: self,
+            grid: try await asyncGridRegistry.load()
+        )
+    }
+
+    func loadDomain() async throws -> any GenericDomain {
+        try await load()
     }
 
     static let logger = Logger(label: "IconNativeDomain")
-    private static let domains = IconNativeDomainCache()
-}
-
-extension DomainTimeSeriesMetadata {
-    init(_ domain: IconNativeDomains) {
-        self.dtSeconds = domain.dtSeconds
-        self.omFileLength = domain.omFileLength
-        self.updateIntervalSeconds = domain.updateIntervalSeconds
-    }
 }

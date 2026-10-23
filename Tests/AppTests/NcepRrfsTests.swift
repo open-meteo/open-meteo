@@ -317,7 +317,7 @@ import OpenMeteoSdk
     }
 
     @Test func exactGridAndRotation() {
-        let grid = NcepRrfsDomain.ncep_rrfs_conus.conusGrid
+        let grid = SyncGridRegistry.ncepRrfsConusGrid
         #expect(grid.nx == 1799 && grid.ny == 1059)
         #expect(grid.dx == 3000 && grid.dy == 3000)
         let origin = grid.getCoordinates(gridpoint: 0)
@@ -330,9 +330,9 @@ import OpenMeteoSdk
 
     @Test func northAmericaGridAndMapping() async throws {
         let domain = NcepRrfsDomain.ncep_rrfs_north_america
-        let grid = domain.northAmericaGrid
+        let grid = SyncGridRegistry.ncepRrfsNorthAmericaGrid
         #expect(grid.nx == 1127 && grid.ny == 683 && grid.count == 769741)
-        #expect(domain.domainRegistryStatic == .ncep_rrfs_north_america)
+        #expect(domain.gridRegistry.staticDomain == .ncep_rrfs_north_america)
         #expect(domain.forecastHours == 0...84)
         #expect(domain.dtSeconds == 3600 && domain.updateIntervalSeconds == 21600)
         #expect(domain.countEnsembleMember == 1)
@@ -743,7 +743,8 @@ import OpenMeteoSdk
 private struct ProbabilityTestDomain: GenericDomain {
     var grid: any Gridable { RegularGrid(nx: 4, ny: 1, latMin: 0, lonMin: 0, dx: 1, dy: 1) }
     var domainRegistry: DomainRegistry { .ncep_rrfs_conus_ensemble }
-    var domainRegistryStatic: DomainRegistry? { nil }
+    // Use a registry without static files to keep this in-memory fixture isolated.
+    var gridRegistry: GridRegistry { .synchronous(.glofas_v4) }
     var dtSeconds: Int { 3600 }
     var updateIntervalSeconds: Int { 21600 }
     var hasYearlyFiles: Bool { false }

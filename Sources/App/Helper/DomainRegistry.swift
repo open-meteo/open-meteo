@@ -248,45 +248,26 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 
-    var nativeDefinition: IconNativeDomains? {
-        switch self {
-        case .dwd_aicon_global_native: return .aiconNative
-        case .dwd_icon_global_native: return .iconNative
-        case .dwd_icon_global_native_model_level: return .iconNativeModelLevel
-        case .dwd_icon_eu_native: return .iconEuNative
-        case .dwd_icon_eu_native_model_level: return .iconEuNativeModelLevel
-        case .dwd_icon_d2_ruc_native: return .iconD2RucNative
-        case .dwd_icon_d2_ruc_native_15min: return .iconD2RucNative15min
-        case .dwd_icon_d2_ruc_native_model_level: return .iconD2RucNativeModelLevel
-        case .dwd_icon_d2_native: return .iconD2Native
-        case .dwd_icon_d2_native_model_level: return .iconD2NativeModelLevel
-        case .dwd_icon_d2_native_15min: return .iconD2Native15min
-        case .dwd_icon_global_eps_native: return .iconEpsNative
-        case .dwd_icon_global_eps_native_ensemble_mean: return .iconEpsNativeEnsembleMean
-        case .dwd_icon_eu_eps_native: return .iconEuEpsNative
-        case .dwd_icon_eu_eps_native_ensemble_mean: return .iconEuEpsNativeEnsembleMean
-        case .dwd_icon_d2_eps_native: return .iconD2EpsNative
-        case .dwd_icon_d2_eps_native_ensemble_mean: return .iconD2EpsNativeEnsembleMean
-        default: return nil
-        }
+    /// Grid identity without loading geometry or static files.
+    var gridRegistry: GridRegistry? {
+        weatherDefinition?.gridRegistry
     }
 
     func getDomain() async throws -> (any GenericDomain)? {
-        if let nativeDefinition {
-            return try await nativeDefinition.load()
-        }
-        return regularDomain
+        try await weatherDefinition?.loadDomain()
     }
 
     /// Used by file scheduling and synchronization without opening grid or elevation files.
     var timeSeriesMetadata: DomainTimeSeriesMetadata? {
-        if let nativeDefinition {
-            return DomainTimeSeriesMetadata(nativeDefinition)
-        }
-        return regularDomain.map { DomainTimeSeriesMetadata($0) }
+        weatherDefinition.map { DomainTimeSeriesMetadata($0) }
     }
 
-    private var regularDomain: (any GenericDomain)? {
+    /// Only time-series datasets offer weather metadata and a loadable reader domain.
+    var weatherDefinition: (any DomainDefinition)? {
+        definition as? any DomainDefinition
+    }
+
+    var definition: (any DatasetDefinition)? {
         switch self {
         case .ncep_rrfs_conus, .ncep_rrfs_conus_15min, .ncep_rrfs_conus_ensemble, .ncep_rrfs_north_america:
             return NcepRrfsDomain(rawValue: rawValue)!
@@ -399,19 +380,45 @@ enum DomainRegistry: String, CaseIterable {
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
         case .dwd_aicon_global_native:
-            return nil
+            return IconNativeDomains.aiconNative
         case .dwd_icon:
             return IconDomains.icon
         case .dwd_icon_d2:
             return IconDomains.iconD2
         case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .dwd_icon_d2_ruc_native, .dwd_icon_d2_ruc_native_15min, .dwd_icon_d2_ruc_native_model_level,
-             .dwd_icon_global_native_model_level, .dwd_icon_eu_native_model_level, .dwd_icon_d2_native_model_level,
-             .dwd_icon_global_native, .dwd_icon_eu_native, .dwd_icon_d2_native, .dwd_icon_d2_native_15min,
-             .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native,
-             .dwd_icon_global_eps_native_ensemble_mean, .dwd_icon_eu_eps_native_ensemble_mean, .dwd_icon_d2_eps_native_ensemble_mean:
-            return nil
+        case .dwd_icon_global_native:
+            return IconNativeDomains.iconNative
+        case .dwd_icon_global_native_model_level:
+            return IconNativeDomains.iconNativeModelLevel
+        case .dwd_icon_eu_native:
+            return IconNativeDomains.iconEuNative
+        case .dwd_icon_eu_native_model_level:
+            return IconNativeDomains.iconEuNativeModelLevel
+        case .dwd_icon_d2_ruc_native:
+            return IconNativeDomains.iconD2RucNative
+        case .dwd_icon_d2_ruc_native_15min:
+            return IconNativeDomains.iconD2RucNative15min
+        case .dwd_icon_d2_ruc_native_model_level:
+            return IconNativeDomains.iconD2RucNativeModelLevel
+        case .dwd_icon_d2_native:
+            return IconNativeDomains.iconD2Native
+        case .dwd_icon_d2_native_model_level:
+            return IconNativeDomains.iconD2NativeModelLevel
+        case .dwd_icon_d2_native_15min:
+            return IconNativeDomains.iconD2Native15min
+        case .dwd_icon_global_eps_native:
+            return IconNativeDomains.iconEpsNative
+        case .dwd_icon_global_eps_native_ensemble_mean:
+            return IconNativeDomains.iconEpsNativeEnsembleMean
+        case .dwd_icon_eu_eps_native:
+            return IconNativeDomains.iconEuEpsNative
+        case .dwd_icon_eu_eps_native_ensemble_mean:
+            return IconNativeDomains.iconEuEpsNativeEnsembleMean
+        case .dwd_icon_d2_eps_native:
+            return IconNativeDomains.iconD2EpsNative
+        case .dwd_icon_d2_eps_native_ensemble_mean:
+            return IconNativeDomains.iconD2EpsNativeEnsembleMean
         case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
         case .dwd_icon_eps:
@@ -647,7 +654,7 @@ struct DomainTimeSeriesMetadata {
     let omFileLength: Int
     let updateIntervalSeconds: Int
 
-    init(_ domain: any GenericDomain) {
+    init(_ domain: any DomainDefinition) {
         self.dtSeconds = domain.dtSeconds
         self.omFileLength = domain.omFileLength
         self.updateIntervalSeconds = domain.updateIntervalSeconds

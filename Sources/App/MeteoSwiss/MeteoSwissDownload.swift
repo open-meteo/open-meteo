@@ -74,7 +74,7 @@ struct MeteoSwissDownload: AsyncCommand {
         let collection = domain.collection
         let storeOnDisk = domain.countEnsembleMember <= 1
         
-        let directory = (domain.domainRegistryStatic ?? domain.domainRegistry).directory
+        let directory = (domain.gridRegistry.staticDomain!).directory
         try FileManager.default.createDirectory(atPath: "\(directory)static", withIntermediateDirectories: true)
         let weightsFile = "\(directory)static/nn_weights.om"
         if !FileManager.default.fileExists(atPath: weightsFile) {
@@ -94,7 +94,7 @@ struct MeteoSwissDownload: AsyncCommand {
             try await elevationRemapped.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
         }
         let mapping: [Int] = try await OmFileReader(mmapFile: weightsFile).expectArray(of: Int.self).read()
-        //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")
+        //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.gridRegistry.staticDomain! ).directory)static/nn_weights.nc")
         
         let timestamps = (0...domain.forecastLength).map { run.add(hours: $0) }
         
