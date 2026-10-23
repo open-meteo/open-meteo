@@ -64,6 +64,14 @@ With Docker, you can just spawn this command and leave it running in the backgro
 The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this command. It can be enabled in `/etc/default/openmeteo-api.env` by setting `SYNC_ENABLED=true`, `SYNC_APIKEY=mykey123`, `SYNC_DOMAINS=cmc_gem_gdps,dwd_icon`, `SYNC_VARIABLES=temperature_2m,shortwave_radiation` and `SYNC_REPEAT_INTERVAL=5` followed by a restart with `systemctl restart openmeteo-sync`.
 
 
+### Syncing a region only
+
+`--bounding-box lat1,lon1,lat2,lon2` keeps only the data around a latitude/longitude box, e.g. `--bounding-box 45,5,48,11`. A grid cell is inside if its coordinate lies in the box. Every chunk of a weather variable file that holds a cell inside the box is copied byte for byte, without decoding it. All other chunks are written empty, which reads as NaN, so the API returns `null` for those chunks, and the file keeps its dimensions, chunking and compression. Chunks are whole, so the data reaches a little beyond the box. Selected chunks separated by gaps of up to 1 MiB share an HTTP range request of up to 8 MiB; a single larger chunk is fetched in one request. Gap bytes are downloaded but discarded, and unselected chunks are written as NaN. The last 8 KiB of each file are prefetched for metadata. Up to eight requests run concurrently per file, and chunks are written serially in file order. A box that reaches beyond the grid of a regional model keeps the cells inside the grid; a box without any cell fails with an error.
+
+Static files, `meta.json` and files that are not an array of floating point numbers on the model grid are copied whole. The grid may be followed or preceded by other dimensions, e.g. ensemble members. Files synced with a box are compared by modification time only, because their size differs from the remote file. The first file that fails stops the model with that error. A file is retried up to 10 times if the remote file changes during the copy or a request times out. A file whose layout does not match the model grid is copied whole, with an info log line.
+
+When changing the box, use a fresh data directory or remove the previously synced weather files first. Modification times alone cannot detect a changed box. Files containing empty chunks require the updated OM reader.
+
 ## Cleanup old data
 To automatically cleanup old data, the following cronjobs can be used.
 

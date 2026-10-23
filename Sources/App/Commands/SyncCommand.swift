@@ -1,4 +1,5 @@
 import Foundation
+import AsyncHTTPClient
 import Vapor
 import OmFileIO
 
@@ -61,6 +62,9 @@ struct SyncCommand: AsyncCommand {
 
         @Option(name: "year", help: "Download one year or a range of years (e.g. 2000-2005)")
         var year: String?
+
+        @Option(name: "bounding-box", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
+        var boundingBox: String?
     }
 
     /// All weather variables that may be available for `previous days API`
@@ -116,6 +120,7 @@ struct SyncCommand: AsyncCommand {
         let pastDays = signature.pastDays ?? 7
         let concurrent = signature.concurrent ?? 2
         let concurrentModels = signature.concurrentModels ?? 2
+        let bbox = try signature.boundingBox.map { try BoundingBoxWGS84(commaSeparated: $0) }
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
@@ -167,7 +172,8 @@ struct SyncCommand: AsyncCommand {
                             yearRange: yearRange,
                             pastDays: pastDays,
                             apikey: signature.apikey,
-                            downloadPressureNow: downloadPressureNow
+                            downloadPressureNow: downloadPressureNow,
+                            bbox: bbox
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
@@ -186,8 +192,20 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?) async throws {
         let logger = application.logger
+        
+        /// The digital elevation model has no grid and only static files, which are copied whole
+        let keep: SyncBoundingBox?
+        if let bbox, model != .copernicus_dem90 {
+            guard let grid = try await model.getDomain()?.grid else {
+                throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
+            }
+            keep = try SyncBoundingBox(grid: grid, box: bbox)
+        } else {
+            keep = nil
+        }
+        let endpoint = S3ServerHealth(logger: logger, servers: [S3BucketEndpoint(rawEndpoint: server, profile: nil)], checksHealth: false)
         
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
         let downloadAllVariables = variablesSig.contains("really_download_all_variables")
@@ -224,7 +242,7 @@ struct SyncCommand: AsyncCommand {
                 return []
             }
             let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
-            let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+            let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory, modificationTimeOnly: keep != nil)
             return Array(filtered)
         }.flatMap({$0})
         
@@ -256,21 +274,65 @@ struct SyncCommand: AsyncCommand {
                 /// Update the `last_run_availability_time` within meta.json
                 try json.with(last_run_availability_time: .now()).writeTo(path: localFile)
             } else {
-                for _ in 0..<10 {
-                    do {
-                        let response = try await client.executeRetryChunked(.init(url: request.url.string), logger: logger)
-                        /// Download file chunked into 8 MB parts. Get 4 chunks in parallel
-                        try await response.body.saveTo(file: localFile, size: try response.contentLength(), modificationDate: response.headers.lastModified?.value, logger: logger)
-                        await progress.add(try response.contentLength() ?? 0)
-                        break
-                    } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
-                        /// Because we are downloading chunks, the remote server might have updated the initial file and we have to restart the entire download
-                        try FileManager.default.removeItemIfExists(at: localFile)
+                // Static files are copied whole and skip the remote metadata reads.
+                if let keep, download.name.hasSuffix(".om"), !download.name.contains("/static/") {
+                    // The server reads the API key from the URL query.
+                    let object = download.name + (request.url.query.map { "?\($0)" } ?? "")
+                    if try await downloadBoundingBox(keep: keep, url: request.url.string, endpoint: endpoint, object: object, download: download, localFile: localFile, logger: logger) != nil {
+                        await progress.add(download.fileSize)
+                        return
                     }
                 }
+                let fetched = try await downloadWholeFile(client: client, url: request.url.string, download: download, localFile: localFile, logger: logger)
+                await progress.add(fetched)
             }
         }
         await progress.finish()
+    }
+
+    /// Restart the complete download if the remote file changes between range requests.
+    private func downloadWholeFile(client: HTTPClient, url: String, download: S3List.ListV2File, localFile: String, logger: Logger) async throws -> Int {
+        var attempts = 0
+        while true {
+            try Task.checkCancellation()
+            attempts += 1
+            do {
+                let response = try await client.executeRetryChunked(.init(url: url), logger: logger, file: attempts == 1 ? download : nil)
+                let size = try response.contentLength()
+                // Download in 8 MiB parts, with four requests in parallel.
+                try await response.body.saveTo(file: localFile, size: size, modificationDate: response.headers.lastModified?.value, logger: logger)
+                return size ?? 0
+            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                try FileManager.default.removeItemIfExists(at: localFile)
+                guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }
+            }
+        }
+    }
+
+    /// Returns nil for unsupported files so the caller can download them whole.
+    private func downloadBoundingBox(keep: SyncBoundingBox, url: String, endpoint: S3ServerHealth, object: String, download: S3List.ListV2File, localFile: String, logger: Logger) async throws -> Int? {
+        var attempts = 0
+        var loggedTimeout = false
+        while true {
+            try Task.checkCancellation()
+            attempts += 1
+            do {
+                // Use listing metadata initially; refresh it when restarting a failed attempt.
+                let remote = attempts == 1
+                    ? OmHttpReaderBackend(context: endpoint, object: object, count: download.fileSize, eTag: download.eTag, lastModified: download.modificationTime)
+                    : try await OmHttpReaderBackend(context: endpoint, object: object)
+                return try await keep.write(remote: remote, url: url, to: localFile, modificationTime: remote.lastModified, logger: logger)
+            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                // Bbox writes leave the existing local file untouched until they succeed.
+                guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }
+            } catch CurlError.timeoutReached {
+                guard attempts < 10 else { throw CurlError.timeoutReached }
+                if !loggedTimeout {
+                    logger.warning("Timeout reading \(download.name) with a bounding box, retrying the file")
+                    loggedTimeout = true
+                }
+            }
+        }
     }
 }
 
@@ -292,7 +354,7 @@ fileprivate extension URL {
     }
 }
 
-fileprivate extension Array where Element == S3List.ListV2File {
+extension Array where Element == S3List.ListV2File {
     /// Only include files with data newer than a given timestamp. This is based on evaluating the time-chunk in the filename and is not based on the modification time
     func includeFiles(timeRange: Range<Timestamp>, domain registry: DomainRegistry) -> [Element] {
         guard let domain = registry.timeSeriesMetadata else {
@@ -322,7 +384,8 @@ fileprivate extension Array where Element == S3List.ListV2File {
     }
 
     /// Compare remote files to local files. Only keep files that are not available locally or older.
-    func includeFiles(compareLocalDirectory: String) -> [Element] {
+    /// With `modificationTimeOnly`, sizes are not compared, because files synced with a bounding box differ in size from the remote file
+    func includeFiles(compareLocalDirectory: String, modificationTimeOnly: Bool) -> [Element] {
         let resourceKeys = Set<URLResourceKey>([.contentModificationDateKey, .fileSizeKey])
         return self.filter({ remoteFile in
             let pathNoData = remoteFile.name[remoteFile.name.index(remoteFile.name.startIndex, offsetBy: 5)..<remoteFile.name.endIndex]
@@ -332,7 +395,7 @@ fileprivate extension Array where Element == S3List.ListV2File {
                   let modificationTime = resourceValues.contentModificationDate else {
                 return true
             }
-            if remoteFile.name.contains("meta.json") {
+            if remoteFile.name.contains("meta.json") || (modificationTimeOnly && remoteFile.name.hasSuffix(".om") && !remoteFile.name.contains("/static/")) {
                 /// meta.json is modified during sync to replace the `last_run_availability_time`.
                 /// Size might be different. Only check for modification time.
                 return remoteFile.modificationTime > modificationTime.addingTimeInterval(1).toTimestamp()

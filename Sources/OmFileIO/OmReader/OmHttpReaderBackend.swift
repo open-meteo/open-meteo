@@ -100,7 +100,7 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
         request.headers.replaceOrAdd(name: "Accept-Encoding", value: "identity")
         let logger = server.logger
-        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
+        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url.prefix { $0 != "?" })")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
         do {
             let buffer = try await HTTPClient.shared.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
