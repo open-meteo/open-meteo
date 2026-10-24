@@ -51,6 +51,13 @@ struct MetricsController: RouteCollection {
             ? OpenMeteo.dataBlockCache.cache.statistics()
             : .zero
 
+        let evictionStats = OpenMeteo.dataBlockCacheInitialized.load(ordering: .relaxed)
+            ? OpenMeteo.dataBlockCache.cache.evictionStatistics
+            : .zero
+        let evictionWindows = evictionStats.accessedWithin.map {
+            "om_block_cache_evictions_recent_total{window=\"\($0.window)\"} \($0.count)"
+        }.joined(separator: "\n")
+
         let monitored_ips = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
 
         var downloadMetrics = ""
@@ -117,6 +124,12 @@ om_file_remote_payload_waiting \(OmFileSystemMetrics.fileRemotePayloadWaiting.lo
 # TYPE om_file_remote_payload_update_waiting gauge
 # HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
 om_file_remote_payload_update_waiting \(OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
+# HELP om_block_cache_evictions_total Occupied committed cache slots evicted for a different key since process start.
+# TYPE om_block_cache_evictions_total counter
+om_block_cache_evictions_total \(evictionStats.total)
+# HELP om_block_cache_evictions_recent_total Evictions whose last access or insertion was within the given window at eviction. Windows overlap; counters reset on process restart.
+# TYPE om_block_cache_evictions_recent_total counter
+\(evictionWindows)
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes
