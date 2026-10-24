@@ -10,6 +10,7 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
     
     case direct(Variable)
+    case ensemble(Variable, EnsembleReduction)
     /// Resolve soil type lazily; prefetch only the moisture dependency.
     /// Requires static soil types encoded using the ERA5 classification.
     case soilMoistureIndex(RawOrMapped)
@@ -254,6 +255,11 @@ extension GenericDeriverProtocol {
     
     fileprivate func get(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
+        case .ensemble(let input, let reduction):
+            let data = try await reduction.readTimes(time).asyncMap {
+                try await reader.get(variable: input, time: $0)
+            }
+            return reduction.calculate(data)
         case .soilMoistureIndex(let input):
             guard let type = try await reader.getEra5SoilType() else {
                 return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
@@ -338,6 +344,10 @@ extension GenericDeriverProtocol {
     
     fileprivate func prefetchData(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws {
         switch variable {
+        case .ensemble(let input, let reduction):
+            for readTime in reduction.readTimes(time) {
+                try await reader.prefetchData(variable: input, time: readTime)
+            }
         case .soilMoistureIndex(let input):
             try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
@@ -455,6 +465,13 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func get(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         switch variable {
+        case .ensemble(let input, let reduction):
+            var data: [DataAndUnit] = []
+            for readTime in reduction.readTimes(time) {
+                guard let member = try await reader.get(variable: input, time: readTime) else { return nil }
+                data.append(member)
+            }
+            return reduction.calculate(data)
         case .soilMoistureIndex(let input):
             guard let type = try await reader.getEra5SoilType() else {
                 return DataAndUnit(Array(repeating: .nan, count: time.time.count), .fraction)
@@ -555,6 +572,13 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func prefetchData(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> Bool {
         switch variable {
+        case .ensemble(let input, let reduction):
+            var available = true
+            for readTime in reduction.readTimes(time) {
+                let accepted = try await reader.prefetchData(variable: input, time: readTime)
+                available = available && accepted
+            }
+            return available
         case .soilMoistureIndex(let input):
             return try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
