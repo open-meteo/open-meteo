@@ -1,4 +1,5 @@
 import Foundation
+import OmFileIO
 import Vapor
 import FlatBuffers
 import OpenMeteoSdk
@@ -85,6 +86,27 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         let dailyVariables: [Model.DailyVariable]?
         let weeklyVariables: [Model.WeeklyVariable]?
         let monthlyVariables: [Model.MonthlyVariable]?
+
+        var count: Int {
+            (currentVariables?.count ?? 0) + (minutely15Variables?.count ?? 0)
+                + (hourlyVariables?.count ?? 0) + (dailyVariables?.count ?? 0)
+                + (weeklyVariables?.count ?? 0) + (monthlyVariables?.count ?? 0)
+        }
+
+        /// Select one variable across the sections in their request order.
+        func singleVariable(at index: Int) -> Self {
+            var remaining = index
+            func select<T>(_ values: [T]?) -> [T]? {
+                let count = values?.count ?? 0
+                defer { remaining -= count }
+                guard let values, remaining >= 0, remaining < count else { return nil }
+                return [values[remaining]]
+            }
+            return Self(
+                currentVariables: select(currentVariables), minutely15Variables: select(minutely15Variables),
+                hourlyVariables: select(hourlyVariables), dailyVariables: select(dailyVariables),
+                weeklyVariables: select(weeklyVariables), monthlyVariables: select(monthlyVariables))
+        }
     }
     let variables: RequestVariables
 
@@ -200,16 +222,58 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
     }
 
+    /// Discover remote ranges in coordinate order with one per-request budget.
+    /// Remote payload downloads run independently under the HTTP scheduler.
+    func preloadRemoteLocations(logger: Logger, concurrency: Int = ReaderPrefetchPolicy.concurrency) async throws {
+        let variableIndices = 0..<variables.count
+        let jobs = results.indices.lazy.flatMap { location in
+            self.results[location].results.indices.lazy.flatMap { model in
+                variableIndices.lazy.map { variable in (location, model, variable) }
+            }
+        }
+        try await ReaderPrefetchPolicy.$current.withValue(.remoteOnly) {
+            try await OmReaderPrefetch.$pageInPayload.withValue(false) {
+                try await OmReaderPrefetch.$remotePriority.withValue(.foreground) {
+                    try await jobs.foreachConcurrent(nConcurrent: concurrency) { location, model, variable in
+                        try Task.checkCancellation()
+                        do {
+                            let variables = self.variables.singleVariable(at: variable)
+                            try await self.results[location].results[model].prefetch(
+                                currentVariables: variables.currentVariables,
+                                minutely15Variables: variables.minutely15Variables,
+                                hourlyVariables: variables.hourlyVariables,
+                                dailyVariables: variables.dailyVariables,
+                                weeklyVariables: variables.weeklyVariables,
+                                monthlyVariables: variables.monthlyVariables)
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            logger.debug("Remote variable preload stopped: \(error)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true, logger: Logger) async throws -> Response {
         if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
+        if OpenMeteo.remoteDataDirectory != nil {
+            try await preloadRemoteLocations(logger: logger)
+        }
         if prefetch {
-            for location in results {
-                for model in location.results {
-                    try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables, weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+            try await ReaderPrefetchPolicy.$current.withValue(.all) {
+                for location in results {
+                    for model in location.results {
+                        try await model.prefetch(
+                            currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables,
+                            hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables,
+                            weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+                    }
                 }
             }
         }
