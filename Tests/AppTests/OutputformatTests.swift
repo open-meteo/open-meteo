@@ -21,9 +21,10 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
     var latitude: Float = 41
     var longitude: Float = 2
     var elevation: Float? = nil
+    var onPrefetch: (@Sendable (ForecastapiResult<Self>.RequestVariables) async throws -> Void)?
 
     func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [App.ForecastVariableDaily]?) async throws {
-        
+        try await onPrefetch?(.init(currentVariables: currentVariables, minutely15Variables: minutely15Variables, hourlyVariables: hourlyVariables, dailyVariables: dailyVariables, weeklyVariables: weeklyVariables, monthlyVariables: monthlyVariables))
     }
 
     func current(variables: [App.ForecastVariable]?) async throws -> App.ApiSectionSingle<App.ForecastVariable>? {

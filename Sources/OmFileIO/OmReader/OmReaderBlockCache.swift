@@ -3,6 +3,13 @@ import Foundation
 import NIOCore
 import Logging
 
+/// Task-scoped block-cache prefetch settings. Remote payload downloads are always asynchronous.
+public enum OmReaderPrefetch {
+    @TaskLocal public static var pageInPayload = true
+    @TaskLocal public static var waitForCompletion = false
+    @TaskLocal public static var remotePriority: RemoteReadPriority = .background
+}
+
 
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache.
@@ -43,6 +50,9 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
 
     public func prefetchData(offset: Int, count: Int, priority: RemoteReadPriority) async throws {
+        let isRemote = backend is OmHttpReaderBackend
+        let pageInPayload = OmReaderPrefetch.pageInPayload
+        let priority: RemoteReadPriority = isRemote ? OmReaderPrefetch.remotePriority : priority
         let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
         let fileSize = self.backend.count
@@ -52,34 +62,40 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         /// Check if all blocks are available sequentially in cache
         let sameSuperBlock = superBlocks.count == 1
         if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
+            // Eager warming skips paging hints; normal prefetch can still page cached bytes in.
+            guard pageInPayload else { return }
             let offset = cache.cache.data.withMutableUnsafeBytes { data in
                 UnsafeRawPointer(data.baseAddress!).distance(to: ptr.baseAddress!)
             }
             cache.cache.data.prefetchData(offset: offset, count: ptr.count)
             return
         }
-        /// Request-associated prefetch retains its explicit priority.
-        Task {
-            do {
-                for superBlock in superBlocks {
-                    let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
-                    let keyStart = calculateCacheKey(block: blocks.lowerBound)
-                    //print("withData blocks \(blocks)")
-                    try await cache.get(key: keyStart, count: blocks.count, priority: priority, provider: ({ [backend] (key, count) in
-                        let block = blocks.lowerBound + Int(key &- keyStart)
-                        let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
-                        return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
-                    }), dataCallback: {(key, _) in
-                        // Miss callbacks can borrow the downloaded buffer, not the mmap.
-                        guard let value = cache.cache.get(key: key, count: 1) else { return }
-                        let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                            UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
-                        }
-                        cache.cache.data.prefetchData(offset: offset, count: value.count)
-                    })
-                }
-            } catch {
-                Logger(label: "RemoteData").debug("Prefetch stopped: \(error)")
+        let download: @Sendable () async throws -> Void = { [self] in
+            for superBlock in superBlocks {
+                let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
+                let keyStart = calculateCacheKey(block: blocks.lowerBound)
+                //print("withData blocks \(blocks)")
+                try await cache.get(key: keyStart, count: blocks.count, priority: priority, provider: ({ [backend] (key, count) in
+                    let block = blocks.lowerBound + Int(key &- keyStart)
+                    let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
+                    return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
+                }), dataCallback: {(key, _) in
+                    guard pageInPayload else { return }
+                    // Miss callbacks can borrow the downloaded buffer, not the mmap.
+                    guard let value = cache.cache.get(key: key, count: 1) else { return }
+                    let offset = cache.cache.data.withMutableUnsafeBytes { data in
+                        UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
+                    }
+                    cache.cache.data.prefetchData(offset: offset, count: value.count)
+                })
+            }
+        }
+        if OmReaderPrefetch.waitForCompletion && !isRemote {
+            try await download()
+        } else {
+            Task {
+                do { try await download() }
+                catch { Logger(label: "RemoteData").debug("Prefetch stopped: \(error)") }
             }
         }
     }

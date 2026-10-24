@@ -46,6 +46,84 @@ private final class PrefetchRecordingStorage: AtomicBlockCacheStorable {
 }
 
 @Suite struct RemoteDownloadSchedulerTests {
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true], [false, true])
+    func remotePrefetchUsesSelectedQueueWithoutWaiting(foreground: Bool, pageInPayload: Bool) async throws {
+        let app = try await Application.make(.testing)
+        app.get { _ in HTTPStatus.ok }
+        app.get("payload") { _ in
+            Response(status: .partialContent, body: .init(data: Data(repeating: 7, count: 128)))
+        }
+        let gate = DownloadGate()
+        do {
+            try await app.server.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let endpoint = S3BucketEndpoint(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
+            let context = S3ServerHealth(logger: .init(label: "test"), servers: [endpoint], downloadLimit: 1, backgroundDownloadLimit: 1)
+            defer { Task { await context.stopMonitoring() } }
+            let scheduler = await context.downloadScheduler(for: endpoint)
+            let occupied = Task {
+                try await scheduler.execute(job: RemoteDownloadJob(priority: .foreground)) { await gate.wait() }
+            }
+            try await eventually { await scheduler.snapshot.activeForeground == 1 }
+            let storage = PrefetchRecordingStorage()
+            let cache = AtomicBlockCache(data: storage, blockSize: 64)
+            let backend = OmHttpReaderBackend(context: context, object: "payload", count: 128, eTag: "\"test\"", lastModified: .now())
+            let reader = OmReaderBlockCache(backend: backend, cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+            try await OmReaderPrefetch.$pageInPayload.withValue(pageInPayload) {
+                try await OmReaderPrefetch.$remotePriority.withValue(foreground ? .foreground : .background) {
+                    try await OmReaderPrefetch.$waitForCompletion.withValue(true) {
+                        try await reader.prefetchData(offset: 0, count: 128)
+                    }
+                }
+            }
+            try await eventually {
+                let snapshot = await scheduler.snapshot
+                return foreground ? snapshot.queuedForeground == 1 : snapshot.queuedBackground == 1
+            }
+            let snapshot = await scheduler.snapshot
+            #expect(snapshot.queuedForeground == (foreground ? 1 : 0))
+            #expect(snapshot.queuedBackground == (foreground ? 0 : 1))
+            #expect(cache.get(key: reader.calculateCacheKey(block: 0), count: 2) == nil)
+            await gate.open()
+            try await occupied.value
+            try await eventually { cache.get(key: reader.calculateCacheKey(block: 0), count: 2) != nil }
+            if pageInPayload {
+                try await eventually { storage.ranges.withLock { $0.count } == 2 }
+            } else {
+                #expect(storage.ranges.withLock { $0.isEmpty })
+            }
+            try await OmReaderPrefetch.$pageInPayload.withValue(pageInPayload) {
+                try await reader.prefetchData(offset: 0, count: 128)
+            }
+            #expect(storage.ranges.withLock { $0.count } == (pageInPayload ? 3 : 0))
+            if !pageInPayload {
+                // The normal pass pages bytes populated by eager warming without downloading again.
+                try await reader.prefetchData(offset: 0, count: 128)
+                #expect(storage.ranges.withLock { $0.count } == 1)
+            }
+        } catch {
+            await gate.open()
+            await app.server.shutdown()
+            try await app.asyncShutdown()
+            throw error
+        }
+        await app.server.shutdown()
+        try await app.asyncShutdown()
+    }
+
+    @Test func awaitedPrefetchCompletesDownloadsAndPagesPayloads() async throws {
+        let storage = PrefetchRecordingStorage()
+        let cache = AtomicBlockCache(data: storage, blockSize: 64)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 7, count: 128)), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        try await OmReaderPrefetch.$waitForCompletion.withValue(true) {
+            try await reader.prefetchData(offset: 0, count: 128)
+            #expect(cache.get(key: reader.calculateCacheKey(block: 0), count: 2) != nil)
+            #expect(storage.ranges.withLock { $0.count } == 2)
+            try await reader.prefetchData(offset: 0, count: 128)
+            #expect(storage.ranges.withLock { $0.count } == 3)
+        }
+    }
+
     @Test(.timeLimit(.minutes(1)), arguments: [false, true])
     func retryBackoffReleasesAdmission(cancelDuringBackoff: Bool) async throws {
         let app = try await Application.make(.testing)

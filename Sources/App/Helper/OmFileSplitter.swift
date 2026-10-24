@@ -736,6 +736,9 @@ extension OmFileReaderArrayProtocol where OmType == Float {
     /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// /// TODO: nMembers variable is wrong if called via API controller. Aways 1
     func willNeed3D(ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) async throws {
+        guard ReaderPrefetchPolicy.current.includes(isRemote: self is OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>) else {
+            return
+        }
         switch self.getDimensionsCount() {
         case 2:
             let dimensions: InlineArray<2, UInt64> = getDimensionsInline()
