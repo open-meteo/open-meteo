@@ -9,18 +9,40 @@ import NIO
 public final actor ApiKeyManager {
     public static let instance = ApiKeyManager()
 
+    /// Optional multiple of the monthly quota at which requests are rejected.
+    private let quotaMultiplier = Environment.get("API_APIKEYS_QUOTA_MULTIPLIER").flatMap(Double.init)
+
     struct KeyAndLimit: Equatable {
         let key: String.SubSequence
         let limit: Int
         let id: String.SubSequence?
+        let usageLast30Days: Double
+
+        func checkQuota(quotaMultiplier: Double?) throws {
+            guard let multiplier = quotaMultiplier, multiplier.isFinite, multiplier > 0,
+                  limit > 0, usageLast30Days.isFinite, usageLast30Days >= 0 else {
+                return
+            }
+            if usageLast30Days >= Double(limit) * multiplier {
+                throw ApiKeyManagerError.apiKeyOverQuota
+            }
+        }
 
         static func readApiKeys(path: String) -> [KeyAndLimit] {
-            return (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: ",").sorted().map {
-                let parts = $0.split(separator: ";")
+            return (try? String(contentsOfFile: path, encoding: .utf8)).map(parseApiKeys) ?? []
+        }
+
+        static func parseApiKeys(_ csv: String) -> [KeyAndLimit] {
+            return csv.split(separator: ",").compactMap { entry -> KeyAndLimit? in
+                let parts = entry.split(separator: ";", omittingEmptySubsequences: false).map {
+                    Substring($0.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
+                guard let key = parts.first, !key.isEmpty else { return nil }
                 let limit = parts.count <= 1 ? 0 : Int(parts[1]) ?? 0
-                let id = parts.count <= 2 ? nil : parts[2]
-                return KeyAndLimit(key: parts[0], limit: limit, id: id)
-            } ?? []
+                let id = parts.count <= 2 || parts[2].isEmpty ? nil : parts[2]
+                let usage = parts.count <= 3 ? 0 : Double(parts[3]) ?? 0
+                return KeyAndLimit(key: key, limit: limit, id: id, usageLast30Days: usage)
+            }.sorted { $0.key < $1.key }
         }
     }
 
@@ -57,8 +79,10 @@ public final actor ApiKeyManager {
         return apiKeys.isEmpty
     }
 
-    func getLimit(_ string: String.SubSequence) -> Int? {
-        return apiKeys.first(where: {$0.key == string})?.limit
+    func getLimit(_ string: String.SubSequence) throws -> Int? {
+        guard let key = apiKeys.first(where: {$0.key == string}) else { return nil }
+        try key.checkQuota(quotaMultiplier: quotaMultiplier)
+        return key.limit
     }
 
     func increment(apikey: String.SubSequence, weight: Float) {
@@ -238,7 +262,7 @@ extension Request {
         guard let apikey = headers["X-Api-Key"].first ?? params.apikey else {
             throw ApiKeyManagerError.apiKeyRequired
         }
-        guard let limit = await ApiKeyManager.instance.getLimit(String.SubSequence(apikey)) else {
+        guard let limit = try await ApiKeyManager.instance.getLimit(String.SubSequence(apikey)) else {
             throw ApiKeyManagerError.apiKeyInvalid
         }
         let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api.", "seasonal-api."]
@@ -270,6 +294,7 @@ extension Request {
 }
 
 enum ApiKeyManagerError: Error {
+    case apiKeyOverQuota
     case apiKeyRequired
     case apiKeyInvalid
     case apiProfessionalRequired
@@ -280,6 +305,8 @@ enum ApiKeyManagerError: Error {
 extension ApiKeyManagerError: AbortError {
     var status: HTTPResponseStatus {
         switch self {
+        case .apiKeyOverQuota:
+            return .forbidden
         case .apiKeyRequired:
             return .unauthorized
         case .apiKeyInvalid:
@@ -293,6 +320,8 @@ extension ApiKeyManagerError: AbortError {
 
     var reason: String {
         switch self {
+        case .apiKeyOverQuota:
+            return "Your API key is over quota."
         case .apiKeyRequired:
             return "API key required. Please add &apikey= to the URL."
         case .apiKeyInvalid:
