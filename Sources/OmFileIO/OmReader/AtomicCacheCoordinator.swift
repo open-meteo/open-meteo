@@ -90,7 +90,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             }
             let waiter = UUID()
             let data = try await withTaskCancellationHandler {
-                return try await withCheckedThrowingContinuation { continuation in
+                // Swift 6.3 does not infer this actor through the cancellation-handler closure.
+                // Keep waiter registration isolated with finish and cancel.
+                return try await withCheckedThrowingContinuation(isolation: self) { continuation in
                     if let result = fetch.result {
                         continuation.resume(with: result)
                     } else {
