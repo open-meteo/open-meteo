@@ -44,6 +44,35 @@ private final class PrefetchRecordingStorage: AtomicBlockCacheStorable {
 }
 
 @Suite struct RemoteDownloadSchedulerTests {
+    /// Run with Swift 6.3 as well as newer toolchains: inferred isolation inside
+    /// the cancellation/continuation closures differs between 6.3 and 6.4.
+    @Test(.timeLimit(.minutes(1))) func fileModificationCompletionRacesWithWaiterRegistration() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let cache = try AtomicBlockCache(file: path, blockSize: 64, blockCount: 16)
+        let coordinator = AtomicCacheCoordinator(cache: cache)
+        for iteration in 0..<200 {
+            let readers = (0..<32).map { index in
+                Task {
+                    do {
+                        try await coordinator.get(key: UInt64(index % 3), count: 3, priority: index % 4 == 0 ? .background : .foreground, provider: { _, _ -> Data in
+                            await Task.yield()
+                            if iteration % 2 == 0 { await Task.yield() }
+                            throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
+                        }, dataCallback: { _, _ in Issue.record("Failed fetch produced data") })
+                        Issue.record("Expected file modification or cancellation")
+                    } catch is CancellationError {
+                    } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                    } catch {
+                        Issue.record("Unexpected error: \(error)")
+                    }
+                }
+            }
+            for (index, reader) in readers.enumerated() where index % 3 == 0 { reader.cancel() }
+            for reader in readers { await reader.value }
+        }
+    }
+
     @Test func foregroundOvertakesQueuedBackground() async throws {
         let scheduler = RemoteDownloadScheduler(limit: 1, backgroundLimit: 1)
         let gate = DownloadGate()
