@@ -1,4 +1,6 @@
 import Foundation
+import AsyncHTTPClient
+import Vapor
 import Testing
 import OmFileFormat
 import Synchronization
@@ -44,6 +46,76 @@ private final class PrefetchRecordingStorage: AtomicBlockCacheStorable {
 }
 
 @Suite struct RemoteDownloadSchedulerTests {
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func retryBackoffReleasesAdmission(cancelDuringBackoff: Bool) async throws {
+        let app = try await Application.make(.testing)
+        let requests = Mutex(0)
+        app.get("retry") { _ -> Response in
+            let attempt = requests.withLock { value in value += 1; return value }
+            return Response(status: attempt == 1 ? .serviceUnavailable : .ok, body: .init(string: "ok"))
+        }
+        do {
+            try await app.server.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let scheduler = RemoteDownloadScheduler(limit: 1, backgroundLimit: 1)
+            let job = RemoteDownloadJob(priority: .background)
+            let retry = Task {
+                try await HTTPClient.shared.executeRetryAndCollect(
+                    HTTPClientRequest(url: "http://127.0.0.1:\(port)/retry"),
+                    logger: .init(label: "retry-test"), upTo: 2,
+                    backOffSettings: .init(factor: .seconds(2), maximum: .seconds(2)),
+                    scheduling: (scheduler, job))
+            }
+            defer { retry.cancel() }
+            try await eventually {
+                let stats = await scheduler.snapshot
+                return requests.withLock { $0 } == 1 && stats.activeBackground == 0
+            }
+            // Hold the freed slot while the original download sleeps, then retries.
+            let gate = DownloadGate()
+            let other = Task {
+                try await scheduler.execute(job: RemoteDownloadJob(priority: .foreground)) { await gate.wait() }
+            }
+            do {
+                try await eventually { await scheduler.snapshot.activeForeground == 1 }
+                if cancelDuringBackoff {
+                    retry.cancel()
+                    do {
+                        _ = try await retry.value
+                        Issue.record("Cancelled retry unexpectedly succeeded")
+                    } catch is CancellationError {}
+                    #expect(requests.withLock { $0 } == 1)
+                } else {
+                    // Promotion while detached must survive admission for the next attempt.
+                    await job.promote()
+                    try await eventually { await scheduler.snapshot.queuedForeground == 1 }
+                    #expect(requests.withLock { $0 } == 1)
+                }
+                await gate.open()
+                try await other.value
+                if !cancelDuringBackoff {
+                    let data = try await retry.value
+                    #expect(data.getString(at: data.readerIndex, length: data.readableBytes) == "ok")
+                    #expect(requests.withLock { $0 } == 2)
+                }
+                let stats = await scheduler.snapshot
+                #expect(stats.activeForeground == 0 && stats.activeBackground == 0)
+                #expect(stats.queuedForeground == 0 && stats.queuedBackground == 0)
+            } catch {
+                await gate.open()
+                other.cancel()
+                _ = await other.result
+                throw error
+            }
+            await app.server.shutdown()
+            try await app.asyncShutdown()
+        } catch {
+            await app.server.shutdown()
+            try await app.asyncShutdown()
+            throw error
+        }
+    }
+
     /// Run with Swift 6.3 as well as newer toolchains: inferred isolation inside
     /// the cancellation/continuation closures differs between 6.3 and 6.4.
     @Test(.timeLimit(.minutes(1))) func fileModificationCompletionRacesWithWaiterRegistration() async throws {

@@ -105,10 +105,7 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         do {
             let scheduler = await server.downloadScheduler(for: serverUrl)
             let job = RemoteDownloadJob.current ?? RemoteDownloadJob(priority: .foreground)
-            let downloadRequest = request
-            let buffer = try await scheduler.execute(job: job) {
-                try await self.server.client.executeRetryAndCollect(downloadRequest, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
-            }
+            let buffer = try await server.client.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff, scheduling: (scheduler, job))
             lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
             return buffer
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
