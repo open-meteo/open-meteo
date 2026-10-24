@@ -10,6 +10,10 @@ public enum S3ServerHealthError: Error {
 public actor S3ServerHealth {
     public nonisolated let logger: Logger
     public nonisolated let client: HTTPClient
+    private var downloadSchedulers: [String: RemoteDownloadScheduler] = [:]
+    private let downloadLimit: Int
+    private let backgroundDownloadLimit: Int
+    public nonisolated let cacheWarmer: RemoteCacheWarmer
     var states: [ServerState]
     var monitor: Task<Void, Never>?
     var initialWaitQueue: [CheckedContinuation<Void, Never>]?
@@ -19,13 +23,35 @@ public actor S3ServerHealth {
         var isOnline: Bool
     }
     
-    public init(logger: Logger, servers: [S3BucketEndpoint], client: HTTPClient = .shared) {
+    public init(logger: Logger, servers: [S3BucketEndpoint], client: HTTPClient = .shared, downloadLimit: Int = 32, backgroundDownloadLimit: Int = 4) {
+        precondition(downloadLimit > 0 && backgroundDownloadLimit > 0 && backgroundDownloadLimit <= downloadLimit)
+        self.downloadLimit = downloadLimit
+        self.backgroundDownloadLimit = backgroundDownloadLimit
+        self.cacheWarmer = RemoteCacheWarmer(concurrency: backgroundDownloadLimit)
         self.logger = logger
         self.client = client
         self.states = servers.map({ .init(server: $0, isOnline: true) })
         self.initialWaitQueue = []
     }
     
+    public func downloadScheduler(for endpoint: S3BucketEndpoint) -> RemoteDownloadScheduler {
+        let cleanURL = endpoint.uploadServer.extractSchemaUserNamePasswordCleanUrl()?.url ?? endpoint.uploadServer
+        let url = URL(string: cleanURL)
+        let origin = "\(url?.scheme ?? "https")://\(url?.host?.lowercased() ?? ""):\(url?.port ?? (url?.scheme == "http" ? 80 : 443))"
+        if let scheduler = downloadSchedulers[origin] { return scheduler }
+        let scheduler = RemoteDownloadScheduler(limit: downloadLimit, backgroundLimit: backgroundDownloadLimit)
+        downloadSchedulers[origin] = scheduler
+        return scheduler
+    }
+
+    public func downloadMetrics() async -> [(String, RemoteDownloadScheduler.Snapshot)] {
+        var result: [(String, RemoteDownloadScheduler.Snapshot)] = []
+        for (origin, scheduler) in downloadSchedulers {
+            result.append((origin, await scheduler.snapshot))
+        }
+        return result
+    }
+
     private func ensureChecks() async {
         if monitor == nil {
             monitor = Task { [weak self] in

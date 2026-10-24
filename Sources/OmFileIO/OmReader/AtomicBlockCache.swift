@@ -65,6 +65,15 @@ extension AtomicBlockCache where Backend == MmapFile {
 public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     let data: Backend
     let blockSize: Int
+    private let evictionMetrics: AtomicBlockCacheEvictionMetrics
+
+    init(data: Backend, blockSize: Int) {
+        self.data = data
+        self.blockSize = blockSize
+        self.evictionMetrics = AtomicBlockCacheEvictionMetrics()
+    }
+
+    public var evictionStatistics: AtomicBlockCacheEvictionStatistics { evictionMetrics.snapshot }
     
     var blockCount: Int {
         return data.count / (blockSize + MemoryLayout<WordPair>.size)
@@ -78,7 +87,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         /// For committed requests set bit 0 to zero
         let committedKey = WordPair(first: UInt(key), second: time | 0x1)
         /// The maximum number of slots to check for an empty space. Afterwards overwrite LRU value
-        let lookAheadCount: UInt64 = 1024
+        let lookAheadCount: UInt64 = 2048
         let blockCount = blockCount
         return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
@@ -116,6 +125,8 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
                     continue // another thread stole the slot
                 }
+                // Count the victim once we own the slot, even if publishing the replacement later loses a race.
+                evictionMetrics.record(evicted: entry, replacementKey: key, now: UInt(Date().timeIntervalSince1970 * 1_000_000_000))
                 let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                 value.withUnsafeBytes {
                     let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
@@ -133,7 +144,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     
     /// Prefetch data
     func prefetch(key: UInt64) {
-        let lookAheadCount: UInt64 = 1024
+        let lookAheadCount: UInt64 = 2048
         let blockCount = blockCount
         data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
@@ -157,7 +168,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     /// Find key in cache, updates the LRU timestamp and returns a pointer to the memory region. There is a slight chance, that data is modified while reading, but it should practically never happen
     func get(key: UInt64, maxAccessedAgeInSeconds: UInt) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
-        let lookAheadCount: UInt64 = 1024
+        let lookAheadCount: UInt64 = 2048
         let blockCount = blockCount
         return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
@@ -197,7 +208,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     /// Return if all keys are available sequentially in the cache
     func get(key: UInt64, count: UInt64) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
-        let lookAheadCount: UInt64 = 1024
+        let lookAheadCount: UInt64 = 2048
         let blockCount = blockCount
         return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
@@ -241,7 +252,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     func delete(key: UInt64, count: UInt64, olderThanSeconds: UInt) -> Int {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let olderThan = time - (olderThanSeconds * 1_000_000_000)
-        let lookAheadCount: UInt64 = 1024
+        let lookAheadCount: UInt64 = 2048
         let blockCount = blockCount
         return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
