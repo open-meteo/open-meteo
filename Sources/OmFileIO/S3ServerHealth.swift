@@ -12,7 +12,7 @@ public actor S3ServerHealth {
     private var downloadSchedulers: [String: RemoteDownloadScheduler] = [:]
     private let downloadLimit: Int
     private let backgroundDownloadLimit: Int
-    public nonisolated let cacheWarmer = RemoteCacheWarmer()
+    public nonisolated let cacheWarmer: RemoteCacheWarmer
     var states: [ServerState]
     var monitor: Task<Void, Never>?
     var initialWaitQueue: [CheckedContinuation<Void, Never>]?
@@ -28,6 +28,7 @@ public actor S3ServerHealth {
         precondition(downloadLimit > 0 && backgroundDownloadLimit > 0 && backgroundDownloadLimit <= downloadLimit)
         self.downloadLimit = downloadLimit
         self.backgroundDownloadLimit = backgroundDownloadLimit
+        self.cacheWarmer = RemoteCacheWarmer(concurrency: backgroundDownloadLimit)
         self.logger = logger
         self.states = servers.map({ .init(server: $0, isOnline: true) })
         self.initialWaitQueue = []
