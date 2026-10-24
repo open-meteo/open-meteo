@@ -65,6 +65,15 @@ extension AtomicBlockCache where Backend == MmapFile {
 public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     let data: Backend
     let blockSize: Int
+    private let evictionMetrics: AtomicBlockCacheEvictionMetrics
+
+    init(data: Backend, blockSize: Int) {
+        self.data = data
+        self.blockSize = blockSize
+        self.evictionMetrics = AtomicBlockCacheEvictionMetrics()
+    }
+
+    public var evictionStatistics: AtomicBlockCacheEvictionStatistics { evictionMetrics.snapshot }
     
     var blockCount: Int {
         return data.count / (blockSize + MemoryLayout<WordPair>.size)
@@ -116,6 +125,8 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
                     continue // another thread stole the slot
                 }
+                // Count the victim once we own the slot, even if publishing the replacement later loses a race.
+                evictionMetrics.record(evicted: entry, replacementKey: key, now: UInt(Date().timeIntervalSince1970 * 1_000_000_000))
                 let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                 value.withUnsafeBytes {
                     let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
