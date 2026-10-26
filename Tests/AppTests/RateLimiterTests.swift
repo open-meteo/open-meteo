@@ -15,13 +15,9 @@ import NIO
             let success = try await request.withFreeApiRateLimiter(limiter: limiter) { _ in
                 (2.5, Response(status: .ok))
             }
-            #expect(success.headers.first(name: "X-RateLimit-Remaining") == "7.5")
-            #expect(success.headers.first(name: "X-RateLimit-Limit") == "10.0")
             let reset = try #require(success.headers.first(name: "X-RateLimit-Reset").flatMap(Int.init))
             #expect(reset > started)
             #expect(reset <= Timestamp.now().timeIntervalSince1970 + 60)
-            #expect(success.headers.first(name: "X-RateLimit-Window") == "60")
-            #expect(success.headers.first(name: "Retry-After") == nil)
             let failure = try await request.withFreeApiRateLimiter(limiter: limiter) { _ in
                 throw Abort(.badRequest, headers: ["X-Test-Error": "preserved"], reason: "Invalid request")
             }
@@ -29,14 +25,15 @@ import NIO
             #expect(failure.headers.first(name: "X-Test-Error") == "preserved")
             #expect(failure.headers.contentType == .json)
             #expect(failure.body.string?.contains("Invalid request") == true)
-            #expect(failure.headers.first(name: "X-RateLimit-Cost") == "1.0")
-            #expect(failure.headers.first(name: "X-RateLimit-Limit") == "10.0")
-            #expect(failure.headers.first(name: "X-RateLimit-Remaining") == "6.5")
-            #expect(failure.headers.first(name: "X-RateLimit-Reset") == success.headers.first(name: "X-RateLimit-Reset"))
-            #expect(failure.headers.first(name: "X-RateLimit-Window") == "60")
-            #expect(failure.headers.first(name: "Retry-After") == nil)
-            #expect(await limiter.counter(address: address)?.increment(0, limits: limiter.limits)?.remaining == 6.5)
-            await limiter.counter(address: address)?.increment(25, limits: limiter.limits)
+            for (response, remaining, cost) in [(success, "7.5", "2.5"), (failure, "6.5", "1.0")] {
+                #expect(response.headers.first(name: "X-RateLimit-Cost") == cost)
+                #expect(response.headers.first(name: "X-RateLimit-Limit") == "10.0")
+                #expect(response.headers.first(name: "X-RateLimit-Remaining") == remaining)
+                #expect(response.headers.first(name: "X-RateLimit-Reset") == String(reset))
+                #expect(response.headers.first(name: "X-RateLimit-Window") == "60")
+                #expect(response.headers.first(name: "Retry-After") == nil)
+            }
+            await limiter.increment(25, for: limiter.clientKey(for: address))
             await #expect(throws: RateLimitError.self) {
                 _ = try await request.withFreeApiRateLimiter(limiter: limiter) { _ in
                     Issue.record("An exhausted quota must reject before running the handler")
@@ -63,139 +60,139 @@ import NIO
 
     @Test func weightedQuotaSelectionAndExhaustion() async throws {
         let limiter = RateLimiter(minute: 10, hour: 12, day: 30)
-        let counter = try #require(await limiter.counter(uint32: 1, now: 60))
-        let minute = try #require(counter.increment(2.5, limits: limiter.limits, now: 100))
-        #expect(minute == RateLimiter.Quota(limit: 10, remaining: 7.5, window: 60, reset: 120))
-        try counter.check(limits: limiter.limits, now: 100)
-
-        counter.increment(7, limits: limiter.limits, now: 100)
-        try counter.check(limits: limiter.limits, now: 120)
-        let hour = try #require(counter.increment(1, limits: limiter.limits, now: 120))
-        #expect(hour == RateLimiter.Quota(limit: 12, remaining: 1.5, window: 3600, reset: 3600))
-
-        let exhaustedHour = try #require(counter.increment(10, limits: limiter.limits, now: 120))
+        let client = 1
+        try await limiter.check(client, now: 60)
+        #expect(await limiter.increment(2.5, for: client, now: 100) ==
+                RateLimiter.Quota(limit: 10, remaining: 7.5, window: 60, reset: 120))
+        try await limiter.check(client, now: 100)
+        await limiter.increment(7, for: client, now: 100)
+        try await limiter.check(client, now: 120)
+        #expect(await limiter.increment(1, for: client, now: 120) ==
+                RateLimiter.Quota(limit: 12, remaining: 1.5, window: 3600, reset: 3600))
+        let exhaustedHour = try #require(await limiter.increment(10, for: client, now: 120))
         #expect(exhaustedHour.remaining == 0)
         #expect(exhaustedHour.window == 3600)
-        #expect(throws: RateLimitError.hourlyExceeded(quota: exhaustedHour, retryAfter: 3480)) {
-            try counter.check(limits: limiter.limits, now: 120)
+        await #expect(throws: RateLimitError.hourlyExceeded(quota: exhaustedHour, retryAfter: 3480)) {
+            try await limiter.check(client, now: 120)
         }
-        let exhaustedDay = try #require(counter.increment(20, limits: limiter.limits, now: 120))
+        let exhaustedDay = try #require(await limiter.increment(20, for: client, now: 120))
         #expect(exhaustedDay.remaining == 0)
         #expect(exhaustedDay.window == 86400)
-        #expect(throws: RateLimitError.dailyExceeded(quota: exhaustedDay, retryAfter: 86280)) {
-            try counter.check(limits: limiter.limits, now: 120)
+        await #expect(throws: RateLimitError.dailyExceeded(quota: exhaustedDay, retryAfter: 86280)) {
+            try await limiter.check(client, now: 120)
         }
     }
 
-    @Test func periodicTaskResetsExpiredWindows() async throws {
+    @Test func periodicResetsPreserveUnexpiredUsage() async throws {
         let limiter = RateLimiter(minute: 10, hour: 20, day: 30)
-        let counter = try #require(await limiter.counter(uint32: 1, now: 3540))
-        counter.increment(25, limits: limiter.limits)
+        let client = 1
+        await limiter.increment(25, for: client, now: 3540)
         await limiter.minutelyCallback(now: 3600)
-        let daily = try #require(counter.increment(0, limits: limiter.limits, now: 3600))
-        try counter.check(limits: limiter.limits, now: 3600)
-        #expect(daily.window == 86400)
-        #expect(daily.remaining == 5)
-        // A repeated callback in the same window must preserve new usage.
-        let other = try #require(await limiter.counter(uint32: 2, now: 3600))
-        other.increment(3, limits: limiter.limits)
+        try await limiter.check(client, now: 3600)
+        #expect(await limiter.increment(0, for: client, now: 3600) ==
+                RateLimiter.Quota(limit: 30, remaining: 5, window: 86400, reset: 86400))
+        let other = -2
+        await limiter.increment(3, for: other, now: 3600)
         await limiter.minutelyCallback(now: 3600)
-        #expect(other.increment(0, limits: limiter.limits, now: 3600)?.remaining == 7)
+        #expect(await limiter.increment(0, for: other, now: 3600)?.remaining == 7)
         await limiter.minutelyCallback(now: 86400)
-        let reset = try #require(counter.increment(0, limits: limiter.limits, now: 86400))
-        #expect(reset.window == 60)
-        #expect(reset.remaining == 10)
-        #expect(reset.reset == 86460)
+        #expect(await limiter.increment(0, for: client, now: 86400) ==
+                RateLimiter.Quota(limit: 10, remaining: 10, window: 60, reset: 86460))
     }
 
     @Test(arguments: [60, 3600, 86400])
     func clientsKeepIndependentResetOffsets(window: Int) async throws {
         let limiter = RateLimiter(minute: window == 60 ? 10 : 0, hour: window == 3600 ? 10 : 0,
                                   day: window == 86400 ? 10 : 0)
-        let first = try #require(await limiter.counter(uint32: 1, now: window - 60 + 2))
-        let second = try #require(await limiter.counter(int64: 2, now: window - 60 + 7))
-        #expect(first.increment(10, limits: limiter.limits, now: window - 1)?.reset == window + 2)
-        #expect(second.increment(10, limits: limiter.limits, now: window - 1)?.reset == window + 7)
-        #expect(throws: RateLimitError.self) {
-            try first.check(limits: limiter.limits, now: window + 1)
+        let first = 1
+        let second = -2
+        try await limiter.check(first, now: window - 60 + 2)
+        try await limiter.check(second, now: window - 60 + 7)
+        #expect(await limiter.increment(10, for: first, now: window - 1)?.reset == window + 2)
+        #expect(await limiter.increment(10, for: second, now: window - 1)?.reset == window + 7)
+        await #expect(throws: RateLimitError.self) {
+            try await limiter.check(first, now: window + 1)
         }
-        try first.check(limits: limiter.limits, now: window + 2)
-        #expect(throws: RateLimitError.self) {
-            try second.check(limits: limiter.limits, now: window + 2)
+        try await limiter.check(first, now: window + 2)
+        await #expect(throws: RateLimitError.self) {
+            try await limiter.check(second, now: window + 2)
         }
-        first.increment(1, limits: limiter.limits, now: window + 2)
+        await limiter.increment(1, for: first, now: window + 2)
         await limiter.minutelyCallback(now: window + 4)
-        #expect(first.increment(0, limits: limiter.limits, now: window + 4)?.remaining == 9)
-        #expect(second.increment(0, limits: limiter.limits, now: window + 4)?.remaining == 0)
-        try second.check(limits: limiter.limits, now: window + 7)
-        second.increment(2, limits: limiter.limits, now: window + 7)
-        // A late periodic task must preserve both the offsets and the new usage.
+        #expect(await limiter.increment(0, for: first, now: window + 4)?.remaining == 9)
+        #expect(await limiter.increment(0, for: second, now: window + 4)?.remaining == 0)
+        try await limiter.check(second, now: window + 7)
+        await limiter.increment(2, for: second, now: window + 7)
         await limiter.minutelyCallback(now: window + 30)
-        let firstQuota = try #require(first.increment(0, limits: limiter.limits, now: window + 30))
-        let secondQuota = try #require(second.increment(0, limits: limiter.limits, now: window + 30))
-        #expect(firstQuota.remaining == 9)
-        #expect(secondQuota.remaining == 8)
-        #expect(firstQuota.reset == 2 * window + 2)
-        #expect(secondQuota.reset == 2 * window + 7)
-        try first.check(limits: limiter.limits, now: window - 1)
-        #expect(first.increment(0, limits: limiter.limits, now: window + 30)?.remaining == 9)
+        #expect(await limiter.increment(0, for: first, now: window + 30) ==
+                RateLimiter.Quota(limit: 10, remaining: 9, window: window, reset: 2 * window + 2))
+        #expect(await limiter.increment(0, for: second, now: window + 30) ==
+                RateLimiter.Quota(limit: 10, remaining: 8, window: window, reset: 2 * window + 7))
+        try await limiter.check(first, now: window - 1)
+        #expect(await limiter.increment(0, for: first, now: window + 30)?.remaining == 9)
     }
 
-    @Test func resetTimestampSupportsUnsignedRange() throws {
+    @Test func resetTimestampSupportsUnsignedRange() async throws {
         let now = 2_200_000_007
-        let counter = RateLimiter.ClientUsageCounter(lastReset: UInt32(now))
-        let limits: (minute: Float, hour: Float, day: Float) = (10, 0, 0)
-        #expect(counter.increment(10, limits: limits, now: now)?.reset == now + 60)
-        #expect(throws: RateLimitError.self) {
-            try counter.check(limits: limits, now: now + 59)
+        let limiter = RateLimiter(minute: 10, hour: 0, day: 0)
+        let client = 1
+        #expect(await limiter.increment(10, for: client, now: now)?.reset == now + 60)
+        await #expect(throws: RateLimitError.self) {
+            try await limiter.check(client, now: now + 59)
         }
-        try counter.check(limits: limits, now: now + 60)
-        #expect(counter.increment(0, limits: limits, now: now + 60)?.remaining == 10)
-        #expect(counter.increment(0, limits: limits, now: now + 60)?.reset == now + 120)
+        try await limiter.check(client, now: now + 60)
+        #expect(await limiter.increment(0, for: client, now: now + 60) ==
+                RateLimiter.Quota(limit: 10, remaining: 10, window: 60, reset: now + 120))
     }
 
-    @Test(arguments: [false, true], [false, true])
-    func periodicCleanup(ipv6: Bool, keepActive: Bool) async throws {
+    @Test func cleanupPreservesUsageAndAllowsLateCompletion() async throws {
         let limiter = RateLimiter(minute: 10, hour: 20, day: 30)
-        let address = try SocketAddress(ipAddress: ipv6 ? "2001:db8::1" : "192.0.2.1", port: 80)
-        var counter = await limiter.counter(address: address, now: 60)
-        counter?.increment(2.5, limits: limiter.limits, now: 100)
-        weak var reference = counter
-        counter = nil
+        let expired = 1
+        let retained = -1
+        // This request completes after cleanup has removed its empty entry.
+        try await limiter.check(expired, now: 60)
+        await limiter.increment(25, for: retained, now: 67)
         await limiter.minutelyCallback(now: 120)
-        #expect(reference != nil) // Hourly and daily usage still applies.
-        await limiter.minutelyCallback(now: 3600)
-        #expect(reference != nil) // Daily usage still applies.
-        if keepActive {
-            counter = await limiter.counter(address: address, now: 3600)
+        await limiter.minutelyCallback(now: 120)
+        #expect(await limiter.increment(2, for: expired, now: 125) ==
+                RateLimiter.Quota(limit: 10, remaining: 8, window: 60, reset: 185))
+        // Repeated cleanup must not affect other clients.
+        let other = 2
+        #expect(await limiter.increment(3, for: other, now: 125)?.remaining == 7)
+        #expect(await limiter.increment(0, for: expired, now: 125)?.remaining == 8)
+        // The retained client's usage and reset offset survive cleanup.
+        await #expect(throws: RateLimitError.self) {
+            try await limiter.check(retained, now: 125)
         }
-        await limiter.minutelyCallback(now: 86400)
-        if keepActive {
-            #expect(counter?.increment(0, limits: limiter.limits, now: 86400)?.remaining == 10)
-            #expect(await limiter.counter(address: address, now: 86400) === counter)
-            counter = nil
-            await limiter.minutelyCallback(now: 86460)
-        }
-        #expect(reference == nil)
+        #expect(await limiter.increment(0, for: retained, now: 3607)?.remaining == 5)
+        await limiter.minutelyCallback(now: 86407)
+        #expect(await limiter.increment(1, for: retained, now: 86427) ==
+                RateLimiter.Quota(limit: 10, remaining: 9, window: 60, reset: 86487))
+        // A request crossing a minute boundary is charged to its completion window,
+        // even when the periodic task has not run yet.
+        try await limiter.check(expired, now: 86430)
+        #expect(await limiter.increment(10, for: expired, now: 86430)?.remaining == 0)
+        #expect(await limiter.increment(2, for: expired, now: 86490)?.remaining == 8)
     }
 
     @Test func disabledLimitsAndAllowlistedAddresses() async throws {
         let disabled = RateLimiter(minute: 0, hour: -1, day: 0)
-        #expect(await disabled.counter(uint32: 1, now: 60) == nil)
-        #expect(await disabled.counter(int64: 1, now: 60) == nil)
+        try await disabled.check(1, now: 60)
+        #expect(await disabled.increment(1, for: 1, now: 60) == nil)
+        #expect(await disabled.increment(1, for: -1, now: 60) == nil)
         let dailyOnly = RateLimiter(minute: 0, hour: 0, day: 100)
-        let counter = try #require(await dailyOnly.counter(int64: 1, now: 60))
-        let quota = try #require(counter.increment(2, limits: dailyOnly.limits, now: 100))
+        let quota = try #require(await dailyOnly.increment(2, for: -1, now: 100))
         #expect(quota.remaining == 98)
         #expect(quota.window == 86400)
         await dailyOnly.setAllowlistForTest(CIDR("127.0.0.1/32"))
         let address = try SocketAddress(ipAddress: "127.0.0.1", port: 1234)
-        #expect(await dailyOnly.counter(address: address, now: 60) == nil)
+        #expect(await dailyOnly.clientKey(for: address) == nil)
+        try await dailyOnly.check(nil, now: 60)
+        #expect(await dailyOnly.increment(2, for: nil, now: 60) == nil)
         let ipv6 = try SocketAddress(ipAddress: "2001:db8::1", port: 1234)
-        let ipv6Counter = try #require(await dailyOnly.counter(address: ipv6, now: 60))
-        #expect(ipv6Counter.increment(2.5, limits: dailyOnly.limits, now: 100)?.remaining == 97.5)
+        let client = try #require(await dailyOnly.clientKey(for: ipv6))
+        #expect(await dailyOnly.increment(2.5, for: client, now: 100)?.remaining == 97.5)
     }
-
 }
 
 private extension RateLimiter {

@@ -186,19 +186,20 @@ extension Request {
         } else {
             slot = address.rateLimitSlot
         }
-        let counter: RateLimiter.ClientUsageCounter?
         if isCFWorker {
             OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
-            counter = await limiter.counter(int64: slot)
-        } else {
-            counter = await limiter.counter(address: address)
         }
-        try counter?.check(limits: limiter.limits)
+        let clientKey: Int? = if isCFWorker {
+            slot | Int.min
+        } else {
+            await limiter.clientKey(for: address)
+        }
+        try await limiter.check(clientKey)
         try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
         do {
             let (weight, response) = try await fn(slot)
             response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
-            counter?.increment(weight, limits: limiter.limits)?.applyHeaders(to: &response.headers)
+            await limiter.increment(weight, for: clientKey)?.applyHeaders(to: &response.headers)
             await ConcurrencyGroupLimiter.instance.release(slot: slot)
             return response
         } catch {
@@ -206,7 +207,7 @@ extension Request {
             // Some users do infinite retries on errors!
             let response = ErrorMiddleware.response(for: error, on: self, environment: application.environment)
             response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: "1.0")
-            counter?.increment(1, limits: limiter.limits)?.applyHeaders(to: &response.headers)
+            await limiter.increment(1, for: clientKey)?.applyHeaders(to: &response.headers)
             OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
             await ConcurrencyGroupLimiter.instance.release(slot: slot)
             return response
@@ -249,7 +250,7 @@ extension Request {
                 }
                 let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: OpenMeteo.numberOfLocationsMaximum), params)
                 let weight = responder.calculateQueryWeight()
-                guard weight <= RateLimiter.limitHourly else {
+                guard weight <= RateLimiter.defaultHourlyLimit else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
                 }
                 let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
