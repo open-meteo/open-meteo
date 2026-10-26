@@ -12,19 +12,25 @@ public actor S3ServerHealth {
     var states: [ServerState]
     var monitor: Task<Void, Never>?
     var initialWaitQueue: [CheckedContinuation<Void, Never>]?
+    /// Without checks every server counts as online, e.g. an Open-Meteo sync server, which answers HEAD on its root only to signed requests
+    let checksHealth: Bool
     
     struct ServerState: Sendable {
         let server: S3BucketEndpoint
         var isOnline: Bool
     }
     
-    public init(logger: Logger, servers: [S3BucketEndpoint]) {
+    public init(logger: Logger, servers: [S3BucketEndpoint], checksHealth: Bool = true) {
         self.logger = logger
         self.states = servers.map({ .init(server: $0, isOnline: true) })
         self.initialWaitQueue = []
+        self.checksHealth = checksHealth
     }
     
     private func ensureChecks() async {
+        guard checksHealth else {
+            return
+        }
         if monitor == nil {
             monitor = Task { [weak self] in
                 while let self {
