@@ -65,6 +65,9 @@ struct SyncCommand: AsyncCommand {
 
         @Option(name: "bounding-box", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
         var boundingBox: String?
+
+        @Option(name: "polygon", help: "Only keep data inside a WGS84 polygon like --bounding-box, as WKT 'POLYGON ((lon lat, ...))' or 'MULTIPOLYGON (((lon lat, ...)))' (outer rings counter-clockwise, holes clockwise), or @path to a file holding it. Cannot be combined with --bounding-box")
+        var polygon: String?
     }
 
     /// All weather variables that may be available for `previous days API`
@@ -120,7 +123,11 @@ struct SyncCommand: AsyncCommand {
         let pastDays = signature.pastDays ?? 7
         let concurrent = signature.concurrent ?? 2
         let concurrentModels = signature.concurrentModels ?? 2
+        guard signature.boundingBox == nil || signature.polygon == nil else {
+            throw ForecastApiError.generic(message: "--bounding-box and --polygon cannot be combined")
+        }
         let bbox = try signature.boundingBox.map { try BoundingBoxWGS84(commaSeparated: $0) }
+        let polygon = try signature.polygon.map { try SyncPolygon(argument: $0) }
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
@@ -173,7 +180,8 @@ struct SyncCommand: AsyncCommand {
                             pastDays: pastDays,
                             apikey: signature.apikey,
                             downloadPressureNow: downloadPressureNow,
-                            bbox: bbox
+                            bbox: bbox,
+                            polygon: polygon
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
@@ -192,16 +200,16 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?, polygon: SyncPolygon?) async throws {
         let logger = application.logger
         
         /// The digital elevation model has no grid and only static files, which are copied whole
         let keep: SyncBoundingBox?
-        if let bbox, model != .copernicus_dem90 {
+        if bbox != nil || polygon != nil, model != .copernicus_dem90 {
             guard let grid = try await model.getDomain()?.grid else {
                 throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
             }
-            keep = try SyncBoundingBox(grid: grid, box: bbox)
+            keep = try polygon.map { polygon in try SyncBoundingBox(grid: grid) { polygon.contains(latitude: Double($0), longitude: Double($1)) } } ?? bbox.map { try SyncBoundingBox(grid: grid, box: $0) }
         } else {
             keep = nil
         }

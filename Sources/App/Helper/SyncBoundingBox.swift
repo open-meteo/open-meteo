@@ -13,9 +13,13 @@ struct SyncBoundingBox: Sendable {
     let nx: Int
 
     init(grid: any Gridable, box: BoundingBoxWGS84) throws {
-        let inside = Self.selectedCells(grid: grid, box: box)
+        try self.init(grid: grid) { box.latitude.contains($0) && box.longitude.contains($1) }
+    }
+
+    init(grid: any Gridable, inside: (Float, Float) -> Bool) throws {
+        let inside = Self.selectedCells(grid: grid, inside: inside)
         guard inside.contains(true) else {
-            throw ForecastApiError.generic(message: "the box holds no cell of this grid")
+            throw ForecastApiError.generic(message: "no cell of this grid lies inside the box or polygon")
         }
         self.init(selectedCells: inside, nx: grid.nx)
     }
@@ -32,9 +36,14 @@ struct SyncBoundingBox: Sendable {
 
     /// Cells whose centre lies inside the box
     static func selectedCells(grid: any Gridable, box: BoundingBoxWGS84) -> [Bool] {
+        selectedCells(grid: grid) { box.latitude.contains($0) && box.longitude.contains($1) }
+    }
+
+    /// Cells whose centre (latitude, longitude from -180 to 180) satisfies `inside`
+    static func selectedCells(grid: any Gridable, inside: (Float, Float) -> Bool) -> [Bool] {
         (0 ..< grid.nx * grid.ny).map {
             let (lat, lon) = grid.getCoordinates(gridpoint: $0)
-            return box.latitude.contains(lat) && box.longitude.contains(wrapped(longitude: lon))
+            return inside(lat, wrapped(longitude: lon))
         }
     }
 
