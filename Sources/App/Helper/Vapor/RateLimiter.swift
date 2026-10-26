@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import NIO
+import Synchronization
 
 /**
  Limit API request rate for the free API.
@@ -19,18 +20,9 @@ final actor RateLimiter {
     
     static let concurrencyLimitTotal = Environment.get("CONCURRENCY_LIMIT_TOTAL").flatMap(Int.init) ?? 4096
 
-    private var dailyPerIPv4 = [UInt32: Float]()
+    private var perIPv4 = [UInt32: ClientUsageCounter]()
+    private var perIPv6 = [Int: ClientUsageCounter]()
 
-    private var dailyPerIPv6 = [Int: Float]()
-
-    private var hourlyPerIPv4 = [UInt32: Float]()
-
-    private var hourlyPerIPv6 = [Int: Float]()
-
-    private var minutelyPerIPv4 = [UInt32: Float]()
-
-    private var minutelyPerIPv6 = [Int: Float]()
-    
     /// List of IP addresses / networks to disable rate limited
     var allowlistedIPs: CIDR?
     
@@ -40,7 +32,10 @@ final actor RateLimiter {
 
     public static let instance = RateLimiter()
 
-    private init() {
+    nonisolated let limits: (minute: Float, hour: Float, day: Float)
+
+    init(minute: Float = limitMinutely, hour: Float = limitHourly, day: Float = limitDaily) {
+        self.limits = (minute, hour, day)
         if let ipAllowlistPath = Environment.get("IP_ALLOWLIST_PATH") {
             do {
                 let cidr = try CIDR(filename: ipAllowlistPath)
@@ -55,10 +50,9 @@ final actor RateLimiter {
     }
 
     /// Called every minute from a life cycle handler
-    func minutelyCallback() {
-        let now = Timestamp.now().timeIntervalSince1970
-        minutelyPerIPv4.removeAll(keepingCapacity: true)
-        minutelyPerIPv6.removeAll(keepingCapacity: true)
+    func minutelyCallback(now: Int? = nil) {
+        let now = now ?? Timestamp.now().timeIntervalSince1970
+        resetExpiredWindows(now: now)
         if (now % 3600) < 60 {
             if let path = Environment.get("IP_ALLOWLIST_PATH") {
                 do {
@@ -70,108 +64,180 @@ final actor RateLimiter {
                     print("Failed to load allowlisted IPs from \(path): \(error)")
                 }
             }
-            hourlyPerIPv4.removeAll(keepingCapacity: true)
-            hourlyPerIPv6.removeAll(keepingCapacity: true)
-        }
-        if (now % (24 * 3600)) < 60 {
-            dailyPerIPv4.removeAll(keepingCapacity: true)
-            dailyPerIPv6.removeAll(keepingCapacity: true)
         }
     }
 
-    /// Check if the current IP address is over quota and throw an error. If not return.
-    func check(address: SocketAddress) throws {
-        guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
-            return
+    /// Periodic cleanup also resets idle clients. Active clients can reset on checks;
+    /// concurrent resets of the same expired window are allowed.
+    private func resetExpiredWindows(now: Int) {
+        // Copy just the keys, so dictionary iteration does not retain the counter objects.
+        for ip in Array(perIPv4.keys) {
+            perIPv4[ip]?.resetIfNeeded(now: now)
+            if isKnownUniquelyReferenced(&perIPv4[ip]), perIPv4[ip]?.isUnused == true {
+                perIPv4.removeValue(forKey: ip)
+            }
         }
+        for ip in Array(perIPv6.keys) {
+            perIPv6[ip]?.resetIfNeeded(now: now)
+            if isKnownUniquelyReferenced(&perIPv6[ip]), perIPv6[ip]?.isUnused == true {
+                perIPv6.removeValue(forKey: ip)
+            }
+        }
+    }
+
+    struct Quota: Sendable, Equatable {
+        let limit: Float
+        let remaining: Float
+        let window: Int
+        let reset: Int
+
+        func applyHeaders(to headers: inout HTTPHeaders) {
+            headers.replaceOrAdd(name: "X-RateLimit-Limit", value: String(limit))
+            headers.replaceOrAdd(name: "X-RateLimit-Remaining", value: String(remaining))
+            headers.replaceOrAdd(name: "X-RateLimit-Reset", value: String(reset))
+            headers.replaceOrAdd(name: "X-RateLimit-Window", value: String(window))
+        }
+    }
+
+    /// Shared usage for one client. Requests retain this object while executing;
+    /// increments and periodic resets can safely run on different executors.
+    final class ClientUsageCounter: Sendable {
+        private let minuteUsed = Atomic<Float>(0)
+        private let hourUsed = Atomic<Float>(0)
+        private let dayUsed = Atomic<Float>(0)
+        private let lastReset: Atomic<UInt32>
+
+        init(lastReset: UInt32 = UInt32(Timestamp.now().timeIntervalSince1970)) {
+            self.lastReset = Atomic(lastReset)
+        }
+
+        fileprivate var isUnused: Bool {
+            minuteUsed.load(ordering: .relaxed) == 0 && hourUsed.load(ordering: .relaxed) == 0 && dayUsed.load(ordering: .relaxed) == 0
+        }
+
+        fileprivate func resetIfNeeded(now: Int) {
+            let previous = Int(lastReset.load(ordering: .acquiring))
+            guard now >= previous + 60 else { return }
+            // Advance whole minutes, preserving this client's original seconds offset.
+            let updated = previous + (now - previous) / 60 * 60
+            let offset = previous % 60
+            // Concurrent resets may clear the same counters more than once.
+            minuteUsed.store(0, ordering: .relaxed)
+            if (updated - offset) / 3600 > (previous - offset) / 3600 { hourUsed.store(0, ordering: .relaxed) }
+            if (updated - offset) / 86400 > (previous - offset) / 86400 { dayUsed.store(0, ordering: .relaxed) }
+            lastReset.store(UInt32(updated), ordering: .releasing)
+        }
+
+        /// Reset expired windows before comparing usage. Construct quota metadata only
+        /// when a limit is exceeded.
+        func check(limits: (minute: Float, hour: Float, day: Float), now: Int? = nil) throws {
+            let now = now ?? Timestamp.now().timeIntervalSince1970
+            resetIfNeeded(now: now)
+            let minute = limits.minute > 0 ? minuteUsed.load(ordering: .relaxed) : 0
+            let hour = limits.hour > 0 ? hourUsed.load(ordering: .relaxed) : 0
+            let day = limits.day > 0 ? dayUsed.load(ordering: .relaxed) : 0
+            guard (limits.minute > 0 && minute >= limits.minute)
+                || (limits.hour > 0 && hour >= limits.hour)
+                || (limits.day > 0 && day >= limits.day) else { return }
+            guard let quota = quota(minute: minute, hour: hour, day: day, limits: limits, now: now) else { return }
+            let retryAfter = max(0, quota.reset - now)
+            switch quota.window {
+            case 60:
+                OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
+                throw RateLimitError.minutelyExceeded(quota: quota, retryAfter: retryAfter)
+            case 3600:
+                OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
+                throw RateLimitError.hourlyExceeded(quota: quota, retryAfter: retryAfter)
+            default:
+                OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
+                throw RateLimitError.dailyExceeded(quota: quota, retryAfter: retryAfter)
+            }
+        }
+
+        private func quota(minute: Float, hour: Float, day: Float, limits: (minute: Float, hour: Float, day: Float), now: Int) -> Quota? {
+            let resetTime = lastReset.load(ordering: .acquiring)
+            let offset = Int(resetTime % 60)
+            var limit: Float = 0
+            var remaining = Float.infinity
+            var window = 0
+            var reset = 0
+
+            if limits.minute > 0 {
+                limit = limits.minute
+                remaining = max(0, limits.minute - minute)
+                window = 60
+                reset = ((now - offset) / 60 + 1) * 60 + offset
+            }
+
+            if limits.hour > 0 {
+                let hourlyRemaining = max(0, limits.hour - hour)
+                let hourlyReset = ((now - offset) / 3600 + 1) * 3600 + offset
+                if hourlyRemaining < remaining || (hourlyRemaining == remaining && hourlyReset > reset) {
+                    limit = limits.hour
+                    remaining = hourlyRemaining
+                    window = 3600
+                    reset = hourlyReset
+                }
+            }
+
+            if limits.day > 0 {
+                let dailyRemaining = max(0, limits.day - day)
+                let dailyReset = ((now - offset) / 86400 + 1) * 86400 + offset
+                if dailyRemaining < remaining || (dailyRemaining == remaining && dailyReset > reset) {
+                    limit = limits.day
+                    remaining = dailyRemaining
+                    window = 86400
+                    reset = dailyReset
+                }
+            }
+
+            guard limit > 0 else { return nil }
+            return Quota(limit: limit, remaining: remaining, window: window, reset: reset)
+        }
+
+        /// Return the quota using the updated values, without reloading usage.
+        @discardableResult
+        func increment(_ count: Float, limits: (minute: Float, hour: Float, day: Float), now: Int = Timestamp.now().timeIntervalSince1970) -> Quota? {
+            let minute = limits.minute > 0 ? minuteUsed.add(count) : 0
+            let hour = limits.hour > 0 ? hourUsed.add(count) : 0
+            let day = limits.day > 0 ? dayUsed.add(count) : 0
+            return quota(minute: minute, hour: hour, day: day, limits: limits, now: now)
+        }
+    }
+
+    func counter(uint32 ip: UInt32, now: Int? = nil) -> ClientUsageCounter? {
+        guard limits.minute > 0 || limits.hour > 0 || limits.day > 0 else { return nil }
+        if let counter = perIPv4[ip] { return counter }
+        let counter = ClientUsageCounter(lastReset: UInt32(now ?? Timestamp.now().timeIntervalSince1970))
+        perIPv4[ip] = counter
+        return counter
+    }
+
+    func counter(int64 ip: Int, now: Int? = nil) -> ClientUsageCounter? {
+        guard limits.minute > 0 || limits.hour > 0 || limits.day > 0 else { return nil }
+        if let counter = perIPv6[ip] { return counter }
+        let counter = ClientUsageCounter(lastReset: UInt32(now ?? Timestamp.now().timeIntervalSince1970))
+        perIPv6[ip] = counter
+        return counter
+    }
+
+    /// Look up the shared counter and retain it for the duration of the request.
+    func counter(address: SocketAddress, now: Int? = nil) -> ClientUsageCounter? {
         if allowlistedIPs?.contains(address) == true {
-            return // always allow this IP address
+            return nil
         }
         switch address {
         case .v4(let socket):
-            try check(uint32: socket.address.sin_addr.s_addr)
+            return counter(uint32: socket.address.sin_addr.s_addr, now: now)
         case .v6:
             var hasher = Hasher()
             address.hash(into: &hasher)
-            let ip = hasher.finalize()
-            try check(int64: ip)
+            return counter(int64: hasher.finalize(), now: now)
         case .unixDomainSocket:
-            break
-        }
-    }
-    
-    func check(uint32 ip: UInt32) throws {
-        if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
-            OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
-            throw RateLimitError.minutelyExceeded
-        }
-        if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
-            OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
-            throw RateLimitError.hourlyExceeded
-        }
-        if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
-            OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
-            throw RateLimitError.dailyExceeded
-        }
-    }
-    
-    func check(int64 ip: Int) throws {
-        if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
-            OmMetrics.limiterMinutelyExceededTotal.add(1, ordering: .relaxed)
-            throw RateLimitError.minutelyExceeded
-        }
-        if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
-            OmMetrics.limiterHourlyExceededTotal.add(1, ordering: .relaxed)
-            throw RateLimitError.hourlyExceeded
-        }
-        if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
-            OmMetrics.limiterDailyExceededTotal.add(1, ordering: .relaxed)
-            throw RateLimitError.dailyExceeded
+            return nil
         }
     }
 
-    /// Increment the current IP address by the specified counter
-    /// `count` can be later used to increase the weight for "heavy" API calls. E.g. calls with many weather variables my account for more than just 1.
-    func increment(address: SocketAddress, count: Float) {
-        guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
-            return
-        }
-        switch address {
-        case .v4(let socket):
-            increment(uint32: socket.address.sin_addr.s_addr, count: count)
-        case .v6:
-            var hasher = Hasher()
-            address.hash(into: &hasher)
-            let ip = hasher.finalize()
-            increment(int64: ip, count: count)
-        case .unixDomainSocket:
-            break
-        }
-    }
-    
-    func increment(uint32 ip: UInt32, count: Float) {
-        if Self.limitMinutely > 0 {
-            minutelyPerIPv4[ip] = count + (minutelyPerIPv4[ip] ?? 0)
-        }
-        if Self.limitHourly > 0 {
-            hourlyPerIPv4[ip] = count + (hourlyPerIPv4[ip] ?? 0)
-        }
-        if Self.limitDaily > 0 {
-            dailyPerIPv4[ip] = count + (dailyPerIPv4[ip] ?? 0)
-        }
-    }
-    
-    func increment(int64 ip: Int, count: Float) {
-        if Self.limitMinutely > 0 {
-            minutelyPerIPv6[ip] = count + (minutelyPerIPv6[ip] ?? 0)
-        }
-        if Self.limitHourly > 0 {
-            hourlyPerIPv6[ip] = count + (hourlyPerIPv6[ip] ?? 0)
-        }
-        if Self.limitDaily > 0 {
-            dailyPerIPv6[ip] = count + (dailyPerIPv6[ip] ?? 0)
-        }
-    }
 }
 
 extension CIDR {
@@ -188,10 +254,10 @@ extension CIDR {
     }
 }
 
-enum RateLimitError: Error, AbortError {
-    case dailyExceeded
-    case hourlyExceeded
-    case minutelyExceeded
+enum RateLimitError: Error, AbortError, Equatable {
+    case dailyExceeded(quota: RateLimiter.Quota, retryAfter: Int)
+    case hourlyExceeded(quota: RateLimiter.Quota, retryAfter: Int)
+    case minutelyExceeded(quota: RateLimiter.Quota, retryAfter: Int)
     case tooManyConcurrentRequests
     case serviceOverloaded
 
@@ -216,21 +282,6 @@ enum RateLimitError: Error, AbortError {
             return "Too many concurrent requests"
         case .serviceOverloaded:
             return "The service is overloaded"
-        }
-    }
-}
-
-extension Request {
-    func incrementRateLimiter(weight: Float, apikey: String?) async {
-        guard let address = peerAddress ?? remoteAddress else {
-            return
-        }
-        if let apikey {
-            await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
-        }
-        /// Free API
-        if headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "customer-") }) {
-            await RateLimiter.instance.increment(address: address, count: weight)
         }
     }
 }

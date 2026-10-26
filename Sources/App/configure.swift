@@ -182,7 +182,8 @@ public func configure(_ app: Application) throws {
         allowedOrigin: .all,
         allowedMethods: [.GET, .POST, /*.PUT,*/ .OPTIONS /*, .DELETE, .PATCH*/],
         allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin, .range, .ifMatch, .ifUnmodifiedSince],
-        exposedHeaders: [HTTPHeaders.Name("X-RateLimit-Cost")]
+        exposedHeaders: ["X-RateLimit-Cost", "X-RateLimit-Limit", "X-RateLimit-Remaining",
+                         "X-RateLimit-Reset", "X-RateLimit-Window", "Retry-After"].map { HTTPHeaders.Name($0) }
     )
     app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
     app.middleware.use(ErrorMiddleware.custom(environment: app.environment))
@@ -296,74 +297,88 @@ extension ErrorMiddleware {
         /// The reason for the error.
         var reason: String
     }
-    
+
     public static func custom(environment: Environment) -> ErrorMiddleware {
         return .init { req, error in
-            let status: HTTPResponseStatus, reason: String, source: ErrorSource
-            var headers: HTTPHeaders
-
-            // Inspect the error type and extract what data we can.
-            switch error {
-            case let decodingError as DecodingError:
-                (reason, status, headers, source) = (decodingError.readableDescription, .badRequest, [:], .capture())
-
-            case let debugAbort as (DebuggableError & AbortError):
-                (reason, status, headers, source) = (debugAbort.reason, debugAbort.status, debugAbort.headers, debugAbort.source ?? .capture())
-                
-            case let abort as AbortError:
-                (reason, status, headers, source) = (abort.reason, abort.status, abort.headers, .capture())
-            
-            case let debugErr as DebuggableError:
-                (reason, status, headers, source) = (debugErr.reason, .internalServerError, [:], debugErr.source ?? .capture())
-            
-            default:
-                // In debug mode, provide the error description; otherwise hide it to avoid sensitive data disclosure.
-                reason = environment.isRelease ? "Something went wrong." : String(describing: error)
-                (status, headers, source) = (.internalServerError, [:], .capture())
-            }
-            
-            switch error {
-            case _ as DecodingError:
-                req.logger.info("\(reason)",
-                                metadata: ["method" : "\(req.method.rawValue)",
-                                           "url" : "\(req.url.string)",
-                                           "userAgent" : .array(req.headers["User-Agent"].map { "\($0)" })])
-            case _ as RateLimitError:
-                fallthrough
-            case _ as ApiKeyManagerError, _ as TimeError, _ as ForecastApiError:
-                // Do not log errors
-                break
-            default:
-                // Report the error
-                req.logger.report(error: error,
-                                  metadata: ["method" : "\(req.method.rawValue)",
-                                             "url" : "\(req.url.string)",
-                                             "userAgent" : .array(req.headers["User-Agent"].map { "\($0)" })],
-                                  file: source.file,
-                                  function: source.function,
-                                  line: source.line)
-            }
-            
-            
-            // attempt to serialize the error to json
-            let body: Response.Body
-            do {
-                let encoder = try ContentConfiguration.global.requireEncoder(for: .json)
-                var byteBuffer = req.byteBufferAllocator.buffer(capacity: 0)
-                try encoder.encode(ErrorResponse2(error: true, reason: reason), to: &byteBuffer, headers: &headers)
-                
-                body = .init(
-                    buffer: byteBuffer,
-                    byteBufferAllocator: req.byteBufferAllocator
-                )
-            } catch {
-                body = .init(string: "Oops: \(String(describing: error))\nWhile encoding error: \(reason)", byteBufferAllocator: req.byteBufferAllocator)
-                headers.contentType = .plainText
-            }
-            
-            // create a Response with appropriate status
-            return Response(status: status, headers: headers, body: body)
+            response(for: error, on: req, environment: environment)
         }
+    }
+
+    static func response(for error: Error, on req: Request, environment: Environment) -> Response {
+        let status: HTTPResponseStatus, reason: String, source: ErrorSource
+        var headers: HTTPHeaders
+
+        // Inspect the error type and extract what data we can.
+        switch error {
+        case let rateLimitError as RateLimitError:
+            (reason, status, headers, source) = (rateLimitError.reason, rateLimitError.status, [:], .capture())
+            switch rateLimitError {
+            case .minutelyExceeded(let quota, let retryAfter), .hourlyExceeded(let quota, let retryAfter), .dailyExceeded(let quota, let retryAfter):
+                quota.applyHeaders(to: &headers)
+                headers.replaceOrAdd(name: "Retry-After", value: String(retryAfter))
+            case .tooManyConcurrentRequests, .serviceOverloaded:
+                break
+            }
+
+        case let decodingError as DecodingError:
+            (reason, status, headers, source) = (decodingError.readableDescription, .badRequest, [:], .capture())
+
+        case let debugAbort as (DebuggableError & AbortError):
+            (reason, status, headers, source) = (debugAbort.reason, debugAbort.status, debugAbort.headers, debugAbort.source ?? .capture())
+
+        case let abort as AbortError:
+            (reason, status, headers, source) = (abort.reason, abort.status, abort.headers, .capture())
+
+        case let debugErr as DebuggableError:
+            (reason, status, headers, source) = (debugErr.reason, .internalServerError, [:], debugErr.source ?? .capture())
+
+        default:
+            // In debug mode, provide the error description; otherwise hide it to avoid sensitive data disclosure.
+            reason = environment.isRelease ? "Something went wrong." : String(describing: error)
+            (status, headers, source) = (.internalServerError, [:], .capture())
+        }
+
+        switch error {
+        case _ as DecodingError:
+            req.logger.info("\(reason)",
+                            metadata: ["method" : "\(req.method.rawValue)",
+                                       "url" : "\(req.url.string)",
+                                       "userAgent" : .array(req.headers["User-Agent"].map { "\($0)" })])
+        case _ as RateLimitError:
+            fallthrough
+        case _ as ApiKeyManagerError, _ as TimeError, _ as ForecastApiError:
+            // Do not log errors
+            break
+        default:
+            // Report the error
+            req.logger.report(error: error,
+                              metadata: ["method" : "\(req.method.rawValue)",
+                                         "url" : "\(req.url.string)",
+                                         "userAgent" : .array(req.headers["User-Agent"].map { "\($0)" })],
+                              file: source.file,
+                              function: source.function,
+                              line: source.line)
+        }
+
+
+        // attempt to serialize the error to json
+        let body: Response.Body
+        do {
+            let encoder = try ContentConfiguration.global.requireEncoder(for: .json)
+            var byteBuffer = req.byteBufferAllocator.buffer(capacity: 0)
+            try encoder.encode(ErrorResponse2(error: true, reason: reason), to: &byteBuffer, headers: &headers)
+
+            body = .init(
+                buffer: byteBuffer,
+                byteBufferAllocator: req.byteBufferAllocator
+            )
+        } catch {
+            body = .init(string: "Oops: \(String(describing: error))\nWhile encoding error: \(reason)", byteBufferAllocator: req.byteBufferAllocator)
+            headers.contentType = .plainText
+        }
+
+        // create a Response with appropriate status
+        return Response(status: status, headers: headers, body: body)
     }
 }
 

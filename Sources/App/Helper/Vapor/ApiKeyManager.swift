@@ -174,7 +174,7 @@ extension Request {
     
     /// Only respond to a query if the rate limits are not exceeded
     /// Limit is IP based, except for CF Workers, where limits are applied per user
-    func withFreeApiRateLimiter(fn: (_ slot: Int) async throws -> (Float, Response)) async throws -> Response {
+    func withFreeApiRateLimiter(limiter: RateLimiter = .instance, fn: (_ slot: Int) async throws -> (Float, Response)) async throws -> Response {
         guard let address = peerAddress ?? remoteAddress else {
             throw ForecastApiError.generic(message: "Could not get remote address")
         }
@@ -186,34 +186,30 @@ extension Request {
         } else {
             slot = address.rateLimitSlot
         }
+        let counter: RateLimiter.ClientUsageCounter?
         if isCFWorker {
             OmMetrics.requestsCloudflareWorkersTotal.add(1, ordering: .relaxed)
-            try await RateLimiter.instance.check(int64: slot)
+            counter = await limiter.counter(int64: slot)
         } else {
-            try await RateLimiter.instance.check(address: address)
+            counter = await limiter.counter(address: address)
         }
+        try counter?.check(limits: limiter.limits)
         try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
         do {
             let (weight, response) = try await fn(slot)
             response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
-            if isCFWorker {
-                await RateLimiter.instance.increment(int64: slot, count: weight)
-            } else {
-                await RateLimiter.instance.increment(address: address, count: weight)
-            }
+            counter?.increment(weight, limits: limiter.limits)?.applyHeaders(to: &response.headers)
             await ConcurrencyGroupLimiter.instance.release(slot: slot)
             return response
         } catch {
             // In an error case, also increment to API rate limiter by 1
             // Some users do infinite retries on errors!
-            if isCFWorker {
-                await RateLimiter.instance.increment(int64: slot, count: 1)
-            } else {
-                await RateLimiter.instance.increment(address: address, count: 1)
-            }
+            let response = ErrorMiddleware.response(for: error, on: self, environment: application.environment)
+            response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: "1.0")
+            counter?.increment(1, limits: limiter.limits)?.applyHeaders(to: &response.headers)
             OmMetrics.requestsErrorThrownTotal.add(1, ordering: .relaxed)
             await ConcurrencyGroupLimiter.instance.release(slot: slot)
-            throw error
+            return response
         }
     }
 
