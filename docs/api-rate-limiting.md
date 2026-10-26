@@ -1,12 +1,10 @@
 # API rate limiting
 
-The free API limits **weighted API calls**, not just the number of HTTP requests. A request for more data can consume several API-call units. Check the response headers to see its cost and your remaining quota.
+The API limits **weighted API calls**, not just the number of HTTP requests. One HTTP request can count as multiple API calls, depending on how much data it requests. Check the response headers to see its cost and your remaining quota.
 
 ## Free API quotas
 
-The default limits are:
-
-| Window | API-call units |
+| Window | API calls |
 | --- | ---: |
 | Minute | 600 |
 | Hour | 5,000 |
@@ -16,11 +14,11 @@ All three limits apply together. Each request's weight counts toward all three q
 
 Usage is generally shared by requests from the same public IP address, so applications using the same outgoing connection can share a quota. Cloudflare Worker traffic may be grouped by Worker identity instead. In the future, we may also identify individual applications hosted on providers such as Netlify, Render, Vercel, Railway, Fly.io, Heroku, and DigitalOcean App Platform. For many providers, however, we cannot distinguish applications sharing an outgoing IP address. Your application may therefore be rate-limited even when its own usage is low, because other applications have consumed the shared quota.
 
-Use the response headers for the limits and reset times that apply to your requests. Resets can occur slightly after the start of a minute, hour, or UTC day; do not assume that quota becomes available exactly at a clock boundary. Customer API quotas depend on your subscription and are separate from these free API limits.
+Use the response headers for the limits and reset times that apply to your requests. Resets can occur slightly after the start of a minute, hour, or UTC day; do not assume that quota becomes available exactly at a clock boundary.
 
 ## Customer API limits
 
-Use the customer endpoint for your API, such as `customer-api.open-meteo.com`, with your API key. Customer subscriptions have a monthly allowance of **weighted API-call units** and do not use the free API's minute, hour, or day quotas. The request-weight calculation below also applies to customer requests.
+Use the customer endpoint for your API, such as `customer-api.open-meteo.com`, with your API key. Customer subscriptions have a monthly allowance of **weighted API calls** and do not use the free API's minute, hour, or day quotas.
 
 The allowance resets every month on the day of the month associated with your subscription start date, whether your subscription is billed monthly or annually. For example, a subscription starting on the 3rd has a monthly quota period from the 3rd of one month to the 3rd of the next. Usage is counted within that quota period, rather than over a rolling 30-day window.
 
@@ -34,38 +32,36 @@ Header names are case-insensitive, so `X-Api-Key` also works. If both the header
 
 Monthly allowance and concurrency are separate limits:
 
-| Plan | Billing quantity | Monthly allowance | Requests processing at once |
+| Plan | Billing quantity | Monthly allowance | HTTP requests processing at once |
 | --- | ---: | ---: | ---: |
-| API Standard (1 million calls) | — | 1 million units | 2 |
-| API Professional (5 million calls) | — | 5 million units | 2 |
-| API Professional (10 million calls) | 1 | 10 million units | 2 |
-| API Professional (10 million calls) | 2 | 20 million units | 4 |
-| API Professional (10 million calls) | 3 | 30 million units | 6 |
-| API Professional (10 million calls) | 5 | 50 million units | 10 |
-| API Professional (10 million calls) | 10 | 100 million units | 20 |
+| API Standard (1 million calls) | — | 1 million API calls | 2 |
+| API Professional (5 million calls) | — | 5 million API calls | 2 |
+| API Professional (10 million calls) | 1 | 10 million API calls | 2 |
+| API Professional (10 million calls) | 2 | 20 million API calls | 4 |
+| API Professional (10 million calls) | 3 | 30 million API calls | 6 |
+| API Professional (10 million calls) | 5 | 50 million API calls | 10 |
+| API Professional (10 million calls) | 10 | 100 million API calls | 20 |
 
-For **API Professional (10 million calls)**, each billing quantity adds 10 million weighted API-call units to the monthly allowance. For example, **quantity 3 provides 30 million units per month**. The plan name stays the same when the quantity changes. Each additional 10 million units adds two requests that can process at once, subject to the endpoint's total pending-request limit. A larger monthly allowance does not mean that all those requests can run simultaneously.
+For **API Professional (10 million calls)**, each billing quantity adds 10 million API calls to the monthly allowance. For example, **quantity 3 provides 30 million API calls per month**. The plan name stays the same when the quantity changes. Each additional 10 million API calls adds two requests that can process at once, subject to the endpoint's total pending-request limit. A larger monthly allowance does not mean that all those requests can run simultaneously.
 
-On standard customer endpoints, **more than 256 concurrent requests per API key results in HTTP `429 Too Many Requests`**. This total includes requests being processed and requests waiting in the queue.
+On standard customer API endpoints, **more than 256 concurrent HTTP requests per API key results in HTTP `429 Too Many Requests`**. This total includes requests being processed and requests waiting in the queue. The dedicated high-resolution endpoint has a separate limit of 1,024 pending requests.
 
-The maximum number of locations in one request is **10,000**. Each location still contributes to the request's weight.
+Customer weather-data requests support up to **10,000 locations**, or **200,000 locations** for allowances of at least 20 million API calls per month. The Elevation API supports up to **100 locations** per request. Each location still contributes to the request's weight.
 
 API Standard does not include the historical weather, historical forecast, previous runs, single runs, climate, ensemble, seasonal, or satellite radiation customer APIs. These require API Professional or higher.
 
-Customer responses report the request's weight in `X-RateLimit-Cost`, the monthly allowance in `X-RateLimit-Limit`, and the remaining weighted units in `X-RateLimit-Remaining` (never below zero). The remaining allowance reflects the latest recorded usage in the current monthly quota period. Customer API usage statistics can have a longer reporting delay because usage is collected from dozens of servers across multiple continents. Do not expect the reported usage to increase, or `X-RateLimit-Remaining` to decrease, after every individual API call. `X-RateLimit-Reset` gives the next monthly quota reset as a Unix timestamp in seconds when available. Customer responses omit `X-RateLimit-Window` because monthly quota periods vary in length. These quota headers also appear on errors once a valid API key has been identified. If access is restricted for exceeding your allowance, the response is `403 Forbidden` with the reason `Your API key is over quota.`; this is different from a temporary concurrency rejection. Review your usage and subscription rather than repeatedly retrying that error.
-
 ## Cost of one HTTP request
 
-For weather-data requests, calculate the weight for each location, then add the location weights:
+For both free and customer weather-data requests, calculate the weight for each location, then add the location weights:
 
 ```text
 location weight = max(1, (V / 10) × max(1, D / 14))
-HTTP request weight = sum of all location weights
+API calls per HTTP request = sum of all location weights
 ```
 
 - **V** is the effective number of requested variables, including models as described below.
 - **D** is the number of days covered by that location's data range, including past and forecast days. Use the endpoint's default date range if you do not specify one.
-- Each location costs at least **1 unit**. Weights above this minimum can be fractional; they are not rounded up to whole calls.
+- Each location costs at least **1 API call**. Weights above this minimum can be fractional; they are not rounded up to whole API calls.
 
 For ordinary, non-ensemble models, add the variables requested in `current`, `minutely_15`, `hourly`, `daily`, `weekly`, and `monthly`, then multiply by the number of selected models. A variable requested in both `current` and `hourly` counts twice. For example, ten variables from two models give **V = 20**.
 
@@ -75,7 +71,7 @@ For locations with the same date range, multiply the location weight by the numb
 
 These examples use non-ensemble models and the same date range for every location.
 
-| Locations | Variables per model | Models | Days | HTTP request weight |
+| Locations | Variables per model | Models | Days | API calls per HTTP request |
 | ---: | ---: | ---: | ---: | ---: |
 | 1 | 5 | 1 | 7 | 1 |
 | 1 | 15 | 1 | 7 | 1.5 |
@@ -85,33 +81,37 @@ These examples use non-ensemble models and the same date range for every locatio
 | 1 | 10 | 2 | 7 | 2 |
 | 2 | 10 | 2 | 28 | 8 |
 
-The minimum applies to the combined calculation. A range longer than 14 days does not necessarily cost more than one unit if you request few variables.
+The minimum applies to the combined calculation. A range longer than 14 days does not necessarily cost more than one API call if you request few variables.
 
 ### Special cases
 
-- **Ensemble data:** Variables count once per ensemble member of each selected model.
-- **Seasonal data:** The actual weight is reduced for monthly data
-- **Elevation API:** Each requested location costs one unit; the weather-data formula does not apply.
-- **Errors:** A free API request that starts processing but fails is charged one unit. Requests rejected because a quota is already exhausted are not charged again.
+- **Ensemble data:** Current, 15-minute, hourly, and daily variables count once per ensemble member of each selected model. Weekly and monthly variables count once per selected model.
+- **Seasonal data:** Divide the effective variable count by 120 and round down before applying the formula. The minimum of one API call per location still applies.
+- **Elevation API:** Each requested location costs one API call; the weather-data formula does not apply.
+- **Errors:** An HTTP request to the free API that starts processing but fails is charged one API call. HTTP requests rejected because a quota is already exhausted are not charged again.
 
-The HTTP response header `X-RateLimit-Cost` reports the actual weight charged for the response.
+The HTTP response header `X-RateLimit-Cost` reports how many API calls the HTTP request is charged.
 
 ## Response headers
 
-For the free API, the headers describe the minute, hour, and day quotas below. For the customer API, they describe the monthly allowance as explained above.
+The free API reports a minute, hour, or day quota; the customer API reports the monthly allowance.
 
-| Header | Meaning |
-| --- | --- |
-| `X-RateLimit-Cost` | API-call units charged for this HTTP request, such as `1.0` or `2.5`. |
-| `X-RateLimit-Limit` | Total quota for the window identified by `X-RateLimit-Window`. |
-| `X-RateLimit-Remaining` | The smallest remaining quota across the minute, hour, and day windows, after this request's charge. Never less than zero. |
-| `X-RateLimit-Window` | The reported window's length in seconds: `60`, `3600`, or `86400`. |
-| `X-RateLimit-Reset` | When the reported window resets, as a Unix timestamp in seconds, not a countdown. |
-| `Retry-After` | How many seconds to wait before retrying a request rejected for an exhausted quota. |
+| Header | Free API | Customer API |
+| --- | --- | --- |
+| `X-RateLimit-Cost` | API calls charged for this HTTP request, such as `1.0` or `2.5`. | Same meaning. |
+| `X-RateLimit-Limit` | Total quota for the window identified by `X-RateLimit-Window`. | Monthly allowance in API calls. |
+| `X-RateLimit-Remaining` | Smallest remaining quota across the minute, hour, and day windows, after this request's charge. | Monthly allowance minus the latest recorded usage in the current quota period. |
+| `X-RateLimit-Window` | Reported window's length in seconds: `60`, `3600`, or `86400`. | Omitted because monthly quota periods vary in length. |
+| `X-RateLimit-Reset` | When the reported window resets, as a Unix timestamp in seconds. | Next monthly quota reset, as a Unix timestamp in seconds, when available. |
+| `Retry-After` | Seconds to wait before retrying a request rejected for an exhausted quota. | Not provided for monthly quota or concurrency rejections. |
 
-For the free API, the quota headers describe the window with the fewest units remaining. If windows have equal remaining quota, the one that resets latest is reported. This also applies when several windows are exhausted: the response tells you to wait for the latest reset. The reported window can change between requests; the other limits still apply.
+For the free API, the quota headers describe the window with the fewest API calls remaining. If windows have equal remaining quota, the one that resets latest is reported. This also applies when several windows are exhausted: the response tells you to wait for the latest reset. The reported window can change between requests; the other limits still apply.
 
-Remaining quota is measured in **weighted units**, not HTTP requests. It is a snapshot, not a reservation for your next request. Not every response includes every header: a quota rejection, for example, can include quota headers and `Retry-After` without `X-RateLimit-Cost`.
+Customer API usage statistics can have a longer reporting delay because usage is collected from dozens of servers across multiple continents. Do not expect the reported usage to increase, or `X-RateLimit-Remaining` to decrease, after every individual HTTP request.
+
+Remaining quota is measured in **API calls**, never falls below zero, and is a snapshot rather than a reservation for your next request. Reset timestamps are absolute times, not countdowns.
+
+Not every response includes every header. A free API quota rejection can include quota headers and `Retry-After` without `X-RateLimit-Cost`. Customer quota headers also appear on errors after a valid API key has been identified, when quota information is available.
 
 ## When a limit is reached
 
@@ -131,15 +131,17 @@ Retry-After: 42
 
 Wait at least the number of seconds in `Retry-After`, then add a small random delay before retrying. Prefer this value over the general wording in the error message.
 
+If customer access is restricted for exceeding the monthly allowance, the response is HTTP `403 Forbidden` with the reason `Your API key is over quota.` Review your usage and subscription rather than repeatedly retrying that error. This differs from a temporary concurrency rejection.
+
 Do not repeatedly retry invalid requests: correct their parameters first.
 
 To reduce usage, request only the variables, models, locations, and date ranges you need, cache responses where appropriate, and spread requests over time. Split an individual request that is rejected for requesting too much data into smaller requests.
 
-## Concurrent requests and queuing
+## Concurrent HTTP requests and queuing
 
-Concurrency limits control how many HTTP requests can be processed at the same time. They are separate from the weighted minute, hour, and day quotas: you can have quota remaining and still receive a concurrency rejection.
+Concurrency limits control how many HTTP requests can be processed at the same time. They are separate from the free API's minute, hour, and day quotas and the customer API's monthly allowance: you can have quota remaining and still receive a concurrency rejection.
 
-By default, the free API processes **one request at a time per client** and queues additional requests. **More than 5 concurrent requests per client results in HTTP `429 Too Many Requests`**, counting both processing and queued requests.
+By default, the free API processes **one HTTP request at a time per client** and queues additional requests. **More than 5 concurrent HTTP requests per client results in HTTP `429 Too Many Requests`**, counting both processing and queued requests.
 
 Queued requests start in arrival order as earlier requests finish processing. Their HTTP connections remain open while they wait, so queuing increases response time. Waiting does not add to a request's weight; a request rejected because the queue is full is not charged.
 
