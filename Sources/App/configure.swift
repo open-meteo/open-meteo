@@ -181,7 +181,8 @@ public func configure(_ app: Application) throws {
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
         allowedMethods: [.GET, .POST, /*.PUT,*/ .OPTIONS /*, .DELETE, .PATCH*/],
-        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin, .range, .ifMatch, .ifUnmodifiedSince]
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin, .range, .ifMatch, .ifUnmodifiedSince],
+        exposedHeaders: [HTTPHeaders.Name("X-RateLimit-Cost")]
     )
     app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
     app.middleware.use(ErrorMiddleware.custom(environment: app.environment))

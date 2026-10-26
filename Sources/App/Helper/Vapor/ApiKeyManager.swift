@@ -195,6 +195,7 @@ extension Request {
         try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: RateLimiter.concurrencyLimit, maxConcurrentHard: RateLimiter.concurrencyLimitHard)
         do {
             let (weight, response) = try await fn(slot)
+            response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
             if isCFWorker {
                 await RateLimiter.instance.increment(int64: slot, count: weight)
             } else {
@@ -225,7 +226,9 @@ extension Request {
             let params = try parseApiParams()
             let responder = try await fn(ApiRequestInfo(host: nil, numberOfLocationsMaximum: nil), params)
             let weight = responder.calculateQueryWeight()
-            return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
+            let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10, logger: logger)
+            response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
+            return response
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: { host.starts(with: $0) }) == true || isDevNode
@@ -282,6 +285,7 @@ extension Request {
             let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: numberOfLocationsMaximum), params)
             let weight = responder.calculateQueryWeight()
             response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
+            response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
             await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         }
         catch {
