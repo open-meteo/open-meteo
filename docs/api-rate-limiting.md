@@ -22,6 +22,8 @@ Use the response headers for the limits and reset times that apply to your reque
 
 Use the customer endpoint for your API, such as `customer-api.open-meteo.com`, with your API key. Customer subscriptions have a monthly allowance of **weighted API-call units** and do not use the free API's minute, hour, or day quotas. The request-weight calculation below also applies to customer requests.
 
+The allowance resets every month on the day of the month associated with your subscription start date, whether your subscription is billed monthly or annually. For example, a subscription starting on the 3rd has a monthly quota period from the 3rd of one month to the 3rd of the next. Usage is counted within that quota period, rather than over a rolling 30-day window.
+
 Provide your API key using either the `apikey` query parameter or the `x-api-key` HTTP header:
 
 ```http
@@ -50,7 +52,7 @@ The maximum number of locations in one request is **10,000**. Each location stil
 
 API Standard does not include the historical weather, historical forecast, previous runs, single runs, climate, ensemble, seasonal, or satellite radiation customer APIs. These require API Professional or higher.
 
-Customer responses report the request's weight in `X-RateLimit-Cost`. The free API quota headers do not report your remaining monthly subscription allowance. If access is restricted for exceeding your allowance, the response is `403 Forbidden` with the reason `Your API key is over quota.`; this is different from a temporary concurrency rejection. Review your usage and subscription rather than repeatedly retrying that error.
+Customer responses report the request's weight in `X-RateLimit-Cost`, the monthly allowance in `X-RateLimit-Limit`, and the remaining weighted units in `X-RateLimit-Remaining` (never below zero). The remaining allowance reflects the latest recorded usage in the current monthly quota period. Customer API usage statistics can have a longer reporting delay because usage is collected from dozens of servers across multiple continents. Do not expect the reported usage to increase, or `X-RateLimit-Remaining` to decrease, after every individual API call. `X-RateLimit-Reset` gives the next monthly quota reset as a Unix timestamp in seconds when available. Customer responses omit `X-RateLimit-Window` because monthly quota periods vary in length. These quota headers also appear on errors once a valid API key has been identified. If access is restricted for exceeding your allowance, the response is `403 Forbidden` with the reason `Your API key is over quota.`; this is different from a temporary concurrency rejection. Review your usage and subscription rather than repeatedly retrying that error.
 
 ## Cost of one HTTP request
 
@@ -96,6 +98,8 @@ The HTTP response header `X-RateLimit-Cost` reports the actual weight charged fo
 
 ## Response headers
 
+For the free API, the headers describe the minute, hour, and day quotas below. For the customer API, they describe the monthly allowance as explained above.
+
 | Header | Meaning |
 | --- | --- |
 | `X-RateLimit-Cost` | API-call units charged for this HTTP request, such as `1.0` or `2.5`. |
@@ -105,13 +109,13 @@ The HTTP response header `X-RateLimit-Cost` reports the actual weight charged fo
 | `X-RateLimit-Reset` | When the reported window resets, as a Unix timestamp in seconds, not a countdown. |
 | `Retry-After` | How many seconds to wait before retrying a request rejected for an exhausted quota. |
 
-The quota headers describe the window with the fewest units remaining. If windows have equal remaining quota, the one that resets latest is reported. This also applies when several windows are exhausted: the response tells you to wait for the latest reset. The reported window can change between requests; the other limits still apply.
+For the free API, the quota headers describe the window with the fewest units remaining. If windows have equal remaining quota, the one that resets latest is reported. This also applies when several windows are exhausted: the response tells you to wait for the latest reset. The reported window can change between requests; the other limits still apply.
 
 Remaining quota is measured in **weighted units**, not HTTP requests. It is a snapshot, not a reservation for your next request. Not every response includes every header: a quota rejection, for example, can include quota headers and `Retry-After` without `X-RateLimit-Cost`.
 
 ## When a limit is reached
 
-A quota rejection returns HTTP `429 Too Many Requests`, for example:
+A free API quota rejection returns HTTP `429 Too Many Requests`, for example:
 
 ```http
 HTTP/1.1 429 Too Many Requests
@@ -141,6 +145,6 @@ Queued requests start in arrival order as earlier requests finish processing. Th
 
 The free API queue is generally shared by requests from the same public IP address, or by Worker identity for identified Cloudflare Worker traffic. Other applications sharing that identity can therefore fill the queue. Customer API concurrency is shared per API key, with processing limits determined by the subscription.
 
-A concurrency rejection has the reason `Too many concurrent requests`. It does not include a quota reset time or `Retry-After`, because it depends on pending requests finishing rather than a scheduled quota reset. The `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers describe weighted quotas, not queue capacity or position.
+A concurrency rejection has the reason `Too many concurrent requests`. It does not include `Retry-After`, because it depends on pending requests finishing rather than a scheduled quota reset. Customer responses can still include the monthly quota reset time; this does not indicate when a concurrency retry will succeed. The `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers describe weighted quotas, not queue capacity or position.
 
 For predictable response times, send free API requests sequentially. If you receive a concurrency rejection, reduce parallel requests and retry with increasing delays and a small random delay. Avoid immediately sending duplicate requests while earlier ones are still waiting. A temporarily overloaded service can also return HTTP `503 Service Unavailable`; retry those requests with increasing delays too.

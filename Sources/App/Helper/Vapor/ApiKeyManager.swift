@@ -10,20 +10,35 @@ public final actor ApiKeyManager {
     public static let instance = ApiKeyManager()
 
     /// Optional multiple of the monthly quota at which requests are rejected.
-    private let quotaMultiplier = Environment.get("API_APIKEYS_QUOTA_MULTIPLIER").flatMap(Double.init)
+    fileprivate static let quotaMultiplier = Environment.get("API_APIKEYS_QUOTA_MULTIPLIER").flatMap(Double.init)
 
     struct KeyAndLimit: Equatable {
         let key: String.SubSequence
         let limit: Int
         let id: String.SubSequence?
-        let usageLast30Days: Double
+        /// Weighted API-call units used in the current monthly quota period.
+        let usageCurrentQuotaPeriod: Double
+        /// Next monthly quota reset (Unix seconds), independent of monthly or annual billing.
+        let quotaResetTimestamp: Int?
+
+        /// Use the billing usage snapshot; local metering may already be included in it.
+        func applyHeaders(to headers: inout HTTPHeaders) {
+            guard limit > 0 else { return }
+            headers.replaceOrAdd(name: "X-RateLimit-Limit", value: String(limit))
+            if usageCurrentQuotaPeriod.isFinite && usageCurrentQuotaPeriod >= 0 {
+                headers.replaceOrAdd(name: "X-RateLimit-Remaining", value: String(max(0, Double(limit) - usageCurrentQuotaPeriod)))
+            }
+            if let quotaResetTimestamp, quotaResetTimestamp > 0 {
+                headers.replaceOrAdd(name: "X-RateLimit-Reset", value: String(quotaResetTimestamp))
+            }
+        }
 
         func checkQuota(quotaMultiplier: Double?) throws {
             guard let multiplier = quotaMultiplier, multiplier.isFinite, multiplier > 0,
-                  limit > 0, usageLast30Days.isFinite, usageLast30Days >= 0 else {
+                  limit > 0, usageCurrentQuotaPeriod.isFinite, usageCurrentQuotaPeriod >= 0 else {
                 return
             }
-            if usageLast30Days >= Double(limit) * multiplier {
+            if usageCurrentQuotaPeriod >= Double(limit) * multiplier {
                 throw ApiKeyManagerError.apiKeyOverQuota
             }
         }
@@ -32,6 +47,7 @@ public final actor ApiKeyManager {
             return (try? String(contentsOfFile: path, encoding: .utf8)).map(parseApiKeys) ?? []
         }
 
+        /// Entries: key;limit;customer_id;usage_current_quota_period;quota_reset_timestamp (Unix seconds).
         static func parseApiKeys(_ csv: String) -> [KeyAndLimit] {
             return csv.split(separator: ",").compactMap { entry -> KeyAndLimit? in
                 let parts = entry.split(separator: ";", omittingEmptySubsequences: false).map {
@@ -41,7 +57,8 @@ public final actor ApiKeyManager {
                 let limit = parts.count <= 1 ? 0 : Int(parts[1]) ?? 0
                 let id = parts.count <= 2 || parts[2].isEmpty ? nil : parts[2]
                 let usage = parts.count <= 3 ? 0 : Double(parts[3]) ?? 0
-                return KeyAndLimit(key: key, limit: limit, id: id, usageLast30Days: usage)
+                let reset = parts.count <= 4 ? nil : Int(parts[4])
+                return KeyAndLimit(key: key, limit: limit, id: id, usageCurrentQuotaPeriod: usage, quotaResetTimestamp: reset)
             }.sorted { $0.key < $1.key }
         }
     }
@@ -79,10 +96,8 @@ public final actor ApiKeyManager {
         return apiKeys.isEmpty
     }
 
-    func getLimit(_ string: String.SubSequence) throws -> Int? {
-        guard let key = apiKeys.first(where: {$0.key == string}) else { return nil }
-        try key.checkQuota(quotaMultiplier: quotaMultiplier)
-        return key.limit
+    func getKey(_ string: String.SubSequence) -> KeyAndLimit? {
+        apiKeys.first(where: { $0.key == string })
     }
 
     func increment(apikey: String.SubSequence, weight: Float) {
@@ -262,35 +277,44 @@ extension Request {
         guard let apikey = headers["X-Api-Key"].first ?? params.apikey else {
             throw ApiKeyManagerError.apiKeyRequired
         }
-        guard let limit = try await ApiKeyManager.instance.getLimit(String.SubSequence(apikey)) else {
+        guard let key = await ApiKeyManager.instance.getKey(String.SubSequence(apikey)) else {
             throw ApiKeyManagerError.apiKeyInvalid
         }
-        let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api.", "seasonal-api."]
-        let resNode = host.starts(with: "customer-res1-api.")
-        if limit > 0 && limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
-            throw ApiKeyManagerError.apiProfessionalRequired
-        }
-        if limit > 0 && limit < 50_000_000 && resNode {
-            throw ApiKeyManagerError.apiProfessionalRequired
-        }
-        let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
-        let maxConcurrent = max(2, limit / 5_000_000)
-        let slot = apikey.hash
-        try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
-        let response: Response
         do {
-            let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: numberOfLocationsMaximum), params)
-            let weight = responder.calculateQueryWeight()
-            response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
-            response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
-            await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
-        }
-        catch {
+            try key.checkQuota(quotaMultiplier: ApiKeyManager.quotaMultiplier)
+            let limit = key.limit
+            let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api.", "seasonal-api."]
+            let resNode = host.starts(with: "customer-res1-api.")
+            if limit > 0 && limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
+                throw ApiKeyManagerError.apiProfessionalRequired
+            }
+            if limit > 0 && limit < 50_000_000 && resNode {
+                throw ApiKeyManagerError.apiProfessionalRequired
+            }
+            let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
+            let maxConcurrent = max(2, limit / 5_000_000)
+            let slot = apikey.hash
+            try await ConcurrencyGroupLimiter.instance.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: resNode ? 1024 : 256)
+            let response: Response
+            do {
+                let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: numberOfLocationsMaximum), params)
+                let weight = responder.calculateQueryWeight()
+                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10, logger: logger)
+                response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
+                await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
+            }
+            catch {
+                await ConcurrencyGroupLimiter.instance.release(slot: slot)
+                throw error
+            }
             await ConcurrencyGroupLimiter.instance.release(slot: slot)
-            throw error
+            key.applyHeaders(to: &response.headers)
+            return response
+        } catch {
+            let response = ErrorMiddleware.response(for: error, on: self, environment: application.environment)
+            key.applyHeaders(to: &response.headers)
+            return response
         }
-        await ConcurrencyGroupLimiter.instance.release(slot: slot)
-        return response
     }
 }
 
