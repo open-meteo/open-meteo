@@ -1134,7 +1134,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 // Validate before checking coverage, as in the coordinate-based initializer.
                 try await options.validateRun(domain: domain)
                 guard let position = domain.grid.findPoint(lat: latitude, lon: longitude) else { return nil }
-                return try await GenericReader(domain: domain, position: position, modelCoordinates: (latitude, longitude), options: options)
+                return try await GenericReader(domain: domain, position: position, modelCoordinates: (latitude, longitude), elevation: elevation, options: options)
             }
         }
     }

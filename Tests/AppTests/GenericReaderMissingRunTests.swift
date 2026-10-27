@@ -198,6 +198,12 @@ import Vapor
             let result = try await MultiDomains.dwd_icon_d2.getReaders(gridpoint: position, mapping: mapping, options: options())
             let hourly = try #require(result.hourly)
             let expected = output.grid.getCoordinates(gridpoint: position)
+            let remapped = try await GenericReader<RunFixtureDomain, GemVariable>(
+                domain: native, position: 0, modelCoordinates: expected, elevation: 500, options: options()
+            )
+            #expect(remapped.targetElevation == 500)
+            #expect(remapped.modelLat == expected.latitude)
+            #expect(remapped.modelLon == expected.longitude)
             let rawGroup = try #require(await group.makeReader(coordinate: expected, options: options()))
             #expect(rawGroup.reader.modelLat == expected.latitude)
             #expect(rawGroup.reader.modelLon == expected.longitude)
