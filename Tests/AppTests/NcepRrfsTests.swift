@@ -232,7 +232,7 @@ import OpenMeteoSdk
             }
             #expect(probability.domainRegistry == .ncep_rrfs_conus_ensemble)
             #expect(ObjectIdentifier(probabilityVariable) == ObjectIdentifier(ProbabilityVariable.self))
-            #expect(mapping.gridForBoundingBoxRequests == nil)
+            #expect(mapping.outputGridDomain == nil)
         }
         #expect(try await model.genericDomain() == nil)
         #expect(model.countEnsembleMember == 1)
@@ -256,7 +256,7 @@ import OpenMeteoSdk
                     return
                 }
                 #expect(ObjectIdentifier(probabilityVariable) == ObjectIdentifier(ProbabilityVariable.self))
-                #expect(mapping.gridForBoundingBoxRequests?.domainRegistry == domain.domainRegistry)
+                #expect(mapping.outputGridDomain?.domainRegistry == domain.domainRegistry)
                 #expect(mapping.requirePrimaryCoverage)
                 #expect(source.domainRegistry == domain.domainRegistry)
                 #expect(probability.domainRegistry == .ncep_rrfs_conus_ensemble)
@@ -361,7 +361,7 @@ import OpenMeteoSdk
         let model = try #require(MultiDomains(rawValue: domain.rawValue))
         let mapping = try #require(try await model.getDomainAndVariable())
         #expect(mapping.primary.count == 1 && mapping.secondary.isEmpty)
-        #expect(mapping.gridForBoundingBoxRequests?.domainRegistry == .ncep_rrfs_north_america)
+        #expect(mapping.outputGridDomain?.domainRegistry == .ncep_rrfs_north_america)
         guard case .domain(let source, let variables) = try #require(mapping.primary.first) else {
             Issue.record("Expected North America RRFS reader")
             return
