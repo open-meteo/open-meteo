@@ -177,6 +177,37 @@ import Vapor
         }
     }
 
+    @Test(arguments: [true, false])
+    func boundingBoxPreservesOutputCoordinatesWithMixedSources(mixedSchemas: Bool) async throws {
+        let output = RunFixtureDomain(grid: RegularGrid(nx: 3, ny: 1, latMin: 45, lonMin: -75, dx: 0.02, dy: 0.02))
+        let native = RunFixtureDomain(
+            domainRegistry: .cmc_gem_rdps_10km,
+            grid: RegularGrid(nx: 1, ny: 1, latMin: 45.01, lonMin: -74.98, dx: 1, dy: 1)
+        )
+        let group = mixedSchemas
+            ? MultiDomains.RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, GemVariable.self))
+            : MultiDomains.RawReaderDerivationGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
+        let mapping = MultiDomains.DomainReaderMapping(
+            primary: [
+                .domain(output, GemVariable.self),
+                .mixedBeforeDerivation(group)
+            ], 
+            gridForBoundingBoxRequests: output
+        )
+        for position in 0..<3 {
+            let result = try await MultiDomains.dwd_icon_d2.getReaders(gridpoint: position, mapping: mapping, options: options())
+            let hourly = try #require(result.hourly)
+            let expected = output.grid.getCoordinates(gridpoint: position)
+            let rawGroup = try #require(await group.makeReader(coordinate: expected, options: options()))
+            #expect(rawGroup.reader.modelLat == expected.latitude)
+            #expect(rawGroup.reader.modelLon == expected.longitude)
+            #expect(hourly.modelLat == expected.latitude)
+            #expect(hourly.modelLon == expected.longitude)
+            #expect(result.daily?.modelLat == expected.latitude)
+            #expect(result.daily?.modelLon == expected.longitude)
+        }
+    }
+
     private func grid(coversLocation: Bool) -> RegularGrid {
         RegularGrid(nx: 1, ny: 1, latMin: coversLocation ? 45 : 0, lonMin: -75, dx: 1, dy: 1)
     }
