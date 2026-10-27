@@ -9,6 +9,8 @@ on:
     branches: [ main ]
 
 env:
+  # Use a consistent CPU target so compiled caches can be reused across runners.
+  MARCH_SKYLAKE: "TRUE"
   swift_package_resolve: ENABLE_PARQUET=TRUE swift package resolve
   swift_build: ENABLE_PARQUET=TRUE swift build --build-tests
   swift_test: ENABLE_PARQUET=TRUE swift test
@@ -25,14 +27,6 @@ jobs:
       run: echo "version=$(swift -version | head -n 1 | sed s/,// )" >> $GITHUB_OUTPUT
       shell: bash
     - uses: actions/checkout@v7
-    - name: Get CPU cache identity
-      id: cpu-cache
-      # C targets use -march=native. Never restore compiled objects from a
-      # runner with a different CPU or instruction set, including fallback hits.
-      run: |
-        fingerprint=$(grep -E '^(vendor_id|cpu family|model|stepping|flags)[[:space:]]*:' /proc/cpuinfo | sort -u | sha256sum | cut -d ' ' -f 1)
-        echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
-      shell: bash
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
       uses: actions/cache@v6
@@ -40,9 +34,9 @@ jobs:
         path: |
           .build
           Package.resolved
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.cpu-cache.outputs.fingerprint }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-skylake-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-${{ steps.cpu-cache.outputs.fingerprint }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+          ${{ runner.os }}-${{ runner.arch }}-skylake-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
