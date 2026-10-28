@@ -28,8 +28,7 @@ extension IconNativeDomain {
     init(definition: IconNativeDomains) async throws {
         var grid = try await definition.nativeGridFile.load()
         let payload = try? await OmFileSystemManager.instance.get(
-            file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF"),
-            client: .shared, logger: IconNativeDomains.logger
+            file: OmFileType.staticFile(domain: definition.domainRegistryStatic ?? definition.domainRegistry, variable: "HSURF")
         )
         let elevations: ElevationValues?
         if let payload {

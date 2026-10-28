@@ -187,7 +187,6 @@ struct WeatherApiController {
             let historyStartDate: Timestamp
             let historyEndDate: Timestamp? = type == .climate ? Timestamp(2051, 1, 1) : nil
             let temporalResolutionDefault: ApiTemporalResolution
-            let allowRemoteArchive = !(OpenMeteo.remoteDataDirectoryMinimumAge ?? 0 >= 24*3600 && type == .forecast)
             switch type {
             case .none:
                 forecastDaysMax = 217
@@ -309,13 +308,13 @@ struct WeatherApiController {
             let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember }) + nVariableNonEnsemble
             // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
             let nVariablesAdjusted = type == .seasonal ? nVariables / 24 / 5 : nVariables
-            let options = try params.readerOptions(for: req, allowRemoteArchive: allowRemoteArchive)
+            let options = try params.readerOptions()
             let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
             
             /// Only read 15 minutely data if actually necessary
             let include15Min = params.current?.isEmpty == false || params.minutely_15?.isEmpty == false || params.current_weather == true || (params.temporal_resolution?.dtSeconds ?? 3600) <= 30*60
             
-            let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
+            let prepared = try await params.prepareCoordinates(allowTimezones: true)
 
             let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation]
             switch prepared {
@@ -334,7 +333,7 @@ struct WeatherApiController {
                     }
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
-                        let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
+                        let run = (domain.useLatestRun && run == nil) ? try await domain.getDomainAndVariable()?.singleDomain?.getLatestFullRun()?.toIsoDateTime() : run
                         var options = options
                         options.run = run
                         guard let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection, include15Min: include15Min) else {
@@ -373,7 +372,7 @@ struct WeatherApiController {
                         OmMetrics.recordModelRequest(models: [domain], locationCount: locationCount)
                     }
                     /// Some domains like `ecmwf_ifs_europe_ensemble` only write data to `data_run`. Resolve the latest run
-                    let run = (domain.useLatestRun && run == nil) ? try await mapping?.singleDomain?.getLatestFullRun(client: options.httpClient, logger: options.logger)?.toIsoDateTime() : run
+                    let run = (domain.useLatestRun && run == nil) ? try await mapping?.singleDomain?.getLatestFullRun()?.toIsoDateTime() : run
                     var options = options
                     options.run = run
 
@@ -1957,7 +1956,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         switch self {
         case .marine_best_match:
             let lastRunAvailabilityTime = try await MfWaveDomain.mfwave
-                .getMetaJson(client: options.httpClient, logger: options.logger)?
+                .getMetaJson()?
                 .lastRunAvailabilityTime
             var sources: [DomainReaderMapping.Source] = [
                 .domain(MfWaveDomain.mfcurrents, MfCurrentVariable.self),

@@ -59,7 +59,7 @@ struct NcepRrfsDownloader: AsyncCommand {
         try await downloadElevation(curl: curl, domain: domain, run: run, server: server, application: application, uploadS3Bucket: uploadS3Bucket)
         let domainElevation: [Float]?
         if domain != .ncep_rrfs_conus_ensemble {
-            guard let elevation = try await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
+            guard let elevation = try await domain.getStaticFile(type: .elevation)?.read() else {
                 throw NcepRrfsError.missingElevation
             }
             domainElevation = elevation

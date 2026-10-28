@@ -1,6 +1,5 @@
 import OmFileFormat
 import Dispatch
-import AsyncHTTPClient
 import Logging
 import OmFileIO
 import Synchronization
@@ -72,7 +71,7 @@ final class OmFileSystemManager: Sendable {
         await localFileSystem.getDirectory(fullPath: path)?.updateIfRequired(force: true)
     }
     
-    func getDirectoryContents(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64)])? {
+    func getDirectoryContents(path: String, localOnly: Bool) async throws -> (directories: Set<String>, files: [String: (lastModified: Timestamp, size: Int64)])? {
         var directories = Set<String>()
         var files = [String: (lastModified: Timestamp, size: Int64)]()
         
@@ -87,7 +86,7 @@ final class OmFileSystemManager: Sendable {
         return (directories, files)
     }
     
-    func getFile(path: String, client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> FileType? {
+    func getFile(path: String, localOnly: Bool) async throws -> FileType? {
         if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
         }
@@ -99,7 +98,7 @@ final class OmFileSystemManager: Sendable {
         return nil
     }
     
-    func with<R, Key: OmFileManagable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+    func with<R, Key: OmFileManagable>(file: Key, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getFile(fullPath: path) {
@@ -119,8 +118,8 @@ final class OmFileSystemManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: OmFileManagable>(file: Key, client: HTTPClient?, logger: Logger) async throws -> Key.Payload? {
-        return try await self.with(file: file, client: client, logger: logger) {
+    func get<Key: OmFileManagable>(file: Key) async throws -> Key.Payload? {
+        return try await self.with(file: file) {
             return $0
         }
     }
@@ -151,7 +150,7 @@ final class OmFileSystemManager: Sendable {
 extension OmFileSystemManager {
     /// Resolve the variable directory once and retain its copy-on-write file indexes.
     /// Returns nil when neither an accessible local nor remote directory exists.
-    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int, client: HTTPClient?, logger: Logger) async throws -> SeriesDirectory? {
+    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int) async throws -> SeriesDirectory? {
         // The common case reuses the variable string without allocating a path.
         var name = variable
         if previousDay > 0 {

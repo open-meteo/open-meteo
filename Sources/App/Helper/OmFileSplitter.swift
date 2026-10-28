@@ -67,7 +67,7 @@ struct OmFileSplitter {
     }
 
     /// Prefetch all required data into memory
-    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws {
+    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws {
         // TODO: maybe we can keep the file handles better in scope
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
@@ -77,7 +77,7 @@ struct OmFileSplitter {
         /// Read individual runs from dedicated database
         if let run {
             let file = OmFileType.run(domain: domain, variable: variable, run: run)
-            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+            try await OmFileSystemManager.instance.with(file: file) { omFile in
                 guard let timestamps = omFile.timestamps else {
                     return
                 }
@@ -97,7 +97,7 @@ struct OmFileSplitter {
         }
 
 
-        guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable, ensembleMember: time.ensembleMember, previousDay: time.previousDay, client: httpClient, logger: logger) else {
+        guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable, ensembleMember: time.ensembleMember, previousDay: time.previousDay) else {
             return
         }
 
@@ -166,12 +166,12 @@ struct OmFileSplitter {
         }
     }
 
-    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws -> Array2DFastTime {
-        let data = try await read(variable: variable, location: location, level: level, time: time, logger: logger, httpClient: httpClient, run: run)
+    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws -> Array2DFastTime {
+        let data = try await read(variable: variable, location: location, level: level, time: time, run: run)
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
 
-    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?, run: IsoDateTime? = nil) async throws -> [Float] {
+    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
@@ -183,7 +183,7 @@ struct OmFileSplitter {
         /// Read individual runs from dedicated database
         if let run {
             let file = OmFileType.run(domain: domain, variable: variable.omFileName.file, run: run)
-            try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+            try await OmFileSystemManager.instance.with(file: file) { omFile in
                 guard let timestamps = omFile.timestamps else {
                     return
                 }
@@ -229,7 +229,7 @@ struct OmFileSplitter {
             return out
         }
 
-        guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable.omFileName.file, ensembleMember: time.ensembleMember, previousDay: time.previousDay, client: httpClient, logger: logger) else {
+        guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable.omFileName.file, ensembleMember: time.ensembleMember, previousDay: time.previousDay) else {
             return out
         }
 
