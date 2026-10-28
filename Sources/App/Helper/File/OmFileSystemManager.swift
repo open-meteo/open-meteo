@@ -40,7 +40,7 @@ final class OmFileSystemManager: Sendable {
         
         self.localFileSystem = OmFileSystemLocal.Directory(directories: directories)
         self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map {
-            OmFileSystemS3(server: S3ServerHealth(logger: .init(label: "RemoteData"), servers: $0, client: RemoteDataHttpClient.makeClient()))
+            OmFileSystemS3(server: S3ServerHealth(logger: .init(label: "RemoteData"), servers: $0))
         }
     }
     
@@ -80,7 +80,7 @@ final class OmFileSystemManager: Sendable {
             await local.exportDirectories(directories: &directories, files: &files)
         }
         
-        if localOnly == false, let remoteFileSystem, let remoteDir = try await remoteFileSystem.getRoot(client: client, logger: logger).getDirectory(fullPath: path) {
+        if localOnly == false, let remoteFileSystem, let remoteDir = try await remoteFileSystem.getRoot().getDirectory(fullPath: path) {
             await remoteDir.directory.exportDirectories(directories: &directories, files: &files)
         }
         
@@ -91,7 +91,7 @@ final class OmFileSystemManager: Sendable {
         if let file = await localFileSystem.getFile(fullPath: path) {
             return .local(file)
         }
-        if localOnly == false, (!OpenMeteo.remotePressureLevelsOnly || path.contains("hPa")), let remoteFileSystem, let file = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) {
+        if localOnly == false, (!OpenMeteo.remotePressureLevelsOnly || path.contains("hPa")), let remoteFileSystem, let file = try await remoteFileSystem.getRoot().getFile(fullPath: path) {
             let client = await file.file.makeCachedClient(context: file.context)
             let file = OmReaderBlockCache(backend: client, cache: OpenMeteo.dataBlockCache, cacheKey: client.cacheKey)
             return .remote(file)
@@ -110,7 +110,7 @@ final class OmFileSystemManager: Sendable {
             return nil
         }
         /// Check for remote file
-        guard let client, let object = try await remoteFileSystem.getRoot(client: client, logger: logger).getFile(fullPath: path) else {
+        guard client != nil, let object = try await remoteFileSystem.getRoot().getFile(fullPath: path) else {
             return nil
         }
         return try await object.with(fn: fn)
@@ -129,7 +129,7 @@ final class OmFileSystemManager: Sendable {
     func backgroundTaskRemote() async {
         let logger = Logger(label: "OmFileSystemManager backgroundTaskRemote")
         let start = DispatchTime.now()
-        await remoteFileSystem?.updateRecursivelyIfRequired(client: .shared, logger: logger)
+        await remoteFileSystem?.updateRecursivelyIfRequired()
         let duration = start.timeElapsedSeconds()
         if duration > 5 {
             logger.warning("Remote S3 file system background update took \(duration.asSecondsPrettyPrint)")
@@ -168,8 +168,8 @@ extension OmFileSystemManager {
             .getDirectory(name: name)?
             .getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
-        if let client, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
-            remote = try await remoteFileSystem.getRoot(client: client, logger: logger)
+        if client != nil, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
+            remote = try await remoteFileSystem.getRoot()
                 .getDirectory(name: "data")?
                 .getDirectory(name: domain.rawValue)?
                 .getDirectory(name: name)

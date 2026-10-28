@@ -38,13 +38,13 @@ public struct OmFileSystemS3: Sendable {
         self.server = server
     }
     
-    /// Make initial root directory access given a HTTP client and logger. Refreshes root if required
-    public func getRoot(client: HTTPClient, logger: Logger) async throws -> DirectoryWithContext {
+    /// Access the root directory using the filesystem context. Refreshes root if required
+    public func getRoot() async throws -> DirectoryWithContext {
         try await root.updateIfRequired(context: server)
         return DirectoryWithContext.init(directory: root, context: server)
     }
 
-    public func updateRecursivelyIfRequired(client: HTTPClient, logger: Logger) async {
+    public func updateRecursivelyIfRequired() async {
         await self.root.updateRecursivelyIfRequired(
             context: server,
             now: .now()
@@ -443,7 +443,7 @@ public struct OmFileSystemS3: Sendable {
             revalidationQueue = []
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
-                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: context.client, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: HTTPClient.sharedRemoteData, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))

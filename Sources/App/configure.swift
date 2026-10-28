@@ -177,7 +177,7 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone.gmt
-    app.lifecycle.use(RemoteDataHttpClient())
+    app.lifecycle.use(RemoteDataHttpClientLifecycle())
 
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
