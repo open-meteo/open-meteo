@@ -110,7 +110,7 @@ final class OmFileSystemManager: Sendable {
             return nil
         }
         /// Check for remote file
-        guard client != nil, let object = try await remoteFileSystem.getRoot().getFile(fullPath: path) else {
+        guard let object = try await remoteFileSystem.getRoot().getFile(fullPath: path) else {
             return nil
         }
         return try await object.with(fn: fn)
@@ -168,7 +168,7 @@ extension OmFileSystemManager {
             .getDirectory(name: name)?
             .getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
-        if client != nil, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
+        if !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
             remote = try await remoteFileSystem.getRoot()
                 .getDirectory(name: "data")?
                 .getDirectory(name: domain.rawValue)?
