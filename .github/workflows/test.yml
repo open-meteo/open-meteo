@@ -9,6 +9,8 @@ on:
     branches: [ main ]
 
 env:
+  # Use a consistent CPU target so compiled caches can be reused across runners.
+  MARCH_SKYLAKE: "TRUE"
   swift_package_resolve: ENABLE_PARQUET=TRUE swift package resolve
   swift_build: ENABLE_PARQUET=TRUE swift build --build-tests
   swift_test: ENABLE_PARQUET=TRUE swift test
@@ -32,9 +34,9 @@ jobs:
         path: |
           .build
           Package.resolved
-        key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-skylake-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
         restore-keys: |
-          ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+          ${{ runner.os }}-${{ runner.arch }}-skylake-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
