@@ -39,7 +39,9 @@ final class OmFileSystemManager: Sendable {
         }
         
         self.localFileSystem = OmFileSystemLocal.Directory(directories: directories)
-        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map { OmFileSystemS3(server: S3ServerHealth(logger: .init(label: ""), servers: $0)) }
+        self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map {
+            OmFileSystemS3(server: S3ServerHealth(logger: .init(label: "RemoteData"), servers: $0, client: RemoteDataHttpClient.makeClient()))
+        }
     }
     
     enum FileType {
