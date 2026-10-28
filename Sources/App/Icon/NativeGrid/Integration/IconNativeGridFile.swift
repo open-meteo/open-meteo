@@ -145,7 +145,7 @@ extension IconNativeGridFile {
             storage = cached
         } else {
             guard let payload = try await OmFileSystemManager.instance.get(
-                file: self, client: .shared, logger: IconNativeDomains.logger
+                file: self
             ) else {
                 throw IconNativeDomainError.missingGridArtifact(getFilePath())
             }

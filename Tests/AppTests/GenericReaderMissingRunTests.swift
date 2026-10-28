@@ -7,7 +7,7 @@ import Vapor
     private let run = Timestamp(1902, 1, 1, 6).toIsoDateTime()
 
     private func options(run: IsoDateTime? = nil) throws -> GenericReaderOptions {
-        try GenericReaderOptions(logger: Logger(label: "missing-run-test"), httpClient: nil, run: run)
+        try GenericReaderOptions(run: run)
     }
 
     @Test(arguments: [true, false])
@@ -67,7 +67,7 @@ import Vapor
 
     @Test func queryPassesRunToReaderOptions() throws {
         let query = try JSONDecoder().decode(ApiQueryParameter.self, from: Data(#"{"run":"2026-06-01T06:00"}"#.utf8))
-        let options = try query.readerOptions(logger: Logger(label: "missing-run-test"), httpClient: .shared)
+        let options = try query.readerOptions()
         #expect(options.run == query.run)
     }
 
@@ -237,7 +237,7 @@ private struct RunFixtureDomain: GenericDomain {
     let omFileLength = 4
     let countEnsembleMember = 1
 
-    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool {
+    func isRunAvailable(run: Timestamp) async throws -> Bool {
         switch availability {
         case .available(let expectedRun):
             #expect(run == expectedRun)
