@@ -51,9 +51,37 @@ struct MetricsController: RouteCollection {
             ? OpenMeteo.dataBlockCache.cache.statistics()
             : .zero
 
-        let monitored_ips = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
+        let evictionStats = OpenMeteo.dataBlockCacheInitialized.load(ordering: .relaxed)
+            ? OpenMeteo.dataBlockCache.cache.evictionStatistics
+            : .zero
+        let evictionWindows = evictionStats.accessedWithin.map {
+            "om_block_cache_evictions_recent_total{window=\"\($0.window)\"} \($0.count)"
+        }.joined(separator: "\n")
+
+        let trackedConcurrencyGroups = await ConcurrencyGroupLimiter.instance.numberOfTrackedSlots()
+
+        var downloadMetrics = ""
+        if OmFileSystemManager.isInitialized, let server = OmFileSystemManager.instance.remoteFileSystem?.server {
+            for (origin, stats) in await server.downloadMetrics().sorted(by: { $0.0 < $1.0 }) {
+                for (priority, active, queued, wait) in [
+                    ("foreground", stats.activeForeground, stats.queuedForeground, stats.foregroundWaitSeconds),
+                    ("background", stats.activeBackground, stats.queuedBackground, stats.backgroundWaitSeconds)
+                ] {
+                    let labels = "upstream=\"\(origin)\",priority=\"\(priority)\""
+                    downloadMetrics += "om_remote_downloads_active{\(labels)} \(active)\n"
+                    downloadMetrics += "om_remote_downloads_queued{\(labels)} \(queued)\n"
+                    downloadMetrics += "om_remote_download_queue_wait_seconds_total{\(labels)} \(wait)\n"
+                }
+                downloadMetrics += "om_remote_download_promotions_total{upstream=\"\(origin)\"} \(stats.promotions)\n"
+            }
+        }
 
         let body = """
+# TYPE om_remote_downloads_active gauge
+# TYPE om_remote_downloads_queued gauge
+# TYPE om_remote_download_queue_wait_seconds_total counter
+# TYPE om_remote_download_promotions_total counter
+\(downloadMetrics)
 # TYPE om_file_local_open gauge
 # HELP om_file_local_open Number of open local files
 om_file_local_open \(OmFileSystemMetrics.fileLocalOpen.load(ordering: .relaxed))
@@ -96,6 +124,12 @@ om_file_remote_payload_waiting \(OmFileSystemMetrics.fileRemotePayloadWaiting.lo
 # TYPE om_file_remote_payload_update_waiting gauge
 # HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
 om_file_remote_payload_update_waiting \(OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
+# HELP om_block_cache_evictions_total Occupied committed cache slots evicted for a different key since process start.
+# TYPE om_block_cache_evictions_total counter
+om_block_cache_evictions_total \(evictionStats.total)
+# HELP om_block_cache_evictions_recent_total Evictions whose last access or insertion was within the given window at eviction. Windows overlap; counters reset on process restart.
+# TYPE om_block_cache_evictions_recent_total counter
+\(evictionWindows)
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes
@@ -111,15 +145,15 @@ om_block_cache_accessed_bytes{window="30m"} \(cacheStats.accessed_30min)
 om_block_cache_accessed_bytes{window="60m"} \(cacheStats.accessed_60min)
 om_block_cache_accessed_bytes{window="3h"} \(cacheStats.accessed_3hours)
 om_block_cache_accessed_bytes{window="24h"} \(cacheStats.accessed_24hours)
-# TYPE om_requests_monitored_ips gauge
-# HELP om_requests_monitored_ips Distinct IPs currently rate-limited
-om_requests_monitored_ips \(monitored_ips)
-# TYPE om_requests_total_running gauge
-# HELP om_requests_total_running Currently running requests
-om_requests_total_running \(OmMetrics.requestsRunning.load(ordering: .relaxed))
-# TYPE om_requests_queued_requests gauge
-# HELP om_requests_queued_requests Queued requests waiting for slot
-om_requests_queued_requests \(OmMetrics.requestsQueued.load(ordering: .relaxed))
+# TYPE om_concurrency_groups_tracked gauge
+# HELP om_concurrency_groups_tracked Concurrency groups with running or queued requests, keyed by IP, Cloudflare Worker, or API key
+om_concurrency_groups_tracked \(trackedConcurrencyGroups)
+# TYPE om_requests_running gauge
+# HELP om_requests_running Currently running requests
+om_requests_running \(OmMetrics.requestsRunning.load(ordering: .relaxed))
+# TYPE om_requests_queued gauge
+# HELP om_requests_queued Queued requests waiting for slot
+om_requests_queued \(OmMetrics.requestsQueued.load(ordering: .relaxed))
 # TYPE om_requests_error_thrown_total counter
 # HELP om_requests_error_thrown_total Number of API with any error thrown
 om_requests_error_thrown_total \(OmMetrics.requestsErrorThrownTotal.load(ordering: .relaxed))
@@ -135,10 +169,10 @@ om_requests_cloudflare_workers_total \(OmMetrics.requestsCloudflareWorkersTotal.
 # TYPE om_requests_forecast_api_total counter
 # HELP om_requests_forecast_api_total Number of Forecast API calls
 om_requests_forecast_api_total \(OmMetrics.requestsForecastApiTotal.load(ordering: .relaxed))
-# TYPE om_requests_model_total counter
-# HELP om_requests_model_total Number of requested locations per resolved model, including calls that fail after locations are counted
+# TYPE om_requested_locations_total counter
+# HELP om_requested_locations_total Number of requested locations per resolved model, including calls that fail after locations are counted
 \(MultiDomains.allCases.map { model in
-    "om_requests_model_total{model=\"\(model.rawValue)\"} \(OmMetrics.requestsPerModelTotal[model]!.value.load(ordering: .relaxed))"
+    "om_requested_locations_total{model=\"\(model.rawValue)\"} \(OmMetrics.requestsPerModelTotal[model]!.value.load(ordering: .relaxed))"
 }.joined(separator: "\n"))
 # TYPE om_requests_s3_api_total counter
 # HELP om_requests_s3_api_total Number of S3 API calls
@@ -146,14 +180,14 @@ om_requests_s3_api_total \(OmMetrics.requestsS3ApiTotal.load(ordering: .relaxed)
 # TYPE om_requests_elevation_api_total counter
 # HELP om_requests_elevation_api_total Number of Elevation API calls
 om_requests_elevation_api_total \(OmMetrics.requestsElevationApiTotal.load(ordering: .relaxed))
-# HELP om_requests_rate_limited_total Block cache accessed data volume over a given window.
+# HELP om_requests_rate_limited_total Number of requests rejected for exceeding the given rate-limit window.
 # TYPE om_requests_rate_limited_total counter
 om_requests_rate_limited_total{window="1m"} \(OmMetrics.limiterMinutelyExceededTotal.load(ordering: .relaxed))
 om_requests_rate_limited_total{window="1h"} \(OmMetrics.limiterHourlyExceededTotal.load(ordering: .relaxed))
 om_requests_rate_limited_total{window="24h"} \(OmMetrics.limiterDailyExceededTotal.load(ordering: .relaxed))
-# TYPE om_memory_read_allocated_bytes counter
-# HELP om_memory_read_allocated_bytes Allocated read arrays
-om_memory_read_allocated_bytes \(OmMetrics.memoryReadAllocated.load(ordering: .relaxed))
+# TYPE om_memory_read_allocated_bytes_total counter
+# HELP om_memory_read_allocated_bytes_total Cumulative bytes allocated for read arrays since process start.
+om_memory_read_allocated_bytes_total \(OmMetrics.memoryReadAllocated.load(ordering: .relaxed))
 # EOF
 """
 

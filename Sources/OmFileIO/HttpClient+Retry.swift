@@ -120,13 +120,14 @@ public extension HTTPClient {
     /**
      Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
      */
-    func executeMapRetry<T>(_ request: HTTPClientRequest,
+    func executeMapRetry<T: Sendable>(_ request: HTTPClientRequest,
         logger: Logger,
         deadline: Date = .minutes(60),
         timeoutPerRequest: TimeAmount = .seconds(30),
         backOffSettings: ExponentialBackOff = .init(),
         error404WaitTime: TimeAmount? = nil,
-        _ body: @escaping (HTTPClientResponse) async throws -> T
+        scheduling: (scheduler: RemoteDownloadScheduler, job: RemoteDownloadJob)? = nil,
+        _ body: @escaping @Sendable (HTTPClientResponse) async throws -> T
     ) async throws -> T {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
@@ -152,23 +153,34 @@ public extension HTTPClient {
         while true {
             do {
                 n += 1
-                var request = request
-                request.url = url
-                if let user, let password {
-                    // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if schema == "s3" {
-                        let signer = AWSSigner(accessKey: String(user), secretKey: String(password), region: "us-west-2", service: "s3")
-                        try signer.sign(request: &request)
-                    } else {
-                        request.setBasicAuth(username: String(user), password: String(password))
+                let attempt = n
+                let operation: @Sendable () async throws -> T = {
+                    var request = request
+                    request.url = url
+                    if let user, let password {
+                        // Request need to be signed in the retry loop because the signature expires after 15 minutes
+                        if schema == "s3" {
+                            let signer = AWSSigner(accessKey: String(user), secretKey: String(password), region: "us-west-2", service: "s3")
+                            try signer.sign(request: &request)
+                        } else {
+                            request.setBasicAuth(username: String(user), password: String(password))
+                        }
                     }
+
+                    let response = try await self.execute(request, timeout: timeoutPerRequest, logger: logger)
+                    logger.debug("Response for HTTP request #\(attempt) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
+                    //print(try await response.readStringImmutable())
+                    try await response.throwOnError()
+                    return try await body(response)
                 }
-                
-                let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
-                //print(try await response.readStringImmutable())
-                try await response.throwOnError()
-                return try await body(response)
+                if let scheduling {
+                    // Release admission on success or failure before the retry handler sleeps.
+                    return try await scheduling.scheduler.execute(job: scheduling.job, operation: operation)
+                }
+                return try await operation()
+            } catch let error as RemoteDownloadSchedulerError {
+                // Admission failure is not a failed HTTP attempt.
+                throw error
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.headers.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
@@ -212,7 +224,8 @@ public extension HTTPClient {
         deadline: Date = .minutes(60),
         timeoutPerRequest: TimeAmount = .seconds(30),
         backOffSettings: ExponentialBackOff = .init(),
-        error404WaitTime: TimeAmount? = nil
+        error404WaitTime: TimeAmount? = nil,
+        scheduling: (scheduler: RemoteDownloadScheduler, job: RemoteDownloadJob)? = nil
     ) async throws -> ByteBuffer {
         return try await executeMapRetry(
             request,
@@ -221,6 +234,7 @@ public extension HTTPClient {
             timeoutPerRequest: timeoutPerRequest,
             backOffSettings: backOffSettings,
             error404WaitTime:error404WaitTime,
+            scheduling: scheduling,
             { try await $0.body.collect(upTo: maxBytes) }
         )
     }

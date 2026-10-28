@@ -1,140 +1,156 @@
 import Foundation
 
-/**
- Coordinate concurrent requests for the same cache key. The atomic block cache is accessed in parallel.
- Requests are only isolated if they need to be fetched from the backend
- */
+/// Cache hits stay lock-free. Misses share a download and its priority across overlapping ranges.
 public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     typealias Key = UInt64
     public nonisolated let cache: AtomicBlockCache<Backend>
-    private var queue: [Key: [CheckedContinuation<UnsafeRawBufferPointer, any Error>]] = [:]
-    
+
+    private final class Fetch {
+        let key: Key
+        let count: Int
+        let job: RemoteDownloadJob
+        var task: Task<Void, Never>?
+        var waiters: [UUID: CheckedContinuation<Data, Error>] = [:]
+        var result: Result<Data, Error>?
+        init(key: Key, count: Int, priority: RemoteReadPriority) {
+            self.key = key
+            self.count = count
+            self.job = RemoteDownloadJob(priority: priority)
+        }
+    }
+    private var pending: [Key: Fetch] = [:]
+
     public init(cache: AtomicBlockCache<Backend>) {
         self.cache = cache
-        self.queue = .init()
-    }    
-    
-    /**
-     Fetch a range of keys. If consecutive keys are missing, fetch them in one call from the backend
-     E.g. Two 64kb HTTP requests can be combined into a single 128kb request
-     */
+    }
+
     nonisolated func get<T: ContiguousBytes & Sendable>(
         key keyStart: Key,
         count: Int,
-        provider: @Sendable (_ key: Key, _ count: Int) async throws -> T,
-        dataCallback: @Sendable (Key, UnsafeRawBufferPointer) -> ()
+        priority: RemoteReadPriority = .foreground,
+        provider: @escaping @Sendable (_ key: Key, _ count: Int) async throws -> T,
+        dataCallback: @Sendable (Key, UnsafeRawBufferPointer) -> Void
     ) async throws {
-        /// Check if blocks are already cached
         for i in 0..<count {
+            try Task.checkCancellation()
             let key = keyStart &+ UInt64(i)
             guard let value = cache.get(key: key, count: 1) else {
-                /// Use actor isolation to ensure data is only fetched once for a given key
-                try await getIsolated(key: key, count: count - i, provider: provider, dataCallback: dataCallback)
+                try await getIsolated(key: key, count: count - i, priority: priority, provider: provider, dataCallback: dataCallback)
                 return
             }
             dataCallback(key, value)
         }
     }
-    
+
     private func getIsolated<T: ContiguousBytes & Sendable>(
         key keyStart: Key,
         count: Int,
-        provider: (_ key: Key, _ count: Int) async throws -> T,
-        dataCallback: @Sendable (Key, UnsafeRawBufferPointer) -> ()
+        priority: RemoteReadPriority,
+        provider: @escaping @Sendable (Key, Int) async throws -> T,
+        dataCallback: @Sendable (Key, UnsafeRawBufferPointer) -> Void
     ) async throws {
-        
-        /// The start position if a range of keys is fetched from the backend
-        var keyFetchStart: Int? = nil
-        
-        let blockSize = cache.blockSize
+        var i = 0
+        while i < count {
+            try Task.checkCancellation()
+            let key = keyStart &+ UInt64(i)
+            if let value = cache.get(key: key, count: 1) {
+                dataCallback(key, value)
+                i += 1
+                continue
+            }
+            let fetch: Fetch
+            if let existing = pending[key] {
+                fetch = existing
+            } else {
+                var length = 1
+                while i + length < count {
+                    let next = key &+ UInt64(length)
+                    if pending[next] != nil || cache.get(key: next, count: 1) != nil { break }
+                    length += 1
+                }
+                fetch = Fetch(key: key, count: length, priority: priority)
+                for offset in 0..<length { pending[key &+ UInt64(offset)] = fetch }
+                // The download belongs to all waiters, not to the task that first missed the cache.
+                fetch.task = Task {
+                    let result: Result<Data, Error>
+                    do {
+                        let bytes = try await RemoteDownloadJob.$current.withValue(fetch.job) {
+                            try await provider(key, length)
+                        }
+                        let data = bytes.withUnsafeBytes { Data($0) }
+                        guard data.count > (length - 1) * self.cache.blockSize, data.count <= length * self.cache.blockSize else {
+                            throw CurlErrorNonRetry.chunkSizeMismatch
+                        }
+                        result = .success(data)
+                    } catch {
+                        result = .failure(error)
+                    }
+                    finish(fetch, result: result)
+                }
+            }
+            let waiter = UUID()
+            let data = try await withTaskCancellationHandler {
+                // Swift 6.3 does not infer this actor through the cancellation-handler closure.
+                // Keep waiter registration isolated with finish and cancel.
+                return try await withCheckedThrowingContinuation(isolation: self) { continuation in
+                    if let result = fetch.result {
+                        continuation.resume(with: result)
+                    } else {
+                        fetch.waiters[waiter] = continuation
+                        if priority == .foreground {
+                            let job = fetch.job
+                            Task { await job.promote() }
+                        }
+                    }
+                }
+            } onCancel: {
+                Task { await self.cancel(waiter: waiter, key: key) }
+            }
+            try Task.checkCancellation()
+            let offset = Int(key &- fetch.key)
+            let available = min(fetch.count - offset, count - i)
+            data.withUnsafeBytes { bytes in
+                for block in 0..<available {
+                    let start = (offset + block) * cache.blockSize
+                    let end = min(start + cache.blockSize, bytes.count)
+                    dataCallback(key &+ UInt64(block), UnsafeRawBufferPointer(rebasing: bytes[start..<end]))
+                }
+            }
+            i += available
+        }
+    }
 
-        /// Loop over keys, check:
-        /// 1. if they are cached
-        /// 2. if they are being fetched by another thread already
-        /// 3. need to be fetched from backend
-        for i in 0..<count {
-            let key = (keyStart &+ UInt64(i))
-            let cachedValue = cache.get(key: key, count: 1)
-            let cached = cachedValue != nil
-            let queued = queue[key] != nil
-            var queuedValue: UnsafeRawBufferPointer? = nil
-            let isLast = i == count-1
-            let cachedOrQueued = cached || queued
-            
-            /// If this is the first missing key, mark this position
-            if !cachedOrQueued && keyFetchStart == nil {
-                keyFetchStart = i
-            }
-            
-            /// Enqueue all further calls to his key
-            if !cachedOrQueued {
-                queue[key] = []
-            }
-            
-            /// Someone else requested this data. Wait for it to arrive. This is leaving the current concurrency isolation and all data in `queue` might be different afterwards
-            /// The queued call can fail and we need to fail all previously blocked keys
-            if queued {
-                do {
-                    let value = try await withCheckedThrowingContinuation(isolation: self) { continuation in
-                        queue[key, default: []].append(continuation)
-                    }
-                    queuedValue = value
-                } catch {
-                    // If the queued fetch fails, fail all previously blocked keys
-                    if let offset = keyFetchStart {
-                        let count = i - offset
-                        let fetchStart = keyStart &+ UInt64(offset)
-                        for block in 0..<count {
-                            let key = fetchStart &+ UInt64(block)
-                            queue.removeValue(forKey: key)?.forEach({
-                                $0.resume(with: .failure(error))
-                            })
-                        }
-                    }
-                    throw error
+    private func finish(_ fetch: Fetch, result: Result<Data, Error>) {
+        // An abandoned download may finish after a replacement was registered for these keys.
+        for offset in 0..<fetch.count {
+            let key = fetch.key &+ UInt64(offset)
+            if pending[key] === fetch { pending.removeValue(forKey: key) }
+        }
+        if case .success(let data) = result {
+            data.withUnsafeBytes { bytes in
+                for block in 0..<fetch.count {
+                    let start = block * cache.blockSize
+                    let end = min(start + cache.blockSize, bytes.count)
+                    guard start < end else { continue }
+                    _ = cache.set(key: fetch.key &+ UInt64(block), value: UnsafeRawBufferPointer(rebasing: bytes[start..<end]))
                 }
             }
-            
-            /// Get data from backend for all prior keys (or if is the last key). Also leaves concurrency isolation.
-            if let offset = keyFetchStart, cachedOrQueued || isLast {
-                let includeEnd = isLast && !cachedOrQueued
-                let count = i - offset + (includeEnd ? 1 : 0)
-                let fetchStart = keyStart &+ UInt64(offset)
-                do {
-                    /// Contains data for all keys in `toFetch`. Needs to be chunked
-                    let fetched = try await provider(fetchStart, count)
-                    fetched.withUnsafeBytes({fetched in
-                        let nBlocks = fetched.count.divideRoundedUp(divisor: blockSize)
-                        assert(count == nBlocks)
-                        for block in 0..<count {
-                            let key = fetchStart &+ UInt64(block)
-                            let blockRange = block * blockSize ..< min((block + 1) * blockSize, fetched.count)
-                            let blockData = UnsafeRawBufferPointer(rebasing: fetched[blockRange])
-                            let cachedBlock = cache.set(key: key, value: blockData)
-                            queue.removeValue(forKey: key)?.forEach({
-                                $0.resume(with: .success(cachedBlock))
-                            })
-                            dataCallback(key, cachedBlock)
-                        }
-                    })
-                } catch {
-                    for block in 0..<count {
-                        let key = fetchStart &+ UInt64(block)
-                        queue.removeValue(forKey: key)?.forEach({
-                            $0.resume(with: .failure(error))
-                        })
-                    }
-                    throw error
-                }
-                keyFetchStart = nil
-            }
-            
-            if let cachedValue {
-                dataCallback(key, cachedValue)
-            }
-            
-            if let queuedValue {
-                dataCallback(key, queuedValue)
+        }
+        fetch.result = result
+        fetch.task = nil
+        let waiters = fetch.waiters
+        fetch.waiters.removeAll()
+        for waiter in waiters.values { waiter.resume(with: result) }
+    }
+
+    private func cancel(waiter: UUID, key: Key) {
+        guard let fetch = pending[key], let continuation = fetch.waiters.removeValue(forKey: waiter) else { return }
+        continuation.resume(throwing: CancellationError())
+        if fetch.waiters.isEmpty {
+            fetch.task?.cancel()
+            for offset in 0..<fetch.count {
+                let key = fetch.key &+ UInt64(offset)
+                if pending[key] === fetch { pending.removeValue(forKey: key) }
             }
         }
     }

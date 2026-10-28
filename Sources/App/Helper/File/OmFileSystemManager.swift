@@ -40,7 +40,13 @@ final class OmFileSystemManager: Sendable {
         
         self.localFileSystem = OmFileSystemLocal.Directory(directories: directories)
         self.remoteFileSystem = OpenMeteo.remoteDataDirectory.map {
-            OmFileSystemS3(server: S3ServerHealth(logger: .init(label: "RemoteData"), servers: $0, client: RemoteDataHttpClient.makeClient()))
+            OmFileSystemS3(server: S3ServerHealth(
+                logger: .init(label: "RemoteData"),
+                servers: $0,
+                client: RemoteDataHttpClient.makeClient(),
+                downloadLimit: RemoteDataHttpClient.positiveLimit("REMOTE_DATA_DOWNLOADS", default: 32),
+                backgroundDownloadLimit: RemoteDataHttpClient.positiveLimit("REMOTE_DATA_BACKGROUND_DOWNLOADS", default: 4)
+            ))
         }
     }
     
