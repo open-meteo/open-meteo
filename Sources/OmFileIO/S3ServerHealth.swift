@@ -84,14 +84,14 @@ public actor S3ServerHealth {
     }
     
     private func performHealthChecks() async {
-        let client = HTTPClient.shared
         for i in states.indices {
             let server = states[i].server
             do {
                 var request = HTTPClientRequest(url: server.uploadServer)
                 request.method = .HEAD
                 request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
-                _ = try await client.executeRetry(
+                // Keep health checks independent of the remote-data connection pool.
+                _ = try await HTTPClient.shared.executeRetry(
                     request,
                     logger: logger,
                     deadline: .seconds(60),
@@ -112,5 +112,10 @@ public actor S3ServerHealth {
             initialWaitQueue.forEach({ $0.resume() })
             self.initialWaitQueue = nil
         }
+    }
+
+    public func stopMonitoring() {
+        monitor?.cancel()
+        monitor = nil
     }
 }

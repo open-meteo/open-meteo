@@ -164,7 +164,6 @@ struct DownloadIconCommand: AsyncCommand {
     /// Download native DWD v1 fields and adapt them to the selected storage outputs.
     func downloadIcon(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
-        let client = application.http.client.shared
         let feed = outputs.downloadDomain
         let remappedDomain = outputs.remapped
         let downloadDirectory = outputs.primary.downloadDirectory
@@ -186,7 +185,7 @@ struct DownloadIconCommand: AsyncCommand {
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
-            guard let elevation = try? await outputs.primary.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read() else {
+            guard let elevation = try? await outputs.primary.getStaticFile(type: .elevation)?.read() else {
                 fatalError("cannot read elevation for feed \(feed.rawValue)")
             }
             return elevation

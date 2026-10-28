@@ -130,7 +130,7 @@ struct NbmDownload: AsyncCommand {
         
         /// Domain elevation field. Used to correct snowfall amount
         let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read() else {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

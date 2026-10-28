@@ -27,7 +27,7 @@ import Testing
     }
 
     @Test func weightedRrfsLayers() async throws {
-        let options = try GenericReaderOptions(logger: Logger(label: "soil-layer-test"), httpClient: nil)
+        let options = try GenericReaderOptions()
         for domain in [DomainRegistry.ncep_rrfs_conus, .ncep_rrfs_north_america] {
             let deriver = VariableHourlyDeriver(reader: SoilReader<NcepRrfsSurfaceVariable>(), options: options, domainRegistry: domain)
             for kind in ["temperature", "moisture"] {
@@ -55,7 +55,7 @@ import Testing
     }
 
     @Test func nativeLayersTakePrecedence() async throws {
-        let options = try GenericReaderOptions(logger: Logger(label: "soil-native-test"), httpClient: nil)
+        let options = try GenericReaderOptions()
         let deriver = VariableHourlyDeriver(reader: SoilReader<Gfs013Variable>(nativeValues: [1, 2, 3, 4]), options: options, domainRegistry: .ncep_gfs013)
         for kind in ["temperature", "moisture"] {
             for layer in ["0_to_10", "10_to_40", "40_to_100", "100_to_200"] {
@@ -67,7 +67,7 @@ import Testing
     }
 
     @Test func missingSoilProfileIsUnavailable() throws {
-        let options = try GenericReaderOptions(logger: Logger(label: "soil-missing-test"), httpClient: nil)
+        let options = try GenericReaderOptions()
         let ensemble = VariableHourlyDeriver(reader: SoilReader<NcepRrfsEnsembleSurfaceVariable>(), options: options, domainRegistry: .ncep_rrfs_conus_ensemble)
         let subhourly = VariableHourlyDeriver(reader: SoilReader<NcepRrfs15MinVariable>(), options: options, domainRegistry: .ncep_rrfs_conus_15min)
         for kind in ["temperature", "moisture"] {
