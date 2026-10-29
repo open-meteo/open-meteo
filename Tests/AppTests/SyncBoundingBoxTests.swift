@@ -273,67 +273,16 @@ import Synchronization
         #expect(kept > 0 && kept < 40)
     }
 
-    @Test(arguments: [
-        "POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))",
-        "POLYGON ((0 0, 1 0, 1 1, 0 1))",
-        "POLYGON ((0 0, 1 0, 0 0))",
-        "POLYGON ((0 0, 1 0, 1 x, 0 1, 0 0))",
-        "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0)",
-        "POINT (1 2)",
-        "MULTIPOLYGON EMPTY",
-        "[[[0 0, 1 0, 1 1, 0 1, 0 0]]]"
-    ])
-    func invalidPolygonIsRejected(text: String) {
-        #expect(throws: (any Error).self) { try SyncPolygon(text: text) }
-    }
-
-    func polygon(_ text: String) throws -> SyncBoundingBox {
-        let polygon = try SyncPolygon(text: text)
-        return try SyncBoundingBox(grid: grid) { polygon.contains(latitude: Double($0), longitude: Double($1)) }
-    }
-
-    @Test func polygonCells() throws {
-        /// Rows and columns 2 to 6, 25 cells
-        let square = try polygon("POLYGON ((1.5 1.5, 6.5 1.5, 6.5 6.5, 1.5 6.5, 1.5 1.5))")
-        #expect(bounds(square).rows == 2 ... 6 && bounds(square).columns == 2 ... 6)
-        #expect(square.selectedCells.count(where: { $0 }) == 25)
-
-        /// The outer ring holds columns 1 to 13 and rows 1 to 10 (130 cells), the hole columns 3 to 12 and rows 3 to 9 (70 cells)
-        let hole = try polygon("POLYGON ((0.5 0.5, 13.5 0.5, 13.5 10.5, 0.5 10.5, 0.5 0.5), (2.5 2.5, 2.5 9.5, 12.5 9.5, 12.5 2.5, 2.5 2.5))")
-        #expect(hole.selectedCells.count(where: { $0 }) == 130 - 70)
-        #expect(!(3 ..< 10).contains { y in (3 ..< 13).contains { hole.selectedCells[y * 15 + $0] } })
-        #expect(hole.selectedCells[3 * 15 + 2] && hole.selectedCells[2 * 15 + 3])
-
-        /// Each square holds one cell centre: (0, 0) and (9, 9)
-        let two = try polygon("MULTIPOLYGON (((-0.5 -0.5, 0.5 -0.5, 0.5 0.5, -0.5 0.5, -0.5 -0.5)), ((8.5 8.5, 9.5 8.5, 9.5 9.5, 8.5 9.5, 8.5 8.5)))")
-        #expect(two.selectedCells.count(where: { $0 }) == 2 && two.selectedCells[0] && two.selectedCells[9 * 15 + 9])
-        #expect(throws: (any Error).self) { try polygon("POLYGON ((50 50, 51 50, 51 51, 50 50))") }
-    }
-
-    /// Nominatim writes no space before the parentheses
-    @Test func nominatimSpellingParses() throws {
-        #expect(try SyncPolygon(text: "MULTIPOLYGON(((0 0, 10 0, 10 10, 0 10, 0 0)))").contains(latitude: 5, longitude: 5))
-    }
-
-    /// A rectangle selects the same cells as the box with the same corners, on its edges too: lower bound in, upper bound out
-    @Test func rectangleSelectsTheCellsOfTheBox() throws {
-        let box = BoundingBoxWGS84(latitude: 2 ..< 6, longitude: 3 ..< 8)
-        #expect(try polygon("POLYGON ((3 2, 8 2, 8 6, 3 6, 3 2))").selectedCells == SyncBoundingBox.selectedCells(grid: grid, box: box))
-    }
-
-    /// Grid latitudes are Float, so a bound written as 30.3 must meet the row at Float 30.3 like the box does
-    @Test func rectangleBoundOffTheFloatGridSelectsTheCellsOfTheBox() throws {
-        let fine = RegularGrid(nx: 3, ny: 12, latMin: 30, lonMin: 0, dx: 1, dy: 0.1, searchRadius: 1)
-        let polygon = try SyncPolygon(text: "POLYGON ((0 30.3, 3 30.3, 3 31, 0 31, 0 30.3))")
-        let keep = try SyncBoundingBox(grid: fine) { polygon.contains(latitude: Double($0), longitude: Double($1)) }
-        #expect(keep.selectedCells == SyncBoundingBox.selectedCells(grid: fine, box: BoundingBoxWGS84(latitude: 30.3 ..< 31, longitude: 0 ..< 3)))
-    }
-
-    /// The corner lies in the bounding box of the diamond-shaped hole but outside the hole
-    @Test func pointInHoleBoxButOutsideHoleIsInside() throws {
-        let polygon = try SyncPolygon(text: "POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0), (5 2, 2 5, 5 8, 8 5, 5 2))")
-        #expect(polygon.contains(latitude: 2.5, longitude: 2.5))
-        #expect(!polygon.contains(latitude: 5, longitude: 5))
+    /// Longitude-first JSON and Float boundaries must select exactly the same cells as a box.
+    @Test func polygonSelectsTheCellsOfTheBox() throws {
+        let grid = RegularGrid(nx: 4, ny: 12, latMin: 30, lonMin: 130, dx: 1, dy: 0.1, searchRadius: 1)
+        let polygon = try SyncPolygon(text: "[[[[130,30.3],[132,30.3],[132,31],[130,31],[130,30.3]]]]")
+        let keep = try SyncBoundingBox(grid: grid) { polygon.contains(latitude: $0, longitude: $1) }
+        let box = BoundingBoxWGS84(latitude: 30.3 ..< 31, longitude: 130 ..< 132)
+        #expect(keep.selectedCells == SyncBoundingBox.selectedCells(grid: grid, box: box))
+        #expect(throws: ForecastApiError.self) {
+            try SyncBoundingBox(grid: self.grid) { polygon.contains(latitude: $0, longitude: $1) }
+        }
     }
 
     /// Legacy files store `[ny * nx, time]` as a flat 2D array

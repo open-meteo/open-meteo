@@ -66,7 +66,7 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "bounding-box", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
         var boundingBox: String?
 
-        @Option(name: "polygon", help: "Only keep data inside a WGS84 polygon like --bounding-box, as WKT 'POLYGON ((lon lat, ...))' or 'MULTIPOLYGON (((lon lat, ...)))' (outer rings counter-clockwise, holes clockwise), or @path to a file holding it. Cannot be combined with --bounding-box")
+        @Option(name: "polygon", help: "Only keep data inside a WGS84 polygon like --bounding-box, as a GeoJSON MultiPolygon coordinates array '[[[[lon,lat],...]],...]' (outer rings counter-clockwise, holes clockwise), or @path to a file holding it. Cannot be combined with --bounding-box")
         var polygon: String?
     }
 
@@ -209,7 +209,7 @@ struct SyncCommand: AsyncCommand {
             guard let grid = try await model.getDomain()?.grid else {
                 throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
             }
-            keep = try polygon.map { polygon in try SyncBoundingBox(grid: grid) { polygon.contains(latitude: Double($0), longitude: Double($1)) } } ?? bbox.map { try SyncBoundingBox(grid: grid, box: $0) }
+            keep = try polygon.map { polygon in try SyncBoundingBox(grid: grid) { polygon.contains(latitude: $0, longitude: $1) } } ?? bbox.map { try SyncBoundingBox(grid: grid, box: $0) }
         } else {
             keep = nil
         }
