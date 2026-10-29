@@ -81,7 +81,7 @@ public struct S3UploadQueue: Sendable {
 }
 
 
-/// Upload multiple files in the background, but do not commit them yet. Once all files have been uploaded, commit all of them
+/// Upload multiple files in the background. Files can commit immediately or wait for session completion.
 public struct S3MultiFileUploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
     let client: HTTPClient
@@ -126,18 +126,38 @@ public struct S3MultiFileUploadQueue: Sendable {
         }
     }
     
-    public func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
+    public func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp, commitImmediately: Bool = false) async {
         let url = endpoint.uploadURL(remotePath: objectName)
-        await enqueuePreparation { [client, executor = partUploadExecutor] in
+        let commit: (@Sendable (S3MultiPartUploadPrepared) async throws -> Void)?
+        if commitImmediately {
+            commit = { [client] prepared in try await prepared.commit(client: client) }
+        } else {
+            commit = nil
+        }
+        await enqueuePreparation(commit: commit) { [client, executor = partUploadExecutor] in
             try await S3Uploader.uploadMultipart(client: client, file: file, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
         }
     }
 
-    func enqueuePreparation(_ work: @escaping @Sendable () async throws -> S3MultiPartUploadPrepared) async {
+    func enqueuePreparation(commit: (@Sendable (S3MultiPartUploadPrepared) async throws -> Void)? = nil, _ work: @escaping @Sendable () async throws -> S3MultiPartUploadPrepared) async {
         do {
-            try await queue.enqueue { [logger, onError] in
-                do { return try await work() } catch {
-                    logger.error("Error preparing multipart upload: \(error)")
+            try await queue.enqueue { [client, logger, onError] in
+                do {
+                    let prepared = try await work()
+                    guard let commit else { return prepared }
+                    do {
+                        try await commit(prepared)
+                    } catch {
+                        // A failed immediate commit must not leave an unfinished multipart upload behind.
+                        do { try await prepared.abort(client: client) } catch {
+                            logger.error("Error aborting multipart upload: \(error)")
+                        }
+                        throw error
+                    }
+                    // Already published; exclude it from later batch commit or abort.
+                    return nil
+                } catch {
+                    logger.error("Error uploading multipart file: \(error)")
                     onError()
                     return nil
                 }
