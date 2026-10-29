@@ -45,7 +45,7 @@ struct ProcessingParallelQueueTests {
         #expect(await started.count == concurrent)
         await gate.increment()
         try await producer.value
-        await queue.finish()
+        queue.finish()
         #expect(try await consumer.value.sorted() == Array(0..<16))
     }
 
@@ -75,7 +75,7 @@ struct ProcessingParallelQueueTests {
                 for try await result in queue.results { values.append(result) }
                 return values
             }
-            await queue.finish()
+            queue.finish()
             #expect(try await consumer.value.sorted() == [0, 1])
         }
     }
@@ -101,7 +101,7 @@ struct ProcessingParallelQueueTests {
         await #expect(throws: CancellationError.self) { try await producer.value }
         await gate.increment()
         try await queue.enqueue { 3 }
-        await queue.finish()
+        queue.finish()
         #expect(try await consumer.value.sorted() == [1, 3])
     }
 
@@ -127,8 +127,7 @@ struct ProcessingParallelQueueTests {
         }
         await entered.wait()
         try await Task.sleep(for: .milliseconds(30))
-        let finishing = Task { await queue.finish() }
-        try await Task.sleep(for: .milliseconds(30))
+        queue.finish()
         #expect(await admitted.count == 0)
         await #expect(throws: ProcessingQueueError.finished) { try await queue.enqueue { 3 } }
         if cancelWaitingEnqueue {
@@ -137,7 +136,6 @@ struct ProcessingParallelQueueTests {
         }
         await gate.increment()
         if !cancelWaitingEnqueue { try await producer.value }
-        await finishing.value
         #expect(try await consumer.value == (cancelWaitingEnqueue ? [1] : [1, 2]))
     }
 
@@ -158,7 +156,7 @@ struct ProcessingParallelQueueTests {
         let producer = Task {
             try await queue.enqueue { 2 }
             await admitted.increment()
-            await queue.finish()
+            queue.finish()
         }
         try await Task.sleep(for: .milliseconds(30))
         #expect(await admitted.count == 0)
@@ -257,7 +255,8 @@ struct ProcessingParallelQueueTests {
         await #expect(throws: Failure.self) {
             for try await _ in queue.results { Issue.record("Unexpected result") }
         }
-        await queue.finish()
+        queue.finish()
+        await queue.waitForCompletion()
         #expect(await stopped.count == 1)
     }
 
