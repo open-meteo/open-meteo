@@ -74,7 +74,7 @@ extension Curl {
             try await downloadEcmwfIndexed(url: url, indexURL: indexURL, allowMultipleRanges: allowMultipleRanges,
                 concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: isIncluded)
                 .foreachConcurrent(nConcurrent: processingConcurrent) { message in
-                    try await body(BufferedGribMessage(message: message))
+                    try await body(BufferedGribMessage(unbufferedMessage: message))
                 }
             return
         }
