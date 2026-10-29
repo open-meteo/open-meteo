@@ -100,10 +100,9 @@ public struct S3MultiFileUploadQueue: Sendable {
         let queue = ProcessingParallelQueue<S3MultiPartUploadPrepared?>(concurrent: maxConcurrentFiles)
         self.queue = queue
         self.onError = onError
-        let results = queue.results
         // Drain throughout conversion so completed uploads never block admission of later files.
         // Only preparation metadata is retained until the caller chooses commit or abort.
-        self.preparations = Task {
+        self.preparations = Task { [results = queue.results, logger, onError] in
             var prepared = [S3MultiPartUploadPrepared]()
             do {
                 for try await result in results {
