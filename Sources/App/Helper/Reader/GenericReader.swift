@@ -112,10 +112,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// If set, use new data files
     let omFileSplitter: OmFileSplitter
     
-    let logger: Logger
-    
-    let httpClient: HTTPClient?
-
     /// Selected and validated at initialization; shared by every read from this reader.
     let run: IsoDateTime?
 
@@ -130,7 +126,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         try await options.validateRun(domain: domain)
         self.domain = domain
         self.position = position
-        if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger) {
+        if let elevationFile = await domain.getStaticFile(type: .elevation) {
             self.modelElevation = try await domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
         } else {
             self.modelElevation = .noData
@@ -141,8 +137,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.modelLat = coords.latitude
         self.modelLon = coords.longitude
         self.omFileSplitter = OmFileSplitter(domain)
-        self.logger = options.logger
-        self.httpClient = options.httpClient
         self.run = options.run
     }
 
@@ -150,7 +144,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         try await options.validateRun(domain: domain)
         // check if coordinates are in domain, otherwise return nil
-        let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
+        let elevationFile = await domain.getStaticFile(type: .elevation)
         guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {
             return nil
         }
@@ -158,8 +152,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.position = gridpoint.gridpoint
         self.modelElevation = gridpoint.gridElevation
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
-        self.logger = options.logger
-        self.httpClient = options.httpClient
         self.run = options.run
 
         omFileSplitter = OmFileSplitter(domain)
@@ -170,7 +162,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
         if time.dtSeconds == domain.dtSeconds {
-            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient, run: run)
+            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
             return
         }
 
@@ -179,12 +171,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
             time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
 
-        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), logger: logger, httpClient: httpClient, run: run)
+        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), run: run)
     }
 
     /// Read
     private func readRaw(variable: Variable, time: TimerangeDtAndSettings) async throws -> [Float] {
-        return try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient, run: run)
+        return try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
     }
     
     /// Scale and apply elevation correction. Must be done after temporal interpolation to preserve scaling
@@ -230,7 +222,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        guard let file = await domain.getStaticFile(type: type, httpClient: httpClient, logger: logger) else {
+        guard let file = await domain.getStaticFile(type: type) else {
             return nil
         }
         return try await domain.grid.readFromStaticFile(gridpoint: position, file: file)

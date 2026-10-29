@@ -221,12 +221,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         }
     }
 
-    func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient, run: run)
-    }
-
-    func readerOptions(for request: Request, allowRemoteArchive: Bool) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil, run: run)
+    func readerOptions() throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, run: run)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps
@@ -272,7 +268,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
-    func prepareCoordinates(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient?) async throws -> ApiRequestGeometry {
+    func prepareCoordinates(allowTimezones: Bool) async throws -> ApiRequestGeometry {
         let dates = try getStartEndDates()
         if let bb = try getBoundingBox() {
             let timezones = allowTimezones ? self.timezone : []
@@ -290,7 +286,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return .boundingBox(bb, dates: dates, timezone: timezone)
         }
 
-        let coordinates = try await getCoordinatesWithTimezone(allowTimezones: allowTimezones, logger: logger, httpClient: httpClient)
+        let coordinates = try await getCoordinatesWithTimezone(allowTimezones: allowTimezones)
 
         /// If no start/end dates are set, leav it `nil`
         guard dates.count > 0 else {
@@ -324,34 +320,14 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         guard coordinates.count > 0 else {
             return nil
         }
-        guard coordinates.count == 4 else {
-            throw ForecastApiError.generic(message: "Parameter bounding_box must have 4 values")
-        }
-        let lat1 = coordinates[0]
-        let lon1 = coordinates[1]
-        let lat2 = coordinates[2]
-        let lon2 = coordinates[3]
-
-        guard lat1 < lat2 else {
-            throw ForecastApiError.generic(message: "The first latitude must be smaller than the second latitude")
-        }
-        guard (-90...90).contains(lat1), (-90...90).contains(lat2) else {
-            throw ForecastApiError.generic(message: "Latitudes must be between -90 and 90")
-        }
-        guard lon1 < lon2 else {
-            throw ForecastApiError.generic(message: "The first longitude must be smaller than the second longitude")
-        }
-        guard (-180...180).contains(lon1), (-180...180).contains(lon2) else {
-            throw ForecastApiError.generic(message: "Longitudes must be between -180 and 180")
-        }
-        return BoundingBoxWGS84(latitude: lat1..<lat2, longitude: lon1..<lon2)
+        return try BoundingBoxWGS84(coordinates: coordinates)
     }
 
     /// Reads coordinates and timezone fields
     /// If only one timezone is given, use the same timezone for all coordinates
     /// Throws errors on invalid coordinates, timezones or invalid counts
-    private func getCoordinatesWithTimezone(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient?) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
-        let coordinates = try await getCoordinates(logger: logger, httpClient: httpClient)
+    private func getCoordinatesWithTimezone(allowTimezones: Bool) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
+        let coordinates = try await getCoordinates()
 
         guard allowTimezones, timezone.count > 0 else {
             // if no timezone is specified, use GMT for all locations
@@ -375,7 +351,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Parse latitude, longitude and elevation arrays to an array of coordinates
     /// If no elevation is provided, a DEM is used to resolve the elevation
     /// Throws errors on invalid coordinate ranges
-    private func getCoordinates(logger: Logger, httpClient: HTTPClient?) async throws -> [CoordinatesAndElevation] {
+    private func getCoordinates() async throws -> [CoordinatesAndElevation] {
         guard latitude.count == longitude.count else {
             throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
         }
@@ -393,9 +369,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
                     latitude: $0.element.0,
                     longitude: $0.element.1.0,
                     locationId: location_id.count > 0 ? location_id[$0.offset] : $0.offset,
-                    elevation: $0.element.1.1,
-                    logger: logger,
-                    httpClient: httpClient
+                    elevation: $0.element.1.1
                 )
             })
         }
@@ -404,9 +378,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
                 latitude: $0.element.0,
                 longitude: $0.element.1,
                 locationId: location_id.count > 0 ? location_id[$0.offset] : $0.offset,
-                elevation: nil,
-                logger: logger,
-                httpClient: httpClient
+                elevation: nil
             )
         })
     }
@@ -650,7 +622,7 @@ struct CoordinatesAndElevation {
     let locationId: Int
 
     /// If elevation is `nil` it will resolve it from DEM. If `NaN` it stays `NaN`.
-    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan, logger: Logger, httpClient: HTTPClient?) async throws {
+    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan) async throws {
         if latitude > 90 || latitude < -90 || latitude.isNaN {
             throw ForecastApiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
         }
@@ -662,7 +634,7 @@ struct CoordinatesAndElevation {
         if let elevation {
             self.elevation = elevation
         } else {
-            self.elevation = try await Dem90.read(lat: latitude, lon: longitude, logger: logger, httpClient: httpClient)
+            self.elevation = try await Dem90.read(lat: latitude, lon: longitude)
         }
         self.locationId = locationId
     }
@@ -782,5 +754,32 @@ extension TimeZone {
             return tz
         }
         throw ForecastApiError.invalidTimezone
+    }
+}
+
+extension BoundingBoxWGS84 {
+    /// Validate `lat1, lon1, lat2, lon2` as given to the `bounding_box` parameter or `sync --bounding-box`
+    init(coordinates: [Float]) throws {
+        guard coordinates.count == 4 else {
+            throw ForecastApiError.generic(message: "Parameter bounding_box must have 4 values")
+        }
+        let lat1 = coordinates[0]
+        let lon1 = coordinates[1]
+        let lat2 = coordinates[2]
+        let lon2 = coordinates[3]
+
+        guard lat1 < lat2 else {
+            throw ForecastApiError.generic(message: "The first latitude must be smaller than the second latitude")
+        }
+        guard (-90...90).contains(lat1), (-90...90).contains(lat2) else {
+            throw ForecastApiError.generic(message: "Latitudes must be between -90 and 90")
+        }
+        guard lon1 < lon2 else {
+            throw ForecastApiError.generic(message: "The first longitude must be smaller than the second longitude")
+        }
+        guard (-180...180).contains(lon1), (-180...180).contains(lon2) else {
+            throw ForecastApiError.generic(message: "Longitudes must be between -180 and 180")
+        }
+        self.init(latitude: lat1..<lat2, longitude: lon1..<lon2)
     }
 }

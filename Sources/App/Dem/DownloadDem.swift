@@ -45,7 +45,7 @@ struct Dem90: GenericDomain {
     }
 
     /// Get elevation for coordinate. Access to om files is cached.
-    static func read(lat: Float, lon: Float, logger: Logger, httpClient: HTTPClient?) async throws -> Float {
+    static func read(lat: Float, lon: Float) async throws -> Float {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }
@@ -56,7 +56,7 @@ struct Dem90: GenericDomain {
         var value: Float = .nan
         
         let file = OmFileType.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
-        try await OmFileSystemManager.instance.with(file: file, client: httpClient, logger: logger) { omFile in
+        try await OmFileSystemManager.instance.with(file: file) { omFile in
             try await omFile.reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
         }
         return value

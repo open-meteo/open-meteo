@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import OmFileIO
 import SwiftNetCDF
 
 struct NetCDFData<D: DataProtocol> {
@@ -83,7 +84,7 @@ struct MfWaveDownload: AsyncCommand {
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, missingFileTimeout: domain == .mfcurrents ? 600 : nil)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
 
@@ -189,7 +190,13 @@ struct MfWaveDownload: AsyncCommand {
                 if onlyTides && !url.contains("MOL") {
                     continue
                 }
-                let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024 * 1024)
+                let memory: ByteBuffer
+                do {
+                    memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024 * 1024)
+                } catch CurlError.fileNotFound where domain == .mfcurrents {
+                    logger.warning("Skipping file still missing after 10 minutes: \(url)")
+                    continue
+                }
                 guard let nc = try NetCDF.open(memory: memory) else {
                     fatalError("Could not open netcdf from memory")
                 }
@@ -290,8 +297,8 @@ extension MfWaveDomain {
         case .mfcurrents:
             // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/2024/06/SMOC_20240606_R20240607.nc
             return [
-                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-sl_PT1H-i_202411/\(r.year)/\(rMM)/MOL_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc",
-                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/\(r.year)/\(rMM)/SMOC_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc"
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/\(r.year)/\(rMM)/SMOC_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc",
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-sl_PT1H-i_202411/\(r.year)/\(rMM)/MOL_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc"
             ]
         case .mfsst:
             /// Only hindcast available after 7 days

@@ -278,8 +278,7 @@ struct ExportCommand: AsyncCommand {
     func generateParquet(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, /*targetGridDomain: TargetGridDomain?,*/ normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?, concurrent: Int, concurrentChunksLength: Int, onlyFullBoundingBox: Bool) async throws {
         #if ENABLE_PARQUET
         let logger = application.logger
-        let client = application.http.client.shared
-        let options = try GenericReaderOptions(logger: logger, httpClient: client)
+        let options = try GenericReaderOptions()
         
         let variables = variables.map {
             guard let variable = ForecastVariable(rawValue: $0) else {
@@ -296,7 +295,7 @@ struct ExportCommand: AsyncCommand {
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
-        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation) else {
             fatalError("Could not read elevation file for domain \(domain)")
         }
         
@@ -345,7 +344,7 @@ struct ExportCommand: AsyncCommand {
 
             /*if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
-                guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+                guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
                 }
                 for l in 0..<grid.count {
@@ -426,7 +425,7 @@ struct ExportCommand: AsyncCommand {
         /// Interpolate data from one grid to another and perform bias correction
         /*if let targetGridDomain {
             let targetDomain = targetGridDomain.genericDomain
-            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
 
@@ -460,7 +459,7 @@ struct ExportCommand: AsyncCommand {
         }*/
 
         // Loop over locations, read and write
-        /*guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        /*guard let elevationFile = await genericDomain.getStaticFile(type: .elevation) else {
             fatalError("Could not read elevation file for domain \(domain)")
         }*/
         do {
@@ -512,8 +511,7 @@ struct ExportCommand: AsyncCommand {
         }
         let grid = genericDomain.grid
         let logger = application.logger
-        let client = application.http.client.shared
-        let options = try GenericReaderOptions(logger: logger, httpClient: client)
+        let options = try GenericReaderOptions()
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
@@ -533,7 +531,7 @@ struct ExportCommand: AsyncCommand {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
             let targetDomain = /*targetGridDomain?.genericDomain ??*/ genericDomain
-            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
             try await ncElevation.write(elevationFile.read())
@@ -556,7 +554,7 @@ struct ExportCommand: AsyncCommand {
 
                 /*if let targetGridDomain {
                     let targetDomain = targetGridDomain.genericDomain
-                    guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+                    guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                         fatalError("Could not read elevation file for domain \(targetDomain)")
                     }
                     for l in 0..<grid.count {
@@ -608,7 +606,7 @@ struct ExportCommand: AsyncCommand {
             /// Interpolate data from one grid to another and perform bias correction
             /*if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
-                guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+                guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
                 }
 

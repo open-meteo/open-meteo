@@ -124,7 +124,7 @@ import OpenMeteoSdk
     }
 
     @Test func legacyMassDensityAliasPreservesHrrr() async throws {
-        let options = try GenericReaderOptions(logger: Logger(label: "rrfs-aerosol-alias"), httpClient: nil)
+        let options = try GenericReaderOptions()
         let time = TimerangeDtAndSettings(time: TimerangeDt(start: Timestamp(2026, 9, 20), nTime: 1, dtSeconds: 3600), ensembleMember: 0, ensembleMemberLevel: 0, previousDay: 0)
         let legacy = try #require(ForecastVariable(rawValue: "mass_density_8m"))
         let organic = try #require(ForecastVariable(rawValue: "pm2_5_total_organic_matter"))

@@ -12,19 +12,25 @@ public actor S3ServerHealth {
     var states: [ServerState]
     var monitor: Task<Void, Never>?
     var initialWaitQueue: [CheckedContinuation<Void, Never>]?
+    /// Without checks every server counts as online, e.g. an Open-Meteo sync server, which answers HEAD on its root only to signed requests
+    let checksHealth: Bool
     
     struct ServerState: Sendable {
         let server: S3BucketEndpoint
         var isOnline: Bool
     }
     
-    public init(logger: Logger, servers: [S3BucketEndpoint]) {
+    public init(logger: Logger, servers: [S3BucketEndpoint], checksHealth: Bool = true) {
         self.logger = logger
         self.states = servers.map({ .init(server: $0, isOnline: true) })
         self.initialWaitQueue = []
+        self.checksHealth = checksHealth
     }
     
     private func ensureChecks() async {
+        guard checksHealth else {
+            return
+        }
         if monitor == nil {
             monitor = Task { [weak self] in
                 while let self {
@@ -78,14 +84,14 @@ public actor S3ServerHealth {
     }
     
     private func performHealthChecks() async {
-        let client = HTTPClient.shared
         for i in states.indices {
             let server = states[i].server
             do {
                 var request = HTTPClientRequest(url: server.uploadServer)
                 request.method = .HEAD
                 request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
-                _ = try await client.executeRetry(
+                // Keep health checks independent of the remote-data connection pool.
+                _ = try await HTTPClient.shared.executeRetry(
                     request,
                     logger: logger,
                     deadline: .seconds(60),
@@ -106,5 +112,10 @@ public actor S3ServerHealth {
             initialWaitQueue.forEach({ $0.resume() })
             self.initialWaitQueue = nil
         }
+    }
+
+    public func stopMonitoring() {
+        monitor?.cancel()
+        monitor = nil
     }
 }

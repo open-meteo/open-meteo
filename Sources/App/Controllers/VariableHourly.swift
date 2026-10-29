@@ -690,6 +690,7 @@ private struct VariableHourlyDerivationCompatibility {
     let reversesWaveDirections: Bool
     let estimatesDiffuseRadiationFromShortwave: Bool
     let derivesCloudLayersFromPressureHumidity: Bool
+    let swapUVComponents: Bool
 
     private init(
         aliasesSoilTemperature0To10cmTo0To7cm: Bool = false,
@@ -703,7 +704,8 @@ private struct VariableHourlyDerivationCompatibility {
         allowsSoilDepthCompatibilityAliases: Bool = true,
         reversesWaveDirections: Bool = false,
         estimatesDiffuseRadiationFromShortwave: Bool = false,
-        derivesCloudLayersFromPressureHumidity: Bool = false
+        derivesCloudLayersFromPressureHumidity: Bool = false,
+        swapUVComponents: Bool = false
     ) {
         self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
         self.supportsEra5SoilMoistureIndices = supportsEra5SoilMoistureIndices
@@ -717,14 +719,17 @@ private struct VariableHourlyDerivationCompatibility {
         self.reversesWaveDirections = reversesWaveDirections
         self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
         self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
+        self.swapUVComponents = swapUVComponents
     }
 
     private static func gfs(
-        convectivePrecipitation: ConvectivePrecipitation = .storedShowers
+        convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
+        swapUVComponents: Bool = false
     ) -> Self {
         return .init(
             convectivePrecipitation: convectivePrecipitation,
-            allowsSoilDepthCompatibilityAliases: false
+            allowsSoilDepthCompatibilityAliases: false,
+            swapUVComponents: swapUVComponents
         )
     }
 
@@ -764,8 +769,13 @@ private struct VariableHourlyDerivationCompatibility {
             self = .gfs()
         case .ncep_gfs025:
             self = .gfs(convectivePrecipitation: .zeroWherePrecipitationIsAvailable)
-        case .ncep_nam_conus,
-             .ncep_gefs025,
+        case .ncep_nam_conus:
+            // Historical NAM files store U under the V label and vice versa.
+            self = .gfs(
+                convectivePrecipitation: .zeroWherePrecipitationIsAvailable,
+                swapUVComponents: true
+            )
+        case .ncep_gefs025,
              .ncep_gefs05,
              .ncep_gefs025_ensemble_mean,
              .ncep_gefs05_ensemble_mean:
@@ -1300,7 +1310,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         case .winddirection_10m:
             return getDeriverMap(variable: .wind_direction_10m)
         case .wind_direction_10m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), trueNorth: trueNorth)
+            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), trueNorth: trueNorth, swapUVComponents: compatibility.swapUVComponents)
         case .windspeed_20m:
             return getDeriverMap(variable: .wind_speed_20m)
         case .wind_speed_20m:
@@ -1346,7 +1356,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_80m)
         case .wind_direction_80m:
             return
-                .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"), trueNorth: trueNorth) ??
+                .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"), trueNorth: trueNorth, swapUVComponents: compatibility.swapUVComponents) ??
                 .direct(Reader.variableFromString("wind_direction_75m")) ??
                 .direct(Reader.variableFromString("wind_direction_100m")) ??
                 .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), trueNorth: trueNorth)

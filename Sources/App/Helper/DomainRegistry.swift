@@ -1,7 +1,5 @@
 import Foundation
 import Vapor
-import AsyncHTTPClient
-import Logging
 
 /**
  List of all integrated domains
@@ -612,11 +610,9 @@ enum DomainRegistry: String, CaseIterable {
     }
     
     /// Get meta information of a specific run
-    func getFullRunMeta(client: HTTPClient?, logger: Logger, run: Timestamp) async throws -> FullRunMetaJson? {
+    func getFullRunMeta(run: Timestamp) async throws -> FullRunMetaJson? {
         return try await OmFileSystemManager.instance.get(
-            file: FullRunMetaFile.run(self, run),
-            client: client,
-            logger: logger
+            file: FullRunMetaFile.run(self, run)
         )
     }
 }
