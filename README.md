@@ -65,6 +65,7 @@ Apps:
 - [Frontside](https://frontside.live) Ranks every surf break near you on one map from Open-Meteo marine and wind forecasts, scored per break, so you know which one is worth the drive today. Free web app, no login.
 - [Going Blue](https://going.blue/) Expedition weather forecasts via satellite, with a custom codec that packs hundreds of forecast data points into each message.
 - [Heat Rules](https://heatrules.com/) A free browser-based calculator for occupational heat exposure limits. Inputs: location, work intensity, acclimatization status. Outputs: work/rest schedule, water intake, and the standard each number comes from.
+- [Heliora](https://heliora.app/) Free browser planner for the Sun, Moon and Milky Way against the real terrain horizon. Shows forecast cloud cover for the next 16 days and 20-year ERA5 clear-sky odds for any pin and date.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
