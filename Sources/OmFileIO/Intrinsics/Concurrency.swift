@@ -124,7 +124,8 @@ public extension AsyncSequence where Element: Sendable, Self: Sendable {
                 group.addTask { try await body(element) }
                 index += 1
             }
-            try await group.waitForAll()
+            // Throw on the first failure so leaving the scope cancels the remaining children.
+            while try await group.next() != nil { }
         }
     }
     
