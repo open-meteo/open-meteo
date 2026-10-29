@@ -89,7 +89,7 @@ extension Curl {
             ranges: ranges, downloadConcurrent: downloadConcurrent, processingConcurrent: processingConcurrent, byteLimit: bufferBytes,
             download: { range in
                 try await self.downloadInMemoryAsync(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)",
-                    minSize: range.count, nConcurrent: 1, maxSize: range.count, expectedRange: range)
+                    minSize: range.count, cacheDirectory: nil, nConcurrent: 1, expectedRange: range)
             }, body: body
         )
         logger.info("Compressed download buffer peak: \(peak.bytesHumanReadable)")
