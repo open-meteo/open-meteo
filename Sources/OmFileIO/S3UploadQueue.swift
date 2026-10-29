@@ -121,28 +121,22 @@ public struct S3MultiFileUploadQueue: Sendable {
     }
     
     func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
-        let client = client
         let url = endpoint.uploadURL(remotePath: objectName)
-        let executor = partUploadExecutor
-        await enqueuePreparation {
+        await enqueuePreparation { [client, executor = partUploadExecutor] in
             try await S3Uploader.uploadMultipart(client: client, data: data, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
         }
     }
     
     public func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
-        let client = client
         let url = endpoint.uploadURL(remotePath: objectName)
-        let executor = partUploadExecutor
-        await enqueuePreparation {
+        await enqueuePreparation { [client, executor = partUploadExecutor] in
             try await S3Uploader.uploadMultipart(client: client, file: file, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
         }
     }
 
     func enqueuePreparation(_ work: @escaping @Sendable () async throws -> S3MultiPartUploadPrepared) async {
-        let logger = logger
-        let onError = onError
         do {
-            try await queue.enqueue {
+            try await queue.enqueue { [logger, onError] in
                 do { return try await work() } catch {
                     logger.error("Error preparing multipart upload: \(error)")
                     onError()
