@@ -1,63 +1,49 @@
-import NIOCore
 import OmFileIO
 @preconcurrency import SwiftEccodes
 
-struct BufferedGribMessage: Sendable {
-    let message: GribMessage
-    let download: BufferedDownload
-}
+/// The raw handle never escapes independently of its backing compressed batch.
+final class BufferedGribMessage: Sendable {
+    private let message: GribMessage
+    private let download: BufferedDownload?
 
-/// Decode one batch incrementally. Each emitted message retains the batch's byte reservation.
-struct BufferedGribSequence: AsyncSequence, Sendable {
-    typealias Element = BufferedGribMessage
-    let downloads: ProcessingParallelQueue<ByteBuffer>.Results
-
-    /// Retain each compressed batch through processing and wake the input waiter on failure.
-    func process(concurrent: Int, body: @escaping @Sendable (GribMessage) async throws -> Void) async throws {
-        try await foreachConcurrent(nConcurrent: concurrent) { item in
-            defer { withExtendedLifetime(item.download) {} }
-            do {
-                try await body(item.message)
-            } catch {
-                // foreachConcurrent may be awaiting input before observing this child error.
-                await downloads.fail(error)
-                throw error
-            }
-        }
+    init(message: GribMessage, download: BufferedDownload? = nil) {
+        self.message = message
+        self.download = download
     }
 
+    func get(attribute: String) -> String? { message.get(attribute: attribute) }
+    func getLong(attribute: String) -> Int? { message.getLong(attribute: attribute) }
+    func getDouble() throws -> [Double] { try message.getDouble() }
+
+    func load(into array: inout GribArray2D) throws {
+        try array.load(message: message)
+    }
+}
+
+/// Decode batches incrementally. Each emitted message owns its backing batch through ARC.
+struct BufferedGribSequence: AsyncSequence, Sendable {
+    typealias Element = BufferedGribMessage
+    let downloads: ProcessingParallelQueue<BufferedDownload>.Results
+
     struct AsyncIterator: AsyncIteratorProtocol {
-        var downloads: ProcessingParallelQueue<ByteBuffer>.Results.AsyncIterator
+        var downloads: ProcessingParallelQueue<BufferedDownload>.Results.AsyncIterator
         var current: BufferedDownload?
-        var remaining = ByteBuffer()
-        var messages = [GribMessage]()
+        var offset = 0
+        var messages = [BufferedGribMessage]()
 
         mutating func next() async throws -> BufferedGribMessage? {
             while true {
                 try Task.checkCancellation()
-                if let current, let message = messages.popLast() {
-                    return BufferedGribMessage(message: message, download: current)
-                }
-                if remaining.readableBytes > 0 {
-                    guard let seek = try remaining.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
-                        throw GribAsyncStreamError.didNotFindGibHeader
-                    }
-                    guard seek.length > 0, seek.length <= remaining.readableBytes - seek.offset else {
-                        throw GribAsyncStreamError.unexpectedEndOfFile
-                    }
-                    messages = try remaining.withUnsafeReadableBytes {
-                        // popLast() must yield submessages in inventory order.
-                        Array(try GribAsyncStreamHelper.decodeMessages(memory: UnsafeRawBufferPointer(rebasing: $0[seek.offset..<seek.offset + seek.length])).reversed())
-                    }
-                    // Only move indices; the leased buffer must remain immutable for ecCodes.
-                    remaining.moveReaderIndex(forwardBy: seek.offset + seek.length)
+                if let message = messages.popLast() { return message }
+                if let current, let decoded = try current.decodeNext(at: &offset) {
+                    // popLast() must yield submessages in inventory order.
+                    messages = Array(decoded.reversed())
                     continue
                 }
-                remaining = ByteBuffer()
                 current = nil
                 guard let batch = try await downloads.next() else { return nil }
                 current = batch
-                remaining = batch.value
+                offset = 0
             }
         }
     }

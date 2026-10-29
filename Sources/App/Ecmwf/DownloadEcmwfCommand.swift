@@ -271,7 +271,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     
                     // logger.info("Processing \(variable)")
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    try grib2d.load(message: message)
+                    try message.load(into: &grib2d)
                     if (domain == .aifs025_single || domain == .aifs025_ensemble) && run >= Timestamp(2026, 5, 12, 6, 0) && run < Timestamp(2026,5,13,6) {
                         // AIFSv2 shifts data by 180° longitude
                         grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -496,7 +496,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 }
                 // logger.info("Processing \(variable)")
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                try grib2d.load(message: message)
+                try message.load(into: &grib2d)
                 grib2d.array.flipLatitude()
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }

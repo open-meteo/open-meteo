@@ -27,24 +27,26 @@ import Testing
     private func preservesBufferedWindSubmessageOrder() async throws {
         let packed = try #require(Data(base64Encoded: Self.windFixture))
         let buffer = ByteBuffer(bytes: packed + packed)
-        try await BufferedDownloadSequence.withDownloads(
-            ranges: [0..<buffer.readableBytes], concurrent: 1,
+        let wind = WindMessages()
+        try await BufferedGribDownload.process(
+            ranges: [0..<buffer.readableBytes], downloadConcurrent: 1, processingConcurrent: 1,
             byteLimit: buffer.readableBytes, download: { _ in buffer }
-        ) { downloads in
-            var wind = WindMessages()
-            for try await item in BufferedGribSequence(downloads: downloads) {
-                defer { withExtendedLifetime(item.download) {} }
-                try wind.append(item.message)
-            }
-            wind.check()
+        ) { message in
+            try await wind.append(message)
         }
+        await wind.check()
     }
 
-    private struct WindMessages {
+    private actor WindMessages {
         var parameters = [Int]()
         var values = [[Double]]()
 
-        mutating func append(_ message: GribMessage) throws {
+        func append(_ message: GribMessage) throws {
+            parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
+            values.append(try message.getDouble())
+        }
+
+        func append(_ message: BufferedGribMessage) throws {
             parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
             values.append(try message.getDouble())
         }
@@ -70,10 +72,10 @@ import Testing
             }
             continuation.finish()
         }
-        var wind = WindMessages()
+        let wind = WindMessages()
         for try await message in stream.decodeGrib() {
-            try wind.append(message)
+            try await wind.append(message)
         }
-        wind.check()
+        await wind.check()
     }
 }

@@ -96,6 +96,7 @@ let package = Package(
         .target(
             name: "OmFileIO",
             dependencies: [
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 //.product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
