@@ -30,9 +30,7 @@ final class BufferedGribBatch: Sendable {
     }
 
     deinit {
-        let budget = budget
-        let bytes = buffer.readableBytes
-        Task { await budget.release(bytes) }
+        Task { [budget, bytes = buffer.readableBytes] in await budget.release(bytes) }
     }
 }
 
