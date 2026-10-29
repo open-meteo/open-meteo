@@ -1,276 +1,181 @@
-import Logging
-import Collections
+import AsyncAlgorithms
+import NIOConcurrencyHelpers
 
-/// Executes jobs in completion order. Optional backpressure bounds pending and active work.
-/// Collected results are retained until collect(); use withResults for large, bounded results.
+/// Executes jobs in completion order, with at most `concurrent` jobs running or awaiting delivery.
+/// Consume results concurrently with enqueueing: both channels apply backpressure.
 public final class ProcessingParallelQueue<T: Sendable>: Sendable {
-    private let state: ProcessingQueueState<T>
+    private let state = ProcessingQueueState<T>()
     private let processingTask: Task<Void, Never>
-    private let onError: @Sendable () -> Void
 
-    public init(executor: LimitedConcurrencyExecutor, maxPending: Int? = nil, onError: @escaping @Sendable () -> Void = {}) {
-        let state = ProcessingQueueState<T>(capacity: maxPending ?? Int.max, maxPending: maxPending ?? Int.max, streaming: false)
-        self.state = state
-        self.onError = onError
+    public var results: Results { Results(state: state) }
+
+    public init(concurrent: Int) {
+        precondition(concurrent > 0)
+        let state = state
         self.processingTask = Task {
-            await withTaskGroup(of: Void.self) { group in
-                for _ in 0..<executor.maxConcurrency {
-                    group.addTask { try? await state.run(executor: executor) }
+            do {
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    for _ in 0..<concurrent {
+                        group.addTask {
+                            do {
+                                for await work in state.jobs {
+                                    try Task.checkCancellation()
+                                    let result = try await work()
+                                    await state.output.send(result)
+                                    try Task.checkCancellation()
+                                }
+                            } catch {
+                                state.fail(error)
+                                throw error
+                            }
+                        }
+                    }
+                    while try await group.next() != nil { }
                 }
+                state.output.finish()
+            } catch {
+                state.fail(error)
             }
         }
     }
 
-    /// With maxPending configured, suspends until pending/active work has capacity.
-    public func enqueue(_ work: @escaping @Sendable () async -> T) async {
-        do { try await state.enqueue(cost: 1, work: work) } catch { onError() }
+    /// Suspends until a worker accepts the job. Cancelling this call leaves the queue open.
+    public func enqueue(_ work: @escaping @Sendable () async throws -> T) async throws {
+        try state.beginEnqueue()
+        defer { state.endEnqueue() }
+        await state.jobs.send(work)
+        try state.checkFailure()
     }
 
-    public func enqueueIgnoreError(logger: Logger, _ work: @escaping @Sendable () async throws -> T) async {
-        let onError = onError
-        do {
-            try await state.enqueue(cost: 1) {
-                do { return try await work() } catch {
-                    logger.error("Error during queued work: \(error)")
-                    onError()
-                    return nil
-                }
-            }
-        } catch { onError() }
-    }
-
-    public func collect() async -> [T] {
-        await state.finish()
+    /// Reject new submissions, drain enqueues already in progress, and join workers.
+    /// The consumer must keep iterating concurrently.
+    public func finish() async {
+        state.finish()
         await processingTask.value
-        return await state.collected
+    }
+
+    public func cancel() async {
+        state.fail(CancellationError())
+        processingTask.cancel()
+        await processingTask.value
     }
 
     deinit {
-        let state = state
-        Task { await state.finish() }
-    }
-
-    /// A reservation follows the result through consumption, including tasks retaining it.
-    /// Retain the lease (not just its value) for as long as processing needs that capacity.
-    public final class ResultLease: Sendable {
-        public let value: T
-        private let id: Int
-        private let state: ProcessingQueueState<T>
-
-        fileprivate init(value: T, id: Int, state: ProcessingQueueState<T>) {
-            self.value = value
-            self.id = id
-            self.state = state
-        }
-
-        deinit {
-            let state = state
-            let id = id
-            Task { await state.release(id: id) }
-        }
+        state.fail(CancellationError())
+        processingTask.cancel()
     }
 
     public struct Results: AsyncSequence, Sendable {
-        public typealias Element = ResultLease
+        public typealias Element = T
         fileprivate let state: ProcessingQueueState<T>
 
-        public var peakCost: Int { get async { await state.peakCost } }
-        public var reservedCost: Int { get async { await state.reservedCost } }
-
-        public func fail(_ error: any Error) async { await state.fail(error) }
+        public func fail(_ error: any Error) { state.fail(error) }
 
         public struct AsyncIterator: AsyncIteratorProtocol {
+            fileprivate var iterator: AsyncThrowingChannel<T, any Error>.Iterator
             fileprivate let state: ProcessingQueueState<T>
-            public mutating func next() async throws -> ResultLease? {
-                guard let item = try await state.next() else { return nil }
-                return ResultLease(value: item.value, id: item.id, state: state)
+
+            public mutating func next() async throws -> T? {
+                try state.checkFailure()
+                let value = try await iterator.next()
+                try state.checkFailure()
+                return value
             }
         }
 
-        public func makeAsyncIterator() -> AsyncIterator { AsyncIterator(state: state) }
+        public func makeAsyncIterator() -> AsyncIterator {
+            AsyncIterator(iterator: state.output.makeAsyncIterator(), state: state)
+        }
     }
 
-    /// Reserve cost before work starts and hold it until the consumer releases the result.
-    /// All workers are cancelled and drained on failure, cancellation or early consumer return.
+    /// Own the producer and workers until consumption finishes, fails or returns early.
     public static func withResults<Input: Sendable, Result>(
-        inputs: [Input], concurrent: Int, capacity: Int, maxPending: Int = 64,
-        cost: @escaping @Sendable (Input) -> Int,
+        inputs: [Input], concurrent: Int,
         work: @escaping @Sendable (Input) async throws -> T,
         body: (Results) async throws -> Result
     ) async throws -> Result {
-        precondition(concurrent > 0)
-        let state = ProcessingQueueState<T>(capacity: capacity, maxPending: maxPending, streaming: true)
+        let queue = ProcessingParallelQueue(concurrent: concurrent)
         return try await withTaskCancellationHandler {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     do {
                         for input in inputs {
-                            try await state.enqueue(cost: cost(input)) { try await work(input) }
+                            try await queue.enqueue { try await work(input) }
                         }
-                        await state.finish()
+                        await queue.finish()
                     } catch {
-                        await state.fail(error)
+                        queue.state.fail(error)
                         throw error
                     }
                 }
-                for _ in 0..<min(concurrent, inputs.count) {
-                    group.addTask { try await state.run() }
-                }
                 do {
-                    let result = try await body(Results(state: state))
-                    try await state.checkFailure()
-                    await state.fail(CancellationError())
+                    let result = try await body(queue.results)
+                    try queue.state.checkFailure()
                     group.cancelAll()
-                    while let _ = await group.nextResult() { }
+                    await queue.cancel()
                     return result
                 } catch {
-                    await state.fail(error)
+                    queue.state.fail(error)
                     group.cancelAll()
+                    await queue.cancel()
                     throw error
                 }
             }
         } onCancel: {
-            Task { await state.fail(CancellationError()) }
+            queue.state.fail(CancellationError())
+            queue.processingTask.cancel()
         }
     }
 }
 
 public enum ProcessingQueueError: Error {
-    case invalidCost(Int)
-    case costExceedsCapacity(cost: Int, capacity: Int)
     case finished
 }
 
-/// Shared scheduler for collecting queues and scoped streaming consumers.
-private actor ProcessingQueueState<T: Sendable> {
-    struct Job: Sendable {
-        let id: Int
-        let work: @Sendable () async throws -> T?
-    }
-    let capacity: Int
-    let maxPending: Int
-    let streaming: Bool
-    private var pending = Deque<Job>()
-    private var ready = Deque<(id: Int, value: T)>()
-    private var reservations = [Int: Int]()
-    private var waiters = [Int: CheckedContinuation<Void, any Error>]()
-    private var nextWaiter = 0
-    private var nextID = 0
-    private var finished = false
-    private var failure: (any Error)?
-    private(set) var collected = [T]()
-    private(set) var reservedCost = 0
-    private(set) var peakCost = 0
-
-    init(capacity: Int, maxPending: Int, streaming: Bool) {
-        precondition(capacity > 0 && maxPending > 0)
-        self.capacity = capacity
-        self.maxPending = maxPending
-        self.streaming = streaming
-    }
+/// Channels own scheduling and waiters. Admission tracking keeps input open until accepted sends finish.
+private final class ProcessingQueueState<T: Sendable>: Sendable {
+    let jobs = AsyncChannel<@Sendable () async throws -> T>()
+    let output = AsyncThrowingChannel<T, any Error>()
+    private let status = NIOLockedValueBox((finished: false, enqueuing: 0, failure: Optional<any Error>.none))
 
     func checkFailure() throws {
         try Task.checkCancellation()
-        if let failure { throw failure }
+        if let error = status.withLockedValue({ $0.failure }) { throw error }
     }
 
-    func enqueue(cost: Int, work: @escaping @Sendable () async throws -> T?) async throws {
-        guard cost > 0 else { throw ProcessingQueueError.invalidCost(cost) }
-        guard cost <= capacity else { throw ProcessingQueueError.costExceedsCapacity(cost: cost, capacity: capacity) }
-        while true {
-            try checkFailure()
-            guard !finished else { throw ProcessingQueueError.finished }
-            if reservations.count < maxPending && cost <= capacity - reservedCost {
-                let id = nextID
-                nextID += 1
-                reservations[id] = cost
-                reservedCost += cost
-                peakCost = max(peakCost, reservedCost)
-                pending.append(Job(id: id, work: work))
-                wakeWaiters()
-                return
-            }
-            try await wait()
+    func beginEnqueue() throws {
+        try Task.checkCancellation()
+        try status.withLockedValue { status in
+            if let error = status.failure { throw error }
+            guard !status.finished else { throw ProcessingQueueError.finished }
+            status.enqueuing += 1
         }
     }
 
-    private func take() async throws -> Job? {
-        while true {
-            try checkFailure()
-            if !pending.isEmpty { return pending.removeFirst() }
-            if finished { return nil }
-            try await wait()
+    func endEnqueue() {
+        let closeInput = status.withLockedValue { status in
+            status.enqueuing -= 1
+            return status.finished && status.enqueuing == 0
         }
-    }
-
-    func run(executor: LimitedConcurrencyExecutor? = nil) async throws {
-        do {
-            while let job = try await take() {
-                let value: T?
-                if let executor {
-                    value = try await executor.execute { try await job.work() }
-                } else {
-                    value = try await job.work()
-                }
-                try checkFailure()
-                if let value {
-                    if streaming { ready.append((job.id, value)) } else { collected.append(value) }
-                }
-                if !streaming || value == nil { release(id: job.id) }
-                wakeWaiters()
-            }
-        } catch {
-            fail(error)
-            throw error
-        }
-    }
-
-    func next() async throws -> (id: Int, value: T)? {
-        while true {
-            try checkFailure()
-            if !ready.isEmpty { return ready.removeFirst() }
-            if finished && reservations.isEmpty { return nil }
-            try await wait()
-        }
-    }
-
-    func release(id: Int) {
-        if let cost = reservations.removeValue(forKey: id) { reservedCost -= cost }
-        wakeWaiters()
+        if closeInput { jobs.finish() }
     }
 
     func finish() {
-        finished = true
-        wakeWaiters()
+        let closeInput = status.withLockedValue { status in
+            status.finished = true
+            return status.enqueuing == 0
+        }
+        if closeInput { jobs.finish() }
     }
 
     func fail(_ error: any Error) {
-        if failure == nil { failure = error }
-        pending.removeAll()
-        ready.removeAll()
-        reservations.removeAll()
-        reservedCost = 0
-        wakeWaiters()
-    }
-
-    private func wait() async throws {
-        let id = nextWaiter
-        nextWaiter += 1
-        try await withTaskCancellationHandler {
-            try Task.checkCancellation()
-            try await withCheckedThrowingContinuation { waiters[id] = $0 }
-        } onCancel: {
-            Task { await self.cancelWaiter(id: id) }
+        let failure = status.withLockedValue { status in
+            status.finished = true
+            if status.failure == nil { status.failure = error }
+            return status.failure!
         }
-    }
-
-    private func cancelWaiter(id: Int) {
-        waiters.removeValue(forKey: id)?.resume(throwing: CancellationError())
-    }
-
-    private func wakeWaiters() {
-        let pending = waiters.values
-        waiters.removeAll(keepingCapacity: true)
-        for continuation in pending { continuation.resume() }
+        // Abort immediately, including sends suspended before input was closed.
+        jobs.finish()
+        output.fail(failure)
     }
 }

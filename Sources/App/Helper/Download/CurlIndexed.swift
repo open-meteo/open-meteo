@@ -67,13 +67,15 @@ extension Curl {
         url: String, indexURL: String, allowMultipleRanges: Bool, downloadConcurrent: Int,
         processingConcurrent: Int, downloadFullGribFile: Bool, bufferBytes: Int = 256 * 1024 * 1024,
         isIncluded: (EcmwfIndexEntry) -> Bool,
-        body: @escaping @Sendable (GribMessage) async throws -> Void
+        body: @escaping @Sendable (BufferedGribMessage) async throws -> Void
     ) async throws {
         // full grib files or multi range requests
         if allowMultipleRanges || downloadFullGribFile {
             try await downloadEcmwfIndexed(url: url, indexURL: indexURL, allowMultipleRanges: allowMultipleRanges,
                 concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: isIncluded)
-                .foreachConcurrent(nConcurrent: processingConcurrent, body: body)
+                .foreachConcurrent(nConcurrent: processingConcurrent) { message in
+                    try await body(BufferedGribMessage(message: message))
+                }
             return
         }
 
@@ -83,18 +85,14 @@ extension Curl {
         let ranges = try index.downloadBatches(targetBytes: min(8 * 1024 * 1024, bufferBytes))
 
         logger.info("Prefetching \(ranges.count) GRIB batches with \(downloadConcurrent) download workers and \(bufferBytes.bytesHumanReadable) compressed buffer")
-        try await BufferedDownloadSequence.withDownloads(
-            ranges: ranges, concurrent: downloadConcurrent, byteLimit: bufferBytes,
+        let peak = try await BufferedGribDownload.process(
+            ranges: ranges, downloadConcurrent: downloadConcurrent, processingConcurrent: processingConcurrent, byteLimit: bufferBytes,
             download: { range in
                 try await self.downloadInMemoryAsync(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)",
                     minSize: range.count, nConcurrent: 1, maxSize: range.count, expectedRange: range)
-            }
-        ) { downloads in
-            try await BufferedGribSequence(downloads: downloads)
-                .process(concurrent: processingConcurrent, body: body)
-            let peak = await downloads.peakCost
-            self.logger.info("Compressed download buffer peak: \(peak.bytesHumanReadable)")
-        }
+            }, body: body
+        )
+        logger.info("Compressed download buffer peak: \(peak.bytesHumanReadable)")
     }
 
     /// Download index file and match against curl variable
