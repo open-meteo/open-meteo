@@ -24,6 +24,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+
+        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        var uploadS3RollingBucket: String?
         
         @Option(name: "apikey", short: "k", help: "API key for ECMWF API")
         var apikey: String?
@@ -67,7 +70,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
             fatalError()
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateTimeSeries: !signature.skipTimeseries)
     }
     
     func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadS3Bucket: String?) async throws {

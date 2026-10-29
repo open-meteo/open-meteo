@@ -34,6 +34,9 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
+        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        var uploadS3RollingBucket: String?
+
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
     }
@@ -82,6 +85,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             concurrent: nConcurrent,
             uploadS3Bucket: signature.uploadS3Bucket,
             uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities,
+            uploadS3RollingBucket: signature.uploadS3RollingBucket,
             createNetcdf: signature.createNetcdf
         )
     }
@@ -96,6 +100,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         concurrent: Int,
         uploadS3Bucket: String?,
         uploadS3OnlyProbabilities: Bool,
+        uploadS3RollingBucket: String? = nil,
         createNetcdf: Bool
     ) async throws {
         let logger = application.logger
@@ -373,6 +378,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             writeUpdateJson: true,
             uploadS3Bucket: uploadS3Bucket,
             uploadS3OnlyProbabilities: uploadS3OnlyProbabilities,
+            uploadS3RollingBucket: uploadS3RollingBucket,
             generateFullRun: false,
             generateTimeSeries: true
         )
