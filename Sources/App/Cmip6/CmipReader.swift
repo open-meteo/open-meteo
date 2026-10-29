@@ -160,9 +160,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
 
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6VariableOrDerived) async throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        if let readerEra5Land, let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger) {
+        if let readerEra5Land, let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue) {
             let nTime = Int(referenceWeightFile.getDimensions().last!)
             var weights = [Float](repeating: .nan, count: nTime)
             try await referenceWeightFile.read3D(
@@ -179,7 +177,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
                 return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation.numeric)
             }
         }
-        guard let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await readerEra5.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger) else {
+        guard let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await readerEra5.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastApiError.generic(message: "Could not read reference weight file \(variable) for domain \(readerEra5.domain)")
         }
         let nTime = Int(referenceWeightFile.getDimensions().last!)
@@ -198,12 +196,10 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     }
 
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
         let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
 
-        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger) else {
+        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastApiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let nTime = Int(controlWeightFile.getDimensions().last!)
@@ -297,9 +293,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     var _referenceElevation: ElevationOrSea?
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        guard let file = await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger) else {
+        guard let file = await referenceDomain.getStaticFile(type: type) else {
             return nil
         }
         return try await referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition.gridpoint, file: file)
@@ -309,9 +303,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         if let _referenceElevation {
             return _referenceElevation
         }
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        guard let elevationFile = await referenceDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        guard let elevationFile = await referenceDomain.getStaticFile(type: .elevation) else {
             throw ForecastApiError.generic(message: "Elevation file for domain \(referenceDomain) is missing")
         }
         let referenceElevation = try await referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
@@ -322,10 +314,8 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
 
-        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger) else {
+        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastApiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let nTime = Int(controlWeightFile.getDimensions().last!)
@@ -342,7 +332,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         )
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
 
-        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue, client: client, logger: logger) else {
+        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastApiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
         }
         let referenceWeights = await BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<Int(referenceWeightFile.getDimensions().last!)))
@@ -417,9 +407,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     let referenceElevation: ElevationOrSea
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        guard let file = await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger) else {
+        guard let file = await referenceDomain.getStaticFile(type: type) else {
             return nil
         }
         return try await referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
@@ -428,10 +416,8 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
 
-        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger) else {
+        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastApiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let nTime = Int(controlWeightFile.getDimensions().last!)
@@ -448,7 +434,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         )
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
 
-        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue, client: client, logger: logger) else {
+        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastApiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
         }
         let nTime2 = Int(referenceWeightFile.getDimensions().last!)
@@ -492,9 +478,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
-        let client = reader.httpClient
-        let logger = reader.logger
-        guard let referencePosition = try await referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger), mode: mode) else {
+        guard let referencePosition = try await referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation), mode: mode) else {
             return nil
         }
         self.referenceDomain = referenceDomain

@@ -123,11 +123,11 @@ struct S3DataController: RouteCollection {
         let localOnly = req.url.path == "/openmeteo-local" || req.url.path == "/openmeteo-local/"
         if params.apikey != nil || req.headers.first(name: .authorization) != nil {
             try authorizeReadRequest(req: req, apikey: params.apikey)
-            return try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly)
+            return try await params.makeResponse(localOnly: localOnly)
         } else {
             return try await req.withFreeApiRateLimiter() { _ in
                 try validateAllowedReferer(req)
-                return (1, try await params.makeResponse(client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly))
+                return (1, try await params.makeResponse(localOnly: localOnly))
             }
         }
     }
@@ -153,7 +153,7 @@ struct S3DataController: RouteCollection {
                 guard path.hasPrefix("data_spatial/") else {
                     throw S3ApiError.forbidden
                 }
-                guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly) else {
+                guard let file = try await OmFileSystemManager.instance.getFile(path: path, localOnly: localOnly) else {
                     throw Abort(.notFound)
                 }
                 return (1, try await req.asyncStreamFile(file: file, mediaType: mediaType))
@@ -166,7 +166,7 @@ struct S3DataController: RouteCollection {
             try authorizeReadRequest(req: req, apikey: params.apikey)
         }
         
-        guard let file = try await OmFileSystemManager.instance.getFile(path: path, client: req.application.dedicatedHttpClient, logger: req.logger, localOnly: localOnly) else {
+        guard let file = try await OmFileSystemManager.instance.getFile(path: path, localOnly: localOnly) else {
             throw Abort(.notFound)
         }
         return try await req.asyncStreamFile(file: file, mediaType: mediaType)
@@ -662,12 +662,12 @@ extension Request {
 }
 
 extension S3List.ListV2Query {
-    func makeResponse(client: HTTPClient, logger: Logger, localOnly: Bool) async throws -> Response {
+    func makeResponse(localOnly: Bool) async throws -> Response {
         let path = self.prefix
         guard self.list_type == 2, self.delimiter == "/", path.hasPrefix("/") == false, (path == "" || path.hasSuffix("/") == true), path.onlyContainsAlphanumericDashSlashDot else {
             throw S3ApiError.forbidden
         }
-        guard let directory = try await OmFileSystemManager.instance.getDirectoryContents(path: path, client: client, logger: logger, localOnly: localOnly) else {
+        guard let directory = try await OmFileSystemManager.instance.getDirectoryContents(path: path, localOnly: localOnly) else {
             throw S3ApiError.forbidden
         }
         // eTag uses "timestamp-filesize" for local files

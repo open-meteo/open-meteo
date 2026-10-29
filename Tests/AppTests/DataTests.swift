@@ -21,7 +21,7 @@ extension InlineArray {
     
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridSeaMatch() async throws {
         try await withApp { app in
-            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs.getStaticFile(type: .elevation))
             let grid = GaussianGrid(type: .o1280)
             // Longitude 0° wraps on x axis
             let center = grid.findPointXY(lat: 53.647546, lon: 0)
@@ -52,7 +52,7 @@ extension InlineArray {
             #expect(bbb.gridpoint == 630534)
             
             // WAM only returns NaN for this grid cell, use corrected land-mask
-            let elevationFile2 = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let elevationFile2 = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation))
             #expect(center.x == 0)
             #expect(center.y == 516)
             let aaa = grid.getSurroundingGridpoints(lat: 50.781, lon: 1.596)
@@ -109,7 +109,7 @@ extension InlineArray {
     
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridAreaSeaMatch() async throws {
         try await withApp { app in
-            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs_europe_ensemble.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs_europe_ensemble.getStaticFile(type: .elevation))
             let grid = GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33.005..<70.967, longitude: -11..<37))
             // Longitude 0° wraps on x axis
             let aa = grid.getSurroundingGridpoints(lat: 70.966606, lon: -10.800018)
@@ -145,7 +145,7 @@ extension InlineArray {
     
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func iconD2GridFindPoint() async throws {
         try await withApp { app in
-            let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation))
             let grid = IconDomains.iconD2.grid
             // Longitude 0° wraps on x axis
             
@@ -218,37 +218,35 @@ extension InlineArray {
         .enabled(if: FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory))
     )
     func dem90() async throws {
-        let logger = Logger(label: "test")
-        let httpClient = HTTPClient.shared
 
         // beach, SE south africa // beach, SE south africa
-        #expect(try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient) == 25)
+        #expect(try await Dem90.read(lat: -32.878000, lon: 28.101000) == 25)
 
         // water, SE south africa // water, SE south africa
-        #expect(try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient) == 25)
+        #expect(try await Dem90.read(lat: -32.878000, lon: 28.101000) == 25)
 
-        #expect(try await Dem90.read(lat: 46.885748, lon: 8.670080, logger: logger, httpClient: httpClient) == 991)
-        #expect(try await Dem90.read(lat: 46.885748, lon: 8.669093, logger: logger, httpClient: httpClient) == 1028)
-        #expect(try await Dem90.read(lat: 46.885748, lon: 8.668106, logger: logger, httpClient: httpClient) == 1046.0)
+        #expect(try await Dem90.read(lat: 46.885748, lon: 8.670080) == 991)
+        #expect(try await Dem90.read(lat: 46.885748, lon: 8.669093) == 1028)
+        #expect(try await Dem90.read(lat: 46.885748, lon: 8.668106) == 1046.0)
 
         // island
-        #expect(try await Dem90.read(lat: 65.03738, lon: -17.75940, logger: logger, httpClient: httpClient) == 715)
+        #expect(try await Dem90.read(lat: 65.03738, lon: -17.75940) == 715)
 
         // greenland
-        #expect(try await Dem90.read(lat: 72.71190, lon: -31.81641, logger: logger, httpClient: httpClient) == 2878.0)
+        #expect(try await Dem90.read(lat: 72.71190, lon: -31.81641) == 2878.0)
         // bolivia
-        #expect(try await Dem90.read(lat: -15.11455, lon: -65.74219, logger: logger, httpClient: httpClient) == 162.0)
+        #expect(try await Dem90.read(lat: -15.11455, lon: -65.74219) == 162.0)
         // antarctica
-        #expect(try await Dem90.read(lat: -70.52490, lon: -65.30273, logger: logger, httpClient: httpClient) == 1749.0)
-        #expect(try await Dem90.read(lat: -80.95610, lon: -70.66406, logger: logger, httpClient: httpClient) == 124.0)
-        #expect(try await Dem90.read(lat: -81.20142, lon: 2.10938, logger: logger, httpClient: httpClient) == 2342.0)
-        #expect(try await Dem90.read(lat: -80.58973, lon: 108.28125, logger: logger, httpClient: httpClient) == 3348.0)
+        #expect(try await Dem90.read(lat: -70.52490, lon: -65.30273) == 1749.0)
+        #expect(try await Dem90.read(lat: -80.95610, lon: -70.66406) == 124.0)
+        #expect(try await Dem90.read(lat: -81.20142, lon: 2.10938) == 2342.0)
+        #expect(try await Dem90.read(lat: -80.58973, lon: 108.28125) == 3348.0)
         
-        #expect(try await Dem90.read(lat: -41.0, lon: 145.7167, logger: logger, httpClient: httpClient) == 18)
-        #expect(try await Dem90.read(lat: -9.0, lon: 32.9833, logger: logger, httpClient: httpClient) == 1590)
-        #expect(try await Dem90.read(lat: -35.0, lon: 138.70, logger: logger, httpClient: httpClient) == 569)
-        #expect(try await Dem90.read(lat: -12.0, lon: -76.90 , logger: logger, httpClient: httpClient) == 387)
-        #expect(try await Dem90.read(lat: -39.0, lon: -68.4167, logger: logger, httpClient: httpClient) == 288)
+        #expect(try await Dem90.read(lat: -41.0, lon: 145.7167) == 18)
+        #expect(try await Dem90.read(lat: -9.0, lon: 32.9833) == 1590)
+        #expect(try await Dem90.read(lat: -35.0, lon: 138.70) == 569)
+        #expect(try await Dem90.read(lat: -12.0, lon: -76.90 ) == 387)
+        #expect(try await Dem90.read(lat: -39.0, lon: -68.4167) == 288)
     }
 
     @Test func regularGrid() {
@@ -275,11 +273,11 @@ extension InlineArray {
     func elevationMatching() async throws {
         let logger = Logger(label: "testElevationMatching")
         let client = HTTPClient.shared
-        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
+        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
         #expect(optimised.gridpoint == 225405)
         #expect(optimised.gridElevation.numeric == 600)
 
-        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
+        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
         #expect(nearest.gridpoint == 225406)
         #expect(nearest.gridElevation.numeric == 1006.0)
     }

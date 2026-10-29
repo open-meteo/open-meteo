@@ -37,12 +37,12 @@ protocol GenericDomain: Sendable {
     var generateTimeSeries: Bool { get }
 
     /// Whether metadata exists for the requested run. Invalid metadata must throw.
-    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool
+    func isRunAvailable(run: Timestamp) async throws -> Bool
 }
 
 extension GenericDomain {
-    func isRunAvailable(run: Timestamp, client: HTTPClient?, logger: Logger) async throws -> Bool {
-        try await domainRegistry.getFullRunMeta(client: client, logger: logger, run: run) != nil
+    func isRunAvailable(run: Timestamp) async throws -> Bool {
+        try await domainRegistry.getFullRunMeta(run: run) != nil
     }
 
     var generateFullRun: Bool {
@@ -69,40 +69,32 @@ extension GenericDomain {
     }
 
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
+    func getStaticFile(type: ReaderStaticVariable) async -> (any OmFileReaderArrayProtocol<Float>)? {
         guard let domainRegistryStatic else {
             return nil
         }
         switch type {
         case .soilType:
             return try? await OmFileSystemManager.instance.get(
-                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
-                client: httpClient,
-                logger: logger
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil)
             )?.reader
         case .elevation:
             return try? await OmFileSystemManager.instance.get(
-                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
-                client: httpClient,
-                logger: logger
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil)
             )?.reader
         }
     }
 
     /// Meta JSON for time-series data
-    func getMetaJson(client: HTTPClient?, logger: Logger) async throws -> ModelUpdateMetaJson? {
+    func getMetaJson() async throws -> ModelUpdateMetaJson? {
         return try await OmFileSystemManager.instance.get(
-            file: ModelUpdateMetaFile(domain: self.domainRegistry),
-            client: client,
-            logger: logger
+            file: ModelUpdateMetaFile(domain: self.domainRegistry)
         )
     }
     
-    func getLatestFullRun(client: HTTPClient?, logger: Logger) async throws -> Timestamp? {
+    func getLatestFullRun() async throws -> Timestamp? {
         return try await OmFileSystemManager.instance.get(
-            file: FullRunMetaFile.latest(self.domainRegistry),
-            client: client,
-            logger: logger
+            file: FullRunMetaFile.latest(self.domainRegistry)
         )?.reference_time.toTimestamp()
     }
 
