@@ -4,9 +4,9 @@ import OmFileIO
 /// The raw handle never escapes independently of its backing compressed batch.
 final class BufferedGribMessage: Sendable {
     private let message: GribMessage
-    private let download: BufferedDownload?
+    private let download: BufferedGribBatch?
 
-    init(message: GribMessage, download: BufferedDownload? = nil) {
+    init(message: GribMessage, download: BufferedGribBatch? = nil) {
         self.message = message
         self.download = download
     }
@@ -23,11 +23,11 @@ final class BufferedGribMessage: Sendable {
 /// Decode batches incrementally. Each emitted message owns its backing batch through ARC.
 struct BufferedGribSequence: AsyncSequence, Sendable {
     typealias Element = BufferedGribMessage
-    let downloads: ProcessingParallelQueue<BufferedDownload>.Results
+    let downloads: ProcessingParallelQueue<BufferedGribBatch>.Results
 
     struct AsyncIterator: AsyncIteratorProtocol {
-        var downloads: ProcessingParallelQueue<BufferedDownload>.Results.AsyncIterator
-        var current: BufferedDownload?
+        var downloads: ProcessingParallelQueue<BufferedGribBatch>.Results.AsyncIterator
+        var current: BufferedGribBatch?
         var offset = 0
         var messages = [BufferedGribMessage]()
 
