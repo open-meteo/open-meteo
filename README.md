@@ -62,6 +62,7 @@ Apps:
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
 - [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
+- [Frontside](https://frontside.live) Ranks every surf break near you on one map from Open-Meteo marine and wind forecasts, scored per break, so you know which one is worth the drive today. Free web app, no login.
 - [Going Blue](https://going.blue/) Expedition weather forecasts via satellite, with a custom codec that packs hundreds of forecast data points into each message.
 - [Heat Rules](https://heatrules.com/) A free browser-based calculator for occupational heat exposure limits. Inputs: location, work intensity, acclimatization status. Outputs: work/rest schedule, water intake, and the standard each number comes from.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
