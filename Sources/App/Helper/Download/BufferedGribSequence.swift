@@ -1,14 +1,21 @@
 import OmFileIO
 @preconcurrency import SwiftEccodes
 
-/// The raw handle never escapes independently of its backing compressed batch.
+/// Buffered messages retain their compressed batch; legacy messages have no batch reservation.
+/// The raw handle never escapes this wrapper.
 final class BufferedGribMessage: Sendable {
     private let message: GribMessage
     private let download: BufferedGribBatch?
 
-    init(message: GribMessage, download: BufferedGribBatch? = nil) {
+    init(message: GribMessage, download: BufferedGribBatch) {
         self.message = message
         self.download = download
+    }
+
+    /// Wrap a message from the legacy full-file or multi-range download path.
+    init(unbufferedMessage message: GribMessage) {
+        self.message = message
+        self.download = nil
     }
 
     func get(attribute: String) -> String? { message.get(attribute: attribute) }
