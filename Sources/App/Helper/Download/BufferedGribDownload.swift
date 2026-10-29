@@ -2,7 +2,7 @@ import NIOCore
 import OmFileIO
 
 /// An immutable compressed batch. Its byte reservation follows its ARC lifetime.
-final class BufferedDownload: Sendable {
+final class BufferedGribBatch: Sendable {
     private let buffer: ByteBuffer
     private let budget: DownloadByteBudget
 
@@ -57,7 +57,7 @@ enum BufferedGribDownload {
             guard range.count <= byteLimit else { throw ValidationError.rangeExceedsBudget(bytes: range.count, limit: byteLimit) }
         }
         let budget = DownloadByteBudget(capacity: byteLimit)
-        return try await ProcessingParallelQueue<BufferedDownload>.withResults(
+        return try await ProcessingParallelQueue<BufferedGribBatch>.withResults(
             inputs: ranges, concurrent: downloadConcurrent,
             work: { range in
                 try await budget.reserve(range.count)
@@ -66,7 +66,7 @@ enum BufferedGribDownload {
                     guard buffer.readableBytes == range.count else {
                         throw ValidationError.unexpectedSize(expected: range.count, actual: buffer.readableBytes)
                     }
-                    return BufferedDownload(buffer: buffer, budget: budget)
+                    return BufferedGribBatch(buffer: buffer, budget: budget)
                 } catch {
                     await budget.release(range.count)
                     throw error
