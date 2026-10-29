@@ -46,10 +46,15 @@ public final class ProcessingParallelQueue<T: Sendable>: Sendable {
         try state.checkFailure()
     }
 
-    /// Reject new submissions, drain enqueues already in progress, and join workers.
-    /// The consumer must keep iterating concurrently.
-    public func finish() async {
+    /// Close input to new submissions without waiting for workers or result consumption.
+    /// Enqueues already in progress are still delivered. Consume results through EOF to drain work.
+    public func finish() {
         state.finish()
+    }
+
+    /// Join workers after consuming results, including when iteration ends with an error.
+    /// This does not close input or consume results; call finish() and drain results first.
+    public func waitForCompletion() async {
         await processingTask.value
     }
 
@@ -101,7 +106,7 @@ public final class ProcessingParallelQueue<T: Sendable>: Sendable {
                         for input in inputs {
                             try await queue.enqueue { try await work(input) }
                         }
-                        await queue.finish()
+                        queue.finish()
                     } catch {
                         queue.state.fail(error)
                         throw error
