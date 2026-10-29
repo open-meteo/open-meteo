@@ -11,8 +11,7 @@ public final class ProcessingParallelQueue<T: Sendable>: Sendable {
 
     public init(concurrent: Int) {
         precondition(concurrent > 0)
-        let state = state
-        self.processingTask = Task {
+        self.processingTask = Task { [state, concurrent] in
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     for _ in 0..<concurrent {
