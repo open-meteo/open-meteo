@@ -17,6 +17,9 @@ struct GfsGraphCastDownload: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
+        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        var uploadS3RollingBucket: String?
+
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
 
@@ -67,7 +70,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, server: signature.server, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
         
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
     func getCmaVariable(logger: Logger, message: GribMessage) -> (any GfsGraphCastVariableDownloadable)? {
