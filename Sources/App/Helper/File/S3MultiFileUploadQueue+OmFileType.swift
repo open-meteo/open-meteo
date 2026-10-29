@@ -14,8 +14,8 @@ extension S3MultiFileUploadQueue {
 
     static func shouldUploadTimeSeriesFile(_ file: OmFileType, endpoint: S3BucketEndpoint, includeRolling: Bool = false) -> Bool {
         switch file {
-        case .domainChunk(let domain, _, .rolling, _, _, _):
-            return includeRolling || (domain == .google_weathernext2_ensemble && !endpoint.isDefaultOpenMeteoOrAws)
+        case .domainChunk(_, _, .rolling, _, _, _):
+            return includeRolling
         case .domainChunk(_, _, _, _, _, let previousDay) where previousDay > 0:
             return !endpoint.isDefaultOpenMeteoOrAws
         case .domainChunk, .staticFile, .run:
