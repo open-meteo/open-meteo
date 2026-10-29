@@ -5,10 +5,17 @@ extension S3MultiFileUploadQueue {
         guard Self.shouldUploadTimeSeriesFile(file, endpoint: endpoint, includeRolling: includeRolling) else {
             return
         }
+        let commitImmediately: Bool
+        if case .domainChunk(_, _, .rolling, _, _, _) = file {
+            commitImmediately = true
+        } else {
+            commitImmediately = false
+        }
         await uploadMultipart(
             file: file.getFilePath(),
             objectName: "data/\(file.getRelativeFilePath())",
-            lastModified: .now()
+            lastModified: .now(),
+            commitImmediately: commitImmediately
         )
     }
 

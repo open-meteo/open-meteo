@@ -29,7 +29,7 @@ public struct S3UploadQueue: Sendable {
     /// Enqueue completion of multi files
     public func finishMultiPartUploads(_ session: S3MultiFileUploadQueue) async {
         await queue.enqueueIgnoreError(logger: logger) {
-            let prepared = await session.queue.collect()
+            let prepared = await session.finishPreparations()
             try await prepared.foreachConcurrent(nConcurrent: 4, body: { prepared in
                 try await prepared.commit(client: client)
             })
@@ -39,7 +39,7 @@ public struct S3UploadQueue: Sendable {
     /// Abort multipart uploads that were prepared before a conversion failure.
     public func abortMultiPartUploads(_ session: S3MultiFileUploadQueue) async {
         await queue.enqueueIgnoreError(logger: logger) {
-            let prepared = await session.queue.collect()
+            let prepared = await session.finishPreparations()
             try await prepared.foreachConcurrent(nConcurrent: 4, body: { prepared in
                 try await prepared.abort(client: client)
             })
@@ -81,7 +81,7 @@ public struct S3UploadQueue: Sendable {
 }
 
 
-/// Upload multiple files in the background, but do not commit them yet. Once all files have been uploaded, commit all of them
+/// Upload multiple files in the background. Files can commit immediately or wait for session completion.
 public struct S3MultiFileUploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
     let client: HTTPClient
@@ -91,7 +91,7 @@ public struct S3MultiFileUploadQueue: Sendable {
     let partUploadExecutor: LimitedConcurrencyExecutor
     
     /// Max number of concurrent file uploads. 4 should be fine
-    let queue: ProcessingParallelQueue<S3MultiPartUploadPrepared>
+    let queue: ProcessingParallelQueue<S3MultiPartUploadPrepared?>
     
     public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int) {
         self.partUploadExecutor = .init(maxConcurrency: maxConcurrentPartUploads)
@@ -107,10 +107,39 @@ public struct S3MultiFileUploadQueue: Sendable {
         }
     }
     
-    public func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
-        await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
-            try await S3Uploader.uploadMultipart(client: client, file: file, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified, executor: partUploadExecutor)
+    public func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp, commitImmediately: Bool = false) async {
+        let url = endpoint.uploadURL(remotePath: objectName)
+        let commit: (@Sendable (S3MultiPartUploadPrepared) async throws -> Void)?
+        if commitImmediately {
+            commit = { [client] prepared in try await prepared.commit(client: client) }
+        } else {
+            commit = nil
         }
+        await enqueuePreparation(commit: commit) { [client, executor = partUploadExecutor] in
+            try await S3Uploader.uploadMultipart(client: client, file: file, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
+        }
+    }
+
+    func enqueuePreparation(commit: (@Sendable (S3MultiPartUploadPrepared) async throws -> Void)? = nil, _ work: @escaping @Sendable () async throws -> S3MultiPartUploadPrepared) async {
+        await queue.enqueueIgnoreError(logger: logger) { [client, logger] in
+            let prepared = try await work()
+            guard let commit else { return prepared }
+            do {
+                try await commit(prepared)
+            } catch {
+                // A failed immediate commit must not leave an unfinished multipart upload behind.
+                do { try await prepared.abort(client: client) } catch {
+                    logger.error("Error aborting multipart upload: \(error)")
+                }
+                throw error
+            }
+            // Already published; exclude it from later batch commit or abort.
+            return nil
+        }
+    }
+
+    func finishPreparations() async -> [S3MultiPartUploadPrepared] {
+        await queue.collect().compactMap { $0 }
     }
 
 }
