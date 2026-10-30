@@ -106,39 +106,50 @@ import Synchronization
         #expect(capped.map(\.bytes) == [0..<150, 150..<151])
     }
 
-    @Test(arguments: [1024 * 1024, 1024 * 1024 + 1])
+    @Test(arguments: [128 * 1024, 128 * 1024 + 1])
     func mergeGapLimit(gap: Int) {
         let start = UInt64(10 + gap)
         let ranges: [Range<UInt64>] = [0..<10, 10..<start, start..<(start + 10)]
         let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, false, true])
-        let expected = gap == 1024 * 1024 ? [0..<(20 + gap)] : [0..<10, (10 + gap)..<(20 + gap)]
+        let expected = gap == 128 * 1024 ? [0..<(20 + gap)] : [0..<10, (10 + gap)..<(20 + gap)]
         #expect(runs.map(\.bytes) == expected)
         let capped = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, false, true], max: gap + 19)
         #expect(capped.count == 2)
     }
 
-    @Test func mergedReadsOnlyWriteSelectedChunks() async throws {
+    @Test(arguments: [0, 1, 1024 * 1024])
+    func customMergeGapLimit(limit: Int) {
+        for gap in [limit, limit + 1] {
+            let start = UInt64(10 + gap)
+            let ranges: [Range<UInt64>] = [0..<10, start..<(start + 10)]
+            let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, true], maxMergeGapBytes: limit)
+            #expect(runs.count == (gap <= limit ? 1 : 2))
+        }
+    }
+
+    @Test(arguments: [0, 128 * 1024], [1, 3, 8, 10])
+    func mergedReadsOnlyWriteSelectedChunks(maxMergeGapBytes: Int, maxConcurrentReads: Int) async throws {
         let values = (0..<120).map { Float($0) / 20 }
         let source = try fixture(values, dimensions: [1, 40, 3], chunks: [1, 1, 3])
         let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let ranges = try await array.chunkIndex()
         let selectedCells = (0..<40).map { $0 % 2 == 1 }
-        let selectedRanges = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: selectedCells).map(\.bytes)
-        #expect(selectedRanges.count == 1)
+        let selectedRanges = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: selectedCells, maxMergeGapBytes: maxMergeGapBytes).map(\.bytes)
+        #expect(selectedRanges.count == (maxMergeGapBytes == 0 ? 20 : 1))
         let backend = RecordingReadBackend(data: source.data, delayedOffsets: Set(selectedRanges.map(\.lowerBound)))
-        let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40)
+        let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40, maxMergeGapBytes: maxMergeGapBytes, maxConcurrentReads: maxConcurrentReads)
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
         _ = try await keep.write(remote: backend, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test"))
 
-        #expect(await backend.peakConcurrentReads == 1)
-        #expect(await backend.readsBeforeFirstCompleted == 1)
+        #expect(await backend.peakConcurrentReads == min(selectedRanges.count, maxConcurrentReads))
+        #expect(await backend.readsBeforeFirstCompleted >= min(selectedRanges.count, maxConcurrentReads))
         let retained = backend.liveBuffers.state.withLock { $0 }
-        #expect(retained.peak <= SyncBoundingBox.maxConcurrentReads)
+        #expect(retained.peak <= maxConcurrentReads)
         #expect(retained.current == 0)
         let payloadReads = await backend.requests.filter { selectedRanges.contains($0) }
         #expect(payloadReads.sorted { $0.lowerBound < $1.lowerBound } == selectedRanges)
-        // This small fixture fits in one metadata block, followed by one merged payload read.
+        // This small fixture fits in one metadata block, followed by the payload reads.
         #expect(source.count <= 4096)
         #expect(await backend.requests.first == 0..<source.count)
         #expect(await backend.requests.count == selectedRanges.count + 1)
@@ -281,7 +292,11 @@ import Synchronization
         let regions: [any GeographicRegion] = [try Polygon(text: text), try SyncPolygon(text: text), box]
         let expected = SyncBoundingBox.selectedCells(grid: grid, region: box)
         for region in regions {
-            #expect(try SyncBoundingBox(grid: grid, region: region).selectedCells == expected)
+            let defaults = try SyncBoundingBox(grid: grid, region: region)
+            #expect(defaults.maxMergeGapBytes == 128 * 1024 && defaults.maxConcurrentReads == 8)
+            let custom = try SyncBoundingBox(grid: grid, region: region, maxMergeGapBytes: 1024 * 1024, maxConcurrentReads: 10)
+            #expect(custom.maxMergeGapBytes == 1024 * 1024 && custom.maxConcurrentReads == 10)
+            #expect(custom.selectedCells == expected && defaults.selectedCells == expected)
             #expect(throws: ForecastApiError.self) { try SyncBoundingBox(grid: self.grid, region: region) }
         }
     }

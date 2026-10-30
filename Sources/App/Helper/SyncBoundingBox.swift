@@ -11,18 +11,22 @@ struct SyncBoundingBox: Sendable {
     /// `ny * nx` flags in grid order
     let selectedCells: [Bool]
     let nx: Int
+    let maxMergeGapBytes: Int
+    let maxConcurrentReads: Int
 
-    init(grid: any Gridable, region: some GeographicRegion) throws {
+    init(grid: any Gridable, region: some GeographicRegion, maxMergeGapBytes: Int = defaultMaxMergeGapBytes, maxConcurrentReads: Int = defaultMaxConcurrentReads) throws {
         let inside = Self.selectedCells(grid: grid, region: region)
         guard inside.contains(true) else {
             throw ForecastApiError.generic(message: "no cell of this grid lies inside the box or polygon")
         }
-        self.init(selectedCells: inside, nx: grid.nx)
+        self.init(selectedCells: inside, nx: grid.nx, maxMergeGapBytes: maxMergeGapBytes, maxConcurrentReads: maxConcurrentReads)
     }
 
-    init(selectedCells: [Bool], nx: Int) {
+    init(selectedCells: [Bool], nx: Int, maxMergeGapBytes: Int = defaultMaxMergeGapBytes, maxConcurrentReads: Int = defaultMaxConcurrentReads) {
         self.selectedCells = selectedCells
         self.nx = nx
+        self.maxMergeGapBytes = maxMergeGapBytes
+        self.maxConcurrentReads = maxConcurrentReads
     }
 
     /// Longitude from -180 to 180, because some grids count degrees east up to 360
@@ -73,9 +77,9 @@ struct SyncBoundingBox: Sendable {
         }
     }
 
-    /// Combine selected chunks across gaps up to 1 MiB, keeping the full read within the limit.
+    /// Combine selected chunks across configurable gaps (128 KiB by default), keeping the full read within the limit.
     /// Empty chunks need no read. A single oversized chunk is fetched in one request.
-    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], max limit: Int = maxReadBytes) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
+    static func coalescedReadRanges<Ranges: RandomAccessCollection>(ranges: Ranges, takeChunks: [Bool], max limit: Int = maxReadBytes, maxMergeGapBytes: Int = defaultMaxMergeGapBytes) -> [(chunks: Range<Int>, bytes: Range<Int>)] where Ranges.Index == Int, Ranges.Element == Range<UInt64> {
         var runs = [(chunks: Range<Int>, bytes: Range<Int>)]()
         for i in ranges.indices where takeChunks[i] && !ranges[i].isEmpty {
             let bytes = Int(ranges[i].lowerBound) ..< Int(ranges[i].upperBound)
@@ -120,14 +124,14 @@ struct SyncBoundingBox: Sendable {
             attributes.append(child)
         }
         let ranges = try await array.chunkIndex()
-        let runs = Self.coalescedReadRanges(ranges: ranges, takeChunks: take)
+        let runs = Self.coalescedReadRanges(ranges: ranges, takeChunks: take, maxMergeGapBytes: maxMergeGapBytes)
 
         let fn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         let writer = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024)
         let out = try writer.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: chunks, compression: array.compression, scale_factor: array.scaleFactor, add_offset: array.addOffset)
         var nextChunk = 0
 
-        let reads = runs.mapStream(nConcurrent: Self.maxConcurrentReads) { run in
+        let reads = runs.mapStream(nConcurrent: maxConcurrentReads) { run in
             try Task.checkCancellation()
             let data = try await remote.getData(offset: run.bytes.lowerBound, count: run.bytes.count)
             guard data.withUnsafeBytes({ $0.count }) == run.bytes.count else { throw CurlErrorNonRetry.chunkSizeMismatch }
@@ -184,9 +188,9 @@ struct SyncBoundingBox: Sendable {
     /// Maximum size of a merged HTTP read; a single oversized chunk is fetched whole.
     static let maxReadBytes = 8 * 1024 * 1024
     /// Maximum gap between selected chunks to include in a single HTTP read; gap bytes are discarded.
-    static let maxMergeGapBytes = 1024 * 1024
+    static let defaultMaxMergeGapBytes = 128 * 1024
     /// Maximum concurrent range requests per file.
-    static let maxConcurrentReads = 8
+    static let defaultMaxConcurrentReads = 8
 }
 
 /// Counts read requests and bytes from the wrapped backend for transfer statistics.
