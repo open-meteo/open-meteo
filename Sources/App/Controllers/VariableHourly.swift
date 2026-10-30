@@ -572,7 +572,7 @@ extension GenericDomain {
     }
     
     /// Compose daily output from the same cached hourly reader.
-    func makeGenericHourlyDaily<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult {
+    func makeGenericHourlyDaily<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> MultiDomains.ForecastReaderResult {
         guard let hourly = try await makeDerivedHourly(variableType: variableType, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
