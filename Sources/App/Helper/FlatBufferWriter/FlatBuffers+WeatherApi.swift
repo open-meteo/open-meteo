@@ -1082,8 +1082,7 @@ extension MultiDomains {
         case .geosphere_arome_austria:
             return .geosphereAromeAustria
         case .geosphere_claef_austria:
-            // TODO: register geosphere_claef_austria in the OpenMeteoSdk model enum
-            return .geosphereAromeAustria
+            return .geosphereClaefAustria
         case .chmi_aladin_cz_1km:
             return .chmiAladinCz1km
         case .chmi_aladin_central_europe_2km:
