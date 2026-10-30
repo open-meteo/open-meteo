@@ -97,7 +97,7 @@ import Vapor
         let old = RunFixtureDomain(availability: oldAvailable ? .available(run.toTimestamp()) : .missing)
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: newAvailable ? .available(run.toTimestamp()) : .missing)
         let mapping = MultiDomains.DomainReaderMapping(
-            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
+            primary: [.mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
             requirePrimaryCoverage: true
         )
         if oldAvailable || newAvailable {
@@ -135,7 +135,7 @@ import Vapor
         let old = RunFixtureDomain(availability: .available(run.toTimestamp()))
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: .missing)
         let mapping = MultiDomains.DomainReaderMapping(
-            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
+            primary: [.mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
             requirePrimaryCoverage: true
         )
         let result = try await mapping.getReaders(lat: -80, lon: 100, elevation: 0, mode: .nearest, options: options(run: run))
@@ -159,7 +159,7 @@ import Vapor
         let mapping = MultiDomains.DomainReaderMapping(
             primary: [
                 .domain(old, GemVariable.self),
-                .mixedBeforeDerivation(.init(domains: [new], variableType: GemVariable.self, derivationDomain: new))
+                .mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [new], variableType: GemVariable.self, derivationDomain: new))
             ],
             gridForBoundingBoxRequests: old,
             prefetchAllReaders: true, smoothTransitions: false
@@ -184,9 +184,9 @@ import Vapor
             domainRegistry: .cmc_gem_rdps_10km,
             grid: RegularGrid(nx: 1, ny: 1, latMin: 45.01, lonMin: -74.98, dx: 1, dy: 1)
         )
-        let group = mixedSchemas
-            ? MultiDomains.RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, GemVariable.self))
-            : MultiDomains.RawReaderDerivationGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
+        let group: any MultiDomains.RawReaderGroupProtocol = mixedSchemas
+            ? MultiDomains.SupplementalReaderGroup(primary: (native, GemVariable.self), supplemental: (output, GemVariable.self))
+            : MultiDomains.SameVariableReaderGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
         let mapping = MultiDomains.DomainReaderMapping(
             primary: [
                 .domain(output, GemVariable.self),
@@ -204,7 +204,7 @@ import Vapor
             #expect(remapped.targetElevation == 500)
             #expect(remapped.modelLat == expected.latitude)
             #expect(remapped.modelLon == expected.longitude)
-            let rawGroup = try #require(await group.makeReader(coordinate: expected, options: options()))
+            let rawGroup = try #require(await group.makeReader(selection: .outputGridCell(latitude: expected.latitude, longitude: expected.longitude), elevation: .nan, options: options()))
             #expect(rawGroup.reader.modelLat == expected.latitude)
             #expect(rawGroup.reader.modelLon == expected.longitude)
             #expect(hourly.modelLat == expected.latitude)
