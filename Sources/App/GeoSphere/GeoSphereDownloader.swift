@@ -41,11 +41,18 @@ struct GeoSphereDownloader: AsyncCommand {
         let domain = try GeoSphereDomain.load(rawValue: signature.domain)
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        let onlyVariables = try GeoSphereVariable.load(commaSeparatedOptional: signature.onlyVariables)
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles: [GenericVariableHandle]
+        switch domain {
+        case .arome_austria:
+            let onlyVariables = try GeoSphereVariable.load(commaSeparatedOptional: signature.onlyVariables)
+            handles = try await downloadArome(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
+        case .claef_austria:
+            let onlyVariables = try GeoSphereClaefVariable.load(commaSeparatedOptional: signature.onlyVariables.map { [$0] })
+            handles = try await downloadClaef(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
+        }
         let nConcurrent = signature.concurrent ?? 1
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
 
@@ -86,16 +93,6 @@ struct GeoSphereDownloader: AsyncCommand {
 
         logger.info("Writing elevation file (\(elevation.count) grid points)")
         try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
-    }
-
-    /// Download forecast data and return variable handles
-    func download(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
-        switch domain {
-        case .arome_austria:
-            return try await downloadArome(application: application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: uploadS3Bucket)
-        case .claef_austria:
-            return try await downloadClaef(application: application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: uploadS3Bucket)
-        }
     }
 
     /// GeoSphere weather symbol codes 1-32 mapped to WMO weather codes
@@ -318,7 +315,7 @@ struct GeoSphereDownloader: AsyncCommand {
 
     /// Download C-LAEF AlpeAdria. Amounts are per hour and radiation is an hourly mean, so nothing is deaccumulated.
     /// Values of the first step are missing for all interval variables.
-    func downloadClaef(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadClaef(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereClaefVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
@@ -412,7 +409,7 @@ struct GeoSphereDownloader: AsyncCommand {
         ]
 
         for (ncName, omVar, multiply) in simpleVariables {
-            if let onlyVariables, !onlyVariables.contains(omVar) {
+            if let onlyVariables, !onlyVariables.contains(.surface(omVar)) {
                 continue
             }
             logger.info("Processing \(omVar)")
@@ -423,8 +420,8 @@ struct GeoSphereDownloader: AsyncCommand {
             try await write(omVar, spatial)
         }
 
-        let writeWindSpeed = onlyVariables?.contains(.wind_speed_10m) ?? true
-        let writeWindDirection = onlyVariables?.contains(.wind_direction_10m) ?? true
+        let writeWindSpeed = onlyVariables?.contains(.surface(.wind_speed_10m)) ?? true
+        let writeWindDirection = onlyVariables?.contains(.surface(.wind_direction_10m)) ?? true
         if writeWindSpeed || writeWindDirection {
             logger.info("Processing wind speed and direction")
             let u = try read("10u")
@@ -441,11 +438,72 @@ struct GeoSphereDownloader: AsyncCommand {
             }
         }
 
-        if onlyVariables?.contains(.weather_code) ?? true {
+        if onlyVariables?.contains(.surface(.weather_code)) ?? true {
             logger.info("Converting weather code")
             var symbol = try read("sy")
             symbol.data = symbol.data.map(Self.weatherCode)
             try await write(.weather_code, symbol)
+        }
+
+        let onlyPressureVariables = onlyVariables?.compactMap { variable -> GeoSpherePressureVariable? in
+            guard case .pressure(let pressure) = variable else { return nil }
+            return pressure
+        }
+        if onlyPressureVariables?.isEmpty != true {
+            guard let levels = try ncFile.getVariable(name: "plev")?.asType(Double.self)?.read(),
+                  levels.allSatisfy({ Int(exactly: $0) != nil }) else {
+                throw Abort(.internalServerError, reason: "Could not read C-LAEF pressure levels")
+            }
+            for variable in onlyPressureVariables ?? [] where !levels.contains(Double(variable.level)) {
+                throw Abort(.internalServerError, reason: "Missing C-LAEF pressure level \(variable.level) hPa")
+            }
+            let pressureFields: [(ncName: String, variable: GeoSpherePressureVariableType, multiply: Float)] = [
+                ("t", .temperature, 1),
+                ("u", .wind_u_component, 1),
+                ("v", .wind_v_component, 1),
+                ("z", .geopotential_height, 1 / 9.80665),
+                ("r", .relative_humidity, 1),
+                ("w", .vertical_velocity, 1) // Convert omega to m/s using temperature below.
+            ]
+            for (ncName, kind, multiply) in pressureFields {
+                let selectedLevels = levels.enumerated().filter { _, level in
+                    guard let onlyPressureVariables else { return true }
+                    let variable = GeoSpherePressureVariable(variable: kind, level: Int(level))
+                    return onlyPressureVariables.contains(variable)
+                }
+                guard !selectedLevels.isEmpty else { continue }
+                guard let field = ncFile.getVariable(name: ncName),
+                      field.dimensions.map({ $0.name }) == ["time", "plev", "latitude", "longitude"],
+                      field.dimensions.map({ $0.length }) == [nTime, levels.count, ny, nx],
+                      let values = field.asType(Float.self) else {
+                    throw Abort(.internalServerError, reason: "Invalid C-LAEF pressure variable \(ncName)")
+                }
+                let temperatureField = kind == .vertical_velocity ? ncFile.getVariable(name: "t") : nil
+                let temperatureValues = temperatureField?.asType(Float.self)
+                if kind == .vertical_velocity {
+                    guard let temperatureField, temperatureValues != nil,
+                          temperatureField.dimensions.map({ $0.name }) == field.dimensions.map({ $0.name }),
+                          temperatureField.dimensions.map({ $0.length }) == field.dimensions.map({ $0.length }) else {
+                        throw Abort(.internalServerError, reason: "Invalid C-LAEF temperature for omega conversion")
+                    }
+                }
+                for (levelIndex, level) in selectedLevels {
+                    let variable = GeoSpherePressureVariable(variable: kind, level: Int(level))
+                    logger.info("Processing \(variable.rawValue)")
+                    for t in 0..<nTime {
+                        var data = try values.read(offset: [t, levelIndex, 0, 0], count: [1, 1, ny, nx])
+                        if let temperatureValues {
+                            let temperature = try temperatureValues.read(offset: [t, levelIndex, 0, 0], count: [1, 1, ny, nx])
+                            data = Meteorology.verticalVelocityPressureToGeometric(omega: data, temperature: temperature, pressureLevel: Float(level))
+                        }
+                        data.flipLatitude(nt: 1, ny: ny, nx: nx)
+                        if multiply != 1 {
+                            data.multiplyAdd(multiply: multiply, add: 0)
+                        }
+                        try await writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
+                    }
+                }
+            }
         }
 
         await curl.printStatistics()

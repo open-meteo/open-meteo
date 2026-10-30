@@ -238,3 +238,55 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min || self == .surface_temperature
     }
 }
+
+
+enum GeoSpherePressureVariableType: String, CaseIterable {
+    case temperature
+    case wind_u_component
+    case wind_v_component
+    case geopotential_height
+    case relative_humidity
+    case vertical_velocity
+}
+
+struct GeoSpherePressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
+    let variable: GeoSpherePressureVariableType
+    let level: Int
+
+    var storePreviousForecast: Bool { false }
+    var omFileName: (file: String, level: Int) { (rawValue, 0) }
+    var isElevationCorrectable: Bool { false }
+
+    var scalefactor: Float {
+        switch variable {
+        case .temperature:
+            return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
+        case .wind_u_component, .wind_v_component:
+            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+        case .geopotential_height:
+            return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
+        case .relative_humidity:
+            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        case .vertical_velocity:
+            return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        variable == .relative_humidity ? .hermite(bounds: 0...100) : .hermite(bounds: nil)
+    }
+
+    var unit: SiUnit {
+        switch variable {
+        case .temperature: return .celsius
+        case .wind_u_component, .wind_v_component: return .metrePerSecond
+        case .geopotential_height: return .metre
+        case .relative_humidity: return .percentage
+        case .vertical_velocity:
+            return .metrePerSecondNotUnitConverted
+        }
+    }
+}
+
+/// C-LAEF adds pressure levels; AROME retains its surface-only schema.
+typealias GeoSphereClaefVariable = SurfaceAndPressureVariable<GeoSphereVariable, GeoSpherePressureVariable>
