@@ -342,7 +342,7 @@ struct WeatherApiController {
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await preparedDomains.asyncCompactMap { preparedDomain in
                         let domain = preparedDomain.domain
-                        let result: ForecastReaderResult?
+                        let result: MultiDomains.ForecastReaderResult?
                         if let factory = preparedDomain.factory {
                             result = try await factory.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection)
                         } else {
@@ -763,26 +763,6 @@ struct ReaderLocation {
     let output: ReaderOutputLocation
 }
 
-enum ReaderSelection {
-    case point(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode)
-    case outputCell(ReaderOutputLocation)
-
-    var elevation: Float {
-        switch self {
-        case .point(_, _, let elevation, _): return elevation
-        case .outputCell(let output): return output.elevation
-        }
-    }
-
-    func resolvingPointElevation(_ elevation: Float) -> Self {
-        switch self {
-        case .point(let lat, let lon, _, let mode):
-            return .point(lat: lat, lon: lon, elevation: elevation, mode: mode)
-        case .outputCell: return self
-        }
-    }
-}
-
 /// Immutable resources shared by the readers of one domain in a request.
 struct ReaderDomainResources {
     let grid: any Gridable
@@ -811,352 +791,6 @@ struct ReaderDomainResources {
             output: .init(latitude: coordinates.latitude, longitude: coordinates.longitude,
                           elevation: elevation.isNaN ? selected.gridElevation.numeric : elevation)
         )
-    }
-}
-
-struct RawReaderDerivationGroup {
-    private let makeReaderClosure: (ReaderSelection, ReaderFactory) async throws -> DerivedReaderResult?
-
-    init<Domain, Variable>(
-        domains: [Domain],
-        variableType: Variable.Type,
-        derivationDomain: Domain
-    ) where
-        Domain: GenericDomain,
-        Variable: GenericVariable & Hashable
-    {
-        self.makeReaderClosure = { selection, factory in
-            let elevation = selection.elevation
-            let options = factory.options
-            var resolvedElevation = elevation
-            var unavailableRun: ForecastApiError?
-            var derivationDomainInitialized = false
-            var hasAvailableRun = false
-            let initialized: [GenericReaderCached<Domain, Variable>] = try await domains.reversed().asyncCompactMap { domain in
-                do {
-                    let rawReader: GenericReader<Domain, Variable>? = try await factory.makeRawReader(domain: domain, selection: selection.resolvingPointElevation(resolvedElevation))
-                    hasAvailableRun = true
-                    guard let rawReader else { return nil }
-                    let reader = GenericReaderCached(reader: rawReader)
-                    if case .point = selection, resolvedElevation.isNaN {
-                        resolvedElevation = reader.resolvedTargetElevation
-                    }
-                    if domain.domainRegistry == derivationDomain.domainRegistry {
-                        derivationDomainInitialized = true
-                    }
-                    return reader
-                } catch let error as ForecastApiError {
-                    guard case .modelRunUnavailable = error else { throw error }
-                    unavailableRun = unavailableRun ?? error
-                    return nil
-                }
-            }.reversed()
-            guard !initialized.isEmpty else {
-                if !hasAvailableRun, let error = unavailableRun { throw error }
-                return nil
-            }
-            // Preserve ordinary spatial coverage; an explicit run may use another generation.
-            guard derivationDomainInitialized || options.run != nil else { return nil }
-            let mixer = GenericReaderMixerSameVariableType(reader: initialized)
-            let reader = VariableHourlyDeriver(
-                reader: mixer,
-                options: options,
-                domainRegistry: derivationDomain.domainRegistry
-            )
-            return (reader, resolvedElevation)
-        }
-    }
-
-    init<PrimaryDomain, PrimaryVariable, SupplementalDomain, SupplementalVariable>(
-        primary: (PrimaryDomain, PrimaryVariable.Type),
-        supplemental: (SupplementalDomain, SupplementalVariable.Type)
-    ) where
-        PrimaryDomain: GenericDomain,
-        PrimaryVariable: GenericVariable,
-        SupplementalDomain: GenericDomain,
-        SupplementalVariable: GenericVariable
-    {
-        self.makeReaderClosure = { selection, factory in
-            let elevation = selection.elevation
-            let options = factory.options
-            guard let primaryRawReader: GenericReader<PrimaryDomain, PrimaryVariable> = try await factory.makeRawReader(
-                domain: primary.0,
-                selection: selection
-            ) else {
-                return nil
-            }
-            let primaryReader = GenericReaderCached(reader: primaryRawReader)
-            let resolvedElevation: Float
-            switch selection {
-            case .point:
-                resolvedElevation = elevation.isFinite ? elevation : primaryReader.resolvedTargetElevation
-            case .outputCell:
-                resolvedElevation = elevation
-            }
-            let supplementalReader: GenericReaderCached<SupplementalDomain, SupplementalVariable>?
-            do {
-                let rawReader: GenericReader<SupplementalDomain, SupplementalVariable>? = try await factory.makeRawReader(
-                    domain: supplemental.0, selection: selection.resolvingPointElevation(resolvedElevation)
-                )
-                supplementalReader = rawReader.map { GenericReaderCached(reader: $0) }
-            } catch ForecastApiError.modelRunUnavailable {
-                supplementalReader = nil
-            }
-            let rawReaders: [any GenericReaderProtocol] = [supplementalReader].compactMap { $0 } + [primaryReader]
-            let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<PrimaryVariable, SupplementalVariable>>(
-                reader: rawReaders
-            )
-            let reader = VariableHourlyDeriver(
-                reader: mixer,
-                options: options,
-                domainRegistry: primary.0.domainRegistry
-            )
-            return (reader, resolvedElevation)
-        }
-    }
-
-    fileprivate func makeReader(selection: ReaderSelection, factory: ReaderFactory) async throws -> DerivedReaderResult? {
-        try await makeReaderClosure(selection, factory)
-    }
-}
-
-/// Executes a declarative plan sequentially within a request or export chunk.
-/// Domain resources and run validation are reused; readers own their data caches.
-final class ReaderFactory {
-    let plan: ReaderPlan
-    let options: GenericReaderOptions
-
-    // A registered domain has one storage grid and run inventory for the request.
-    private var domains = [DomainRegistry: ReaderDomainResources]()
-    private var runs = [DomainRegistry: Result<Void, any Error>]()
-    // Shared only while constructing readers for one output cell; reset by getReaders(gridpoint:).
-    private var sourceLocations = [DomainRegistry: ReaderSourceLocation]()
-
-    init(plan: ReaderPlan, options: GenericReaderOptions) {
-        self.plan = plan
-        self.options = options
-    }
-
-    private func resources(for domain: any GenericDomain) async -> ReaderDomainResources {
-        let key = domain.domainRegistry
-        if let resources = domains[key] { return resources }
-        let resources = await ReaderDomainResources(domain: domain)
-        domains[key] = resources
-        return resources
-    }
-
-    private func validateRun(domain: any GenericDomain) async throws {
-        guard options.run != nil else { return }
-        let key = domain.domainRegistry
-        if let result = runs[key] { return try result.get() }
-        do {
-            try await options.validateRun(domain: domain)
-            runs[key] = .success(())
-        } catch {
-            runs[key] = .failure(error)
-            throw error
-        }
-    }
-
-    private func outputCell(domain: any GenericDomain, position: Int) async throws -> ReaderSelection {
-        let resources = await resources(for: domain)
-        let source = try await resources.sourceLocation(position: position)
-        sourceLocations[domain.domainRegistry] = source
-        let coordinates = resources.grid.getCoordinates(gridpoint: position)
-        return .outputCell(.init(latitude: coordinates.latitude, longitude: coordinates.longitude, elevation: source.elevation.numeric))
-    }
-
-    fileprivate func makeRawReader<Domain: GenericDomain, Variable: GenericVariable>(
-        domain: Domain, selection: ReaderSelection
-    ) async throws -> GenericReader<Domain, Variable>? {
-        // Run availability is independent of coverage, even when the location is outside the grid.
-        if options.run != nil { try await validateRun(domain: domain) }
-        let location: ReaderLocation
-        switch selection {
-        case .point(let lat, let lon, let elevation, let mode):
-            let resources = await resources(for: domain)
-            guard let selected = try await resources.point(lat: lat, lon: lon, elevation: elevation, mode: mode) else { return nil }
-            location = selected
-        case .outputCell(let output):
-            let key = domain.domainRegistry
-            let source: ReaderSourceLocation
-            if let cached = sourceLocations[key] {
-                source = cached
-            } else {
-                let resources = await resources(for: domain)
-                guard let position = resources.grid.findPoint(lat: output.latitude, lon: output.longitude) else { return nil }
-                source = try await resources.sourceLocation(position: position)
-                sourceLocations[key] = source
-            }
-            location = ReaderLocation(source: source, output: output)
-        }
-        return GenericReader(domain: domain, location: location, run: options.run)
-    }
-
-    private func makeDerivedReader<Domain: GenericDomain, Variable: GenericVariable>(
-        domain: Domain, variable: Variable.Type, selection: ReaderSelection
-    ) async throws -> DerivedReaderResult? {
-        guard let raw: GenericReader<Domain, Variable> = try await makeRawReader(domain: domain, selection: selection) else { return nil }
-        let reader = VariableHourlyDeriver(reader: GenericReaderCached(reader: raw), options: options, domainRegistry: domain.domainRegistry)
-        return (reader, raw.targetElevation)
-    }
-
-    private func makeReader(source: ReaderPlan.Source, selection: ReaderSelection) async throws -> DerivedReaderResult? {
-        switch source {
-        case .domain(let domain, let variable):
-            return try await makeDerivedReader(domain: domain, variable: variable, selection: selection)
-        case .mixedBeforeDerivation(let group):
-            return try await group.makeReader(selection: selection, factory: self)
-        }
-    }
-
-    struct Readers {
-        var readers = [any GenericReaderOptionalProtocol<ForecastVariable>]()
-        var elevation: Float
-        var unavailableRun: ForecastApiError?
-        var hasAvailableRun = false
-    }
-
-    func makeDomainReaders(sources: [ReaderPlan.Source], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws -> Readers {
-        var result = Readers(elevation: elevation)
-        result.readers.reserveCapacity(sources.count)
-        for source in sources.reversed() {
-            do {
-                let reader = try await makeReader(source: source, selection: .point(lat: lat, lon: lon, elevation: result.elevation, mode: mode))
-                // A valid run outside coverage still satisfies run availability.
-                result.hasAvailableRun = true
-                guard let reader else { continue }
-                if result.elevation.isNaN { result.elevation = reader.elevation }
-                result.readers.append(reader.reader)
-            } catch let error as ForecastApiError {
-                guard case .modelRunUnavailable = error else { throw error }
-                result.unavailableRun = result.unavailableRun ?? error
-            }
-        }
-        result.readers.reverse()
-        return result
-    }
-
-    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws -> ForecastReaderResult? {
-        let forecast = try await makeDomainReaders(sources: plan.primary, lat: lat, lon: lon, elevation: elevation, mode: mode)
-        if !forecast.hasAvailableRun, let error = forecast.unavailableRun { throw error }
-        if plan.requirePrimaryCoverage && forecast.readers.isEmpty { return nil }
-        let supplemental = try await makeDomainReaders(sources: plan.secondary, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode)
-        let readers = supplemental.readers + forecast.readers
-        guard !readers.isEmpty else { return nil }
-        return combined(readers)
-    }
-
-    func getReaders(gridpoint: Int) async throws -> ForecastReaderResult {
-        // Source positions belong to this output cell. Retain capacity, but never reuse
-        // positions from a previous call, including one that failed during construction.
-        sourceLocations.removeAll(keepingCapacity: true)
-        guard let outputDomain = plan.gridForBoundingBoxRequests else { return (nil, nil, nil, nil) }
-        let selection = try await outputCell(domain: outputDomain, position: gridpoint)
-        var unavailableRun: ForecastApiError?
-        var readers = [any GenericReaderOptionalProtocol<ForecastVariable>]()
-        readers.reserveCapacity(plan.primary.count)
-        for source in plan.primary {
-            do {
-                if let result = try await makeReader(source: source, selection: selection) {
-                    readers.append(result.reader)
-                }
-            } catch let error as ForecastApiError {
-                guard case .modelRunUnavailable = error else { throw error }
-                unavailableRun = unavailableRun ?? error
-            }
-        }
-        if readers.isEmpty, let error = unavailableRun { throw error }
-        // Empty output cells still produce null forecast columns.
-        return combined(readers)
-    }
-
-    private func combined(_ readers: [any GenericReaderOptionalProtocol<ForecastVariable>]) -> ForecastReaderResult {
-        let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: plan.prefetchAllReaders, smoothTransitions: plan.smoothTransitions)
-        return (hourly, hourly.makeDailyAggregator(), nil, nil)
-    }
-}
-
-typealias DerivedReaderResult = (reader: any GenericReaderOptionalProtocol<ForecastVariable>, elevation: Float)
-
-typealias ForecastReaderResult = (
-    hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?,
-    daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?,
-    weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?,
-    monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
-)
-
-/// Each source derives its variables independently (optionally mixing raw inputs first),
-/// then the resulting readers are combined by priority.
-/// Missing runs are skipped during construction; if every primary run is missing,
-/// throw `modelRunUnavailable`. Other construction errors propagate.
-struct ReaderPlan {
-    enum Source {
-        /// Derive variables from one domain before mixing with other sources.
-        case domain(any GenericDomain, any GenericVariable.Type)
-        /// Mix raw variables within the group before deriving forecast variables.
-        case mixedBeforeDerivation(RawReaderDerivationGroup)
-
-    }
-
-    /// Forecast sources, ordered from lowest to highest priority. At least one
-    /// must have the requested run, independently of whether it covers the location.
-    let primary: [Source]
-    /// Optional providers (e.g. precipitation probability), ordered from lowest to
-    /// highest priority, below all primary sources. They cannot satisfy run availability
-    /// or required primary coverage, and are omitted from bounding-box requests.
-    let secondary: [Source]
-    /// Defines the output grid for bounding-box requests; nil disables these requests.
-    /// All primary sources are remapped onto this grid. The domain also supplies
-    /// metadata for automatic latest-run selection where enabled.
-    let gridForBoundingBoxRequests: (any GenericDomain)?
-    /// Prefetch all outer source readers; otherwise stop at the first accepting the variable.
-    /// Raw groups always prefetch all their inputs, independently of this flag.
-    let prefetchAllReaders: Bool
-    /// Smooth transitions when combining model data. False only fills missing values
-    /// from lower-priority readers, preserving existing higher-priority values.
-    let smoothTransitions: Bool
-    /// At least one coordinate must be covered by a primary domain
-    let requirePrimaryCoverage: Bool
-
-    init(
-        primary: [Source],
-        secondary: [Source] = [],
-        gridForBoundingBoxRequests: (any GenericDomain)? = nil,
-        prefetchAllReaders: Bool = false,
-        smoothTransitions: Bool = true,
-        requirePrimaryCoverage: Bool = false
-    ) {
-        self.primary = primary
-        self.secondary = secondary
-        self.gridForBoundingBoxRequests = gridForBoundingBoxRequests
-        self.prefetchAllReaders = prefetchAllReaders
-        self.smoothTransitions = smoothTransitions
-        self.requirePrimaryCoverage = requirePrimaryCoverage
-    }
-
-    static func single(_ domain: any GenericDomain, _ variable: any GenericVariable.Type) -> Self {
-        .init(primary: [.domain(domain, variable)], gridForBoundingBoxRequests: domain)
-    }
-
-    static func multiple(_ primary: [Source], secondary: [Source] = []) -> Self {
-        .init(primary: primary, secondary: secondary)
-    }
-
-    static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain) -> Self {
-        .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, requirePrimaryCoverage: true)
-    }
-
-    static func multipleWithPrecipitationProbability(_ primary: [Source], precipitationProb: any GenericDomain) -> Self {
-        .init(primary: primary, secondary: [.domain(precipitationProb, ProbabilityVariable.self)])
-    }
-
-    func makeFactory(options: GenericReaderOptions) -> ReaderFactory {
-        ReaderFactory(plan: self, options: options)
-    }
-
-    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
-        try await makeFactory(options: options).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }
 
@@ -1436,6 +1070,372 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return true
         default:
             return false
+        }
+    }
+
+    enum ReaderSelection {
+        case point(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode)
+        case outputCell(ReaderOutputLocation)
+
+        var elevation: Float {
+            switch self {
+            case .point(_, _, let elevation, _): return elevation
+            case .outputCell(let output): return output.elevation
+            }
+        }
+
+        func resolvingPointElevation(_ elevation: Float) -> Self {
+            switch self {
+            case .point(let lat, let lon, _, let mode):
+                return .point(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            case .outputCell: return self
+            }
+        }
+    }
+
+    struct RawReaderDerivationGroup {
+        private let makeReaderClosure: (ReaderSelection, ReaderFactory) async throws -> DerivedReaderResult?
+
+        init<Domain, Variable>(
+            domains: [Domain],
+            variableType: Variable.Type,
+            derivationDomain: Domain
+        ) where
+            Domain: GenericDomain,
+            Variable: GenericVariable & Hashable
+        {
+            self.makeReaderClosure = { selection, factory in
+                let elevation = selection.elevation
+                let options = factory.options
+                var resolvedElevation = elevation
+                var unavailableRun: ForecastApiError?
+                var derivationDomainInitialized = false
+                var hasAvailableRun = false
+                let initialized: [GenericReaderCached<Domain, Variable>] = try await domains.reversed().asyncCompactMap { domain in
+                    do {
+                        let rawReader: GenericReader<Domain, Variable>? = try await factory.makeRawReader(domain: domain, selection: selection.resolvingPointElevation(resolvedElevation))
+                        hasAvailableRun = true
+                        guard let rawReader else { return nil }
+                        let reader = GenericReaderCached(reader: rawReader)
+                        if case .point = selection, resolvedElevation.isNaN {
+                            resolvedElevation = reader.resolvedTargetElevation
+                        }
+                        if domain.domainRegistry == derivationDomain.domainRegistry {
+                            derivationDomainInitialized = true
+                        }
+                        return reader
+                    } catch let error as ForecastApiError {
+                        guard case .modelRunUnavailable = error else { throw error }
+                        unavailableRun = unavailableRun ?? error
+                        return nil
+                    }
+                }.reversed()
+                guard !initialized.isEmpty else {
+                    if !hasAvailableRun, let error = unavailableRun { throw error }
+                    return nil
+                }
+                // Preserve ordinary spatial coverage; an explicit run may use another generation.
+                guard derivationDomainInitialized || options.run != nil else { return nil }
+                let mixer = GenericReaderMixerSameVariableType(reader: initialized)
+                let reader = VariableHourlyDeriver(
+                    reader: mixer,
+                    options: options,
+                    domainRegistry: derivationDomain.domainRegistry
+                )
+                return (reader, resolvedElevation)
+            }
+        }
+
+        init<PrimaryDomain, PrimaryVariable, SupplementalDomain, SupplementalVariable>(
+            primary: (PrimaryDomain, PrimaryVariable.Type),
+            supplemental: (SupplementalDomain, SupplementalVariable.Type)
+        ) where
+            PrimaryDomain: GenericDomain,
+            PrimaryVariable: GenericVariable,
+            SupplementalDomain: GenericDomain,
+            SupplementalVariable: GenericVariable
+        {
+            self.makeReaderClosure = { selection, factory in
+                let elevation = selection.elevation
+                let options = factory.options
+                guard let primaryRawReader: GenericReader<PrimaryDomain, PrimaryVariable> = try await factory.makeRawReader(
+                    domain: primary.0,
+                    selection: selection
+                ) else {
+                    return nil
+                }
+                let primaryReader = GenericReaderCached(reader: primaryRawReader)
+                let resolvedElevation: Float
+                switch selection {
+                case .point:
+                    resolvedElevation = elevation.isFinite ? elevation : primaryReader.resolvedTargetElevation
+                case .outputCell:
+                    resolvedElevation = elevation
+                }
+                let supplementalReader: GenericReaderCached<SupplementalDomain, SupplementalVariable>?
+                do {
+                    let rawReader: GenericReader<SupplementalDomain, SupplementalVariable>? = try await factory.makeRawReader(
+                        domain: supplemental.0, selection: selection.resolvingPointElevation(resolvedElevation)
+                    )
+                    supplementalReader = rawReader.map { GenericReaderCached(reader: $0) }
+                } catch ForecastApiError.modelRunUnavailable {
+                    supplementalReader = nil
+                }
+                let rawReaders: [any GenericReaderProtocol] = [supplementalReader].compactMap { $0 } + [primaryReader]
+                let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<PrimaryVariable, SupplementalVariable>>(
+                    reader: rawReaders
+                )
+                let reader = VariableHourlyDeriver(
+                    reader: mixer,
+                    options: options,
+                    domainRegistry: primary.0.domainRegistry
+                )
+                return (reader, resolvedElevation)
+            }
+        }
+
+        fileprivate func makeReader(selection: ReaderSelection, factory: ReaderFactory) async throws -> DerivedReaderResult? {
+            try await makeReaderClosure(selection, factory)
+        }
+    }
+
+    /// Executes a declarative plan sequentially within a request or export chunk.
+    /// Domain resources and run validation are reused; readers own their data caches.
+    final class ReaderFactory {
+        let plan: ReaderPlan
+        let options: GenericReaderOptions
+
+        // A registered domain has one storage grid and run inventory for the request.
+        private var domains = [DomainRegistry: ReaderDomainResources]()
+        private var runs = [DomainRegistry: Result<Void, any Error>]()
+        // Shared only while constructing readers for one output cell; reset by getReaders(gridpoint:).
+        private var sourceLocations = [DomainRegistry: ReaderSourceLocation]()
+
+        init(plan: ReaderPlan, options: GenericReaderOptions) {
+            self.plan = plan
+            self.options = options
+        }
+
+        private func resources(for domain: any GenericDomain) async -> ReaderDomainResources {
+            let key = domain.domainRegistry
+            if let resources = domains[key] { return resources }
+            let resources = await ReaderDomainResources(domain: domain)
+            domains[key] = resources
+            return resources
+        }
+
+        private func validateRun(domain: any GenericDomain) async throws {
+            guard options.run != nil else { return }
+            let key = domain.domainRegistry
+            if let result = runs[key] { return try result.get() }
+            do {
+                try await options.validateRun(domain: domain)
+                runs[key] = .success(())
+            } catch {
+                runs[key] = .failure(error)
+                throw error
+            }
+        }
+
+        private func outputCell(domain: any GenericDomain, position: Int) async throws -> ReaderSelection {
+            let resources = await resources(for: domain)
+            let source = try await resources.sourceLocation(position: position)
+            sourceLocations[domain.domainRegistry] = source
+            let coordinates = resources.grid.getCoordinates(gridpoint: position)
+            return .outputCell(.init(latitude: coordinates.latitude, longitude: coordinates.longitude, elevation: source.elevation.numeric))
+        }
+
+        fileprivate func makeRawReader<Domain: GenericDomain, Variable: GenericVariable>(
+            domain: Domain, selection: ReaderSelection
+        ) async throws -> GenericReader<Domain, Variable>? {
+            // Run availability is independent of coverage, even when the location is outside the grid.
+            if options.run != nil { try await validateRun(domain: domain) }
+            let location: ReaderLocation
+            switch selection {
+            case .point(let lat, let lon, let elevation, let mode):
+                let resources = await resources(for: domain)
+                guard let selected = try await resources.point(lat: lat, lon: lon, elevation: elevation, mode: mode) else { return nil }
+                location = selected
+            case .outputCell(let output):
+                let key = domain.domainRegistry
+                let source: ReaderSourceLocation
+                if let cached = sourceLocations[key] {
+                    source = cached
+                } else {
+                    let resources = await resources(for: domain)
+                    guard let position = resources.grid.findPoint(lat: output.latitude, lon: output.longitude) else { return nil }
+                    source = try await resources.sourceLocation(position: position)
+                    sourceLocations[key] = source
+                }
+                location = ReaderLocation(source: source, output: output)
+            }
+            return GenericReader(domain: domain, location: location, run: options.run)
+        }
+
+        private func makeDerivedReader<Domain: GenericDomain, Variable: GenericVariable>(
+            domain: Domain, variable: Variable.Type, selection: ReaderSelection
+        ) async throws -> DerivedReaderResult? {
+            guard let raw: GenericReader<Domain, Variable> = try await makeRawReader(domain: domain, selection: selection) else { return nil }
+            let reader = VariableHourlyDeriver(reader: GenericReaderCached(reader: raw), options: options, domainRegistry: domain.domainRegistry)
+            return (reader, raw.targetElevation)
+        }
+
+        private func makeReader(source: ReaderPlan.Source, selection: ReaderSelection) async throws -> DerivedReaderResult? {
+            switch source {
+            case .domain(let domain, let variable):
+                return try await makeDerivedReader(domain: domain, variable: variable, selection: selection)
+            case .mixedBeforeDerivation(let group):
+                return try await group.makeReader(selection: selection, factory: self)
+            }
+        }
+
+        struct Readers {
+            var readers = [any GenericReaderOptionalProtocol<ForecastVariable>]()
+            var elevation: Float
+            var unavailableRun: ForecastApiError?
+            var hasAvailableRun = false
+        }
+
+        func makeDomainReaders(sources: [ReaderPlan.Source], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws -> Readers {
+            var result = Readers(elevation: elevation)
+            result.readers.reserveCapacity(sources.count)
+            for source in sources.reversed() {
+                do {
+                    let reader = try await makeReader(source: source, selection: .point(lat: lat, lon: lon, elevation: result.elevation, mode: mode))
+                    // A valid run outside coverage still satisfies run availability.
+                    result.hasAvailableRun = true
+                    guard let reader else { continue }
+                    if result.elevation.isNaN { result.elevation = reader.elevation }
+                    result.readers.append(reader.reader)
+                } catch let error as ForecastApiError {
+                    guard case .modelRunUnavailable = error else { throw error }
+                    result.unavailableRun = result.unavailableRun ?? error
+                }
+            }
+            result.readers.reverse()
+            return result
+        }
+
+        func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws -> ForecastReaderResult? {
+            let forecast = try await makeDomainReaders(sources: plan.primary, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            if !forecast.hasAvailableRun, let error = forecast.unavailableRun { throw error }
+            if plan.requirePrimaryCoverage && forecast.readers.isEmpty { return nil }
+            let supplemental = try await makeDomainReaders(sources: plan.secondary, lat: lat, lon: lon, elevation: forecast.elevation, mode: mode)
+            let readers = supplemental.readers + forecast.readers
+            guard !readers.isEmpty else { return nil }
+            return combined(readers)
+        }
+
+        func getReaders(gridpoint: Int) async throws -> ForecastReaderResult {
+            // Source positions belong to this output cell. Retain capacity, but never reuse
+            // positions from a previous call, including one that failed during construction.
+            sourceLocations.removeAll(keepingCapacity: true)
+            guard let outputDomain = plan.gridForBoundingBoxRequests else { return (nil, nil, nil, nil) }
+            let selection = try await outputCell(domain: outputDomain, position: gridpoint)
+            var unavailableRun: ForecastApiError?
+            var readers = [any GenericReaderOptionalProtocol<ForecastVariable>]()
+            readers.reserveCapacity(plan.primary.count)
+            for source in plan.primary {
+                do {
+                    if let result = try await makeReader(source: source, selection: selection) {
+                        readers.append(result.reader)
+                    }
+                } catch let error as ForecastApiError {
+                    guard case .modelRunUnavailable = error else { throw error }
+                    unavailableRun = unavailableRun ?? error
+                }
+            }
+            if readers.isEmpty, let error = unavailableRun { throw error }
+            // Empty output cells still produce null forecast columns.
+            return combined(readers)
+        }
+
+        private func combined(_ readers: [any GenericReaderOptionalProtocol<ForecastVariable>]) -> ForecastReaderResult {
+            let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers, prefetchAllReaders: plan.prefetchAllReaders, smoothTransitions: plan.smoothTransitions)
+            return (hourly, hourly.makeDailyAggregator(), nil, nil)
+        }
+    }
+
+    typealias DerivedReaderResult = (reader: any GenericReaderOptionalProtocol<ForecastVariable>, elevation: Float)
+
+    typealias ForecastReaderResult = (
+        hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?,
+        daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?,
+        weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?,
+        monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
+    )
+
+    /// Each source derives its variables independently (optionally mixing raw inputs first),
+    /// then the resulting readers are combined by priority.
+    /// Missing runs are skipped during construction; if every primary run is missing,
+    /// throw `modelRunUnavailable`. Other construction errors propagate.
+    struct ReaderPlan {
+        enum Source {
+            /// Derive variables from one domain before mixing with other sources.
+            case domain(any GenericDomain, any GenericVariable.Type)
+            /// Mix raw variables within the group before deriving forecast variables.
+            case mixedBeforeDerivation(RawReaderDerivationGroup)
+
+        }
+
+        /// Forecast sources, ordered from lowest to highest priority. At least one
+        /// must have the requested run, independently of whether it covers the location.
+        let primary: [Source]
+        /// Optional providers (e.g. precipitation probability), ordered from lowest to
+        /// highest priority, below all primary sources. They cannot satisfy run availability
+        /// or required primary coverage, and are omitted from bounding-box requests.
+        let secondary: [Source]
+        /// Defines the output grid for bounding-box requests; nil disables these requests.
+        /// All primary sources are remapped onto this grid. The domain also supplies
+        /// metadata for automatic latest-run selection where enabled.
+        let gridForBoundingBoxRequests: (any GenericDomain)?
+        /// Prefetch all outer source readers; otherwise stop at the first accepting the variable.
+        /// Raw groups always prefetch all their inputs, independently of this flag.
+        let prefetchAllReaders: Bool
+        /// Smooth transitions when combining model data. False only fills missing values
+        /// from lower-priority readers, preserving existing higher-priority values.
+        let smoothTransitions: Bool
+        /// At least one coordinate must be covered by a primary domain
+        let requirePrimaryCoverage: Bool
+
+        init(
+            primary: [Source],
+            secondary: [Source] = [],
+            gridForBoundingBoxRequests: (any GenericDomain)? = nil,
+            prefetchAllReaders: Bool = false,
+            smoothTransitions: Bool = true,
+            requirePrimaryCoverage: Bool = false
+        ) {
+            self.primary = primary
+            self.secondary = secondary
+            self.gridForBoundingBoxRequests = gridForBoundingBoxRequests
+            self.prefetchAllReaders = prefetchAllReaders
+            self.smoothTransitions = smoothTransitions
+            self.requirePrimaryCoverage = requirePrimaryCoverage
+        }
+
+        static func single(_ domain: any GenericDomain, _ variable: any GenericVariable.Type) -> Self {
+            .init(primary: [.domain(domain, variable)], gridForBoundingBoxRequests: domain)
+        }
+
+        static func multiple(_ primary: [Source], secondary: [Source] = []) -> Self {
+            .init(primary: primary, secondary: secondary)
+        }
+
+        static func singleWithPrecipitationProbability(_ domain: any GenericDomain, _ variable: any GenericVariable.Type, precipitationProb: any GenericDomain) -> Self {
+            .init(primary: [.domain(domain, variable)], secondary: [.domain(precipitationProb, ProbabilityVariable.self)], gridForBoundingBoxRequests: domain, requirePrimaryCoverage: true)
+        }
+
+        static func multipleWithPrecipitationProbability(_ primary: [Source], precipitationProb: any GenericDomain) -> Self {
+            .init(primary: primary, secondary: [.domain(precipitationProb, ProbabilityVariable.self)])
+        }
+
+        func makeFactory(options: GenericReaderOptions) -> ReaderFactory {
+            ReaderFactory(plan: self, options: options)
+        }
+
+        func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> ForecastReaderResult? {
+            try await makeFactory(options: options).getReaders(lat: lat, lon: lon, elevation: elevation, mode: mode)
         }
     }
 
