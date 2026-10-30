@@ -164,7 +164,8 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
     
     /// Which blocks have been accessed recently. When a file is modified on the remote server, use a list of blocks to preload the new file.
-    public func listOfActiveBlocks(maxAgeSeconds: UInt) -> [Range<Int>] {
+    /// Optionally scale their positions to a replacement file's byte size, rounding outward to whole blocks.
+    public func listOfActiveBlocks(maxAgeSeconds: UInt, scaledToFileSize: Int? = nil) -> [Range<Int>] {
         let totalCount = self.backend.count
         let blockSize = cache.cache.blockSize
         let blocks = 0..<totalCount.divideRoundedUp(divisor: blockSize)
@@ -176,7 +177,31 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 activeRanges.append(block..<(block + 1))
             }
         }
-        return activeRanges
+        guard let newSize = scaledToFileSize, newSize != totalCount else {
+            return activeRanges
+        }
+        guard totalCount > 0, newSize > 0 else {
+            return []
+        }
+        let newBlockCount = newSize.divideRoundedUp(divisor: blockSize)
+        // Full-width multiplication keeps the ratio exact without overflowing for large files.
+        func scale(_ block: Int, roundUp: Bool) -> Int {
+            let product = UInt(block).multipliedFullWidth(by: UInt(newSize))
+            let (quotient, remainder) = UInt(totalCount).dividingFullWidth(product)
+            let rounded = quotient + (roundUp && remainder != 0 ? 1 : 0)
+            return Int(min(rounded, UInt(newBlockCount)))
+        }
+        var scaledRanges = [Range<Int>]()
+        for range in activeRanges {
+            let scaled = scale(range.lowerBound, roundUp: false)..<scale(range.upperBound, roundUp: true)
+            guard !scaled.isEmpty else { continue }
+            if let last = scaledRanges.last, last.upperBound >= scaled.lowerBound {
+                scaledRanges[scaledRanges.count - 1] = last.lowerBound..<max(last.upperBound, scaled.upperBound)
+            } else {
+                scaledRanges.append(scaled)
+            }
+        }
+        return scaledRanges
     }
     
     /// Remove cached data blocks that are older then a couple of seconds. Return the number of deleted blocks

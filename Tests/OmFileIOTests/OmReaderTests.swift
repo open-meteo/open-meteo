@@ -4,6 +4,34 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test(arguments: [
+        (640, 1280, [2..<4, 9..<10], [4..<8, 18..<20]),
+        (640, 320, [2..<4, 9..<10], [1..<2, 4..<5]),
+        (640, 640, [2..<4, 9..<10], [2..<4, 9..<10]),
+        (640, 100, [2..<3, 4..<5, 9..<10], [0..<2]),
+        (100, 150, [1..<2], [1..<3]),
+        (640, 0, [2..<4], []),
+        (0, 640, [], [])
+    ])
+    func scaleActiveBlocks(oldSize: Int, newSize: Int, active: [Range<Int>], expected: [Range<Int>]) async throws {
+        let blockSize = 64
+        let storage = DataAsClass(data: Data(repeating: 0, count: (blockSize + 16) * 128))
+        let cache = AtomicCacheCoordinator(cache: AtomicBlockCache(data: storage, blockSize: blockSize))
+        let old = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 1, count: oldSize)), cache: cache, cacheKey: 123)
+        try await old.preloadBlocks(blocks: active)
+        let scaled = old.listOfActiveBlocks(maxAgeSeconds: 60, scaledToFileSize: newSize)
+        #expect(scaled == expected)
+
+        let replacement = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 2, count: newSize)), cache: cache, cacheKey: 456)
+        try await replacement.preloadBlocks(blocks: scaled)
+        #expect(replacement.listOfActiveBlocks(maxAgeSeconds: 60) == expected)
+        for range in expected {
+            let offset = range.lowerBound * blockSize
+            let count = min(range.upperBound * blockSize, newSize) - offset
+            #expect(try await replacement.getData(offset: offset, count: count) == Data(repeating: 2, count: count))
+        }
+    }
+
     @Test(arguments: ["read", "preload", "prefetch", "existing"])
     func blockCacheAcrossSuperBlockBoundary(path: String) async throws {
         let blockSize = 64 * 1024
