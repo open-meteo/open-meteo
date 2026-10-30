@@ -97,7 +97,7 @@ import Vapor
         let old = RunFixtureDomain(availability: oldAvailable ? .available(run.toTimestamp()) : .missing)
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: newAvailable ? .available(run.toTimestamp()) : .missing)
         let mapping = MultiDomains.DomainReaderMapping(
-            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
+            primary: [.mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
             requirePrimaryCoverage: true
         )
         if oldAvailable || newAvailable {
@@ -135,7 +135,7 @@ import Vapor
         let old = RunFixtureDomain(availability: .available(run.toTimestamp()))
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: .missing)
         let mapping = MultiDomains.DomainReaderMapping(
-            primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
+            primary: [.mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
             requirePrimaryCoverage: true
         )
         let result = try await mapping.getReaders(lat: -80, lon: 100, elevation: 0, mode: .nearest, options: options(run: run))
@@ -159,7 +159,7 @@ import Vapor
         let mapping = MultiDomains.DomainReaderMapping(
             primary: [
                 .domain(old, GemVariable.self),
-                .mixedBeforeDerivation(.init(domains: [new], variableType: GemVariable.self, derivationDomain: new))
+                .mixedBeforeDerivation(MultiDomains.SameVariableReaderGroup(domains: [new], variableType: GemVariable.self, derivationDomain: new))
             ],
             gridForBoundingBoxRequests: old,
             prefetchAllReaders: true, smoothTransitions: false
@@ -174,6 +174,43 @@ import Vapor
                 guard case ForecastApiError.modelRunUnavailable = error else { return false }
                 return true
             }
+        }
+    }
+
+    @Test(arguments: [true, false])
+    func boundingBoxPreservesOutputCoordinatesWithMixedSources(mixedSchemas: Bool) async throws {
+        let output = RunFixtureDomain(grid: RegularGrid(nx: 3, ny: 1, latMin: 45, lonMin: -75, dx: 0.02, dy: 0.02))
+        let native = RunFixtureDomain(
+            domainRegistry: .cmc_gem_rdps_10km,
+            grid: RegularGrid(nx: 1, ny: 1, latMin: 45.01, lonMin: -74.98, dx: 1, dy: 1)
+        )
+        let group: any MultiDomains.RawReaderGroupProtocol = mixedSchemas
+            ? MultiDomains.SupplementalReaderGroup(primary: (native, GemVariable.self), supplemental: (output, GemVariable.self))
+            : MultiDomains.SameVariableReaderGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
+        let mapping = MultiDomains.DomainReaderMapping(
+            primary: [
+                .domain(output, GemVariable.self),
+                .mixedBeforeDerivation(group)
+            ], 
+            gridForBoundingBoxRequests: output
+        )
+        for position in 0..<3 {
+            let result = try await MultiDomains.dwd_icon_d2.getReaders(gridpoint: position, mapping: mapping, options: options())
+            let hourly = try #require(result.hourly)
+            let expected = output.grid.getCoordinates(gridpoint: position)
+            let remapped = try await GenericReader<RunFixtureDomain, GemVariable>(
+                domain: native, position: 0, modelCoordinates: expected, elevation: 500, options: options()
+            )
+            #expect(remapped.targetElevation == 500)
+            #expect(remapped.modelLat == expected.latitude)
+            #expect(remapped.modelLon == expected.longitude)
+            let rawGroup = try #require(await group.makeReader(selection: .outputGridCell(latitude: expected.latitude, longitude: expected.longitude), elevation: .nan, options: options()))
+            #expect(rawGroup.reader.modelLat == expected.latitude)
+            #expect(rawGroup.reader.modelLon == expected.longitude)
+            #expect(hourly.modelLat == expected.latitude)
+            #expect(hourly.modelLon == expected.longitude)
+            #expect(result.daily?.modelLat == expected.latitude)
+            #expect(result.daily?.modelLon == expected.longitude)
         }
     }
 

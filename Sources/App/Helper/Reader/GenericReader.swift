@@ -122,7 +122,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Initialise reader to read a single grid-point
     // TODO: Use decoded cached elevations for icon native domains in both initializers 
     // and getStatic(.elevation) to avoid redundant filesystem-cache access and OM reads.
-    public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws {
+    public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, elevation: Float = .nan, options: GenericReaderOptions) async throws {
         try await options.validateRun(domain: domain)
         self.domain = domain
         self.position = position
@@ -131,8 +131,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         } else {
             self.modelElevation = .noData
         }
-        // Grid-point requests use model terrain for elevation-dependent derived variables.
-        self.targetElevation = self.modelElevation.numeric
+        // Mixed sources share a target elevation; standalone grid-point reads use model terrain.
+        self.targetElevation = elevation.isNaN ? self.modelElevation.numeric : elevation
         let coords = modelCoordinates ?? domain.grid.getCoordinates(gridpoint: position)
         self.modelLat = coords.latitude
         self.modelLon = coords.longitude
