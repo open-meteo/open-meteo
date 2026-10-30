@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import Vapor
 import OmFileFormat
@@ -34,7 +35,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
@@ -46,6 +47,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         disableIdleSleep()
 
         let domain = try WeatherNextDomain.load(rawValue: signature.domain)
@@ -83,9 +85,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             run: run,
             server: server,
             concurrent: nConcurrent,
-            uploadS3Bucket: signature.uploadS3Bucket,
+            uploadQueues: resolvedUploadQueues,
             uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities,
-            uploadS3RollingBucket: signature.uploadS3RollingBucket,
             createNetcdf: signature.createNetcdf
         )
     }
@@ -98,9 +99,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         run: Timestamp,
         server: String,
         concurrent: Int,
-        uploadS3Bucket: String?,
+        uploadQueues: [S3UploadQueue]?,
         uploadS3OnlyProbabilities: Bool,
-        uploadS3RollingBucket: String? = nil,
         createNetcdf: Bool
     ) async throws {
         let logger = application.logger
@@ -376,9 +376,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             handles: allHandles,
             concurrent: concurrent,
             writeUpdateJson: true,
-            uploadS3Bucket: uploadS3Bucket,
+            uploadQueues: uploadQueues,
             uploadS3OnlyProbabilities: uploadS3OnlyProbabilities,
-            uploadS3RollingBucket: uploadS3RollingBucket,
             generateFullRun: false,
             generateTimeSeries: true
         )

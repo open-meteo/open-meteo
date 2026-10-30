@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import Vapor
 
@@ -142,6 +143,10 @@ extension VariablePerMemberStorage {
     /// - `elevation`: in metres
     /// - `landMask` 0 = sea, 1 = land. Fractions below 0.5 are considered sea.
     func generateElevationFile(elevation: V, landmask: V, domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
+        try await generateElevationFile(elevation: elevation, landmask: landmask, domain: domain, application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
+    }
+
+    func generateElevationFile(elevation: V, landmask: V, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]?) async throws {
         let elevationFile = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: elevationFile.getFilePath()) {
             return
@@ -165,7 +170,7 @@ extension VariablePerMemberStorage {
         try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         #endif
 
-        try await elevation.writeStaticOmFile(file: elevationFile, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await elevation.writeStaticOmFile(file: elevationFile, grid: domain.grid, application: application, uploadQueues: uploadQueues)
     }
     
     /// Lower freezing level or snowfall height below grid-cell elevation to adjust data to mixed terrain

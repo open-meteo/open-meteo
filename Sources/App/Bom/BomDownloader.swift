@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import OmFileFormat
 import Vapor
@@ -20,7 +21,7 @@ struct DownloadBomCommand: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
 
         @Flag(name: "create-netcdf")
@@ -44,6 +45,7 @@ struct DownloadBomCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         disableIdleSleep()
 
         let domain = try BomDomain.load(rawValue: signature.domain)
@@ -59,15 +61,15 @@ struct DownloadBomCommand: AsyncCommand {
         let generateFullRun = domain.countEnsembleMember == 1
         let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try await downloadElevation(application: context.application, domain: domain, server: server, run: run, uploadS3Bucket: signature.uploadS3Bucket)
+        try await downloadElevation(application: context.application, domain: domain, server: server, run: run, uploadQueues: resolvedUploadQueues)
         let handles = domain == .access_global_ensemble ?
-        try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) : signature.upperLevel ?
-            try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) :
-            try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateFullRun: generateFullRun)
+        try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadQueues: resolvedUploadQueues) : signature.upperLevel ?
+            try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadQueues: resolvedUploadQueues) :
+            try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadQueues: resolvedUploadQueues)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
     }
 
-    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp, uploadQueues: [S3UploadQueue]?) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -116,11 +118,11 @@ struct DownloadBomCommand: AsyncCommand {
         }
 
         elevation.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
     }
 
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
-    func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
@@ -173,14 +175,14 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         Process.alarm(seconds: 0)
         return handles
     }
 
     /// Download variables, convert to temporary om files and return all handles
     /// Ensemble do no have `rh_scrn` and `cld_phys_thunder_p`
-    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
@@ -314,13 +316,13 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: nil) + writerProbabilities.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: nil) + writerProbabilities.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         Process.alarm(seconds: 0)
         return handles
     }
 
     /// Download variables, convert to temporary om files and return all handles
-    func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
@@ -427,7 +429,7 @@ struct DownloadBomCommand: AsyncCommand {
             try await writer.writeBom(time: timestamp, member: 0, variable: .wind_direction_10m, data: direction)
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         Process.alarm(seconds: 0)
         return handles
     }

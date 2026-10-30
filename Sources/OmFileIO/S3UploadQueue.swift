@@ -7,6 +7,8 @@ import OmTime
 
 public struct S3UploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
+    /// Time-series upload policy, inherited by multipart sessions.
+    public var excludeRollingFiles: Bool = true
     let client: HTTPClient
     let logger: Logger
     let onError: @Sendable () -> Void
@@ -23,7 +25,7 @@ public struct S3UploadQueue: Sendable {
     
     /// Start uploading multiple files in the background that are committed at a later stage
     public func startMultiPartUploads() -> S3MultiFileUploadQueue {
-        S3MultiFileUploadQueue(endpoint: endpoint, client: client, onError: onError, maxConcurrentFiles: 4, maxConcurrentPartUploads: 16)
+        S3MultiFileUploadQueue(endpoint: endpoint, client: client, onError: onError, maxConcurrentFiles: 4, maxConcurrentPartUploads: 16, excludeRollingFiles: excludeRollingFiles)
     }
     
     /// Enqueue completion of multi files
@@ -84,6 +86,7 @@ public struct S3UploadQueue: Sendable {
 /// Upload multiple files in the background. Files can commit immediately or wait for session completion.
 public struct S3MultiFileUploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
+    public let excludeRollingFiles: Bool
     let client: HTTPClient
     let logger: Logger
     
@@ -95,7 +98,8 @@ public struct S3MultiFileUploadQueue: Sendable {
     private let preparations: Task<[S3MultiPartUploadPrepared], Never>
     private let onError: @Sendable () -> Void
     
-    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int) {
+    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int, excludeRollingFiles: Bool = true) {
+        self.excludeRollingFiles = excludeRollingFiles
         self.partUploadExecutor = .init(maxConcurrency: maxConcurrentPartUploads)
         let queue = ProcessingParallelQueue<S3MultiPartUploadPrepared?>(concurrent: maxConcurrentFiles)
         self.queue = queue

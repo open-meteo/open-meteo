@@ -132,6 +132,10 @@ enum IconNativeDomainError: AbortError, Equatable, CustomStringConvertible, Send
 extension IconNativeDomains {
     /// Validates/reuses the local artifact or regenerates it offline; only generated files upload.
     func prepareNativeGrid(application: Application, uploadS3Bucket: String?) async throws {
+        try await prepareNativeGrid(application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
+    }
+
+    func prepareNativeGrid(application: Application, uploadQueues: [S3UploadQueue]?) async throws {
         let downloadDirectory = "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
         let artifact = nativeGridFile
         let identity = artifact.identity
@@ -200,7 +204,7 @@ extension IconNativeDomains {
         if generated.coordinatesGenerated {
             application.logger.info("Generated native ICON coordinates at \(coordinatesFile.getFilePath())")
         }
-        for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
+        for queue in uploadQueues ?? [] {
             let uploads = queue.startMultiPartUploads()
             await uploads.uploadMultipart(
                 file: artifactPath,

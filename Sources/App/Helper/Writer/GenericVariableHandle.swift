@@ -39,14 +39,15 @@ struct GenericVariableHandle: Sendable {
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
     /// If `fullRunSkipMeta` do not generate meta.json for each run
-    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, uploadS3RollingBucket: String? = nil, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+        try await convert(application: application, domain: domainIgnored, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: writeUpdateJson, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket), uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, compression: compression, generateFullRun: generateFullRun, generateTimeSeries: generateTimeSeries, fullRunSkipMeta: fullRunSkipMeta)
+    }
+
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadQueues: [S3UploadQueue]?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
         let logger = application.logger
         let groups = handles.groupedPreservedOrder(by: {"\($0.domain)"}).map { (_, handles) in
             (domain: handles[0].domain, handles: handles)
         }
-        let uploadQueues = await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket)
-        let rollingUploadQueues = await application.s3SyncManager.getQueues(bucketsOpt: uploadS3RollingBucket)
-        let includeRolling = uploadS3RollingBucket != nil
 
         for (domain, handles) in groups {
             let generateTimeSeries = generateTimeSeries && domain.generateTimeSeries
@@ -56,15 +57,13 @@ struct GenericVariableHandle: Sendable {
                 logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
 
                 let multipartUploadQueues = uploadQueues?.map { $0.startMultiPartUploads() }
-                let rollingMultipartUploadQueues = rollingUploadQueues?.map { $0.startMultiPartUploads() }
-                let sessions = Array(zip(uploadQueues ?? [], multipartUploadQueues ?? [])) + Array(zip(rollingUploadQueues ?? [], rollingMultipartUploadQueues ?? []))
                 do {
-                    try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, rollingUploadQueues: rollingMultipartUploadQueues, includeRolling: includeRolling)
-                    for (queue, multipartUploadQueue) in sessions {
+                    try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities)
+                    for (queue, multipartUploadQueue) in zip(uploadQueues ?? [], multipartUploadQueues ?? []) {
                         await queue.finishMultiPartUploads(multipartUploadQueue)
                     }
                 } catch {
-                    for (queue, multipartUploadQueue) in sessions {
+                    for (queue, multipartUploadQueue) in zip(uploadQueues ?? [], multipartUploadQueues ?? []) {
                         await queue.abortMultiPartUploads(multipartUploadQueue)
                     }
                     throw error
@@ -101,9 +100,7 @@ struct GenericVariableHandle: Sendable {
                  let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
                 try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
                 let metaData = try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
-                // Rolling destinations also need the ensemble model's update metadata.
-                let metadataQueues = (uploadQueues ?? []) + (domain.domainRegistry.useRollingDays != nil ? rollingUploadQueues ?? [] : [])
-                for upload in metadataQueues {
+                for upload in uploadQueues ?? [] {
                     await upload.upload(data: metaData, objectName: "data/\(domain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json", lastModified: .now())
                 }
             }
@@ -125,15 +122,15 @@ struct GenericVariableHandle: Sendable {
                 // if run is nil, do not attempt to generate previous days files
                 logger.info("Convert previous day database if required [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimePreviousDays = DispatchTime.now()
-                let previousDayUploadQueues = uploadS3OnlyProbabilities ? nil : uploadQueues
-                let multipartUploadQueues = previousDayUploadQueues?.map { $0.startMultiPartUploads() }
+                let previousDayUploadQueues = (uploadQueues ?? []).filter { !uploadS3OnlyProbabilities || !$0.excludeRollingFiles }
+                let multipartUploadQueues = previousDayUploadQueues.map { $0.startMultiPartUploads() }
                 do {
                     try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: false)
-                    for (queue, multipartUploadQueue) in zip(previousDayUploadQueues ?? [], multipartUploadQueues ?? []) {
+                    for (queue, multipartUploadQueue) in zip(previousDayUploadQueues, multipartUploadQueues) {
                         await queue.finishMultiPartUploads(multipartUploadQueue)
                     }
                 } catch {
-                    for (queue, multipartUploadQueue) in zip(previousDayUploadQueues ?? [], multipartUploadQueues ?? []) {
+                    for (queue, multipartUploadQueue) in zip(previousDayUploadQueues, multipartUploadQueues) {
                         await queue.abortMultiPartUploads(multipartUploadQueue)
                     }
                     throw error
@@ -276,21 +273,21 @@ struct GenericVariableHandle: Sendable {
         }
     }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool, rollingUploadQueues: [S3MultiFileUploadQueue]? = nil, includeRolling: Bool = false) async throws {
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
                 .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, rollingUploadQueues: rollingUploadQueues, includeRolling: includeRolling)
+                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities)
             })
         } else {
-            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities, rollingUploadQueues: rollingUploadQueues, includeRolling: includeRolling)
+            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues, uploadS3OnlyProbabilities: uploadS3OnlyProbabilities)
         }
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool, rollingUploadQueues: [S3MultiFileUploadQueue]? = nil, includeRolling: Bool = false) async throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]?, uploadS3OnlyProbabilities: Bool) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -380,15 +377,11 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            let isRolling = nMembers > 1 && domain.domainRegistry.useRollingDays != nil
-            let variableUploadQueues: [S3MultiFileUploadQueue]?
-            if isRolling, includeRolling {
-                variableUploadQueues = rollingUploadQueues
-            } else {
-                variableUploadQueues = !uploadS3OnlyProbabilities || variable.omFileName.file == ProbabilityVariable.precipitation_probability.omFileName.file ? multipartUploadQueues : nil
+            let variableUploadQueues = multipartUploadQueues?.filter {
+                !$0.excludeRollingFiles || !uploadS3OnlyProbabilities || variable.omFileName.file == ProbabilityVariable.precipitation_probability.omFileName.file
             }
 
-            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, multipartUploadQueues: variableUploadQueues, includeRolling: includeRolling) { yRange, xRange, memberRange in
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, multipartUploadQueues: variableUploadQueues) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
