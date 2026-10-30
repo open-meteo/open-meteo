@@ -2,15 +2,19 @@ import Foundation
 import OmFileFormat
 import Vapor
 
-/// GeoSphere Austria AROME 2.5km regional model
-/// Data: https://data.hub.geosphere.at/dataset/nwp-v1-1h-2500m
+/// GeoSphere Austria regional models
+/// AROME 2.5km: https://data.hub.geosphere.at/dataset/nwp-v1-1h-2500m (discontinued on 4 November 2026)
+/// C-LAEF AlpeAdria 1km (deterministic control run): https://data.hub.geosphere.at/dataset/nwp-v2-1h-1km
 enum GeoSphereDomain: String, GenericDomain, CaseIterable {
     case arome_austria
+    case claef_austria
 
     var domainRegistry: DomainRegistry {
         switch self {
         case .arome_austria:
             return .geosphere_arome_austria
+        case .claef_austria:
+            return .geosphere_claef_austria
         }
     }
 
@@ -34,10 +38,16 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
         return false
     }
 
-    /// Runs every 3 hours (00, 03, 06, 09, 12, 15, 18, 21) with 03:20 delay
+    /// Runs every 3 hours (00, 03, 06, 09, 12, 15, 18, 21)
     var lastRun: Timestamp {
-        // Subtract 3 hours for delay, then floor to nearest 3h
-        return Timestamp.now().add(hours: -3).floor(toNearestHour: 3)
+        switch self {
+        case .arome_austria:
+            // 03:20 delay
+            return Timestamp.now().add(hours: -3).floor(toNearestHour: 3)
+        case .claef_austria:
+            // Bulk files are published about 4:35 after the run
+            return Timestamp.now().add(hours: -5).floor(toNearestHour: 3)
+        }
     }
 
     /// 60h forecast + 2 days buffer
@@ -50,6 +60,9 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
         case .arome_austria:
             // lon=594, lat=492, south-to-north
             return RegularGrid(nx: 594, ny: 492, latMin: 42.981, lonMin: 5.498, dx: 0.028, dy: 0.018)
+        case .claef_austria:
+            // lon=1300, lat=945; the files are north-to-south and flipped on download
+            return RegularGrid(nx: 1300, ny: 945, latitude: 43.002...51.498, longitude: 5.0317...22.5682)
         }
     }
 
@@ -58,8 +71,8 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
     }
 }
 
-/// SYMBOL (weather symbol) uses GeoSphere-specific codes 1-31 (not WMO), so weather_code
-/// is derived from raw fields via WeatherCode.calculate().
+/// The weather symbol (AROME `SYMBOL`, C-LAEF `sy`) uses GeoSphere-specific codes 1-32 (not WMO);
+/// the downloader maps them to WMO weather codes.
 enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
     case relative_humidity_2m
@@ -225,3 +238,55 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min || self == .surface_temperature
     }
 }
+
+
+enum GeoSpherePressureVariableType: String, CaseIterable {
+    case temperature
+    case wind_u_component
+    case wind_v_component
+    case geopotential_height
+    case relative_humidity
+    case vertical_velocity
+}
+
+struct GeoSpherePressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
+    let variable: GeoSpherePressureVariableType
+    let level: Int
+
+    var storePreviousForecast: Bool { false }
+    var omFileName: (file: String, level: Int) { (rawValue, 0) }
+    var isElevationCorrectable: Bool { false }
+
+    var scalefactor: Float {
+        switch variable {
+        case .temperature:
+            return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
+        case .wind_u_component, .wind_v_component:
+            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+        case .geopotential_height:
+            return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
+        case .relative_humidity:
+            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        case .vertical_velocity:
+            return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        variable == .relative_humidity ? .hermite(bounds: 0...100) : .hermite(bounds: nil)
+    }
+
+    var unit: SiUnit {
+        switch variable {
+        case .temperature: return .celsius
+        case .wind_u_component, .wind_v_component: return .metrePerSecond
+        case .geopotential_height: return .metre
+        case .relative_humidity: return .percentage
+        case .vertical_velocity:
+            return .metrePerSecondNotUnitConverted
+        }
+    }
+}
+
+/// C-LAEF adds pressure levels; AROME retains its surface-only schema.
+typealias GeoSphereClaefVariable = SurfaceAndPressureVariable<GeoSphereVariable, GeoSpherePressureVariable>
