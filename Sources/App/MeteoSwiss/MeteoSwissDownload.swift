@@ -27,6 +27,9 @@ struct MeteoSwissDownload: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload generated products, including ensemble rolling.om files but excluding spatial files, to these S3 buckets.")
+        var uploadS3RollingBucket: String?
         
         @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
         var concurrent: Int?
@@ -43,6 +46,7 @@ struct MeteoSwissDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try MeteoSwissDomain.load(rawValue: signature.domain)
@@ -53,15 +57,15 @@ struct MeteoSwissDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadQueues: resolvedUploadQueues)
         let nConcurrent = signature.concurrent ?? 1
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// Process each variable and update time-series optimised files
-    func download(application: Application, domain: MeteoSwissDomain, variables: [MeteoSwissSurfaceVariable], run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: MeteoSwissDomain, variables: [MeteoSwissSurfaceVariable], run: Timestamp, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
         let logger = application.logger
@@ -91,7 +95,7 @@ struct MeteoSwissDownload: AsyncCommand {
                     elevationRemapped[i] = -999
                 }
             }
-            try await elevationRemapped.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+            try await elevationRemapped.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
         }
         let mapping: [Int] = try await OmFileReader(mmapFile: weightsFile).expectArray(of: Int.self).read()
         //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")
@@ -198,7 +202,7 @@ struct MeteoSwissDownload: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) ?? [])
             return handles
         }
         await curl.printStatistics()

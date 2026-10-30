@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 @preconcurrency import SwiftEccodes
 import Vapor
@@ -207,6 +208,10 @@ struct DownloadEra5Command: AsyncCommand {
     }
 
     static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, application: Application, uploadS3Bucket: String?) async throws {
+        try await processElevationLsmGrib(domain: domain, files: files, createNetCdf: createNetCdf, application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
+    }
+
+    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, application: Application, uploadQueues: [S3UploadQueue]?) async throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
@@ -259,7 +264,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
         }
 
-        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetCdf)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: createNetCdf)
     }
 
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [any GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {

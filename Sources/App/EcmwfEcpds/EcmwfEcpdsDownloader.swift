@@ -1,3 +1,4 @@
+import OmFileIO
 import Vapor
 
 struct DownloadEcmwfEcpdsCommand: AsyncCommand {
@@ -29,6 +30,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload generated products, including ensemble rolling.om files but excluding spatial files, to these S3 buckets.")
+        var uploadS3RollingBucket: String?
+
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
         
@@ -51,6 +55,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         disableIdleSleep()
 
         guard let domain = EcmwfEcpdsDomain(rawValue: signature.domain) else {
@@ -68,7 +73,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 fatalError("Email and key required")
             }
             let runs = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4)
-            try await downloadMars(application: context.application, domain: domain, runs: runs, concurrent: nConcurrent, key: key, email: email, uploadS3Bucket: signature.uploadS3Bucket, params: signature.downloadParams)
+            try await downloadMars(application: context.application, domain: domain, runs: runs, concurrent: nConcurrent, key: key, email: email, uploadQueues: resolvedUploadQueues, params: signature.downloadParams)
             return
         }
         guard let server = signature.server else {
@@ -79,8 +84,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         let shortCutOff = signature.shortCutOff.map(Int.init) ?? nil
 
         try await downloadEcmwfElevation(application: context.application, domain: domain, run: run)
-        let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, shortCutOffHour: shortCutOff)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
+        let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: resolvedUploadQueues, shortCutOffHour: shortCutOff)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// Download elevation file
@@ -148,7 +153,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
     
     /// Download multiple runs from ECMWF MARS archives, convert them and upload to S3
-    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadS3Bucket: String?, params paramsOverwrite: String?) async throws {
+    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadQueues: [S3UploadQueue]?, params paramsOverwrite: String?) async throws {
         let logger = application.logger
         
         struct EcmwfQuery: Encodable {
@@ -324,10 +329,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
-                        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: nil)
-                        try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
+                        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: nil)
+                        try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
 
-                        if let directory = OpenMeteo.dataRunDirectory, uploadS3Bucket != nil {
+                        if let directory = OpenMeteo.dataRunDirectory, uploadQueues != nil {
                             // Delete run directory after S3 upload
                             let model = domain.domainRegistry.rawValue
                             let timeFormatted = run.format_directoriesYYYYMMddhhmm
@@ -344,9 +349,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, shortCutOffHour: Int?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]?, shortCutOffHour: Int?) async throws -> [GenericVariableHandle] {
         if domain == .wam {
-            return try await downloadEcmwfWam(application: application, domain: domain, server: server, run: run, concurrent: concurrent, maxForecastHour: maxForecastHour, uploadS3Bucket: uploadS3Bucket)
+            return try await downloadEcmwfWam(application: application, domain: domain, server: server, run: run, concurrent: concurrent, maxForecastHour: maxForecastHour, uploadQueues: uploadQueues)
         }
         
         let logger = application.logger
@@ -398,10 +403,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         logger.info("Got \(shortName)")
                         var d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                         if shortName == "lsm" {
-                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+                            try await elevationLsmGenerator.ingest(lsm: d.array, domain: domain, application: application, uploadQueues: uploadQueues)
                         } else {
                             d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+                            try await elevationLsmGenerator.ingest(elevation: d.array, domain: domain, application: application, uploadQueues: uploadQueues)
                         }
                         return
                     }
@@ -472,12 +477,12 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             logger.info("Completed hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm), elapsed \(time.timeElapsedPretty())]")
             
             let completed = i == timestamps.count - 1            
-            handles.append(contentsOf: try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket))
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues))
             
             if hour == shortCutOffHour {
                 let handles = handles
                 uploadTaskShortCutOff = Task {
-                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: true, generateTimeSeries: false)
+                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateFullRun: true, generateTimeSeries: false)
                 }
             }
             
@@ -489,7 +494,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     
     
     /// Download wave model
-    func downloadEcmwfWam(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwfWam(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         // Note 2025-10-08 0z: The delivery for the last forecast hours took more than 4 hours caused by a retry.
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6, retryUnauthorized: false)
@@ -537,7 +542,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             }
             
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
         }
         await curl.printStatistics()
         return handles
