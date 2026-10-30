@@ -29,6 +29,29 @@ struct SyncCommand: AsyncCommand {
         return "Download the open-meteo weather database from a S3 server."
     }
 
+    struct Job: Hashable {
+        let server: String
+        let model: DomainRegistry
+        let variables: [String]
+        var staticOnly = false
+    }
+
+    /// Static ownership is metadata-only: planning works on an empty local database.
+    static func makeJobs(_ weatherJobs: [Job]) -> [Job] {
+        var staticJobs = [Job]()
+        var seen = Set<Job>()
+        for job in weatherJobs {
+            let owners = [job.model, job.model.definition?.staticFileDependency].compactMap { $0 }
+            for owner in owners {
+                let dependency = Job(server: job.server, model: owner, variables: [], staticOnly: true)
+                if seen.insert(dependency).inserted {
+                    staticJobs.append(dependency)
+                }
+            }
+        }
+        return staticJobs + weatherJobs
+    }
+
     struct Signature: CommandSignature {
         @Argument(name: "models", help: "Weather model domains separated by comma. E.g. 'cmc_gem_gdps,dwd_icon'")
         var models: String
@@ -110,7 +133,7 @@ struct SyncCommand: AsyncCommand {
         }
 
         let variablesSetA = signature.variables.split(separator: ";").map {
-            $0.split(separator: ",").map(String.init) + ["static"]
+            $0.split(separator: ",").map(String.init)
         }
         if variablesSetA.count > 1 && variablesSetA.count != serverSet.count {
             fatalError("Number of servers and variables sets must be the same")
@@ -145,30 +168,29 @@ struct SyncCommand: AsyncCommand {
             logger.info("Checking for files with more than \(pastDays) past days data")
         }
         
-        let serverModelVariable: [(server: String, model: DomainRegistry, variables: [String])] = zip(serverSet, zip(modelsSet, variablesSet)).flatMap { server, arg1 -> [(server: String, model: DomainRegistry, variables: [String])] in
-            let (models, variablesSig) = arg1
-            
-            return models.map { model in
-                return (server, model, variablesSig)
-            }
-        }.grouped(by: { $0.server }).flatMap( { $0.value })
-        
-        let modelsChunkLength = max(1, serverModelVariable.count / concurrentModels)
+        let weatherJobs = zip(serverSet, zip(modelsSet, variablesSet)).flatMap { server, selection in
+            let (models, variables) = selection
+            return models.map { Job(server: server, model: $0, variables: variables) }
+        }
+        let jobs = Self.makeJobs(weatherJobs).grouped(by: { $0.server }).flatMap { $0.value }
+
+        let modelsChunkLength = max(1, jobs.count / concurrentModels)
 
         /// Download from each server concurrently
-        try await serverModelVariable.chunks(ofCount: modelsChunkLength).foreachConcurrent(nConcurrent: serverModelVariable.count) {
+        try await jobs.chunks(ofCount: modelsChunkLength).foreachConcurrent(nConcurrent: jobs.count) {
             while true {
                 var lastPressureDownloadDate = Timestamp.now().with(hour: 0).add(days: -1)
                 /// Used for `really_download_all_but_pressure_once_per_day` to download pressure data only once per day
                 let downloadPressureNow = lastPressureDownloadDate != Timestamp.now().with(hour: 0)
-                for (server, model, variablesSig) in $0 {
+                for job in $0 {
                     do {
                         try await syncModel(
                             application: context.application,
                             concurrent: concurrent,
-                            server: server,
-                            model: model,
-                            variablesSig: variablesSig,
+                            server: job.server,
+                            model: job.model,
+                            variablesSig: job.variables,
+                            staticOnly: job.staticOnly,
                             yearRange: yearRange,
                             pastDays: pastDays,
                             apikey: signature.apikey,
@@ -192,12 +214,12 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], staticOnly: Bool = false, yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?) async throws {
         let logger = application.logger
         
         /// The digital elevation model has no grid and only static files, which are copied whole
         let keep: SyncBoundingBox?
-        if let bbox, model != .copernicus_dem90 {
+        if let bbox, !staticOnly, model != .copernicus_dem90 {
             guard let grid = try await model.getDomain()?.grid else {
                 throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
             }
@@ -221,19 +243,26 @@ struct SyncCommand: AsyncCommand {
         
         let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
         
-        /// Get a list of all variables from all models
-        let remoteDirectories = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
-        
+        /// Static jobs select their directory directly; weather jobs discover variable directories.
+        let remoteDirectories: [String]
+        if staticOnly {
+            remoteDirectories = ["data/\(model.rawValue)/static/"]
+        } else {
+            remoteDirectories = try await S3List.s3list(server: server, client: client, logger: logger, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
+        }
+
         /// Filter variables to download
         let toDownload: [S3List.ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3List.ListV2File] in
             guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
                 fatalError("could not get variable from string")
             }
             let variable = remoteDirectory[remoteDirectory.index(after: variablePos)..<remoteDirectory.index(before: remoteDirectory.endIndex)]
+            // Static folders are handled once by independent jobs, regardless of shortcuts.
+            guard staticOnly || variable != "static" else { return [] }
             let isPreviousDay = variable.contains("_previous_day")
             let isPressureLevel = variable.contains("hPa")
             let isSurface = !isPressureLevel && !variable.contains("_previous_day")
-            guard downloadAllVariables ||
+            guard staticOnly || downloadAllVariables ||
                     (downloadAllButPressureOncePerDay && (!isPressureLevel || downloadPressureNow)) ||
                     (downloadAllPressureLevel && isPressureLevel) ||
                     (downloadAllSurface && isSurface) ||
@@ -242,10 +271,10 @@ struct SyncCommand: AsyncCommand {
                 return []
             }
             let remote = try await S3List.s3list(server: server, client: client, logger: logger, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
-            let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory, modificationTimeOnly: keep != nil)
-            return Array(filtered)
+            let files = staticOnly ? remote.files : remote.files.includeFiles(timeRange: timeRange, domain: model)
+            return files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory, modificationTimeOnly: keep != nil)
         }.flatMap({$0})
-        
+
         guard toDownload.count > 0 else {
             return
         }

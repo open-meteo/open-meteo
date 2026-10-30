@@ -1,4 +1,4 @@
-enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
+enum EcmwfSeasDomain: String, SyncGridDomain, CaseIterable {
     /// O320 single level, 6 hourly data, 51 members
     case seas5
     case seas5_ensemble_mean
@@ -24,17 +24,7 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     
     /// O320 grid, weekly mean/anomaly/sot/efi/probabilities
     case ec46_weekly
-    
-    
-    var grid: any Gridable {
-        switch self {
-        case .seas5, .seas5_daily, .seas5_monthly, .ec46, .ec46_weekly, .ec46_ensemble_mean, .seas5_ensemble_mean, .seas5_daily_ensemble_mean:
-            return GaussianGrid(type: .o320)
-        case .seas5_12hourly, .seas5_monthly_upper_level:
-            return GaussianGrid(type: .n160)
-        }
-    }
-    
+
     var ensembleMeanDomain: Self? {
         switch self {
         case .ec46:
@@ -84,18 +74,12 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .seas5, .ec46, .ec46_weekly, .ec46_ensemble_mean, .seas5_ensemble_mean, .seas5_daily_ensemble_mean:
+        case .seas5, .seas5_daily, .seas5_monthly, .ec46, .ec46_weekly, .ec46_ensemble_mean, .seas5_ensemble_mean, .seas5_daily_ensemble_mean:
             return .ecmwf_seas5
-        case .seas5_12hourly:
+        case .seas5_12hourly, .seas5_monthly_upper_level:
             return .ecmwf_seas5_12hourly
-        case .seas5_daily:
-            return .ecmwf_seas5
-        case .seas5_monthly_upper_level:
-            return .ecmwf_seas5_12hourly
-        case .seas5_monthly:
-            return .ecmwf_seas5
         }
     }
     

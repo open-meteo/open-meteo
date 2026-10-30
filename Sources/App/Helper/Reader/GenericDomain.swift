@@ -5,42 +5,28 @@ import Vapor
 /**
  Generic domain that is required for the reader
  */
-protocol GenericDomain: Sendable {
-    /// The grid definition. Could later be replaced with a more generic implementation
+protocol GenericDomain: DomainDefinition {
+    /// Loaded geometry. Native domains retain an asynchronously initialized grid.
     var grid: any Gridable { get }
-
-    /// Domain name used as data directory
-    var domainRegistry: DomainRegistry { get }
-
-    /// Domain which is used for static files. E.g. 15minutes domains refer to the 1-hourly domain
-    var domainRegistryStatic: DomainRegistry? { get }
-
-    /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
-    var dtSeconds: Int { get }
-
-    /// How often a domain is updated in seconds. `3600` for updates every hour
-    var updateIntervalSeconds: Int { get }
-
-    /// If present, the timerange that is available in a master file
-    var masterTimeRange: Range<Timestamp>? { get }
-
-    /// The time length of each compressed time series file
-    var omFileLength: Int { get }
-    
-    /// Number of ensemble members, including control. Default 1
-    var countEnsembleMember: Int { get }
-    
-    /// Whether or not to generate the full run database in ./data_run
-    var generateFullRun: Bool { get }
-    
-    /// Whether to generate regular database ./data
-    var generateTimeSeries: Bool { get }
 
     /// Whether metadata exists for the requested run. Invalid metadata must throw.
     func isRunAvailable(run: Timestamp) async throws -> Bool
 }
 
+/// Domains whose geometry is available synchronously from their typed registry.
+protocol SyncGridDomain: GenericDomain {
+    var syncGridRegistry: SyncGridRegistry { get }
+}
+
+extension SyncGridDomain {
+    var grid: any Gridable { syncGridRegistry.grid }
+    var gridRegistry: GridRegistry { .synchronous(syncGridRegistry) }
+}
+
 extension GenericDomain {
+    /// Initialized domains need no additional loading.
+    func loadDomain() -> any GenericDomain { self }
+
     func isRunAvailable(run: Timestamp) async throws -> Bool {
         try await domainRegistry.getFullRunMeta(run: run) != nil
     }
@@ -56,11 +42,6 @@ extension GenericDomain {
     var dtHours: Int { dtSeconds / 3600 }
 
     /// Temporary directory to download data
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
-    }
-    
-    /// Temporary directory to download data
     var dataRunDirectory: String? {
         guard let dataRunDirectory = OpenMeteo.dataRunDirectory else {
             return nil
@@ -70,17 +51,17 @@ extension GenericDomain {
 
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable) async -> (any OmFileReaderArrayProtocol<Float>)? {
-        guard let domainRegistryStatic else {
+        guard let staticDomain = gridRegistry.staticDomain else {
             return nil
         }
         switch type {
         case .soilType:
             return try? await OmFileSystemManager.instance.get(
-                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil)
+                file: OmFileType.staticFile(domain: staticDomain, variable: "soil_type", chunk: nil)
             )?.reader
         case .elevation:
             return try? await OmFileSystemManager.instance.get(
-                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil)
+                file: OmFileType.staticFile(domain: staticDomain, variable: "HSURF", chunk: nil)
             )?.reader
         }
     }
@@ -100,11 +81,11 @@ extension GenericDomain {
 
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: OmFileType {
-        .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "HSURF", chunk: nil)
+        .staticFile(domain: gridRegistry.staticDomain!, variable: "HSURF", chunk: nil)
     }
 
     var soilTypeFileOm: OmFileType {
-        .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "soil_type", chunk: nil)
+        .staticFile(domain: gridRegistry.staticDomain!, variable: "soil_type", chunk: nil)
     }
 }
 

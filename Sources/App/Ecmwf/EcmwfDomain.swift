@@ -1,7 +1,7 @@
 import Foundation
 import OmFileFormat
 
-enum EcmwfDomain: String, GenericDomain {
+enum EcmwfDomain: String, SyncGridDomain {
     case ifs04
     case ifs04_ensemble
 
@@ -72,12 +72,23 @@ enum EcmwfDomain: String, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .wam025, .ifs025_ensemble_mean, .aifs025, .aifs025_ensemble, .aifs025_single, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .ifs04:
+            return .ecmwf_ifs04
+        case .ifs04_ensemble:
+            // Elevation comes from the ensemble enfo file, while IFS04 uses oper/scda.
+            // Keep separate until their elevation and land-sea fields are verified equivalent.
+            return .ecmwf_ifs04_ensemble
+        case .ifs025, .ifs025_ensemble, .ifs025_ensemble_mean,
+            .aifs025, .aifs025_single, .aifs025_ensemble, .aifs025_ensemble_mean:
+            // IFS025 ensemble uses the deterministic IFS025 file for elevation.
+            // WAM025 also uses IFS025 static fields; wave downloads do not generate elevation.
             return .ecmwf_ifs025
-        default:
-            return domainRegistry
+        case .wam025, .wam025_ensemble, .wam025_ensemble_mean:
+            // TODO: Verify whether this should share IFS025 static fields!
+            // neither wave downloader generates elevation files.
+            return .ecmwf_ifs025
         }
     }
 
@@ -115,15 +126,6 @@ enum EcmwfDomain: String, GenericDomain {
             return 6 * 3600
         case .aifs025, .aifs025_single, .aifs025_ensemble, .aifs025_ensemble_mean:
             return 6 * 3600
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .ifs04, .ifs04_ensemble:
-            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360 / 900, dy: 180 / 450)
-        case .ifs025, .ifs025_ensemble, .aifs025, .wam025, .wam025_ensemble, .aifs025_single, .aifs025_ensemble, .ifs025_ensemble_mean, .wam025_ensemble_mean, .aifs025_ensemble_mean:
-            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360 / 1440, dy: 180 / (721 - 1))
         }
     }
 

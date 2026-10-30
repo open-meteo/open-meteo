@@ -2,7 +2,6 @@ import Foundation
 import OmFileFormat
 import OmFileIO
 import ReducedLatLon
-import Synchronization
 
 extension IconNativeGridIdentity {
     /// Validates a mapped artifact and its operational identity, wrapping failures with its path.
@@ -54,7 +53,7 @@ extension IconNativeGridIdentity {
 
 }
 
-/// Static artifact location and lifetime-pinned cache shared by domains using the same ICON mesh.
+/// Static artifact location and validation for an ICON mesh.
 /// Publish replacements atomically; never modify or truncate a mapped inode. Initialized domains
 /// retain their mapping and decoded elevations, so restart readers to load replacement resources.
 /// API readers validate artifacts but do not regenerate them: generation belongs to downloader
@@ -65,7 +64,31 @@ struct IconNativeGridFile: OmFileManagable, Sendable {
     let localFile: String
     let registry: DomainRegistry
     let identity: IconNativeGridIdentity
-    let cache = IconNativeGridCache()
+
+    static func forGrid(_ grid: AsyncGridRegistry) -> Self {
+        let identity: IconNativeGridIdentity
+        switch grid {
+        case .dwd_icon_global_native:
+            identity = .global
+        case .dwd_icon_eu_native:
+            identity = .europe
+        case .dwd_icon_d2_native:
+            identity = .d2
+        case .dwd_icon_global_eps_native:
+            identity = .globalEnsemble
+        case .dwd_icon_eu_eps_native:
+            identity = .europeEnsemble
+        }
+        return Self(registry: grid.staticDomain, identity: identity)
+    }
+
+    static func forRemotePath(_ path: String) -> Self? {
+        let components = path.split(separator: "/", omittingEmptySubsequences: false)
+        guard components.count == 4, components[0] == "data",
+              components[2] == "static", components[3] == "grid.bin",
+              let grid = AsyncGridRegistry(rawValue: String(components[1])) else { return nil }
+        return forGrid(grid)
+    }
 
     /// Materializes a complete backend, validating it before atomically replacing the local file.
     func load<Backend: OmFileReaderBackend>(file: Backend) async throws -> ReducedLatLonIndex
@@ -93,15 +116,13 @@ struct IconNativeGridPayload: OmFilePayload {
 
     /// Loads a supported remote registry path through validated local materialization.
     init(file: OmHttpReaderBackend) async throws {
-        guard let domain = IconNativeDomains.allCases.first(where: {
-            $0.nativeGridFile.getRelativeFilePathWithData() == file.object
-        }) else {
+        guard let artifact = IconNativeGridFile.forRemotePath(file.object) else {
             throw IconNativeDomainError.invalidGridArtifact(
                 path: file.object, reason: "Unknown native grid path"
             )
         }
         let cached = OmReaderBlockCache(backend: file, cache: OpenMeteo.dataBlockCache, cacheKey: file.cacheKey)
-        storage = try await domain.nativeGridFile.load(file: cached)
+        storage = try await artifact.load(file: cached)
     }
 
     func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self {
@@ -119,15 +140,14 @@ extension IconNativeGridFile {
         self.identity = identity
     }
 
-    /// Downloader preparation always validates the on-disk artifact before installing it.
-    func validateFileAndInstall() throws(IconNativeDomainError) {
+    /// Downloader preparation validates the on-disk artifact before installing it in the loader.
+    func validateFile() throws(IconNativeDomainError) -> ReducedLatLonIndex {
         guard FileManager.default.fileExists(atPath: localFile) else {
             throw IconNativeDomainError.missingGridArtifact(localFile)
         }
         do {
             let handle = try FileHandle.openFileReading(file: localFile)
-            let storage = try identity.loadStorage(mapped: MmapFile(fn: handle), path: localFile)
-            cache.install(storage)
+            return try identity.loadStorage(mapped: MmapFile(fn: handle), path: localFile)
         } catch let error as IconNativeDomainError {
             throw error
         } catch {
@@ -138,44 +158,14 @@ extension IconNativeGridFile {
         }
     }
 
-    /// Resolves and pins a validated index, returning an adapter with this grid's distance policy.
-    func load() async throws -> IconNativeGrid {
-        let storage: ReducedLatLonIndex
-        if let cached = cache.get() {
-            storage = cached
-        } else {
-            guard let payload = try await OmFileSystemManager.instance.get(
-                file: self
-            ) else {
-                throw IconNativeDomainError.missingGridArtifact(getFilePath())
-            }
-            try identity.validate(storage: payload.storage, path: getFilePath())
-            storage = payload.storage
-            cache.install(storage)
+    /// Reads and validates the artifact; shared geometry is retained by IconNativeGridLoader.
+    func load() async throws -> ReducedLatLonIndex {
+        guard let payload = try await OmFileSystemManager.instance.get(
+            file: self
+        ) else {
+            throw IconNativeDomainError.missingGridArtifact(getFilePath())
         }
-        return IconNativeGrid(
-            storage: storage,
-            resolutionMeters: identity.resolutionMeters,
-            maximumChordDistanceSquared: identity.maximumChordDistanceSquared,
-            nearbyMaximumChordDistanceSquared: identity.nearbyMaximumChordDistanceSquared
-        )
+        try identity.validate(storage: payload.storage, path: getFilePath())
+        return payload.storage
     }
-}
-
-
-/// Pins a successfully loaded mapping for this artifact. Local and remote file
-/// discovery belongs to `OmFileSystemManager`.
-final class IconNativeGridCache: Sendable {
-    private let entry = AtomicLazyReference<ReducedLatLonIndex>()
-
-    /// Returns the first successfully installed mapping, or nil before initialization.
-    func get() -> ReducedLatLonIndex? {
-        entry.load()
-    }
-
-    /// Publish a storage mapping produced by downloader preparation before the cache is resolved.
-    func install(_ storage: ReducedLatLonIndex) {
-        _ = entry.storeIfNil(storage)
-    }
-
 }
