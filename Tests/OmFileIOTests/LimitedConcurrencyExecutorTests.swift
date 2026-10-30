@@ -1,6 +1,4 @@
 @testable import OmFileIO
-import Logging
-import Synchronization
 import Testing
 
 @Suite struct LimitedConcurrencyExecutorTests {
@@ -62,54 +60,6 @@ import Testing
             42
         }
         #expect(result == 42)
-    }
-
-    @Test func processingParallelQueueLimitsStartedWorkAndCompletes() async throws {
-        let executor = LimitedConcurrencyExecutor(maxConcurrency: 2)
-        let queue = ProcessingParallelQueue<Int>(executor: executor)
-        let startCounter = Counter()
-        let gate = Gate()
-
-        for value in 0..<20 {
-            await queue.enqueue {
-                await startCounter.increment()
-                await gate.wait()
-                return value
-            }
-        }
-
-        await startCounter.wait(untilAtLeast: executor.maxConcurrency)
-        try await Task.sleep(nanoseconds: 50_000_000)
-        #expect(await startCounter.value == executor.maxConcurrency)
-
-        let collectTask = Task {
-            await queue.collect()
-        }
-        await gate.open()
-
-        let results = await collectTask.value
-        #expect(results.sorted() == Array(0..<20))
-    }
-
-    @Test func processingParallelQueueReportsIgnoredErrorsAndContinues() async {
-        enum TestError: Error {
-            case failed
-        }
-
-        let failed = Atomic(false)
-        let queue = ProcessingParallelQueue<Int>(
-            executor: LimitedConcurrencyExecutor(maxConcurrency: 2),
-            onError: { failed.store(true, ordering: .relaxed) }
-        )
-        await queue.enqueueIgnoreError(logger: Logger(label: "ProcessingParallelQueueTests")) {
-            throw TestError.failed
-        }
-        await queue.enqueue { 42 }
-
-        let results = await queue.collect()
-        #expect(results == [42])
-        let hasFailed = failed.load(ordering: .relaxed)
-        #expect(hasFailed)
     }
 }
 

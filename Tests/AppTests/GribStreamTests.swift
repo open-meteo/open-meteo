@@ -1,18 +1,59 @@
 import Foundation
 import NIOCore
 import Testing
+@preconcurrency import SwiftEccodes
 @testable import App
 
 @Suite struct GribStreamTests {
-    @Test func concurrentWindSubmessagesStayInTheirStreams() async throws {
+    private static let windFixture = "R1JJQv//AAIAAAAAAAAA9QAAABUBAGIAAAQAAQfXAxcMAAAAAgAAAEgDAAAAAAQAAAAABv///////////////////wAAAAIAAAACAAAAAP////8Dk4cAAAAAADAAAAAAAcnDgAAehIAAHoSAAAAAACIEAAAAAAICAP+AAAAAAQAAAAAB//////////////8AAAAVBQAAAAQAAEBAAAAAAAAAAAAAAAAGBv8AAAAFBwAAACIEAAAAAAIDAP+AAAAAAQAAAAAB//////////////8AAAAVBQAAAAQAAECAAAAAAAAAAAAAAAAGBv8AAAAFBzc3Nzc="
+
+    @Test(arguments: [false, true])
+    func concurrentWindSubmessagesStayInTheirStreams(mixedDecoders: Bool) async throws {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for index in 0..<64 {
                 let chunkSize = [1, 17, 245, 490][index % 4]
                 group.addTask {
-                    try await preservesWindSubmessageOrder(chunkSize: chunkSize)
+                    if mixedDecoders && index.isMultiple(of: 2) {
+                        try await preservesBufferedWindSubmessageOrder()
+                    } else {
+                        try await preservesWindSubmessageOrder(chunkSize: chunkSize)
+                    }
                 }
             }
             try await group.waitForAll()
+        }
+    }
+
+    private func preservesBufferedWindSubmessageOrder() async throws {
+        let packed = try #require(Data(base64Encoded: Self.windFixture))
+        let buffer = ByteBuffer(bytes: packed + packed)
+        let wind = WindMessages()
+        try await BufferedGribDownload.process(
+            ranges: [0..<buffer.readableBytes], downloadConcurrent: 1, processingConcurrent: 1,
+            byteLimit: buffer.readableBytes, download: { _ in buffer }
+        ) { message in
+            try await wind.append(message)
+        }
+        await wind.check()
+    }
+
+    private actor WindMessages {
+        var parameters = [Int]()
+        var values = [[Double]]()
+
+        func append(_ message: GribMessage) throws {
+            parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
+            values.append(try message.getDouble())
+        }
+
+        func append(_ message: BufferedGribMessage) throws {
+            parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
+            values.append(try message.getDouble())
+        }
+
+        func check() {
+            #expect(parameters == [2, 3, 2, 3])
+            #expect(values == [[3, 3, 3, 3], [4, 4, 4, 4], [3, 3, 3, 3], [4, 4, 4, 4]])
         }
     }
 
@@ -21,7 +62,7 @@ import Testing
         // Synthetic ecCodes regular_ll_sfc_grib2 fixture: one message containing
         // U = 3 m/s followed by V = 4 m/s, each on a 2 x 2 grid, as in NAM packing.
         let packed = try #require(Data(base64Encoded:
-            "R1JJQv//AAIAAAAAAAAA9QAAABUBAGIAAAQAAQfXAxcMAAAAAgAAAEgDAAAAAAQAAAAABv///////////////////wAAAAIAAAACAAAAAP////8Dk4cAAAAAADAAAAAAAcnDgAAehIAAHoSAAAAAACIEAAAAAAICAP+AAAAAAQAAAAAB//////////////8AAAAVBQAAAAQAAEBAAAAAAAAAAAAAAAAGBv8AAAAFBwAAACIEAAAAAAIDAP+AAAAAAQAAAAAB//////////////8AAAAVBQAAAAQAAECAAAAAAAAAAAAAAAAGBv8AAAAFBzc3Nzc="
+            Self.windFixture
         ))
         // Repeat to exercise draining submessages before reading the next message.
         let bytes = Array(packed + packed)
@@ -31,13 +72,10 @@ import Testing
             }
             continuation.finish()
         }
-        var parameters = [Int]()
-        var values = [[Double]]()
+        let wind = WindMessages()
         for try await message in stream.decodeGrib() {
-            parameters.append(try #require(message.get(attribute: "parameterNumber").flatMap(Int.init)))
-            values.append(try message.getDouble())
+            try await wind.append(message)
         }
-        #expect(parameters == [2, 3, 2, 3])
-        #expect(values == [[3, 3, 3, 3], [4, 4, 4, 4], [3, 3, 3, 3], [4, 4, 4, 4]])
+        await wind.check()
     }
 }
