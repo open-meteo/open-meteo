@@ -70,8 +70,9 @@ The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this com
 
 The following options apply to both bounding-box and polygon syncing:
 
-- `--max-merge-gap-bytes 1MB` changes the maximum gap merged into a range request. The default is `128KB`; supported sizes use `KB`, `MB`, `GB`, or `TB` suffixes with powers of 1024. The allowed range is `0KB` to `1MB`. Use `0KB` to merge only adjacent chunks.
-- `--max-concurrent-reads 10` changes the maximum concurrent range reads per file. The default is `8`, with an allowed range of 1–32. `--concurrent` (files per model, default 2) must also be 1–32, and its product with `--max-concurrent-reads` must not exceed 128. Multiple concurrent models can further increase total requests.
+- `--max-merge-gap-bytes`: default 128KB, allowed range 0KB–1MB. For example, `--max-merge-gap-bytes 1MB` merges requests across larger gaps; 0KB merges only adjacent chunks. Gap bytes are downloaded but discarded, and merged requests remain capped at 8 MiB unless a single chunk is larger.
+- `--max-concurrent-reads`: default 8 per file, allowed range 1–32. For example, `--max-concurrent-reads 10` permits ten simultaneous range reads per file.
+- `--concurrent` defaults to 2 files per model and must be 1–32. Its product with `--max-concurrent-reads` must not exceed 128. Concurrent models can further increase total requests.
 
 The defaults remain conservative for connections with reasonable latency. The AWS open-data S3 repository is a shared, limited resource; increase these settings only when needed, and account for file and model concurrency.
 
