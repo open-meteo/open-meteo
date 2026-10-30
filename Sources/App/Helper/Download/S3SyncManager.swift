@@ -40,11 +40,18 @@ actor S3SyncManager: LifecycleHandler {
         }
     }
     
-    func getQueues(bucketsOpt: String?) -> [S3UploadQueue]? {
-        guard let bucketsOpt else {
-            return nil
+    func getQueues(bucketsOpt: String?, rollingBucketsOpt: String? = nil) -> [S3UploadQueue]? {
+        let standard = bucketsOpt.map(S3BucketEndpoint.parseList) ?? []
+        let rolling = rollingBucketsOpt.map(S3BucketEndpoint.parseList) ?? []
+        guard !standard.isEmpty || !rolling.isEmpty else { return nil }
+        let rollingEndpoints = Set(rolling)
+        var seen = Set<S3BucketEndpoint>()
+        return (standard + rolling).filter { seen.insert($0).inserted }.map { endpoint in
+            // Configure a value copy while sharing the endpoint's underlying task queue.
+            var queue = getQueue(endpoint: endpoint)
+            queue.excludeRollingFiles = !rollingEndpoints.contains(endpoint)
+            return queue
         }
-        return getQueues(buckets: bucketsOpt)
     }
     
     /// Wait for all queued syncs to finish.

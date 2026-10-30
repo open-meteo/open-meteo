@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import OmFileFormat
 import Vapor
@@ -17,7 +18,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
 
         @Flag(name: "create-netcdf")
@@ -47,30 +48,31 @@ struct GfsGraphCastDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         disableIdleSleep()
 
         let domain = try GfsGraphCastDomain.load(rawValue: signature.domain)
         try validateSourceOptions(signature: signature)
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
-                try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+                try await downloadRun(using: context, signature: signature, run: run, domain: domain, uploadQueues: resolvedUploadQueues)
             }
             return
         }
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+        try await downloadRun(using: context, signature: signature, run: run, domain: domain, uploadQueues: resolvedUploadQueues)
     }
 
-    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain) async throws {
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain, uploadQueues: [S3UploadQueue]?) async throws {
         let logger = context.application.logger
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, server: signature.server, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, server: signature.server, downloadFromAws: signature.downloadFromAws, uploadQueues: uploadQueues)
         
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
     func getCmaVariable(logger: Logger, message: GribMessage) -> (any GfsGraphCastVariableDownloadable)? {
@@ -140,7 +142,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         }
     }
 
-    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, server: String?, downloadFromAws: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, server: String?, downloadFromAws: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = domain == .aigefs025 ? 6 : 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -305,7 +307,7 @@ struct GfsGraphCastDownload: AsyncCommand {
             }
                         
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) ?? [])
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)

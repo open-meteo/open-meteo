@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import OmFileFormat
 import Vapor
@@ -25,7 +26,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
         
         @Option(name: "apikey", short: "k", help: "API key for ECMWF API")
@@ -46,6 +47,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         //disableIdleSleep()
 
         let domain = try EcmwfSeasDomain.load(rawValue: signature.domain)
@@ -59,21 +61,21 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             fatalError("Parameter server is required")
         }
         
-        try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
+        try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf, uploadQueues: resolvedUploadQueues)
         logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let handles: [GenericVariableHandle]
         switch domain {
         case .ec46, .ec46_weekly:
-            handles = try await downloadEC46(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+            handles = try await downloadEC46(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadQueues: resolvedUploadQueues)
         case .seas5, .seas5_monthly, .seas5_12hourly, .seas5_daily, .seas5_monthly_upper_level:
-            handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+            handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadQueues: resolvedUploadQueues)
         case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
             fatalError()
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
     }
     
-    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadQueues: [S3UploadQueue]?) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
@@ -118,11 +120,11 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
         }
 
-        try await DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile], createNetCdf: createNetCdf, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile], createNetCdf: createNetCdf, application: application, uploadQueues: uploadQueues)
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
     
-    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
@@ -233,12 +235,12 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise(application: application, completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: day >= 46, validTimes: validTimes, uploadQueues: uploadQueues))
         }
         return handles
     }
 
-    func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
@@ -337,7 +339,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise(application: application, completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
+            handles.append(contentsOf: try await writer.finalise(application: application, completed: month >= 6, validTimes: validTimes, uploadQueues: uploadQueues))
         }
         return handles
     }

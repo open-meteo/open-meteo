@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import Vapor
 import OmFileFormat
@@ -41,7 +42,7 @@ struct GfsDownload: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
@@ -62,22 +63,23 @@ struct GfsDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
-                try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+                try await downloadRun(using: context, signature: signature, run: run, domain: domain, uploadQueues: resolvedUploadQueues)
             }
             return
         }
 
         /// 18z run is available the day after starting 05:26
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+        try await downloadRun(using: context, signature: signature, run: run, domain: domain, uploadQueues: resolvedUploadQueues)
     }
 
-    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain) async throws {
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain, uploadQueues: [S3UploadQueue]?) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
         disableIdleSleep()
@@ -117,15 +119,15 @@ struct GfsDownload: AsyncCommand {
             }
             let writeUpdateJson = !isPressureOnlyEnsembleDownload
 
-            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
+            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadQueues: uploadQueues)
 
             let nConcurrent = signature.concurrent ?? 4
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateFullRun: generateFullRun)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             let variables: [any GfsVariableDownloadable] = GfsWaveVariable.allCases
-            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
+            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadQueues: uploadQueues)
             let nConcurrent = signature.concurrent ?? 1
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         case .gefs025_ensemble_mean, .gefs05_ensemble_mean, .gefswave025_ensemble_mean:
             fatalError("Ensemble mean domains cannot be downloaded directly")
         }
@@ -160,7 +162,7 @@ struct GfsDownload: AsyncCommand {
         return surface
     }
 
-    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileType, grid: any Gridable, isGlobal: Bool, uploadS3Bucket: String?) async throws {
+    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileType, grid: any Gridable, isGlobal: Bool, uploadQueues: [S3UploadQueue]?) async throws {
         let logger = application.logger
 
         /// download seamask and height
@@ -214,18 +216,18 @@ struct GfsDownload: AsyncCommand {
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
 
-        try await height.data.writeStaticOmFile(file: surfaceElevationFileOm, grid: grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+        try await height.data.writeStaticOmFile(file: surfaceElevationFileOm, grid: grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
     }
 
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?, skipMissing: Bool, downloadFromAws: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?, skipMissing: Bool, downloadFromAws: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         // GFS025 ensemble does not have elevation information, use non-ensemble version
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0, useAws: downloadFromAws)
         if ![GfsDomain.hrrr_conus_15min, .gfswave025, .gfswave025_ens, .gfswave016].contains(domain) {
             // 15min hrrr data uses hrrr domain elevation files
-            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal, uploadS3Bucket: uploadS3Bucket)
+            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal, uploadQueues: uploadQueues)
         }
 
         let deadLineHours: Double
@@ -318,7 +320,7 @@ struct GfsDownload: AsyncCommand {
                 }
                 let completed = forecastHour == 18
                 let validTimes = TimerangeDt(start: run, nTime: (forecastHour+1)*4, dtSeconds: 900).map({$0})
-                return try await writer.finalise(application: application, completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                return try await writer.finalise(application: application, completed: completed, validTimes: validTimes, uploadQueues: uploadQueues)
             }
             await curl.printStatistics()
             return handles
@@ -408,7 +410,7 @@ struct GfsDownload: AsyncCommand {
                     /// Generate land mask from regular data for GFS Wave013
                     if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                         let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
-                        try await height.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+                        try await height.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
                     }
                     
                     // Deaccumulate precipitation
@@ -527,7 +529,7 @@ struct GfsDownload: AsyncCommand {
                 )
             }
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) + (try await writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) ?? [])
         }
         await curl.printStatistics()
         return handles

@@ -111,8 +111,12 @@ extension Array where Element == Float {
     /// Writes a new static file and queues its upload, if configured. Callers skip existing files.
     /// Retains caller isolation through the write so elevation-generating actors cannot interleave writes.
     nonisolated(nonsending) func writeStaticOmFile(file: OmFileType, grid: any Gridable, application: Application, uploadS3Bucket: String?, createNetCdf: Bool = false) async throws {
+        try await writeStaticOmFile(file: file, grid: grid, application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket), createNetCdf: createNetCdf)
+    }
+
+    nonisolated(nonsending) func writeStaticOmFile(file: OmFileType, grid: any Gridable, application: Application, uploadQueues: [S3UploadQueue]?, createNetCdf: Bool = false) async throws {
         try writeOmFile2D(file: file.getFilePath(), grid: grid, createNetCdf: createNetCdf)
-        for queue in await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket) ?? [] {
+        for queue in uploadQueues ?? [] {
             let uploads = queue.startMultiPartUploads()
             await uploads.uploadMultipart(file: file.getFilePath(), objectName: file.getRelativeFilePathWithData(), lastModified: .now())
             await queue.finishMultiPartUploads(uploads)

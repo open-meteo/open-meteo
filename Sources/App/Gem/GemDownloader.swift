@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 import Vapor
 import OmFileFormat
@@ -38,7 +39,7 @@ struct GemDownload: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Enable ensemble rolling.om uploads to these S3 buckets; other products use --upload-s3-bucket.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
@@ -53,6 +54,7 @@ struct GemDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try GemDomain.load(rawValue: signature.domain)
@@ -96,14 +98,14 @@ struct GemDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadS3Bucket: signature.uploadS3Bucket, concurrent: signature.concurrent)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, uploadS3RollingBucket: signature.uploadS3RollingBucket, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf, uploadQueues: resolvedUploadQueues)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadQueues: resolvedUploadQueues, concurrent: signature.concurrent)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     // download seamask and height
-    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadQueues: [S3UploadQueue]?) async throws {
         if domain == .gem_gdps_15km_upper_level {
             return
         }
@@ -179,11 +181,11 @@ struct GemDownload: AsyncCommand {
             }
         }
 
-        try await height.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetcdf)
+        try await height.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: createNetcdf)
     }
 
     /// Download data and store as compressed files for each timestep
-    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadS3Bucket: String?, concurrent: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadQueues: [S3UploadQueue]?, concurrent: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         // HRDPS west domain uploads files not atomically -> causing corrupted files if downloaded too early
@@ -292,7 +294,7 @@ struct GemDownload: AsyncCommand {
                 }
             }
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) + (writerProbabilities?.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues) ?? [])
             return handles
         }
         await curl.printStatistics()
