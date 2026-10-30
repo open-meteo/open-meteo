@@ -9,6 +9,8 @@ public struct S3UploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
     /// Time-series upload policy, inherited by multipart sessions.
     public var excludeRollingFiles: Bool = true
+    /// Skip spatial files and their associated metadata.
+    public var excludeSpatialFiles: Bool = false
     let client: HTTPClient
     let logger: Logger
     let onError: @Sendable () -> Void
