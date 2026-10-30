@@ -10,9 +10,9 @@ import Testing
             grid: RegularGrid(nx: 1, ny: 1, latMin: 45.01, lonMin: -74.98, dx: 1, dy: 1)
         )
         let group = mixedVariableSchemas
-            ? RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, ProbabilityVariable.self))
-            : RawReaderDerivationGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
-        let mapping = ReaderPlan(
+            ? MultiDomains.RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, ProbabilityVariable.self))
+            : MultiDomains.RawReaderDerivationGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
+        let mapping = MultiDomains.ReaderPlan(
             primary: [
                 .domain(output, GemVariable.self),
                 .mixedBeforeDerivation(group)
@@ -41,9 +41,9 @@ import Testing
             grid: RegularGrid(nx: 1, ny: 1, latMin: 45.01, lonMin: -74.98, dx: 1, dy: 1)
         )
         let group = mixedVariableSchemas
-            ? RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, ProbabilityVariable.self))
-            : RawReaderDerivationGroup(domains: [output, native], variableType: GemVariable.self, derivationDomain: native)
-        let factory = ReaderPlan(primary: [.mixedBeforeDerivation(group)], gridForBoundingBoxRequests: output)
+            ? MultiDomains.RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, ProbabilityVariable.self))
+            : MultiDomains.RawReaderDerivationGroup(domains: [output, native], variableType: GemVariable.self, derivationDomain: native)
+        let factory = MultiDomains.ReaderPlan(primary: [.mixedBeforeDerivation(group)], gridForBoundingBoxRequests: output)
             .makeFactory(options: try GenericReaderOptions())
         let result = try #require(await factory.getReaders(lat: 45, lon: -74.98, elevation: 500, mode: .nearest))
         #expect(result.hourly?.targetElevation == 500)
@@ -54,7 +54,7 @@ import Testing
         let output = BoundingBoxFixtureDomain(grid: RegularGrid(nx: 3, ny: 1, latMin: 45, lonMin: -75, dx: 0.02, dy: 0.02))
         let source = BoundingBoxFixtureDomain(domainRegistry: .cmc_gem_rdps_10km,
             grid: RegularGrid(nx: 2, ny: 1, latMin: 45, lonMin: -75, dx: 0.04, dy: 0.04))
-        let factory = ReaderPlan(primary: [.domain(source, GemVariable.self)], gridForBoundingBoxRequests: output)
+        let factory = MultiDomains.ReaderPlan(primary: [.domain(source, GemVariable.self)], gridForBoundingBoxRequests: output)
             .makeFactory(options: try GenericReaderOptions())
         for (outputPosition, sourcePosition) in [(0, 0), (2, 1), (0, 0)] {
             let result = try await factory.getReaders(gridpoint: outputPosition)
@@ -80,7 +80,7 @@ import Testing
 
     @Test func missingOutputTerrainDisablesCorrections() async throws {
         let output = BoundingBoxFixtureDomain()
-        let mapping = ReaderPlan(
+        let mapping = MultiDomains.ReaderPlan(
             primary: [.domain(output, GemVariable.self)], gridForBoundingBoxRequests: output
         )
         let factory = mapping.makeFactory(options: try GenericReaderOptions())
