@@ -52,15 +52,16 @@ struct GeoSphereDownloader: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    /// Download elevation data from GeoSphere DEM file
-    func downloadElevation(application: Application, domain: GeoSphereDomain, uploadS3Bucket: String?) async throws {
+    /// Download AROME elevation from its DEM file. C-LAEF uses forecast surface geopotential instead.
+    func downloadAromeElevation(application: Application, uploadS3Bucket: String?) async throws {
+        let domain = GeoSphereDomain.arome_austria
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
         try domain.surfaceElevationFileOm.createDirectory()
-        logger.info("Downloading elevation data from GeoSphere DEM")
+        logger.info("Downloading AROME elevation data from GeoSphere DEM")
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         let demUrl = "https://public.hub.geosphere.at/public/resources/misc/NWP_DEM.nc"
@@ -114,7 +115,7 @@ struct GeoSphereDownloader: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        try await downloadElevation(application: application, domain: domain, uploadS3Bucket: uploadS3Bucket)
+        try await downloadAromeElevation(application: application, uploadS3Bucket: uploadS3Bucket)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
 
