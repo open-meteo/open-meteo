@@ -1850,6 +1850,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .oceanCurrentDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
             
         case .soil_temperature_0_to_10cm:
+            if compatibility.aliasesSoilTemperature0To10cmTo0To7cm {
+                return .direct(Reader.variableFromString("soil_temperature_0_to_7cm"))
+            }
             return soilLayerAverage([.soil_temperature_0cm, .soil_temperature_1cm, .soil_temperature_4cm, .soil_temperature_10cm], weights: [0.05, 0.2, 0.45, 0.3])
         case .soil_temperature_10_to_40cm:
             return soilLayerAverage([.soil_temperature_10cm, .soil_temperature_30cm, .soil_temperature_60cm], weights: [1.0 / 3, 11.0 / 18, 1.0 / 18])
@@ -1868,9 +1871,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
 
         case .skin_temperature:
             return .direct(Reader.variableFromString("surface_temperature")) ?? .direct(Reader.variableFromString("soil_temperature_0cm"))
-        case .soil_temperature_0_to_10cm:
-            guard compatibility.aliasesSoilTemperature0To10cmTo0To7cm else { return nil }
-            return .direct(Reader.variableFromString("soil_temperature_0_to_7cm"))
         case .soil_temperature_0cm:
             guard compatibility.allowsSoilDepthCompatibilityAliases else { return nil }
             return .direct(Reader.variableFromString(ForecastSurfaceVariable.skin_temperature.rawValue)) ?? .direct(Reader.variableFromString(ForecastSurfaceVariable.surface_temperature.rawValue))
