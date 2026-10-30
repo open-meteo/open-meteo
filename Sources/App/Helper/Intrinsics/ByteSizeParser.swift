@@ -15,7 +15,11 @@ enum ByteSizeParser {
         guard let number = Double(str.dropLast(2)) else {
             throw ByteSizeParserError.numberConversionFailed(str)
         }
-        return Int(number * multiplier)
+        let bytes = number * multiplier
+        guard bytes.isFinite, bytes >= Double(Int.min), bytes < Double(Int.max) else {
+            throw ByteSizeParserError.numberConversionFailed(str)
+        }
+        return Int(bytes)
     }
 }
 

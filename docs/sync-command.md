@@ -66,11 +66,45 @@ The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this com
 
 ### Syncing a region only
 
-`--bounding-box lat1,lon1,lat2,lon2` keeps only the data around a latitude/longitude box, e.g. `--bounding-box 45,5,48,11`. A grid cell is inside if its coordinate lies in the box. Every chunk of a weather variable file that holds a cell inside the box is copied byte for byte, without decoding it. All other chunks are written empty, which reads as NaN, so the API returns `null` for those chunks, and the file keeps its dimensions, chunking and compression. Chunks are whole, so the data reaches a little beyond the box. Selected chunks separated by gaps of up to 1 MiB share an HTTP range request of up to 8 MiB; a single larger chunk is fetched in one request. Gap bytes are downloaded but discarded, and unselected chunks are written as NaN. The last 8 KiB of each file are prefetched for metadata. Up to eight requests run concurrently per file, and chunks are written serially in file order. A box that reaches beyond the grid of a regional model keeps the cells inside the grid; a box without any cell fails with an error.
+`--bounding-box lat1,lon1,lat2,lon2` keeps only the data around a latitude/longitude box, e.g. `--bounding-box 45,5,48,11`. A grid cell is inside if its coordinate lies in the box. Every chunk of a weather variable file that holds a cell inside the box is copied byte for byte, without decoding it. All other chunks are written empty, which reads as NaN, so the API returns `null` for those chunks, and the file keeps its dimensions, chunking and compression. Chunks are whole, so the data reaches a little beyond the box. Selected chunks separated by gaps of up to 128 KiB by default share an HTTP range request of up to 8 MiB; a single larger chunk is fetched in one request. Gap bytes are downloaded but discarded, and unselected chunks are written as NaN. The last 8 KiB of each file are prefetched for metadata. Up to eight requests run concurrently per file, and chunks are written serially in file order. A box that reaches beyond the grid of a regional model keeps the cells inside the grid; a box without any cell fails with an error.
 
-Static files, `meta.json` and files that are not an array of floating point numbers on the model grid are copied whole. The grid may be followed or preceded by other dimensions, e.g. ensemble members. Files synced with a box are compared by modification time only, because their size differs from the remote file. The first file that fails stops the model with that error. A file is retried up to 10 times if the remote file changes during the copy or a request times out. A file whose layout does not match the model grid is copied whole, with an info log line.
+The following options apply to both bounding-box and polygon syncing:
 
-When changing the box, use a fresh data directory or remove the previously synced weather files first. Modification times alone cannot detect a changed box. Files containing empty chunks require the updated OM reader.
+- `--max-merge-gap-bytes`: default 128KB, allowed range 0KB–1MB. For example, `--max-merge-gap-bytes 1MB` merges requests across larger gaps; 0KB merges only adjacent chunks. Gap bytes are downloaded but discarded, and merged requests remain capped at 8 MiB unless a single chunk is larger.
+- `--max-concurrent-reads`: default 8 per file, allowed range 1–32. For example, `--max-concurrent-reads 10` permits ten simultaneous range reads per file.
+- `--concurrent` defaults to 2 files per model and must be 1–32. Its product with `--max-concurrent-reads` must not exceed 128. Concurrent models can further increase total requests.
+
+The defaults remain conservative for connections with reasonable latency. The AWS open-data S3 repository is a shared, limited resource; increase these settings only when needed, and account for file and model concurrency.
+
+`--polygon` selects one or more regions, including regions with holes, using a GeoJSON MultiPolygon **coordinates array** in WGS84 degrees. Positions use `[longitude, latitude]`, unlike the latitude-first `--bounding-box` parameter. Pass the coordinates array only, without a GeoJSON geometry object.
+
+For example, this rectangular boundary covers an illustrative Central Europe region from 5°E to 20°E and 45°N to 55°N. It is an approximate selection area, not an administrative boundary:
+
+```bash
+openmeteo-api sync ecmwf_ifs temperature_2m,shortwave_radiation --polygon '[[[[5,45],[20,45],[20,55],[5,55],[5,45]]]]'
+```
+
+This rectangle selects the same cells as `--bounding-box 45,5,55,20`. To use a file instead, save the following coordinates to `central-europe.json`:
+
+```json
+[
+  [
+    [[5, 45], [20, 45], [20, 55], [5, 55], [5, 45]]
+  ]
+]
+```
+
+Then replace the inline `--polygon` argument with `--polygon @central-europe.json`. File input is useful for detailed boundaries that would exceed command-line length limits.
+
+- The nesting is polygons → rings → positions. Each position must contain exactly two numbers: longitude and latitude. Altitude is not supported.
+- Each ring needs at least four positions and must repeat its first position at the end. The first ring is the exterior; subsequent rings are holes. Exterior rings must run counter-clockwise and holes clockwise, otherwise the command fails with the ring named.
+- For an existing GeoJSON MultiPolygon geometry, use its `coordinates` field directly. For a GeoJSON Polygon geometry, wrap its `coordinates` field in one additional array.
+- A grid cell is selected when its centre lies inside a polygon and outside its holes. Whole compressed chunks containing selected cells are retained, so downloaded data can extend beyond the boundary. Unselected chunks read as missing data (`null` in the API). A region containing no grid cells fails with an error.
+- `--polygon` and `--bounding-box` cannot be combined. Rings must not cross the antimeridian; split such regions into separate polygons.
+
+Static files, `meta.json` and files that are not an array of floating point numbers on the model grid are copied whole. The grid may be followed or preceded by other dimensions, e.g. ensemble members. Files synced with a box or polygon are compared by modification time only, because their size differs from the remote file. The first file that fails stops the model with that error. A file is retried up to 10 times if the remote file changes during the copy or a request times out. A file whose layout does not match the model grid is copied whole, with an info log line.
+
+When changing the box or polygon, use a fresh data directory or remove the previously synced weather files first. Modification times alone cannot detect a changed region. Files containing empty chunks require the updated OM reader.
 
 ## Cleanup old data
 To automatically cleanup old data, the following cronjobs can be used.

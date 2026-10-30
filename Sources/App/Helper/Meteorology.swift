@@ -270,7 +270,7 @@ enum Meteorology {
         }
     }
     
-    /// Calculate relative humidity using vapor vapor saturation
+    /// Calculate relative humidity using IFS saturation vapour pressure.
     /// Accounts for saturation pressure over ice. This is critical to use RH for upper level cloud cover fraction.
     /// Uses ECMWF-like mixed phase transition between -23°C and 0°C
     /// All variables must be on the same level.
@@ -293,22 +293,12 @@ enum Meteorology {
         // Vapor pressure from specific humidity (Pa)
         let e = (q * p) / (0.622 + 0.378 * q)
         
-        // Saturation over ice (Murphy & Koop 2005). Accurate range from -110°C to 0.01°C
-        let lnEsi = 9.550426
-                    - (5723.265 / Float(T))
-                    + 3.53068 * log(Float(T))
-                    - 0.00728332 * Float(T)
-        let esi = exp(lnEsi)
+        // IFS saturation over ice (Pa).
+        // https://earthkit-meteo.readthedocs.io/en/stable/autoapi/earthkit/meteo/thermo/saturation_vapour_pressure.html
+        let esi = 611.21 * exp(22.587 * (T - T0) / (T + 0.7))
         
-        // Saturation over liquid water (Murphy & Koop 2005)
-        let term1 = 54.842763
-                    - 6763.22 / T
-                    - 4.210 * log(T)
-                    + 0.000367 * T
-        let term2 = tanh(0.0415 * (T - 218.8)) *
-                    (53.878 - 1331.22 / T - 9.44523 * log(T) + 0.014025 * T)
-        let lnEsw = term1 + term2
-        let esw = exp(lnEsw)
+        // IFS saturation over liquid water (Pa).
+        let esw = 611.21 * exp(17.502 * (T - T0) / (T - 32.19))
         
         /// Temperature-based liquid or ice fraction. 0 = ice, 1 = liquid
         let fLiquid: Float
