@@ -5,19 +5,15 @@ import OmFileIO
 import Logging
 import Synchronization
 
-/// Grid cells that `sync --bounding-box` keeps: the cells whose centres lie inside the box.
+/// Grid cells that regional sync keeps: the cells whose centres lie inside the region.
 /// Compressed chunks of a weather variable file that hold none of them are written as NaN, so the API returns null for those chunks.
 struct SyncBoundingBox: Sendable {
     /// `ny * nx` flags in grid order
     let selectedCells: [Bool]
     let nx: Int
 
-    init(grid: any Gridable, box: BoundingBoxWGS84) throws {
-        try self.init(grid: grid) { box.latitude.contains($0) && box.longitude.contains($1) }
-    }
-
-    init(grid: any Gridable, inside: (Float, Float) -> Bool) throws {
-        let inside = Self.selectedCells(grid: grid, inside: inside)
+    init(grid: any Gridable, region: some GeographicRegion) throws {
+        let inside = Self.selectedCells(grid: grid, region: region)
         guard inside.contains(true) else {
             throw ForecastApiError.generic(message: "no cell of this grid lies inside the box or polygon")
         }
@@ -34,16 +30,11 @@ struct SyncBoundingBox: Sendable {
         longitude >= 180 ? longitude - 360 : longitude < -180 ? longitude + 360 : longitude
     }
 
-    /// Cells whose centre lies inside the box
-    static func selectedCells(grid: any Gridable, box: BoundingBoxWGS84) -> [Bool] {
-        selectedCells(grid: grid) { box.latitude.contains($0) && box.longitude.contains($1) }
-    }
-
-    /// Cells whose centre (latitude, longitude from -180 to 180) satisfies `inside`
-    static func selectedCells(grid: any Gridable, inside: (Float, Float) -> Bool) -> [Bool] {
+    /// Cells whose centres lie inside the region, with longitudes normalized to -180..<180.
+    static func selectedCells(grid: any Gridable, region: some GeographicRegion) -> [Bool] {
         (0 ..< grid.nx * grid.ny).map {
-            let (lat, lon) = grid.getCoordinates(gridpoint: $0)
-            return inside(lat, wrapped(longitude: lon))
+            let (latitude, longitude) = grid.getCoordinates(gridpoint: $0)
+            return region.contains(latitude: latitude, longitude: wrapped(longitude: longitude))
         }
     }
 

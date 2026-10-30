@@ -126,8 +126,14 @@ struct SyncCommand: AsyncCommand {
         guard signature.boundingBox == nil || signature.polygon == nil else {
             throw ForecastApiError.generic(message: "--bounding-box and --polygon cannot be combined")
         }
-        let bbox = try signature.boundingBox.map { try BoundingBoxWGS84(commaSeparated: $0) }
-        let polygon = try signature.polygon.map { try SyncPolygon(argument: $0) }
+        let region: (any GeographicRegion)?
+        if let polygon = signature.polygon {
+            region = try SyncPolygon(argument: polygon)
+        } else if let boundingBox = signature.boundingBox {
+            region = try BoundingBoxWGS84(commaSeparated: boundingBox)
+        } else {
+            region = nil
+        }
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
@@ -180,8 +186,7 @@ struct SyncCommand: AsyncCommand {
                             pastDays: pastDays,
                             apikey: signature.apikey,
                             downloadPressureNow: downloadPressureNow,
-                            bbox: bbox,
-                            polygon: polygon
+                            region: region
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
@@ -200,16 +205,16 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?, polygon: SyncPolygon?) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, region: (any GeographicRegion)?) async throws {
         let logger = application.logger
         
         /// The digital elevation model has no grid and only static files, which are copied whole
         let keep: SyncBoundingBox?
-        if bbox != nil || polygon != nil, model != .copernicus_dem90 {
+        if let region, model != .copernicus_dem90 {
             guard let grid = try await model.getDomain()?.grid else {
                 throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
             }
-            keep = try polygon.map { polygon in try SyncBoundingBox(grid: grid) { polygon.contains(latitude: $0, longitude: $1) } } ?? bbox.map { try SyncBoundingBox(grid: grid, box: $0) }
+            keep = try SyncBoundingBox(grid: grid, region: region)
         } else {
             keep = nil
         }

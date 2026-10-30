@@ -1,7 +1,7 @@
 import Foundation
 
 /// WGS84 adapter for `sync --polygon`. Rings must not cross the antimeridian.
-struct SyncPolygon: Sendable {
+struct SyncPolygon: GeographicRegion {
     private let geometry: Polygon
 
     /// GeoJSON MultiPolygon coordinates starting with `[[[[`, or `@path` to a UTF-8 file containing it.
@@ -28,6 +28,6 @@ struct SyncPolygon: Sendable {
     }
 
     func contains(latitude: Float, longitude: Float) -> Bool {
-        geometry.contains(x: longitude, y: latitude)
+        geometry.contains(latitude: latitude, longitude: longitude)
     }
 }
