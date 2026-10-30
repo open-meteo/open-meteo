@@ -51,13 +51,13 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
 
-        @Option(name: "concurrent", short: "c", help: "Number of concurrent files per model download. Default 2")
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent files per model download. Default 2, range 1-32. Product with max-concurrent-reads must not exceed 128.")
         var concurrent: Int?
         
         @Option(name: "concurrent-models", short: "c", help: "Number of concurrent models to download. Default 2")
         var concurrentModels: Int?
 
-        @Flag(name: "execute", help: "Actually perfom file delete on cleanup")
+        @Flag(name: "execute", help: "Actually perform file delete on cleanup")
         var execute: Bool
 
         @Option(name: "year", help: "Download one year or a range of years (e.g. 2000-2005)")
@@ -65,6 +65,15 @@ struct SyncCommand: AsyncCommand {
 
         @Option(name: "bounding-box", help: "Only keep data inside a box 'lat1,lon1,lat2,lon2'. Chunks holding no cell inside the box are written as NaN")
         var boundingBox: String?
+
+        @Option(name: "polygon", help: "Only keep data inside a WGS84 polygon like --bounding-box, as a GeoJSON MultiPolygon coordinates array '[[[[lon,lat],...]],...]' (outer rings counter-clockwise, holes clockwise), or @path to a file holding it. Cannot be combined with --bounding-box")
+        var polygon: String?
+
+        @Option(name: "max-merge-gap-bytes", help: "Maximum gap to merge into a regional HTTP read, with KB/MB/GB/TB suffix. Default 128KB (128 KiB), maximum 1MB (1 MiB). Use 0KB to merge only adjacent chunks.")
+        var maxMergeGapBytes: String?
+
+        @Option(name: "max-concurrent-reads", help: "Maximum concurrent regional HTTP reads per file. Default 8, range 1-32. Product with concurrent must not exceed 128.")
+        var maxConcurrentReads: Int?
     }
 
     /// All weather variables that may be available for `previous days API`
@@ -119,8 +128,32 @@ struct SyncCommand: AsyncCommand {
 
         let pastDays = signature.pastDays ?? 7
         let concurrent = signature.concurrent ?? 2
+        guard (1...32).contains(concurrent) else {
+            throw ForecastApiError.generic(message: "--concurrent must be between 1 and 32")
+        }
+        let maxMergeGapBytes = try signature.maxMergeGapBytes.map { try ByteSizeParser.parseSizeStringToBytes($0) } ?? SyncBoundingBox.defaultMaxMergeGapBytes
+        guard (0...1024 * 1024).contains(maxMergeGapBytes) else {
+            throw ForecastApiError.generic(message: "--max-merge-gap-bytes must be between 0KB and 1MB")
+        }
+        let maxConcurrentReads = signature.maxConcurrentReads ?? SyncBoundingBox.defaultMaxConcurrentReads
+        guard (1...32).contains(maxConcurrentReads) else {
+            throw ForecastApiError.generic(message: "--max-concurrent-reads must be between 1 and 32")
+        }
+        guard concurrent * maxConcurrentReads <= 128 else {
+            throw ForecastApiError.generic(message: "--concurrent multiplied by --max-concurrent-reads must not exceed 128")
+        }
         let concurrentModels = signature.concurrentModels ?? 2
-        let bbox = try signature.boundingBox.map { try BoundingBoxWGS84(commaSeparated: $0) }
+        guard signature.boundingBox == nil || signature.polygon == nil else {
+            throw ForecastApiError.generic(message: "--bounding-box and --polygon cannot be combined")
+        }
+        let region: (any GeographicRegion)?
+        if let polygon = signature.polygon {
+            region = try SyncPolygon(argument: polygon)
+        } else if let boundingBox = signature.boundingBox {
+            region = try BoundingBoxWGS84(commaSeparated: boundingBox)
+        } else {
+            region = nil
+        }
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
@@ -173,7 +206,9 @@ struct SyncCommand: AsyncCommand {
                             pastDays: pastDays,
                             apikey: signature.apikey,
                             downloadPressureNow: downloadPressureNow,
-                            bbox: bbox
+                            region: region,
+                            maxMergeGapBytes: maxMergeGapBytes,
+                            maxConcurrentReads: maxConcurrentReads
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
@@ -192,16 +227,16 @@ struct SyncCommand: AsyncCommand {
         }
     }
     
-    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, bbox: BoundingBoxWGS84?) async throws {
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool, region: (any GeographicRegion)?, maxMergeGapBytes: Int = SyncBoundingBox.defaultMaxMergeGapBytes, maxConcurrentReads: Int = SyncBoundingBox.defaultMaxConcurrentReads) async throws {
         let logger = application.logger
         
         /// The digital elevation model has no grid and only static files, which are copied whole
         let keep: SyncBoundingBox?
-        if let bbox, model != .copernicus_dem90 {
+        if let region, model != .copernicus_dem90 {
             guard let grid = try await model.getDomain()?.grid else {
                 throw ForecastApiError.generic(message: "regional sync is not supported for this grid")
             }
-            keep = try SyncBoundingBox(grid: grid, box: bbox)
+            keep = try SyncBoundingBox(grid: grid, region: region, maxMergeGapBytes: maxMergeGapBytes, maxConcurrentReads: maxConcurrentReads)
         } else {
             keep = nil
         }

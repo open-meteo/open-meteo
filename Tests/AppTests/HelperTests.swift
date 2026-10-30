@@ -133,5 +133,8 @@ import NIO
         #expect(bytes4 == Int(0.5 * 1024 * 1024 * 1024 * 1024))
         let bytes5 = try ByteSizeParser.parseSizeStringToBytes("3.25MB")
         #expect(bytes5 == Int(3.25 * 1024 * 1024))
+        for value in ["nanMB", "infKB", "1e100TB", "-1e100GB"] {
+            #expect(throws: ByteSizeParserError.self) { try ByteSizeParser.parseSizeStringToBytes(value) }
+        }
     }
 }

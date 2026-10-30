@@ -32,9 +32,9 @@ import Synchronization
 
     @Test func keepsOnlyCellsInsideTheBox() throws {
         let box = BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5)
-        let inside = SyncBoundingBox.selectedCells(grid: grid, box: box)
+        let inside = SyncBoundingBox.selectedCells(grid: grid, region: box)
         #expect(inside.filter { $0 }.count == 4)
-        let keep = try SyncBoundingBox(grid: grid, box: box)
+        let keep = try SyncBoundingBox(grid: grid, region: box)
         /// Rows 5 and 6, columns 7 and 8, regardless of the grid search radius
         let (rows, columns) = bounds(keep)
         #expect(rows == 5 ... 6 && columns == 7 ... 8)
@@ -42,11 +42,11 @@ import Synchronization
     }
 
     @Test func boxPartlyOutsideKeepsTheCellsInside() throws {
-        let edges = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: -20 ..< 0.5, longitude: 13.5 ..< 40))
+        let edges = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: -20 ..< 0.5, longitude: 13.5 ..< 40))
         let (rows, columns) = bounds(edges)
         #expect(rows == 0 ... 0 && columns == 14 ... 14)
         #expect(throws: (any Error).self) {
-            try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 50 ..< 60, longitude: 50 ..< 60))
+            try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 50 ..< 60, longitude: 50 ..< 60))
         }
     }
 
@@ -60,7 +60,7 @@ import Synchronization
         defer { fixture.remove() }
         let grid = IconNativeGrid(storage: fixture.index, resolutionMeters: 1000,
             maximumChordDistanceSquared: 1, nearbyMaximumChordDistanceSquared: 1)
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 0..<10, longitude: 0..<10))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 0..<10, longitude: 0..<10))
         #expect(keep.selectedCells == [false, true, false, true])
         try await copyAndCheck(keep: keep, dims: [1, 4, 5], chunks: [1, 1, 2], cell: { $0[1] })
         try await copyAndCheck(keep: keep, dims: [4, 5], chunks: [1, 2], cell: { $0[0] })
@@ -106,39 +106,50 @@ import Synchronization
         #expect(capped.map(\.bytes) == [0..<150, 150..<151])
     }
 
-    @Test(arguments: [1024 * 1024, 1024 * 1024 + 1])
+    @Test(arguments: [128 * 1024, 128 * 1024 + 1])
     func mergeGapLimit(gap: Int) {
         let start = UInt64(10 + gap)
         let ranges: [Range<UInt64>] = [0..<10, 10..<start, start..<(start + 10)]
         let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, false, true])
-        let expected = gap == 1024 * 1024 ? [0..<(20 + gap)] : [0..<10, (10 + gap)..<(20 + gap)]
+        let expected = gap == 128 * 1024 ? [0..<(20 + gap)] : [0..<10, (10 + gap)..<(20 + gap)]
         #expect(runs.map(\.bytes) == expected)
         let capped = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, false, true], max: gap + 19)
         #expect(capped.count == 2)
     }
 
-    @Test func mergedReadsOnlyWriteSelectedChunks() async throws {
+    @Test(arguments: [0, 1, 1024 * 1024])
+    func customMergeGapLimit(limit: Int) {
+        for gap in [limit, limit + 1] {
+            let start = UInt64(10 + gap)
+            let ranges: [Range<UInt64>] = [0..<10, start..<(start + 10)]
+            let runs = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: [true, true], maxMergeGapBytes: limit)
+            #expect(runs.count == (gap <= limit ? 1 : 2))
+        }
+    }
+
+    @Test(arguments: [0, 128 * 1024], [1, 3, 8, 10])
+    func mergedReadsOnlyWriteSelectedChunks(maxMergeGapBytes: Int, maxConcurrentReads: Int) async throws {
         let values = (0..<120).map { Float($0) / 20 }
         let source = try fixture(values, dimensions: [1, 40, 3], chunks: [1, 1, 3])
         let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let ranges = try await array.chunkIndex()
         let selectedCells = (0..<40).map { $0 % 2 == 1 }
-        let selectedRanges = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: selectedCells).map(\.bytes)
-        #expect(selectedRanges.count == 1)
+        let selectedRanges = SyncBoundingBox.coalescedReadRanges(ranges: ranges, takeChunks: selectedCells, maxMergeGapBytes: maxMergeGapBytes).map(\.bytes)
+        #expect(selectedRanges.count == (maxMergeGapBytes == 0 ? 20 : 1))
         let backend = RecordingReadBackend(data: source.data, delayedOffsets: Set(selectedRanges.map(\.lowerBound)))
-        let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40)
+        let keep = SyncBoundingBox(selectedCells: selectedCells, nx: 40, maxMergeGapBytes: maxMergeGapBytes, maxConcurrentReads: maxConcurrentReads)
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
         _ = try await keep.write(remote: backend, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test"))
 
-        #expect(await backend.peakConcurrentReads == 1)
-        #expect(await backend.readsBeforeFirstCompleted == 1)
+        #expect(await backend.peakConcurrentReads == min(selectedRanges.count, maxConcurrentReads))
+        #expect(await backend.readsBeforeFirstCompleted >= min(selectedRanges.count, maxConcurrentReads))
         let retained = backend.liveBuffers.state.withLock { $0 }
-        #expect(retained.peak <= SyncBoundingBox.maxConcurrentReads)
+        #expect(retained.peak <= maxConcurrentReads)
         #expect(retained.current == 0)
         let payloadReads = await backend.requests.filter { selectedRanges.contains($0) }
         #expect(payloadReads.sorted { $0.lowerBound < $1.lowerBound } == selectedRanges)
-        // This small fixture fits in one metadata block, followed by one merged payload read.
+        // This small fixture fits in one metadata block, followed by the payload reads.
         #expect(source.count <= 4096)
         #expect(await backend.requests.first == 0..<source.count)
         #expect(await backend.requests.count == selectedRanges.count + 1)
@@ -253,29 +264,46 @@ import Synchronization
     }
 
     @Test func keepsChunksInsideBoxAndNaNElsewhere() async throws {
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         /// Time chunks of 2 over 5 values: the last chunk is smaller. Rows 5 and 6 occupy chunk rows 2 and 3; columns 7 and 8 share chunk column 2
         let kept = try await copyAndCheck(keep: keep, dims: [12, 15, 5], chunks: [2, 3, 2], cell: { $0[0] * 15 + $0[1] }, modificationTime: Timestamp(1_600_000_000))
         #expect(kept == 2 * 1 * 3)
     }
 
     @Test func ensembleFilesKeepTheirMembers() async throws {
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         try await copyAndCheck(keep: keep, dims: [3, 12, 15, 5], chunks: [2, 2, 3, 2], cell: { $0[1] * 15 + $0[2] })
         try await copyAndCheck(keep: keep, dims: [12, 15, 3, 5], chunks: [2, 3, 2, 2], cell: { $0[0] * 15 + $0[1] })
     }
 
     @Test func gaussianFileKeepsChunksWithAKeptCell() async throws {
         let gaussian = GaussianGrid(type: .n160)
-        let keep = try SyncBoundingBox(grid: gaussian, box: BoundingBoxWGS84(latitude: 45 ..< 48, longitude: 5 ..< 11))
+        let keep = try SyncBoundingBox(grid: gaussian, region: BoundingBoxWGS84(latitude: 45 ..< 48, longitude: 5 ..< 11))
         /// One run of kept chunks per ring, far apart in the file
         let kept = try await copyAndCheck(keep: keep, dims: [1, gaussian.nx, 2], chunks: [1, 100, 2], cell: { $0[1] })
         #expect(kept > 0 && kept < 40)
     }
 
+    /// Longitude-first JSON and Float boundaries must select exactly the same cells as a box.
+    @Test func polygonSelectsTheCellsOfTheBox() throws {
+        let grid = RegularGrid(nx: 4, ny: 12, latMin: 30, lonMin: 130, dx: 1, dy: 0.1, searchRadius: 1)
+        let text = "[[[[130,30.3],[132,30.3],[132,31],[130,31],[130,30.3]]]]"
+        let box = BoundingBoxWGS84(latitude: 30.3 ..< 31, longitude: 130 ..< 132)
+        let regions: [any GeographicRegion] = [try Polygon(text: text), try SyncPolygon(text: text), box]
+        let expected = SyncBoundingBox.selectedCells(grid: grid, region: box)
+        for region in regions {
+            let defaults = try SyncBoundingBox(grid: grid, region: region)
+            #expect(defaults.maxMergeGapBytes == 128 * 1024 && defaults.maxConcurrentReads == 8)
+            let custom = try SyncBoundingBox(grid: grid, region: region, maxMergeGapBytes: 1024 * 1024, maxConcurrentReads: 10)
+            #expect(custom.maxMergeGapBytes == 1024 * 1024 && custom.maxConcurrentReads == 10)
+            #expect(custom.selectedCells == expected && defaults.selectedCells == expected)
+            #expect(throws: ForecastApiError.self) { try SyncBoundingBox(grid: self.grid, region: region) }
+        }
+    }
+
     /// Legacy files store `[ny * nx, time]` as a flat 2D array
     @Test func legacyFlatFileKeepsLayoutAndMasksChunks() async throws {
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let kept = try await copyAndCheck(keep: keep, dims: [12 * 15, 5], chunks: [7, 3], cell: { $0[0] })
         #expect(kept > 0)
     }
@@ -300,7 +328,7 @@ import Synchronization
 
     @Test func shortChunkReadPreservesExistingFile() async throws {
         let source = try fixture((0..<900).map(Float.init), dimensions: [12, 15, 5], chunks: [2, 3, 2])
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5..<6.5, longitude: 7..<8.5))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 5..<6.5, longitude: 7..<8.5))
         let array = try await OmFileReader(fn: source).expectArray(of: Float.self)
         let ranges = try await array.chunkIndex()
         let take = try #require(try keep.takeChunks(layout: array.chunkLayout()))
@@ -318,7 +346,7 @@ import Synchronization
 
     @Test func cancelledCopyPreservesExistingFile() async throws {
         let source = try fixture([Float](repeating: 1, count: 900), dimensions: [12, 15, 5], chunks: [2, 3, 2])
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5..<6.5, longitude: 7..<8.5))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 5..<6.5, longitude: 7..<8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID()).om"
         defer { try? FileManager.default.removeItem(atPath: file) }
         let previous = Data("existing file".utf8)
@@ -332,7 +360,7 @@ import Synchronization
     }
 
     @Test func otherLayoutsAreNotWritten() async throws {
-        let keep = try SyncBoundingBox(grid: grid, box: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
+        let keep = try SyncBoundingBox(grid: grid, region: BoundingBoxWGS84(latitude: 5 ..< 6.5, longitude: 7 ..< 8.5))
         let file = "\(FileManager.default.temporaryDirectory.path)/sync-bbox-\(UUID().uuidString).om"
         let other = try fixture([Float](repeating: 1, count: 10 * 15), dimensions: [10, 15], chunks: [4, 5])
         #expect(try await keep.write(remote: other, url: "https://example.com/test.om", to: file, modificationTime: nil, logger: Logger(label: "test")) == nil)
