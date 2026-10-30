@@ -227,7 +227,7 @@ actor OmSpatialTimestepWriter {
         }
         let metadataUploads = metaUploads
         let logger = logger
-        for uploadQueue in uploadQueues where uploadQueue.endpoint.profile != "ceph" {
+        for uploadQueue in uploadQueues where !uploadQueue.excludeSpatialFiles && uploadQueue.endpoint.profile != "ceph" {
             await uploadQueue.enqueueUpload("spatial \(remoteFile)") { client, endpoint in
                 let uploadStart = DispatchTime.now()
                 let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)

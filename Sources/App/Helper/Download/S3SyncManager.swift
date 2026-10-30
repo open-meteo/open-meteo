@@ -50,6 +50,7 @@ actor S3SyncManager: LifecycleHandler {
             // Configure a value copy while sharing the endpoint's underlying task queue.
             var queue = getQueue(endpoint: endpoint)
             queue.excludeRollingFiles = !rollingEndpoints.contains(endpoint)
+            queue.excludeSpatialFiles = rollingEndpoints.contains(endpoint)
             return queue
         }
     }

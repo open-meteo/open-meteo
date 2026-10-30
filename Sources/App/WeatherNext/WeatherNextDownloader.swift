@@ -35,7 +35,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
-        @Option(name: "upload-s3-rolling-bucket", help: "Upload all generated products, including ensemble rolling.om files, to these S3 buckets.")
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload generated products, including ensemble rolling.om files but excluding spatial files, to these S3 buckets.")
         var uploadS3RollingBucket: String?
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
