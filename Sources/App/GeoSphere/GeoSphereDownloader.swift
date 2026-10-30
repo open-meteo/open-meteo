@@ -100,7 +100,17 @@ struct GeoSphereDownloader: AsyncCommand {
 
     /// GeoSphere weather symbol codes 1-32 mapped to WMO weather codes
     /// https://github.com/Geosphere-Austria/dataset-api-docs/issues/30
-    static let symbolToWmo: [Float] = [.nan ,0,1,2,3,3,45,45,61,63,65,66,66,66,71,73,75,81,81,82,85,85,85,85,85,86,95,95,95,96,99,96,99]
+    private static let symbolToWmo: InlineArray<33, Float> = [
+        .nan,                     // 0: missing
+        0, 1, 2, 3, 3,            // 1–5: cloud cover
+        45, 45,                   // 6–7: fog
+        61, 63, 65,               // 8–10: rain
+        66, 66, 66,               // 11–13: freezing rain
+        71, 73, 75,               // 14–16: snowfall
+        81, 81, 82,               // 17–19: rain showers
+        85, 85, 85, 85, 85, 86,   // 20–25: snow showers
+        95, 95, 95, 96, 99, 96, 99 // 26–32: thunderstorms
+    ]
 
     static func weatherCode(symbol: Float) -> Float {
         guard symbol.isFinite, let index = Int(exactly: symbol.rounded()), symbolToWmo.indices.contains(index) else {
@@ -122,7 +132,6 @@ struct GeoSphereDownloader: AsyncCommand {
         // Download bulk NetCDF file directly from the public data hub
         let runStr = run.format_YYYYMMddHH
         let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
-//        let url = "file:///Users/patrick/Downloads/nwp_2026032106.nc"
 
         logger.info("Downloading forecast from \(url)")
 
