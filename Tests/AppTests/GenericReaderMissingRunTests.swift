@@ -159,7 +159,7 @@ import Vapor
         let mapping = MultiDomains.ReaderPlan(
             primary: [
                 .domain(old, GemVariable.self),
-                .mixedBeforeDerivation(RawReaderDerivationGroup(domains: [new], variableType: GemVariable.self, derivationDomain: new))
+                .mixedBeforeDerivation(.init(domains: [new], variableType: GemVariable.self, derivationDomain: new))
             ],
             gridForBoundingBoxRequests: old,
             prefetchAllReaders: true, smoothTransitions: false
