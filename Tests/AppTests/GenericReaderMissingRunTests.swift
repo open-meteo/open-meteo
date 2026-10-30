@@ -42,20 +42,20 @@ import Vapor
 
     @Test(arguments: [true, false], [true, false])
     func primaryCoverageFlagControlsSecondaryFallback(localCoverage: Bool, requirePrimaryCoverage: Bool) async throws {
-        let mapping = MultiDomains.DomainReaderMapping(
+        let mapping = MultiDomains.ReaderPlan(
             primary: [.domain(RunFixtureDomain(grid: grid(coversLocation: localCoverage)), GemVariable.self)],
-            secondary: [.domain(RunFixtureDomain(), GemVariable.self)],
+            secondary: [.domain(RunFixtureDomain(domainRegistry: .cmc_gem_geps), GemVariable.self)],
             requirePrimaryCoverage: requirePrimaryCoverage
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
         #expect((result?.hourly != nil) == (localCoverage || !requirePrimaryCoverage))
-        #expect(mapping.singleDomain == nil)
+        #expect(mapping.gridForBoundingBoxRequests == nil)
     }
 
     @Test(arguments: [true, false])
     func singleWithPrecipitationProbabilityRequiresPrimaryCoverage(localCoverage: Bool) async throws {
-        let mapping = MultiDomains.DomainReaderMapping.singleWithPrecipitationProbability(
-            RunFixtureDomain(grid: grid(coversLocation: localCoverage)), GemVariable.self, precipitationProb: RunFixtureDomain()
+        let mapping = MultiDomains.ReaderPlan.singleWithPrecipitationProbability(
+            RunFixtureDomain(grid: grid(coversLocation: localCoverage)), GemVariable.self, precipitationProb: RunFixtureDomain(domainRegistry: .cmc_gem_geps)
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
         if localCoverage {
@@ -73,9 +73,9 @@ import Vapor
 
     @Test(arguments: [true, false])
     func explicitRunAlsoRespectsPrimaryCoverage(requirePrimaryCoverage: Bool) async throws {
-        let mapping = MultiDomains.DomainReaderMapping(
+        let mapping = MultiDomains.ReaderPlan(
             primary: [.domain(RunFixtureDomain(grid: grid(coversLocation: false), availability: .available(run.toTimestamp())), GemVariable.self)],
-            secondary: [.domain(RunFixtureDomain(availability: .available(run.toTimestamp())), GemVariable.self)],
+            secondary: [.domain(RunFixtureDomain(domainRegistry: .cmc_gem_geps, availability: .available(run.toTimestamp())), GemVariable.self)],
             requirePrimaryCoverage: requirePrimaryCoverage
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options(run: run))
@@ -96,7 +96,7 @@ import Vapor
     func eitherGenerationCanSupplyRun(oldAvailable: Bool, newAvailable: Bool) async throws {
         let old = RunFixtureDomain(availability: oldAvailable ? .available(run.toTimestamp()) : .missing)
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: newAvailable ? .available(run.toTimestamp()) : .missing)
-        let mapping = MultiDomains.DomainReaderMapping(
+        let mapping = MultiDomains.ReaderPlan(
             primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
             requirePrimaryCoverage: true
         )
@@ -117,7 +117,7 @@ import Vapor
     func secondaryRunDoesNotDetermineAvailability(primaryAvailable: Bool, secondaryAvailable: Bool) async throws {
         let primary = RunFixtureDomain(availability: primaryAvailable ? .available(run.toTimestamp()) : .missing)
         let secondary = RunFixtureDomain(domainRegistry: .cmc_gem_geps, availability: secondaryAvailable ? .available(run.toTimestamp()) : .missing)
-        let mapping = MultiDomains.DomainReaderMapping.singleWithPrecipitationProbability(primary, GemVariable.self, precipitationProb: secondary)
+        let mapping = MultiDomains.ReaderPlan.singleWithPrecipitationProbability(primary, GemVariable.self, precipitationProb: secondary)
         if primaryAvailable {
             let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: 100, mode: .nearest, options: options(run: run))
             #expect(result?.hourly != nil)
@@ -134,7 +134,7 @@ import Vapor
     @Test func availableRawGroupOutsideCoverageDoesNotReportMissingRun() async throws {
         let old = RunFixtureDomain(availability: .available(run.toTimestamp()))
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: .missing)
-        let mapping = MultiDomains.DomainReaderMapping(
+        let mapping = MultiDomains.ReaderPlan(
             primary: [.mixedBeforeDerivation(.init(domains: [old, new], variableType: GemVariable.self, derivationDomain: new))],
             requirePrimaryCoverage: true
         )
@@ -146,7 +146,7 @@ import Vapor
     func metadataErrorsAreNotSuppressed(secondaryFails: Bool) async throws {
         let primary = RunFixtureDomain(availability: secondaryFails ? .available(run.toTimestamp()) : .failure)
         let secondary = RunFixtureDomain(domainRegistry: .cmc_gem_geps, availability: secondaryFails ? .failure : .available(run.toTimestamp()))
-        let mapping = MultiDomains.DomainReaderMapping.singleWithPrecipitationProbability(primary, GemVariable.self, precipitationProb: secondary)
+        let mapping = MultiDomains.ReaderPlan.singleWithPrecipitationProbability(primary, GemVariable.self, precipitationProb: secondary)
         await #expect(throws: DecodingError.self) {
             _ = try await mapping.getReaders(lat: 45, lon: -75, elevation: 100, mode: .nearest, options: options(run: run))
         }
@@ -156,7 +156,7 @@ import Vapor
     func boundingBoxSkipsMissingPrimaryRuns(newAvailable: Bool) async throws {
         let old = RunFixtureDomain(availability: .missing)
         let new = RunFixtureDomain(domainRegistry: .cmc_gem_rdps_10km, availability: newAvailable ? .available(run.toTimestamp()) : .missing)
-        let mapping = MultiDomains.DomainReaderMapping(
+        let mapping = MultiDomains.ReaderPlan(
             primary: [
                 .domain(old, GemVariable.self),
                 .mixedBeforeDerivation(.init(domains: [new], variableType: GemVariable.self, derivationDomain: new))
@@ -165,11 +165,11 @@ import Vapor
             prefetchAllReaders: true, smoothTransitions: false
         )
         if newAvailable {
-            let result = try await MultiDomains.cmc_gem_rdps.getReaders(gridpoint: 0, mapping: mapping, options: options(run: run))
+            let result = try await mapping.makeFactory(options: options(run: run)).getReaders(gridpoint: 0)
             #expect(result.hourly != nil)
         } else {
             await #expect {
-                _ = try await MultiDomains.cmc_gem_rdps.getReaders(gridpoint: 0, mapping: mapping, options: options(run: run))
+                _ = try await mapping.makeFactory(options: options(run: run)).getReaders(gridpoint: 0)
             } throws: { error in
                 guard case ForecastApiError.modelRunUnavailable = error else { return false }
                 return true
@@ -178,40 +178,29 @@ import Vapor
     }
 
     @Test(arguments: [true, false])
-    func boundingBoxPreservesOutputCoordinatesWithMixedSources(mixedSchemas: Bool) async throws {
-        let output = RunFixtureDomain(grid: RegularGrid(nx: 3, ny: 1, latMin: 45, lonMin: -75, dx: 0.02, dy: 0.02))
+    func boundingBoxValidatesEachDomainOnce(nativeAvailable: Bool) async throws {
+        let outputCalls = RunValidationCounter()
+        let nativeCalls = RunValidationCounter()
+        let output = RunFixtureDomain(
+            grid: RegularGrid(nx: 3, ny: 1, latMin: 45, lonMin: -75, dx: 0.02, dy: 0.02),
+            availability: .available(run.toTimestamp()), validationCounter: outputCalls
+        )
         let native = RunFixtureDomain(
             domainRegistry: .cmc_gem_rdps_10km,
-            grid: RegularGrid(nx: 1, ny: 1, latMin: 45.01, lonMin: -74.98, dx: 1, dy: 1)
+            availability: nativeAvailable ? .available(run.toTimestamp()) : .missing,
+            validationCounter: nativeCalls
         )
-        let group = mixedSchemas
-            ? MultiDomains.RawReaderDerivationGroup(primary: (native, GemVariable.self), supplemental: (output, GemVariable.self))
-            : MultiDomains.RawReaderDerivationGroup(domains: [native], variableType: GemVariable.self, derivationDomain: native)
-        let mapping = MultiDomains.DomainReaderMapping(
-            primary: [
-                .domain(output, GemVariable.self),
-                .mixedBeforeDerivation(group)
-            ], 
-            gridForBoundingBoxRequests: output
-        )
+        let plan = MultiDomains.ReaderPlan(primary: [
+            .domain(output, GemVariable.self),
+            .mixedBeforeDerivation(.init(domains: [output, native], variableType: GemVariable.self, derivationDomain: native))
+        ], gridForBoundingBoxRequests: output)
+        let factory = plan.makeFactory(options: try options(run: run))
         for position in 0..<3 {
-            let result = try await MultiDomains.dwd_icon_d2.getReaders(gridpoint: position, mapping: mapping, options: options())
-            let hourly = try #require(result.hourly)
-            let expected = output.grid.getCoordinates(gridpoint: position)
-            let remapped = try await GenericReader<RunFixtureDomain, GemVariable>(
-                domain: native, position: 0, modelCoordinates: expected, elevation: 500, options: options()
-            )
-            #expect(remapped.targetElevation == 500)
-            #expect(remapped.modelLat == expected.latitude)
-            #expect(remapped.modelLon == expected.longitude)
-            let rawGroup = try #require(await group.makeReader(coordinate: expected, options: options()))
-            #expect(rawGroup.reader.modelLat == expected.latitude)
-            #expect(rawGroup.reader.modelLon == expected.longitude)
-            #expect(hourly.modelLat == expected.latitude)
-            #expect(hourly.modelLon == expected.longitude)
-            #expect(result.daily?.modelLat == expected.latitude)
-            #expect(result.daily?.modelLon == expected.longitude)
+            let readers = try await factory.getReaders(gridpoint: position)
+            #expect(readers.hourly != nil)
         }
+        #expect(await outputCalls.count == 1)
+        #expect(await nativeCalls.count == 1)
     }
 
     private func grid(coversLocation: Bool) -> RegularGrid {
@@ -231,6 +220,7 @@ private struct RunFixtureDomain: GenericDomain {
     let domainRegistryStatic: DomainRegistry? = nil
     var grid: any Gridable = RegularGrid(nx: 1, ny: 1, latMin: 45, lonMin: -75, dx: 1, dy: 1)
     var availability: Availability = .missing
+    var validationCounter: RunValidationCounter?
     let dtSeconds = 3600
     let updateIntervalSeconds = 21600
     let masterTimeRange: Range<Timestamp>? = nil
@@ -238,6 +228,7 @@ private struct RunFixtureDomain: GenericDomain {
     let countEnsembleMember = 1
 
     func isRunAvailable(run: Timestamp) async throws -> Bool {
+        await validationCounter?.increment()
         switch availability {
         case .available(let expectedRun):
             #expect(run == expectedRun)
@@ -248,4 +239,9 @@ private struct RunFixtureDomain: GenericDomain {
             throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid run metadata"))
         }
     }
+}
+
+private actor RunValidationCounter {
+    private(set) var count = 0
+    func increment() { count += 1 }
 }

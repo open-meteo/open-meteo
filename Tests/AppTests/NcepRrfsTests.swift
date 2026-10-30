@@ -209,7 +209,7 @@ import OpenMeteoSdk
     @Test func seamlessForecastMapping() async throws {
         let model = try #require(MultiDomains(rawValue: "ncep_rrfs_seamless"))
         for include15Min in [false, true] {
-            let mapping = try #require(try await model.getDomainAndVariable(include15Min: include15Min))
+            let mapping = try #require(try await model.readerPlan(include15Min: include15Min))
             let expected: [(DomainRegistry, any GenericVariable.Type)] = [
                 (.ncep_gefs05, Gefs05Variable.self), (.ncep_gfs025, Gfs025Variable.self),
                 (.ncep_rrfs_conus, NcepRrfsVariable.self),
@@ -248,7 +248,7 @@ import OpenMeteoSdk
         for (domain, variableType) in expected {
             let model = try #require(MultiDomains(rawValue: domain.rawValue))
             for include15Min in [false, true] {
-                let mapping = try #require(try await model.getDomainAndVariable(include15Min: include15Min))
+                let mapping = try #require(try await model.readerPlan(include15Min: include15Min))
                 #expect(mapping.primary.count == 1 && mapping.secondary.count == 1)
                 guard case .domain(let source, let variables) = try #require(mapping.primary.first),
                       case .domain(let probability, let probabilityVariable) = try #require(mapping.secondary.first) else {
@@ -359,7 +359,7 @@ import OpenMeteoSdk
         let urls = domain.gribUrls(run: Timestamp(2026, 9, 24), forecastHour: 84, member: 0, server: "https://example.com")
         #expect(urls == ["2dfld", "prslev"].map { "https://example.com/rrfs.20260924/00/rrfs.t00z.\($0).13km.f084.na.grib2" })
         let model = try #require(MultiDomains(rawValue: domain.rawValue))
-        let mapping = try #require(try await model.getDomainAndVariable())
+        let mapping = try #require(try await model.readerPlan())
         #expect(mapping.primary.count == 1 && mapping.secondary.isEmpty)
         #expect(mapping.gridForBoundingBoxRequests?.domainRegistry == .ncep_rrfs_north_america)
         guard case .domain(let source, let variables) = try #require(mapping.primary.first) else {
