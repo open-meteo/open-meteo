@@ -1201,11 +1201,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     /// Executes a declarative plan sequentially within a request or export chunk.
     /// Domain resources and run validation are reused; readers own their data caches.
+    /// Do not share a factory between concurrent tasks: construction mutates its caches across awaits.
     final class ReaderFactory {
         let plan: ReaderPlan
         let options: GenericReaderOptions
 
-        // A registered domain has one storage grid and run inventory for the request.
+        // Cache keys assume every source with the same DomainRegistry uses the same
+        // storage grid, terrain source and run inventory for the lifetime of this factory.
         private var domains = [DomainRegistry: ReaderDomainResources]()
         private var runs = [DomainRegistry: Result<Void, any Error>]()
         // Shared only while constructing readers for one output cell; reset by getReaders(gridpoint:).
@@ -2549,6 +2551,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 }
+
+@available(*, unavailable, message: "ReaderFactory must be used sequentially; create a separate factory for each concurrent task.")
+extension MultiDomains.ReaderFactory: Sendable {}
 
 enum ModelError: AbortError {
     var status: NIOHTTP1.HTTPResponseStatus {
