@@ -117,12 +117,13 @@ import Testing
     }
 
     @Test func specificHumidity() {
-        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [6.06], temperature: [23.00], pressure: [1013.25]) == [34.988453])
-        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.06], temperature: [23.00], pressure: [1013.25]) == [0.34768343])
+        // Reference values from the documented IFS formulas, evaluated in double precision.
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [6.06], temperature: [23.00], pressure: [1013.25])[0].isApproximatelyEqual(to: 35.042033, absoluteTolerance: 0.001))
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.06], temperature: [23.00], pressure: [1013.25])[0].isApproximatelyEqual(to: 0.34821586, absoluteTolerance: 0.00001))
         // ice
-        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.3], temperature: [-33], pressure: [300]) == [52.203484])
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.3], temperature: [-33], pressure: [300])[0].isApproximatelyEqual(to: 52.314667, absoluteTolerance: 0.001))
         // mixed phase
-        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [1.5], temperature: [-10], pressure: [750]) == [67.33522])
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [1.5], temperature: [-10], pressure: [750])[0].isApproximatelyEqual(to: 67.427967, absoluteTolerance: 0.001))
         // not really possible
         #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [24.06], temperature: [23.00], pressure: [1013.25]) == [100])
     }
