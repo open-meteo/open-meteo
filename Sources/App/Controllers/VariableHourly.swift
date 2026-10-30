@@ -735,7 +735,7 @@ private struct VariableHourlyDerivationCompatibility {
 
     init(domain: DomainRegistry) {
         switch domain {
-        case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
+        case .ecmwf_ifs01, .ecmwf_ifs01_pressure_levels, .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels, .ecmwf_ifs01_ensemble_mean, .ecmwf_ifs01_ensemble_pressure_levels_mean, .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
             self = .init(
                 aliasesSoilTemperature0To10cmTo0To7cm: true,
                 supportsEra5SoilMoistureIndices: true,
