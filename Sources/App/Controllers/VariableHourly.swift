@@ -691,6 +691,7 @@ private struct VariableHourlyDerivationCompatibility {
     let estimatesDiffuseRadiationFromShortwave: Bool
     let derivesCloudLayersFromPressureHumidity: Bool
     let swapUVComponents: Bool
+    let snowfallHeightAddsGridElevationSince: Timestamp?
 
     private init(
         aliasesSoilTemperature0To10cmTo0To7cm: Bool = false,
@@ -705,7 +706,8 @@ private struct VariableHourlyDerivationCompatibility {
         reversesWaveDirections: Bool = false,
         estimatesDiffuseRadiationFromShortwave: Bool = false,
         derivesCloudLayersFromPressureHumidity: Bool = false,
-        swapUVComponents: Bool = false
+        swapUVComponents: Bool = false,
+        snowfallHeightAddsGridElevationSince: Timestamp? = nil
     ) {
         self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
         self.supportsEra5SoilMoistureIndices = supportsEra5SoilMoistureIndices
@@ -720,6 +722,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
         self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
         self.swapUVComponents = swapUVComponents
+        self.snowfallHeightAddsGridElevationSince = snowfallHeightAddsGridElevationSince
     }
 
     private static func gfs(
@@ -808,6 +811,9 @@ private struct VariableHourlyDerivationCompatibility {
             self = .init(usesLegacyIconEpsRadiationStorage: true)
         case .meteofrance_wave:
             self = .init(reversesWaveDirections: true)
+        case .geosphere_arome_austria:
+            // Since #1782 the downloader adds the grid elevation to SNOWLMT, which is already above sea level.
+            self = .init(snowfallHeightAddsGridElevationSince: GeoSphereVariable.snowfallHeightGridElevationAddedSince)
         default:
             self = .init()
         }
@@ -887,6 +893,20 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         }
 
         return .raw(shortwave)
+    }
+
+    private func snowfallHeightInput(_ snowfallHeight: Reader.MixingVar) -> DerivedMapping<Reader.MixingVar>.RawOrMapped {
+        guard let since = compatibility.snowfallHeightAddsGridElevationSince else {
+            return .raw(snowfallHeight)
+        }
+        // A NaN model elevation yields NaN, and NaN stays NaN so seamless can fall back to another model.
+        let elevation = reader.modelElevation.numeric
+        return .mapped(.one(.raw(snowfallHeight)) { snowfallHeight, time in
+            let data = zip(snowfallHeight.data, time.time).map { value, timestamp in
+                timestamp < since || value.isNaN ? value : max(value - elevation, 0)
+            }
+            return DataAndUnit(data, snowfallHeight.unit)
+        })
     }
 
     private func maximum(
@@ -1171,6 +1191,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                     return nil
                 }
                 return .from(input: shortwave)
+            case .snowfall_height:
+                return .from(input: snowfallHeightInput(rawVariable))
             case .direct_radiation, .diffuse_radiation:
                 return .one(.raw(rawVariable)) { radiation, _ in
                     return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)

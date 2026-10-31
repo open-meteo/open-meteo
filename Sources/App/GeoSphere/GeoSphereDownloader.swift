@@ -214,9 +214,9 @@ struct GeoSphereDownloader: AsyncCommand {
             try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.pressure_msl, data: Array(msl[t, 0..<nLocations]))
         }
         
-        /// Lower snowfall level height below grid-cell elevation to adjust data to mixed terrain
-        /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
-        logger.info("Correct snowfall height from metre above ground to metre above sea level")
+        /// SNOWLMT is already above sea level, so adding the elevation counts it twice (#2278).
+        /// Kept for archive consistency; `VariableHourlyDeriver` subtracts the model elevation on read.
+        logger.info("Processing snowfall height")
         guard var snowlmt = try ncFile.getVariable(name: "SNOWLMT")?.readAndScale() else {
             fatalError("Could not read SNOWLMT")
         }

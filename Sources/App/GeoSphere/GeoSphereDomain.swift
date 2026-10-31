@@ -86,6 +86,9 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
     case sunshine_duration
     case weather_code
 
+    /// First valid time whose stored `snowfall_height` includes the grid elevation twice (#2278)
+    static let snowfallHeightGridElevationAddedSince = Timestamp(2026, 3, 27)
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
