@@ -54,6 +54,7 @@ Apps:
 - [Calendrier Tempo](https://www.calendrier-tempo.fr/) Forecasts the EDF Tempo day colour (blue, white or red), which sets the electricity price for Tempo customers in France, up to 15 days ahead, using Open-Meteo forecasts for 9 French cities. Free, French-language site.
 - [Calima Canarias](https://calimacanarias.com) Real-time Saharan dust (calima) forecast and air quality monitoring for the Canary Islands and the rest of Spain.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
+- [ClearSkys](https://clearskys.app) Free stargazing forecast and astronomy planning tool that combines Open-Meteo weather data with cloud cover, visibility, darkness, astronomical events and celestial object tracking to help users find the best nights for observing the night sky. Features location-specific forecasts, satellite and planetary visibility, and a simple rating to show whether conditions are worth heading outside for.
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
 - [CycleWeather](https://cycleweather.app) CycleWeather is a free iOS weather app for cyclists, showing a color-coded 7-day hourly forecast — temperature (feels-like), precipitation, wind, air quality, and UV — with rain alerts and radar, all in one glanceable view.
 - [Drizz.li](https://drizz.li) Open-source and statically-hosted weather site that turns Open-Meteo API data into detailed, localized forecasts with custom charts and an embedded weather map.
