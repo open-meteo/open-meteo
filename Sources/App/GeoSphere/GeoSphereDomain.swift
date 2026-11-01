@@ -45,8 +45,8 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
             // 03:20 delay
             return Timestamp.now().add(hours: -3).floor(toNearestHour: 3)
         case .claef_austria:
-            // Bulk files are published about 4:35 after the run
-            return Timestamp.now().add(hours: -5).floor(toNearestHour: 3)
+            // Bulk files are published about 4:10 after the run
+            return Timestamp.now().add(hours: -4).floor(toNearestHour: 3)
         }
     }
 
