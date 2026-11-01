@@ -659,6 +659,7 @@ paths:
                 - meteoswiss_icon_ch2
                 - geosphere_seamless
                 - geosphere_arome_austria
+                - geosphere_claef_austria
       responses:
         '200':
           description: OK
