@@ -208,6 +208,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(KnmiDownload(), as: "download-knmi")
     app.asyncCommands.use(DmiDownload(), as: "download-dmi")
     app.asyncCommands.use(UkmoDownload(), as: "download-ukmo")
+    app.asyncCommands.use(EumetsatSarahCorrect(), as: "correct-eumetsat-sarah")
     app.asyncCommands.use(EumetsatSarahDownload(), as: "download-eumetsat-sarah")
     app.asyncCommands.use(EumetsatLsaSafDownload(), as: "download-eumetsat-lsa-saf")
     app.asyncCommands.use(JaxaHimawariDownload(), as: "download-jaxa-himawari")

@@ -381,7 +381,7 @@ public enum Zensun {
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
     /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them.
     /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
-    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, sunDeclinationCutOffDegrees: Float, scanTimeDifferenceHours: [Double]) {
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, sunDeclinationCutOffDegrees: Float, scanTimeDifferenceHours: [Double], undoAveraging: Bool = false) {
         let decang = timerange.map { $0.getSunDeclination() }
         let eqtime = timerange.map { $0.getSunEquationOfTime() }
 
@@ -441,6 +441,10 @@ public enum Zensun {
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
                 if p10 < sunset || p1 > sunrise {
+                    if undoAveraging {
+                        if data[pos].isFinite && data[pos] != 0 { data[pos] = .nan }
+                        continue
+                    }
                     data[pos] = 0
                     ktPrevious = .nan
                     continue
@@ -457,6 +461,15 @@ public enum Zensun {
 
                 /// Instant sun elevation
                 let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1Scan - p0)
+                // Archive repair: invert only the geometric scaling. Clipping, quantisation and
+                // the old sunset/missing-value backfill are lossy and cannot be undone.
+                if undoAveraging {
+                    if data[pos].isFinite && data[pos] != 0 {
+                        data[pos] = zzBackwards > 0 && zzInstant > 0
+                            ? data[pos] * zzInstant / zzBackwards : .nan
+                    }
+                    continue
+                }
                 // SARAH-3 already shows 0 watts close to sunset even at zzInstant > 0
                 // Additionally very old files have missing some timesteps. Use kt to backfill data
                 if (data[pos] == 0 || data[pos].isNaN) && zzBackwards > radMinium && ktPrevious.isFinite {
