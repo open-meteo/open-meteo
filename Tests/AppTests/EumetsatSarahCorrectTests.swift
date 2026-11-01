@@ -107,6 +107,15 @@ import OmFileFormat
         try await EumetsatSarahCorrect.repairArchive(directory: directory, variables: [variable], selectedFile: nil,
             grid: grid, mviri: offsets, seviri: offsets, logger: Logger(label: "test"))
         #expect(try Data(contentsOf: URL(fileURLWithPath: path)) == before)
+        let outputDirectory = "\(directory)/\(variable)_corrected"
+        let filenames = try FileManager.default.contentsOfDirectory(atPath: outputDirectory).filter { $0.hasSuffix(".om") }.sorted()
+        let serial = try filenames.map { try Data(contentsOf: URL(fileURLWithPath: "\(outputDirectory)/\($0)")) }
+        try FileManager.default.removeItem(atPath: outputDirectory)
+        try await EumetsatSarahCorrect.repairArchive(directory: directory, variables: [variable], selectedFile: nil,
+            grid: grid, mviri: offsets, seviri: offsets, logger: Logger(label: "test"), concurrent: 4)
+        for (name, expected) in zip(filenames, serial) {
+            #expect(try Data(contentsOf: URL(fileURLWithPath: "\(outputDirectory)/\(name)")) == expected)
+        }
     }
     @Test func yearlyBoundaryUsesSourceSatellite() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
@@ -137,6 +146,45 @@ import OmFileFormat
             #expect(abs(actual[t] - expected[0]) < 0.11)
         }
         #expect(!FileManager.default.fileExists(atPath: "\(directory)/\(variable)_corrected/year_2005.om"))
+    }
+
+    @Test func orderedWorkersAndFailure() async throws {
+        var written = [Int]()
+        try await EumetsatSarahCorrect.processOrdered(count: 12, concurrent: 4, process: { index in
+            // Force later tiles to finish before the first; output must still be ordered.
+            if index == 0 { try await Task.sleep(for: .milliseconds(20)) }
+            return [Float(index)]
+        }, consume: { index, result in
+            #expect(result == [Float(index)])
+            written.append(index)
+        })
+        #expect(written == Array(0..<12))
+        enum Failure: Error { case expected }
+        do {
+            try await EumetsatSarahCorrect.processOrdered(count: 12, concurrent: 4, process: { index in
+                if index == 2 { throw Failure.expected }
+                return [Float(index)]
+            }, consume: { _, _ in })
+            Issue.record("Worker failure must propagate")
+        } catch Failure.expected { }
+    }
+
+    @Test func cachedGeometryMatchesUncached() {
+        let grid = RegularGrid(nx: 3, ny: 2, latMin: -60, lonMin: -60, dx: 60, dy: 120)
+        let offsets: [Double] = [0.1, 0.18, .nan, 0.2, 0.3, 0.15]
+        for date in [Timestamp(2005, 12, 31), Timestamp(2024, 6, 21), Timestamp(2024, 3, 20)] {
+            let day = EumetsatSarahCorrect.CorrectionDay(start: date.timeIntervalSince1970 / 1800, count: 48)
+            var uncached: [Float] = (0..<grid.count * 48).map { i in
+                i % 7 == 0 ? .nan : i % 5 == 0 ? 0 : Float(50 + i * 3)
+            }
+            var cached = uncached
+            EumetsatSarahCorrect.correct(data: &uncached, grid: grid, locations: 0..<grid.count, time: day.time, offsets: offsets)
+            EumetsatSarahCorrect.correct(data: &cached, grid: grid, locations: 0..<grid.count, time: day.time, offsets: offsets,
+                geometry: day.geometry, shiftedGeometry: day.shiftedGeometry)
+            for i in cached.indices {
+                #expect(cached[i] == uncached[i] || (cached[i].isNaN && uncached[i].isNaN))
+            }
+        }
     }
 
 }

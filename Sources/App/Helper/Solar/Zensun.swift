@@ -381,9 +381,9 @@ public enum Zensun {
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
     /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them.
     /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
-    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, sunDeclinationCutOffDegrees: Float, scanTimeDifferenceHours: [Double], undoAveraging: Bool = false) {
-        let decang = timerange.map { $0.getSunDeclination() }
-        let eqtime = timerange.map { $0.getSunEquationOfTime() }
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, sunDeclinationCutOffDegrees: Float, scanTimeDifferenceHours: [Double], undoAveraging: Bool = false, geometry: SolarAveragingGeometry? = nil) {
+        let geometry = geometry ?? SolarAveragingGeometry(time: timerange)
+        precondition(geometry.time == timerange)
 
         /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
         let radMinium = 5 / Zensun.solarConstant
@@ -393,41 +393,30 @@ public enum Zensun {
 
         for (i, gridpoint) in locationRange.enumerated() {
             var ktPrevious = Float.nan
+            let scanOffset = scanTimeDifferenceHours[i]
+            if scanOffset.isNaN { continue }
+            let scanSeconds = Int(scanOffset * 3600)
+            let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
+            let t0 = (90 - latitude).degreesToRadians
+            let cosT0 = cos(t0)
+            let sinT0 = sin(t0)
+            let longitudeRadians = longitude.degreesToRadians
 
-            for (t, timestamp) in timerange.enumerated() {
+            for (t, step) in geometry.steps.enumerated() {
                 let pos = i * timerange.count + t
-                let scanTimeDifferenceHours = scanTimeDifferenceHours[i]
-                if scanTimeDifferenceHours.isNaN {
-                    continue
-                }
-                let decang = decang[t]
-                let eqtime = eqtime[t]
-
-                let latsun = decang
-                /// universal time
-                let ut = timestamp.hourWithFraction
-                let t1 = (90 - latsun).degreesToRadians
-
-                let scantime = timestamp.add(Int(scanTimeDifferenceHours * 3600))
+                // The inverse leaves zeros and missing values unchanged; avoid solar work at night.
+                if undoAveraging && (data[pos] == 0 || data[pos].isNaN) { continue }
+                let scantime = step.timestamp.add(scanSeconds)
                 let utScan = scantime.hourWithFraction
-
-                let lonsun = -15.0 * (ut - 12.0 + eqtime)
-                let lonsunScan = -15.0 * (utScan - 12.0 + eqtime)
-
-                let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
-                /// longitude of sun
-                let p1 = lonsun.degreesToRadians
+                let lonsunScan = -15.0 * (utScan - 12.0 + step.eqtime)
                 let p1Scan = lonsunScan.degreesToRadians
-
-                let ut0 = ut - (Float(timerange.dtSeconds) / 3600)
-                let lonsun0 = -15.0 * (ut0 - 12.0 + eqtime)
-
-                let p10 = lonsun0.degreesToRadians
-
-                let t0 = (90 - latitude).degreesToRadians                     // colatitude of point
+                let p1 = step.p1
+                let p10 = step.p10
+                let cosProduct = cosT0 * step.cosT1
+                let sinProduct = sinT0 * step.sinT1
 
                 /// longitude of point
-                var p0 = longitude.degreesToRadians
+                var p0 = longitudeRadians
                 if p0 < p1 - .pi {
                     p0 += 2 * .pi
                 }
@@ -436,7 +425,7 @@ public enum Zensun {
                 }
 
                 // limit p1 and p10 to sunrise/set
-                let arg = -(/*sin(alpha) + */cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+                let arg = -cosProduct / sinProduct
                 let carg = arg > 1 || arg < -1 ? .pi : (acos(arg) - zenithCutOff)
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
@@ -454,13 +443,13 @@ public enum Zensun {
 
                 // solve integral to get sun elevation dt
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
-                let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
-                let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                let left = sinProduct * sin(p1_l - p0) + p1_l * cosT0 * step.cosT1
+                let right = sinProduct * sin(p10_l - p0) + p10_l * cosT0 * step.cosT1
                 /// sun elevation (`zz = sin(alpha)`)
                 let zzBackwards = abs((left - right) / (p10 - p1))
 
                 /// Instant sun elevation
-                let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1Scan - p0)
+                let zzInstant = cosProduct + sinProduct * cos(p1Scan - p0)
                 // Archive repair: invert only the geometric scaling. Clipping, quantisation and
                 // the old sunset/missing-value backfill are lossy and cannot be undone.
                 if undoAveraging {
@@ -496,6 +485,34 @@ public enum Zensun {
                 let backwards = instant / factor
                 data[pos] = backwards
                 ktPrevious = (instant / zzInstant)
+            }
+        }
+    }
+
+    /// Time-only geometry shared by all locations. Archive repair reuses this across spatial tiles.
+    public struct SolarAveragingGeometry: Sendable {
+        let time: TimerangeDt
+        let steps: [Step]
+
+        struct Step: Sendable {
+            let timestamp: Timestamp
+            let eqtime: Float
+            let cosT1: Float
+            let sinT1: Float
+            let p1: Float
+            let p10: Float
+        }
+
+        init(time: TimerangeDt) {
+            self.time = time
+            self.steps = time.map { timestamp in
+                let t1 = (90 - timestamp.getSunDeclination()).degreesToRadians
+                let eqtime = timestamp.getSunEquationOfTime()
+                let ut = timestamp.hourWithFraction
+                let ut0 = ut - Float(time.dtSeconds) / 3600
+                return Step(timestamp: timestamp, eqtime: eqtime, cosT1: cos(t1), sinT1: sin(t1),
+                    p1: (-15.0 * (ut - 12.0 + eqtime)).degreesToRadians,
+                    p10: (-15.0 * (ut0 - 12.0 + eqtime)).degreesToRadians)
             }
         }
     }

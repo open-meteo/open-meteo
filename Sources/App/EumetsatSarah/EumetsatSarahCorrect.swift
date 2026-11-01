@@ -13,13 +13,16 @@ struct EumetsatSarahCorrect: AsyncCommand {
         @Option(name: "variables", help: "Comma-separated shortwave_radiation,direct_radiation (default: both)")
         var variables: String?
 
+        @Option(name: "concurrent", short: "c", help: "Parallel spatial tiles (default: up to 8 CPU cores; buffers capped at 512 MiB)")
+        var concurrent: Int?
+
         @Option(name: "file", help: "Only write this basename, e.g. year_2024.om; neighbours are still read")
         var file: String?
     }
 
     var help: String { "Repair SARAH scan-time averaging into separate _corrected directories; resume by rerunning" }
 
-    struct ArchiveFile {
+    struct ArchiveFile: Sendable {
         let name: String
         let time: Range<Int> // half-hour indices since Unix epoch
     }
@@ -61,11 +64,13 @@ struct EumetsatSarahCorrect: AsyncCommand {
         let mviri = try offsets("time_difference_MVIRI")
         let seviri = try offsets("time_difference_SEVIRI")
         try await Self.repairArchive(directory: signature.directory, variables: variables, selectedFile: signature.file,
-            grid: grid, mviri: mviri, seviri: seviri, logger: logger)
+            grid: grid, mviri: mviri, seviri: seviri, logger: logger,
+            concurrent: signature.concurrent ?? min(8, ProcessInfo.processInfo.activeProcessorCount))
     }
 
     static func repairArchive(directory: String, variables: [String], selectedFile: String?, grid: any Gridable,
-                              mviri: [Double], seviri: [Double], logger: Logger) async throws {
+                              mviri: [Double], seviri: [Double], logger: Logger, concurrent: Int = 1) async throws {
+        guard concurrent > 0 else { throw RepairError.invalid("--concurrent must be positive") }
         let fm = FileManager.default
         for variable in variables {
             let source = "\(directory)/\(variable)"
@@ -132,47 +137,38 @@ struct EumetsatSarahCorrect: AsyncCommand {
                     chunkDimensions: [UInt64(cy), UInt64(cx), min(nativeChunks[2], UInt64(target.time.count))],
                     compression: reference.compression, scale_factor: reference.scaleFactor, add_offset: reference.addOffset)
                 let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * target.time.count * 4, name: "Correct")
-                for y in stride(from: 0, to: grid.ny, by: cy) {
-                    for x in stride(from: 0, to: grid.nx, by: cx) {
-                        let ys = y..<min(y + cy, grid.ny)
-                        let xs = x..<min(x + cx, grid.nx)
-                        var data = [Float](repeating: .nan, count: ys.count * xs.count * inputTime.count)
-                        for (file, reader) in readers {
-                            let lo = max(inputTime.lowerBound, file.time.lowerBound)
-                            let hi = min(inputTime.upperBound, file.time.upperBound)
-                            let tr = UInt64(lo - file.time.lowerBound)..<UInt64(hi - file.time.lowerBound)
-                            try await reader.read(into: &data, range: [ys.toUInt64(), xs.toUInt64(), tr],
-                                intoCubeOffset: [0, 0, UInt64(lo - start)],
-                                intoCubeDimension: [UInt64(ys.count), UInt64(xs.count), UInt64(inputTime.count)])
-                        }
-                        var result = [Float](repeating: .nan, count: ys.count * xs.count * target.time.count)
-                        for (row, yy) in ys.enumerated() {
-                            let locations = yy * grid.nx + xs.lowerBound ..< yy * grid.nx + xs.upperBound
-                            for day in stride(from: start, to: inputTime.upperBound, by: 48) {
-                                let count = min(48, inputTime.upperBound - day)
-                                let time = TimerangeDt(start: Timestamp(day * 1800), nTime: count, dtSeconds: 1800)
-                                let scan = day * 1800 < Timestamp(2006, 1, 1).timeIntervalSince1970 ? mviri : seviri
-                                let offsets = Array(scan[locations])
-                                var daily = [Float](repeating: .nan, count: xs.count * count)
-                                for col in 0..<xs.count {
-                                    let base = (row * xs.count + col) * inputTime.count + day - start
-                                    daily.replaceSubrange(col * count ..< (col + 1) * count, with: data[base..<base + count])
-                                }
-                                Self.correct(data: &daily, grid: grid, locations: locations, time: time, offsets: offsets)
-                                for col in 0..<xs.count {
-                                    for t in 0..<count {
-                                        let out = day + t + 1 - target.time.lowerBound
-                                        if out >= 0 && out < target.time.count {
-                                            result[(row * xs.count + col) * target.time.count + out] = daily[col * count + t]
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        try writer.writeData(array: result, arrayDimensions: [UInt64(ys.count), UInt64(xs.count), UInt64(target.time.count)])
-                        await progress.add(result.count * 4)
-                    }
+                let days = stride(from: start, to: inputTime.upperBound, by: 48).map { day in
+                    CorrectionDay(start: day, count: min(48, inputTime.upperBound - day))
                 }
+                let nxTiles = (grid.nx + cx - 1) / cx
+                let nTiles = ((grid.ny + cy - 1) / cy) * nxTiles
+                // Includes input/output and daily scratch buffers; lookup tables and mappings are extra.
+                let bytesPerTile = cy * cx * (inputTime.count + target.time.count + 4 * 48) * MemoryLayout<Float>.stride
+                let workers = min(concurrent, nTiles, max(1, 512 * 1024 * 1024 / bytesPerTile))
+                logger.info("Using \(workers) spatial workers, approximately \(workers * bytesPerTile / 1024 / 1024) MiB of tile buffers")
+                let tileRanges: @Sendable (Int) -> (Range<Int>, Range<Int>) = { index in
+                    let y = (index / nxTiles) * cy
+                    let x = (index % nxTiles) * cx
+                    return (y..<min(y + cy, grid.ny), x..<min(x + cx, grid.nx))
+                }
+                let conversionStart = DispatchTime.now()
+                var workerReadSeconds = 0.0
+                var workerSolarSeconds = 0.0
+                var writeSeconds = 0.0
+                try await processOrdered(count: nTiles, concurrent: workers, process: { index in
+                    let (ys, xs) = tileRanges(index)
+                    return try await correctTile(ys: ys, xs: xs, readers: readers, grid: grid,
+                        inputTime: inputTime, target: target, days: days, mviri: mviri, seviri: seviri)
+                }, consume: { index, result in
+                    let (ys, xs) = tileRanges(index)
+                    let writeStart = DispatchTime.now()
+                    try writer.writeData(array: result.data, arrayDimensions: [UInt64(ys.count), UInt64(xs.count), UInt64(target.time.count)])
+                    writeSeconds += elapsedSeconds(since: writeStart)
+                    workerReadSeconds += result.readSeconds
+                    workerSolarSeconds += result.solarSeconds
+                    await progress.add(result.data.count * 4)
+                })
+                logger.info("Tile processing elapsed \(elapsedSeconds(since: conversionStart))s; summed worker read/decode \(workerReadSeconds)s, solar \(workerSolarSeconds)s; serial compression/write \(writeSeconds)s")
                 let root = try fileWriter.write(array: try writer.finalise(), name: "", children: [])
                 try fileWriter.writeTrailer(rootVariable: root)
                 try handle.synchronize()
@@ -185,15 +181,140 @@ struct EumetsatSarahCorrect: AsyncCommand {
         }
     }
 
-    static func correct(data: inout [Float], grid: any Gridable, locations: Range<Int>, time: TimerangeDt, offsets: [Double]) {
-        let missing = data.map { $0.isNaN }
+    struct CorrectionDay: Sendable {
+        let start: Int
+        let time: TimerangeDt
+        let isMviri: Bool
+        let geometry: Zensun.SolarAveragingGeometry
+        let shiftedGeometry: Zensun.SolarAveragingGeometry
+
+        init(start: Int, count: Int) {
+            self.start = start
+            self.time = TimerangeDt(start: Timestamp(start * 1800), nTime: count, dtSeconds: 1800)
+            self.isMviri = start * 1800 < Timestamp(2006, 1, 1).timeIntervalSince1970
+            self.geometry = Zensun.SolarAveragingGeometry(time: time)
+            self.shiftedGeometry = Zensun.SolarAveragingGeometry(time:
+                TimerangeDt(start: time.range.lowerBound.add(1800), nTime: count, dtSeconds: 1800))
+        }
+    }
+
+    /// Parallel reads and solar conversion, with a bounded reorder buffer and a single ordered writer.
+    /// Only refill slots after consuming results, so a slow early tile cannot accumulate unbounded data.
+    static func processOrdered<Result: Sendable>(count: Int, concurrent: Int,
+                               process: @escaping @Sendable (Int) async throws -> Result,
+                               consume: (Int, Result) async throws -> Void) async throws {
+        precondition(concurrent > 0)
+        try await withThrowingTaskGroup(of: (Int, Result).self) { group in
+            var submitted = 0
+            var next = 0
+            var pending = [Int: Result]()
+            for index in 0..<min(count, concurrent) {
+                group.addTask { (index, try await process(index)) }
+                submitted += 1
+            }
+            while let (index, data) = try await group.next() {
+                pending[index] = data
+                while let result = pending.removeValue(forKey: next) {
+                    try Task.checkCancellation()
+                    try await consume(next, result)
+                    next += 1
+                    if submitted < count {
+                        let index = submitted
+                        group.addTask { (index, try await process(index)) }
+                        submitted += 1
+                    }
+                }
+            }
+        }
+    }
+
+    struct TileResult: Sendable {
+        let data: [Float]
+        let readSeconds: Double
+        let solarSeconds: Double
+    }
+
+    static func elapsedSeconds(since start: DispatchTime) -> Double {
+        Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000_000
+    }
+
+    static func correctTile(ys: Range<Int>, xs: Range<Int>,
+                            readers: [(ArchiveFile, OmFileReaderArray<MmapFile, Float>)], grid: any Gridable,
+                            inputTime: Range<Int>, target: ArchiveFile, days: [CorrectionDay],
+                            mviri: [Double], seviri: [Double]) async throws -> TileResult {
+        try Task.checkCancellation()
+        let start = inputTime.lowerBound
+        // Outside the satellite footprint both sensors have invalid offsets; output is always NaN.
+        let outsideFootprint = ys.allSatisfy { y in
+            xs.allSatisfy { x in
+                let location = y * grid.nx + x
+                return !mviri[location].isFinite && !seviri[location].isFinite
+            }
+        }
+        if outsideFootprint {
+            return TileResult(data: [Float](repeating: .nan, count: ys.count * xs.count * target.time.count), readSeconds: 0, solarSeconds: 0)
+        }
+        let readStart = DispatchTime.now()
+        var data = [Float](repeating: .nan, count: ys.count * xs.count * inputTime.count)
+        for (file, reader) in readers {
+            let lo = max(inputTime.lowerBound, file.time.lowerBound)
+            let hi = min(inputTime.upperBound, file.time.upperBound)
+            let tr = UInt64(lo - file.time.lowerBound)..<UInt64(hi - file.time.lowerBound)
+            try await reader.read(into: &data, range: [ys.toUInt64(), xs.toUInt64(), tr],
+                intoCubeOffset: [0, 0, UInt64(lo - start)],
+                intoCubeDimension: [UInt64(ys.count), UInt64(xs.count), UInt64(inputTime.count)])
+        }
+        let readSeconds = elapsedSeconds(since: readStart)
+        let solarStart = DispatchTime.now()
+        if data.allSatisfy({ $0.isNaN }) {
+            return TileResult(data: [Float](repeating: .nan, count: ys.count * xs.count * target.time.count),
+                readSeconds: readSeconds, solarSeconds: elapsedSeconds(since: solarStart))
+        }
+        var result = [Float](repeating: .nan, count: ys.count * xs.count * target.time.count)
+        for (row, yy) in ys.enumerated() {
+            let locations = yy * grid.nx + xs.lowerBound ..< yy * grid.nx + xs.upperBound
+            let mviriOffsets = Array(mviri[locations])
+            let seviriOffsets = Array(seviri[locations])
+            let mviriShifted = mviriOffsets.map { $0 - 0.5 }
+            let seviriShifted = seviriOffsets.map { $0 - 0.5 }
+            var daily = [Float](repeating: .nan, count: xs.count * 48)
+            for day in days {
+                try Task.checkCancellation()
+                let count = day.time.count
+                let offsets = day.isMviri ? mviriOffsets : seviriOffsets
+                let shiftedOffsets = day.isMviri ? mviriShifted : seviriShifted
+                if daily.count != xs.count * count {
+                    daily = [Float](repeating: .nan, count: xs.count * count)
+                }
+                for col in 0..<xs.count {
+                    let base = (row * xs.count + col) * inputTime.count + day.start - start
+                    daily.replaceSubrange(col * count ..< (col + 1) * count, with: data[base..<base + count])
+                }
+                Self.correct(data: &daily, grid: grid, locations: locations, time: day.time, offsets: offsets, geometry: day.geometry,
+                    shiftedGeometry: day.shiftedGeometry, shiftedOffsets: shiftedOffsets)
+                for col in 0..<xs.count {
+                    for t in 0..<count {
+                        let out = day.start + t + 1 - target.time.lowerBound
+                        if out >= 0 && out < target.time.count {
+                            result[(row * xs.count + col) * target.time.count + out] = daily[col * count + t]
+                        }
+                    }
+                }
+            }
+        }
+        return TileResult(data: result, readSeconds: readSeconds, solarSeconds: elapsedSeconds(since: solarStart))
+    }
+
+    static func correct(data: inout [Float], grid: any Gridable, locations: Range<Int>, time: TimerangeDt, offsets: [Double],
+                        geometry: Zensun.SolarAveragingGeometry? = nil,
+                        shiftedGeometry: Zensun.SolarAveragingGeometry? = nil, shiftedOffsets: [Double]? = nil) {
         Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &data, grid: grid, locationRange: locations,
-            timerange: time, sunDeclinationCutOffDegrees: 1, scanTimeDifferenceHours: offsets, undoAveraging: true)
+            timerange: time, sunDeclinationCutOffDegrees: 1, scanTimeDifferenceHours: offsets, undoAveraging: true, geometry: geometry)
         let unrecoverable = data.map { $0.isNaN }
         Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &data, grid: grid, locationRange: locations,
             timerange: TimerangeDt(start: time.range.lowerBound.add(1800), nTime: time.count, dtSeconds: 1800),
-            sunDeclinationCutOffDegrees: 1, scanTimeDifferenceHours: offsets.map { $0 - 0.5 })
+            sunDeclinationCutOffDegrees: 1, scanTimeDifferenceHours: shiftedOffsets ?? offsets.map { $0 - 0.5 }, geometry: shiftedGeometry)
         // Do not turn archive gaps (including absent neighbours) into synthetic observations.
-        for i in data.indices where missing[i] || unrecoverable[i] || !offsets[i / time.count].isFinite { data[i] = .nan }
+        for i in data.indices where unrecoverable[i] || !offsets[i / time.count].isFinite { data[i] = .nan }
     }
 }
