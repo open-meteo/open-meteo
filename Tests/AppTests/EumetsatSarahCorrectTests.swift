@@ -174,8 +174,11 @@ import OmFileFormat
         let offsets: [Double] = [0.1, 0.18, .nan, 0.2, 0.3, 0.15]
         for date in [Timestamp(2005, 12, 31), Timestamp(2024, 6, 21), Timestamp(2024, 3, 20)] {
             let day = EumetsatSarahCorrect.CorrectionDay(start: date.timeIntervalSince1970 / 1800, count: 48)
-            var uncached: [Float] = (0..<grid.count * 48).map { i in
-                i % 7 == 0 ? .nan : i % 5 == 0 ? 0 : Float(50 + i * 3)
+            let sampleCount = grid.count * 48
+            var uncached = (0..<sampleCount).map { i -> Float in
+                if i % 7 == 0 { return .nan }
+                if i % 5 == 0 { return 0 }
+                return Float(50 + i * 3)
             }
             var cached = uncached
             EumetsatSarahCorrect.correct(data: &uncached, grid: grid, locations: 0..<grid.count, time: day.time, offsets: offsets)
