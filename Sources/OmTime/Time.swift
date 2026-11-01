@@ -6,7 +6,7 @@ public enum TimeError: Error {
     case endDateMustBeLargerEqualsThanStartDate
     case startAndEndDateCountMustBeTheSame
     
-    var reason: String {
+    public var reason: String {
         switch self {
         case .InvalidDateFromat:
             return "Invalid date format. Make sure to use 'YYYY-MM-DD'"
