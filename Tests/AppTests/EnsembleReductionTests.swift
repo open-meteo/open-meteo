@@ -40,36 +40,19 @@ import Testing
             .toSettings(ensembleMember: 2, previousDay: 1, ensembleMemberLevel: 3)
     }
 
-    @Test func requiredExecutorSharesMemberDependencies() async throws {
-        let reader = MemberReader(values: [[0, 0], [2, 12], [4, 14]])
-        let derived = MemberDeriver(reader: reader, members: 1..<3)
+    @Test func dailyDeriverSharesMemberDependencies() async throws {
+        let reader = MemberReader(values: [[2, 12], [4, 14]])
+        let derived = VariableDailyDeriver(reader: reader, countEnsembleMember: 2)
         #expect(try await derived.get(variable: .river_discharge_mean, time: time)?.data == [3, 13])
         #expect(try await derived.prefetchData(variable: .river_discharge_mean, time: time))
-        let dependencies = (1..<3).map { time.with(ensembleMember: $0) }
+        let dependencies = (0..<2).map { time.with(ensembleMember: $0) }
         #expect(reader.reads == dependencies)
-        #expect(reader.prefetches == dependencies)
-    }
-
-    @Test func optionalExecutorReportsUnavailableMembers() async throws {
-        let reader = OptionalMemberReader()
-        let derived = OptionalDeriver(reader: reader)
-        #expect(try await derived.get(variable: .river_discharge_mean, time: time)?.data == [3, 13])
-        #expect(try await derived.prefetchData(variable: .river_discharge_mean, time: time))
-        let dependencies = (1..<4).map { time.with(ensembleMember: $0) }
-        #expect(reader.reads == dependencies)
-        #expect(reader.prefetches == dependencies)
-
-        reader.unavailableMember = 2
-        reader.prefetches = []
-        #expect(try await derived.get(variable: .river_discharge_mean, time: time) == nil)
-        #expect(try await derived.prefetchData(variable: .river_discharge_mean, time: time) == false)
-        // Prefetch must still visit members after the unavailable one.
         #expect(reader.prefetches == dependencies)
     }
 
     @Test func statisticsAreCalculatedBeforeSourceFallback() async throws {
-        let lower = MemberDeriver(reader: MemberReader(values: [[2, 2], [10, 10]]), members: 0..<2)
-        let higher = MemberDeriver(reader: MemberReader(values: [[.nan, 20], [100, 40]]), members: 0..<2)
+        let lower = VariableDailyDeriver(reader: MemberReader(values: [[2, 2], [10, 10]]), countEnsembleMember: 2)
+        let higher = VariableDailyDeriver(reader: MemberReader(values: [[.nan, 20], [100, 40]]), countEnsembleMember: 2)
         let mixed = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [lower, higher], prefetchAllReaders: true)
         // Raw-member fallback would produce 51 at the first sample instead of 6.
         #expect(try await mixed.get(variable: .river_discharge_mean, time: time)?.data == [6, 30])
@@ -96,47 +79,6 @@ import Testing
         }
         func prefetchData(variable: GloFasVariable, time: TimerangeDtAndSettings) async throws {
             prefetches.append(time)
-        }
-    }
-
-    private struct MemberDeriver: GenericDeriverProtocol {
-        typealias VariableOpt = ForecastVariableDaily
-        let reader: MemberReader
-        let members: Range<Int>
-
-        func getDeriverMap(variable: ForecastVariableDaily) -> DerivedMapping<GloFasVariable>? {
-            .ensemble(.river_discharge, EnsembleReduction(members: members, statistic: .mean, requireFirstMemberData: true))
-        }
-    }
-
-    private final class OptionalMemberReader: GenericReaderOptionalProtocol {
-        let modelLat: Float = 45
-        let modelLon: Float = 10
-        let modelElevation: ElevationOrSea = .elevation(100)
-        let targetElevation: Float = 100
-        let modelDtSeconds = 86400
-        var unavailableMember: Int?
-        var reads: [TimerangeDtAndSettings] = []
-        var prefetches: [TimerangeDtAndSettings] = []
-
-        func getStatic(type: ReaderStaticVariable) async throws -> Float? { nil }
-        func get(variable: ForecastVariableDaily, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
-            reads.append(time)
-            guard time.ensembleMember != unavailableMember else { return nil }
-            return DataAndUnit([Float(time.ensembleMember) + 1, Float(time.ensembleMember) + 11], .cubicMetrePerSecond)
-        }
-        func prefetchData(variable: ForecastVariableDaily, time: TimerangeDtAndSettings) async throws -> Bool {
-            prefetches.append(time)
-            return time.ensembleMember != unavailableMember
-        }
-    }
-
-    private struct OptionalDeriver: GenericDeriverOptionalProtocol {
-        typealias VariableOpt = ForecastVariableDaily
-        let reader: any GenericReaderOptionalProtocol<ForecastVariableDaily>
-
-        func getDeriverMap(variable: ForecastVariableDaily) -> DerivedMapping<ForecastVariableDaily>? {
-            .ensemble(.river_discharge, EnsembleReduction(members: 1..<4, statistic: .mean))
         }
     }
 }

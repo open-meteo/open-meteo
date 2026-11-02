@@ -369,17 +369,16 @@ extension GenericDomain {
     func makeDerivedDaily<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (some GenericReaderOptionalProtocol<ForecastVariableDaily>)? {
         let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         return reader.map {
-            VariableDailyDeriver(reader: GenericReaderCached(reader: $0), options: options)
+            VariableDailyDeriver(reader: GenericReaderCached(reader: $0), countEnsembleMember: countEnsembleMember)
         }
     }
 }
 
-struct VariableDailyDeriver<Domain: GenericDomain, Variable: GenericVariable>: GenericDeriverProtocol {
-    typealias Reader = GenericReaderCached<Domain, Variable>
+struct VariableDailyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
     typealias VariableOpt = ForecastVariableDaily
 
     let reader: Reader
-    let options: GenericReaderOptions
+    let countEnsembleMember: Int
 
     func getDeriverMap(variable: VariableOpt) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
@@ -403,6 +402,6 @@ struct VariableDailyDeriver<Domain: GenericDomain, Variable: GenericVariable>: G
             return nil
         }
         guard let discharge = Reader.variableFromString("river_discharge") else { return nil }
-        return .ensemble(discharge, EnsembleReduction(members: 0..<reader.domain.countEnsembleMember, statistic: statistic, requireFirstMemberData: true))
+        return .ensemble(discharge, EnsembleReduction(members: 0..<countEnsembleMember, statistic: statistic, requireFirstMemberData: true))
     }
 }
