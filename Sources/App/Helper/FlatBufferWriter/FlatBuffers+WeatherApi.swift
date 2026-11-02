@@ -83,7 +83,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .directNormalIrradiance, previousDay: previousDay)
         case .direct_normal_irradiance_instant:
             return .init(variable: .directNormalIrradianceInstant, previousDay: previousDay)
-        case .direct_radiation:
+        case .direct_radiation, .direct_radiation_corrected:
             return .init(variable: .directRadiation, previousDay: previousDay)
         case .direct_radiation_instant:
             return .init(variable: .directRadiationInstant, previousDay: previousDay)
@@ -119,7 +119,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .runoff, previousDay: previousDay)
         case .sensible_heatflux, .sensible_heat_flux:
             return .init(variable: .sensibleHeatFlux, previousDay: previousDay)
-        case .shortwave_radiation:
+        case .shortwave_radiation, .shortwave_radiation_corrected:
             return .init(variable: .shortwaveRadiation, previousDay: previousDay)
         case .shortwave_radiation_instant:
             return .init(variable: .shortwaveRadiationInstant, previousDay: previousDay)

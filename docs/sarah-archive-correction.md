@@ -22,6 +22,21 @@ For a trial, add `--variables shortwave_radiation --file chunk_2965.om`.
 Neighbouring files are still read. Omit `--file` to process all years and chunks.
 Build in release mode for the full archive.
 
+## Reading corrected data
+
+The forecast API exposes both files under their stored names for `models=eumetsat_sarah3`:
+
+```text
+/v1/forecast?latitude=50.8&longitude=4.35&models=eumetsat_sarah3&hourly=shortwave_radiation,shortwave_radiation_corrected,direct_radiation,direct_radiation_corrected&temporal_resolution=native
+```
+
+The `_corrected` fields read the corresponding corrected directories and return
+W/m². Original fields and their derived variables continue to use the original
+archive. Missing corrected coverage stays missing; it does not fall back to
+uncorrected radiation. Downloads still populate only the original variables.
+JSON/CSV retain the `_corrected` names; FlatBuffers uses the existing shortwave
+and direct radiation identifiers for these fields.
+
 ## Throughput
 
 `--concurrent` / `-c` controls spatial workers (default: CPU count, capped at 8).

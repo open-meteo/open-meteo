@@ -61,6 +61,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
+    case direct_radiation_corrected
     case direct_radiation_instant
     case et0_fao_evapotranspiration
     case evapotranspiration
@@ -87,6 +88,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case sensible_heatflux
     case sensible_heat_flux
     case shortwave_radiation
+    case shortwave_radiation_corrected
     case shortwave_radiation_instant
     case shortwave_radiation_clear_sky_instant
     case showers
@@ -1171,7 +1173,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                     return nil
                 }
                 return .from(input: shortwave)
-            case .direct_radiation, .diffuse_radiation:
+            case .direct_radiation, .diffuse_radiation, .shortwave_radiation_corrected, .direct_radiation_corrected:
                 return .one(.raw(rawVariable)) { radiation, _ in
                     return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)
                 }
