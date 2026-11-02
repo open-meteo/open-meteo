@@ -19,7 +19,7 @@ import Testing
         (.minimum, [4, 2, .nan]), (.maximum, [8, 6, .nan])
     ] as [(EnsembleReduction.Statistic, [Float])])
     func missingSamples(statistic: EnsembleReduction.Statistic, expected: [Float]) {
-        let reduction = EnsembleReduction(members: 0..<3, statistic: statistic, requireFirstMemberData: true)
+        let reduction = EnsembleReduction(members: 0..<3, statistic: statistic)
         let data: [[Float]] = [[.nan, 2, .nan], [4, .nan, .nan], [8, 6, .nan]]
         let result = reduction.calculate(data.map { DataAndUnit($0, .cubicMetrePerSecond) })
         for (actual, expected) in zip(result.data, expected) {
@@ -27,12 +27,10 @@ import Testing
         }
     }
 
-    @Test func missingControlPolicy() {
+    @Test func missingControlMakesSourceUnavailable() {
         let data = [DataAndUnit([.nan, .nan], .cubicMetrePerSecond), DataAndUnit([10, 20], .cubicMetrePerSecond)]
-        let required = EnsembleReduction(members: 0..<2, statistic: .minimum, requireFirstMemberData: true)
-        let optional = EnsembleReduction(members: 0..<2, statistic: .minimum)
-        #expect(required.calculate(data).data.onlyNaN())
-        #expect(optional.calculate(data).data == [10, 20])
+        let reduction = EnsembleReduction(members: 0..<2, statistic: .minimum)
+        #expect(reduction.calculate(data).data.onlyNaN())
     }
 
     private var time: TimerangeDtAndSettings {

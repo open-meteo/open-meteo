@@ -402,6 +402,6 @@ struct VariableDailyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtoc
             return nil
         }
         guard let discharge = Reader.variableFromString("river_discharge") else { return nil }
-        return .ensemble(discharge, EnsembleReduction(members: 0..<countEnsembleMember, statistic: statistic, requireFirstMemberData: true))
+        return .ensemble(discharge, EnsembleReduction(members: 0..<countEnsembleMember, statistic: statistic))
     }
 }

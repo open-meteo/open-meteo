@@ -11,15 +11,11 @@ struct EnsembleReduction {
 
     let members: Range<Int>
     let statistic: Statistic
-    /// GloFAS treats a wholly missing control member as an unavailable source.
-    /// This applies to the entire requested range, not individual samples.
-    let requireFirstMemberData: Bool
 
-    init(members: Range<Int>, statistic: Statistic, requireFirstMemberData: Bool = false) {
+    init(members: Range<Int>, statistic: Statistic) {
         precondition(!members.isEmpty)
         self.members = members
         self.statistic = statistic
-        self.requireFirstMemberData = requireFirstMemberData
     }
 
     func readTimes(_ time: TimerangeDtAndSettings) -> [TimerangeDtAndSettings] {
@@ -30,7 +26,9 @@ struct EnsembleReduction {
         precondition(data.count == members.count)
         let first = data[0]
         precondition(data.allSatisfy { $0.data.count == first.data.count && $0.unit == first.unit })
-        if requireFirstMemberData && first.data.onlyNaN() {
+        // A wholly missing first (control) member makes the source unavailable, as intended for GloFAS.
+        // This applies to the entire requested range, not individual samples.
+        if first.data.onlyNaN() {
             return first
         }
         let values: [Float] = first.data.indices.map { t in
