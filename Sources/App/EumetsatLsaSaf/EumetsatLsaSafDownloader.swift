@@ -47,6 +47,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let logger = context.application.logger
         let domain = try EumetsatLsaSafDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
@@ -61,9 +62,9 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
                 let handles = try await runs.asyncFlatMap { run in
-                    return try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password, uploadS3Bucket: nil)
+                    return try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password, uploadQueues: [])
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [])
             }
             return
         }
@@ -81,16 +82,16 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
         logger.info("Downloading range \(downloadRange.prettyString())")
         let handles = try await downloadRange.asyncFlatMap { run in
-            try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password, uploadS3Bucket: signature.uploadS3Bucket)
+            try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password, uploadQueues: uploadQueues)
         }
         if let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.subtract(seconds: domain.dtSeconds) {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
-    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatLsaSafDomain, username: String, password: String, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatLsaSafDomain, username: String, password: String, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryError4xx: false)
         let nx = domain.grid.nx
@@ -145,7 +146,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             }
             elevation.flipLatitude(nt: 1, ny: ny, nx: nx)
             try surfaceElevationFileOm.createDirectory()
-            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
         }
         
         guard var shortwave_radiation = try nc.getVariable(name: "DSSF_TOT")?.readAndScale() else {

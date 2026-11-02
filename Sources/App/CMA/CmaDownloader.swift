@@ -46,6 +46,7 @@ struct DownloadCmaCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         disableIdleSleep()
 
         let domain = try CmaDomain.load(rawValue: signature.domain)
@@ -69,8 +70,8 @@ struct DownloadCmaCommand: AsyncCommand {
         }
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, maxForecastHour: signature.maxForecastHour)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadQueues: uploadQueues, maxForecastHour: signature.maxForecastHour)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// read each file in chunks, apply shortwave correction and write again
@@ -274,7 +275,7 @@ struct DownloadCmaCommand: AsyncCommand {
     /// Uses concurrent downloads and concurrent data conversion to process data as fast as possible
     /// Each download GRIB file is split into hundrets 16 MB parts and download in parallel using HTTP RANGE.
     /// Individual grib messages are extracted while downloading and processed concurrently
-    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int, uploadQueues: [S3UploadQueue], maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -337,7 +338,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
                     previous = previousScoped
                     let completed = i == timestamps.count - 1
-                    return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                    return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
                 }
                 handles.append(contentsOf: h)
             } catch CurlError.timeoutReached {

@@ -19,12 +19,13 @@
  */
 import Vapor
 import OmFileFormat
+import OmFileIO
 
 extension DownloadCamsCommand {
     /**
      Download CAMS Global Greenhouse Gas forecast from ADS
      */
-    func downloadCamsGlobalGreenhouseGases(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadCamsGlobalGreenhouseGases(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String, concurrent: Int, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let date = run.iso8601_YYYY_MM_dd
         let forecastHours = domain.forecastHours
         let logger = application.logger
@@ -67,7 +68,7 @@ extension DownloadCamsCommand {
                 grib2d.array.shift180LongitudeAndFlipLatitude()
                 try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
             }
-            return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         }
     }
 }

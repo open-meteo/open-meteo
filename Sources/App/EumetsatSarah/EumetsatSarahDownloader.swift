@@ -44,6 +44,7 @@ struct EumetsatSarahDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let logger = context.application.logger
         let domain = try EumetsatSarahDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
@@ -61,20 +62,20 @@ struct EumetsatSarahDownload: AsyncCommand {
             for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
                 let handles = try await runs.asyncFlatMap { run in
-                    return try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadS3Bucket: nil)
+                    return try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadQueues: [])
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [])
             }
             return
         }
 
         let api = EumetsatApiDownloader(application: context.application, key: apiKey, secret: apiSecret, deadLineHours: 3)
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
-        let handles = try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        let handles = try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadQueues: uploadQueues)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
-    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatSarahDomain, api: EumetsatApiDownloader, variables: [EumetsatSarahVariable], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatSarahDomain, api: EumetsatApiDownloader, variables: [EumetsatSarahVariable], uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         // Download meta data for elevation and scan time offsets
@@ -108,7 +109,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             let elevation: [Float] = meta.elevation.enumerated().map { i, value in
                 return meta.timeDifference[i].isNaN ? .nan : meta.landMask[i] == 0 ? -999 : Float(value)
             }
-            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
         }
 
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
