@@ -144,6 +144,7 @@ import Synchronization
 
         #expect(await backend.peakConcurrentReads == min(selectedRanges.count, maxConcurrentReads))
         #expect(await backend.readsBeforeFirstCompleted >= min(selectedRanges.count, maxConcurrentReads))
+        try await backend.liveBuffers.waitUntilReleased()
         let retained = backend.liveBuffers.state.withLock { $0 }
         #expect(retained.peak <= maxConcurrentReads)
         #expect(retained.current == 0)
@@ -424,6 +425,14 @@ private actor RecordingReadBackend: OmFileReaderBackend {
 
 private final class LiveReadBuffers: Sendable {
     let state = Mutex((current: 0, peak: 0))
+
+    /// Task results can outlive their consumer briefly while completed tasks finish cleanup.
+    func waitUntilReleased() async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while state.withLock({ $0.current }) != 0, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+    }
 }
 
 private final class TrackedReadBuffer: ContiguousBytes, Sendable {
