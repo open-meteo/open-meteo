@@ -227,7 +227,9 @@ enum DomainRegistry: String, CaseIterable {
     /// Instead of generating time chunks, use a single rolling files and retain a certain number of days inside
     var useRollingDays: Int? {
         switch self {
-        case .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels, .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
+        case .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels:
+            return 1
+        case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
         case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps,
              .dwd_icon_global_eps_native, .dwd_icon_eu_eps_native, .dwd_icon_d2_eps_native:
