@@ -95,10 +95,10 @@ public struct S3MultiFileUploadQueue: Sendable {
     let client: HTTPClient
     let logger: Logger
     
-    /// Max number of concurrent multipart uploads. 10 is a good number
+    /// Limits concurrent part uploads across files in this session.
     let partUploadExecutor: LimitedConcurrencyExecutor
     
-    /// Max number of concurrent file uploads. 4 should be fine
+    /// Uploads files concurrently and collects uploads awaiting commit; immediately committed files return nil.
     let queue: ProcessingParallelQueue<S3MultiPartUploadPrepared?>
     
     public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int, excludeRollingFiles: Bool = true, onlyProbabilityTimeSeries: Bool = false) {
