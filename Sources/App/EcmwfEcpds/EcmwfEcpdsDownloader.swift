@@ -332,7 +332,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: [])
                         try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
 
-                        if let directory = OpenMeteo.dataRunDirectory, uploadQueues != nil {
+                        if let directory = OpenMeteo.dataRunDirectory, !uploadQueues.isEmpty {
                             // Delete run directory after S3 upload
                             let model = domain.domainRegistry.rawValue
                             let timeFormatted = run.format_directoriesYYYYMMddhhmm
