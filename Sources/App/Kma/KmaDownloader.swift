@@ -54,7 +54,7 @@ struct KmaDownload: AsyncCommand {
         try await downloadElevation(application: context.application, domain: domain, run: run, server: server, uploadQueues: uploadQueues)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 

@@ -63,7 +63,7 @@ struct GfsDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
 
@@ -122,12 +122,12 @@ struct GfsDownload: AsyncCommand {
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadQueues: uploadQueues)
 
             let nConcurrent = signature.concurrent ?? 4
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: writeUpdateJson, uploadQueues: uploadQueues, generateFullRun: generateFullRun)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             let variables: [any GfsVariableDownloadable] = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadQueues: uploadQueues)
             let nConcurrent = signature.concurrent ?? 1
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         case .gefs025_ensemble_mean, .gefs05_ensemble_mean, .gefswave025_ensemble_mean:
             fatalError("Ensemble mean domains cannot be downloaded directly")
         }

@@ -59,7 +59,7 @@ struct NbmDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         let domain = try NbmDomain.load(rawValue: signature.domain)
         disableIdleSleep()
 
@@ -102,14 +102,14 @@ struct NbmDownload: AsyncCommand {
                 let h = try await downloadNbm(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour, uploadQueues: [])
                 handles.append(contentsOf: h)
             }
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
             return
         }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let handles = try await downloadNbm(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 

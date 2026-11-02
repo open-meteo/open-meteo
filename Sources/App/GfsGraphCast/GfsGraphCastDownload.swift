@@ -48,7 +48,7 @@ struct GfsGraphCastDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         disableIdleSleep()
 
         let domain = try GfsGraphCastDomain.load(rawValue: signature.domain)
@@ -72,7 +72,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, server: signature.server, downloadFromAws: signature.downloadFromAws, uploadQueues: uploadQueues)
         
         let generateFullRun = domain.countEnsembleMember == 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
     func getCmaVariable(logger: Logger, message: GribMessage) -> (any GfsGraphCastVariableDownloadable)? {

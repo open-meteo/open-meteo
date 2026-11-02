@@ -40,7 +40,7 @@ actor S3SyncManager: LifecycleHandler {
         }
     }
     
-    func getQueues(bucketsOpt: String?, rollingBucketsOpt: String? = nil) -> [S3UploadQueue] {
+    func getQueues(bucketsOpt: String?, rollingBucketsOpt: String? = nil, onlyProbabilityTimeSeries: Bool = false) -> [S3UploadQueue] {
         let standard = bucketsOpt.map(S3BucketEndpoint.parseList) ?? []
         let rolling = rollingBucketsOpt.map(S3BucketEndpoint.parseList) ?? []
         let rollingEndpoints = Set(rolling)
@@ -50,6 +50,7 @@ actor S3SyncManager: LifecycleHandler {
             var queue = getQueue(endpoint: endpoint)
             queue.excludeRollingFiles = !rollingEndpoints.contains(endpoint)
             queue.excludeSpatialFiles = rollingEndpoints.contains(endpoint)
+            queue.onlyProbabilityTimeSeries = onlyProbabilityTimeSeries && queue.excludeRollingFiles
             return queue
         }
     }

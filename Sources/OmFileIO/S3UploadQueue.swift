@@ -9,6 +9,8 @@ public struct S3UploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
     /// Time-series upload policy, inherited by multipart sessions.
     public var excludeRollingFiles: Bool = true
+    /// Restrict time-series uploads to probabilities; does not affect spatial files, metadata, or full runs.
+    public var onlyProbabilityTimeSeries: Bool = false
     /// Skip spatial files and their associated metadata.
     public var excludeSpatialFiles: Bool = false
     let client: HTTPClient
@@ -27,7 +29,7 @@ public struct S3UploadQueue: Sendable {
     
     /// Start uploading multiple files in the background that are committed at a later stage
     public func startMultiPartUploads() -> S3MultiFileUploadQueue {
-        S3MultiFileUploadQueue(endpoint: endpoint, client: client, onError: onError, maxConcurrentFiles: 4, maxConcurrentPartUploads: 16, excludeRollingFiles: excludeRollingFiles)
+        S3MultiFileUploadQueue(endpoint: endpoint, client: client, onError: onError, maxConcurrentFiles: 4, maxConcurrentPartUploads: 16, excludeRollingFiles: excludeRollingFiles, onlyProbabilityTimeSeries: onlyProbabilityTimeSeries)
     }
     
     /// Enqueue completion of multi files
@@ -89,6 +91,7 @@ public struct S3UploadQueue: Sendable {
 public struct S3MultiFileUploadQueue: Sendable {
     public let endpoint: S3BucketEndpoint
     public let excludeRollingFiles: Bool
+    public let onlyProbabilityTimeSeries: Bool
     let client: HTTPClient
     let logger: Logger
     
@@ -98,8 +101,9 @@ public struct S3MultiFileUploadQueue: Sendable {
     /// Max number of concurrent file uploads. 4 should be fine
     let queue: ProcessingParallelQueue<S3MultiPartUploadPrepared?>
     
-    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int, excludeRollingFiles: Bool = true) {
+    public init(endpoint: S3BucketEndpoint, client: HTTPClient, logger: Logger = Logger(label: "S3MultiFileUploadQueue"), onError: @escaping @Sendable () -> Void = {}, maxConcurrentFiles: Int, maxConcurrentPartUploads: Int, excludeRollingFiles: Bool = true, onlyProbabilityTimeSeries: Bool = false) {
         self.excludeRollingFiles = excludeRollingFiles
+        self.onlyProbabilityTimeSeries = onlyProbabilityTimeSeries
         self.partUploadExecutor = .init(maxConcurrency: maxConcurrentPartUploads)
         self.queue = .init(executor: LimitedConcurrencyExecutor(maxConcurrency: maxConcurrentFiles), onError: onError)
         self.client = client

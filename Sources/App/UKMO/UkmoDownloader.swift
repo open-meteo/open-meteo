@@ -63,7 +63,7 @@ struct UkmoDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try UkmoDomain.load(rawValue: signature.domain)
@@ -101,7 +101,7 @@ struct UkmoDownload: AsyncCommand {
 
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadQueues: [])
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
             }
             return
         }
@@ -111,7 +111,7 @@ struct UkmoDownload: AsyncCommand {
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf, uploadQueues: resolvedUploadQueues)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadQueues: resolvedUploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 

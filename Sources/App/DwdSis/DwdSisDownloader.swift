@@ -61,7 +61,7 @@ struct DwdSisDownloader: AsyncCommand {
         let last = availableRuns.last!
         try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         Process.alarm(seconds: 0)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
     static let sisDirectory = "https://opendata.dwd.de/weather/satellite/radiation/sis/"

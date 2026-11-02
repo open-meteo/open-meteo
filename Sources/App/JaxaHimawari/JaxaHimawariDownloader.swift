@@ -79,7 +79,7 @@ struct JaxaHimawariDownload: AsyncCommand {
                     }
                     return try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], generateTimeSeries: !signature.skipTimeseries)
             }
             return
         }
@@ -125,7 +125,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
         Process.alarm(seconds: 0)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
     }
 
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: JaxaHimawariDomain, variables: [JaxaHimawariVariable], downloader: JaxaFtpDownloader) async throws -> [GenericVariableHandle] {

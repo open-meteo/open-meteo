@@ -124,7 +124,7 @@ struct ChmiDownload: AsyncCommand {
 
         let handles = try await download(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadQueues: uploadQueues)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }

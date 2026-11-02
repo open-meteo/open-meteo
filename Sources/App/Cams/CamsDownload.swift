@@ -86,7 +86,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 fatalError("ftppassword is required")
             }
             let handles = try await downloadCamsGlobal(application: context.application, domain: domain, run: run, variables: variables, user: ftpuser, password: ftppassword, uploadQueues: uploadQueues)
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
             return
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
@@ -95,12 +95,12 @@ struct DownloadCamsCommand: AsyncCommand {
             if let timeinterval = signature.timeinterval {
                 for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400) {
                     let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: 24, concurrent: signature.concurrent ?? 1, uploadQueues: [])
-                    try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+                    try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: false, uploadQueues: [], generateTimeSeries: !signature.skipTimeseries)
                 }
                 return
             }
             let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: nil, concurrent: signature.concurrent ?? 1, uploadQueues: uploadQueues)
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
             return
         case .cams_global_greenhouse_gases:
             guard let cdskey = signature.cdskey else {
@@ -108,7 +108,7 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             let concurrent = signature.concurrent ?? 1
             let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent, uploadQueues: uploadQueues)
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
             return
         }
     }

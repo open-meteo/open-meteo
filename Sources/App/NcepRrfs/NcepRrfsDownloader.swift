@@ -47,7 +47,7 @@ struct NcepRrfsDownloader: AsyncCommand {
                                              uploadQueues: uploadQueues)
             try await GenericVariableHandle.convert(application: context.application, domain: domain,
                 createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent,
-                writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false,
+                writeUpdateJson: true, uploadQueues: uploadQueues,
                 generateFullRun: domain.generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         }
     }

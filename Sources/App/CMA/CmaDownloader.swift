@@ -71,7 +71,7 @@ struct DownloadCmaCommand: AsyncCommand {
 
         let nConcurrent = signature.concurrent ?? 1
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadQueues: uploadQueues, maxForecastHour: signature.maxForecastHour)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// read each file in chunks, apply shortwave correction and write again

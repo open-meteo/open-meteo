@@ -65,7 +65,7 @@ struct MfWaveDownload: AsyncCommand {
                     logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                     return try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadQueues: [])
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [])
             }
             return
         }
@@ -74,7 +74,7 @@ struct MfWaveDownload: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let handles = try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadQueues: uploadQueues)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files

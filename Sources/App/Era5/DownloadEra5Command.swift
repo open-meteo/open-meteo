@@ -87,7 +87,7 @@ struct DownloadEra5Command: AsyncCommand {
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
     /**

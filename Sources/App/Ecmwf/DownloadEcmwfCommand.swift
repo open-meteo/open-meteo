@@ -65,7 +65,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         disableIdleSleep()
 
         let domain = signature.domain.map {
@@ -95,7 +95,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: [], downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: [], downloadFullGribFile: signature.downloadFullGribFile)
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [])
             }
             return
         }
@@ -106,7 +106,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let generateFullRun = domain.countEnsembleMember == 1
         let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: resolvedUploadQueues, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: resolvedUploadQueues, downloadFullGribFile: signature.downloadFullGribFile)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// Download elevation file

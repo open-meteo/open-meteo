@@ -55,7 +55,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         disableIdleSleep()
 
         guard let domain = EcmwfEcpdsDomain(rawValue: signature.domain) else {
@@ -85,7 +85,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
 
         try await downloadEcmwfElevation(application: context.application, domain: domain, run: run)
         let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: resolvedUploadQueues, shortCutOffHour: shortCutOff)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// Download elevation file
@@ -330,7 +330,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
                         let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: [])
-                        try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
+                        try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
 
                         if let directory = OpenMeteo.dataRunDirectory, uploadQueues != nil {
                             // Delete run directory after S3 upload
@@ -482,7 +482,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             if hour == shortCutOffHour {
                 let handles = handles
                 uploadTaskShortCutOff = Task {
-                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateFullRun: true, generateTimeSeries: false)
+                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateFullRun: true, generateTimeSeries: false)
                 }
             }
             

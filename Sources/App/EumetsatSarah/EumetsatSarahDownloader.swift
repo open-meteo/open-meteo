@@ -64,7 +64,7 @@ struct EumetsatSarahDownload: AsyncCommand {
                 let handles = try await runs.asyncFlatMap { run in
                     return try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadQueues: [])
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [])
             }
             return
         }
@@ -72,7 +72,7 @@ struct EumetsatSarahDownload: AsyncCommand {
         let api = EumetsatApiDownloader(application: context.application, key: apiKey, secret: apiSecret, deadLineHours: 3)
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
         let handles = try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables, uploadQueues: uploadQueues)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatSarahDomain, api: EumetsatApiDownloader, variables: [EumetsatSarahVariable], uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {

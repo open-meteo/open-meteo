@@ -99,7 +99,7 @@ struct MeteoFranceDownload: AsyncCommand {
         try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadQueues: uploadQueues, packages: gribPackages) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
 
         logger.info("Finished in \(start.timeElapsedPretty())")

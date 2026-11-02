@@ -45,7 +45,7 @@ struct DownloadBomCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         disableIdleSleep()
 
         let domain = try BomDomain.load(rawValue: signature.domain)
@@ -66,7 +66,7 @@ struct DownloadBomCommand: AsyncCommand {
         try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadQueues: resolvedUploadQueues) : signature.upperLevel ?
             try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadQueues: resolvedUploadQueues) :
             try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadQueues: resolvedUploadQueues)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, generateFullRun: generateFullRun)
     }
 
     func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {

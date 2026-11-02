@@ -64,7 +64,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
                 let handles = try await runs.asyncFlatMap { run in
                     return try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password, uploadQueues: [])
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [])
             }
             return
         }
@@ -88,7 +88,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatLsaSafDomain, username: String, password: String, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {

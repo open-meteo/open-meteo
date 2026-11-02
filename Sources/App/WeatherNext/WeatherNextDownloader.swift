@@ -47,7 +47,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket)
+        let resolvedUploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket, rollingBucketsOpt: signature.uploadS3RollingBucket, onlyProbabilityTimeSeries: signature.uploadS3OnlyProbabilities)
         disableIdleSleep()
 
         let domain = try WeatherNextDomain.load(rawValue: signature.domain)
@@ -86,7 +86,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             server: server,
             concurrent: nConcurrent,
             uploadQueues: resolvedUploadQueues,
-            uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities,
             createNetcdf: signature.createNetcdf
         )
     }
@@ -100,7 +99,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         server: String,
         concurrent: Int,
         uploadQueues: [S3UploadQueue],
-        uploadS3OnlyProbabilities: Bool,
         createNetcdf: Bool
     ) async throws {
         let logger = application.logger
@@ -377,7 +375,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             concurrent: concurrent,
             writeUpdateJson: true,
             uploadQueues: uploadQueues,
-            uploadS3OnlyProbabilities: uploadS3OnlyProbabilities,
             generateFullRun: false,
             generateTimeSeries: true
         )

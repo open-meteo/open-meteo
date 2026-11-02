@@ -72,7 +72,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
             fatalError()
         }
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, generateTimeSeries: !signature.skipTimeseries)
     }
     
     func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadQueues: [S3UploadQueue]) async throws {
