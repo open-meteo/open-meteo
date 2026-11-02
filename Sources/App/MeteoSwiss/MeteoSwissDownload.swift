@@ -65,7 +65,7 @@ struct MeteoSwissDownload: AsyncCommand {
     }
 
     /// Process each variable and update time-series optimised files
-    func download(application: Application, domain: MeteoSwissDomain, variables: [MeteoSwissSurfaceVariable], run: Timestamp, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: MeteoSwissDomain, variables: [MeteoSwissSurfaceVariable], run: Timestamp, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
         let logger = application.logger

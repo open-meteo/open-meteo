@@ -105,7 +105,7 @@ struct GemDownload: AsyncCommand {
     }
 
     // download seamask and height
-    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadQueues: [S3UploadQueue]) async throws {
         if domain == .gem_gdps_15km_upper_level {
             return
         }
@@ -185,7 +185,7 @@ struct GemDownload: AsyncCommand {
     }
 
     /// Download data and store as compressed files for each timestep
-    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadQueues: [S3UploadQueue]?, concurrent: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadQueues: [S3UploadQueue], concurrent: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         // HRDPS west domain uploads files not atomically -> causing corrupted files if downloaded too early

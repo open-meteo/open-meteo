@@ -75,7 +75,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
     }
     
-    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
@@ -124,7 +124,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
     
-    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
@@ -240,7 +240,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         return handles
     }
 
-    func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)

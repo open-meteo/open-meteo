@@ -153,7 +153,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
     
     /// Download multiple runs from ECMWF MARS archives, convert them and upload to S3
-    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadQueues: [S3UploadQueue]?, params paramsOverwrite: String?) async throws {
+    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadQueues: [S3UploadQueue], params paramsOverwrite: String?) async throws {
         let logger = application.logger
         
         struct EcmwfQuery: Encodable {
@@ -329,7 +329,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
-                        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: nil)
+                        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: [])
                         try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
 
                         if let directory = OpenMeteo.dataRunDirectory, uploadQueues != nil {
@@ -349,7 +349,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]?, shortCutOffHour: Int?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue], shortCutOffHour: Int?) async throws -> [GenericVariableHandle] {
         if domain == .wam {
             return try await downloadEcmwfWam(application: application, domain: domain, server: server, run: run, concurrent: concurrent, maxForecastHour: maxForecastHour, uploadQueues: uploadQueues)
         }
@@ -494,7 +494,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     
     
     /// Download wave model
-    func downloadEcmwfWam(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwfWam(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         // Note 2025-10-08 0z: The delivery for the last forecast hours took more than 4 hours caused by a retry.
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6, retryUnauthorized: false)

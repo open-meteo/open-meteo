@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 import OmFileFormat
 import SwiftNetCDF
+import OmFileIO
 
 /// Download GeoSphere Austria models
 /// AROME: https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_{YYYYMMDDHH}.nc
@@ -36,6 +37,7 @@ struct GeoSphereDownloader: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try GeoSphereDomain.load(rawValue: signature.domain)
@@ -48,19 +50,19 @@ struct GeoSphereDownloader: AsyncCommand {
         switch domain {
         case .arome_austria:
             let onlyVariables = try GeoSphereVariable.load(commaSeparatedOptional: signature.onlyVariables)
-            handles = try await downloadArome(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
+            handles = try await downloadArome(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadQueues: uploadQueues)
         case .claef_austria:
             let onlyVariables = try GeoSphereClaefVariable.load(commaSeparatedOptional: signature.onlyVariables.map { [$0] })
-            handles = try await downloadClaef(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
+            handles = try await downloadClaef(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadQueues: uploadQueues)
         }
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// Download AROME elevation from its DEM file. C-LAEF uses forecast surface geopotential instead.
-    func downloadAromeElevation(application: Application, uploadS3Bucket: String?) async throws {
+    func downloadAromeElevation(application: Application, uploadQueues: [S3UploadQueue]) async throws {
         let domain = GeoSphereDomain.arome_austria
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
@@ -92,7 +94,7 @@ struct GeoSphereDownloader: AsyncCommand {
         }
 
         logger.info("Writing elevation file (\(elevation.count) grid points)")
-        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
     }
 
     /// GeoSphere weather symbol codes 1-32 mapped to WMO weather codes
@@ -116,13 +118,13 @@ struct GeoSphereDownloader: AsyncCommand {
         return symbolToWmo[index]
     }
 
-    func downloadArome(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadArome(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereVariable]?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        try await downloadAromeElevation(application: application, uploadS3Bucket: uploadS3Bucket)
+        try await downloadAromeElevation(application: application, uploadQueues: uploadQueues)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
 
@@ -310,12 +312,12 @@ struct GeoSphereDownloader: AsyncCommand {
         }
 
         await curl.printStatistics()
-        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
     }
 
     /// Download C-LAEF AlpeAdria. Amounts are per hour and radiation is an hourly mean, so nothing is deaccumulated.
     /// Values of the first step are missing for all interval variables.
-    func downloadClaef(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereClaefVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadClaef(application: Application, domain: GeoSphereDomain, run: Timestamp, onlyVariables: [GeoSphereClaefVariable]?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
@@ -373,7 +375,7 @@ struct GeoSphereDownloader: AsyncCommand {
             }
             elevation.flipLatitude(nt: 1, ny: ny, nx: nx)
             elevation.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
         }
 
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
@@ -521,6 +523,6 @@ struct GeoSphereDownloader: AsyncCommand {
         }
 
         await curl.printStatistics()
-        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
     }
 }

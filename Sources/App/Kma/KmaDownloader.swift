@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 @preconcurrency import SwiftEccodes
 import OmFileFormat
+import OmFileIO
 
 struct KmaDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -35,6 +36,7 @@ struct KmaDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         disableIdleSleep()
         let start = DispatchTime.now()
         let logger = context.application.logger
@@ -49,14 +51,14 @@ struct KmaDownload: AsyncCommand {
         guard let server = signature.server else {
             fatalError("Option server is required")
         }
-        try await downloadElevation(application: context.application, domain: domain, run: run, server: server, uploadS3Bucket: signature.uploadS3Bucket)
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server, uploadS3Bucket: signature.uploadS3Bucket)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: server, uploadQueues: uploadQueues)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation(application: Application, domain: KmaDomain, run: Timestamp, server: String, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, domain: KmaDomain, run: Timestamp, server: String, uploadQueues: [S3UploadQueue]) async throws {
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
@@ -86,10 +88,10 @@ struct KmaDownload: AsyncCommand {
             }
         }
 
-        try await elevation.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+        try await elevation.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
     }
 
-    func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(6)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
@@ -187,7 +189,7 @@ struct KmaDownload: AsyncCommand {
                 try await inMemory.sumUp(var1: .precipitation, var2: .snowfall_water_equivalent, outVariable: KmaSurfaceVariable.precipitation, writer: writer)
             }
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
         }
     }
 }

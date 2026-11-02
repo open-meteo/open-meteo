@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import OmFileIO
 @preconcurrency import SwiftEccodes
 
 struct DmiDownload: AsyncCommand {
@@ -29,6 +30,7 @@ struct DmiDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try DmiDomain.load(rawValue: signature.domain)
@@ -39,9 +41,9 @@ struct DmiDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -67,7 +69,7 @@ struct DmiDownload: AsyncCommand {
      Download GRIB file for each timestamp, decode, generate some derived variables.
      Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
      */
-    func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(4)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
@@ -291,10 +293,10 @@ struct DmiDownload: AsyncCommand {
                 previous = previousScoped
                 
                 if generateElevationFile {
-                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadQueues: uploadQueues)
                 }
                 let completed = i == timestamps.count - 1
-                return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
             }
         }
         await curl.printStatistics()

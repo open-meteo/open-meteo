@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import OmFileIO
 @preconcurrency import SwiftEccodes
 
 /**
@@ -38,6 +39,7 @@ struct JmaDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try JmaDomain.load(rawValue: signature.domain)
@@ -48,21 +50,21 @@ struct JmaDownload: AsyncCommand {
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
-                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: nil, createNetCdf: signature.createNetcdf)
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadQueues: [], createNetCdf: signature.createNetcdf)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
             }
             return
         }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, createNetCdf: signature.createNetcdf)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadQueues: uploadQueues, createNetCdf: signature.createNetcdf)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// MSM or GSM domain
     /// Return open file handles, to ensure overlapping runs are not conflicting
-    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?, createNetCdf: Bool) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int, uploadQueues: [S3UploadQueue], createNetCdf: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let deadLineHours: Double = domain == .gsm ? 3 : 6
@@ -112,7 +114,7 @@ struct JmaDownload: AsyncCommand {
                 Meteorology.elevation(sealevelPressure: $1.0 / 100, surfacePressure: $0 / 100, temperature_2m: $1.1 - 273.15)
             }
             try domain.surfaceElevationFileOm.createDirectory()
-            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetCdf)
+            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: createNetCdf)
         }
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
@@ -168,7 +170,7 @@ struct JmaDownload: AsyncCommand {
                 }
                 let completed = filename == filesToDownload.last
                 deaverager = deaveragerScoped
-                return try await writer.finalise(application: application, completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
+                return try await writer.finalise(application: application, completed: completed, validTimes: Array(validTimes).sorted(), uploadQueues: uploadQueues)
             }
         }
         await curl.printStatistics()

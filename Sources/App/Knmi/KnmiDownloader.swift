@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import OmFileIO
 @preconcurrency import SwiftEccodes
 
 struct KnmiDownload: AsyncCommand {
@@ -29,6 +30,7 @@ struct KnmiDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try KnmiDomain.load(rawValue: signature.domain)
@@ -39,9 +41,9 @@ struct KnmiDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -77,7 +79,7 @@ struct KnmiDownload: AsyncCommand {
      
      Important: Wind U/V components are defined on a Rotated LatLon  projection. They need to be corrected for true north.
      */
-    func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'KNMI_API_KEY'")
         }
@@ -304,9 +306,9 @@ struct KnmiDownload: AsyncCommand {
             }
 
             if generateElevationFile {
-                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadQueues: uploadQueues)
             }
-            return try await writerMultistep.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+            return try await writerMultistep.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         }
         await curl.printStatistics()
         return handles

@@ -145,11 +145,7 @@ actor OmSpatialTimestepWriter {
     }
     
     /// Finalize and upload
-    func finalise(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws -> [GenericVariableHandle] {
-        return try await finalise(application: application, completed: completed, validTimes: validTimes, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket), uploadMeta: uploadMeta)
-    }
-
-    func finalise(application: Application, completed: Bool, validTimes: [Timestamp], uploadQueues: [S3UploadQueue]?, uploadMeta: Bool = true) async throws -> [GenericVariableHandle] {
+    func finalise(application: Application, completed: Bool, validTimes: [Timestamp], uploadQueues: [S3UploadQueue], uploadMeta: Bool = true) async throws -> [GenericVariableHandle] {
         let handles = try await finalise()
         guard handles.count > 0 else {
             return []
@@ -159,11 +155,7 @@ actor OmSpatialTimestepWriter {
     }
     
     /// Note: Meta JSON files are now uploaded using in-memory data. It is now safe to call this function out of sync with model downloading. Ideally one queue per bucket.
-    func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
-        try await writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket), uploadMeta: uploadMeta)
-    }
-
-    func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadQueues: [S3UploadQueue]?, uploadMeta: Bool = true) async throws {
+    func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadQueues: [S3UploadQueue], uploadMeta: Bool = true) async throws {
         try await ensembleMean?.writer.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadQueues: uploadQueues, uploadMeta: uploadMeta)
         
         // Upload to AWS S3
@@ -201,7 +193,7 @@ actor OmSpatialTimestepWriter {
             try metaData.writeAtomic(path: metaLatest)
         }
         
-        guard let uploadQueues else {
+        guard !uploadQueues.isEmpty else {
             return
         }
         let domainRegistry = domain.domainRegistry
@@ -350,11 +342,7 @@ actor OmSpatialMultistepWriter {
     
     /// Finalise the time step and return all handles
     /// If not validTimes are given, use all timestamps from the underlaying writer
-    func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
-        return try await finalise(application: application, completed: completed, validTimes: validTimes, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
-    }
-
-    func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func finalise(application: Application, completed: Bool, validTimes: [Timestamp]?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         // Queue the latest timestep's metadata upload after all other timestep files.
         let writer = writer.sorted { $0.time < $1.time }
         let validTimes = validTimes ?? writer.map { $0.time }
@@ -376,7 +364,7 @@ actor OmSpatialMultistepWriter {
     }
     
     // Upload om files to AWS from mutliple timesteps
-    /*func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadQueues: [S3UploadQueue]?, uploadMeta: Bool = true) async throws {
+    /*func writeMetaAndAWSUpload(application: Application, completed: Bool, validTimes: [Timestamp], uploadQueues: [S3UploadQueue], uploadMeta: Bool = true) async throws {
         try await writer.last?.writeMetaAndAWSUpload(application: application, completed: completed, validTimes: validTimes, uploadQueues: uploadQueues, uploadMeta: uploadMeta, forceAllTimestampUpload: true)
     }*/
 }

@@ -6,11 +6,7 @@ actor ElevationLsmGenerator {
     var elevation: Array2D? = nil
     var lsm: Array2D? = nil
     
-    func ingest(elevation: Array2D, domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
-        try await ingest(elevation: elevation, domain: domain, application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
-    }
-
-    func ingest(elevation: Array2D, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]?) async throws {
+    func ingest(elevation: Array2D, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         if domain.surfaceElevationFileOm.exists() {
             return
         }
@@ -18,11 +14,7 @@ actor ElevationLsmGenerator {
         try await generate(domain: domain, application: application, uploadQueues: uploadQueues)
     }
     
-    func ingest(lsm: Array2D, domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
-        try await ingest(lsm: lsm, domain: domain, application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
-    }
-
-    func ingest(lsm: Array2D, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]?) async throws {
+    func ingest(lsm: Array2D, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         if domain.surfaceElevationFileOm.exists() {
             return
         }
@@ -30,11 +22,7 @@ actor ElevationLsmGenerator {
         try await generate(domain: domain, application: application, uploadQueues: uploadQueues)
     }
     
-    func generate(domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
-        try await generate(domain: domain, application: application, uploadQueues: await application.s3SyncManager.getQueues(bucketsOpt: uploadS3Bucket))
-    }
-
-    func generate(domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]?) async throws {
+    func generate(domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         guard let lsm, var elevation else {
             return
         }

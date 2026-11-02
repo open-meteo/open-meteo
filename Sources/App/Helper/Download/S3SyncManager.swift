@@ -40,10 +40,9 @@ actor S3SyncManager: LifecycleHandler {
         }
     }
     
-    func getQueues(bucketsOpt: String?, rollingBucketsOpt: String? = nil) -> [S3UploadQueue]? {
+    func getQueues(bucketsOpt: String?, rollingBucketsOpt: String? = nil) -> [S3UploadQueue] {
         let standard = bucketsOpt.map(S3BucketEndpoint.parseList) ?? []
         let rolling = rollingBucketsOpt.map(S3BucketEndpoint.parseList) ?? []
-        guard !standard.isEmpty || !rolling.isEmpty else { return nil }
         let rollingEndpoints = Set(rolling)
         var seen = Set<S3BucketEndpoint>()
         return (standard + rolling).filter { seen.insert($0).inserted }.map { endpoint in

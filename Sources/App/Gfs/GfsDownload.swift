@@ -79,7 +79,7 @@ struct GfsDownload: AsyncCommand {
         try await downloadRun(using: context, signature: signature, run: run, domain: domain, uploadQueues: resolvedUploadQueues)
     }
 
-    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain, uploadQueues: [S3UploadQueue]) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
         disableIdleSleep()
@@ -162,7 +162,7 @@ struct GfsDownload: AsyncCommand {
         return surface
     }
 
-    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileType, grid: any Gridable, isGlobal: Bool, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileType, grid: any Gridable, isGlobal: Bool, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
 
         /// download seamask and height
@@ -220,7 +220,7 @@ struct GfsDownload: AsyncCommand {
     }
 
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?, skipMissing: Bool, downloadFromAws: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?, skipMissing: Bool, downloadFromAws: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         // GFS025 ensemble does not have elevation information, use non-ensemble version

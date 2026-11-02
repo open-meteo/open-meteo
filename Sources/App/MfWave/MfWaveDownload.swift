@@ -49,6 +49,7 @@ struct MfWaveDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let domain = try MfWaveDomain.load(rawValue: signature.domain)
 
         let nConcurrent = signature.concurrent ?? 1
@@ -62,9 +63,9 @@ struct MfWaveDownload: AsyncCommand {
             for year in runs.groupedPreservedOrder(by: { $0.toComponents().year }) {
                 let handles = try await year.values.asyncFlatMap { run in
                     logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                    return try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadS3Bucket: nil)
+                    return try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadQueues: [])
                 }
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false)
             }
             return
         }
@@ -72,12 +73,12 @@ struct MfWaveDownload: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        let handles = try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides, uploadQueues: uploadQueues)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false)
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func download(application: Application, domain: MfWaveDomain, run: Timestamp, onlyTides: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: MfWaveDomain, run: Timestamp, onlyTides: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
 
@@ -237,7 +238,7 @@ struct MfWaveDownload: AsyncCommand {
                                     return $0.isNaN ? Float(0) : -999
                                 }
                                 try domain.surfaceElevationFileOm.createDirectory()
-                                try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+                                try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
                             }
                             try await writer.write(time: timestamp, member: 0, variable: variable, data: data)
                         }
@@ -268,14 +269,14 @@ struct MfWaveDownload: AsyncCommand {
                                 return $0.isNaN ? Float(0) : -999
                             }
                             try domain.surfaceElevationFileOm.createDirectory()
-                            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+                            try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
                         }
                         try await writer.write(time: timestamp, member: 0, variable: variable, data: data)
                     }
                 }
             }
         }
-        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         await curl.printStatistics()
         return handles
     }

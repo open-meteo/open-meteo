@@ -3,6 +3,7 @@
 import Foundation
 import OmFileFormat
 import Vapor
+import OmFileIO
 @preconcurrency import SwiftEccodes
 
 /// Download RRFS deterministic, subhourly and five-member ensemble forecasts.
@@ -22,6 +23,7 @@ struct NcepRrfsDownloader: AsyncCommand {
     var help: String { "Download and process NOAA RRFS forecasts" }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         disableIdleSleep()
         let domain = try NcepRrfsDomain.load(rawValue: signature.domain)
         let concurrent = signature.concurrent ?? 2
@@ -42,21 +44,21 @@ struct NcepRrfsDownloader: AsyncCommand {
             let handles = try await download(application: context.application, domain: domain, run: run,
                                              concurrent: concurrent, maxForecastHour: signature.maxForecastHour,
                                              server: signature.server ?? "https://noaa-rrfs-ops-pds.s3.amazonaws.com",
-                                             uploadS3Bucket: signature.uploadS3Bucket)
+                                             uploadQueues: uploadQueues)
             try await GenericVariableHandle.convert(application: context.application, domain: domain,
                 createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent,
-                writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false,
+                writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false,
                 generateFullRun: domain.generateFullRun, generateTimeSeries: !signature.skipTimeseries)
         }
     }
 
     func download(application: Application, domain: NcepRrfsDomain, run: Timestamp, concurrent: Int,
-                  maxForecastHour: Int?, server: String, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+                  maxForecastHour: Int?, server: String, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6)
         Process.alarm(seconds: 7 * 3600)
         defer { Process.alarm(seconds: 0) }
-        try await downloadElevation(curl: curl, domain: domain, run: run, server: server, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await downloadElevation(curl: curl, domain: domain, run: run, server: server, application: application, uploadQueues: uploadQueues)
         let domainElevation: [Float]?
         if domain != .ncep_rrfs_conus_ensemble {
             guard let elevation = try await domain.getStaticFile(type: .elevation)?.read() else {
@@ -197,13 +199,13 @@ struct NcepRrfsDownloader: AsyncCommand {
                 try await precipitationMembers.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation, dtHoursOfCurrentStep: domain.dtHours, writer: timestepWriter)
             }
-            handles += try await writer.finalise(application: application, completed: hour == lastHour, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+            handles += try await writer.finalise(application: application, completed: hour == lastHour, validTimes: validTimes, uploadQueues: uploadQueues)
         }
         await curl.printStatistics()
         return handles
     }
 
-    private func downloadElevation(curl: Curl, domain: NcepRrfsDomain, run: Timestamp, server: String, application: Application, uploadS3Bucket: String?) async throws {
+    private func downloadElevation(curl: Curl, domain: NcepRrfsDomain, run: Timestamp, server: String, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         guard !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) else { return }
         // The CONUS products share terrain; North America has its own rotated grid.
         let elevationDomain: NcepRrfsDomain = domain == .ncep_rrfs_north_america ? .ncep_rrfs_north_america : .ncep_rrfs_conus
@@ -213,7 +215,7 @@ struct NcepRrfsDownloader: AsyncCommand {
             let array = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
             await storage.set(variable: variable, timestamp: run, member: 0, data: array)
         }
-        try await storage.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await storage.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain, application: application, uploadQueues: uploadQueues)
         guard FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) else { throw NcepRrfsError.missingElevation }
     }
 }

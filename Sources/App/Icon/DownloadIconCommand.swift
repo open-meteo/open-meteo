@@ -115,7 +115,7 @@ struct DownloadIconCommand: AsyncCommand {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, uploadQueues: [S3UploadQueue]?) async throws {
+    func convertSurfaceElevation(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
         let feedStatic = outputs.nativeDomain.staticResourceDomain.downloadDomain
         let needsPrimary = !FileManager.default.fileExists(atPath: outputs.primary.surfaceElevationFileOm.getFilePath())
@@ -166,7 +166,7 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     /// Download native DWD v1 fields and adapt them to the selected storage outputs.
-    func downloadIcon(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadQueues: [S3UploadQueue]?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, outputs: IconDownloadOutputs, remapper: IconRemapper?, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadQueues: [S3UploadQueue], realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let feed = outputs.downloadDomain
         let remappedDomain = outputs.remapped
@@ -523,7 +523,7 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     /// Publish each cadence independently; D2's quarter-hour output ends before its hourly output.
-    func finaliseQuarterHourly(application: Application, writer: OmSpatialMultistepWriter?, lastTime: Timestamp?, validTimes: inout Set<Timestamp>, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func finaliseQuarterHourly(application: Application, writer: OmSpatialMultistepWriter?, lastTime: Timestamp?, validTimes: inout Set<Timestamp>, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         guard let writer else { return [] }
         let writtenTimes = await writer.writer.map { $0.time }
         guard !writtenTimes.isEmpty else { return [] }

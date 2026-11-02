@@ -100,8 +100,8 @@ struct UkmoDownload: AsyncCommand {
             }*/
 
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
-                let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadQueues: nil)
-                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: nil, uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
+                let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadQueues: [])
+                try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadQueues: [], uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
             }
             return
         }
@@ -160,7 +160,7 @@ struct UkmoDownload: AsyncCommand {
         }
     }*/
 
-    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool, uploadQueues: [S3UploadQueue]) async throws {
         // UKMO Global data has been manually converted from GRIB files
         /*try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: ["/Users/patrick/Downloads/UKMO_static/uk2km_ground_land-cover+model-terrain-height_00.grib2"], createNetCdf: createNetcdf, shift180LongitudeAndFlipLatitude: false)
         fatalError()*/
@@ -240,7 +240,7 @@ struct UkmoDownload: AsyncCommand {
     /**
      Download a specified UKMO run and return file handles for conversion
      */
-    func download(application: Application, domain: UkmoDomain, variables: [any UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?, skipMissing: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: UkmoDomain, variables: [any UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?, skipMissing: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double
         switch domain {

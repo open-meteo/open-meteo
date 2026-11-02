@@ -63,7 +63,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         try await downloadRun(using: context, signature: signature, run: run, domain: domain, uploadQueues: resolvedUploadQueues)
     }
 
-    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain, uploadQueues: [S3UploadQueue]) async throws {
         let logger = context.application.logger
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
@@ -142,7 +142,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         }
     }
 
-    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, server: String?, downloadFromAws: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, server: String?, downloadFromAws: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = domain == .aigefs025 ? 6 : 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)

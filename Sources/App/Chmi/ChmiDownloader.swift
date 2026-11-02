@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import OmFileIO
 @preconcurrency import SwiftEccodes
 
 /// Download ČHMÚ ALADIN models.
@@ -111,6 +112,7 @@ struct ChmiDownload: AsyncCommand {
     static let nForecastHours = 73
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try ChmiDomain.load(rawValue: signature.domain)
@@ -120,9 +122,9 @@ struct ChmiDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, onlyVariables: onlyVariables, uploadQueues: uploadQueues)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -154,7 +156,7 @@ struct ChmiDownload: AsyncCommand {
     /// Static geopotential field -> elevation in metre. Single GRIB message.
     /// TODO: This currently does not encode sea-points as -999
     /// -> There is a separate GRIB land-sea mask variable `SURFIND_TERREMER` (land=1, sea=0) which should be processed as well!
-    func downloadElevation(application: Application, domain: ChmiDomain, run: Timestamp, curl: Curl, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, domain: ChmiDomain, run: Timestamp, curl: Curl, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -181,7 +183,7 @@ struct ChmiDownload: AsyncCommand {
             fatalError("Could not read geopotential for elevation")
         }
         logger.info("Writing elevation file (\(elevation.count) grid points)")
-        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
     }
 
     /// Read a single GRIB file containing all timesteps into a time-major buffer.
@@ -233,7 +235,7 @@ struct ChmiDownload: AsyncCommand {
         }
     }
 
-    func download(application: Application, domain: ChmiDomain, run: Timestamp, onlyVariables: [ChmiVariable]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: ChmiDomain, run: Timestamp, onlyVariables: [ChmiVariable]?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
@@ -246,7 +248,7 @@ struct ChmiDownload: AsyncCommand {
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
 
-        try await downloadElevation(application: application, domain: domain, run: run, curl: curl, uploadS3Bucket: uploadS3Bucket)
+        try await downloadElevation(application: application, domain: domain, run: run, curl: curl, uploadQueues: uploadQueues)
 
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
@@ -298,6 +300,6 @@ struct ChmiDownload: AsyncCommand {
         }
 
         await curl.printStatistics()
-        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
     }
 }

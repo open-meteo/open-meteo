@@ -99,7 +99,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         run: Timestamp,
         server: String,
         concurrent: Int,
-        uploadQueues: [S3UploadQueue]?,
+        uploadQueues: [S3UploadQueue],
         uploadS3OnlyProbabilities: Bool,
         createNetcdf: Bool
     ) async throws {

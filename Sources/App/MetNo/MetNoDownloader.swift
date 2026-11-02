@@ -36,6 +36,7 @@ struct MetNoDownloader: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try MetNoDomain.load(rawValue: signature.domain)
@@ -46,15 +47,15 @@ struct MetNoDownloader: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadQueues: uploadQueues)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// Process each variable and update time-series optimised files
-    func download(application: Application, domain: MetNoDomain, variables: [MetNoVariable], run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: MetNoDomain, variables: [MetNoVariable], run: Timestamp, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
         let logger = application.logger
@@ -107,7 +108,7 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
             logger.info("Writing elevation file")
-            try await altitude.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+            try await altitude.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
         }
 
         /// Verify projection and grid coordinates
@@ -165,7 +166,7 @@ struct MetNoDownloader: AsyncCommand {
                 try await writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
             }
         }
-        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
     }
 }
 

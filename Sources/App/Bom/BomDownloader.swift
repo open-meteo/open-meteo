@@ -69,7 +69,7 @@ struct DownloadBomCommand: AsyncCommand {
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
     }
 
-    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp, uploadQueues: [S3UploadQueue]?) async throws {
+    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -122,7 +122,7 @@ struct DownloadBomCommand: AsyncCommand {
     }
 
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
-    func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
@@ -182,7 +182,7 @@ struct DownloadBomCommand: AsyncCommand {
 
     /// Download variables, convert to temporary om files and return all handles
     /// Ensemble do no have `rh_scrn` and `cld_phys_thunder_p`
-    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
@@ -316,13 +316,13 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
         await curl.printStatistics()
-        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: nil) + writerProbabilities.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
+        let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: []) + writerProbabilities.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
         Process.alarm(seconds: 0)
         return handles
     }
 
     /// Download variables, convert to temporary om files and return all handles
-    func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))

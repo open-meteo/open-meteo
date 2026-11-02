@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 @preconcurrency import SwiftEccodes
 import OmFileFormat
+import OmFileIO
 
 /**
  Modifications / Calculations:
@@ -46,6 +47,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         disableIdleSleep()
         let start = DispatchTime.now()
         let logger = context.application.logger
@@ -57,14 +59,14 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try await downloadElevation(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket)
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
+        try await downloadElevation(application: context.application, domain: domain, run: run, uploadQueues: uploadQueues)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
@@ -88,10 +90,10 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
             }
         }
 
-        try await elevation.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+        try await elevation.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
     }
 
-    func download(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(6)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
@@ -336,6 +338,6 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                 }
             }
         }
-        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
     }
 }
