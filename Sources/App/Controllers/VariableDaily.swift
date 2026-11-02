@@ -364,34 +364,44 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
 }
 
 
+extension GenericDomain {
+    /// Derive from native daily data without aggregating an hourly reader.
+    func makeDerivedDaily<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (some GenericReaderOptionalProtocol<ForecastVariableDaily>)? {
+        let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        return reader.map {
+            VariableDailyDeriver(reader: GenericReaderCached(reader: $0), countEnsembleMember: countEnsembleMember)
+        }
+    }
+}
+
 struct VariableDailyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
     typealias VariableOpt = ForecastVariableDaily
-    
+
     let reader: Reader
-    let options: GenericReaderOptions
-    
+    let countEnsembleMember: Int
+
     func getDeriverMap(variable: VariableOpt) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }
+        let statistic: EnsembleReduction.Statistic
         switch variable {
-        /*case .temperature_2m_max:
-            guard let v = Reader.variableFromString("temperature_max24h_2m") else {
-                return nil
-            }
-            return .directShift24Hour(v)
-        case .temperature_2m_min:
-            guard let v = Reader.variableFromString("temperature_min24h_2m") else {
-                return nil
-            }
-            return .directShift24Hour(v)
-        case .temperature_2m_mean:
-            guard let v = Reader.variableFromString("temperature_mean24h_2m") else {
-                return nil
-            }
-            return .directShift24Hour(v)*/
+        case .river_discharge_mean:
+            statistic = .mean
+        case .river_discharge_min:
+            statistic = .minimum
+        case .river_discharge_max:
+            statistic = .maximum
+        case .river_discharge_median:
+            statistic = .percentile(0.5)
+        case .river_discharge_p25:
+            statistic = .percentile(0.25)
+        case .river_discharge_p75:
+            statistic = .percentile(0.75)
         default:
             return nil
         }
+        guard let discharge = Reader.variableFromString("river_discharge") else { return nil }
+        return .ensemble(discharge, EnsembleReduction(members: 0..<countEnsembleMember, statistic: statistic))
     }
 }

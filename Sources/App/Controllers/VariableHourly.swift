@@ -544,56 +544,45 @@ extension ForecastVariable {
 }
 
 extension GenericDomain {
-    func makeHourlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> VariableHourlyDeriver<GenericReaderCached<Self, Variable>>? {
-        guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            return nil
+    /// Construct a cached hourly deriver, retaining its static type until composition.
+    func makeDerivedHourly<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (some GenericReaderOptionalProtocol<ForecastVariable>)? {
+        let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        return reader.map {
+            VariableHourlyDeriver(reader: GenericReaderCached(reader: $0), options: options, domainRegistry: domainRegistry)
         }
-        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
-    
-    func makeWeeklyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
+
+    func makeWeeklyDeriverCached<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>? {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         return SeasonalForecastDeriverWeekly<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
     }
     
-    func makeMonthlyDeriverCached<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverMonthly<GenericReaderCached<Self, Variable>>? {
+    func makeMonthlyDeriverCached<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> SeasonalForecastDeriverMonthly<GenericReaderCached<Self, Variable>>? {
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         return SeasonalForecastDeriverMonthly<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
     }
     
-    /// Make a default reader for a single domain with hourly data with cache and deriver
-    func makeDerivedHourly<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
-        
-        guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            return nil
-        }
-        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-    }
-
-    /// Make a default reader for a single domain with hourly data
-    func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
+    /// Type-erase an uncached raw reader for heterogeneous domain compositions.
+    func makeHourlyReader<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
     
-    /// Make a default reader for a single domain with hourly data and inject a daily deriver
-    func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
-        guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    /// Compose daily output from the same cached hourly reader.
+    func makeGenericHourlyDaily<Variable: GenericVariable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> MultiDomains.ForecastReaderResult {
+        guard let hourly = try await makeDerivedHourly(variableType: variableType, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return (nil, nil, nil, nil)
         }
-        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
         return (hourly, hourly.makeDailyAggregator(), nil, nil)
     }
-    
-    /// Make a default reader for a single domain with hourly data and inject a daily deriver
-    func makeGenericHourlyDaily<Variable: GenericVariable & Hashable>(variableType: Variable.Type, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
-        
+
+    /// Construct a cached hourly deriver at a known grid position.
+    func makeDerivedHourly<Variable: GenericVariable>(variableType: Variable.Type, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, options: GenericReaderOptions) async throws -> some GenericReaderOptionalProtocol<ForecastVariable> {
         let reader = try await GenericReader<Self, Variable>(domain: self, position: position, modelCoordinates: modelCoordinates, options: options)
-        let hourly = VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
-        return (hourly, hourly.makeDailyAggregator(), nil, nil)
+        return VariableHourlyDeriver(reader: GenericReaderCached(reader: reader), options: options, domainRegistry: domainRegistry)
     }
 }
 
