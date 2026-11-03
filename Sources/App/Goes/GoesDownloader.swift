@@ -8,14 +8,14 @@ struct GoesDownloader: AsyncCommand {
         @Argument(name: "domain") var domain: String
         @Option(name: "timeinterval", short: "t", help: "Backfill inclusive dates, e.g. 20261101-20261103") var timeinterval: String?
         @Option(name: "lookback-days", help: "Recheck this many days for late/replaced scans (default 3)") var lookbackDays: Int?
-        @Option(name: "concurrent", short: "c", help: "Conversion concurrency (default 1)") var concurrent: Int?
+        @Option(name: "concurrent", short: "c", help: "Download and conversion concurrency (default 1)") var concurrent: Int?
         @Flag(name: "create-netcdf") var createNetcdf: Bool
         @Option(name: "upload-s3-bucket") var uploadS3Bucket: String?
     }
     var help: String { "Download GOES-19 10-minute surface shortwave radiation" }
     static let server = "https://noaa-goes19.s3.amazonaws.com/"
 
-    struct Scan: Equatable {
+    struct Scan: Equatable, Sendable {
         let key: String
         let start: Timestamp
         let identity: String
@@ -102,8 +102,7 @@ struct GoesDownloader: AsyncCommand {
         let batches = Self.batches(scans: scans, completed: completed)
         logger.info("GOES: \(scans.count) available scans, \(batches.count) conversion batches")
         for batch in batches {
-            var handles = [GenericVariableHandle]()
-            for scan in batch {
+            let handles: [GenericVariableHandle] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
                 logger.info("GOES: \(scan.key)")
                 let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key, minSize: nil)
                 let data = try buffer.withUnsafeBytes { bytes in
@@ -111,8 +110,8 @@ struct GoesDownloader: AsyncCommand {
                     return try Self.decode(nc: nc, scan: scan)
                 }
                 let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
-                handles.append(try await GenericVariableHandle(variable: GoesVariable.shortwave_radiation, time: scan.time, member: 0,
-                    fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data), domain: domain))
+                return try await GenericVariableHandle(variable: GoesVariable.shortwave_radiation, time: scan.time, member: 0,
+                    fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data), domain: domain)
             }
             try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf,
                 run: nil, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: queues)

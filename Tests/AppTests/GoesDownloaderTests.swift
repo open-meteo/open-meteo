@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import SwiftNetCDF
+import OmFileIO
 @testable import App
 
 @Suite struct GoesDownloaderTests {
@@ -103,7 +104,7 @@ import SwiftNetCDF
     }
 
     /// Opt-in real NOAA fixture, kept out of the repository (12 MB compressed).
-    @Test func realNoaaFile() throws {
+    @Test func realNoaaFile() async throws {
         guard let path = ProcessInfo.processInfo.environment["GOES_TEST_FILE"] else { return }
         let nc = try #require(try NetCDF.open(path: path, allowUpdate: false))
         let values = try GoesDownloader.decode(nc: nc, scan: scan(0))
@@ -112,5 +113,20 @@ import SwiftNetCDF
         #expect(values.contains { $0 > 100 && $0 < 1500 })
         #expect(values.contains { $0 == 0 })
         #expect(!values.contains { $0.isInfinite || $0 < 0 })
+
+        // Concurrent in-memory opening and decoding must match the serial result,
+        // including missing pixels. Exercise the same helper used by the downloader.
+        let buffer = try Data(contentsOf: URL(fileURLWithPath: path))
+        let fileScan = scan(0)
+        let matches: [Bool] = try await [0, 1].mapConcurrent(nConcurrent: 2) { _ in
+            let decoded = try buffer.withUnsafeBytes { bytes in
+                let file = try #require(try NetCDF.open(memory: bytes))
+                return try GoesDownloader.decode(nc: file, scan: fileScan)
+            }
+            return decoded.count == values.count && zip(decoded, values).allSatisfy {
+                $0 == $1 || ($0.isNaN && $1.isNaN)
+            }
+        }
+        #expect(matches == [true, true])
     }
 }
