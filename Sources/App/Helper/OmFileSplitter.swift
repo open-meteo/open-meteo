@@ -471,9 +471,13 @@ struct OmFileSplitter {
             try writer.writeFile.writeTrailer(rootVariable: root)
             // Overwrite existing file, with newly created
             try writer.writeFn.linkTemporary(file: writer.fileName)
-            try writer.writeFn.close()
-            for uploadQueue in multipartUploadQueues {
-                await uploadQueue.uploadTimeSeriesFile(writer.file)
+            // Keep this exact file open until queued uploads finish reading it.
+            for uploadQueue in multipartUploadQueues where uploadQueue.shouldUploadTimeSeriesFile(writer.file) {
+                await uploadQueue.uploadMultipart(
+                    data: writer.writeFn,
+                    objectName: "data/\(writer.file.getRelativeFilePath())",
+                    lastModified: .now()
+                )
             }
         }
     }
@@ -605,9 +609,14 @@ struct OmFileSplitter {
         ])
         try writeFile.writeTrailer(rootVariable: root)
         try writeFn.linkTemporary(file: fileName)
-        try writeFn.close()
-        for uploadQueue in multipartUploadQueues {
-            await uploadQueue.uploadTimeSeriesFile(readFile)
+        // Keep the completed file open while queued uploads read it.
+        for uploadQueue in multipartUploadQueues where uploadQueue.shouldUploadTimeSeriesFile(readFile) {
+            await uploadQueue.uploadMultipart(
+                data: writeFn,
+                objectName: "data/\(readFile.getRelativeFilePath())",
+                lastModified: .now(),
+                commitImmediately: true
+            )
         }
     }
 }

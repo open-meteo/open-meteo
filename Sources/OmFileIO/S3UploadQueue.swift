@@ -111,31 +111,13 @@ public struct S3MultiFileUploadQueue: Sendable {
         self.endpoint = endpoint
     }
     
-    public func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
-        await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
-            try await S3Uploader.uploadMultipart(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified, executor: partUploadExecutor)
-        }
-    }
-    
-    public func uploadMultipart(file: String, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp, commitImmediately: Bool = false) async {
+    public func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp, commitImmediately: Bool = false) async {
         let url = endpoint.uploadURL(remotePath: objectName)
-        let commit: (@Sendable (S3MultiPartUploadPrepared) async throws -> Void)?
-        if commitImmediately {
-            commit = { [client] prepared in try await prepared.commit(client: client) }
-        } else {
-            commit = nil
-        }
-        await enqueuePreparation(commit: commit) { [client, executor = partUploadExecutor] in
-            try await S3Uploader.uploadMultipart(client: client, file: file, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
-        }
-    }
-
-    func enqueuePreparation(commit: (@Sendable (S3MultiPartUploadPrepared) async throws -> Void)? = nil, _ work: @escaping @Sendable () async throws -> S3MultiPartUploadPrepared) async {
-        await queue.enqueueIgnoreError(logger: logger) { [client, logger] in
-            let prepared = try await work()
-            guard let commit else { return prepared }
+        await queue.enqueueIgnoreError(logger: logger) { [client, logger, executor = partUploadExecutor] in
+            let prepared = try await S3Uploader.uploadMultipart(client: client, data: data, url: url, contentType: contentType, lastModified: lastModified, executor: executor)
+            guard commitImmediately else { return prepared }
             do {
-                try await commit(prepared)
+                try await prepared.commit(client: client)
             } catch {
                 // A failed immediate commit must not leave an unfinished multipart upload behind.
                 do { try await prepared.abort(client: client) } catch {

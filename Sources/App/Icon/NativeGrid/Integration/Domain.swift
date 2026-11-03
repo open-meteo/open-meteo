@@ -200,16 +200,19 @@ extension IconNativeDomains {
         if generated.coordinatesGenerated {
             application.logger.info("Generated native ICON coordinates at \(coordinatesFile.getFilePath())")
         }
+        guard !uploadQueues.isEmpty else { return }
+        let artifactHandle = try FileHandle.openFileReading(file: artifactPath)
+        let coordinatesHandle = try generated.coordinatesGenerated ? FileHandle.openFileReading(file: coordinatesFile.getFilePath()) : nil
         for queue in uploadQueues {
             let uploads = queue.startMultiPartUploads()
             await uploads.uploadMultipart(
-                file: artifactPath,
+                data: artifactHandle,
                 objectName: "data/\(registry.rawValue)/static/grid.bin",
                 lastModified: .now()
             )
-            if generated.coordinatesGenerated {
+            if let coordinatesHandle {
                 await uploads.uploadMultipart(
-                    file: coordinatesFile.getFilePath(),
+                    data: coordinatesHandle,
                     objectName: coordinatesFile.getRelativeFilePathWithData(),
                     lastModified: .now()
                 )

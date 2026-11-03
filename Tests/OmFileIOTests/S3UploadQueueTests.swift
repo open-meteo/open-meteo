@@ -4,6 +4,7 @@ import OmFileFormat
 import AsyncHTTPClient
 import Synchronization
 import Testing
+import Vapor
 @testable import OmFileIO
 
 @Suite(.timeLimit(.minutes(1)))
@@ -69,36 +70,52 @@ struct S3UploadQueueTests {
         }
     }
 
-    @Test func immediateCommitDoesNotWaitForOtherFilesOrSessionCompletion() async {
-        let failures = Atomic<Int>(0)
+    @Test func immediateCommitDoesNotWaitForOtherFilesOrSessionCompletion() async throws {
         let committed = AsyncStream<Void>.makeStream()
-        let releaseSlowUpload = AsyncStream<Void>.makeStream()
-        let session = S3MultiFileUploadQueue(
-            endpoint: .init(rawEndpoint: "s3://test/", profile: nil), client: .shared,
-            onError: { failures.wrappingAdd(1, ordering: .relaxed) },
-            maxConcurrentFiles: 2, maxConcurrentPartUploads: 1
-        )
-        await session.enqueuePreparation {
-            for await _ in releaseSlowUpload.stream { break }
-            return S3MultiPartUploadPrepared(etags: [], url: "https://example.com/slow", encodedUploadId: "slow", lastModified: .init(0))
+        let app = try await Application.make(.testing)
+        do {
+            app.post("fast") { request -> String in
+                if request.url.query == "uploads" {
+                    return "<UploadId>fast</UploadId>"
+                }
+                committed.continuation.yield(())
+                return "<CompleteMultipartUploadResult/>"
+            }
+            app.put("fast") { _ -> Response in
+                Response(status: .ok, headers: ["ETag": "test-part"])
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let failures = Atomic<Int>(0)
+            let releaseSlowUpload = AsyncStream<Void>.makeStream()
+            let session = S3MultiFileUploadQueue(
+                endpoint: .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil), client: .shared,
+                onError: { failures.wrappingAdd(1, ordering: .relaxed) },
+                maxConcurrentFiles: 2, maxConcurrentPartUploads: 1
+            )
+            await session.queue.enqueueIgnoreError(logger: session.logger) {
+                for await _ in releaseSlowUpload.stream { break }
+                return S3MultiPartUploadPrepared(etags: [], url: "https://example.com/slow", encodedUploadId: "slow", lastModified: .init(0))
+            }
+            await session.uploadMultipart(data: ByteBuffer(string: "forecast"), objectName: "fast", lastModified: .init(0), commitImmediately: true)
+            // Publication must happen before we release the other file or finish the session.
+            var notifications = committed.stream.makeAsyncIterator()
+            _ = await notifications.next()
+            await session.queue.enqueueIgnoreError(logger: session.logger) { throw Failure.injected }
+            releaseSlowUpload.continuation.yield(())
+            releaseSlowUpload.continuation.finish()
+            committed.continuation.finish()
+            let prepared = await session.finishPreparations()
+            // A later failure cannot cause the published file to be committed again or aborted.
+            #expect(prepared.map(\.encodedUploadId) == ["slow"])
+            #expect(failures.load(ordering: .relaxed) == 1)
+        } catch {
+            await app.http.server.shared.shutdown()
+            try await app.asyncShutdown()
+            throw error
         }
-        await session.enqueuePreparation(commit: { prepared in
-            #expect(prepared.encodedUploadId == "fast")
-            committed.continuation.yield(())
-        }) {
-            S3MultiPartUploadPrepared(etags: [], url: "https://example.com/fast", encodedUploadId: "fast", lastModified: .init(0))
-        }
-        // Publication must happen before we release the other file or finish the session.
-        var notifications = committed.stream.makeAsyncIterator()
-        _ = await notifications.next()
-        await session.enqueuePreparation { throw Failure.injected }
-        releaseSlowUpload.continuation.yield(())
-        releaseSlowUpload.continuation.finish()
-        committed.continuation.finish()
-        let prepared = await session.finishPreparations()
-        // A later failure cannot cause the published file to be committed again or aborted.
-        #expect(prepared.map(\.encodedUploadId) == ["slow"])
-        #expect(failures.load(ordering: .relaxed) == 1)
+        await app.http.server.shared.shutdown()
+        try await app.asyncShutdown()
     }
 
     @Test(arguments: [false, true])
@@ -112,7 +129,7 @@ struct S3UploadQueueTests {
         // More results than queue capacity must drain before finish is called.
         // A failed preparation must not discard successful uploads needed for commit or abort.
         for index in 0..<8 {
-            await session.enqueuePreparation {
+            await session.queue.enqueueIgnoreError(logger: session.logger) {
                 if ignoreFailure && index == 3 { throw Failure.injected }
                 return S3MultiPartUploadPrepared(
                     etags: [], url: "https://example.com/\(index)",
