@@ -1,3 +1,4 @@
+import OmFileIO
 import Vapor
 
 /// Helper to generate elevation om file
@@ -5,23 +6,23 @@ actor ElevationLsmGenerator {
     var elevation: Array2D? = nil
     var lsm: Array2D? = nil
     
-    func ingest(elevation: Array2D, domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
+    func ingest(elevation: Array2D, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         if domain.surfaceElevationFileOm.exists() {
             return
         }
         self.elevation = elevation
-        try await generate(domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await generate(domain: domain, application: application, uploadQueues: uploadQueues)
     }
     
-    func ingest(lsm: Array2D, domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
+    func ingest(lsm: Array2D, domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         if domain.surfaceElevationFileOm.exists() {
             return
         }
         self.lsm = lsm
-        try await generate(domain: domain, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await generate(domain: domain, application: application, uploadQueues: uploadQueues)
     }
     
-    func generate(domain: GenericDomain, application: Application, uploadS3Bucket: String?) async throws {
+    func generate(domain: GenericDomain, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         guard let lsm, var elevation else {
             return
         }
@@ -32,6 +33,6 @@ actor ElevationLsmGenerator {
             }
         }
         try domain.surfaceElevationFileOm.createDirectory()
-        try await elevation.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await elevation.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues)
     }
 }

@@ -41,6 +41,12 @@ import Testing
         #expect(Meteorology.relativeHumidity(temperature: 5, dewpoint: 15) == 100)
     }
 
+    @Test func dewpointAtZeroRelativeHumidity() {
+        let dewpointAtZero = Meteorology.dewpoint(temperature: 20, relativeHumidity: 0)
+        #expect(dewpointAtZero.isFinite)
+        #expect(dewpointAtZero == Meteorology.dewpoint(temperature: 20, relativeHumidity: 1))
+    }
+
     @Test func windScale() {
         #expect(Meteorology.scaleWindFactor(from: 120, to: 130) == 1.008896)
         #expect(Meteorology.scaleWindFactor(from: 130, to: 120) == 0.9911824)

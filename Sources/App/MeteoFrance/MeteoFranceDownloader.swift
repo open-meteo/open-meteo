@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 import OmFileFormat
 import SwiftEccodes
+import OmFileIO
 
 /**
 Meteofrance Arome, Arpge downloader
@@ -55,6 +56,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try MeteoFranceDomain.load(rawValue: signature.domain)
@@ -92,18 +94,18 @@ struct MeteoFranceDownload: AsyncCommand {
         let useGribPackagesDownload = signature.useGribPackages && !domain.mfApiPackagesSurface.isEmpty
         let gribPackages: [String]? = signature.gribPackages.map{$0.split(separator: ",").map(String.init)}
 
-        try await downloadElevation2(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket)
-        let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
-        try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, packages: gribPackages) :
-        try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
+        try await downloadElevation2(application: context.application, domain: domain, run: run, uploadQueues: uploadQueues)
+        let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadQueues: uploadQueues) : useGribPackagesDownload ?
+        try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadQueues: uploadQueues, packages: gribPackages) :
+        try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadQueues: uploadQueues)
 
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadS3Bucket: String?) async throws {
+    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if domain == .arome_france_15min || domain == .arome_france_hd_15min || domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities {
@@ -133,7 +135,7 @@ struct MeteoFranceDownload: AsyncCommand {
         // try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         // message.dumpAttributes()
 
-        try await grib2d.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: false)
+        try await grib2d.array.data.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: false)
     }
 
     /// Temporarily keep those varibles to derive others
@@ -183,7 +185,7 @@ struct MeteoFranceDownload: AsyncCommand {
     /**
      Download statistical ensemble forecast. See https://github.com/open-meteo/open-meteo/issues/1069
      */
-    func downloadProbabilities(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadProbabilities(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -230,7 +232,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
                 }
                 let completed = i == timestamps.count - 1
-                return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
             }
         }
         await curl.printStatistics()
@@ -243,7 +245,7 @@ struct MeteoFranceDownload: AsyncCommand {
      - MF does not publish 15minutely data via GRIB packages
      - There is no GRIB inventory, so we have to download the entire GRIB file
      */
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, /*upperLevel: Bool,*/ useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?, packages: [String]?) async throws -> [GenericVariableHandle] {
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, /*upperLevel: Bool,*/ useGovServer: Bool, maxForecastHour: Int?, uploadQueues: [S3UploadQueue], packages: [String]?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = domain.timeoutHours
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
@@ -399,7 +401,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 validTimes.insert(writer.time)
             }
             let completed = packageTime == domain.mfApiPackageTimes.last
-            return try await writer.finalise(application: application, completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(validTimes).sorted(), uploadQueues: uploadQueues)
         }
         await curl.printStatistics()
         return handles
@@ -508,7 +510,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
 
     /// Download one field at a time
-    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [any MeteoFranceVariableDownloadable], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [any MeteoFranceVariableDownloadable], uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -581,7 +583,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
-            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            let handles = try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
             return handles
         }
         // await curl.printStatistics()

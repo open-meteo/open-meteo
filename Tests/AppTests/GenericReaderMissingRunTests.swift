@@ -49,7 +49,7 @@ import Vapor
         )
         let result = try await mapping.getReaders(lat: 45, lon: -75, elevation: .nan, mode: .nearest, options: options())
         #expect((result?.hourly != nil) == (localCoverage || !requirePrimaryCoverage))
-        #expect(mapping.singleDomain == nil)
+        #expect(mapping.gridForBoundingBoxRequests == nil)
     }
 
     @Test(arguments: [true, false])

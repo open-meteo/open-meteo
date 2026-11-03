@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 import SwiftNetCDF
 import OmFileFormat
+import OmFileIO
 
 /// Download CAMS Europe and Global air quality forecasts
 struct DownloadCamsCommand: AsyncCommand {
@@ -48,6 +49,7 @@ struct DownloadCamsCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         disableIdleSleep()
 
         let domain = try CamsDomain.load(rawValue: signature.domain)
@@ -83,8 +85,8 @@ struct DownloadCamsCommand: AsyncCommand {
             guard let ftppassword = signature.ftppassword else {
                 fatalError("ftppassword is required")
             }
-            let handles = try await downloadCamsGlobal(application: context.application, domain: domain, run: run, variables: variables, user: ftpuser, password: ftppassword, uploadS3Bucket: signature.uploadS3Bucket)
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+            let handles = try await downloadCamsGlobal(application: context.application, domain: domain, run: run, variables: variables, user: ftpuser, password: ftppassword, uploadQueues: uploadQueues)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
             return
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
@@ -92,28 +94,28 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             if let timeinterval = signature.timeinterval {
                 for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400) {
-                    let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: 24, concurrent: signature.concurrent ?? 1, uploadS3Bucket: nil)
-                    try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+                    let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: 24, concurrent: signature.concurrent ?? 1, uploadQueues: [])
+                    try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: false, uploadQueues: [], generateTimeSeries: !signature.skipTimeseries)
                 }
                 return
             }
-            let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: nil, concurrent: signature.concurrent ?? 1, uploadS3Bucket: signature.uploadS3Bucket)
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+            let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: nil, concurrent: signature.concurrent ?? 1, uploadQueues: uploadQueues)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
             return
         case .cams_global_greenhouse_gases:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
             let concurrent = signature.concurrent ?? 1
-            let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent, uploadS3Bucket: signature.uploadS3Bucket)
-            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: !signature.skipTimeseries)
+            let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent, uploadQueues: uploadQueues)
+            try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues, generateTimeSeries: !signature.skipTimeseries)
             return
         }
     }
 
     /// Download from the ECMWF CAMS ftp/http server
     /// This data is also available via the ADC API, but queue times are 4 hours!
-    func downloadCamsGlobal(application: Application, domain: CamsDomain, run: Timestamp, variables: [CamsVariable], user: String, password: String, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadCamsGlobal(application: Application, domain: CamsDomain, run: Timestamp, variables: [CamsVariable], user: String, password: String, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let logger = application.logger
 
@@ -169,7 +171,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 try await writer.write(member: 0, variable: variable, data: data)
             }
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return try await writer.finalise(application: application, completed: completed, validTimes: Array(timestamps[0...i]), uploadQueues: uploadQueues)
         }
         await curl.printStatistics()
         return handles
@@ -298,7 +300,7 @@ struct DownloadCamsCommand: AsyncCommand {
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, variables: [CamsVariable], cdskey: String, forecastHours: Int?, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, variables: [CamsVariable], cdskey: String, forecastHours: Int?, concurrent: Int, uploadQueues: [S3UploadQueue]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
@@ -342,7 +344,7 @@ struct DownloadCamsCommand: AsyncCommand {
                     }
                     try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }
-                return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+                return try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: uploadQueues)
             }
             handles.append(contentsOf: h)
         } catch CdsApiError.restrictedAccessToValidData {

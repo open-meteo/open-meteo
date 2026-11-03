@@ -23,6 +23,8 @@ RUN ENABLE_PARQUET=TRUE MARCH_SKYLAKE=TRUE swift build -c release
 # ================================
 FROM ghcr.io/open-meteo/docker-container-run:0.0.17
 
+ENV ICU_TIMEZONE_FILES_DIR=/usr/share/zoneinfo-icu/44/le
+
 # Create a openmeteo user and group with /app as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app openmeteo
 

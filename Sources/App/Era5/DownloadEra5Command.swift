@@ -1,3 +1,4 @@
+import OmFileIO
 import Foundation
 @preconcurrency import SwiftEccodes
 import Vapor
@@ -59,6 +60,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
         let domain = try CdsDomain.load(rawValue: signature.domain)
 
         let variables: [any GenericVariable]
@@ -78,20 +80,20 @@ struct DownloadEra5Command: AsyncCommand {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf, uploadS3Bucket: signature.uploadS3Bucket)
+        try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf, uploadQueues: uploadQueues)
 
         let concurrent = signature.concurrent ?? System.coreCount
 
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
-        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: uploadQueues)
     }
 
     /**
      Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
      */
-    func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain, createNetCdf: Bool, uploadS3Bucket: String?) async throws {
+    func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain, createNetCdf: Bool, uploadQueues: [S3UploadQueue]) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
@@ -195,7 +197,7 @@ struct DownloadEra5Command: AsyncCommand {
             try await client.shutdown()
         }
 
-        try await Self.processElevationLsmGrib(domain: domain, files: Array([tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted()), createNetCdf: createNetCdf, application: application, uploadS3Bucket: uploadS3Bucket)
+        try await Self.processElevationLsmGrib(domain: domain, files: Array([tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted()), createNetCdf: createNetCdf, application: application, uploadQueues: uploadQueues)
 
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {
@@ -206,7 +208,7 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
 
-    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, application: Application, uploadS3Bucket: String?) async throws {
+    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, application: Application, uploadQueues: [S3UploadQueue]) async throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
@@ -259,7 +261,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
         }
 
-        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadS3Bucket: uploadS3Bucket, createNetCdf: createNetCdf)
+        try await elevation.writeStaticOmFile(file: domain.surfaceElevationFileOm, grid: domain.grid, application: application, uploadQueues: uploadQueues, createNetCdf: createNetCdf)
     }
 
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [any GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {

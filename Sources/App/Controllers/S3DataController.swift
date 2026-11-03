@@ -428,9 +428,12 @@ struct S3DataController: RouteCollection {
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
         
-        for queue in await lazyReplicationQueues(req) {
+        let queues = await lazyReplicationQueues(req)
+        guard !queues.isEmpty else { return }
+        let handle = try Foundation.FileHandle(forReadingFrom: URL(fileURLWithPath: absolutePath))
+        for queue in queues {
             let session = queue.startMultiPartUploads()
-            await session.uploadMultipart(file: absolutePath, objectName: String(path.dropFirst(1)), lastModified: lastModified)
+            await session.uploadMultipart(data: handle, objectName: String(path.dropFirst(1)), lastModified: lastModified)
             await queue.finishMultiPartUploads(session)
         }
     }

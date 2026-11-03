@@ -209,53 +209,6 @@ public enum S3Uploader {
     }
 }
 
-/// Protocol of how a file can be chunked into 8 MB parts and upload as individual ByteBuffers. Unfortunately, `AsyncHTTPClient` only accepts ByteBuffers so a memory copy can not be avoided.
-public protocol S3UploadAble {
-    associatedtype ByteBufferSequence: AsyncSequence where ByteBufferSequence.Element == ByteBuffer, ByteBufferSequence: Sendable
-    func readChunks(chunkLength: ByteCount) -> ByteBufferSequence
-    
-    func getFileSize() async throws -> Int64
-}
-
-extension ReadFileHandle: S3UploadAble {
-    public func getFileSize() async throws -> Int64 {
-        return try await self.info().size
-    }
-}
-
-extension ByteBuffer: S3UploadAble {
-    public func getFileSize() async throws -> Int64 {
-        return Int64(self.readableBytes)
-    }
-    
-    public func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
-        let chunkSize = Int(chunkLength.bytes)
-        var copy = self
-        return AsyncStream { continuation in
-            while copy.readableBytes > 0 {
-                let slice = copy.readSlice(length: min(chunkSize, copy.readableBytes))!
-                continuation.yield(slice)
-            }
-            continuation.finish()
-        }
-    }
-}
-
-//extension Foundation.FileHandle: S3UploadAble {
-//    /// Note: Blocking implementation
-//    public func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
-//        let chunkSize = Int(chunkLength.bytes)
-//        return AsyncStream { continuation in
-//            while true {
-//                let data = self.readData(ofLength: chunkSize)
-//                if data.isEmpty { break }
-//                continuation.yield(ByteBuffer(bytes: data))
-//            }
-//            continuation.finish()
-//        }
-//    }
-//}
-
 extension String {
     /// Match a filename against a glob pattern supporting `*` (any sequence) and `?` (single character).
     /// E.g. `".*"`, `"*~"`, `"*_previous_day*"`
@@ -323,6 +276,7 @@ public struct S3MultiPartUploadPrepared: Sendable {
 }
 
 enum S3UploaderError: Error {
+    case unexpectedEndOfFile
     case missingUploadId
     case missingETag(partNumber: Int)
 }

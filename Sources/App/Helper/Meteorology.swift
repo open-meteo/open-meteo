@@ -247,7 +247,8 @@ enum Meteorology {
     @inlinable public static func dewpoint(temperature: Float, relativeHumidity: Float) -> Float {
         let β = Float(17.625)
         let λ = Float(243.04)
-        return λ * (log(relativeHumidity / 100) + ((β * temperature) / (λ + temperature))) / (β - log(relativeHumidity / 100) - ((β * temperature) / (λ + temperature)))
+        let rh = relativeHumidity == 0 ? Float(1) : relativeHumidity
+        return λ * (log(rh / 100) + ((β * temperature) / (λ + temperature))) / (β - log(rh / 100) - ((β * temperature) / (λ + temperature)))
     }
     
     /// Calculate relative humidity. All variables should be on the same level
