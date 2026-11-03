@@ -2,7 +2,7 @@ import Foundation
 import OmFileFormat
 
 /// CAMS Air quality domain definitions for Europe and global domains
-enum CamsDomain: String, GenericDomain, CaseIterable {
+enum CamsDomain: String, SyncGridDomain, CaseIterable {
     case cams_global
     case cams_global_greenhouse_gases
     case cams_europe
@@ -68,8 +68,23 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .cams_global:
+            return .cams_global
+        case .cams_global_greenhouse_gases:
+            return .cams_global_greenhouse_gases
+        case .cams_europe:
+            return .cams_europe
+        case .cams_europe_reanalysis_interim:
+            return .cams_europe_reanalysis_interim
+        case .cams_europe_reanalysis_validated:
+            return .cams_europe_reanalysis_validated
+        case .cams_europe_reanalysis_validated_pre2020:
+            return .cams_europe_reanalysis_validated_pre2020
+        case .cams_europe_reanalysis_validated_pre2018:
+            return .cams_europe_reanalysis_validated_pre2018
+        }
     }
 
     var masterTimeRange: Range<Timestamp>? {
@@ -100,23 +115,6 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: any Gridable {
-        switch self {
-        case .cams_global:
-            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
-        case .cams_global_greenhouse_gases:
-            return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
-        case .cams_europe:
-            // IMPORTANT: GRID is flipped! Therefore dy negative!
-            return RegularGrid(nx: 700, ny: 420, latMin: /*30.05*/ 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
-        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
-            return RegularGrid(nx: 700, ny: 420, latMin: 30.05 /*71.95*/, lonMin: -24.95, dx: 0.1, dy: 0.1)
-        case .cams_europe_reanalysis_validated_pre2020:
-            return RegularGrid(nx: 701, ny: 421, latMin: 30, lonMin: -25, dx: 0.1, dy: 0.1)
-        case .cams_europe_reanalysis_validated_pre2018:
-            return RegularGrid(nx: 701, ny: 401, latMin: 30, lonMin: -25, dx: 0.1, dy: 0.1)
-        }
-    }
 }
 
 /// Variables for CAMS. Some variables are not available in

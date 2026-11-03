@@ -87,7 +87,7 @@ import SwiftNetCDF
  FGLOALS: Raw 1.2 TB, Compressed 120 GB
  
  */
-enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
+enum Cmip6Domain: String, RawRepresentableString, CaseIterable, SyncGridDomain {
     case CMCC_CM2_VHR4
     // case FGOALS_f3_H_highresSST
     case FGOALS_f3_H
@@ -205,8 +205,23 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .CMCC_CM2_VHR4:
+            return .cmip_CMCC_CM2_VHR4
+        case .FGOALS_f3_H:
+            return .cmip_FGOALS_f3_H
+        case .HiRAM_SIT_HR:
+            return .cmip_HiRAM_SIT_HR
+        case .MRI_AGCM3_2_S:
+            return .cmip_MRI_AGCM3_2_S
+        case .EC_Earth3P_HR:
+            return .cmip_EC_Earth3P_HR
+        case .MPI_ESM1_2_XR:
+            return .cmip_MPI_ESM1_2_XR
+        case .NICAM16_8S:
+            return .cmip_NICAM16_8S
+        }
     }
 
     var masterTimeRange: Range<Timestamp>? {
@@ -230,29 +245,6 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     /// true if feb 29 is missing
     var needsLeapYearFix: Bool {
         return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H /*|| self == .FGOALS_f3_H_highresSST*/
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .CMCC_CM2_VHR4:
-            return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180 / 768)
-        case .FGOALS_f3_H:
-           // fallthrough
-        // case .FGOALS_f3_H_highresSST:
-            return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .HiRAM_SIT_HR:
-            return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360 / 1536, dy: 180 / 768)
-        case .MRI_AGCM3_2_S:
-            return RegularGrid(nx: 1920, ny: 960, latMin: -90, lonMin: -180, dx: 0.1875, dy: 0.1875)
-        case .EC_Earth3P_HR:
-            return RegularGrid(nx: 1024, ny: 512, latMin: -90, lonMin: -180, dx: 360 / 1024, dy: 180 / 512)
-        // case .HadGEM3_GC31_HM:
-        //    return RegularGrid(nx: 1024, ny: 768, latMin: -90, lonMin: -180, dx: 360/1024, dy: 180/768)
-        case .MPI_ESM1_2_XR:
-            return RegularGrid(nx: 768, ny: 384, latMin: -90, lonMin: -180, dx: 360 / 768, dy: 180 / 384)
-        case .NICAM16_8S:
-            return RegularGrid(nx: 1280, ny: 640, latMin: -90, lonMin: -180, dx: 360 / 1280, dy: 180 / 640)
-        }
     }
 
     var versionOrography: (altitude: String, landmask: String)? {

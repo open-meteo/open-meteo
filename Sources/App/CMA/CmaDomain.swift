@@ -6,15 +6,8 @@ import Foundation
  
  No mesoscale model yet, only global
  */
-enum CmaDomain: String, GenericDomain, CaseIterable {
+enum CmaDomain: String, SyncGridDomain, CaseIterable {
     case grapes_global
-
-    var grid: any Gridable {
-        switch self {
-        case .grapes_global:
-            return RegularGrid(nx: 2880, ny: 1440, latMin: -89.9375, lonMin: -180, dx: 0.125, dy: 0.125)
-        }
-    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -27,9 +20,7 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
         return 1
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .cma_grapes_global }
 
     var dtSeconds: Int {
         return 3 * 3600

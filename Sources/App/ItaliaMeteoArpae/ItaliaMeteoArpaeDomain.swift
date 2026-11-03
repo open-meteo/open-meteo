@@ -1,14 +1,7 @@
 import Foundation
 
-enum ItaliaMeteoArpaeDomain: String, GenericDomain, CaseIterable {
+enum ItaliaMeteoArpaeDomain: String, SyncGridDomain, CaseIterable {
     case icon_2i
-
-    var grid: any Gridable {
-        switch self {
-        case .icon_2i:
-            return RegularGrid(nx: 761, ny: 761, latMin: 33.7, lonMin: 3, dx: 0.025, dy: 0.02)
-        }
-    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -17,9 +10,7 @@ enum ItaliaMeteoArpaeDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .italia_meteo_arpae_icon_2i }
 
     var dtSeconds: Int {
         switch self {

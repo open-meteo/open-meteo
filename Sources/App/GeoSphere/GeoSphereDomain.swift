@@ -5,7 +5,7 @@ import Vapor
 /// GeoSphere Austria regional models
 /// AROME 2.5km: https://data.hub.geosphere.at/dataset/nwp-v1-1h-2500m (discontinued on 4 November 2026)
 /// C-LAEF AlpeAdria 1km (deterministic control run): https://data.hub.geosphere.at/dataset/nwp-v2-1h-1km
-enum GeoSphereDomain: String, GenericDomain, CaseIterable {
+enum GeoSphereDomain: String, SyncGridDomain, CaseIterable {
     case arome_austria
     case claef_austria
 
@@ -18,9 +18,7 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .geosphere_arome_austria }
 
     var countEnsembleMember: Int {
         return 1
@@ -53,17 +51,6 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
     /// 60h forecast + 2 days buffer
     var omFileLength: Int {
         return 108
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .arome_austria:
-            // lon=594, lat=492, south-to-north
-            return RegularGrid(nx: 594, ny: 492, latMin: 42.981, lonMin: 5.498, dx: 0.028, dy: 0.018)
-        case .claef_austria:
-            // lon=1300, lat=945; the files are north-to-south and flipped on download
-            return RegularGrid(nx: 1300, ny: 945, latitude: 43.002...51.498, longitude: 5.0317...22.5682)
-        }
     }
 
     var updateIntervalSeconds: Int {
