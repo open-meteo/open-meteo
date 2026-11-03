@@ -3,8 +3,8 @@ set -euo pipefail
 
 # ICU's little-endian resources support the production x86_64 and arm64 targets.
 # Update the version, immutable commit and checksums together.
-version=2026e
-revision=bae5ca647fa41703393dbf00240ec1b807a9c353
+version=2026f
+revision=6eac2f4d349d9f4a0825103bb41845d8e5ab7add
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 destination=${1:?Usage: prepare-icu-tzdata.sh DESTINATION}
 mkdir -p "$destination"
