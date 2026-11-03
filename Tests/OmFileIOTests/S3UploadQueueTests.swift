@@ -1,3 +1,6 @@
+import Foundation
+import NIOCore
+import OmFileFormat
 import AsyncHTTPClient
 import Synchronization
 import Testing
@@ -6,6 +9,65 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct S3UploadQueueTests {
     enum Failure: Error { case injected }
+
+    @Test(arguments: ["", "temporary forecast data"])
+    func unlinkedTemporaryFileSupportsIndependentUploadReaders(contents: String) async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: "\(path)~") }
+        let expected = Array(contents.utf8)
+        func prepareChunks() throws -> FileHandle.ByteBufferSequence {
+            let file = try FileHandle.createNewFile(file: path, temporary: true)
+            if !file.wasDeleted() {
+                try FileManager.default.removeItem(atPath: "\(path)~")
+            }
+            try file.write(contentsOf: Data(expected))
+            #expect(file.wasDeleted())
+            return file.readChunks(chunkLength: .bytes(3))
+        }
+        // Only the sequence now retains the file handle.
+        let chunks = try prepareChunks()
+        #expect(!FileManager.default.fileExists(atPath: path))
+        #expect(!FileManager.default.fileExists(atPath: "\(path)~"))
+        try await withThrowingTaskGroup(of: [UInt8].self) { group in
+            for _ in 0..<2 {
+                group.addTask {
+                    var bytes: [UInt8] = []
+                    for try await chunk in chunks {
+                        #expect(chunk.readableBytes <= 3)
+                        bytes.append(contentsOf: chunk.readableBytesView)
+                    }
+                    return bytes
+                }
+            }
+            for try await bytes in group {
+                #expect(bytes == expected)
+            }
+        }
+    }
+
+    @Test func reusedUploadBufferPreservesRetainedChunks() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: "\(path)~") }
+        let file = try FileHandle.createNewFile(file: path, temporary: true)
+        try file.write(contentsOf: Data("abcdefgh".utf8))
+        var retained: [ByteBuffer] = []
+        for try await chunk in file.readChunks(chunkLength: .bytes(3)) {
+            retained.append(chunk)
+        }
+        #expect(retained.map { String(decoding: $0.readableBytesView, as: UTF8.self) } == ["abc", "def", "gh"])
+    }
+
+    @Test func uploadReaderReportsUnexpectedEndOfFile() async throws {
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: "\(path)~") }
+        let file = try FileHandle.createNewFile(file: path, temporary: true)
+        try file.write(contentsOf: Data("forecast".utf8))
+        let chunks = file.readChunks(chunkLength: .bytes(3))
+        try file.truncate(atOffset: 2)
+        await #expect(throws: S3UploaderError.self) {
+            for try await _ in chunks {}
+        }
+    }
 
     @Test func immediateCommitDoesNotWaitForOtherFilesOrSessionCompletion() async {
         let failures = Atomic<Int>(0)

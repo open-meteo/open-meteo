@@ -98,6 +98,8 @@ let package = Package(
             dependencies: [
                 //.product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "OmFileFormat", package: "om-file-format"),
                 .product(name: "Vapor", package: "vapor"),

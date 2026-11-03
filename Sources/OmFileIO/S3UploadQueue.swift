@@ -111,7 +111,7 @@ public struct S3MultiFileUploadQueue: Sendable {
         self.endpoint = endpoint
     }
     
-    func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
+    public func uploadMultipart<Data: S3UploadAble & Sendable>(data: Data, objectName: String, contentType: String = "application/octet-stream", lastModified: Timestamp) async {
         await queue.enqueueIgnoreError(logger: Logger(label: "Multipart Uploader")) {
             try await S3Uploader.uploadMultipart(client: client, data: data, url: endpoint.uploadURL(remotePath: objectName), contentType: contentType, lastModified: lastModified, executor: partUploadExecutor)
         }
