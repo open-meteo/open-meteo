@@ -14,6 +14,9 @@ RUN ENABLE_PARQUET=TRUE swift package resolve
 # Copy entire repo into container
 COPY . .
 
+# Pin ICU timezone data independently of the Swift runtime.
+RUN bash build/prepare-icu-tzdata.sh /build/icu-tzdata
+
 # Compile with optimizations
 RUN ENABLE_PARQUET=TRUE MARCH_SKYLAKE=TRUE swift build -c release
 
@@ -22,6 +25,8 @@ RUN ENABLE_PARQUET=TRUE MARCH_SKYLAKE=TRUE swift build -c release
 # Run image contains swift runtime libraries, netcdf, eccodes, cdo and cds utilities
 # ================================
 FROM ghcr.io/open-meteo/docker-container-run:0.0.17
+
+COPY --from=build /build/icu-tzdata/ /usr/share/openmeteo-api/icu-tzdata/
 
 # Create a openmeteo user and group with /app as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app openmeteo
