@@ -103,9 +103,7 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url.prefix { $0 != "?" })")
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
         do {
-            let scheduler = await server.downloadScheduler(for: serverUrl)
-            let job = RemoteDownloadJob.current ?? RemoteDownloadJob(priority: .foreground)
-            let buffer = try await HTTPClient.sharedRemoteData.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff, scheduling: (scheduler, job))
+            let buffer = try await HTTPClient.sharedRemoteData.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
             lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
             return buffer
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {

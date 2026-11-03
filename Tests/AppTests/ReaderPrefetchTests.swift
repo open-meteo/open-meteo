@@ -52,33 +52,31 @@ private final class PrefetchRecordingBackend: OmFileReaderBackend, Sendable {
         }
     }
 
-    @Test(arguments: [false, true])
-    func responseKeepsNormalPrefetchSeparate(prefetch: Bool) async throws {
+    @Test(arguments: [false, true], [false, true])
+    func responseKeepsNormalPrefetchSeparate(prefetch: Bool, remoteEnabled: Bool) async throws {
         let calls = Mutex((remote: 0, local: 0))
-        let remoteEnabled = OpenMeteo.remoteDataDirectory != nil
         let provider = DummyDataProvider(onPrefetch: { variables in
             switch ReaderPrefetchPolicy.current {
             case .remoteOnly:
                 #expect(!OmReaderPrefetch.pageInPayload)
-                #expect(OmReaderPrefetch.remotePriority == .foreground)
                 #expect(variables.count == 1)
                 calls.withLock {
-                    #expect($0.local == 0)
                     $0.remote += 1
                 }
-            case .all:
+            case .all, .localOnly:
+                #expect(ReaderPrefetchPolicy.current == (remoteEnabled ? .localOnly : .all))
                 #expect(OmReaderPrefetch.pageInPayload)
                 #expect(prefetch)
                 #expect(variables.count == 8)
                 calls.withLock {
-                    #expect($0.remote == (remoteEnabled ? 8 : 0))
                     $0.local += 1
                 }
             }
         })
         let result = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1, firstLocation: provider)
-        let response = try await result.response(format: .json(fixedGenerationTime: 0), prefetch: prefetch, logger: .init(label: "test"))
+        let response = try await result.response(format: .json(fixedGenerationTime: 0), prefetch: prefetch, logger: .init(label: "test"), remoteEnabled: remoteEnabled)
         #expect(calls.withLock { $0.local } == (prefetch ? 1 : 0))
+        // Discovery must finish before response consumption starts.
         #expect(calls.withLock { $0.remote } == (remoteEnabled ? 8 : 0))
         try await withApp { app in
             _ = try await response.body.collect(on: app.eventLoopGroup.next()).get()
@@ -86,103 +84,26 @@ private final class PrefetchRecordingBackend: OmFileReaderBackend, Sendable {
         #expect(calls.withLock { $0.local } == (prefetch ? 1 : 0))
         #expect(calls.withLock { $0.remote } == (remoteEnabled ? 8 : 0))
         #expect(ReaderPrefetchPolicy.current == .all)
-        #expect(OmReaderPrefetch.remotePriority == .background)
-    }
-
-    @Test
-    func normalPrefetchRemainsSequentialPerLocation() async throws {
-        let state = Mutex((order: [Int](), active: 0))
-        let template = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1)
-        let locations = (0..<3).map { index in
-            let provider = DummyDataProvider(onPrefetch: { variables in
-                guard ReaderPrefetchPolicy.current == .all else { return }
-                #expect(variables.count == 8)
-                state.withLock {
-                    $0.order.append(index)
-                    $0.active += 1
-                    #expect($0.active == 1)
-                }
-                await Task.yield()
-                state.withLock { $0.active -= 1 }
-            })
-            let location = template.results[0]
-            return ForecastapiResult<DummyDataProvider>.PerLocation(
-                timezone: location.timezone, time: location.time, locationId: index, results: [provider])
-        }
-        let result = ForecastapiResult<DummyDataProvider>(
-            timeformat: template.timeformat, results: locations,
-            currentVariables: template.variables.currentVariables, minutely15Variables: nil,
-            hourlyVariables: template.variables.hourlyVariables, dailyVariables: template.variables.dailyVariables,
-            weeklyVariables: nil, monthlyVariables: template.variables.monthlyVariables)
-        _ = try await result.response(format: .json(fixedGenerationTime: 0), prefetch: true, logger: .init(label: "test"))
-        #expect(state.withLock { $0.order } == [0, 1, 2])
-        #expect(state.withLock { $0.active } == 0)
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func slowCoordinateDoesNotHoldBackLaterCoordinates() async throws {
-        let state = Mutex((started: Set<Int>(), active: 0, maximum: 0))
-        let (gate, release) = AsyncStream<Void>.makeStream()
-        defer { release.finish() }
+    func preloadMapsVariablesAcrossAllCoordinatesWithoutBatchBarrier() async throws {
+        let started = Mutex([(coordinate: Int, variable: String)]())
+        let (firstCoordinate, releaseFirst) = AsyncStream<Void>.makeStream()
+        let (slowVariable, releaseSlow) = AsyncStream<Void>.makeStream()
+        defer { releaseFirst.finish(); releaseSlow.finish() }
+        let names = ["temperature_2m", "temperature_500hPa", "wind_speed_850hPa"]
         let template = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1)
         let locations = (0..<25).map { index in
             let provider = DummyDataProvider(onPrefetch: { variables in
                 #expect(ReaderPrefetchPolicy.current == .remoteOnly)
-                state.withLock {
-                    $0.started.insert(index)
-                    $0.active += 1
-                    $0.maximum = max($0.maximum, $0.active)
+                #expect(variables.count == 1)
+                let variable = try #require(variables.hourlyVariables?.first?.rawValue)
+                started.withLock { $0.append((index, variable)) }
+                if index == 0 {
+                    for await _ in firstCoordinate {}
+                    if variable == names[0] { for await _ in slowVariable {} }
                 }
-                defer { state.withLock { $0.active -= 1 } }
-                if index == 0 && variables.currentVariables?.first?.rawValue == "temperature_2m" {
-                    for await _ in gate {}
-                }
-            })
-            let location = template.results[0]
-            return ForecastapiResult<DummyDataProvider>.PerLocation(
-                timezone: location.timezone, time: location.time, locationId: index, results: [provider])
-        }
-        let result = ForecastapiResult<DummyDataProvider>(
-            timeformat: template.timeformat, results: locations,
-            currentVariables: template.variables.currentVariables, minutely15Variables: nil,
-            hourlyVariables: template.variables.hourlyVariables, dailyVariables: template.variables.dailyVariables,
-            weeklyVariables: template.variables.dailyVariables, monthlyVariables: template.variables.monthlyVariables)
-        let prefetch = Task { try await result.preloadRemoteLocations(logger: .init(label: "test"), concurrency: 4) }
-        do {
-            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-            while state.withLock({ $0.started.count }) < 25 {
-                try #require(ContinuousClock.now < deadline, "Later coordinates waited for the first batch")
-                try await Task.sleep(for: .milliseconds(10))
-            }
-            #expect(state.withLock { $0.maximum } <= 4)
-            #expect(state.withLock { $0.active } >= 1)
-            release.finish()
-            try await prefetch.value
-            #expect(state.withLock { $0.active } == 0)
-        } catch {
-            release.finish()
-            prefetch.cancel()
-            _ = await prefetch.result
-            throw error
-        }
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func variablesWithinCoordinateTakePriority() async throws {
-        let state = Mutex((coordinates: [Int](), active: 0, maximum: 0))
-        let (gate, release) = AsyncStream<Void>.makeStream()
-        defer { release.finish() }
-        let template = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1)
-        let locations = (0..<2).map { index in
-            let provider = DummyDataProvider(onPrefetch: { variables in
-                #expect(variables.hourlyVariables?.count == 1)
-                state.withLock {
-                    $0.coordinates.append(index)
-                    $0.active += 1
-                    $0.maximum = max($0.maximum, $0.active)
-                }
-                defer { state.withLock { $0.active -= 1 } }
-                for await _ in gate {}
             })
             let location = template.results[0]
             return ForecastapiResult<DummyDataProvider>.PerLocation(
@@ -191,24 +112,29 @@ private final class PrefetchRecordingBackend: OmFileReaderBackend, Sendable {
         let result = ForecastapiResult<DummyDataProvider>(
             timeformat: template.timeformat, results: locations,
             currentVariables: nil, minutely15Variables: nil,
-            hourlyVariables: ["temperature_2m", "temperature_500hPa", "wind_speed_850hPa", "relative_humidity_700hPa", "precipitation"].compactMap(ForecastVariable.init(rawValue:)),
+            hourlyVariables: names.compactMap(ForecastVariable.init(rawValue:)),
             dailyVariables: nil, weeklyVariables: nil, monthlyVariables: nil)
         let prefetch = Task { try await result.preloadRemoteLocations(logger: .init(label: "test"), concurrency: 3) }
         do {
             let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-            while state.withLock({ $0.coordinates.count }) < 3 {
+            while started.withLock({ $0.count }) < 3 {
                 try #require(ContinuousClock.now < deadline, "Variables within a coordinate were serialized")
-                try await Task.sleep(for: .milliseconds(10))
+                try await Task.sleep(for: .milliseconds(1))
             }
-            #expect(state.withLock { $0.coordinates } == [0, 0, 0])
-            release.finish()
+            #expect(started.withLock { $0.map(\.coordinate) } == [0, 0, 0])
+            releaseFirst.finish()
+            while started.withLock({ $0.count }) < locations.count * names.count {
+                try #require(ContinuousClock.now < deadline, "Later coordinates waited for the slow variable")
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            releaseSlow.finish()
             try await prefetch.value
-            #expect(state.withLock { $0.coordinates.filter { $0 == 0 }.count } == 5)
-            #expect(state.withLock { $0.coordinates.filter { $0 == 1 }.count } == 5)
-            #expect(state.withLock { $0.maximum } == 3)
-            #expect(state.withLock { $0.active } == 0)
+            for coordinate in locations.indices {
+                #expect(started.withLock { $0.filter { $0.coordinate == coordinate }.map(\.variable).sorted() } == names.sorted())
+            }
         } catch {
-            release.finish()
+            releaseFirst.finish()
+            releaseSlow.finish()
             prefetch.cancel()
             _ = await prefetch.result
             throw error

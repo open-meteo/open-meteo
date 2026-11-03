@@ -42,8 +42,7 @@ final class OmFileSystemManager: Sendable {
             OmFileSystemS3(server: S3ServerHealth(
                 logger: .init(label: "RemoteData"),
                 servers: $0,
-                downloadLimit: RemoteDataHttpClientLifecycle.positiveLimit("REMOTE_DATA_DOWNLOADS", default: 32),
-                backgroundDownloadLimit: RemoteDataHttpClientLifecycle.positiveLimit("REMOTE_DATA_BACKGROUND_DOWNLOADS", default: 4)
+                preloadExecutor: ReaderPrefetchPolicy.executor
             ))
         }
     }
@@ -103,14 +102,15 @@ final class OmFileSystemManager: Sendable {
         return nil
     }
     
-    func with<R, Key: OmFileManagable>(file: Key, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+    func with<R, Key: OmFileManagable>(file: Key, localOnly: Bool = false, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+        try RemotePreloadSession.current?.checkActive()
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getFile(fullPath: path) {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
             return try await fn(payload)
         }
-        guard !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
+        guard !localOnly, !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
             return nil
         }
         /// Check for remote file
@@ -155,7 +155,8 @@ final class OmFileSystemManager: Sendable {
 extension OmFileSystemManager {
     /// Resolve the variable directory once and retain its copy-on-write file indexes.
     /// Returns nil when neither an accessible local nor remote directory exists.
-    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int) async throws -> SeriesDirectory? {
+    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int, localOnly: Bool = false) async throws -> SeriesDirectory? {
+        try RemotePreloadSession.current?.checkActive()
         // The common case reuses the variable string without allocating a path.
         var name = variable
         if previousDay > 0 {
@@ -172,7 +173,7 @@ extension OmFileSystemManager {
             .getDirectory(name: name)?
             .getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
-        if !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
+        if !localOnly, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
             remote = try await remoteFileSystem.getRoot()
                 .getDirectory(name: "data")?
                 .getDirectory(name: domain.rawValue)?
@@ -236,6 +237,7 @@ extension OmFileSystemManager {
         case remote(OmFileSystemS3.FileWithContext)
         
         func with<R, Key: OmFileManagable>(payloadType: Key.Type, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+            try RemotePreloadSession.current?.checkActive()
             switch self {
             case .local(let file):
                 return try await fn(file.getPayload(ofType: Key.Payload.self))

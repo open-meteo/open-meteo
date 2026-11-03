@@ -61,6 +61,7 @@ public struct OmFileSystemS3: Sendable {
                 guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: false) else {
                     return nil
                 }
+                try RemotePreloadSession.current?.checkActive()
                 return try await fn(payload)
             } catch CurlError.fileNotFound {
                 await file.receivedObjectDeletedError()
@@ -70,6 +71,7 @@ public struct OmFileSystemS3: Sendable {
                     return nil
                 }
                 /// Catch error again? If there would a file modified error again, this could indicate some remote server issues
+                try RemotePreloadSession.current?.checkActive()
                 return try await fn(payload)
             }
         }
@@ -92,13 +94,13 @@ public struct OmFileSystemS3: Sendable {
             case none
             
             /// Payload is currently initialising. Consecutive requets are queued
-            case initialising([CheckedContinuation<any OmRemotePayload, Error>])
+            case initialising(PayloadWaiters)
             
             /// Payload got initialised and should be in sync with remote server
             case ready(any OmRemotePayload)
             
             /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload, but keep the old payload
-            case updating(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
+            case updating(old: any OmRemotePayload, PayloadWaiters)
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
             case deleted
@@ -106,6 +108,28 @@ public struct OmFileSystemS3: Sendable {
             /// An error occurred while initialising the payload. This could also contains unrecoverable network errors, corrupted file errors, file not found, modified errors and others.
             /// Errors are cleared every minute
             case error(Error, Timestamp)
+        }
+
+        /// One completion per initialization or replacement, accessed only on this file actor.
+        /// Waiters retain the completion, not a snapshot of the file's mutable state.
+        private final class PayloadWaiters {
+            private var result: Result<any OmRemotePayload, Error>?
+            private var continuations: [CheckedContinuation<any OmRemotePayload, Error>] = []
+
+            func append(_ continuation: CheckedContinuation<any OmRemotePayload, Error>) {
+                if let result {
+                    continuation.resume(with: result)
+                } else {
+                    continuations.append(continuation)
+                }
+            }
+
+            func finish(_ result: Result<any OmRemotePayload, Error>) {
+                self.result = result
+                let queued = continuations
+                continuations.removeAll()
+                for continuation in queued { continuation.resume(with: result) }
+            }
         }
 
         /// Cancellation and stale remote metadata are not terminal payload
@@ -158,17 +182,20 @@ public struct OmFileSystemS3: Sendable {
             self.eTag = eTag
             switch payload {
             case .ready(let old):
-                payload = .updating(old: old, [])
+                payload = .updating(old: old, PayloadWaiters())
                 do {
                     let file = makeCachedClient(context: context)
-                    let new = try await old.remoteUpdated(file: file)
+                    // Shared metadata must finish even if the initiating preload stops.
+                    let new = try await Task {
+                        try await RemotePreloadSession.$current.withValue(nil) {
+                            try await old.remoteUpdated(file: file)
+                        }
+                    }.value
                     guard case .updating(_, let queued) = payload else {
                         fatalError("State was not .updating()")
                     }
                     self.payload = .ready(new)
-                    queued.forEach {
-                        $0.resume(with: .success(new))
-                    }
+                    queued.finish(.success(new))
                     await new.remotePublished()
                 } catch {
                     guard case .updating(_, let queued) = payload else {
@@ -179,9 +206,7 @@ public struct OmFileSystemS3: Sendable {
                     } else {
                         self.payload = .error(error, .now())
                     }
-                    queued.forEach({
-                        $0.resume(throwing: error)
-                    })
+                    queued.finish(.failure(error))
                 }
             case .error(_, _), .deleted:
                 /// Old payload had an error. Just reset state
@@ -214,27 +239,29 @@ public struct OmFileSystemS3: Sendable {
             }
             switch payload {
             case .none:
-                self.payload = .initialising([])
+                self.payload = .initialising(PayloadWaiters())
                 do {
-                    let p: T
-                    if receivedFileModifiedError {
-                        // File modified errors can happen if the S3 listing is already outdated the first time the file is retrieved
-                        let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
-                        context.logger.warning("Initial s3 file open but received file modified error for \(objectName) [Old size: \(self.contentLength), new size: \(newReader.count), old etag: \(self.eTag), new etag: \(newReader.eTag), old lastModified: \(self.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), new lastModified: \(newReader.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), delta: \(Double(newReader.lastModified.timeIntervalSince1970 - lastModified.timeIntervalSince1970).asSecondsPrettyPrint)]")
-                        self.contentLength = newReader.count
-                        self.lastModified = newReader.lastModified
-                        self.eTag = newReader.eTag
-                        p = try await T(file: newReader)
-                    } else {
-                        p = try await T(file: makeCachedClient(context: context))
-                    }
+                    // The payload and its queued callers outlive any initiating preload.
+                    let p: T = try await Task {
+                        try await RemotePreloadSession.$current.withValue(nil) {
+                            if receivedFileModifiedError {
+                                // File modified errors can happen if the S3 listing is already outdated the first time the file is retrieved
+                                let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
+                                context.logger.warning("Initial s3 file open but received file modified error for \(objectName) [Old size: \(self.contentLength), new size: \(newReader.count), old etag: \(self.eTag), new etag: \(newReader.eTag), old lastModified: \(self.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), new lastModified: \(newReader.lastModified.iso8601_YYYY_MM_dd_HH_mm_ss), delta: \(Double(newReader.lastModified.timeIntervalSince1970 - lastModified.timeIntervalSince1970).asSecondsPrettyPrint)]")
+                                self.contentLength = newReader.count
+                                self.lastModified = newReader.lastModified
+                                self.eTag = newReader.eTag
+                                return try await T(file: newReader)
+                            } else {
+                                return try await T(file: makeCachedClient(context: context))
+                            }
+                        }
+                    }.value
                     guard case .initialising(let queued) = payload else {
                         fatalError("State was not .initialising()")
                     }
                     self.payload = .ready(p)
-                    queued.forEach {
-                        $0.resume(with: .success(p))
-                    }
+                    queued.finish(.success(p))
                     return p
                 } catch {
                     guard case .initialising(let queued) = payload else {
@@ -246,16 +273,14 @@ public struct OmFileSystemS3: Sendable {
                     } else {
                         self.payload = .error(error, .now())
                     }
-                    queued.forEach({
-                        $0.resume(throwing: error)
-                    })
+                    queued.finish(.failure(error))
                     throw error
                 }
             case .initialising(let queue):
                 OmFileSystemMetrics.fileRemotePayloadWaiting.add(1, ordering: .relaxed)
                 defer { OmFileSystemMetrics.fileRemotePayloadWaiting.add(-1, ordering: .relaxed) }
                 return try await withCheckedThrowingContinuation { continuation in
-                    payload = .initialising(queue + [continuation])
+                    queue.append(continuation)
                 } as? T
             case .updating(let old, let queue):
                 // If the file is actively being updated, allow access to the old file, because cached responses still work
@@ -264,7 +289,7 @@ public struct OmFileSystemS3: Sendable {
                     OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.add(1, ordering: .relaxed)
                     defer { OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.add(-1, ordering: .relaxed) }
                     let payload = try await withCheckedThrowingContinuation { continuation in
-                        self.payload = .updating(old: old, queue + [continuation])
+                        queue.append(continuation)
                     }
                     guard let payload = payload as? T else {
                         fatalError("Payload was not of correct type \(T.self)")
@@ -284,20 +309,22 @@ public struct OmFileSystemS3: Sendable {
                 }
                 // Old file got modified, we have to download it from the remote server again
                 // At this stage there could be dozens of failing calls coming in
-                self.payload = .updating(old: payload, [])
+                self.payload = .updating(old: payload, PayloadWaiters())
                 do {
-                    let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
-                    self.contentLength = newReader.count
-                    self.lastModified = newReader.lastModified
-                    self.eTag = newReader.eTag
-                    let new = try await payload.remoteUpdated(file: newReader)
+                    let new = try await Task {
+                        try await RemotePreloadSession.$current.withValue(nil) {
+                            let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
+                            self.contentLength = newReader.count
+                            self.lastModified = newReader.lastModified
+                            self.eTag = newReader.eTag
+                            return try await payload.remoteUpdated(file: newReader)
+                        }
+                    }.value
                     guard case .updating(old: _, let queued) = self.payload else {
                         fatalError("State was not .updating()")
                     }
                     self.payload = .ready(new)
-                    queued.forEach({
-                        $0.resume(returning: new)
-                    })
+                    queued.finish(.success(new))
                     await new.remotePublished()
                     return new
                 } catch {
@@ -309,9 +336,7 @@ public struct OmFileSystemS3: Sendable {
                     } else {
                         self.payload = .error(error, .now())
                     }
-                    queued.forEach({
-                        $0.resume(throwing: error)
-                    })
+                    queued.finish(.failure(error))
                     throw error
                 }
             case .deleted:

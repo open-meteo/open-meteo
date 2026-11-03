@@ -1,5 +1,6 @@
 @testable import OmFileIO
 import Foundation
+import Synchronization
 import Testing
 import Vapor
 import AsyncHTTPClient
@@ -13,6 +14,62 @@ import Darwin
 #endif
 
 @Suite(.serialized) struct DownloaderTests {
+    @Test(.timeLimit(.minutes(1)))
+    func speculativeHTTPReleasesCapacityDuringBackoffAndPromotesRetry() async throws {
+        let app = try await Application.make(.testing)
+        let attempts = Atomic<Int>(0)
+        let admission = RemoteHTTPAdmission(concurrency: 1, warmingConcurrency: 1)
+        let owner = RemotePreloadSession(admission: admission, concurrency: 1)
+        let job = RemotePayloadDownload(owner: owner)
+        do {
+            app.get("retry") { _ -> Response in
+                let attempt = attempts.wrappingAdd(1, ordering: .relaxed).newValue
+                return Response(status: attempt == 1 ? .internalServerError : .ok, body: .init(string: "payload"))
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let download = Task { @Sendable in
+                try await RemotePayloadDownload.$current.withValue(job) {
+                    try await HTTPClient.shared.executeRetryAndCollect(
+                        .init(url: "http://127.0.0.1:\(port)/retry"), logger: .init(label: "retry-test"), upTo: 100,
+                        backOffSettings: .init(factor: .seconds(1), maximum: .seconds(1)))
+                }
+            }
+            let blocker = RemotePayloadDownload(owner: RemotePreloadSession(admission: admission, concurrency: 1))
+            do {
+                let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+                while true {
+                    let active = await admission.snapshot.activeRequests
+                    if attempts.load(ordering: .relaxed) == 1 && active == 0 { break }
+                    try #require(ContinuousClock.now < deadline)
+                    try await Task.sleep(for: .milliseconds(1))
+                }
+                #expect(try await admission.acquire(blocker))
+                while await admission.snapshot.queuedRequests != 1 {
+                    try #require(ContinuousClock.now < deadline)
+                    try await Task.sleep(for: .milliseconds(1))
+                }
+                await job.promote()
+                let bytes = try await download.value
+                #expect(String(buffer: bytes) == "payload")
+                #expect(attempts.load(ordering: .relaxed) == 2)
+                #expect(await admission.snapshot.activeRequests == 1)
+                await admission.release(blocker)
+            } catch {
+                download.cancel()
+                await admission.release(blocker)
+                _ = await download.result
+                throw error
+            }
+            await app.http.server.shared.shutdown()
+            try await app.asyncShutdown()
+        } catch {
+            await app.http.server.shared.shutdown()
+            try await app.asyncShutdown()
+            throw error
+        }
+    }
+
     @Test func chunkedDownloadUsesListingMetadataWithoutHead() async throws {
         let client = HTTPClient(eventLoopGroupProvider: .singleton)
         defer { let _ = client.shutdown() }

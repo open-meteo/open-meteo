@@ -120,14 +120,13 @@ public extension HTTPClient {
     /**
      Retry HTTP requests on error. Map the HTTPClientResponse with a given closure. If the closure throws an error, it be retried as well
      */
-    func executeMapRetry<T: Sendable>(_ request: HTTPClientRequest,
+    func executeMapRetry<T>(_ request: HTTPClientRequest,
         logger: Logger,
         deadline: Date = .minutes(60),
         timeoutPerRequest: TimeAmount = .seconds(30),
         backOffSettings: ExponentialBackOff = .init(),
         error404WaitTime: TimeAmount? = nil,
-        scheduling: (scheduler: RemoteDownloadScheduler, job: RemoteDownloadJob)? = nil,
-        _ body: @escaping @Sendable (HTTPClientResponse) async throws -> T
+        _ body: @escaping (HTTPClientResponse) async throws -> T
     ) async throws -> T {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
@@ -152,35 +151,46 @@ public extension HTTPClient {
         
         while true {
             do {
+                try _Concurrency.Task.checkCancellation()
                 n += 1
-                let attempt = n
-                let operation: @Sendable () async throws -> T = {
-                    var request = request
-                    request.url = url
-                    if let user, let password {
-                        // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                        if schema == "s3" {
-                            let signer = AWSSigner(accessKey: String(user), secretKey: String(password), region: "us-west-2", service: "s3")
-                            try signer.sign(request: &request)
-                        } else {
-                            request.setBasicAuth(username: String(user), password: String(password))
-                        }
+                var request = request
+                request.url = url
+                if let user, let password {
+                    // Request need to be signed in the retry loop because the signature expires after 15 minutes
+                    if schema == "s3" {
+                        let signer = AWSSigner(accessKey: String(user), secretKey: String(password), region: "us-west-2", service: "s3")
+                        try signer.sign(request: &request)
+                    } else {
+                        request.setBasicAuth(username: String(user), password: String(password))
                     }
-
-                    let response = try await self.execute(request, timeout: timeoutPerRequest, logger: logger)
-                    logger.debug("Response for HTTP request #\(attempt) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
-                    //print(try await response.readStringImmutable())
+                }
+                
+                // Only explicitly marked payload prefetch acquires admission. Metadata and demand bypass it.
+                let download = RemotePayloadDownload.current
+                let admission = download?.owner.admission
+                let leased: Bool
+                if let download, download.isDemand {
+                    guard download.markStarted() else { throw CancellationError() }
+                    leased = false
+                } else if let download, let admission {
+                    leased = try await admission.acquire(download)
+                } else {
+                    leased = false
+                }
+                do {
+                    try _Concurrency.Task.checkCancellation()
+                    let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
+                    logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
                     try await response.throwOnError()
-                    return try await body(response)
+                    let result = try await body(response)
+                    if leased, let download, let admission { await admission.release(download) }
+                    return result
+                } catch {
+                    if leased, let download, let admission { await admission.release(download) }
+                    throw error
                 }
-                if let scheduling {
-                    // Release admission on success or failure before the retry handler sleeps.
-                    return try await scheduling.scheduler.execute(job: scheduling.job, operation: operation)
-                }
-                return try await operation()
-            } catch let error as RemoteDownloadSchedulerError {
-                // Admission failure is not a failed HTTP attempt.
-                throw error
+            } catch is CancellationError {
+                throw CancellationError()
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.headers.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
@@ -224,8 +234,7 @@ public extension HTTPClient {
         deadline: Date = .minutes(60),
         timeoutPerRequest: TimeAmount = .seconds(30),
         backOffSettings: ExponentialBackOff = .init(),
-        error404WaitTime: TimeAmount? = nil,
-        scheduling: (scheduler: RemoteDownloadScheduler, job: RemoteDownloadJob)? = nil
+        error404WaitTime: TimeAmount? = nil
     ) async throws -> ByteBuffer {
         return try await executeMapRetry(
             request,
@@ -234,7 +243,6 @@ public extension HTTPClient {
             timeoutPerRequest: timeoutPerRequest,
             backOffSettings: backOffSettings,
             error404WaitTime:error404WaitTime,
-            scheduling: scheduling,
             { try await $0.body.collect(upTo: maxBytes) }
         )
     }
