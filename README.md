@@ -105,6 +105,7 @@ Apps:
 - [Weather Journey](https://weatherjourney.com/) Historical weather records, temperature trends & climate anomalies for 6,000+ cities since 1940.
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
 - [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
+- [Where Boats Anchor](https://whereboatsanchor.com) Where boats stayed the night, and in what wind, worldwide from AIS. Open-Meteo gives each bay tonight's forecast and the 7-day wind. Free web app, no login.
 - [WorldWeatherMonitor](https://world-weather-monitor.vercel.app/) An interactive world weather map that displays real-time weather conditions for cities around the globe.
 
 Repositories:
