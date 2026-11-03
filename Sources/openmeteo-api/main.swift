@@ -7,12 +7,6 @@
 import App
 import Vapor
 
-#if os(Linux)
-// Set before Foundation/ICU first loads timezone data. Packaged releases install
-// updated resources here; ICU falls back to bundled data on development machines.
-setenv("ICU_TIMEZONE_FILES_DIR", "/usr/share/openmeteo-api/icu-tzdata", 1)
-#endif
-
 /// Xcode sets current working directory to something in derived data
 #if Xcode
 let projectHome = String(#filePath[...#filePath.range(of: "/Sources/")!.lowerBound])
