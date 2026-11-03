@@ -39,7 +39,7 @@ struct GenericVariableHandle: Sendable {
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
     /// If `fullRunSkipMeta` do not generate meta.json for each run
-    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadQueues: [S3UploadQueue], compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false) async throws {
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadQueues: [S3UploadQueue], compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, storeFullRunOnDisk: Bool = true) async throws {
         let logger = application.logger
         let groups = handles.groupedPreservedOrder(by: {"\($0.domain)"}).map { (_, handles) in
             (domain: handles[0].domain, handles: handles)
@@ -107,7 +107,7 @@ struct GenericVariableHandle: Sendable {
             if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
                 logger.info("Generate full run data [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
                 let startTimeFullRun = DispatchTime.now()
-                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta, uploadQueues: uploadQueues)
+                try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression, skipMeta: fullRunSkipMeta, uploadQueues: uploadQueues, storeOnDisk: storeFullRunOnDisk)
                 logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             }
         }
@@ -136,10 +136,11 @@ struct GenericVariableHandle: Sendable {
         }
     }
 
-    private static func uploadFullRunFile(_ file: OmFileType, queues: [S3MultiFileUploadQueue]) async {
+    private static func uploadFullRunFile(_ file: OmFileType, fn: FileHandle, queues: [S3MultiFileUploadQueue]) async {
+        guard !queues.isEmpty else { return }
         let objectName = "data_run/\(file.getRelativeFilePath())"
         for queue in queues {
-            await queue.uploadMultipart(file: file.getFilePath(), objectName: objectName, lastModified: .now())
+            await queue.uploadMultipart(data: fn, objectName: objectName, lastModified: .now())
         }
     }
 
@@ -150,14 +151,17 @@ struct GenericVariableHandle: Sendable {
     }
 
     /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
-    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, uploadQueues: [S3UploadQueue] = []) async throws {
+    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType, skipMeta: Bool, uploadQueues: [S3UploadQueue] = [], storeOnDisk: Bool = true) async throws {
+        // Without an upload destination, retain the generated files locally.
+        let storeOnDisk = storeOnDisk || uploadQueues.isEmpty
+        let fullRunHandles = handles.filter { FullRunsVariables.includes($0.variable.omFileName.file) }
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
 
         let multipartUploadQueues = uploadQueues.map { $0.startMultiPartUploads() }
         do {
-            try await handles.filter({FullRunsVariables.includes($0.variable.omFileName.file)}).groupedPreservedOrder(by: \.variable.omFileName.file).foreachConcurrent(nConcurrent: concurrent) { (_, handles) in
+            try await fullRunHandles.groupedPreservedOrder(by: \.variable.omFileName.file).foreachConcurrent(nConcurrent: concurrent) { (_, handles) in
                 let variable = handles[0].variable
                 let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
                 let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
@@ -170,6 +174,10 @@ struct GenericVariableHandle: Sendable {
                 try file.createDirectory()
                 let filePath = file.getFilePath()
                 let fn = try FileHandle.createNewFile(file: filePath, overwrite: true, temporary: true)
+                if !storeOnDisk && !fn.wasDeleted() {
+                    // macOS and filesystems without O_TMPFILE use a named temporary fallback.
+                    try FileManager.default.removeItem(atPath: "\(filePath)~")
+                }
 
                 let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
                 let chunks = nMembers > 1 ? [1, 1, chunknLocations, nTime] : [1, chunknLocations, nTime]
@@ -241,8 +249,10 @@ struct GenericVariableHandle: Sendable {
                 let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
                 let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
                 try writeFile.writeTrailer(rootVariable: root)
-                try fn.linkTemporary(file: filePath)
-                await uploadFullRunFile(file, queues: multipartUploadQueues)
+                if storeOnDisk {
+                    try fn.linkTemporary(file: filePath)
+                }
+                await uploadFullRunFile(file, fn: fn, queues: multipartUploadQueues)
                 await progress.finish()
             }
             for (queue, multipartUploadQueue) in zip(uploadQueues, multipartUploadQueues) {
@@ -250,7 +260,8 @@ struct GenericVariableHandle: Sendable {
             }
             let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()
             if !skipMeta {
-                let metaFiles = try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes)
+                let variables = fullRunHandles.map { $0.variable.omFileName.file }.uniqued().sorted()
+                let metaFiles = try FullRunMetaJson.write(domain: domain, run: run, validTimes: validTimes, variables: variables)
                 for meta in metaFiles {
                     await uploadFullRunMeta(meta.file, data: meta.data, queues: uploadQueues)
                 }

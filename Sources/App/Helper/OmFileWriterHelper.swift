@@ -112,9 +112,11 @@ extension Array where Element == Float {
     /// Retains caller isolation through the write so elevation-generating actors cannot interleave writes.
     nonisolated(nonsending) func writeStaticOmFile(file: OmFileType, grid: any Gridable, application: Application, uploadQueues: [S3UploadQueue], createNetCdf: Bool = false) async throws {
         try writeOmFile2D(file: file.getFilePath(), grid: grid, createNetCdf: createNetCdf)
+        guard !uploadQueues.isEmpty else { return }
+        let handle = try FileHandle.openFileReading(file: file.getFilePath())
         for queue in uploadQueues {
             let uploads = queue.startMultiPartUploads()
-            await uploads.uploadMultipart(file: file.getFilePath(), objectName: file.getRelativeFilePathWithData(), lastModified: .now())
+            await uploads.uploadMultipart(data: handle, objectName: file.getRelativeFilePathWithData(), lastModified: .now())
             await queue.finishMultiPartUploads(uploads)
         }
     }

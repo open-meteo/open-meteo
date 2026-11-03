@@ -330,16 +330,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
                         let handles = try await writer.finalise(application: application, completed: true, validTimes: nil, uploadQueues: [])
-                        try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil)
-
-                        if let directory = OpenMeteo.dataRunDirectory, !uploadQueues.isEmpty {
-                            // Delete run directory after S3 upload
-                            let model = domain.domainRegistry.rawValue
-                            let timeFormatted = run.format_directoriesYYYYMMddhhmm
-                            let runDir = "\(directory)\(model)/\(timeFormatted)/"
-                            logger.info("Deleting local run directory: \(runDir)")
-                            try FileManager.default.removeItem(atPath: runDir)
-                        }
+                        try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateTimeSeries: false, fullRunSkipMeta: paramsOverwrite != nil, storeFullRunOnDisk: false)
                     }
                 }
             }
