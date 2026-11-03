@@ -63,9 +63,6 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          # Refresh APT packages even when the application build is cached.
-          no-cache-filters: runtime
-          pull: true
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
@@ -81,9 +78,6 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          # Refresh APT packages even when the application build is cached.
-          no-cache-filters: runtime
-          pull: true
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE2 }},push-by-digest=true,name-canonical=true,push=true    

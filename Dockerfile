@@ -21,20 +21,9 @@ RUN ENABLE_PARQUET=TRUE MARCH_SKYLAKE=TRUE swift build -c release
 # ================================
 # Run image contains swift runtime libraries, netcdf, eccodes, cdo and cds utilities
 # ================================
-FROM ghcr.io/open-meteo/docker-container-run:0.0.17 AS runtime
+FROM ghcr.io/open-meteo/docker-container-run:0.0.17
 
 ENV ICU_TIMEZONE_FILES_DIR=/usr/share/zoneinfo-icu/44/le
-
-# Use the base image's Ubuntu -updates and -security repositories.
-# Jammy includes ICU resources in tzdata; Noble splits them into tzdata-icu.
-RUN apt-get update \
-    && . /etc/os-release \
-    && if [ "$VERSION_CODENAME" = noble ]; then \
-        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata tzdata-icu; \
-    else \
-        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata; \
-    fi \
-    && rm -rf /var/lib/apt/lists/*
 
 # Create a openmeteo user and group with /app as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app openmeteo
