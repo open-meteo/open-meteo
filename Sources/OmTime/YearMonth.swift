@@ -38,6 +38,11 @@ public struct YearMonth: Strideable, Comparable {
     public var timestamp: Timestamp {
         Timestamp(year, month, 1)
     }
+
+    /// Number of days in this month, 28 to 31
+    public var daysInMonth: Int {
+        (advanced(by: 1).timestamp.timeIntervalSince1970 - timestamp.timeIntervalSince1970) / 86400
+    }
 }
 
 extension YearMonth: Hashable {

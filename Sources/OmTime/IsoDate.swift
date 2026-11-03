@@ -77,6 +77,9 @@ public struct IsoDate: Codable, Sendable, Equatable {
         guard year >= 1900, year <= 2050, month >= 1, month <= 12, day >= 1, day <= 31 else {
             throw TimeError.InvalidDate
         }
+        guard day <= YearMonth(year: Int(year), month: Int(month)).daysInMonth else {
+            throw TimeError.InvalidDate
+        }
         self.date = year * 10000 + month * 100 + day
     }
 }
