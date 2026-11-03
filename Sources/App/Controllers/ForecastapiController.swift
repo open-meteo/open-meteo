@@ -2263,6 +2263,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .consolidated_v4:
             return try await Self.makeDailyReaders(domains: [GloFasDomain.consolidated], variableType: GloFasVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         case .satellite_radiation_seamless:
+            if lon < -37.5 { // GOES-East at 75°W; midpoint with MSG at 0°
+                return try await GoesDomain.goes19.makeGenericHourlyDaily(variableType: GoesVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            }
             if (-20..<60).contains(lon) { // DWD MTG on 0°
                 return try await DwdSisDomain.europe_africa_v4.makeGenericHourlyDaily(variableType: DwdSisVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
