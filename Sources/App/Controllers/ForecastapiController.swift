@@ -837,6 +837,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_global_eps_native
     case dwd_icon_eu_eps_native
     case dwd_icon_d2_eps_native
+    case noaa_goes19
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
@@ -1448,6 +1449,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
         case .ncep_aigefs025_ensemble_mean:
             return .single(GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+        case .noaa_goes19:
+            return .single(GoesDomain.goes19, GoesVariable.self)
         case .dwd_sis_europe_africa_v4:
             return .single(DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
         case .eumetsat_sarah3:

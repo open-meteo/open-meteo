@@ -1,0 +1,116 @@
+import Foundation
+import Testing
+import SwiftNetCDF
+@testable import App
+
+@Suite struct GoesDownloaderTests {
+    static let key = "ABI-L2-DSRF/2026/307/00/OR_ABI-L2-DSRF-M6_G19_s20263070000210_e20263070009518_c20263070015556.nc"
+    func scan(_ minute: Int, tag: String = "a") -> GoesDownloader.Scan {
+        GoesDownloader.Scan(key: Self.key.replacingOccurrences(of: "s20263070000210", with: "s202630700\(minute.zeroPadded(len: 2))210"), eTag: tag)!
+    }
+
+    @Test func filenameAndIntervalEnd() {
+        let file = scan(0)
+        #expect(file.start == Timestamp(2026, 11, 3, 0, 0, 21))
+        #expect(file.time == Timestamp(2026, 11, 3, 0, 10))
+        #expect(GoesDownloader.Scan(key: Self.key.replacingOccurrences(of: "DSRF", with: "DSIF"), eTag: "a") == nil)
+        #expect(GoesDownloader.Scan(key: Self.key.replacingOccurrences(of: "M6", with: "M3"), eTag: "a") == nil)
+        #expect(GoesDownloader.Scan(key: Self.key.replacingOccurrences(of: "G19", with: "G18"), eTag: "a") == nil)
+        let endOfYear = Self.key.replacingOccurrences(of: "s20263070000210", with: "s20263652350210")
+        #expect(GoesDownloader.Scan(key: endOfYear, eTag: "a")?.time == Timestamp(2027, 1, 1))
+    }
+
+    @Test func sharedS3ListingPreservesExistingCheckpointIdentities() {
+        let legacy = scan(0, tag: "&quot;abc123&quot;")
+        let listed = scan(0, tag: "\"abc123\"")
+        #expect(listed.identity == legacy.identity)
+        #expect(GoesDownloader.batches(scans: [listed], completed: [legacy.identity]).isEmpty)
+        let replaced = scan(0, tag: "\"new-etag\"")
+        #expect(GoesDownloader.batches(scans: [replaced], completed: [legacy.identity]) == [[replaced]])
+    }
+
+    @Test func lateArrivalAndReplacementAreNotLostBehindWatermark() {
+        let first = scan(0), late = scan(10), latest = scan(30)
+        let completed: Set<String> = [first.identity, latest.identity]
+        #expect(GoesDownloader.batches(scans: [first, latest], completed: completed).isEmpty)
+        #expect(GoesDownloader.batches(scans: [first, late, latest], completed: completed) == [[first, late, latest]])
+        let replaced = scan(0, tag: "new")
+        #expect(GoesDownloader.batches(scans: [replaced, latest], completed: completed) == [[replaced, latest]])
+    }
+
+    @Test func boundedBatchesRetainGapEndpointsAndRetries() {
+        let scans = [scan(0), scan(10), scan(30), scan(40), scan(50)]
+        let batches = GoesDownloader.batches(scans: scans, completed: [], batchSize: 3)
+        #expect(batches == [Array(scans[0...2]), Array(scans[2...4])])
+        // Only the first batch committed before a failure. The retry still has its left endpoint.
+        #expect(GoesDownloader.batches(scans: scans, completed: Set(scans[0...2].map(\.identity))) == [Array(scans[2...4])])
+        #expect(GoesDownloader.batches(scans: [], completed: []).isEmpty)
+    }
+
+    @Test func projectionAndNativeGridOrientation() {
+        let projection = GoesProjection()
+        let nadir = projection.inverse(x: 0, y: 0)
+        #expect(abs(nadir.latitude) < 0.0001)
+        #expect(abs(nadir.longitude + 75) < 0.0001)
+        for (lat, lon): (Float, Float) in [(40.7, -74), (-33.4, -70.7), (0, -75), (60, -100)] {
+            let xy = projection.forward(latitude: lat, longitude: lon)
+            let back = projection.inverse(x: xy.x, y: xy.y)
+            #expect(abs(back.latitude - lat) < 0.0001)
+            #expect(abs(back.longitude - lon) < 0.0001)
+            let grid = GoesDomain.fixedGrid
+            let point = grid.findPoint(lat: lat, lon: lon)!
+            let coords = grid.getCoordinates(gridpoint: point)
+            #expect(abs(coords.latitude - lat) < 0.05)
+            #expect(abs(coords.longitude - lon) < 0.05)
+            #expect(grid.findPointInterpolated(lat: lat, lon: lon) != nil)
+        }
+        #expect(GoesDomain.fixedGrid.findPoint(lat: 0, lon: 105) == nil)
+        #expect(GoesDomain.fixedGrid.getCoordinates(gridpoint: 0).latitude.isNaN)
+        #expect(GoesDomain.fixedGrid.getCoordinates(gridpoint: 1000 * 5424 + 2712).latitude < 0)
+        #expect(GoesDomain.fixedGrid.getCoordinates(gridpoint: 4423 * 5424 + 2712).latitude > 0)
+    }
+
+    @Test func unsignedPackingAndQualityMask() {
+        #expect(GoesDownloader.radiation(raw: 40000, quality: 0, fill: 65535, scale: 0.02, offset: 0) == 800)
+        #expect(GoesDownloader.radiation(raw: 65535, quality: 0, fill: 65535, scale: 0.02, offset: 0).isNaN)
+        #expect(GoesDownloader.radiation(raw: 40000, quality: 1, fill: 65535, scale: 0.02, offset: 0).isNaN)
+        #expect(GoesDownloader.radiation(raw: 40000, quality: 255, fill: 65535, scale: 0.02, offset: 0).isNaN)
+    }
+
+    @Test func acquisitionOffsetsFollowSwathsAndStayWithinScan() {
+        let start = 21.0, end = 591.8
+        let north = GoesDownloader.scanSeconds(sourceRow: 0, column: 2712, start: start, end: end)
+        let south = GoesDownloader.scanSeconds(sourceRow: 5423, column: 2712, start: start, end: end)
+        #expect(north < 30)
+        #expect(south > 580)
+        #expect(north >= start && south <= end)
+        let west = GoesDownloader.scanSeconds(sourceRow: 2712, column: 1000, start: start, end: end)
+        let east = GoesDownloader.scanSeconds(sourceRow: 2712, column: 4000, start: start, end: end)
+        #expect(west < east)
+        #expect((east - 600) / 3600 < 0) // Offsets are relative to the interval END.
+    }
+
+    @Test func solarConversionUsesAcquisitionTime() {
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 0, lonMin: -75, dx: 1, dy: 1)
+        let time = TimerangeDt(start: Timestamp(2026, 3, 20, 12), nTime: 1, dtSeconds: 600)
+        var early: [Float] = [100], late: [Float] = [100]
+        Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &early, grid: grid, locationRange: 0..<1,
+            timerange: time, sunDeclinationCutOffDegrees: 1, scanTimeDifferenceHours: [-9.0 / 60])
+        Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &late, grid: grid, locationRange: 0..<1,
+            timerange: time, sunDeclinationCutOffDegrees: 1, scanTimeDifferenceHours: [-1.0 / 60])
+        #expect(early[0] > late[0])
+        #expect(early[0].isFinite && late[0].isFinite)
+    }
+
+    /// Opt-in real NOAA fixture, kept out of the repository (12 MB compressed).
+    @Test func realNoaaFile() throws {
+        guard let path = ProcessInfo.processInfo.environment["GOES_TEST_FILE"] else { return }
+        let nc = try #require(try NetCDF.open(path: path, allowUpdate: false))
+        let values = try GoesDownloader.decode(nc: nc, scan: scan(0))
+        #expect(values.count == 5424 * 5424)
+        #expect(values[0].isNaN) // Space must never become nighttime zero.
+        #expect(values.contains { $0 > 100 && $0 < 1500 })
+        #expect(values.contains { $0 == 0 })
+        #expect(!values.contains { $0.isInfinite || $0 < 0 })
+    }
+}

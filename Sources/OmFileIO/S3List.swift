@@ -28,13 +28,14 @@ public enum S3List {
         public let eTag: String
     }
 
-    /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
-    public static func s3list(server: String, client: HTTPClient, logger: Logger, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3List.ListV2File], directories: [String]) {
+    /// List files and directories with AWS ListObjectsV2, following all continuation pages.
+    /// Pass an empty delimiter to list all objects recursively under the prefix.
+    public static func s3list(server: String, client: HTTPClient, logger: Logger, prefix: String, apikey: String?, deadLineHours: Double, delimiter: String = "/") async throws -> (files: [S3List.ListV2File], directories: [String]) {
         var allFiles: [S3List.ListV2File] = []
         var allDirectories: [String] = []
         var continuation: String? = nil
         while true {
-            var url = "\(server)?list-type=2&delimiter=%2F&prefix=\(prefix.awsPercentEncoded)"
+            var url = "\(server)?list-type=2&delimiter=\(delimiter.awsPercentEncoded)&prefix=\(prefix.awsPercentEncoded)"
             if let continuation {
                 url += "&continuation-token=\(continuation.awsPercentEncoded)"
             }
