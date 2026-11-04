@@ -133,7 +133,9 @@ struct GoesDownloader: AsyncCommand {
                     guard let nc = try NetCDF.open(memory: bytes) else { throw Abort(.badGateway, reason: "Cannot open GOES NetCDF") }
                     return try Self.decode(nc: nc, scan: scan)
                 }
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
+                // Conversion reads full-width strips only a few rows high. Keep
+                // chunks within one row to avoid repeatedly decoding 32-row tiles.
+                let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [1, min(domain.grid.nx, 1024)])
                 return try await GenericVariableHandle(variable: GoesVariable.shortwave_radiation, time: scan.time, member: 0,
                     fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data), domain: domain)
             }
