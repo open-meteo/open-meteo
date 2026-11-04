@@ -10,6 +10,7 @@ struct GoesDownloader: AsyncCommand {
         @Option(name: "lookback-days", help: "Recheck this many days for late/replaced scans (default 3)") var lookbackDays: Int?
         @Option(name: "concurrent", short: "c", help: "Download and conversion concurrency (default 1)") var concurrent: Int?
         @Flag(name: "create-netcdf") var createNetcdf: Bool
+        @Flag(name: "force", help: "Reprocess available scans even if already completed") var force: Bool
         @Option(name: "upload-s3-bucket") var uploadS3Bucket: String?
     }
     var help: String { "Download GOES-19 10-minute surface shortwave radiation" }
@@ -99,7 +100,7 @@ struct GoesDownloader: AsyncCommand {
             }
         }
         let scans = scansByTime.values.sorted { $0.time < $1.time }
-        let batches = Self.batches(scans: scans, completed: completed)
+        let batches = Self.batches(scans: scans, completed: signature.force ? [] : completed)
         logger.info("GOES: \(scans.count) available scans, \(batches.count) conversion batches")
         for batch in batches {
             let handles: [GenericVariableHandle] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
@@ -167,7 +168,10 @@ struct GoesDownloader: AsyncCommand {
     }
 
     static func radiation(raw: UInt16, quality: UInt8, fill: UInt16, scale: Float, offset: Float) -> Float {
-        guard quality == 0, raw != fill else { return .nan }
+        // DQF=1 includes low-sun retrievals (solar zenith >70 degrees), as well
+        // as other degraded/invalid retrievals. Retain finite, in-range values
+        // so sunrise/sunset radiation is available; still reject fill values.
+        guard quality <= 1, raw != fill else { return .nan }
         let value = Float(raw) * scale + offset
         return (0...1500).contains(value) ? value : .nan
     }

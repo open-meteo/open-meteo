@@ -74,8 +74,31 @@ import OmFileIO
     @Test func unsignedPackingAndQualityMask() {
         #expect(GoesDownloader.radiation(raw: 40000, quality: 0, fill: 65535, scale: 0.02, offset: 0) == 800)
         #expect(GoesDownloader.radiation(raw: 65535, quality: 0, fill: 65535, scale: 0.02, offset: 0).isNaN)
-        #expect(GoesDownloader.radiation(raw: 40000, quality: 1, fill: 65535, scale: 0.02, offset: 0).isNaN)
+        #expect(GoesDownloader.radiation(raw: 40000, quality: 1, fill: 65535, scale: 0.02, offset: 0) == 800)
+        #expect(GoesDownloader.radiation(raw: 65535, quality: 1, fill: 65535, scale: 0.02, offset: 0).isNaN)
+        #expect(GoesDownloader.radiation(raw: 40000, quality: 2, fill: 65535, scale: 0.02, offset: 0).isNaN)
         #expect(GoesDownloader.radiation(raw: 40000, quality: 255, fill: 65535, scale: 0.02, offset: 0).isNaN)
+        #expect(GoesDownloader.radiation(raw: 40000, quality: 1, fill: 65535, scale: 0.04, offset: 0).isNaN)
+        #expect(GoesDownloader.radiation(raw: 0, quality: 1, fill: 65535, scale: 0.02, offset: -1).isNaN)
+    }
+
+    @Test func lowSunRetrievalsSurviveScanTimeCorrection() {
+        // Actual DQF=1 pixels from NOAA's 2026-11-01 scans at New York.
+        let samples: [(Timestamp, UInt16)] = [
+            (Timestamp(2026, 11, 1, 12, 10), 1654),
+            (Timestamp(2026, 11, 1, 13, 40), 9751),
+            (Timestamp(2026, 11, 1, 20, 0), 12473)
+        ]
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 40.702015, lonMin: -74.017105, dx: 1, dy: 1)
+        for (time, raw) in samples {
+            let end = Double(time.timeIntervalSince1970)
+            let acquisition = GoesDownloader.scanSeconds(sourceRow: 740, column: 2751, start: end - 579, end: end - 8.1)
+            var values = [GoesDownloader.radiation(raw: raw, quality: 1, fill: 65535, scale: 0.02289028, offset: 0)]
+            Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &values, grid: grid, locationRange: 0..<1,
+                timerange: TimerangeDt(start: time, nTime: 1, dtSeconds: 600), sunDeclinationCutOffDegrees: 1,
+                scanTimeDifferenceHours: [(acquisition - end) / 3600])
+            #expect(values[0].isFinite && values[0] > 0 && values[0] <= 1500)
+        }
     }
 
     @Test func acquisitionOffsetsFollowSwathsAndStayWithinScan() {
