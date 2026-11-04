@@ -49,7 +49,7 @@ extension AtomicBlockCache where Backend == MmapFile {
     }
 
     private init(file: FileHandle, blockSize: Int, blockCount: Int) throws {
-        // Neighboring data slots can hold unrelated data; disable automatic readahead.
+        // Use MADV_RANDOM for om-files data sections
         let mapping = try MmapFile(fn: file, mode: .readWrite, advice: .random)
         let indexSize = MemoryLayout<WordPair>.size * blockCount
         let pageSize = Int(getpagesize())
