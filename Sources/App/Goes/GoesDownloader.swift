@@ -127,7 +127,9 @@ struct GoesDownloader: AsyncCommand {
         for batch in batches {
             let handles: [GenericVariableHandle] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
                 logger.info("GOES: \(scan.key)")
-                let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key, minSize: nil)
+                // Backfills can run for days. Start a fresh retry deadline per file
+                // instead of inheriting Curl's deadline from command startup.
+                let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key, minSize: nil, deadLineHours: 1)
                 await progress.add(buffer.readableBytes)
                 let data = try buffer.withUnsafeBytes { bytes in
                     guard let nc = try NetCDF.open(memory: bytes) else { throw Abort(.badGateway, reason: "Cannot open GOES NetCDF") }
