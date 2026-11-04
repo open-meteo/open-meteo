@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import SwiftNetCDF
 import OmFileIO
+import OmFileFormat
 @testable import App
 
 @Suite struct GoesDownloaderTests {
@@ -16,6 +17,21 @@ import OmFileIO
         let day = ((start.timeIntervalSince1970 - Timestamp(year, 1, 1).timeIntervalSince1970) / 86400 + 1).zeroPadded(len: 3)
         let hour = start.hour.zeroPadded(len: 2), minute = start.minute.zeroPadded(len: 2)
         return GoesDownloader.Scan(key: "ABI-L2-DSRF/\(year)/\(day)/\(hour)/OR_ABI-L2-DSRF-M6_G19_s\(year)\(day)\(hour)\(minute)210_eunused_cunused.nc", eTag: "a")!
+    }
+
+    @Test func rowChunksPreserveStripReads() async throws {
+        let nx = 1030, ny = 5
+        let values = (0..<nx * ny).map { $0 % 17 == 0 ? Float.nan : Float($0 % 1501) }
+        let writer = OmFileWriterHelper(dimensions: [ny, nx], chunks: [1, 1024])
+        let file = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: values)
+        let reader = try await OmFileReader(fn: MmapFile(fn: file)).expectArray(of: Float.self)
+        for row in stride(from: 0, to: ny, by: 2) {
+            let end = min(row + 2, ny)
+            let strip = try await reader.read(range: [UInt64(row)..<UInt64(end), 0..<UInt64(nx)])
+            for (actual, expected) in zip(strip, values[row * nx..<end * nx]) {
+                #expect(actual == expected || (actual.isNaN && expected.isNaN))
+            }
+        }
     }
 
     @Test func filenameAndIntervalEnd() {
