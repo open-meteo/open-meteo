@@ -68,6 +68,7 @@ Apps:
 - [Heliora](https://heliora.app/) Free browser planner for the Sun, Moon and Milky Way against the real terrain horizon. Shows forecast cloud cover for the next 16 days and 20-year ERA5 clear-sky odds for any pin and date.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
+- [LSPC Weather](https://amelia-m.github.io/lspc-weather/) Skydiving weather dashboard for one drop zone (Lincoln Sport Parachute Club, Nebraska): winds aloft by altitude for freefall drift, cloud cover and a 10-day outlook from Open-Meteo beside the NWS forecast and the nearest METAR. Free, open source, no account. ([source](https://github.com/amelia-m/lspc-weather)).
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 - [Meteograph](https://github.com/timbortnik/widget) Open-source Android home-screen weather widget showing a meteogram with 48-hour and 7-day forecasts; no ads, no tracking, no account. ([Google Play](https://play.google.com/store/apps/details?id=org.bortnik.meteogram))
