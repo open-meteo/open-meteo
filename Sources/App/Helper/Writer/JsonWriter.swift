@@ -3,12 +3,16 @@ import Vapor
 
 extension AsyncBodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(concurrencySlot: Int?, logger: Logger, _ task: @escaping () async throws -> Void) async throws {
+    func submit(concurrencySlot: Int?, logger: Logger, preload: ReaderPreload? = nil, _ task: @escaping () async throws -> Void) async throws {
         if let concurrencySlot {
             try await ConcurrencyGroupLimiter.instance.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
         }
         do {
-            try await task()
+            try await withTaskCancellationHandler {
+                try await task()
+            } onCancel: {
+                preload?.stop()
+            }
             if let concurrencySlot {
                 await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
             }
@@ -38,7 +42,8 @@ extension ForecastapiResult {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in
-            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
+            defer { preload?.stop() }
+            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger, preload: preload) {
                 var b = BufferAndAsyncWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1

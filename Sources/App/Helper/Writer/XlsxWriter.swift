@@ -4,6 +4,7 @@ import Vapor
 
 extension ForecastapiResult {
     func toXlsxResponse(timestamp: Timestamp, withLocationHeader: Bool = true) async throws -> Response {
+        defer { preload?.stop() }
         let multiLocation = results.count > 1
 
         let sheet = try XlsxWriter()

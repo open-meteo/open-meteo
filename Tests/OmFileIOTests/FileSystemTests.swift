@@ -1,9 +1,53 @@
 import Foundation
+import OmFileFormat
 @testable import OmFileIO
 import Testing
 import OmTime
 
 @Suite(.serialized) struct FileSystemTests {
+    @Test(.timeLimit(.minutes(1)))
+    func stoppedPreloadDoesNotFailWaitingDemand() async throws {
+        let context = S3ServerHealth(logger: .init(label: "metadata-test"), servers: [], checksHealth: false)
+        let file = OmFileSystemS3.File(objectName: "metadata.om", contentLength: 128, lastModified: .now(), eTag: "\"old\"")
+        let session = RemotePreloadSession()
+        let pause = MetadataPause()
+        let preload = Task {
+            try await MetadataPayload.$pause.withValue(pause) {
+                try await RemotePreloadSession.$current.withValue(session) {
+                    let object = OmFileSystemS3.FileWithContext(file: file, context: context)
+                    _ = try await object.with { (_: MetadataPayload) in
+                        Issue.record("Stopped preload must not advance to payload prefetch")
+                    }
+                }
+            }
+        }
+        do {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+            while !(await pause.arrived) {
+                try #require(ContinuousClock.now < deadline)
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            let demand = Task {
+                try await file.getPayload(ofType: MetadataPayload.self, context: context, receivedFileModifiedError: false)
+            }
+            defer { demand.cancel() }
+            while OmFileSystemMetrics.fileRemotePayloadWaiting.load(ordering: .relaxed) == 0 {
+                try #require(ContinuousClock.now < deadline)
+                try await Task.sleep(for: .milliseconds(1))
+            }
+            session.stop()
+            preload.cancel()
+            await pause.release()
+            do { try await preload.value; Issue.record("Expected stopped preload") } catch is CancellationError {}
+            #expect(try await demand.value?.version == "\"old\"")
+        } catch {
+            session.stop()
+            await pause.release()
+            _ = await preload.result
+            throw error
+        }
+    }
+
     @Test func seriesIndexRangesAndMissingFiles() {
         let index = OmFileSeriesIndex(files: [
             "chunk_-2.om": 1, "chunk_0.om": 2,
@@ -95,4 +139,38 @@ import OmTime
         await root.updateRecursivelyIfRequired(now: refreshTime)
         #expect(await dataDirectory.getFile(name: "new-file") != nil)
     }
+}
+
+private actor MetadataPause {
+    var arrived = false
+    private var released = false
+    private var waiter: CheckedContinuation<Void, Never>?
+    func betweenReads() async {
+        arrived = true
+        if !released { await withCheckedContinuation { waiter = $0 } }
+    }
+    func release() {
+        released = true
+        waiter?.resume()
+        waiter = nil
+    }
+}
+
+private struct MetadataPayload: OmRemotePayload {
+    @TaskLocal static var pause: MetadataPause?
+    let version: String
+
+    init(file: OmHttpReaderBackend) async throws {
+        // Exercise the real block-cache cancellation checks on two metadata reads.
+        let cache = AtomicBlockCache(data: DataAsClass(data: Data(count: 80 * 16)), blockSize: 64)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 7, count: 128)),
+                                       cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        _ = try await reader.getData(offset: 0, count: 1)
+        await Self.pause?.betweenReads()
+        _ = try await reader.getData(offset: 64, count: 1)
+        version = file.eTag
+    }
+
+    func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self { try await Self(file: file) }
+    func remoteDeleted() async throws {}
 }

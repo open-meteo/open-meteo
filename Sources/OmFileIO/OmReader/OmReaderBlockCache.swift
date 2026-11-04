@@ -2,6 +2,11 @@ import OmFileFormat
 import Foundation
 import NIOCore
 
+/// Task-scoped paging hints for cached payloads.
+public enum OmReaderPrefetch {
+    @TaskLocal public static var pageInPayload = true
+}
+
 
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache.
@@ -47,6 +52,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
 
     public func prefetchData(offset: Int, count: Int) async throws {
+        let pageInPayload = OmReaderPrefetch.pageInPayload
         let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
         let fileSize = self.backend.count
@@ -56,32 +62,33 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         /// Check if all blocks are available sequentially in cache
         let sameSuperBlock = superBlocks.count == 1
         if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
+            // Eager warming skips paging hints; normal prefetch can still page cached bytes in.
+            guard pageInPayload else { return }
             let offset = cache.cache.data.withMutableUnsafeBytes { data in
                 UnsafeRawPointer(data.baseAddress!).distance(to: ptr.baseAddress!)
             }
             cache.cache.data.prefetchData(offset: offset, count: ptr.count)
             return
         }
-        /// Prefetch data from the HTTP backend in a detached task
-        Task {
-            for superBlock in superBlocks {
-                let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
-                let keyStart = calculateCacheKey(block: blocks.lowerBound)
-                //print("withData blocks \(blocks)")
-                try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
-                    let block = blocks.lowerBound + Int(key &- keyStart)
-                    let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
-                    return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
-                }), dataCallback: {(_, value) in
-                    let offset = cache.cache.data.withMutableUnsafeBytes { data in
-                        UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
-                    }
-                    cache.cache.data.prefetchData(offset: offset, count: value.count)
-                })
-            }
+        for superBlock in superBlocks {
+            try RemotePreloadSession.current?.checkActive()
+            let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
+            let keyStart = calculateCacheKey(block: blocks.lowerBound)
+            // Register misses without retaining the decoder's lookup table during downloads.
+            try await cache.get(key: keyStart, count: blocks.count, prefetch: true, enqueueOnly: true, provider: { [backend] key, count in
+                let block = blocks.lowerBound + Int(key &- keyStart)
+                let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
+                return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
+            }, dataCallback: { [cache] key, _ in
+                guard pageInPayload, let value = cache.cache.get(key: key, count: 1) else { return }
+                let offset = cache.cache.data.withMutableUnsafeBytes { data in
+                    UnsafeRawPointer(data.baseAddress!).distance(to: value.baseAddress!)
+                }
+                cache.cache.data.prefetchData(offset: offset, count: value.count)
+            })
         }
     }
-    
+
     public var count: Int {
         return backend.count
     }
@@ -96,6 +103,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     
     /// Fetch data from cache or backend. If data is cached, return a temporary pointer. Otherwise allocate a new buffer which must be freed afterwards
     fileprivate func fetch(offset: Int, count: Int) async throws -> DataOwnership {
+        try RemotePreloadSession.current?.checkActive()
         let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
         let fileSize = self.backend.count
@@ -117,7 +125,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
                 let keyStart = calculateCacheKey(block: blocks.lowerBound)
                 //print("withData blocks \(blocks)")
-                try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
+                try await cache.get(key: keyStart, count: blocks.count, provider: ({ [backend] (key, count) in
                     let block = blocks.lowerBound + Int(key &- keyStart)
                     let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
@@ -227,36 +235,60 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         return deletedCount
     }
     
+    /// Lazy chunks bounded by 1 MiB and cache-key super-block boundaries.
+    public func preloadChunks(blocks: [Range<Int>]) -> OmPreloadBlockChunks {
+        OmPreloadBlockChunks(ranges: blocks, blockCount: backend.count.divideRoundedUp(divisor: cache.cache.blockSize),
+                             superBlockLength: superBlockLength, chunkLength: max(1, 1024 * 1024 / cache.cache.blockSize))
+    }
+
     /// Load list of blocks into cache. This is used to prefetch data after rotating files.
     public func preloadBlocks(blocks: [Range<Int>]) async throws {
         let blockSize = cache.cache.blockSize
         let totalCount = self.backend.count
-        let totalBlockCount = totalCount.divideRoundedUp(divisor: blockSize)
-        for range in blocks {
-            let range = range.clamped(to: 0..<totalBlockCount)
-            guard !range.isEmpty else {
+        for blocks in preloadChunks(blocks: blocks) {
+            try Task.checkCancellation()
+            try RemotePreloadSession.current?.checkActive()
+            let cacheKey = calculateCacheKey(block: blocks.lowerBound)
+            try await cache.get(key: cacheKey, count: blocks.count, prefetch: true, provider: { [backend] key, count in
+                let firstBlock = blocks.lowerBound + Int(key &- cacheKey)
+                let range = firstBlock * blockSize ..< min((firstBlock + count) * blockSize, totalCount)
+                return try await backend.getData(offset: range.lowerBound, count: range.count)
+            }, dataCallback: { _, _ in })
+        }
+    }
+}
+
+public struct OmPreloadBlockChunks: Sequence, Sendable {
+    let ranges: [Range<Int>]
+    let blockCount: Int
+    let superBlockLength: Int
+    let chunkLength: Int
+
+    public func makeIterator() -> Iterator { Iterator(chunks: self) }
+
+    public struct Iterator: IteratorProtocol {
+        let chunks: OmPreloadBlockChunks
+        var index = 0
+        var lowerBound: Int?
+
+        public mutating func next() -> Range<Int>? {
+            while index < chunks.ranges.count {
                 /// The list of blocks is from an older file revision.
                 /// The new file could be smaller and contain fewer blocks.
-                continue
-            }
-            var lowerBound = range.lowerBound
-            while lowerBound < range.upperBound {
+                let range = chunks.ranges[index].clamped(to: 0..<chunks.blockCount)
+                let lower = lowerBound ?? range.lowerBound
+                guard lower < range.upperBound else {
+                    index += 1
+                    lowerBound = nil
+                    continue
+                }
                 // Cache keys are only consecutive within a super block.
-                let chunkLowerBound = lowerBound
-                let upperBound = min(range.upperBound, (chunkLowerBound / superBlockLength + 1) * superBlockLength)
-                let cacheKey = calculateCacheKey(block: chunkLowerBound)
-                let _ = try await cache.get(
-                    key: cacheKey,
-                    count: upperBound - chunkLowerBound,
-                    provider: ({ key, count in
-                        let firstBlock = chunkLowerBound + Int(key &- cacheKey)
-                        let dataRange = firstBlock * blockSize ..< min((firstBlock + count) * blockSize, totalCount)
-                        return try await backend.getData(offset: dataRange.lowerBound, count: dataRange.count)
-                    }),
-                    dataCallback: { _,_ in }
-                )
-                lowerBound = upperBound
+                let upper = Swift.min(range.upperBound, (lower / chunks.superBlockLength + 1) * chunks.superBlockLength,
+                                lower + chunks.chunkLength)
+                lowerBound = upper
+                return lower..<upper
             }
+            return nil
         }
     }
 }

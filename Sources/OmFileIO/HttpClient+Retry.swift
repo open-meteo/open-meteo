@@ -151,6 +151,7 @@ public extension HTTPClient {
         
         while true {
             do {
+                try _Concurrency.Task.checkCancellation()
                 n += 1
                 var request = request
                 request.url = url
@@ -164,11 +165,32 @@ public extension HTTPClient {
                     }
                 }
                 
-                let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
-                //print(try await response.readStringImmutable())
-                try await response.throwOnError()
-                return try await body(response)
+                // Only explicitly marked payload prefetch acquires admission. Metadata and demand bypass it.
+                let download = RemotePayloadDownload.current
+                let admission = download?.owner.admission
+                let leased: Bool
+                if let download, download.isDemand {
+                    guard download.markStarted() else { throw CancellationError() }
+                    leased = false
+                } else if let download, let admission {
+                    leased = try await admission.acquire(download)
+                } else {
+                    leased = false
+                }
+                do {
+                    try _Concurrency.Task.checkCancellation()
+                    let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
+                    logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.headers.rangePrettyPrint)")
+                    try await response.throwOnError()
+                    let result = try await body(response)
+                    if leased, let download, let admission { await admission.release(download) }
+                    return result
+                } catch {
+                    if leased, let download, let admission { await admission.release(download) }
+                    throw error
+                }
+            } catch is CancellationError {
+                throw CancellationError()
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(url)\(request.headers.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized

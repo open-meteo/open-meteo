@@ -11,7 +11,8 @@ extension ForecastapiResult {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in
-            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
+            defer { preload?.stop() }
+            try await writer.submit(concurrencySlot: concurrencySlot, logger: logger, preload: preload) {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
                 // TODO: Estimate initial buffer size
                 let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)

@@ -1,4 +1,5 @@
 import Foundation
+import OmFileIO
 import Vapor
 import FlatBuffers
 import OpenMeteoSdk
@@ -12,7 +13,7 @@ protocol ForecastapiResponder {
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response
 }
 
-protocol ModelFlatbufferSerialisable {
+protocol ModelFlatbufferSerialisable: SendableMetatype {
     associatedtype HourlyVariable: FlatBuffersVariable
     associatedtype DailyVariable: FlatBuffersVariable
     associatedtype WeeklyVariable: FlatBuffersVariable
@@ -72,6 +73,7 @@ extension ModelFlatbufferSerialisable {
 /// Stores the API output for multiple locations
 struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, @unchecked Sendable {
     let timeformat: Timeformat
+    var preload: ReaderPreload? = nil
     /// per location, per model
     let results: [PerLocation]
 
@@ -85,6 +87,27 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         let dailyVariables: [Model.DailyVariable]?
         let weeklyVariables: [Model.WeeklyVariable]?
         let monthlyVariables: [Model.MonthlyVariable]?
+
+        var count: Int {
+            (currentVariables?.count ?? 0) + (minutely15Variables?.count ?? 0)
+                + (hourlyVariables?.count ?? 0) + (dailyVariables?.count ?? 0)
+                + (weeklyVariables?.count ?? 0) + (monthlyVariables?.count ?? 0)
+        }
+
+        /// Select one variable across the sections in their request order.
+        func singleVariable(at index: Int) -> Self {
+            var remaining = index
+            func select<T>(_ values: [T]?) -> [T]? {
+                let count = values?.count ?? 0
+                defer { remaining -= count }
+                guard let values, remaining >= 0, remaining < count else { return nil }
+                return [values[remaining]]
+            }
+            return Self(
+                currentVariables: select(currentVariables), minutely15Variables: select(minutely15Variables),
+                hourlyVariables: select(hourlyVariables), dailyVariables: select(dailyVariables),
+                weeklyVariables: select(weeklyVariables), monthlyVariables: select(monthlyVariables))
+        }
     }
     let variables: RequestVariables
 
@@ -200,38 +223,96 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
     }
 
+    /// Traverse variables independently per request; only payload HTTP attempts share admission.
+    func preloadRemoteLocations(logger: Logger, concurrency: Int = ReaderPrefetchPolicy.concurrency) async throws {
+        // Index only model instances; variable jobs are generated lazily on admission.
+        let models = results.indices.flatMap { location in
+            results[location].results.indices.map { (location: location, model: $0) }
+        }
+        let variableCount = variables.count
+        try await ReaderPrefetchPolicy.executor.run(count: models.count * variableCount, concurrency: concurrency) { index in
+            let (location, model) = models[index / variableCount]
+            let variable = index % variableCount
+            await ReaderPrefetchPolicy.$current.withValue(.remoteOnly) {
+                await OmReaderPrefetch.$pageInPayload.withValue(false) {
+                    do {
+                        try RemotePreloadSession.current?.checkActive()
+                        let variables = self.variables.singleVariable(at: variable)
+                        try await self.results[location].results[model].prefetch(
+                            currentVariables: variables.currentVariables,
+                            minutely15Variables: variables.minutely15Variables,
+                            hourlyVariables: variables.hourlyVariables,
+                            dailyVariables: variables.dailyVariables,
+                            weeklyVariables: variables.weeklyVariables,
+                            monthlyVariables: variables.monthlyVariables)
+                    } catch is CancellationError {
+                        return
+                    } catch {
+                        logger.debug("Remote variable preload stopped: \(error)")
+                    }
+                }
+            }
+        }
+    }
+
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true, logger: Logger) async throws -> Response {
+        try await response(
+            format: format, 
+            concurrencySlot: concurrencySlot, 
+            prefetch: prefetch, 
+            logger: logger,
+            remoteEnabled: OpenMeteo.remoteDataDirectory != nil
+        )
+    }
+
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true, logger: Logger, remoteEnabled: Bool) async throws -> Response {
         if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
+        var output = self
+        if remoteEnabled {
+            let preload = ReaderPreload()
+            output.preload = preload
+            // Finish range discovery before consumption; payload downloads continue independently.
+            try await RemotePreloadSession.$current.withValue(preload.session) {
+                try await preloadRemoteLocations(logger: logger)
+            }
+        }
         if prefetch {
-            for location in results {
-                for model in location.results {
-                    try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables, weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+            try await ReaderPrefetchPolicy.$current.withValue(.all) {
+                try await RemotePreloadSession.$current.withValue(output.preload?.session) {
+                    for location in results {
+                        for model in location.results {
+                            try await model.prefetch(
+                                currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables,
+                                hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables,
+                                weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+                        }
+                    }
                 }
             }
         }
         switch format ?? .json() {
         case .json(let fixedGenerationTime):
-            return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
+            return try output.toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
         case .xlsx(let timestamp, let locationInformation):
             switch locationInformation {
             case .omit:
-                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: false)
+                return try await output.toXlsxResponse(timestamp: timestamp, withLocationHeader: false)
             case .section:
-                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: true)
+                return try await output.toXlsxResponse(timestamp: timestamp, withLocationHeader: true)
             }
         case .csv(let locationInformation):
             switch locationInformation {
                 case .omit:
-                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false, logger: logger)
+                return try output.toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false, logger: logger)
                 case .section:
-                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true, logger: logger)
+                return try output.toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true, logger: logger)
             }
         case .flatbuffers(let fixedGenerationTime):
-            return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
+            return try output.toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
         }
     }
 
