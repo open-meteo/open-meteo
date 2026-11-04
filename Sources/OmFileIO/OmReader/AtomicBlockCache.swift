@@ -39,12 +39,25 @@ extension AtomicBlockCache where Backend == MmapFile {
         if FileManager.default.fileExists(atPath: file) {
             let fn = try FileHandle.openFileReadWrite(file: file)
             if try fn.seekToEnd() == size {
-                self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
+                try self.init(file: fn, blockSize: blockSize, blockCount: blockCount)
                 return
             }
         }
         let fn = try FileHandle.createNewFile(file: file, size: size, overwrite: true)
-        self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
+        try self.init(file: fn, blockSize: blockSize, blockCount: blockCount)
+    }
+
+    private init(file: FileHandle, blockSize: Int, blockCount: Int) throws {
+        // Neighboring data slots can hold unrelated data; disable automatic readahead.
+        let mapping = try MmapFile(fn: file, mode: .readWrite, advice: .random)
+        let indexSize = MemoryLayout<WordPair>.size * blockCount
+        let pageSize = Int(getpagesize())
+        let indexPagesSize = indexSize / pageSize * pageSize
+        // Scan index pages sequentially. A page shared with data keeps random advice.
+        if indexPagesSize > 0 {
+            mapping.prefetchData(offset: 0, count: indexPagesSize, advice: .sequential)
+        }
+        self = .init(data: mapping, blockSize: blockSize)
     }
 }
 
