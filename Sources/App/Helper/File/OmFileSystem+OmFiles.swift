@@ -20,7 +20,7 @@ struct OmFileLocalRemoteOmReader {
 extension OmFileLocalRemoteOmReader: OmFilePayload {
     init(fd: FileHandle, size: Int64) async throws {
         // TODO because the size is known already, this should be passed to MmapFile.init
-        let file = try MmapFile(fn: fd)
+        let file = try MmapFile(fn: fd, advice: .random)
         let readerRaw = try await OmFileReader(fn: file)
         self.reader = try readerRaw.expectArray(of: Float.self)
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
