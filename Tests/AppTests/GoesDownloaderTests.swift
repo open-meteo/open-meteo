@@ -29,6 +29,17 @@ import OmFileIO
         #expect(GoesDownloader.Scan(key: endOfYear, eTag: "a")?.time == Timestamp(2027, 1, 1))
     }
 
+    @Test func completedStateExpiresByAcquisitionTime() {
+        let oldest = scan(0), newer = scan(10)
+        let now = oldest.start.add(days: 3)
+        let completed: Set<String> = [oldest.identity, newer.identity, "invalid"]
+        #expect(GoesDownloader.recentCompleted(completed, lookbackDays: 3, now: now) == [oldest.identity, newer.identity])
+        #expect(GoesDownloader.recentCompleted(completed, lookbackDays: 3, now: now.add(1)) == [newer.identity])
+        #expect(GoesDownloader.recentCompleted(completed, lookbackDays: 1, now: now).isEmpty)
+        // Historical backfills must not accumulate expired checkpoint entries.
+        #expect(GoesDownloader.recentCompleted(completed, lookbackDays: 3, now: now.add(days: 30)).isEmpty)
+    }
+
     @Test func sharedS3ListingPreservesExistingCheckpointIdentities() {
         let legacy = scan(0, tag: "&quot;abc123&quot;")
         let listed = scan(0, tag: "\"abc123\"")
@@ -58,14 +69,14 @@ import OmFileIO
         #expect(GoesDownloader.batches(scans: [], completed: []).isEmpty)
     }
 
-    @Test func batchesMatchTwoDayOmChunks() {
+    @Test func batchesMatchOmChunks() {
         let domain = GoesDomain.goes19
         let duration = domain.dtSeconds * domain.omFileLength
         let boundary = Timestamp(Timestamp(2026, 11, 3).timeIntervalSince1970 / duration * duration)
         let scans = (0..<domain.omFileLength * 2).map { scan(endingAt: boundary.add($0 * domain.dtSeconds)) }
         let batches = GoesDownloader.batches(scans: scans, completed: [])
         #expect(batches.count == 2)
-        #expect(batches.map(\.count) == [288, 288])
+        #expect(batches.map(\.count) == [domain.omFileLength, domain.omFileLength])
         #expect(batches.flatMap { $0 } == scans)
         for batch in batches {
             let time = TimerangeDt(start: batch.first!.time, to: batch.last!.time.add(domain.dtSeconds), dtSeconds: domain.dtSeconds)

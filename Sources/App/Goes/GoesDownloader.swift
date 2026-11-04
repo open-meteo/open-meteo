@@ -7,7 +7,7 @@ struct GoesDownloader: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain") var domain: String
         @Option(name: "timeinterval", short: "t", help: "Backfill inclusive dates, e.g. 20261101-20261103") var timeinterval: String?
-        @Option(name: "lookback-days", help: "Recheck this many days for late/replaced scans (default 3)") var lookbackDays: Int?
+        @Option(name: "lookback-days", help: "Recheck this many days for late/replaced scans (default 2)") var lookbackDays: Int?
         @Option(name: "concurrent", short: "c", help: "Download and conversion concurrency (default 1)") var concurrent: Int?
         @Flag(name: "create-netcdf") var createNetcdf: Bool
         @Flag(name: "force", help: "Reprocess available scans even if already completed") var force: Bool
@@ -64,11 +64,19 @@ struct GoesDownloader: AsyncCommand {
         return result
     }
 
+    static func recentCompleted(_ completed: Set<String>, lookbackDays: Int, now: Timestamp = .now()) -> Set<String> {
+        let cutoff = now.add(days: -lookbackDays)
+        return completed.filter { identity in
+            guard let scan = Scan(key: String(identity.prefix { $0 != ":" }), eTag: "") else { return false }
+            return scan.start >= cutoff
+        }
+    }
+
     func run(using context: CommandContext, signature: Signature) async throws {
         let domain = try GoesDomain.load(rawValue: signature.domain)
-        let days = signature.lookbackDays ?? 3
+        let loopbackDays = signature.lookbackDays ?? 2
         let concurrent = signature.concurrent ?? 1
-        guard days > 0, concurrent > 0 else { throw Abort(.badRequest, reason: "lookback-days and concurrent must be positive") }
+        guard loopbackDays > 0, concurrent > 0 else { throw Abort(.badRequest, reason: "lookback-days and concurrent must be positive") }
         let logger = context.application.logger
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient)
         let queues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
@@ -86,7 +94,7 @@ struct GoesDownloader: AsyncCommand {
                 Scan(key: String(identity.prefix { $0 != ":" }), eTag: "")?.start
             }.max()
             // Resume an interrupted downloader even when the outage exceeds the normal lookback.
-            let firstDay = min(today.add(days: 1 - days), lastSuccess?.with(hour: 0) ?? today)
+            let firstDay = min(today.add(days: 1 - loopbackDays), lastSuccess?.with(hour: 0) ?? today)
             range = TimerangeDt(start: firstDay, to: today.add(days: 1), dtSeconds: 86400)
         }
         var scansByTime = [Timestamp: Scan]()
@@ -105,6 +113,10 @@ struct GoesDownloader: AsyncCommand {
         }
         let scans = scansByTime.values.sorted { $0.time < $1.time }
         let batches = Self.batches(scans: scans, completed: signature.force ? [] : completed, domain: domain)
+        // Prune even when no new scans need conversion. Plan first so existing
+        // checkpoints still suppress completed historical work in this invocation.
+        completed = Self.recentCompleted(completed, lookbackDays: loopbackDays)
+        try JSONEncoder().encode(completed.sorted()).write(to: URL(fileURLWithPath: stateFile), options: .atomic)
         logger.info("GOES: \(scans.count) available scans, \(batches.count) conversion batches")
         guard !batches.isEmpty else { return }
         // Count the actual download plan, including observations needed for interpolation.
@@ -129,6 +141,7 @@ struct GoesDownloader: AsyncCommand {
                 run: nil, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: queues)
             // Commit only after conversion succeeds. Failed/interrupted batches are retried.
             completed.formUnion(batch.map(\.identity))
+            completed = Self.recentCompleted(completed, lookbackDays: loopbackDays)
             try JSONEncoder().encode(completed.sorted()).write(to: URL(fileURLWithPath: stateFile), options: .atomic)
         }
         await progress.finish()
