@@ -7,7 +7,7 @@ import OmFileIO
  Important: SARAH-3 data originally uses instantaneous solar radiation values. However, each line has a scan time offset of 0-15 minutes.
  In Europe the offset is closer to 15 minutes.
  
- OpenMeteo corrects this scan time offset and stores backwards averaged 30 minutes values.
+ OpenMeteo stores the snapshot for scan start T as the backwards average ending at T + 30 minutes.
  */
 struct EumetsatSarahDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -96,7 +96,10 @@ struct EumetsatSarahDownload: AsyncCommand {
             /// time difference of the acquisition time since 2006 onwards (SEVIRI) to the time provided in the instantaneous data files
             /// time difference of the acquisition time during 1983-2005 (MVIRI) to the time provided in the instantaneous data files
             let timeDifferenceKey = run >= Timestamp(2006, 1, 1) ? "time_difference_SEVIRI" : "time_difference_MVIRI"
-            guard let timeDifference = try nc.getVariable(name: timeDifferenceKey)?.asType(Double.self)?.read().map({ $0 <= -999 ? Double.nan : $0 }) else {
+            // The output label is one step after scan start. Express acquisition offsets relative
+            // to that label so the solar geometry still uses the original observation time.
+            let labelShiftHours = Double(domain.dtSeconds) / 3600
+            guard let timeDifference = try nc.getVariable(name: timeDifferenceKey)?.asType(Double.self)?.read().map({ $0 <= -999 ? Double.nan : $0 - labelShiftHours }) else {
                 fatalError("Could not read \(timeDifferenceKey)")
             }
             return (elevation, landMask, timeDifference)
@@ -119,13 +122,15 @@ struct EumetsatSarahDownload: AsyncCommand {
             let memory = try await api.download(url: url)
             let (time, data) = try memory.readNetcdf(name: variable.eumetsatName)
             var dataFastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: time.count).transpose().data
+            // A snapshot scanned after T belongs to (T, T + 30 min], labelled T + 30 min.
+            // Use the same start for averaging and storage, including the next day's midnight.
+            let outputStart = time[0].add(domain.dtSeconds)
 
             // Transform instant solar radiation values to backwards averaged values
             // Instant values have a scan time difference which needs to be corrected for
             if variable == .direct_radiation || variable == .shortwave_radiation {
                 let start = DispatchTime.now()
-                let timerange = TimerangeDt(start: run, nTime: time.count, dtSeconds: domain.dtSeconds)
-                // Note: `timeDifference` is negative. Therefore we do not need to forward project timestamps
+                let timerange = TimerangeDt(start: outputStart, nTime: time.count, dtSeconds: domain.dtSeconds)
                 Zensun.instantaneousSolarRadiationToBackwardsAverages(
                     timeOrientedData: &dataFastTime,
                     grid: domain.grid,
@@ -141,7 +146,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: dataFastTime)
             return try await GenericVariableHandle(
                 variable: variable,
-                time: time[0],
+                time: outputStart,
                 member: 0,
                 fn: fn,
                 domain: domain
