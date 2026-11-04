@@ -8,7 +8,8 @@ enum GoesDomain: String, CaseIterable, GenericDomain {
     var domainRegistryStatic: DomainRegistry? { domainRegistry }
     var dtSeconds: Int { 600 }
     var updateIntervalSeconds: Int { 600 }
-    var omFileLength: Int { 2 * 24 * 6 }
+    /// One file chunk per day (GMT+0)
+    var omFileLength: Int { 1 * 24 * 6 }
     var countEnsembleMember: Int { 1 }
     var masterTimeRange: Range<Timestamp>? { nil }
     var generateFullRun: Bool { false }
