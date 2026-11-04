@@ -53,9 +53,9 @@ extension AtomicBlockCache where Backend == MmapFile {
         let indexSize = MemoryLayout<WordPair>.size * blockCount
         let pageSize = Int(getpagesize())
         let indexPagesSize = indexSize / pageSize * pageSize
-        // Scan index pages sequentially. A page shared with data keeps random advice.
+        // Prefetch index pages. A page shared with data keeps random advice.
         if indexPagesSize > 0 {
-            mapping.prefetchData(offset: 0, count: indexPagesSize, advice: .sequential)
+            mapping.prefetchData(offset: 0, count: indexPagesSize, advice: .willneed)
         }
         self = .init(data: mapping, blockSize: blockSize)
     }
