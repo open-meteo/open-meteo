@@ -40,7 +40,8 @@ public actor RemotePreloadExecutor {
         let session: RemotePreloadSession
         var next: () -> (@Sendable () async -> Void)?
         var ready = false
-        var active = false
+        var active: Set<UUID> = []
+        var exhausted = false
     }
     public struct Snapshot: Sendable {
         public let activeRequests: Int
@@ -82,12 +83,12 @@ public actor RemotePreloadExecutor {
         cancel(key: key)
         let id = UUID()
         guard !stopped else { return id }
-        if warmups.filter({ !$0.active }).count >= warmingCapacity,
-           let oldest = warmups.first(where: { !$0.active }) {
+        if warmups.filter({ $0.active.isEmpty }).count >= warmingCapacity,
+           let oldest = warmups.first(where: { $0.active.isEmpty }) {
             cancel(key: oldest.key)
         }
         var iterator = jobs.makeIterator()
-        warmups.append(Warmup(id: id, key: key, session: RemotePreloadSession(admission: admission, concurrency: 1, background: true), next: {
+        warmups.append(Warmup(id: id, key: key, session: RemotePreloadSession(admission: admission, concurrency: warmingConcurrency, background: true), next: {
             guard let job = iterator.next() else { return nil }
             return { await operation(job) }
         }))
@@ -103,9 +104,9 @@ public actor RemotePreloadExecutor {
         for work in warmups where work.key == key {
             if !work.session.isStopped { stoppedWarmups += 1 }
             work.session.stop()
-            tasks[work.id]?.cancel()
+            for task in work.active { tasks[task]?.cancel() }
         }
-        warmups.removeAll { !$0.active && $0.session.isStopped }
+        warmups.removeAll { $0.active.isEmpty && ($0.session.isStopped || $0.exhausted) }
     }
 
     public func shutdown() async {
@@ -177,19 +178,25 @@ public actor RemotePreloadExecutor {
     }
 
     private func drain() {
-        warmups.removeAll { !$0.active && $0.session.isStopped }
+        warmups.removeAll { $0.active.isEmpty && ($0.session.isStopped || $0.exhausted) }
         guard !stopped else { return }
-        // Rotation traversal is bounded separately; HTTP admission gives API work priority.
+        // Prefer files with fewer active chunks, rotating ties. One file can use spare capacity.
         while activeWarmups < warmingConcurrency,
-              let index = warmups.firstIndex(where: { $0.ready && !$0.active }) {
+              let index = warmups.indices.lazy.filter({
+                  self.warmups[$0].ready && !self.warmups[$0].exhausted && !self.warmups[$0].session.isStopped
+              }).min(by: { warmups[$0].active.count < warmups[$1].active.count }) {
             var work = warmups.remove(at: index)
-            guard let operation = work.next() else { continue }
-            work.active = true
+            guard let operation = work.next() else {
+                work.exhausted = true
+                if !work.active.isEmpty { warmups.append(work) }
+                continue
+            }
+            let task = UUID()
+            work.active.insert(task)
             warmups.append(work)
             activeWarmups += 1
             let id = work.id
             let session = work.session
-            let task = id
             tasks[task] = Task {
                 await RemotePreloadSession.$current.withValue(session) {
                     if !session.isStopped { await operation() }
@@ -197,10 +204,7 @@ public actor RemotePreloadExecutor {
                 tasks.removeValue(forKey: task)
                 activeWarmups -= 1
                 if let index = warmups.firstIndex(where: { $0.id == id }) {
-                    // Move the completed file behind other files for chunk-level fairness.
-                    var work = warmups.remove(at: index)
-                    work.active = false
-                    warmups.append(work)
+                    warmups[index].active.remove(task)
                 }
                 drain()
             }

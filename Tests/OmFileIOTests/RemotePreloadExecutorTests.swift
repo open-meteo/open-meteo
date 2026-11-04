@@ -80,19 +80,61 @@ private func preloadAttempt(_ operation: () async -> Void) async {
     }
 
     @Test(.timeLimit(.minutes(1)))
+    func warmingUsesSpareCapacityAndGivesAnotherFileTheNextSlot() async throws {
+        let executor = RemotePreloadExecutor(concurrency: 4, warmingConcurrency: 3)
+        let gates = (0..<6).map { _ in PreloadGate() }
+        let otherGate = PreloadGate()
+        let log = Mutex<[String]>([])
+        let first = await executor.stage(key: "first", jobs: 0..<6) { chunk in
+            await preloadAttempt {
+                log.withLock { $0.append("first\(chunk)") }
+                await gates[chunk].wait()
+            }
+        }
+        await executor.activate(first)
+        do {
+            try await waitForPreload { log.withLock { $0.count == 3 } }
+            #expect(log.withLock { Set($0) } == ["first0", "first1", "first2"])
+            #expect(await executor.snapshot.activeWarmups == 3)
+            let other = await executor.stage(key: "other", jobs: 0..<1) { _ in
+                await preloadAttempt {
+                    log.withLock { $0.append("other") }
+                    await otherGate.wait()
+                }
+            }
+            await executor.activate(other)
+            await gates[0].release()
+            try await waitForPreload { log.withLock { $0.count >= 4 } }
+            #expect(log.withLock { $0.count } == 4)
+            #expect(log.withLock { $0.last } == "other")
+            #expect(await executor.snapshot.activeWarmups == 3)
+            for gate in gates { await gate.release() }
+            await otherGate.release()
+            try await waitForPreload { log.withLock { $0.count == 7 } }
+            await executor.shutdown()
+        } catch {
+            for gate in gates { await gate.release() }
+            await otherGate.release()
+            await executor.shutdown()
+            throw error
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
     func replacementStopsFutureChunksButFinishesActiveChunk() async throws {
-        let executor = RemotePreloadExecutor(concurrency: 1)
+        let executor = RemotePreloadExecutor(concurrency: 2, warmingConcurrency: 2)
         let gate = PreloadGate()
         let log = Mutex<[String]>([])
-        let old = await executor.stage(key: "file", jobs: 0..<2) { chunk in
+        let old = await executor.stage(key: "file", jobs: 0..<3) { chunk in
             log.withLock { $0.append("old\(chunk)") }
             await gate.wait()
             #expect(RemotePreloadSession.current?.isStopped == true)
+            #expect(Task.isCancelled)
             log.withLock { $0.append("finished") }
         }
         await executor.activate(old)
         do {
-            try await waitForPreload { log.withLock { $0 == ["old0"] } }
+            try await waitForPreload { log.withLock { Set($0) == ["old0", "old1"] } }
             let latest = await executor.stage(key: "file", jobs: 0..<1) { _ in
                 log.withLock { $0.append("latest") }
             }
@@ -100,8 +142,9 @@ private func preloadAttempt(_ operation: () async -> Void) async {
             #expect(await executor.snapshot.activeWarmups == 0) // No HTTP attempt in this chunk.
             #expect(await executor.snapshot.stoppedWarmups == 1)
             await gate.release()
-            try await waitForPreload { log.withLock { $0.count == 3 } }
-            #expect(log.withLock { $0 } == ["old0", "finished", "latest"])
+            try await waitForPreload { log.withLock { $0.count == 5 } }
+            #expect(log.withLock { $0.filter { $0 == "finished" }.count } == 2)
+            #expect(log.withLock { Set($0) } == ["old0", "old1", "finished", "latest"])
             await executor.shutdown()
         } catch {
             await gate.release()
