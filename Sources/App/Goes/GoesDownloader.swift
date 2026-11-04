@@ -47,7 +47,8 @@ struct GoesDownloader: AsyncCommand {
     static func batches(scans: [Scan], completed: Set<String>, domain: GoesDomain = .goes19) -> [[Scan]] {
         var result = [[Scan]]()
         for (_, chunkScans) in scans.groupedPreservedOrder(by: {
-            $0.time.timeIntervalSince1970 / domain.dtSeconds / domain.omFileLength
+            // Shift acquisition time to the stored interval end before choosing the chunk.
+            ($0.start.timeIntervalSince1970 + domain.dtSeconds) / domain.dtSeconds / domain.omFileLength
         }) {
             guard let first = chunkScans.firstIndex(where: { !completed.contains($0.identity) }),
                   let last = chunkScans.lastIndex(where: { !completed.contains($0.identity) }) else {
