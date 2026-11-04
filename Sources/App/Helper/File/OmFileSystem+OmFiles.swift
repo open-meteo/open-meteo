@@ -19,9 +19,17 @@ struct OmFileLocalRemoteOmReader {
 
 extension OmFileLocalRemoteOmReader: OmFilePayload {
     init(fd: FileHandle, size: Int64) async throws {
-        // TODO because the size is known already, this should be passed to MmapFile.init
-        let file = try MmapFile(fn: fd, advice: .random)
-        let readerRaw = try await OmFileReader(fn: file)
+        // On a network file system, a mapped file that another machine replaces raises SIGBUS on the next page fault and ends the process. pread only fails the read
+        if OpenMeteo.dataDirectoryNetworkFileSystem {
+            try await self.init(localFile: FileHandleWithCount(fd))
+        } else {
+            // TODO because the size is known already, this should be passed to MmapFile.init
+            try await self.init(localFile: MmapFile(fn: fd, advice: .random))
+        }
+    }
+
+    private init<Backend: OmFileReaderBackend>(localFile: Backend) async throws {
+        let readerRaw = try await OmFileReader(fn: localFile)
         self.reader = try readerRaw.expectArray(of: Float.self)
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
