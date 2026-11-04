@@ -10,6 +10,14 @@ import OmFileIO
         GoesDownloader.Scan(key: Self.key.replacingOccurrences(of: "s20263070000210", with: "s202630700\(minute.zeroPadded(len: 2))210"), eTag: tag)!
     }
 
+    func scan(endingAt time: Timestamp) -> GoesDownloader.Scan {
+        let start = time.add(-GoesDomain.goes19.dtSeconds)
+        let year = start.toComponents().year
+        let day = ((start.timeIntervalSince1970 - Timestamp(year, 1, 1).timeIntervalSince1970) / 86400 + 1).zeroPadded(len: 3)
+        let hour = start.hour.zeroPadded(len: 2), minute = start.minute.zeroPadded(len: 2)
+        return GoesDownloader.Scan(key: "ABI-L2-DSRF/\(year)/\(day)/\(hour)/OR_ABI-L2-DSRF-M6_G19_s\(year)\(day)\(hour)\(minute)210_eunused_cunused.nc", eTag: "a")!
+    }
+
     @Test func filenameAndIntervalEnd() {
         let file = scan(0)
         #expect(file.start == Timestamp(2026, 11, 3, 0, 0, 21))
@@ -39,13 +47,47 @@ import OmFileIO
         #expect(GoesDownloader.batches(scans: [replaced, latest], completed: completed) == [[replaced, latest]])
     }
 
-    @Test func boundedBatchesRetainGapEndpointsAndRetries() {
+    @Test func chunkBatchRetainsGapEndpointsAndRetries() {
         let scans = [scan(0), scan(10), scan(30), scan(40), scan(50)]
-        let batches = GoesDownloader.batches(scans: scans, completed: [], batchSize: 3)
-        #expect(batches == [Array(scans[0...2]), Array(scans[2...4])])
-        // Only the first batch committed before a failure. The retry still has its left endpoint.
+        #expect(GoesDownloader.batches(scans: scans, completed: []) == [scans])
+        // Earlier invocations completed the first observations; retain the gap endpoint.
         #expect(GoesDownloader.batches(scans: scans, completed: Set(scans[0...2].map(\.identity))) == [Array(scans[2...4])])
+        // Pending observations separated by completed scans must not cause those
+        // observations to be replaced by interpolation in the merged conversion.
+        #expect(GoesDownloader.batches(scans: scans, completed: Set(scans[1...3].map(\.identity))) == [scans])
         #expect(GoesDownloader.batches(scans: [], completed: []).isEmpty)
+    }
+
+    @Test func batchesMatchTwoDayOmChunks() {
+        let domain = GoesDomain.goes19
+        let duration = domain.dtSeconds * domain.omFileLength
+        let boundary = Timestamp(Timestamp(2026, 11, 3).timeIntervalSince1970 / duration * duration)
+        let scans = (0..<domain.omFileLength * 2).map { scan(endingAt: boundary.add($0 * domain.dtSeconds)) }
+        let batches = GoesDownloader.batches(scans: scans, completed: [])
+        #expect(batches.count == 2)
+        #expect(batches.map(\.count) == [288, 288])
+        #expect(batches.flatMap { $0 } == scans)
+        for batch in batches {
+            let time = TimerangeDt(start: batch.first!.time, to: batch.last!.time.add(domain.dtSeconds), dtSeconds: domain.dtSeconds)
+            // Exactly one file would be opened by OmFileSplitter for this batch.
+            #expect(time.toIndexTime().divideRoundedUp(divisor: domain.omFileLength).count == 1)
+        }
+        // A failed second chunk is retried without downloading/writing the first again.
+        let completed = Set(batches[0].map(\.identity))
+        #expect(GoesDownloader.batches(scans: scans, completed: completed) == [batches[1]])
+    }
+
+    @Test func shiftedMidnightScanBelongsToNextChunk() {
+        let domain = GoesDomain.goes19
+        let duration = domain.dtSeconds * domain.omFileLength
+        let boundary = Timestamp(Timestamp(2026, 11, 3).timeIntervalSince1970 / duration * duration)
+        let before = scan(endingAt: boundary.add(-domain.dtSeconds))
+        let midnight = scan(endingAt: boundary)
+        let after = scan(endingAt: boundary.add(domain.dtSeconds))
+        #expect(midnight.start < boundary)
+        #expect(midnight.time == boundary)
+        #expect(GoesDownloader.batches(scans: [before, midnight, after], completed: []) == [[before], [midnight, after]])
+        #expect(GoesDownloader.batches(scans: [before, midnight, after], completed: [before.identity]) == [[midnight, after]])
     }
 
     @Test func projectionAndNativeGridOrientation() {

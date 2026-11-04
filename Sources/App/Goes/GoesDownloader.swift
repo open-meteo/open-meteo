@@ -39,24 +39,25 @@ struct GoesDownloader: AsyncCommand {
         }
     }
 
-    /// Include adjacent observations in each conversion batch so a missing scan can
-    /// be interpolated, including gaps crossing invocations and late arrivals.
-    static func batches(scans: [Scan], completed: Set<String>, batchSize: Int = 12) -> [[Scan]] {
-        var selected = Set<Int>()
-        for i in scans.indices where !completed.contains(scans[i].identity) {
-            for j in max(0, i - 1)...min(scans.count - 1, i + 1) { selected.insert(j) }
-        }
-        var result = [[Scan]](), batch = [Scan]()
-        var previous: Int?
-        for i in selected.sorted() {
-            if let previous, i != previous + 1 || batch.count >= batchSize {
-                result.append(batch)
-                batch = i == previous + 1 ? [scans[previous]] : []
+    /// Convert each OM time chunk at most once per invocation. Use the stored
+    /// interval-end timestamp, including its shift from the nominal scan time,
+    /// and the same epoch-based indexing as OmFileSplitter.
+    static func batches(scans: [Scan], completed: Set<String>, domain: GoesDomain = .goes19) -> [[Scan]] {
+        var result = [[Scan]]()
+        for (_, chunkScans) in scans.groupedPreservedOrder(by: {
+            $0.time.timeIntervalSince1970 / domain.dtSeconds / domain.omFileLength
+        }) {
+            guard let first = chunkScans.firstIndex(where: { !completed.contains($0.identity) }),
+                  let last = chunkScans.lastIndex(where: { !completed.contains($0.identity) }) else {
+                continue
             }
-            batch.append(scans[i])
-            previous = i
+            // Include all observations between pending scans, plus their neighbors
+            // within this chunk. This preserves actual observations during gap
+            // interpolation without rewriting an adjacent OM file for an anchor.
+            let start = max(0, first - 1)
+            let end = min(chunkScans.count, last + 2)
+            result.append(Array(chunkScans[start..<end]))
         }
-        if !batch.isEmpty { result.append(batch) }
         return result
     }
 
@@ -100,7 +101,7 @@ struct GoesDownloader: AsyncCommand {
             }
         }
         let scans = scansByTime.values.sorted { $0.time < $1.time }
-        let batches = Self.batches(scans: scans, completed: signature.force ? [] : completed)
+        let batches = Self.batches(scans: scans, completed: signature.force ? [] : completed, domain: domain)
         logger.info("GOES: \(scans.count) available scans, \(batches.count) conversion batches")
         for batch in batches {
             let handles: [GenericVariableHandle] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
