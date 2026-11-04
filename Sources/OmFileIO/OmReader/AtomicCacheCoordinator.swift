@@ -27,7 +27,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     // Speculation may be skipped under pressure; demand is never limited here.
     private let speculativeCapacity: Int
 
-    public init(cache: AtomicBlockCache<Backend>, speculativeCapacity: Int = 1024) {
+    public init(cache: AtomicBlockCache<Backend>, speculativeCapacity: Int = 4 * 1024) {
         precondition(speculativeCapacity > 0)
         self.speculativeCapacity = speculativeCapacity
         self.cache = cache
