@@ -281,13 +281,15 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
         }
         if prefetch {
-            try await ReaderPrefetchPolicy.$current.withValue(remoteEnabled ? .localOnly : .all) {
-                for location in results {
-                    for model in location.results {
-                        try await model.prefetch(
-                            currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables,
-                            hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables,
-                            weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+            try await ReaderPrefetchPolicy.$current.withValue(.all) {
+                try await RemotePreloadSession.$current.withValue(output.preload?.session) {
+                    for location in results {
+                        for model in location.results {
+                            try await model.prefetch(
+                                currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables,
+                                hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables,
+                                weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
+                        }
                     }
                 }
             }

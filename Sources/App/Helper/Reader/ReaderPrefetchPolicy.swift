@@ -1,19 +1,14 @@
 import OmFileIO
 
-/// Keep normal paging separate from early remote block-cache warming.
-/// Local-only prefetch skips remote lookup before initializing file payloads.
-/// The resolved reader also filters payload prefetch, including local fallbacks
-/// reached by remote-only jobs.
+/// Separate early remote discovery from the normal paging pass over all readers.
 enum ReaderPrefetchPolicy: Sendable {
     case all
     case remoteOnly
-    case localOnly
 
     func includes(isRemote: Bool) -> Bool {
         switch self {
         case .all: return true
         case .remoteOnly: return isRemote
-        case .localOnly: return !isRemote
         }
     }
 

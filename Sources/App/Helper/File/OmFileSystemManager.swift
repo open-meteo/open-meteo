@@ -102,7 +102,7 @@ final class OmFileSystemManager: Sendable {
         return nil
     }
     
-    func with<R, Key: OmFileManagable>(file: Key, localOnly: Bool = false, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
+    func with<R, Key: OmFileManagable>(file: Key, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
         try RemotePreloadSession.current?.checkActive()
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
@@ -110,7 +110,7 @@ final class OmFileSystemManager: Sendable {
             let payload = try await object.getPayload(ofType: Key.Payload.self)
             return try await fn(payload)
         }
-        guard !localOnly, !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
+        guard !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
             return nil
         }
         /// Check for remote file
@@ -155,7 +155,7 @@ final class OmFileSystemManager: Sendable {
 extension OmFileSystemManager {
     /// Resolve the variable directory once and retain its copy-on-write file indexes.
     /// Returns nil when neither an accessible local nor remote directory exists.
-    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int, localOnly: Bool = false) async throws -> SeriesDirectory? {
+    func getSeriesDirectory(domain: DomainRegistry, variable: String, ensembleMember: Int, previousDay: Int) async throws -> SeriesDirectory? {
         try RemotePreloadSession.current?.checkActive()
         // The common case reuses the variable string without allocating a path.
         var name = variable
@@ -173,7 +173,7 @@ extension OmFileSystemManager {
             .getDirectory(name: name)?
             .getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
-        if !localOnly, !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
+        if !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
             remote = try await remoteFileSystem.getRoot()
                 .getDirectory(name: "data")?
                 .getDirectory(name: domain.rawValue)?

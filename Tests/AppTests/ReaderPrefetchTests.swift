@@ -54,7 +54,7 @@ private final class PrefetchRecordingBackend: OmFileReaderBackend, Sendable {
 
     @Test(arguments: [false, true], [false, true])
     func responseKeepsNormalPrefetchSeparate(prefetch: Bool, remoteEnabled: Bool) async throws {
-        let calls = Mutex((remote: 0, local: 0))
+        let calls = Mutex((remote: 0, normal: 0))
         let provider = DummyDataProvider(onPrefetch: { variables in
             switch ReaderPrefetchPolicy.current {
             case .remoteOnly:
@@ -63,25 +63,26 @@ private final class PrefetchRecordingBackend: OmFileReaderBackend, Sendable {
                 calls.withLock {
                     $0.remote += 1
                 }
-            case .all, .localOnly:
-                #expect(ReaderPrefetchPolicy.current == (remoteEnabled ? .localOnly : .all))
+            case .all:
+                #expect(ReaderPrefetchPolicy.current == .all)
+                #expect((RemotePreloadSession.current != nil) == remoteEnabled)
                 #expect(OmReaderPrefetch.pageInPayload)
                 #expect(prefetch)
                 #expect(variables.count == 8)
                 calls.withLock {
-                    $0.local += 1
+                    $0.normal += 1
                 }
             }
         })
         let result = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1, firstLocation: provider)
         let response = try await result.response(format: .json(fixedGenerationTime: 0), prefetch: prefetch, logger: .init(label: "test"), remoteEnabled: remoteEnabled)
-        #expect(calls.withLock { $0.local } == (prefetch ? 1 : 0))
+        #expect(calls.withLock { $0.normal } == (prefetch ? 1 : 0))
         // Discovery must finish before response consumption starts.
         #expect(calls.withLock { $0.remote } == (remoteEnabled ? 8 : 0))
         try await withApp { app in
             _ = try await response.body.collect(on: app.eventLoopGroup.next()).get()
         }
-        #expect(calls.withLock { $0.local } == (prefetch ? 1 : 0))
+        #expect(calls.withLock { $0.normal } == (prefetch ? 1 : 0))
         #expect(calls.withLock { $0.remote } == (remoteEnabled ? 8 : 0))
         #expect(ReaderPrefetchPolicy.current == .all)
     }
