@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.1](https://github.com/open-meteo/open-meteo/compare/1.8.0...1.8.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **sarah-3:** Use forward timestamps similar to DWD SIS ([#2301](https://github.com/open-meteo/open-meteo/issues/2301)) ([4e602cc](https://github.com/open-meteo/open-meteo/commit/4e602ccddf8e4e519855aac02ed402261800512a))
+* use madv random for atomic block cache ([#2303](https://github.com/open-meteo/open-meteo/issues/2303)) ([97132c5](https://github.com/open-meteo/open-meteo/commit/97132c51bbb138c0041ebbbe6570e4140943eb03))
+
 ## [1.8.0](https://github.com/open-meteo/open-meteo/compare/1.7.0...1.8.0) (2026-11-03)
 
 
