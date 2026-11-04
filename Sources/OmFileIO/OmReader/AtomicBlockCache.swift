@@ -9,6 +9,7 @@ public protocol AtomicBlockCacheStorable: Sendable {
     var count: Int { get }
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R
     func prefetchData(offset: Int, count: Int)
+    func adviseData(offset: Int, count: Int, advice: MmapFile.MAdvice)
 }
 
 extension MmapFile: AtomicBlockCacheStorable {
@@ -144,8 +145,8 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
-    /// Prefetch data
-    func prefetch(key: UInt64) {
+    /// Advise the memory pages of a cached block.
+    func advise(key: UInt64, advice: MmapFile.MAdvice) {
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
         data.withMutableUnsafeBytes { bytes in
@@ -160,7 +161,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         break
                     }
                     let offset = blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot)
-                    data.prefetchData(offset: offset, count: blockSize)
+                    data.adviseData(offset: offset, count: blockSize, advice: advice)
                     return
                 }
             }

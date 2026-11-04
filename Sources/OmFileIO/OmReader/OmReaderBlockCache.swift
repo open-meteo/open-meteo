@@ -37,6 +37,15 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         return cacheKey.addFnv1aHash(UInt64(block / superBlockLength)) &+ UInt64(block)
     }
     
+    /// Advise resident cache blocks without fetching missing data from the backend.
+    public func adviseData(offset: Int, count: Int, advice: MmapFile.MAdvice) {
+        guard offset >= 0, count > 0, offset <= self.count, count <= self.count - offset else { return }
+        let blocks = (offset ..< offset + count).divideRoundedUp(divisor: cache.cache.blockSize)
+        for block in blocks {
+            cache.cache.advise(key: calculateCacheKey(block: block), advice: advice)
+        }
+    }
+
     public func prefetchData(offset: Int, count: Int) async throws {
         let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
