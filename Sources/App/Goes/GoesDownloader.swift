@@ -20,9 +20,10 @@ struct GoesDownloader: AsyncCommand {
         let key: String
         let start: Timestamp
         let identity: String
+        let fileSize: Int
         var time: Timestamp { Timestamp(start.timeIntervalSince1970 / 600 * 600 + 600) }
 
-        init?(key: String, eTag: String) {
+        init?(key: String, eTag: String, fileSize: Int = 0) {
             guard key.hasPrefix("ABI-L2-DSRF/"), key.hasSuffix(".nc"),
                   key.contains("OR_ABI-L2-DSRF-M6_G19_s"),
                   let token = key.components(separatedBy: "_s").last?.components(separatedBy: "_").first,
@@ -33,6 +34,7 @@ struct GoesDownloader: AsyncCommand {
                   let minute = Int(token[9..<11]), minute < 60,
                   let second = Int(token[11..<13]), second < 60 else { return nil }
             self.key = key
+            self.fileSize = fileSize
             self.start = Timestamp(year, 1, 1).add((day - 1) * 86400 + hour * 3600 + minute * 60 + second)
             // Preserve checkpoint identities written by the original XML listing parser.
             self.identity = key + ":" + eTag.replacingOccurrences(of: "\"", with: "&quot;")
@@ -94,7 +96,7 @@ struct GoesDownloader: AsyncCommand {
             let listing = try await S3List.s3list(server: Self.server, client: context.application.dedicatedHttpClient,
                 logger: logger, prefix: prefix, apikey: nil, deadLineHours: 0.1, delimiter: "")
             for file in listing.files {
-                guard let scan = Scan(key: file.name, eTag: file.eTag) else { continue }
+                guard let scan = Scan(key: file.name, eTag: file.eTag, fileSize: file.fileSize) else { continue }
                 // Creation timestamp at the end of the key sorts reprocessed versions.
                 if let old = scansByTime[scan.time], old.key > scan.key { continue }
                 scansByTime[scan.time] = scan
@@ -103,10 +105,17 @@ struct GoesDownloader: AsyncCommand {
         let scans = scansByTime.values.sorted { $0.time < $1.time }
         let batches = Self.batches(scans: scans, completed: signature.force ? [] : completed, domain: domain)
         logger.info("GOES: \(scans.count) available scans, \(batches.count) conversion batches")
+        guard !batches.isEmpty else { return }
+        // Count the actual download plan, including observations needed for interpolation.
+        let totalBytes = batches.reduce(0) { total, batch in total + batch.reduce(0) { $0 + $1.fileSize } }
+        let fileCount = batches.reduce(0) { $0 + $1.count }
+        logger.info("GOES: Downloading \(fileCount) files (\(totalBytes.bytesHumanReadable))")
+        let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "GOES overall download")
         for batch in batches {
             let handles: [GenericVariableHandle] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
                 logger.info("GOES: \(scan.key)")
                 let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key, minSize: nil)
+                await progress.add(buffer.readableBytes)
                 let data = try buffer.withUnsafeBytes { bytes in
                     guard let nc = try NetCDF.open(memory: bytes) else { throw Abort(.badGateway, reason: "Cannot open GOES NetCDF") }
                     return try Self.decode(nc: nc, scan: scan)
@@ -121,6 +130,7 @@ struct GoesDownloader: AsyncCommand {
             completed.formUnion(batch.map(\.identity))
             try JSONEncoder().encode(completed.sorted()).write(to: URL(fileURLWithPath: stateFile), options: .atomic)
         }
+        await progress.finish()
     }
 
     static func decode(nc: Group, scan: Scan) throws -> [Float] {
