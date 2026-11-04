@@ -93,7 +93,7 @@ struct S3UploadQueueTests {
                 onError: { failures.wrappingAdd(1, ordering: .relaxed) },
                 maxConcurrentFiles: 2, maxConcurrentPartUploads: 1
             )
-            await session.queue.enqueueIgnoreError(logger: session.logger) {
+            await session.enqueuePreparation {
                 for await _ in releaseSlowUpload.stream { break }
                 return S3MultiPartUploadPrepared(etags: [], url: "https://example.com/slow", encodedUploadId: "slow", lastModified: .init(0))
             }
@@ -101,7 +101,7 @@ struct S3UploadQueueTests {
             // Publication must happen before we release the other file or finish the session.
             var notifications = committed.stream.makeAsyncIterator()
             _ = await notifications.next()
-            await session.queue.enqueueIgnoreError(logger: session.logger) { throw Failure.injected }
+            await session.enqueuePreparation { throw Failure.injected }
             releaseSlowUpload.continuation.yield(())
             releaseSlowUpload.continuation.finish()
             committed.continuation.finish()
@@ -129,7 +129,7 @@ struct S3UploadQueueTests {
         // More results than queue capacity must drain before finish is called.
         // A failed preparation must not discard successful uploads needed for commit or abort.
         for index in 0..<8 {
-            await session.queue.enqueueIgnoreError(logger: session.logger) {
+            await session.enqueuePreparation {
                 if ignoreFailure && index == 3 { throw Failure.injected }
                 return S3MultiPartUploadPrepared(
                     etags: [], url: "https://example.com/\(index)",
