@@ -1,3 +1,4 @@
+import Foundation
 import OmFileFormat
 import Dispatch
 import Logging
@@ -102,8 +103,7 @@ final class OmFileSystemManager: Sendable {
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getFile(fullPath: path) {
-            let payload = try await object.getPayload(ofType: Key.Payload.self)
-            return try await fn(payload)
+            return try await object.with(payloadType: Key.Payload.self, fn: fn)
         }
         guard !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
             return nil
@@ -233,11 +233,25 @@ extension OmFileSystemManager {
         func with<R, Key: OmFileManagable>(payloadType: Key.Type, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
             switch self {
             case .local(let file):
-                return try await fn(file.getPayload(ofType: Key.Payload.self))
+                return try await file.with(payloadType: Key.Payload.self, fn: fn)
             case .remote(let file):
                 return try await file.with(fn: fn)
             }
         }
     }
 
+}
+
+extension OmFileSystemLocal.File {
+    /// On a network file system, a file that another machine replaced fails reads with ESTALE or EIO until the directory is listed again, so the read is retried once on the file opened again by name
+    nonisolated func with<T: OmLocalPayload, R>(payloadType: T.Type, fn: (T) async throws -> R) async throws -> R {
+        do {
+            return try await fn(getPayload(ofType: T.self))
+        } catch OmFileFormatSwiftError.cannotReadFile(let code, let message) where OpenMeteo.dataDirectoryNetworkFileSystem && (code == ESTALE || code == EIO) {
+            guard let reopened = await reopen() else {
+                throw OmFileFormatSwiftError.cannotReadFile(errno: code, error: message)
+            }
+            return try await fn(reopened.getPayload(ofType: T.self))
+        }
+    }
 }

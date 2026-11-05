@@ -81,6 +81,25 @@ import OmTime
         #expect(try await replacementFile.fd.readToEnd() == Data("replacement".utf8))
     }
 
+    @Test func reopenReplacedFileWithoutDirectoryRefresh() async throws {
+        let directoryUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directoryUrl, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryUrl) }
+        let fileUrl = directoryUrl.appendingPathComponent("file")
+        try Data("old".utf8).write(to: fileUrl)
+        let directory = try OmFileSystemLocal.Directory(path: directoryUrl.path)
+        await directory.updateIfRequired()
+        let oldFile = try #require(await directory.getFile(name: "file"))
+
+        let replacementUrl = directoryUrl.appendingPathComponent("replacement~")
+        try Data("replacement".utf8).write(to: replacementUrl)
+        try FileManager.default.moveFileOverwrite(from: replacementUrl.path, to: fileUrl.path)
+
+        let reopened = try #require(await oldFile.reopen())
+        #expect(try reopened.fd.readToEnd() == Data("replacement".utf8))
+        #expect(await directory.getFile(name: "file") === reopened)
+    }
+
     @Test func fileSystemCacheBackgroundRefreshTraversesSyntheticRoot() async throws {
         let directoryUrl = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directoryUrl, withIntermediateDirectories: true)
