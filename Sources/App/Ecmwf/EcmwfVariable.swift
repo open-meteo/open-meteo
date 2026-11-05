@@ -289,6 +289,11 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     static let pressure_levels = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
 
+    /// Pressure fields use the hPa suffix; soil fields also have a GRIB level.
+    var isPressureLevel: Bool {
+        rawValue.hasSuffix("hPa")
+    }
+
     var omFileName: (file: String, level: Int) {
         return (nameInFiles, 0)
     }
