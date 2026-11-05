@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 import Testing
 import SwiftNetCDF
 import OmFileIO
@@ -50,6 +51,37 @@ import OmFileFormat
             let nc = try #require(try NetCDF.open(path: path, allowUpdate: false))
             #expect(throws: GoesDownloader.InvalidScanTimes.self) {
                 try GoesDownloader.decode(nc: nc, scan: scan)
+            }
+        }
+    }
+
+    @Test func hdf5DecodeRetriesAndLeavesFailedScansPending() async throws {
+        let logger = Logger(label: "goes-retry-test")
+        let recovered = try await GoesDownloader.decodeWithRetries(scan: scan(0), logger: logger, retryDelayNanoseconds: 0) { attempt in
+            if attempt < 3 { throw NetCDFError.hdf5Error }
+            return [42]
+        }
+        #expect(recovered == [42])
+        let skipped = try await GoesDownloader.decodeWithRetries(scan: scan(0), logger: logger, retryDelayNanoseconds: 0) { attempt in
+            #expect((1...3).contains(attempt))
+            throw NetCDFError.hdf5Error
+        }
+        #expect(skipped == nil)
+        let invalid = try await GoesDownloader.decodeWithRetries(scan: scan(0), logger: logger, retryDelayNanoseconds: 0) { attempt in
+            #expect(attempt == 1)
+            throw GoesDownloader.InvalidScanTimes(bounds: [-999, -999])
+        }
+        #expect(invalid == nil)
+        await #expect(throws: NetCDFError.self) {
+            try await GoesDownloader.decodeWithRetries(scan: scan(0), logger: logger, retryDelayNanoseconds: 0) { attempt in
+                #expect(attempt == 1)
+                throw NetCDFError.outOfMemory
+            }
+        }
+        await #expect(throws: CancellationError.self) {
+            try await GoesDownloader.decodeWithRetries(scan: scan(0), logger: logger, retryDelayNanoseconds: 0) { attempt in
+                #expect(attempt == 1)
+                throw CancellationError()
             }
         }
     }

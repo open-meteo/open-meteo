@@ -127,20 +127,18 @@ struct GoesDownloader: AsyncCommand {
         for batch in batches {
             let downloads: [(scan: Scan, handle: GenericVariableHandle)?] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
                 logger.info("GOES: \(scan.key)")
-                // Backfills can run for days. Start a fresh retry deadline per file
-                // instead of inheriting Curl's deadline from command startup.
-                let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key, minSize: nil, deadLineHours: 1)
-                await progress.add(buffer.readableBytes)
-                let data: [Float]
-                do {
-                    data = try buffer.withUnsafeBytes { bytes in
+                let decoded = try await Self.decodeWithRetries(scan: scan, logger: logger) { attempt in
+                    // Each attempt gets a fresh download and retry deadline.
+                    let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key,
+                        minSize: scan.fileSize > 0 ? scan.fileSize : nil, deadLineHours: 1)
+                    // Keep overall progress relative to the planned files, excluding retries.
+                    if attempt == 1 { await progress.add(buffer.readableBytes) }
+                    return try buffer.withUnsafeBytes { bytes in
                         guard let nc = try NetCDF.open(memory: bytes) else { throw Abort(.badGateway, reason: "Cannot open GOES NetCDF") }
                         return try Self.decode(nc: nc, scan: scan)
                     }
-                } catch let error as InvalidScanTimes {
-                    logger.warning("GOES: Skipping \(scan.key): \(error). Leaving scan pending for retry.")
-                    return nil
                 }
+                guard let data = decoded else { return nil }
                 // Conversion reads full-width strips only a few rows high. Keep
                 // chunks within one row to avoid repeatedly decoding 32-row tiles.
                 let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [1, min(domain.grid.nx, 1024)])
@@ -159,6 +157,32 @@ struct GoesDownloader: AsyncCommand {
             try JSONEncoder().encode(completed.sorted()).write(to: URL(fileURLWithPath: stateFile), options: .atomic)
         }
         await progress.finish()
+    }
+
+    /// Retry HDF5 decoding errors with a fresh file, but do not hide resource,
+    /// schema or cancellation errors. Skipped scans remain absent from checkpoints.
+    static func decodeWithRetries(scan: Scan, logger: Logger, retryDelayNanoseconds: UInt64 = 5_000_000_000,
+                                  operation: @Sendable (Int) async throws -> [Float]) async throws -> [Float]? {
+        for attempt in 1...3 {
+            try Task.checkCancellation()
+            do {
+                return try await operation(attempt)
+            } catch let error as InvalidScanTimes {
+                logger.warning("GOES: Skipping \(scan.key): \(error). Leaving scan pending for retry.")
+                return nil
+            } catch NetCDFError.hdf5Error {
+                if attempt == 3 {
+                    logger.warning("GOES: Skipping \(scan.key): HDF5 decoding failed after 3 downloads. Leaving scan pending for retry.")
+                    return nil
+                }
+                logger.warning("GOES: HDF5 decoding failed for \(scan.key), attempt \(attempt)/3. Downloading the file again.")
+                try await Task.sleep(nanoseconds: retryDelayNanoseconds)
+            } catch {
+                logger.error("GOES: Failed to download/decode \(scan.key): \(error)")
+                throw error
+            }
+        }
+        return nil
     }
 
     struct InvalidScanTimes: Error, CustomStringConvertible {
