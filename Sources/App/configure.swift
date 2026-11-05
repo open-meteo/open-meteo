@@ -7,6 +7,9 @@ import OmFileIO
 enum OpenMeteo {
     static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
 
+    /// Set `DATA_DIRECTORY_NETWORK_FS=true` when the data directory is on a network file system (NFS) that another machine writes to
+    static let dataDirectoryNetworkFileSystem = Environment.get("DATA_DIRECTORY_NETWORK_FS") == "true"
+
     /// Data directory with trailing slash
     static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
