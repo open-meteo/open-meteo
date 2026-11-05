@@ -34,6 +34,26 @@ import OmFileFormat
         }
     }
 
+    @Test func invalidScanTimingIsRejected() throws {
+        let scan = scan(0)
+        let epoch = Double(Timestamp(2000, 1, 1, 12).timeIntervalSince1970)
+        let start = Double(scan.start.timeIntervalSince1970) + 0.1 - epoch
+        let valid = try GoesDownloader.validatedScanTimes(bounds: [start, start + 570.8], scan: scan)
+        #expect(abs(valid.end - valid.start - 570.8) < 0.001)
+        for bounds: [Double] in [[], [-999, -999], [start, start], [start, start + 100], [.nan, .nan], [start, .infinity], [start + 600, start + 1170.8]] {
+            #expect(throws: GoesDownloader.InvalidScanTimes.self) {
+                try GoesDownloader.validatedScanTimes(bounds: bounds, scan: scan)
+            }
+        }
+        // Optional real NOAA file with missing time bounds (2025-05-21 17:30).
+        if let path = ProcessInfo.processInfo.environment["GOES_INVALID_TIME_TEST_FILE"] {
+            let nc = try #require(try NetCDF.open(path: path, allowUpdate: false))
+            #expect(throws: GoesDownloader.InvalidScanTimes.self) {
+                try GoesDownloader.decode(nc: nc, scan: scan)
+            }
+        }
+    }
+
     @Test func filenameAndIntervalEnd() {
         let file = scan(0)
         #expect(file.start == Timestamp(2026, 11, 3, 0, 0, 21))

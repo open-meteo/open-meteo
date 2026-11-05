@@ -125,33 +125,61 @@ struct GoesDownloader: AsyncCommand {
         logger.info("GOES: Downloading \(fileCount) files (\(totalBytes.bytesHumanReadable))")
         let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "GOES overall download")
         for batch in batches {
-            let handles: [GenericVariableHandle] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
+            let downloads: [(scan: Scan, handle: GenericVariableHandle)?] = try await batch.mapConcurrent(nConcurrent: concurrent) { scan in
                 logger.info("GOES: \(scan.key)")
                 // Backfills can run for days. Start a fresh retry deadline per file
                 // instead of inheriting Curl's deadline from command startup.
                 let buffer = try await curl.downloadInMemoryAsync(url: Self.server + scan.key, minSize: nil, deadLineHours: 1)
                 await progress.add(buffer.readableBytes)
-                let data = try buffer.withUnsafeBytes { bytes in
-                    guard let nc = try NetCDF.open(memory: bytes) else { throw Abort(.badGateway, reason: "Cannot open GOES NetCDF") }
-                    return try Self.decode(nc: nc, scan: scan)
+                let data: [Float]
+                do {
+                    data = try buffer.withUnsafeBytes { bytes in
+                        guard let nc = try NetCDF.open(memory: bytes) else { throw Abort(.badGateway, reason: "Cannot open GOES NetCDF") }
+                        return try Self.decode(nc: nc, scan: scan)
+                    }
+                } catch let error as InvalidScanTimes {
+                    logger.warning("GOES: Skipping \(scan.key): \(error). Leaving scan pending for retry.")
+                    return nil
                 }
                 // Conversion reads full-width strips only a few rows high. Keep
                 // chunks within one row to avoid repeatedly decoding 32-row tiles.
                 let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [1, min(domain.grid.nx, 1024)])
-                return try await GenericVariableHandle(variable: GoesVariable.shortwave_radiation, time: scan.time, member: 0,
+                let handle = try await GenericVariableHandle(variable: GoesVariable.shortwave_radiation, time: scan.time, member: 0,
                     fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data), domain: domain)
+                return (scan, handle)
             }
+            let successful = downloads.compactMap { $0 }
+            guard !successful.isEmpty else { continue }
+            let handles = successful.map(\.handle)
             try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf,
                 run: nil, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadQueues: queues)
             // Commit only after conversion succeeds. Failed/interrupted batches are retried.
-            completed.formUnion(batch.map(\.identity))
+            completed.formUnion(successful.map { $0.scan.identity })
             completed = Self.recentCompleted(completed, lookbackDays: loopbackDays)
             try JSONEncoder().encode(completed.sorted()).write(to: URL(fileURLWithPath: stateFile), options: .atomic)
         }
         await progress.finish()
     }
 
+    struct InvalidScanTimes: Error, CustomStringConvertible {
+        let bounds: [Double]
+        var description: String { "Invalid GOES mode-6 time_bounds: \(bounds)" }
+    }
+
+    static func validatedScanTimes(bounds: [Double], scan: Scan) throws -> (start: Double, end: Double) {
+        guard bounds.count == 2 else { throw InvalidScanTimes(bounds: bounds) }
+        let epoch = Double(Timestamp(2000, 1, 1, 12).timeIntervalSince1970)
+        let start = epoch + bounds[0], end = epoch + bounds[1]
+        guard start.isFinite, end.isFinite, abs(start - Double(scan.start.timeIntervalSince1970)) < 2,
+              (560...590).contains(end - start) else {
+            throw InvalidScanTimes(bounds: bounds)
+        }
+        return (start, end)
+    }
+
     static func decode(nc: Group, scan: Scan) throws -> [Float] {
+        let bounds = try nc.getVariable(name: "time_bounds")?.asType(Double.self)?.read() ?? []
+        let (start, end) = try validatedScanTimes(bounds: bounds, scan: scan)
         let grid = GoesDomain.fixedGrid
         guard let variable = nc.getVariable(name: "DSR"), variable.dimensions.map(\.length) == [grid.ny, grid.nx],
               let raw = try variable.asType(UInt16.self)?.read(),
@@ -159,7 +187,6 @@ struct GoesDownloader: AsyncCommand {
               let scale = try variable.getAttribute("scale_factor")?.readFloat(),
               let offset = try variable.getAttribute("add_offset")?.readFloat(),
               let fill: UInt16 = try variable.getAttribute("_FillValue")?.read(),
-              let bounds = try nc.getVariable(name: "time_bounds")?.asType(Double.self)?.read(), bounds.count == 2,
               let x = try nc.getVariable(name: "x")?.readAndScale(),
               let y = try nc.getVariable(name: "y")?.readAndScale(), x.count == grid.nx, y.count == grid.ny,
               let projection = nc.getVariable(name: "goes_imager_projection"),
@@ -167,12 +194,6 @@ struct GoesDownloader: AsyncCommand {
               abs(x[0] + 0.151844) < 0.000001, abs(x.last! - 0.151844) < 0.000001,
               abs(y[0] - 0.151844) < 0.000001, abs(y.last! + 0.151844) < 0.000001 else {
             throw Abort(.badGateway, reason: "Unexpected GOES-19 DSR grid, variables or projection")
-        }
-        let epoch = Double(Timestamp(2000, 1, 1, 12).timeIntervalSince1970)
-        let start = epoch + bounds[0], end = epoch + bounds[1]
-        guard start.isFinite, end.isFinite, abs(start - Double(scan.start.timeIntervalSince1970)) < 2,
-              (560...590).contains(end - start) else {
-            throw Abort(.badGateway, reason: "Unexpected GOES mode-6 scan times")
         }
         var data = [Float](repeating: .nan, count: raw.count)
         // Work one row at a time, avoiding a full-disk array of double scan offsets.
