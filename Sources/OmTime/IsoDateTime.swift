@@ -88,7 +88,7 @@ public extension IsoDateTime {
         }
         guard year >= 1900, year <= 2050,
                 month >= 1, month <= 12,
-                day >= 1, day <= YearMonth(year: year, month: month).daysInMonth
+                day >= 1, day <= daysInMonth(year: year, month: month)
         else {
             throw TimeError.InvalidDate
         }
