@@ -4,9 +4,10 @@ import Vapor
 
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    func toCsvResponse(concurrencySlot: Int?, withLocationHeader: Bool = true, logger: Logger) throws -> Response {
+    func toCsvResponse(concurrencySlot: Int?, withLocationHeader: Bool = true, prefetchLookAhead: Int = 3, logger: Logger) throws -> Response {
         let response = Response(body: .init(asyncStream: { writer in
             try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
+                var prefetchDone = prefetchLookAhead <= 0
                 var b = BufferAndAsyncWriter(writer: writer)
                 let multiLocation = results.count > 1
 
@@ -27,23 +28,59 @@ extension ForecastapiResult {
                     }
                 }
 
-                for location in results {
-                    try await location.current(variables: variables.currentVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                if variables.currentVariables != nil {
+                    for (i, location) in results.enumerated() {
+                        if !prefetchDone, prefetchLookAhead < results.count - i {
+                            try await prefetchLocation(at: i + prefetchLookAhead)
+                        }
+                        try await location.current(variables: variables.currentVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    }
+                    prefetchDone = true
                 }
-                for location in results {
-                    try await location.minutely15(variables: variables.minutely15Variables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                if variables.minutely15Variables != nil {
+                    for (i, location) in results.enumerated() {
+                        if !prefetchDone, prefetchLookAhead < results.count - i {
+                            try await prefetchLocation(at: i + prefetchLookAhead)
+                        }
+                        try await location.minutely15(variables: variables.minutely15Variables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    }
+                    prefetchDone = true
                 }
-                for location in results {
-                    try await location.hourly(variables: variables.hourlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                if variables.hourlyVariables != nil {
+                    for (i, location) in results.enumerated() {
+                        if !prefetchDone, prefetchLookAhead < results.count - i {
+                            try await prefetchLocation(at: i + prefetchLookAhead)
+                        }
+                        try await location.hourly(variables: variables.hourlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    }
+                    prefetchDone = true
                 }
-                for location in results {
-                    try await location.daily(variables: variables.dailyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                if variables.dailyVariables != nil {
+                    for (i, location) in results.enumerated() {
+                        if !prefetchDone, prefetchLookAhead < results.count - i {
+                            try await prefetchLocation(at: i + prefetchLookAhead)
+                        }
+                        try await location.daily(variables: variables.dailyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    }
+                    prefetchDone = true
                 }
-                for location in results {
-                    try await location.weekly(variables: variables.weeklyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                if variables.weeklyVariables != nil {
+                    for (i, location) in results.enumerated() {
+                        if !prefetchDone, prefetchLookAhead < results.count - i {
+                            try await prefetchLocation(at: i + prefetchLookAhead)
+                        }
+                        try await location.weekly(variables: variables.weeklyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    }
+                    prefetchDone = true
                 }
-                for location in results {
-                    try await location.monthly(variables: variables.monthlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                if variables.monthlyVariables != nil {
+                    for (i, location) in results.enumerated() {
+                        if !prefetchDone, prefetchLookAhead < results.count - i {
+                            try await prefetchLocation(at: i + prefetchLookAhead)
+                        }
+                        try await location.monthly(variables: variables.monthlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    }
+                    prefetchDone = true
                 }
                 try await b.flush()
                 try await b.end()

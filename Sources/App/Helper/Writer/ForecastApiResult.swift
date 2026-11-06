@@ -9,7 +9,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 
 protocol ForecastapiResponder {
     func calculateQueryWeight() -> Float
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetchLookAhead: Int, logger: Logger) async throws -> Response
 }
 
 protocol ModelFlatbufferSerialisable {
@@ -202,36 +202,40 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetch: Bool = true, logger: Logger) async throws -> Response {
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil, prefetchLookAhead: Int = 3, logger: Logger) async throws -> Response {
         if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
-        if prefetch {
-            for location in results {
-                for model in location.results {
-                    try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables, weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
-                }
+        if prefetchLookAhead > 0 {
+            for index in results.indices.prefix(prefetchLookAhead) {
+                try await prefetchLocation(at: index)
             }
         }
         switch format ?? .json() {
         case .json(let fixedGenerationTime):
-            return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
+            return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, prefetchLookAhead: prefetchLookAhead, logger: logger)
         case .xlsx(let timestamp, let locationInformation):
             switch locationInformation {
             case .omit:
-                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: false)
+                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: false, prefetchLookAhead: prefetchLookAhead)
             case .section:
-                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: true)
+                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: true, prefetchLookAhead: prefetchLookAhead)
             }
         case .csv(let locationInformation):
             switch locationInformation {
                 case .omit:
-                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false, logger: logger)
+                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false, prefetchLookAhead: prefetchLookAhead, logger: logger)
                 case .section:
-                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true, logger: logger)
+                return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true, prefetchLookAhead: prefetchLookAhead, logger: logger)
             }
         case .flatbuffers(let fixedGenerationTime):
-            return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, logger: logger)
+            return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot, prefetchLookAhead: prefetchLookAhead, logger: logger)
+        }
+    }
+
+    func prefetchLocation(at index: Int) async throws {
+        for model in results[index].results {
+            try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, dailyVariables: variables.dailyVariables, weeklyVariables: variables.weeklyVariables, monthlyVariables: variables.monthlyVariables)
         }
     }
 
