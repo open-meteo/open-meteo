@@ -36,7 +36,7 @@ import VaporTesting
     private struct TestResponder: ForecastapiResponder {
         func calculateQueryWeight() -> Float { 2.5 }
 
-        func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetch: Bool, logger: Logger) async throws -> Response {
+        func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?, prefetchLookAhead: Int, logger: Logger) async throws -> Response {
             Response(status: .ok)
         }
     }
