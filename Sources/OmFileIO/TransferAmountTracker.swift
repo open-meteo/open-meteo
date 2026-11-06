@@ -41,7 +41,7 @@ public final actor TransferAmountTracker: Sendable {
             if let totalSize {
                 let percent = Int(round(Float(transfered) / Float(totalSize) * 100))
                 let remainingTime = Double(totalSize - transfered) / rate
-                logger.info("\(name) \(percent)% \(transfered.bytesHumanReadable) / \(totalSize.bytesHumanReadable) in \(timeElapsed), \(Int(rate).bytesHumanReadable)/s remaining \(remainingTime.asSecondsPrettyPrint)")
+                logger.info("\(name) \(percent)% \(transfered.bytesHumanReadable) / \(totalSize.bytesHumanReadable) in \(timeElapsed), \(Int(rate).bytesHumanReadable)/s remaining \(max(0, totalSize - transfered).bytesHumanReadable), \(remainingTime.asSecondsPrettyPrint)")
             } else {
                 logger.info("\(name) \(transfered.bytesHumanReadable) in \(timeElapsed), \(Int(rate).bytesHumanReadable)/s")
             }
