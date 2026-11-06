@@ -268,7 +268,7 @@ extension Request {
                 guard weight <= RateLimiter.defaultHourlyLimit else {
                     throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
                 }
-                let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetchLookAhead: weight < 10 ? 3 : 0, logger: logger)
+                let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetchLookAhead: 3, logger: logger)
                 return (weight, response)
             }
         }
@@ -299,7 +299,7 @@ extension Request {
             do {
                 let responder = try await fn(ApiRequestInfo(host: host, numberOfLocationsMaximum: numberOfLocationsMaximum), params)
                 let weight = responder.calculateQueryWeight()
-                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetchLookAhead: weight < 10 ? 3 : 0, logger: logger)
+                response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetchLookAhead: 3, logger: logger)
                 response.headers.replaceOrAdd(name: "X-RateLimit-Cost", value: String(weight))
                 await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
             }
