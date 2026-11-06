@@ -32,7 +32,10 @@ public protocol OmFilePayload: OmRemotePayload, OmLocalPayload {
 public protocol OmRemotePayload: Sendable {
     /// Initialise from remote source
     init(file: OmHttpReaderBackend) async throws
-    func remoteUpdated(file: OmHttpReaderBackend) async throws -> Self
+    /// Reload metadata without prefetching data blocks.
+    func updateMetaData(file: OmHttpReaderBackend) async throws -> Self
+    /// Warm this payload using the previous payload's access pattern.
+    func prefetchBackground(from previous: any OmRemotePayload) async throws
     func remoteDeleted() async throws
 }
 
