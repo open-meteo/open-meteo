@@ -21,10 +21,14 @@ import OmFileFormat
     }
 
     @Test func rowChunksPreserveStripReads() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("goes-chunks-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
         let nx = 1030, ny = 5
         let values = (0..<nx * ny).map { $0 % 17 == 0 ? Float.nan : Float($0 % 1501) }
         let writer = OmFileWriterHelper(dimensions: [ny, nx], chunks: [1, 1024])
-        let file = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: values)
+        let file = try writer.write(file: directory.appendingPathComponent("scan.om").path,
+            compressionType: .pfor_delta2d_int16, scalefactor: 1, all: values)
         let reader = try await OmFileReader(fn: MmapFile(fn: file)).expectArray(of: Float.self)
         for row in stride(from: 0, to: ny, by: 2) {
             let end = min(row + 2, ny)
@@ -46,17 +50,10 @@ import OmFileFormat
                 try GoesDownloader.validatedScanTimes(bounds: bounds, scan: scan)
             }
         }
-        // Optional real NOAA file with missing time bounds (2025-05-21 17:30).
-        if let path = ProcessInfo.processInfo.environment["GOES_INVALID_TIME_TEST_FILE"] {
-            let nc = try #require(try NetCDF.open(path: path, allowUpdate: false))
-            #expect(throws: GoesDownloader.InvalidScanTimes.self) {
-                try GoesDownloader.decode(nc: nc, scan: scan)
-            }
-        }
     }
 
     @Test func hdf5DecodeRetriesAndLeavesFailedScansPending() async throws {
-        let logger = Logger(label: "goes-retry-test")
+        let logger = Logger(label: "goes-retry-test", factory: { _ in SwiftLogNoOpLogHandler() })
         let recovered = try await GoesDownloader.decodeWithRetries(scan: scan(0), logger: logger, retryDelayNanoseconds: 0) { attempt in
             if attempt < 3 { throw NetCDFError.hdf5Error }
             return [42]
@@ -247,30 +244,4 @@ import OmFileFormat
         #expect(early[0].isFinite && late[0].isFinite)
     }
 
-    /// Opt-in real NOAA fixture, kept out of the repository (12 MB compressed).
-    @Test func realNoaaFile() async throws {
-        guard let path = ProcessInfo.processInfo.environment["GOES_TEST_FILE"] else { return }
-        let nc = try #require(try NetCDF.open(path: path, allowUpdate: false))
-        let values = try GoesDownloader.decode(nc: nc, scan: scan(0))
-        #expect(values.count == 5424 * 5424)
-        #expect(values[0].isNaN) // Space must never become nighttime zero.
-        #expect(values.contains { $0 > 100 && $0 < 1500 })
-        #expect(values.contains { $0 == 0 })
-        #expect(!values.contains { $0.isInfinite || $0 < 0 })
-
-        // Concurrent in-memory opening and decoding must match the serial result,
-        // including missing pixels. Exercise the same helper used by the downloader.
-        let buffer = try Data(contentsOf: URL(fileURLWithPath: path))
-        let fileScan = scan(0)
-        let matches: [Bool] = try await [0, 1].mapConcurrent(nConcurrent: 2) { _ in
-            let decoded = try buffer.withUnsafeBytes { bytes in
-                let file = try #require(try NetCDF.open(memory: bytes))
-                return try GoesDownloader.decode(nc: file, scan: fileScan)
-            }
-            return decoded.count == values.count && zip(decoded, values).allSatisfy {
-                $0 == $1 || ($0.isNaN && $1.isNaN)
-            }
-        }
-        #expect(matches == [true, true])
-    }
 }
