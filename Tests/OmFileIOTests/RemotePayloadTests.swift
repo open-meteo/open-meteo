@@ -54,6 +54,24 @@ private struct TestRemotePayload: OmRemotePayload {
 }
 
 struct RemotePayloadTests {
+    @Test func modifiedBackendRejectsReadsWithoutContactingServer() async throws {
+        // With no endpoints, attempting network access would fail with a server selection error.
+        let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
+        let backend = OmHttpReaderBackend(context: context, object: "test.om", count: 1, eTag: "\"old\"", lastModified: Timestamp(0))
+        backend.markModified()
+
+        for _ in 0..<2 {
+            do {
+                _ = try await backend.getData(offset: 0, count: 1)
+                Issue.record("A modified backend must reject reads")
+            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {}
+        }
+        do {
+            _ = try await backend.withData(offset: 0, count: 1) { $0.count }
+            Issue.record("A modified backend must reject reads")
+        } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {}
+    }
+
     @Test(arguments: [false, true])
     func metadataAvailableBeforePrefetchFinishes(prefetchFails: Bool) async throws {
         let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)

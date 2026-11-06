@@ -33,7 +33,13 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
     }
     
     func updateMetaData(file: OmHttpReaderBackend) async throws -> OmFileLocalRemoteOmReader {
-        try await Self(file: file)
+        guard let reader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {
+            fatalError("updateMetaData requires a remote OM reader")
+        }
+        // The inventory already identified a replacement. Cached blocks remain usable,
+        // but cache misses must fail locally instead of sending requests with the old ETag.
+        reader.fn.backend.markModified()
+        return try await Self(file: file)
     }
 
     func prefetchBackground(from previous: any OmRemotePayload) async throws {
