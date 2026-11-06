@@ -1,4 +1,5 @@
 import AsyncHTTPClient
+import Foundation
 import Logging
 import OmFileFormat
 import OmTime
@@ -85,7 +86,7 @@ public struct OmFileSystemS3: Sendable {
         /// Reference to the open-meteo file or json file
         private var payload: RemotePayloadState
         
-        /// If state is `updating`, a remote modification was detected and the old payload is now being updated
+        /// If state is `updatingMetaData`, a remote modification was detected and the old payload is now being updated
         /// The old payload is still available, because in many cases it can be reused
         private enum RemotePayloadState {
             /// Payload has not been requested yet by the application
@@ -97,8 +98,11 @@ public struct OmFileSystemS3: Sendable {
             /// Payload got initialised and should be in sync with remote server
             case ready(any OmRemotePayload)
             
-            /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload, but keep the old payload
-            case updating(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
+            /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload meta data, but no preloaded data yet
+            case updatingMetaData(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
+
+            /// After an S3 directory update, the new file is available, but background updates are still running. If possible, use the old payload
+            case updatingPrefetchBackground(old: any OmRemotePayload, new: any OmRemotePayload, identity: UUID)
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
             case deleted
@@ -157,21 +161,21 @@ public struct OmFileSystemS3: Sendable {
             assert(eTag.hasSuffix("\""))
             self.eTag = eTag
             switch payload {
-            case .ready(let old):
-                payload = .updating(old: old, [])
+            case .ready(let old), .updatingPrefetchBackground(_, let old, _):
+                payload = .updatingMetaData(old: old, [])
                 do {
                     let file = makeCachedClient(context: context)
-                    let new = try await old.remoteUpdated(file: file)
-                    guard case .updating(_, let queued) = payload else {
-                        fatalError("State was not .updating()")
+                    let new = try await old.updateMetaData(file: file)
+                    guard case .updatingMetaData(_, let queued) = payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
-                    self.payload = .ready(new)
                     queued.forEach {
                         $0.resume(with: .success(new))
                     }
+                    startBackgroundPrefetch(old: old, new: new, context: context)
                 } catch {
-                    guard case .updating(_, let queued) = payload else {
-                        fatalError("State was not .updating()")
+                    guard case .updatingMetaData(_, let queued) = payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
                     if Self.shouldResetPayload(after: error) {
                         self.payload = .none
@@ -189,18 +193,39 @@ public struct OmFileSystemS3: Sendable {
                 break
             case .initialising(_):
                 break
-            case .updating(old: _, _):
+            case .updatingMetaData(old: _, _):
                 // most likely the new file is already being fetched
                 break
             }
         }
         
+        /// Publish metadata immediately; warming the data cache must not delay waiting readers.
+        private func startBackgroundPrefetch(old: any OmRemotePayload, new: any OmRemotePayload, context: S3ServerHealth) {
+            // Identify this update so its task can recognise whether it still owns the state after awaiting I/O.
+            let identity = UUID()
+            payload = .updatingPrefetchBackground(old: old, new: new, identity: identity)
+            Task {
+                do {
+                    try await new.prefetchBackground(from: old)
+                } catch {
+                    // Prefetch is optional. The new payload can still fetch data on demand.
+                    context.logger.warning("Background prefetch failed for \(objectName): \(error)")
+                }
+                // Another update or deletion may have occurred while prefetch was suspended.
+                // Even if the state is still prefetching, a different identity belongs to a newer update.
+                guard case .updatingPrefetchBackground(_, _, let currentIdentity) = payload, currentIdentity == identity else {
+                    return
+                }
+                payload = .ready(new)
+            }
+        }
+
         func receivedObjectDeletedError() {
             /// If this is called, we know for sure the file hast been deleted
             switch payload {
-            case .none, .ready(_), .error(_, _):
+            case .none, .ready(_), .updatingPrefetchBackground(_, _, _), .error(_, _):
                 payload = .deleted
-            case .initialising(_), .updating(old: _, _), .deleted:
+            case .initialising(_), .updatingMetaData(old: _, _), .deleted:
                 break // do not modify queued requests
             }
         }
@@ -256,14 +281,14 @@ public struct OmFileSystemS3: Sendable {
                 return try await withCheckedThrowingContinuation { continuation in
                     payload = .initialising(queue + [continuation])
                 } as? T
-            case .updating(let old, let queue):
+            case .updatingMetaData(let old, let queue):
                 // If the file is actively being updated, allow access to the old file, because cached responses still work
                 if receivedFileModifiedError {
                     // If the access fails, enqueue to get the new file
                     OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.add(1, ordering: .relaxed)
                     defer { OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.add(-1, ordering: .relaxed) }
                     let payload = try await withCheckedThrowingContinuation { continuation in
-                        self.payload = .updating(old: old, queue + [continuation])
+                        self.payload = .updatingMetaData(old: old, queue + [continuation])
                     }
                     guard let payload = payload as? T else {
                         fatalError("Payload was not of correct type \(T.self)")
@@ -274,6 +299,11 @@ public struct OmFileSystemS3: Sendable {
                     fatalError("Payload was not of correct type \(T.self)")
                 }
                 return old
+            case .updatingPrefetchBackground(let old, let new, _):
+                guard let selected = (receivedFileModifiedError ? new : old) as? T else {
+                    fatalError("Payload was not of correct type \(T.self)")
+                }
+                return selected
             case .ready(let payload):
                 guard let payload = payload as? T else {
                     fatalError("Payload was not of correct type \(T.self)")
@@ -283,24 +313,24 @@ public struct OmFileSystemS3: Sendable {
                 }
                 // Old file got modified, we have to download it from the remote server again
                 // At this stage there could be dozens of failing calls coming in
-                self.payload = .updating(old: payload, [])
+                self.payload = .updatingMetaData(old: payload, [])
                 do {
                     let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
                     self.contentLength = newReader.count
                     self.lastModified = newReader.lastModified
                     self.eTag = newReader.eTag
-                    let new = try await payload.remoteUpdated(file: newReader)
-                    guard case .updating(old: _, let queued) = self.payload else {
-                        fatalError("State was not .updating()")
+                    let new = try await payload.updateMetaData(file: newReader)
+                    guard case .updatingMetaData(old: _, let queued) = self.payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
-                    self.payload = .ready(new)
                     queued.forEach({
                         $0.resume(returning: new)
                     })
+                    startBackgroundPrefetch(old: payload, new: new, context: context)
                     return new
                 } catch {
-                    guard case .updating(old: _, let queued) = self.payload else {
-                        fatalError("State was not .updating()")
+                    guard case .updatingMetaData(old: _, let queued) = self.payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
                     if Self.shouldResetPayload(after: error) {
                         self.payload = .none

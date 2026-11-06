@@ -28,8 +28,7 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     public let lastModified: Timestamp
     
     /// Timestamp in seconds when the last data was successfully fetched from the backend.
-    /// If set to `0`, the file has been deleted or modified. In both cases, it is not valid anymore
-    /// TODO: this is only used to store HTTP etag/modified errors
+    /// `0` marks a modified file; `1` marks a deleted file. Both reject further backend reads.
     private let lastValidatedAtomic: Atomic<Int>
     
     public typealias DataType = ByteBuffer
@@ -85,11 +84,17 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     public func prefetchData(offset: Int, count: Int) async throws {
         // nothing do do here
     }
+
+    /// Reject uncached reads immediately when an inventory update identifies a replacement.
+    public func markModified() {
+        lastValidatedAtomic.store(0, ordering: .relaxed)
+    }
     
     public func getData(offset: Int, count: Int) async throws -> ByteBuffer {
         /// If `lastValidated` is set to `0`, the file received a file modified error,
         /// if `1` received a file not found error
-        switch lastValidatedAtomic.load(ordering: .relaxed) {
+        let lastValidated = lastValidatedAtomic.load(ordering: .relaxed)
+        switch lastValidated {
         case 0: throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
         case 1: throw CurlError.fileNotFound
         default: break
@@ -104,10 +109,11 @@ public final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
         do {
             let buffer = try await HTTPClient.sharedRemoteData.executeRetryAndCollect(request, logger: logger, upTo: count, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
-            lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+            // A response already in flight must not undo an inventory or HTTP invalidation.
+            _ = lastValidatedAtomic.compareExchange(expected: lastValidated, desired: Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
             return buffer
         } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
-            self.lastValidatedAtomic.store(0, ordering: .relaxed)
+            markModified()
             throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
         } catch CurlError.fileNotFound {
             self.lastValidatedAtomic.store(1, ordering: .relaxed)
