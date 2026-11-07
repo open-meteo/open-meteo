@@ -1,5 +1,5 @@
 {
-  "originHash" : "d99a3ffb61cc0ce973266011576df20779eaece41f1500c43e07cbc662cf5c98",
+  "originHash" : "cc7290633a422235ca56c32bca077bbf10eb6f95e4b1c4a67f64797800e92ead",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -302,8 +302,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/swift-zarr.git",
       "state" : {
-        "revision" : "fa3861c69cf6f03871c83fc0a543ff63292433ce",
-        "version" : "0.1.5"
+        "revision" : "b371283ac5d025268ad4cd0c5e916c4f1159cb7f"
       }
     },
     {
