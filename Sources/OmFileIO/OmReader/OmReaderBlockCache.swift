@@ -68,8 +68,8 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
                 let keyStart = calculateCacheKey(block: blocks.lowerBound)
                 //print("withData blocks \(blocks)")
-                try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
-                    let block = blocks.lowerBound + Int(key &- keyStart)
+                try await cache.get(key: keyStart, count: blocks.count, allowedWait: .milliseconds(100), superBlockKey: calculateCacheKey(block: superBlock * superBlockLength), provider: ({ [self] (key, count) in
+                    let block = blocks.lowerBound + Int(Int64(bitPattern: key &- keyStart))
                     let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
                 }), dataCallback: {(_, value) in
@@ -117,12 +117,12 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
                 let keyStart = calculateCacheKey(block: blocks.lowerBound)
                 //print("withData blocks \(blocks)")
-                try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
-                    let block = blocks.lowerBound + Int(key &- keyStart)
+                try await cache.get(key: keyStart, count: blocks.count, allowedWait: .zero, superBlockKey: calculateCacheKey(block: superBlock * superBlockLength), provider: ({ [self] (key, count) in
+                    let block = blocks.lowerBound + Int(Int64(bitPattern: key &- keyStart))
                     let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
                     return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
                 }), dataCallback: {(key, value) in
-                    let block = blocks.lowerBound + Int(key &- keyStart)
+                    let block = blocks.lowerBound + Int(Int64(bitPattern: key &- keyStart))
                     let fileRange = block * blockSize ..< min((block + 1) * blockSize, fileSize)
                     let range = dataRange.intersect(fileTime: fileRange)!
                     let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
@@ -248,8 +248,10 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 let _ = try await cache.get(
                     key: cacheKey,
                     count: upperBound - chunkLowerBound,
-                    provider: ({ key, count in
-                        let firstBlock = chunkLowerBound + Int(key &- cacheKey)
+                    allowedWait: .seconds(1),
+                    superBlockKey: calculateCacheKey(block: chunkLowerBound / superBlockLength * superBlockLength),
+                    provider: ({ [self] key, count in
+                        let firstBlock = chunkLowerBound + Int(Int64(bitPattern: key &- cacheKey))
                         let dataRange = firstBlock * blockSize ..< min((firstBlock + count) * blockSize, totalCount)
                         return try await backend.getData(offset: dataRange.lowerBound, count: dataRange.count)
                     }),

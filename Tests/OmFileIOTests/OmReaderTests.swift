@@ -139,7 +139,7 @@ import OmFileFormat
         let cache = try AtomicBlockCache(file: file, blockSize: 20, blockCount: 10)
         let coordinator = AtomicCacheCoordinator(cache: cache)
         // Read 2 blocks, both not cached
-        try await coordinator.get(key: 123, count: 2, provider: { key,count in
+        try await coordinator.get(key: 123, count: 2, allowedWait: .zero, superBlockKey: 0, provider: { key,count in
             #expect(key == 123)
             #expect(count == 2)
             return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
@@ -154,7 +154,7 @@ import OmFileFormat
             }
         })
         // First block cached, second missing
-        try await coordinator.get(key: 124, count: 2, provider: { key,count in
+        try await coordinator.get(key: 124, count: 2, allowedWait: .zero, superBlockKey: 0, provider: { key,count in
             #expect(key == 125)
             #expect(count == 1)
             return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
@@ -169,7 +169,7 @@ import OmFileFormat
             }
         })
         // Both blocks cached
-        try await coordinator.get(key: 123, count: 3, provider: { key,count in
+        try await coordinator.get(key: 123, count: 3, allowedWait: .zero, superBlockKey: 0, provider: { key,count in
             #expect(Bool(false))
             return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
         }, dataCallback: { key, data in

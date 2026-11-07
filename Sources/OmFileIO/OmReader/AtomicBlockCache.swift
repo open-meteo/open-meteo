@@ -66,6 +66,11 @@ extension AtomicBlockCache where Backend == MmapFile {
 /**
  Key-value cache for fixed block sizes and a fixed amount of blocks. Uses a hash map with LRU strategy.
  The entire cache size is preallocated. Due to the fixed number of elements, the hash map does not need rebalancing
+
+ Returned pointers borrow cache storage; they do not pin entries against eviction. A later write
+ can overwrite the bytes before or during a read, including while a coordinator reader is suspended.
+ This risk is accepted to avoid copying or pinning blocks. The production cache is very large, so
+ such reuse is not expected under normal real-world load, but is possible under eviction pressure.
  
  Uses Atomics for thread safety. The beginning of the cache contains N key entries. Each key entry is the 64 bit key and a 64 bit timestamp in nanoseconds.
  
