@@ -292,6 +292,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
     app.asyncCommands.use(GoesDownloader(), as: "download-goes")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
+    app.asyncCommands.use(DownloadWeatherNext3Command(), as: "download-weathernext3")
     app.asyncCommands.use(DownloadWeatherNextCommand(), as: "download-weathernext")
 
     app.http.server.configuration.hostname = "0.0.0.0"

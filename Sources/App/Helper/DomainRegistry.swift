@@ -166,6 +166,8 @@ enum DomainRegistry: String, CaseIterable {
 
     case bom_access_global
     case bom_access_global_ensemble
+    case google_weathernext3_ensemble_mean
+    case google_weathernext3_station_ensemble_mean
     case google_weathernext2_ensemble
     case google_weathernext2_ensemble_mean
 
@@ -496,6 +498,10 @@ enum DomainRegistry: String, CaseIterable {
             return BomDomain.access_global_ensemble
         case .google_weathernext2_ensemble:
             return WeatherNextDomain.weathernext_global
+        case .google_weathernext3_ensemble_mean:
+            return WeatherNext3Domain.surface
+        case .google_weathernext3_station_ensemble_mean:
+            return WeatherNext3Domain.station
         case .google_weathernext2_ensemble_mean:
             return WeatherNextDomain.weathernext_global_ensemble_mean
         case .meteofrance_arome_france0025_15min:

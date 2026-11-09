@@ -200,3 +200,51 @@ For further installation instructions see, [Install or update the latest version
 - Linux: `apt install gdal`
 
 Afterwards it can be converted with `<exe> download-dem dem-90m` and input data can be removed with `rm -R dem-90m data/dem90/`. The converted files will be available at `data/omfile-dem90`
+
+
+## WeatherNext 3 statistics
+
+Run `openmeteo-api download-weathernext3 --run 2026110800 --concurrent 1`.
+The downloader uses `GOOGLE_APPLICATION_CREDENTIALS` pointing to an allowlisted
+service-account JSON file. User gcloud credentials used for schema inspection
+are not automatically used by this command.
+
+Without `--run`, the first invocation selects the latest expected main cycle;
+subsequent invocations ingest the next hourly initialization after the last
+completed run. A missing success marker leaves the checkpoint unchanged.
+Invoke every five minutes, avoiding overlapping invocations.
+Main cycles contain hours 1–360; interim cycles contain hours 1–48. Existing
+long-range values and the metadata end time survive interim updates.
+
+The public model is `google_weathernext3_ensemble_mean`. Temperature and dew point
+use the 0.05-degree station heads; other surface variables use the 0.1-degree grid.
+Precipitation is the native hourly mean. Temperature elevation correction is
+disabled because model terrain is not supplied. Nonlinear derived values are
+computed from means. Scalar wind speed uses the upstream scalar mean.
+
+Spread uses `(p90 - p10) / 2.5631031311`. It estimates standard deviation under a
+Gaussian assumption, not standard error. Only the following spreads are exposed.
+No empirical correction is applied; the percentile interpolation convention is
+not specified by the source metadata.
+
+| Spread | Grid | WeatherNext bias / normalized RMSE / error percentiles |
+| --- | --- | --- |
+| Temperature | 0.05° | Not measured |
+| Dew point | 0.05° | Not measured |
+| Mean sea-level pressure | 0.1° | Not measured |
+| U wind, 10 m | 0.1° | Not measured |
+| V wind, 10 m | 0.1° | Not measured |
+| U wind, 100 m | 0.1° | Not measured |
+| V wind, 100 m | 0.1° | Not measured |
+
+A synthetic benchmark of 30,000 independent 64-member Gaussian ensembles, using
+linearly interpolated empirical percentiles, gave −2.7% mean relative error,
+6.7% relative RMSE, and a central 95% relative-error interval of −15.3% to +8.6%
+against the same ensemble's sample standard deviation (denominator n−1).
+These figures are not WeatherNext accuracy measurements. Heavy tails and
+multimodal distributions can produce substantially larger errors.
+
+FlatBuffers output uses an undefined model placeholder pending allocation of a
+WeatherNext 3 model ID in the upstream SDK. JSON and CSV retain the new model's name. Historical archive
+backfill, pressure levels and individual-member access are not implemented.
+Production scheduling should follow full-run ingestion and capacity validation.

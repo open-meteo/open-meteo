@@ -812,6 +812,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
     /// Correct wind direction for HRRR and NAM models on the demand
     private let trueNorth: Float?
+    private let isWeatherNext3: Bool
 
     init(
         reader: Reader,
@@ -820,6 +821,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     ) {
         self.reader = reader
         self.options = options
+        self.isWeatherNext3 = domainRegistry == .google_weathernext3_ensemble_mean || domainRegistry == .google_weathernext3_station_ensemble_mean
         self.compatibility = .init(domain: domainRegistry)
         self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
         let windGridDomain: GfsDomain?
@@ -1052,6 +1054,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
+        if isWeatherNext3 && variable.rawValue.hasSuffix("_spread") && WeatherNext3Variable(rawValue: variable.rawValue) == nil { return nil }
+
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
         if compatibility.usesLegacyIconEpsRadiationStorage {
             switch variable {

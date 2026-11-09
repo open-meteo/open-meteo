@@ -995,6 +995,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ncep_gefs_ensemble_mean_seamless
     case cmc_gem_geps_ensemble_mean
     case bom_access_global_ensemble_mean
+    case google_weathernext3_ensemble_mean
     case google_weathernext2_ensemble_mean
     case ukmo_global_ensemble_mean_20km
     case ukmo_uk_ensemble_mean_2km
@@ -1714,6 +1715,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
         case .bom_access_global_ensemble_mean:
             return .single(BomDomain.access_global_ensemble, VariableOrSpread<BomVariable>.self)
+        case .google_weathernext3_ensemble_mean:
+            return .init(primary: [.mixedBeforeDerivation(SupplementalReaderGroup(primary: (WeatherNext3Domain.station, WeatherNext3GridVariable<WeatherNext3StationGrid>.self), supplemental: (WeatherNext3Domain.surface, WeatherNext3GridVariable<WeatherNext3SurfaceGrid>.self)))], gridForBoundingBoxRequests: WeatherNext3Domain.station, smoothTransitions: false)
         case .google_weathernext2_ensemble_mean:
             return .single(WeatherNextDomain.weathernext_global_ensemble_mean, VariableOrSpread<WeatherNextVariable>.self)
         case .ukmo_global_ensemble_20km:
