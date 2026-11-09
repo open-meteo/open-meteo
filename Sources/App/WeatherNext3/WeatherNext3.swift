@@ -1,6 +1,5 @@
 import Foundation
 
-/// Native statistics grids. Station heads supply temperature and dew point exclusively.
 enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
     case surface, station
 
@@ -209,21 +208,30 @@ struct WeatherNext3Variable: GenericVariable {
         ),
     ]
 
-    init?(rawValue: String) {
-        let spread = rawValue.hasSuffix("_spread")
-        let name = spread ? String(rawValue.dropLast(7)) : rawValue
-        guard Self.fields.contains(where: { $0.name == name && (!spread || $0.spread) }) else { return nil }
-        self.rawValue = rawValue
+    enum Statistic: String, CaseIterable {
+        case mean, p10, p25, p50, p75, p90
     }
 
-    var isSpread: Bool { rawValue.hasSuffix("_spread") }
+    let statistic: Statistic
+    let field: Field
 
-    var field: Field { Self.fields.first { $0.name == (isSpread ? String(rawValue.dropLast(7)) : rawValue) }! }
+    init?(rawValue: String) {
+        let statistic = Statistic.allCases.first { $0 != .mean && rawValue.hasSuffix("_" + $0.rawValue) } ?? .mean
+        let name = statistic == .mean ? rawValue : String(rawValue.dropLast(statistic.rawValue.count + 1))
+        guard let field = Self.fields.first(where: { $0.name == name }) else { return nil }
+        self.rawValue = rawValue
+        self.statistic = statistic
+        self.field = field
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.rawValue == rhs.rawValue }
+
+    func hash(into hasher: inout Hasher) { hasher.combine(rawValue) }
 
     var omFileName: (file: String, level: Int) { (rawValue, 0) }
 
     var scalefactor: Float {
-        if isSpread { return 100 }
+        if statistic != .mean { return 100 }
         switch field.unit {
         case .celsius: return 20
         case .percentage, .wattPerSquareMetre: return 1
@@ -231,10 +239,10 @@ struct WeatherNext3Variable: GenericVariable {
         }
     }
 
-    var unit: SiUnit { isSpread && field.unit == .celsius ? .kelvin : field.unit }
+    var unit: SiUnit { field.unit }
 
     var interpolation: ReaderInterpolation {
-        if isSpread { return .linear }
+        if statistic != .mean { return .linear }
         if rawValue == "precipitation" { return .backwards_sum }
         if field.unit == .wattPerSquareMetre { return .solar_backwards_averaged }
         return .linear
@@ -243,11 +251,6 @@ struct WeatherNext3Variable: GenericVariable {
     var isElevationCorrectable: Bool { false }
 
     var storePreviousForecast: Bool { false }
-
-    static func estimatedSpread(low: Float, high: Float, scale: Float) -> Float {
-        guard low.isFinite, high.isFinite, high >= low else { return .nan }
-        return (high - low) / 2.5631031311 * scale
-    }
 }
 
 protocol WeatherNext3Grid: Sendable, Hashable {
@@ -262,7 +265,6 @@ enum WeatherNext3StationGrid: WeatherNext3Grid {
     static var domain: WeatherNext3Domain { .station }
 }
 
-/// Restrict each reader to its actual fields before composing derived quantities.
 struct WeatherNext3GridVariable<Grid: WeatherNext3Grid>: GenericVariable {
     let variable: WeatherNext3Variable
 

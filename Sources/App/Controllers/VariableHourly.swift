@@ -1054,7 +1054,24 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
-        if isWeatherNext3 && variable.rawValue.hasSuffix("_spread") && WeatherNext3Variable(rawValue: variable.rawValue) == nil { return nil }
+        if isWeatherNext3 && variable.rawValue.hasSuffix("_spread") {
+            let name = String(variable.rawValue.dropLast(7))
+            guard let field = WeatherNext3Variable.fields.first(where: { $0.name == name && $0.spread }),
+                let low = Reader.variableFromString(name + "_p10"),
+                let high = Reader.variableFromString(name + "_p90")
+            else {
+                return nil
+            }
+            let unit = field.unit == .celsius ? SiUnit.kelvin : field.unit
+            return .two(.raw(low), .raw(high)) { low, high, _ in
+                let spread = zip(low.data, high.data).map { lower, upper -> Float in
+                    guard lower.isFinite, upper.isFinite, upper >= lower else { return .nan }
+                    // Gaussian-equivalent standard deviation from the central 80% interval.
+                    return (upper - lower) / 2.5631031311
+                }
+                return DataAndUnit(spread, unit)
+            }
+        }
 
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
         if compatibility.usesLegacyIconEpsRadiationStorage {

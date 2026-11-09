@@ -167,27 +167,13 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                         return data
                     }
 
-                    let mean = try await read("mean").map { $0 * field.scale + field.offset }
-                    try await writer.write(member: 0, variable: WeatherNext3Variable(rawValue: field.name)!, data: mean)
-
-                    if field.spread {
-                        let low = try await read("p10")
-                        let high = try await read("p90")
-                        let invalidCount = zip(low, high).reduce(0) {
-                            $0 + ($1.0.isFinite && $1.1.isFinite && $1.1 < $1.0 ? 1 : 0)
-                        }
-                        if invalidCount > 0 {
-                            logger.warning(
-                                "WeatherNext 3 \(field.name): \(invalidCount) reversed percentile pairs at hour \(index + 1)"
-                            )
-                        }
-                        let spread = zip(low, high).map {
-                            WeatherNext3Variable.estimatedSpread(low: $0, high: $1, scale: field.scale)
-                        }
+                    for statistic in WeatherNext3Variable.Statistic.allCases {
+                        let data = try await read(statistic.rawValue).map { $0 * field.scale + field.offset }
+                        let name = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
                         try await writer.write(
                             member: 0,
-                            variable: WeatherNext3Variable(rawValue: field.name + "_spread")!,
-                            data: spread
+                            variable: WeatherNext3Variable(rawValue: name)!,
+                            data: data
                         )
                     }
                 }
