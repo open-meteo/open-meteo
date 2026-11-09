@@ -34,7 +34,7 @@ extension ForecastapiResult {
      Memory footprint is therefore much smaller and fits better into L2/L3 caches.
      Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
      */
-    func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, logger: Logger) throws -> Response {
+    func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, prefetchLookAhead: Int = 3, logger: Logger) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in
@@ -50,6 +50,9 @@ extension ForecastapiResult {
                 }
                 first = nil*/
                 for (i, location) in results.enumerated() {
+                    if prefetchLookAhead > 0, prefetchLookAhead < results.count - i {
+                        try await prefetchLocation(at: i + prefetchLookAhead)
+                    }
                     if i != 0 {
                         b.buffer.writeString(",")
                     }

@@ -3,7 +3,8 @@ import Vapor
 
 
 extension ForecastapiResult {
-    func toXlsxResponse(timestamp: Timestamp, withLocationHeader: Bool = true) async throws -> Response {
+    func toXlsxResponse(timestamp: Timestamp, withLocationHeader: Bool = true, prefetchLookAhead: Int = 3) async throws -> Response {
+        var prefetchDone = prefetchLookAhead <= 0
         let multiLocation = results.count > 1
 
         let sheet = try XlsxWriter()
@@ -38,23 +39,59 @@ extension ForecastapiResult {
             }
         }
 
-        for location in results {
-            try await location.current(variables: variables.currentVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+        if variables.currentVariables != nil {
+            for (i, location) in results.enumerated() {
+                if !prefetchDone, prefetchLookAhead < results.count - i {
+                    try await prefetchLocation(at: i + prefetchLookAhead)
+                }
+                try await location.current(variables: variables.currentVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            }
+            prefetchDone = true
         }
-        for location in results {
-            try await location.minutely15(variables: variables.minutely15Variables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+        if variables.minutely15Variables != nil {
+            for (i, location) in results.enumerated() {
+                if !prefetchDone, prefetchLookAhead < results.count - i {
+                    try await prefetchLocation(at: i + prefetchLookAhead)
+                }
+                try await location.minutely15(variables: variables.minutely15Variables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            }
+            prefetchDone = true
         }
-        for location in results {
-            try await location.hourly(variables: variables.hourlyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+        if variables.hourlyVariables != nil {
+            for (i, location) in results.enumerated() {
+                if !prefetchDone, prefetchLookAhead < results.count - i {
+                    try await prefetchLocation(at: i + prefetchLookAhead)
+                }
+                try await location.hourly(variables: variables.hourlyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            }
+            prefetchDone = true
         }
-        for location in results {
-            try await location.daily(variables: variables.dailyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+        if variables.dailyVariables != nil {
+            for (i, location) in results.enumerated() {
+                if !prefetchDone, prefetchLookAhead < results.count - i {
+                    try await prefetchLocation(at: i + prefetchLookAhead)
+                }
+                try await location.daily(variables: variables.dailyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            }
+            prefetchDone = true
         }
-        for location in results {
-            try await location.weekly(variables: variables.weeklyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+        if variables.weeklyVariables != nil {
+            for (i, location) in results.enumerated() {
+                if !prefetchDone, prefetchLookAhead < results.count - i {
+                    try await prefetchLocation(at: i + prefetchLookAhead)
+                }
+                try await location.weekly(variables: variables.weeklyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            }
+            prefetchDone = true
         }
-        for location in results {
-            try await location.monthly(variables: variables.monthlyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+        if variables.monthlyVariables != nil {
+            for (i, location) in results.enumerated() {
+                if !prefetchDone, prefetchLookAhead < results.count - i {
+                    try await prefetchLocation(at: i + prefetchLookAhead)
+                }
+                try await location.monthly(variables: variables.monthlyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            }
+            prefetchDone = true
         }
 
         let data = sheet.write(timestamp: timestamp)
