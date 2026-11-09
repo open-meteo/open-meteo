@@ -166,6 +166,14 @@ extension Application {
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
         configuration.httpVersion = httpVersion
+        // Keep AsyncHTTPClient's default unless explicitly configured. HTTP/2
+        // concurrency is controlled by the peer's stream limit instead.
+        if let rawLimit = Environment.get("DEDICATED_HTTP_CONNECTIONS") {
+            guard let limit = Int(rawLimit), limit > 0 else {
+                fatalError("DEDICATED_HTTP_CONNECTIONS must be a positive integer")
+            }
+            configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = limit
+        }
 
         return HTTPClient(
             eventLoopGroupProvider: .shared(eventLoopGroup),
@@ -233,6 +241,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
     app.asyncCommands.use(ValidateOmFilesCommand(), as: "validate-om-files")
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
+    app.asyncCommands.use(GoesDownloader(), as: "download-goes")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
     app.asyncCommands.use(DownloadWeatherNextCommand(), as: "download-weathernext")
 

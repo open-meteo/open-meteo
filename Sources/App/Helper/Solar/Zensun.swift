@@ -18,6 +18,7 @@ public enum Zensun {
     /// the night fraction of a step counts as zero. No closed form exists, uses 3-point Gauss-Legendre
     /// quadrature. Error of the average is below 0.0002 for hourly steps and 0.001 for up to 6 hours
     /// (~0.06° in equivalent zenith angle). ~28ns per timestep / location.
+    @available(*, deprecated, message: "Solar interpolation now uses ClearSkySolarFactorCache to calculate factors on demand.")
     public static func calculateClearSkyRadiationBackwardsAveraged(grid: any Gridable, locationRange: some RandomAccessCollection<Int>, timerange: TimerangeDt) -> Array2DFastTime {
         var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
 

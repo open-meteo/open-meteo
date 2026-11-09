@@ -246,7 +246,7 @@ extension Array where Element == Float {
     ///
     /// If `missingValuesAreBackwardsAveraged` is set, it is assumed that values after missing data is properly averaged over the missing time-steps.
     /// `true` for weather model data. `false` for satellite data and other measurements
-    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: any Gridable, locationRange: any RandomAccessCollection<Int>, missingValuesAreBackwardsAveraged: Bool) {
+    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: any Gridable, locationRange: some RandomAccessCollection<Int>, missingValuesAreBackwardsAveraged: Bool) {
         let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
@@ -284,7 +284,9 @@ extension Array where Element == Float {
                 firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
                 break
             }
-            for i in firstValid..<nTime {
+            // Trailing NaNs have no right endpoint and cannot be interpolated.
+            let lastValid = (firstValid..<nTime).last(where: { !self[l * nTime + $0].isNaN }) ?? firstValid
+            for i in firstValid..<lastValid {
                 guard self[l * nTime + i].isNaN else {
                     continue
                 }
@@ -305,7 +307,7 @@ extension Array where Element == Float {
         let missingSteps = maximumMissingHours * 3600 / time.dtSeconds
         
         /// Which range of hours solar radiation data is required
-        let solarHours = firstMissing - missingSteps*2 ..< lastMissing + missingSteps*2
+        let solarHours = Swift.max(0, firstMissing - missingSteps*2) ..< Swift.min(nTime, lastMissing + missingSteps*2)
         /// Only calculate solar coefficients for this time-range
         let solarTime = TimerangeDt(
             start: time.range.lowerBound.add(solarHours.lowerBound * time.dtSeconds),
@@ -319,130 +321,216 @@ extension Array where Element == Float {
         /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
         let radMinium = 5 / Zensun.solarConstant
 
-        /// solar factor corrected by Haurwitz clear-sky attenuation, backwards averaged over dt
-        let solar2d = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
-
+        // Time-dependent geometry is shared by every location. Compute it once.
+        let sun = solarTime.map { timestamp in
+            let t1 = (90 - timestamp.getSunDeclination()).degreesToRadians
+            let eqtime = timestamp.getSunEquationOfTime()
+            let ut = timestamp.hourWithFraction
+            let p1 = (-15 * (ut - 12 + eqtime)).degreesToRadians
+            let ut0 = ut - Float(time.dtSeconds) / 3600
+            let p10 = (-15 * (ut0 - 12 + eqtime)).degreesToRadians
+            let rsun = timestamp.getSunRadius()
+            return (cosSun: cos(t1), sinSun: sin(t1), p1: p1, p10: p10, denominator: rsun * rsun * (p10 - p1))
+        }
         let sLow = solarHours.lowerBound
-
-        for l in 0..<nTimeSeries {
-            let sPos = l / nMembers
-            /// Find the first valid value. This might be adjusted due to data spacing
-            var firstValid = nTime
-            for t in 0..<nTime {
-                guard !self[l * nTime + t].isNaN else {
-                    continue
-                }
-                if firstValid == nTime {
-                    firstValid = t
-                    continue
-                }
-                // 1 = no spacing
-                // 2 = -D-D-D
-                // 3 = --D--D--D
-                firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
-                break
+        for (location, gridpoint) in locationRange.enumerated() {
+            // Skip empty/complete series and trailing gaps before projecting this
+            // location or allocating its solar cache. Check all ensemble members.
+            let needsInterpolation = (0..<nMembers).contains { member in
+                let offset = (location * nMembers + member) * nTime
+                guard let first = (0..<nTime).first(where: { !self[offset + $0].isNaN }),
+                      let second = (first + 1..<nTime).first(where: { !self[offset + $0].isNaN }),
+                      let last = (second..<nTime).last(where: { !self[offset + $0].isNaN }) else { return false }
+                // Preserve the backwards-average leading-gap adjustment.
+                let start = Swift.max(first - (second - first - 1), 0)
+                return (start..<last).contains { self[offset + $0].isNaN }
             }
+            guard needsInterpolation else { continue }
+            let (lat, lon) = grid.getCoordinates(gridpoint: gridpoint)
+            // Each location owns its lazy cache, shared across its ensemble members.
+            var solar = ClearSkySolarFactorCache(sun: sun, latitude: lat, longitude: lon)
 
-            for t in firstValid..<nTime {
-                guard self[l * nTime + t].isNaN else {
-                    continue
-                }
-
-                var C = Float.nan
-                // var D = Float.nan
-                let posB = t - 1
-                var posC = 0
-                // Find the first valid value for point C within the next 12 hours
-                for t2 in (t + 1)..<Swift.min(t + 1 + 1 + maximumMissingHours * 3600 / time.dtSeconds, nTime) {
-                    let value = self[l * nTime + t2]
-                    guard !value.isNaN else {
+            for member in 0..<nMembers {
+                let l = location * nMembers + member
+                /// Find the first valid value. This might be adjusted due to data spacing
+                var firstValid = nTime
+                for t in 0..<nTime {
+                    guard !self[l * nTime + t].isNaN else {
                         continue
                     }
-                    C = value
-                    posC = t2
-                    break
-                }
-                if C.isNaN {
-                    // not possible to do any interpolation
-                    break
-                }
-                // Interpolate between 3 points. Each point is actually an interval mean value.
-                // It is therefore important to preserve the mean value
-                let width = posC - posB
-                let posA = posB - width
-                let posD = posC + width
-                let posBValid = posA >= 0 && posA - sLow >= 0 && !self[l * nTime + posA].isNaN
-                let posDValid = posD < nTime && posD - sLow < solarTime.count && !self[l * nTime + posD].isNaN
-                let solC = solar2d[sPos, posC - sLow]
-
-                /// solAvgC is an average of the solar factor from posB until posC
-                let solAvgC = missingValuesAreBackwardsAveraged ? solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean() : solC
-                
-                /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
-                let ktC = solAvgC <= radMinium || C <= 0 ? .nan : Swift.min(C / solAvgC, radLimit)
-                
-                var ktB: Float
-                if posBValid {
-                    let B = missingValuesAreBackwardsAveraged ? self[l * nTime + posA + 1 ..< l * nTime + posB + 1].mean() : self[l * nTime + posB]
-                    let solAvgB = missingValuesAreBackwardsAveraged ? solar2d[sPos, posA + 1 - sLow ..< posB + 1 - sLow].mean() : solar2d[sPos, posB - sLow]
-                    ktB = solAvgB <= radMinium ? ktC : Swift.min(B / solAvgB, radLimit)
-                } else {
-                    ktB = ktC
-                }
-                
-                var ktD: Float
-                if posDValid {
-                    let D = self[l * nTime + posD]
-                    /// solD is an average of the solar factor from posC until posD
-                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solar2d[sPos, posD - sLow]
-                    ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
-                } else {
-                    ktD = ktC
-                }
-                
-                if ktB.isNaN, ktC.isNaN, ktD.isNaN {
-                    // night time. Does not apply +1 to range, because current value should already be 0
-                    for t in t..<posC {
-                        self[l * nTime + t] = 0
+                    if firstValid == nTime {
+                        firstValid = t
+                        continue
                     }
-                    continue
+                    // 1 = no spacing
+                    // 2 = -D-D-D
+                    // 3 = --D--D--D
+                    firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
+                    break
                 }
-                let meanPreservationFactor: Float
-                /// If value is below 5 watts, do not adjust means
-                if missingValuesAreBackwardsAveraged && C > 5 {
-                    var mean: Float = 0
-                    let meanWith = posC - t + 1
-                    for t in t..<posC + 1 {
+
+                for t in firstValid..<nTime {
+                    guard self[l * nTime + t].isNaN else {
+                        continue
+                    }
+
+                    var C = Float.nan
+                    // var D = Float.nan
+                    let posB = t - 1
+                    var posC = 0
+                    // Find the first valid value for point C within the next 12 hours
+                    for t2 in (t + 1)..<Swift.min(t + 1 + 1 + maximumMissingHours * 3600 / time.dtSeconds, nTime) {
+                        let value = self[l * nTime + t2]
+                        guard !value.isNaN else {
+                            continue
+                        }
+                        C = value
+                        posC = t2
+                        break
+                    }
+                    if C.isNaN {
+                        // not possible to do any interpolation
+                        break
+                    }
+                    // Interpolate between 3 points. Each point is actually an interval mean value.
+                    // It is therefore important to preserve the mean value
+                    let width = posC - posB
+                    let posA = posB - width
+                    let posD = posC + width
+                    let posBValid = posA >= 0 && posA - sLow >= 0 && !self[l * nTime + posA].isNaN
+                    let posDValid = posD < nTime && posD - sLow < solarTime.count && !self[l * nTime + posD].isNaN
+                    let solC = solar.factor(posC - sLow)
+
+                    /// solAvgC is an average of the solar factor from posB until posC
+                    let solAvgC = missingValuesAreBackwardsAveraged ? solar.mean(posB + 1 - sLow ..< posC + 1 - sLow) : solC
+
+                    /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
+                    let ktC = solAvgC <= radMinium || C <= 0 ? .nan : Swift.min(C / solAvgC, radLimit)
+
+                    var ktB: Float
+                    if posBValid {
+                        let B = missingValuesAreBackwardsAveraged ? self[l * nTime + posA + 1 ..< l * nTime + posB + 1].mean() : self[l * nTime + posB]
+                        let solAvgB = missingValuesAreBackwardsAveraged ? solar.mean(posA + 1 - sLow ..< posB + 1 - sLow) : solar.factor(posB - sLow)
+                        ktB = solAvgB <= radMinium ? ktC : Swift.min(B / solAvgB, radLimit)
+                    } else {
+                        ktB = ktC
+                    }
+
+                    var ktD: Float
+                    if posDValid {
+                        let D = self[l * nTime + posD]
+                        /// solD is an average of the solar factor from posC until posD
+                        let solAvgD = missingValuesAreBackwardsAveraged ? solar.mean(posC + 1 - sLow ..< posD + 1 - sLow) : solar.factor(posD - sLow)
+                        ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
+                    } else {
+                        ktD = ktC
+                    }
+
+                    if ktB.isNaN, ktC.isNaN, ktD.isNaN {
+                        // night time. Does not apply +1 to range, because current value should already be 0
+                        for t in t..<posC {
+                            self[l * nTime + t] = 0
+                        }
+                        continue
+                    }
+                    let meanPreservationFactor: Float
+                    /// If value is below 5 watts, do not adjust means
+                    if missingValuesAreBackwardsAveraged && C > 5 {
+                        var mean: Float = 0
+                        let meanWith = posC - t + 1
+                        for t in t..<posC + 1 {
+                            let ktC = ktC.isFinite ? ktC : ktB.isFinite ? ktB : ktD
+                            let ktB = ktB.isFinite ? ktB : ktC
+                            let ktD = ktD.isFinite ? ktD : ktC
+                            let f = Float(t - posB) / Float(posC - posB)
+                            let kt = splineInterpolateCentered(a: ktB, b: ktC, c: ktD, fraction: f)
+                            mean += Swift.max(kt, 0) * solar.factor(t - sLow)
+                        }
+                        meanPreservationFactor = mean <= 5 ? 0 : C / mean * Float(meanWith)
+                    } else {
+                        meanPreservationFactor = 1
+                    }
+
+                    for t in t..<posC + (missingValuesAreBackwardsAveraged ? 1 : 0) {
                         let ktC = ktC.isFinite ? ktC : ktB.isFinite ? ktB : ktD
                         let ktB = ktB.isFinite ? ktB : ktC
                         let ktD = ktD.isFinite ? ktD : ktC
                         let f = Float(t - posB) / Float(posC - posB)
                         let kt = splineInterpolateCentered(a: ktB, b: ktC, c: ktD, fraction: f)
-                        mean += Swift.max(kt, 0) * solar2d[sPos, t - sLow]
+
+                        self[l * nTime + t] = Swift.max(kt, 0) * solar.factor(t - sLow) * meanPreservationFactor
+                        //print(ktB, ktC, ktD, f, "=", kt, meanPreservationFactor, solar.factor(t - sLow), self[l * nTime + t] )
                     }
-                    meanPreservationFactor = mean <= 5 ? 0 : C / mean * Float(meanWith)
-                } else {
-                    meanPreservationFactor = 1
+    //                for t in t..<posC {
+    //                    self[l * nTime + t] = Swift.max(0, ktC) * solar.factor(t - sLow)
+    //                }
+    //                if missingValuesAreBackwardsAveraged {
+    //                    self[l * nTime + posC] = Swift.max(0, ktC) * solC
+    //                }
                 }
-                
-                for t in t..<posC + (missingValuesAreBackwardsAveraged ? 1 : 0) {
-                    let ktC = ktC.isFinite ? ktC : ktB.isFinite ? ktB : ktD
-                    let ktB = ktB.isFinite ? ktB : ktC
-                    let ktD = ktD.isFinite ? ktD : ktC
-                    let f = Float(t - posB) / Float(posC - posB)
-                    let kt = splineInterpolateCentered(a: ktB, b: ktC, c: ktD, fraction: f)
-                    
-                    self[l * nTime + t] = Swift.max(kt, 0) * solar2d[sPos, t - sLow] * meanPreservationFactor
-                    //print(ktB, ktC, ktD, f, "=", kt, meanPreservationFactor, solar2d[sPos, t - sLow], self[l * nTime + t] )
-                }
-//                for t in t..<posC {
-//                    self[l * nTime + t] = Swift.max(0, ktC) * solar2d[sPos, t - sLow]
-//                }
-//                if missingValuesAreBackwardsAveraged {
-//                    self[l * nTime + posC] = Swift.max(0, ktC) * solC
-//                }
             }
         }
+    }
+}
+
+/// Lazy clear-sky calculations used by solar interpolation.
+private struct ClearSkySolarFactorCache {
+    typealias Sun = (cosSun: Float, sinSun: Float, p1: Float, p10: Float, denominator: Float)
+    private let sun: [Sun]
+    private let longitude: Float
+    private let cosLatitude: Float
+    private let sinLatitude: Float
+    private var cache: [Float]
+
+    init(sun: [Sun], latitude: Float, longitude: Float) {
+        self.sun = sun
+        self.longitude = longitude.degreesToRadians
+        let t0 = (90 - latitude).degreesToRadians
+        self.cosLatitude = cos(t0)
+        self.sinLatitude = sin(t0)
+        self.cache = [Float](repeating: .nan, count: sun.count)
+    }
+
+    // Haurwitz clear-sky factor integrated over the timestep. Keep the same
+    // sunrise/sunset clipping and quadrature as Zensun's bulk helper.
+    mutating func factor(_ index: Int) -> Float {
+        if !cache[index].isNaN { return cache[index] }
+        let geometry = sun[index]
+        var p0 = longitude
+        if p0 < geometry.p1 - .pi { p0 += 2 * .pi }
+        if p0 > geometry.p1 + .pi { p0 -= 2 * .pi }
+        let a = cosLatitude * geometry.cosSun
+        let b = sinLatitude * geometry.sinSun
+        assert(b > 0)
+        let arg = -a / b
+        guard arg < 1 else {
+            cache[index] = 0
+            return 0
+        }
+        let carg = arg <= -1 ? Float.pi : acos(arg)
+        let lo = max(geometry.p1, p0 - carg)
+        let hi = min(geometry.p10, p0 + carg)
+        guard lo < hi else {
+            cache[index] = 0
+            return 0
+        }
+        let c = (lo + hi) * 0.5
+        let h = (hi - lo) * 0.5
+        let x = h * 0.77459667
+        let value = h * ((5 / 9) * (Self.integrand(c - x, a: a, b: b, p0: p0) + Self.integrand(c + x, a: a, b: b, p0: p0)) + (8 / 9) * Self.integrand(c, a: a, b: b, p0: p0)) / geometry.denominator
+        cache[index] = value
+        return value
+    }
+
+    mutating func mean(_ range: Range<Int>) -> Float {
+        var sum: Float = 0
+        for index in range { sum += factor(index) }
+        return sum / Float(range.count)
+    }
+
+    private static func integrand(_ p: Float, a: Float, b: Float, p0: Float) -> Float {
+        let mu = a + b * cos(p - p0)
+        return mu < 0.005 ? 0 : mu * exp(-0.057 / mu)
     }
 }
 
