@@ -60,11 +60,11 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     }
 
     /// Advise cached pages and schedule missing whole blocks for a valid file byte range.
-    /// Uses a 100 ms scheduling allowance, preserving the exact advised bytes across super blocks.
+    /// Uses a one-second scheduling allowance, preserving the exact advised bytes across super blocks.
     /// Returns after scheduling; backend failures are not returned. Cancellation or queue exhaustion
     /// may throw after earlier work has already been scheduled. Misses incur coordinator scheduling costs.
     public func prefetchData(offset: Int, count: Int) async throws {
-        try await prefetch(byteRange: offset..<(offset + count), allowedWait: .milliseconds(100))
+        try await prefetch(byteRange: offset..<(offset + count), allowedWait: .seconds(1))
     }
 
     /// Prepare a valid absolute file byte range for background fetching. Fully cached linear ranges
@@ -235,7 +235,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         return deletedCount
     }
     
-    /// Preload absolute block-index ranges after rotating files, with a one-second scheduling allowance.
+    /// Preload absolute block-index ranges after rotating files, with a 30-second scheduling allowance.
     /// Clamp old ranges to the current file size, skip empty ranges, and clip the final block at EOF.
     /// Cached blocks receive WILLNEED advice for their requested bytes; missing blocks fetch in the
     /// background. The reader splits super blocks; the coordinator shares overlapping work.
@@ -254,7 +254,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 continue
             }
             try await prefetch(byteRange: (range.lowerBound * blockSize)..<min(range.upperBound * blockSize, totalCount),
-                               allowedWait: .seconds(1))
+                               allowedWait: .seconds(30))
         }
     }
 }

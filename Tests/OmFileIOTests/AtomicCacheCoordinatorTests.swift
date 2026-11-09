@@ -499,7 +499,7 @@ struct AtomicCacheCoordinatorTests {
 
     @Test(arguments: [Duration.seconds(120), .seconds(60), .zero])
     func defaultLimitAndCacheHitsBypassQueue(allowedWait: Duration) async throws {
-        let limit = 16
+        let limit = 4
         let cache = try coordinator()
         let probe = FetchProbe()
         Data(repeating: 231, count: 64).withUnsafeBytes {

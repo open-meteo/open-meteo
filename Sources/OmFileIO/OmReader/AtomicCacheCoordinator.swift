@@ -20,7 +20,7 @@ enum DataOwnership: Sendable {
 /// block indices; internal jobs and the single-super-block `prefetch` entry point use cache keys.
 /// Providers fetch whole blocks and clip the final block at EOF.
 ///
-/// Up to 16 jobs run concurrently by default; another 16,384 may queue. Readers compute an absolute
+/// Up to 4 jobs run concurrently by default; another 16,384 may queue. Readers compute an absolute
 /// deadline as request time plus `allowedWait`. Free slots start immediately; queued jobs run by
 /// earliest deadline, without a timeout or guaranteed start time. Joining readers can advance a
 /// deadline, and equal deadlines have no guaranteed ordering. Workers reuse their task and slot
@@ -249,10 +249,10 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
 
     /// Coordinate reads against an existing cache. Both limits must be positive and count backend
     /// jobs, not blocks: running jobs use concurrency slots, and waiting jobs use queue capacity.
-    /// Defaults are 16 concurrent and 16,384 queued jobs. Construction does not start background work.
+    /// Defaults are 4 concurrent and 16,384 queued jobs. Construction does not start background work.
     public init(
         cache: AtomicBlockCache<Backend>,
-        maxConcurrentFetches: Int = 16,
+        maxConcurrentFetches: Int = 4,
         maxPendingFetches: Int = 16_384
     ) {
         precondition(maxConcurrentFetches > 0)
