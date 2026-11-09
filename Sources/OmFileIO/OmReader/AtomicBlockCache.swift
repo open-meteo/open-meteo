@@ -68,7 +68,8 @@ extension AtomicBlockCache where Backend == MmapFile {
  The entire cache size is preallocated. Due to the fixed number of elements, the hash map does not need rebalancing
 
  Returned pointers borrow cache storage; they do not pin entries against eviction. A later write
- can overwrite the bytes before or during a read, including while a coordinator reader is suspended.
+ can overwrite the bytes before or during a read. Copies are independent once taken, but the source
+ is not pinned while copying.
  This risk is accepted to avoid copying or pinning blocks. The production cache is very large, so
  such reuse is not expected under normal real-world load, but is possible under eviction pressure.
  
@@ -150,8 +151,12 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
-    /// Advise the memory pages of a cached block.
-    func advise(key: UInt64, advice: MmapFile.MAdvice) {
+    /// Advise only pages intersecting the requested bytes within a cached block.
+    /// The mmap backend aligns the physical offset to the platform's page size.
+    func advise(key: UInt64, byteRange: Range<Int>? = nil, advice: MmapFile.MAdvice) {
+        let byteRange = byteRange ?? 0..<blockSize
+        precondition(byteRange.lowerBound >= 0 && byteRange.upperBound <= blockSize)
+        guard !byteRange.isEmpty else { return }
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
         data.withMutableUnsafeBytes { bytes in
@@ -166,7 +171,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         break
                     }
                     let offset = blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot)
-                    data.adviseData(offset: offset, count: blockSize, advice: advice)
+                    data.adviseData(offset: offset + byteRange.lowerBound, count: byteRange.count, advice: advice)
                     return
                 }
             }

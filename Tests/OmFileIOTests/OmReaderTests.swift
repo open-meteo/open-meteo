@@ -4,6 +4,14 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    private func waitForPrefetch(_ ready: () -> Bool) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !ready(), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(ready())
+    }
+
     @Test(arguments: [
         (640, 1280, [2..<4, 9..<10], [4..<8, 18..<20]),
         (640, 320, [2..<4, 9..<10], [1..<2, 4..<5]),
@@ -15,15 +23,19 @@ import OmFileFormat
     ])
     func scaleActiveBlocks(oldSize: Int, newSize: Int, active: [Range<Int>], expected: [Range<Int>]) async throws {
         let blockSize = 64
-        let storage = DataAsClass(data: Data(repeating: 0, count: (blockSize + 16) * 128))
-        let cache = AtomicCacheCoordinator(cache: AtomicBlockCache(data: storage, blockSize: blockSize))
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        // Background preloads and cache polling require storage that supports concurrent access.
+        let cache = AtomicCacheCoordinator(cache: try AtomicBlockCache(file: path, blockSize: blockSize, blockCount: 128))
         let old = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 1, count: oldSize)), cache: cache, cacheKey: 123)
         try await old.preloadBlocks(blocks: active)
+        try await waitForPrefetch { old.listOfActiveBlocks(maxAgeSeconds: 60) == active }
         let scaled = old.listOfActiveBlocks(maxAgeSeconds: 60, scaledToFileSize: newSize)
         #expect(scaled == expected)
 
         let replacement = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 2, count: newSize)), cache: cache, cacheKey: 456)
         try await replacement.preloadBlocks(blocks: scaled)
+        try await waitForPrefetch { replacement.listOfActiveBlocks(maxAgeSeconds: 60) == expected }
         #expect(replacement.listOfActiveBlocks(maxAgeSeconds: 60) == expected)
         for range in expected {
             let offset = range.lowerBound * blockSize
@@ -43,7 +55,8 @@ import OmFileFormat
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("block-cache-\(UUID().uuidString).bin").path
         defer { try? FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: blockSize, blockCount: 256)
-        let reader = OmReaderBlockCache(backend: DataAsClass(data: contents), cache: AtomicCacheCoordinator(cache: cache), cacheKey: 123)
+        let coordinator = AtomicCacheCoordinator(cache: cache)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: contents), cache: coordinator, cacheKey: 123)
         let offset = blocks.lowerBound * blockSize + 17
         let count = blocks.count * blockSize - 34
         let expected = contents.subdata(in: offset..<offset + count)
@@ -61,11 +74,9 @@ import OmFileFormat
             }
         default:
             try await reader.prefetchData(offset: offset, count: count)
-            // Prefetch returns before its background task commits the blocks.
-            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-            while reader.listOfActiveBlocks(maxAgeSeconds: 60) != [blocks], ContinuousClock.now < deadline {
-                try await Task.sleep(for: .milliseconds(10))
-            }
+        }
+        if path == "preload" || path == "prefetch" {
+            try await waitForPrefetch { reader.listOfActiveBlocks(maxAgeSeconds: 60) == [blocks] }
         }
 
         #expect(reader.listOfActiveBlocks(maxAgeSeconds: 60) == [blocks])
@@ -139,11 +150,11 @@ import OmFileFormat
         let cache = try AtomicBlockCache(file: file, blockSize: 20, blockCount: 10)
         let coordinator = AtomicCacheCoordinator(cache: cache)
         // Read 2 blocks, both not cached
-        try await coordinator.get(key: 123, count: 2, allowedWait: .zero, superBlockKey: 0, provider: { key,count in
+        try await coordinator.checkRead(key: 123, count: 2, allowedWait: .zero, fileKey: 0, provider: { key,count in
             #expect(key == 123)
             #expect(count == 2)
             return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
-        }, dataCallback: { key, data in
+        }, check: { key, data in
             switch key {
             case 123:
                 #expect(data[4] == 4)
@@ -154,11 +165,11 @@ import OmFileFormat
             }
         })
         // First block cached, second missing
-        try await coordinator.get(key: 124, count: 2, allowedWait: .zero, superBlockKey: 0, provider: { key,count in
+        try await coordinator.checkRead(key: 124, count: 2, allowedWait: .zero, fileKey: 0, provider: { key,count in
             #expect(key == 125)
             #expect(count == 1)
             return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
-        }, dataCallback: { key, data in
+        }, check: { key, data in
             switch key {
             case 124:
                 #expect(data[4] == 24)
@@ -169,10 +180,10 @@ import OmFileFormat
             }
         })
         // Both blocks cached
-        try await coordinator.get(key: 123, count: 3, allowedWait: .zero, superBlockKey: 0, provider: { key,count in
+        try await coordinator.checkRead(key: 123, count: 3, allowedWait: .zero, fileKey: 0, provider: { key,count in
             #expect(Bool(false))
             return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
-        }, dataCallback: { key, data in
+        }, check: { key, data in
             switch key {
             case 123:
                 #expect(data[4] == 4)
