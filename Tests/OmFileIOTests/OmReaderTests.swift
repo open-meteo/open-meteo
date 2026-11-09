@@ -4,12 +4,13 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
-    private func waitForPrefetch(_ ready: () -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    private func waitForPrefetch(sourceLocation: SourceLocation = #_sourceLocation, _ ready: () -> Bool) async throws {
+        // Allow for executor contention from unrelated tests in the full Linux CI suite.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(60))
         while !ready(), ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(10))
         }
-        try #require(ready())
+        try #require(ready(), "Timed out waiting for background prefetch", sourceLocation: sourceLocation)
     }
 
     @Test(arguments: [

@@ -465,12 +465,36 @@ struct AtomicCacheCoordinatorTests {
         }
     }
 
-    private func waitUntil(_ condition: () async -> Bool) async throws {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    private func waitUntil(
+        timeout: Duration = .seconds(60), sourceLocation: SourceLocation = #_sourceLocation,
+        _ condition: () async -> Bool
+    ) async throws {
+        // The full suite can occupy the cooperative executor for seconds on small CI runners.
+        // This is a deadlock watchdog, not a performance assertion.
+        let deadline = ContinuousClock.now.advanced(by: timeout)
         while !(await condition()) {
-            try #require(ContinuousClock.now < deadline)
+            if ContinuousClock.now >= deadline {
+                // An actor predicate may return false before this task gets CPU time again.
+                // Check fresh state before reporting a timeout at the caller's source location.
+                try #require(await condition(), "Timed out waiting for cache scheduling state", sourceLocation: sourceLocation)
+                return
+            }
             try await Task.sleep(for: .milliseconds(1))
         }
+    }
+
+    @Test func waitUntilRechecksConditionAfterSuspension() async throws {
+        var checks = 0
+        try await waitUntil(timeout: .milliseconds(1)) {
+            checks += 1
+            if checks == 1 {
+                // Simulate a stale false result arriving after the watchdog deadline.
+                try? await Task.sleep(for: .milliseconds(10))
+                return false
+            }
+            return true
+        }
+        #expect(checks == 2)
     }
 
     @Test func earliestDeadlineFirst() async throws {
@@ -1175,19 +1199,20 @@ struct AtomicCacheCoordinatorTests {
     }
 
     @Test func fileReadCopiesBeforeCacheSlotReuse() async throws {
-        let cache = try coordinator(limit: 1, blockSize: 8 * 1024 * 1024, blockCount: 1)
-        // Each super block must be copied before the next backend result reuses its cache slot.
-        let result = try await cache.get(fileKey: 123, byteRange: cache.cache.blockSize..<(4 * cache.cache.blockSize), provider: { key, count in
+        let cache = try coordinator(limit: 1, blockCount: 1)
+        let blockSize = cache.cache.blockSize
+        let boundary = cache.superBlockLength * blockSize
+        // Straddle a super-block boundary with two small blocks. The owned result must preserve
+        // the first block when the second fetch reuses the cache's only slot.
+        let result = try await cache.get(fileKey: 123, byteRange: (boundary - blockSize)..<(boundary + blockSize), provider: { key, count in
             #expect(count == 1)
-            return Data(repeating: UInt8(key), count: cache.cache.blockSize)
+            return Data(repeating: UInt8(truncatingIfNeeded: key), count: blockSize)
         })
         guard case .owned(let bytes) = result else { Issue.record("Cross-super-block reads must allocate"); return }
         defer { bytes.deallocate() }
-        #expect(bytes.count == 3 * cache.cache.blockSize)
-        for block in 0..<3 {
-            let start = block * cache.cache.blockSize
-            #expect(bytes[start..<(start + cache.cache.blockSize)].allSatisfy { $0 == UInt8(block + 1) })
-        }
+        let first = UInt8(truncatingIfNeeded: cache.superBlockLength - 1)
+        let second = UInt8(truncatingIfNeeded: cache.superBlockLength)
+        #expect(Data(bytes) == Data(repeating: first, count: blockSize) + Data(repeating: second, count: blockSize))
     }
 
     @Test func runningRangeSharesEveryRegisteredBlock() async throws {
