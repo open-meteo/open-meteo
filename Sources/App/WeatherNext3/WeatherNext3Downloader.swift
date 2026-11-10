@@ -134,10 +134,6 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                         logger.debug("WeatherNext 3: reading \(name), hour \(index + 1)")
                         let store = try await storage()
                         let root = try await ZarrGroup(storage: store, path: prefix + "predictions.zarr/")
-                        guard try await store.exists(path: prefix + "predictions.zarr/" + name + "/c/\(index)/0/0")
-                        else {
-                            throw Abort(.badRequest, reason: "Missing WeatherNext 3 chunk: \(name), hour \(index + 1)")
-                        }
                         let array = try await root.openArray(name: name)
                         let suffix = domain == .surface ? "0p1" : "0p05"
                         let expectedUnit: String
