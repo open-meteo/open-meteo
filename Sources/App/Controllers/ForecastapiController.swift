@@ -837,6 +837,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_global_eps_native
     case dwd_icon_eu_eps_native
     case dwd_icon_d2_eps_native
+    case noaa_goes19
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
@@ -1448,6 +1449,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
         case .ncep_aigefs025_ensemble_mean:
             return .single(GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+        case .noaa_goes19:
+            return .single(GoesDomain.goes19, GoesVariable.self)
         case .dwd_sis_europe_africa_v4:
             return .single(DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
         case .eumetsat_sarah3:
@@ -1860,7 +1863,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .multipleWithPrecipitationProbability([
                 .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(GeoSphereDomain.arome_austria, GeoSphereVariable.self),
                 .domain(GeoSphereDomain.claef_austria, GeoSphereClaefVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         default:
@@ -2260,6 +2262,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .consolidated_v4:
             return try await Self.makeDailyReaders(domains: [GloFasDomain.consolidated], variableType: GloFasVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         case .satellite_radiation_seamless:
+            if lon < -37.5 { // GOES-East at 75°W; midpoint with MSG at 0°
+                return try await GoesDomain.goes19.makeGenericHourlyDaily(variableType: GoesVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            }
             if (-20..<60).contains(lon) { // DWD MTG on 0°
                 return try await DwdSisDomain.europe_africa_v4.makeGenericHourlyDaily(variableType: DwdSisVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }

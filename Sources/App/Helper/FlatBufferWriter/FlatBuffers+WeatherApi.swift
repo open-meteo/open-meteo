@@ -1313,6 +1313,9 @@ extension MultiDomains {
             return .ncepHgefs025EnsembleMean
         case .ncep_aigefs025_ensemble_mean:
             return .ncepAigefs025
+        case .noaa_goes19:
+            // The SDK has not assigned a GOES-19 model identifier yet.
+            return .undefined
         case .dwd_sis_europe_africa_v4:
             return .dwdSisEuropeAfricaV4
         case .dwd_icon_eps_ensemble_mean_seamless:
