@@ -1863,7 +1863,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .multipleWithPrecipitationProbability([
                 .domain(EcmwfDomain.ifs025, EcmwfIfsVariable.self),
                 .domain(EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
-                .domain(GeoSphereDomain.arome_austria, GeoSphereVariable.self),
                 .domain(GeoSphereDomain.claef_austria, GeoSphereClaefVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         default:
