@@ -672,6 +672,7 @@ private struct VariableHourlyDerivationCompatibility {
     let convectivePrecipitation: ConvectivePrecipitation
     let omitsConvectivePrecipitationFromWeatherCode: Bool
     let shortwaveRadiationScale: Float?
+    let correctsGeoSphereAromeSnowfallHeight: Bool
     let pressureLevelGeopotentialHeightScale: Float?
     let convertsPressureLevelVerticalVelocity: Bool
     let usesLegacyIconEpsRadiationStorage: Bool
@@ -687,6 +688,7 @@ private struct VariableHourlyDerivationCompatibility {
         convectivePrecipitation: ConvectivePrecipitation = .storedShowers,
         omitsConvectivePrecipitationFromWeatherCode: Bool = false,
         shortwaveRadiationScale: Float? = nil,
+        correctsGeoSphereAromeSnowfallHeight: Bool = false,
         pressureLevelGeopotentialHeightScale: Float? = nil,
         convertsPressureLevelVerticalVelocity: Bool = false,
         usesLegacyIconEpsRadiationStorage: Bool = false,
@@ -701,6 +703,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.convectivePrecipitation = convectivePrecipitation
         self.omitsConvectivePrecipitationFromWeatherCode = omitsConvectivePrecipitationFromWeatherCode
         self.shortwaveRadiationScale = shortwaveRadiationScale
+        self.correctsGeoSphereAromeSnowfallHeight = correctsGeoSphereAromeSnowfallHeight
         self.pressureLevelGeopotentialHeightScale = pressureLevelGeopotentialHeightScale
         self.convertsPressureLevelVerticalVelocity = convertsPressureLevelVerticalVelocity
         self.usesLegacyIconEpsRadiationStorage = usesLegacyIconEpsRadiationStorage
@@ -786,6 +789,8 @@ private struct VariableHourlyDerivationCompatibility {
              .meteofrance_arpege_europe,
              .meteofrance_arpege_world025:
             self = .init(shortwaveRadiationScale: MeteoFranceSurfaceVariable.shortwaveRadiationArchiveCorrectionFactor)
+        case .geosphere_arome_austria:
+            self = .init(correctsGeoSphereAromeSnowfallHeight: true)
         case .jma_gsm, .jma_msm_upper_level:
             self = .init(
                 pressureLevelGeopotentialHeightScale: 9.80665,
@@ -1160,6 +1165,12 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                     return nil
                 }
                 return .from(input: shortwave)
+            case .snowfall_height where compatibility.correctsGeoSphereAromeSnowfallHeight:
+                // The archive added ZSURF/g to an already sea-level-referenced snow line.
+                // The static model elevation is an approximation of the run's ZSURF/g.
+                return .one(.raw(rawVariable)) { snowline, _ in
+                    return DataAndUnit(snowline.data.map { $0 - reader.modelElevation.numeric }, snowline.unit)
+                }
             case .direct_radiation, .diffuse_radiation:
                 return .one(.raw(rawVariable)) { radiation, _ in
                     return DataAndUnit(radiation.data.map { max($0, 0) }, radiation.unit)
