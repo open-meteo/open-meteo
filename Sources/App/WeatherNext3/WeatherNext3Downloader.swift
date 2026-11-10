@@ -5,7 +5,8 @@ import Vapor
 struct DownloadWeatherNext3Command: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "run") var run: String?
-        @Option(name: "concurrent") var concurrent: Int?
+        @Option(name: "concurrent", help: "Maximum concurrent chunk download/processing tasks (default: 16)")
+        var concurrent: Int?
         @Option(name: "upload-s3-bucket") var uploadS3Bucket: String?
     }
 
@@ -15,7 +16,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let app = context.application
         let logger = context.application.logger
         logger.info("WeatherNext 3: starting downloader; reading local run metadata")
-        let concurrency = signature.concurrent ?? 1
+        let concurrency = signature.concurrent ?? 16
         guard concurrency > 0 else { throw Abort(.badRequest, reason: "concurrent must be positive") }
 
         let queues = await app.s3SyncManager.getQueues(
@@ -112,76 +113,79 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 hourly lead coordinates")
         }
 
-        logger.info("WeatherNext 3: validation complete; downloading both global grids for \(hours) timesteps")
-        let handles = try await (0..<hours).mapConcurrent(nConcurrent: concurrency) { index in
-            let started = Date()
-            logger.info("WeatherNext 3: starting forecast hour \(index + 1)/\(hours)")
-            var handles = [GenericVariableHandle]()
-            for domain in WeatherNext3Domain.allCases {
-                let writer = OmSpatialTimestepWriter(
-                    domain: domain,
-                    run: run,
-                    time: run.add(hours: index + 1),
-                    storeOnDisk: false,
-                    realm: nil,
-                    logger: logger
-                )
-                for field in WeatherNext3Variable.fields where field.domain == domain {
-                    logger.info("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(field.name)")
-
-                    func read(_ statistic: String) async throws -> [Float] {
-                        let name = field.source + "_" + statistic
-                        logger.debug("WeatherNext 3: reading \(name), hour \(index + 1)")
-                        let store = try await storage()
-                        let root = try await ZarrGroup(storage: store, path: prefix + "predictions.zarr/")
-                        let array = try await root.openArray(name: name)
-                        let suffix = domain == .surface ? "0p1" : "0p05"
-                        let expectedUnit: String
-                        switch field.unit {
-                        case .celsius: expectedUnit = "K"
-                        case .hectopascal: expectedUnit = "Pa"
-                        case .millimetre: expectedUnit = "m"
-                        case .percentage: expectedUnit = "(0 - 1)"
-                        case .wattPerSquareMetre: expectedUnit = "J m**-2"
-                        default: expectedUnit = "m s**-1"
-                        }
-
-                        guard case .v3(let metadata) = array.metadata,
-                            metadata.dataType == "float32",
-                            metadata.dimensionNames == ["lead_time", "lat_" + suffix, "lon_" + suffix],
-                            metadata.attributes?["units"]?.stringValue == expectedUnit,
-                            array.chunkShape == [1, domain.grid.ny, domain.grid.nx],
-                            array.shape == [hours, domain.grid.ny, domain.grid.nx]
-                        else {
-                            throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
-                        }
-
-                        var data: [Float] = try await array.retrieveArraySubset([
-                            index..<index + 1, 0..<domain.grid.ny, 0..<domain.grid.nx,
-                        ])
-                        data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-                        return data
-                    }
-
-                    for statistic in WeatherNext3Variable.Statistic.allCases {
-                        let data = try await read(statistic.rawValue).map { $0 * field.scale + field.offset }
-                        let name = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
-                        try await writer.write(
-                            member: 0,
-                            variable: WeatherNext3Variable(rawValue: name)!,
-                            data: data
-                        )
-                    }
-                }
-
-                handles += try await writer.finalise()
+        logger.info("WeatherNext 3: loading and validating field metadata")
+        let statistics = WeatherNext3Variable.fields.flatMap { field in
+            WeatherNext3Variable.Statistic.allCases.map { (field, $0) }
+        }
+        let arrays = try await statistics.mapConcurrent(nConcurrent: concurrency) { field, statistic in
+            let name = field.source + "_" + statistic.rawValue
+            let array = try await root.openArray(name: name)
+            let domain = field.domain
+            let suffix = domain == .surface ? "0p1" : "0p05"
+            let expectedUnit: String
+            switch field.unit {
+            case .celsius: expectedUnit = "K"
+            case .hectopascal: expectedUnit = "Pa"
+            case .millimetre: expectedUnit = "m"
+            case .percentage: expectedUnit = "(0 - 1)"
+            case .wattPerSquareMetre: expectedUnit = "J m**-2"
+            default: expectedUnit = "m s**-1"
             }
 
-            logger.info(
-                "WeatherNext 3: finished hour \(index + 1)/\(hours) in \(Int(Date().timeIntervalSince(started)))s"
-            )
-            return handles
-        }.flatMap { $0 }
+            guard case .v3(let metadata) = array.metadata,
+                metadata.dataType == "float32",
+                metadata.dimensionNames == ["lead_time", "lat_" + suffix, "lon_" + suffix],
+                metadata.attributes?["units"]?.stringValue == expectedUnit,
+                array.chunkShape == [1, domain.grid.ny, domain.grid.nx],
+                array.shape == [hours, domain.grid.ny, domain.grid.nx]
+            else {
+                throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
+            }
+
+            let variableName = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
+            return (field: field, variable: WeatherNext3Variable(rawValue: variableName)!, array: array)
+        }
+
+        let writers = Dictionary(
+            uniqueKeysWithValues: WeatherNext3Domain.allCases.map { domain in
+                (
+                    domain,
+                    (0..<hours).map { index in
+                        OmSpatialTimestepWriter(
+                            domain: domain,
+                            run: run,
+                            time: run.add(hours: index + 1),
+                            storeOnDisk: false,
+                            realm: nil,
+                            logger: logger
+                        )
+                    }
+                )
+            }
+        )
+        let chunks = (0..<hours).flatMap { hour in arrays.indices.map { (hour, $0) } }
+        logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(concurrency)")
+        try await chunks.foreachConcurrent(nConcurrent: concurrency) { index, arrayIndex in
+            let (field, variable, template) = arrays[arrayIndex]
+            let domain = field.domain
+            logger.info("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
+            let array = try await ZarrArray(metadata: template.metadata, storage: storage(), path: template.path)
+            var data: [Float] = try await array.retrieveArraySubset([
+                index..<index + 1, 0..<domain.grid.ny, 0..<domain.grid.nx,
+            ])
+            data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+            if field.scale != 1 || field.offset != 0 {
+                data.multiplyAdd(multiply: field.scale, add: field.offset)
+            }
+            try await writers[domain]![index].write(member: 0, variable: variable, data: data)
+        }
+
+        var handles = [GenericVariableHandle]()
+        for domain in WeatherNext3Domain.allCases {
+            for writer in writers[domain]! {
+                handles += try await writer.finalise()
+            }
+        }
 
         logger.info("WeatherNext 3: downloads complete; converting \(handles.count) variable handles to time series")
         try await GenericVariableHandle.convert(
