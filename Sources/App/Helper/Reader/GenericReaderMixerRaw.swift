@@ -35,12 +35,11 @@ struct GenericReaderMixerByVariableName<Variable: GenericVariable>: GenericReade
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var result = PrefetchResult.noData
-        for reader in reader {
+        var result = PrefetchResult()
+        for reader in reader.reversed() {
             let coverage = try await reader.prefetchData(mixed: variable.rawValue, time: time)
-            if coverage == .full || (coverage == .partial && result == .noData) {
-                result = coverage
-            }
+            result.include(coverage)
+            if result.covers(time.range) { break }
         }
         return result
     }
@@ -78,12 +77,11 @@ extension GenericReaderMixerRaw {
     }
 
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var result = PrefetchResult.noData
-        for reader in reader {
+        var result = PrefetchResult()
+        for reader in reader.reversed() {
             let coverage = try await reader.prefetchData(variable: variable, time: time)
-            if coverage == .full || (coverage == .partial && result == .noData) {
-                result = coverage
-            }
+            result.include(coverage)
+            if result.covers(time.range) { break }
         }
         return result
     }

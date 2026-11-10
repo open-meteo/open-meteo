@@ -42,7 +42,7 @@ import Testing
         let reader = MemberReader(values: [[2, 12], [4, 14]])
         let derived = VariableDailyDeriver(reader: reader, countEnsembleMember: 2)
         #expect(try await derived.get(variable: .river_discharge_mean, time: time)?.data == [3, 13])
-        #expect(try await derived.prefetchData(variable: .river_discharge_mean, time: time) == .full)
+        #expect(try await derived.prefetchData(variable: .river_discharge_mean, time: time) == PrefetchResult(time.range))
         let dependencies = (0..<2).map { time.with(ensembleMember: $0) }
         #expect(reader.reads == dependencies)
         #expect(reader.prefetches == dependencies)
@@ -77,7 +77,7 @@ import Testing
         }
         func prefetchData(variable: GloFasVariable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
             prefetches.append(time)
-            return .full
+            return PrefetchResult(time.range)
         }
     }
 }

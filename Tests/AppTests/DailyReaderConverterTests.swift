@@ -24,7 +24,7 @@ import Testing
         let expectedTime = dailyTime.with(time: TimerangeDt(start: start.add(modelDt), to: start.add(hours: 48).add(modelDt), dtSeconds: modelDt))
         #expect(reader.reads.map(\.time) == [expectedTime])
 
-        _ = try await converter.prefetchData(variable: .temperature_2m_min, time: dailyTime)
+        #expect(try await converter.prefetchData(variable: .temperature_2m_min, time: dailyTime).range == dailyTime.range)
         #expect(reader.prefetches.map(\.variable) == ["temperature_2m_min", "temperature_2m"])
         #expect(reader.prefetches.map(\.time) == [expectedTime, dailyTime.with(dtSeconds: modelDt)])
     }
@@ -44,7 +44,7 @@ import Testing
 
         let expectedTime = dailyTime.with(dtSeconds: modelDt)
         #expect(reader.reads.map(\.time) == [expectedTime])
-        _ = try await converter.prefetchData(variable: variable, time: dailyTime)
+        #expect(try await converter.prefetchData(variable: variable, time: dailyTime).range == dailyTime.range)
         #expect(reader.prefetches.map(\.time) == [expectedTime])
         #expect(reader.prefetches.map(\.variable) == reader.reads.map(\.variable))
 
@@ -66,6 +66,14 @@ import Testing
         #expect(missingAll.data.allSatisfy { $0.isNaN })
     }
 
+    @Test func prefetchCoverageRequiresCompleteDays() async throws {
+        let reader = FixtureReader(modelDtSeconds: 3600, start: start)
+        reader.prefetchEnd = start.add(hours: 30)
+        let converter = DailyReaderConverter<FixtureReader, ForecastVariableDaily>(reader: reader)
+        let result = try await converter.prefetchData(variable: .precipitation_sum, time: dailyTime)
+        #expect(result.range == start..<start.add(hours: 24))
+    }
+
     private final class FixtureReader: GenericReaderOptionalProtocol {
         let modelLat: Float = 0
         let modelLon: Float = 0
@@ -76,6 +84,7 @@ import Testing
         var reads: [(variable: String, time: TimerangeDtAndSettings)] = []
         var prefetches: [(variable: String, time: TimerangeDtAndSettings)] = []
         var missingTimes: [Timestamp] = []
+        var prefetchEnd: Timestamp?
 
         init(modelDtSeconds: Int, start: Timestamp) {
             self.modelDtSeconds = modelDtSeconds
@@ -112,7 +121,9 @@ import Testing
 
         func prefetchData(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
             prefetches.append((variable.rawValue, time))
-            return .full
+            guard let prefetchEnd else { return PrefetchResult(time.range) }
+            let end = min(time.range.upperBound, max(time.range.lowerBound, prefetchEnd))
+            return PrefetchResult(time.range.lowerBound..<end)
         }
     }
 }

@@ -224,7 +224,7 @@ extension GenericDeriverProtocol {
     
     func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         guard let mapping = getDeriverMap(variable: variable) else {
-            return .noData
+            return PrefetchResult()
         }
         return try await prefetchData(variable: mapping, time: time)
     }
@@ -336,60 +336,65 @@ extension GenericDeriverProtocol {
     
     fileprivate func prefetchData(variable: Reader.MixingVar?, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         guard let variable else {
-            return .noData
+            return PrefetchResult()
         }
         return try await reader.prefetchData(variable: variable, time: time)
     }
     
     fileprivate func prefetchData(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var dependencies = PrefetchResult.Dependencies()
+        var coverage = PrefetchResult(time.range)
         switch variable {
         case .ensemble(let input, let reduction):
             for readTime in reduction.readTimes(time) {
-                dependencies.merge(try await reader.prefetchData(variable: input, time: readTime))
+                let prefetched = try await reader.prefetchData(variable: input, time: readTime)
+                coverage.formIntersection(prefetched.mapped(from: readTime.time, to: time.time))
             }
         case .soilMoistureIndex(let input):
-            dependencies.merge(try await prefetchData(mapping: input, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: input, time: time))
         case .direct(let variable):
-            dependencies.merge(try await prefetchData(variable: variable, time: time))
+            coverage.formIntersection(try await prefetchData(variable: variable, time: time))
         case .directShift24Hour(let variable):
-            dependencies.merge(try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400))))
+            let readTime = time.time.add(-86400)
+            let prefetched = try await prefetchData(variable: variable, time: time.with(time: readTime))
+            coverage.formIntersection(prefetched.mapped(from: readTime, to: time.time))
         case .hermiteIntervalExtrema(let variable, _):
             let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
-            dependencies.merge(try await prefetchData(variable: variable, time: time.with(time: readTime)))
+            let prefetched = try await prefetchData(variable: variable, time: time.with(time: readTime))
+            coverage.formIntersection(prefetched.mapped(from: readTime, to: time.time))
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
-            dependencies.merge(try await prefetchData(variable: input, time: time.with(time: readTime)))
+            let prefetched = try await prefetchData(variable: input, time: time.with(time: readTime))
+            coverage.formIntersection(prefetched.mapped(from: readTime, to: time.time))
         case .one(let a, _):
-            dependencies.merge(try await prefetchData(mapping: a, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: a, time: time))
         case .two(let a, let b, _):
-            dependencies.merge(try await prefetchData(mapping: a, time: time))
-            dependencies.merge(try await prefetchData(mapping: b, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: a, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: b, time: time))
         case .three(let a, let b, let c, _):
-            dependencies.merge(try await prefetchData(mapping: a, time: time))
-            dependencies.merge(try await prefetchData(mapping: b, time: time))
-            dependencies.merge(try await prefetchData(mapping: c, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: a, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: b, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: c, time: time))
         case .four(let a, let b, let c, let d, _):
-            dependencies.merge(try await prefetchData(mapping: a, time: time))
-            dependencies.merge(try await prefetchData(mapping: b, time: time))
-            dependencies.merge(try await prefetchData(mapping: c, time: time))
-            dependencies.merge(try await prefetchData(mapping: d, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: a, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: b, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: c, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: d, time: time))
         case .weatherCode(cloudcover: let cloudcover, precipitation: let precipitation, convectivePrecipitation: let convectivePrecipitation, snowfallCentimeters: let snowfallCentimeters, gusts: let gusts, cape: let cape, liftedIndex: let liftedIndex, convectiveInhibition: let convectiveInhibition, boundaryLayerHeight: let boundaryLayerHeight, visibilityMeters: let visibilityMeters, categoricalFreezingRain: let categoricalFreezingRain):
-            dependencies.merge(try await prefetchData(mapping: cloudcover, time: time))
-            dependencies.merge(try await prefetchData(mapping: snowfallCentimeters, time: time))
-            dependencies.merge(try await prefetchData(variable: precipitation, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: cloudcover, time: time))
+            coverage.formIntersection(try await prefetchData(mapping: snowfallCentimeters, time: time))
+            coverage.formIntersection(try await prefetchData(variable: precipitation, time: time))
             if let convectivePrecipitation {
-                dependencies.merge(try await prefetchData(mapping: convectivePrecipitation, time: time))
+                _ = try await prefetchData(mapping: convectivePrecipitation, time: time)
             }
-            dependencies.merge(try await prefetchData(variable: gusts, time: time))
-            dependencies.merge(try await prefetchData(variable: cape, time: time))
-            dependencies.merge(try await prefetchData(variable: liftedIndex, time: time))
-            dependencies.merge(try await prefetchData(variable: convectiveInhibition, time: time))
-            dependencies.merge(try await prefetchData(variable: boundaryLayerHeight, time: time))
-            dependencies.merge(try await prefetchData(variable: visibilityMeters, time: time))
-            dependencies.merge(try await prefetchData(variable: categoricalFreezingRain, time: time))
+            _ = try await prefetchData(variable: gusts, time: time)
+            _ = try await prefetchData(variable: cape, time: time)
+            _ = try await prefetchData(variable: liftedIndex, time: time)
+            _ = try await prefetchData(variable: convectiveInhibition, time: time)
+            _ = try await prefetchData(variable: boundaryLayerHeight, time: time)
+            _ = try await prefetchData(variable: visibilityMeters, time: time)
+            _ = try await prefetchData(variable: categoricalFreezingRain, time: time)
         }
-        return dependencies.result
+        return coverage
     }
 }
 
@@ -435,7 +440,7 @@ extension GenericDeriverOptionalProtocol {
     
     func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         guard let mapping = getDeriverMap(variable: variable) else {
-            return .noData
+            return PrefetchResult()
         }
         return try await prefetchData(variable: mapping, time: time)
     }
@@ -566,7 +571,7 @@ extension GenericDeriverOptionalProtocol {
     
     fileprivate func prefetchData(variable: ReaderVariable?, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         guard let variable else {
-            return .noData
+            return PrefetchResult()
         }
         return try await reader.prefetchData(variable: variable, time: time)
     }
@@ -574,41 +579,45 @@ extension GenericDeriverOptionalProtocol {
     fileprivate func prefetchData(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         switch variable {
         case .ensemble(let input, let reduction):
-            var dependencies = PrefetchResult.Dependencies()
+            var coverage = PrefetchResult(time.range)
             for readTime in reduction.readTimes(time) {
                 let accepted = try await reader.prefetchData(variable: input, time: readTime)
-                dependencies.merge(accepted)
+                coverage.formIntersection(accepted.mapped(from: readTime.time, to: time.time))
             }
-            return dependencies.result
+            return coverage
         case .soilMoistureIndex(let input):
             return try await prefetchData(mapping: input, time: time)
         case .direct(let variable):
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
-            return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+            let readTime = time.time.add(-86400)
+            let prefetched = try await prefetchData(variable: variable, time: time.with(time: readTime))
+            return prefetched.mapped(from: readTime, to: time.time)
         case .hermiteIntervalExtrema(let variable, _):
             let readTime = HermiteIntervalExtrema.readTime(output: time.time, modelDtSeconds: reader.modelDtSeconds)
-            return try await prefetchData(variable: variable, time: time.with(time: readTime))
+            let prefetched = try await prefetchData(variable: variable, time: time.with(time: readTime))
+            return prefetched.mapped(from: readTime, to: time.time)
         case .runningMean(let input, let windowSeconds, let maximumStepSeconds):
             let readTime = time.time.runningMeanReadTime(windowSeconds: windowSeconds, maximumStepSeconds: maximumStepSeconds)
-            return try await prefetchData(variable: input, time: time.with(time: readTime))
+            let prefetched = try await prefetchData(variable: input, time: time.with(time: readTime))
+            return prefetched.mapped(from: readTime, to: time.time)
         case .one(let a, _):
             return try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):
             let a = try await prefetchData(mapping: a, time: time)
             let b = try await prefetchData(mapping: b, time: time)
-            return a.merged(with: b)
+            return a.intersecting(b)
         case .three(let a, let b, let c, _):
             let a = try await prefetchData(mapping: a, time: time)
             let b = try await prefetchData(mapping: b, time: time)
             let c = try await prefetchData(mapping: c, time: time)
-            return a.merged(with: b).merged(with: c)
+            return a.intersecting(b).intersecting(c)
         case .four(let a, let b, let c, let d, _):
             let a = try await prefetchData(mapping: a, time: time)
             let b = try await prefetchData(mapping: b, time: time)
             let c = try await prefetchData(mapping: c, time: time)
             let d = try await prefetchData(mapping: d, time: time)
-            return a.merged(with: b).merged(with: c).merged(with: d)
+            return a.intersecting(b).intersecting(c).intersecting(d)
         case .weatherCode(cloudcover: let cloudcover, precipitation: let precipitation, convectivePrecipitation: let convectivePrecipitation, snowfallCentimeters: let snowfallCentimeters, gusts: let gusts, cape: let cape, liftedIndex: let liftedIndex, convectiveInhibition: let convectiveInhibition, boundaryLayerHeight: let boundaryLayerHeight, visibilityMeters: let visibilityMeters, categoricalFreezingRain: let categoricalFreezingRain):
             let a = try await prefetchData(mapping: cloudcover, time: time)
             let b = try await prefetchData(mapping: snowfallCentimeters, time: time)
@@ -623,7 +632,7 @@ extension GenericDeriverOptionalProtocol {
             let _ = try await prefetchData(variable: boundaryLayerHeight, time: time)
             let _ = try await prefetchData(variable: visibilityMeters, time: time)
             let _ = try await prefetchData(variable: categoricalFreezingRain, time: time)
-            return a.merged(with: b).merged(with: c)
+            return a.intersecting(b).intersecting(c)
         }
     }
 }

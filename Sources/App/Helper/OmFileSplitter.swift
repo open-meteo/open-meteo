@@ -71,10 +71,10 @@ struct OmFileSplitter {
         // TODO: maybe we can keep the file handles better in scope
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
-        guard nTime > 0 else { return .noData }
-        // TODO: Use recorded chunk valid-time metadata here, falling back to chunk bounds for legacy files.
-        // Even valid-time ranges can include unmarked NaNs and overestimate availability.
-        var coverage = PrefetchCoverage(requested: indexTime)
+        guard nTime > 0 else { return PrefetchResult() }
+        // Forecast metadata limits coverage; legacy files fall back to their file bounds.
+        // NaN gaps inside those ranges can still overestimate availability.
+        var coverage = PrefetchCoverage(requested: time.time)
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var start = indexTime.lowerBound
         
@@ -152,11 +152,12 @@ struct OmFileSplitter {
                 guard let fileTime = omFile.timeRangeDt else {
                     return true
                 }
-                guard let offsets = indexTime.intersect(fileTime: fileTime.toIndexTime()) else {
+                let availableTime = omFile.prefetchTimeRange(fileTime: fileTime.toIndexTime(), dtSeconds: time.dtSeconds)
+                guard let offsets = indexTime.intersect(fileTime: availableTime) else {
                     return true
                 }
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
-                coverage.insert(fileTime.toIndexTime())
+                coverage.insert(availableTime)
                 return true
             }) == true {
                 return coverage.result
@@ -166,13 +167,14 @@ struct OmFileSplitter {
         let subring = start ..< indexTime.upperBound
         for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile).clamped(to: directory.chunkRange) {
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
-            guard let offsets = subring.intersect(fileTime: fileTime) else {
-                continue
-            }
             let file = directory.getChunk(index: timeChunk)
             try await file?.with(payloadType: OmFileType.self) { omFile in
+                let availableTime = omFile.prefetchTimeRange(fileTime: fileTime, dtSeconds: time.dtSeconds)
+                guard let offsets = subring.intersect(fileTime: availableTime) else {
+                    return
+                }
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
-                coverage.insert(fileTime.clamped(to: subring))
+                coverage.insert(availableTime.clamped(to: subring))
             }
         }
         return coverage.result

@@ -36,14 +36,13 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        // Stop on partial coverage too; get() still fills gaps from lower-priority readers.
+        var prefetched = PrefetchResult()
         for reader in reader.reversed() {
             let result = try await reader.prefetchData(mixed: variable.rawValue, time: time)
-            if result != .noData {
-                return result
-            }
+            prefetched.include(result)
+            if prefetched.covers(time.range) { break }
         }
-        return .noData
+        return prefetched
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
@@ -74,7 +73,7 @@ extension GenericReaderProtocol {
 
     func prefetchData(mixed: String, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         guard let v = MixingVar(rawValue: mixed) else {
-            return .noData
+            return PrefetchResult()
         }
         return try await self.prefetchData(variable: v, time: time)
     }
@@ -117,13 +116,11 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var prefetched = PrefetchResult.noData
+        var prefetched = PrefetchResult()
         for reader in reader.reversed() {
             let accepted = try await reader.prefetchData(variable: variable, time: time)
-            if accepted == .full || (accepted == .partial && prefetched == .noData) {
-                prefetched = accepted
-            }
-            if accepted != .noData && !prefetchAllReaders {
+            prefetched.include(accepted)
+            if prefetched.covers(time.range) && !prefetchAllReaders {
                 break
             }
         }

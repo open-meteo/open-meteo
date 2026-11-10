@@ -158,22 +158,25 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     }
     
     func prefetchData(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var dependencies = PrefetchResult.Dependencies()
+        var coverage = PrefetchResult(timeDaily.range)
         let modelDtSeconds = max(3600, reader.modelDtSeconds)
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         if let v0 = variable.aggregation.variables.0 {
             switch variable.aggregation {
             case .minTwo, .maxTwo:
                 let timeInterval = time.with(time: time.time.add(modelDtSeconds))
-                dependencies.merge(try await reader.prefetchData(variable: v0, time: timeInterval))
+                let prefetched = try await reader.prefetchData(variable: v0, time: timeInterval)
+                coverage.formIntersection(prefetched.mapped(from: timeInterval.time, to: timeDaily.time))
             default:
-                dependencies.merge(try await reader.prefetchData(variable: v0, time: time))
+                let prefetched = try await reader.prefetchData(variable: v0, time: time)
+                coverage.formIntersection(prefetched.mapped(from: time.time, to: timeDaily.time))
             }
         }
         if let v1 = variable.aggregation.variables.1 {
-            dependencies.merge(try await reader.prefetchData(variable: v1, time: time))
+            let prefetched = try await reader.prefetchData(variable: v1, time: time)
+            coverage.formIntersection(prefetched.mapped(from: time.time, to: timeDaily.time))
         }
-        return dependencies.result
+        return coverage
     }
     
 }

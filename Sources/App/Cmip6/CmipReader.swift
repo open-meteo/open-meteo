@@ -590,47 +590,47 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
     }
 
     func prefetchData(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var dependencies = PrefetchResult.Dependencies()
+        var coverage = PrefetchResult(time.range)
         switch derived {
         case .snowfall_sum:
-            dependencies.merge(try await prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time))
         case .rain_sum:
-            dependencies.merge(try await prefetchData(raw: .raw(.precipitation_sum), time: time))
-            dependencies.merge(try await prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.precipitation_sum), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time))
         case .dewpoint_2m_max, .dew_point_2m_max:
-            dependencies.merge(try await prefetchData(raw: .raw(.temperature_2m_min), time: time))
-            dependencies.merge(try await prefetchData(raw: .raw(.relative_humidity_2m_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.temperature_2m_min), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.relative_humidity_2m_max), time: time))
         case .dewpoint_2m_min, .dew_point_2m_min:
-            dependencies.merge(try await prefetchData(raw: .raw(.temperature_2m_max), time: time))
-            dependencies.merge(try await prefetchData(raw: .raw(.relative_humidity_2m_min), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.temperature_2m_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.relative_humidity_2m_min), time: time))
         case .dewpoint_2m_mean, .dew_point_2m_mean:
-            dependencies.merge(try await prefetchData(raw: .raw(.temperature_2m_mean), time: time))
-            dependencies.merge(try await prefetchData(raw: .raw(.relative_humidity_2m_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.temperature_2m_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.relative_humidity_2m_mean), time: time))
         case .growing_degree_days_base_0_limit_50:
-            dependencies.merge(try await prefetchData(raw: .raw(.temperature_2m_max), time: time))
-            dependencies.merge(try await prefetchData(raw: .raw(.temperature_2m_min), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.temperature_2m_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.temperature_2m_min), time: time))
         case .soil_moisture_index_0_to_10cm_mean:
-            dependencies.merge(try await prefetchData(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time))
         case .soil_moisture_index_0_to_100cm_mean:
-            dependencies.merge(try await prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time))
         case .daylight_duration:
             break
         case .windspeed_2m_max, .wind_speed_2m_max:
-            dependencies.merge(try await prefetchData(raw: .raw(.wind_speed_10m_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.wind_speed_10m_max), time: time))
         case .windspeed_2m_mean, .wind_speed_2m_mean:
-            dependencies.merge(try await prefetchData(raw: .raw(.wind_speed_10m_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.wind_speed_10m_mean), time: time))
         case .windgusts_10m_mean:
-            dependencies.merge(try await prefetchData(raw: .derived(.wind_gusts_10m_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .derived(.wind_gusts_10m_mean), time: time))
         case .windgusts_10m_max:
-            dependencies.merge(try await prefetchData(raw: .derived(.wind_gusts_10m_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .derived(.wind_gusts_10m_max), time: time))
         case .vapor_pressure_deficit_max:
-            dependencies.merge(try await prefetchData(raw: .derived(.vapour_pressure_deficit_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .derived(.vapour_pressure_deficit_max), time: time))
         case .windspeed_10m_max:
-            dependencies.merge(try await prefetchData(raw: .raw(.wind_speed_10m_max), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.wind_speed_10m_max), time: time))
         case .windspeed_10m_mean:
-            dependencies.merge(try await prefetchData(raw: .raw(.wind_speed_10m_mean), time: time))
+            coverage.formIntersection(try await prefetchData(raw: .raw(.wind_speed_10m_mean), time: time))
         }
-        return dependencies.result
+        return coverage
     }
 }
 
@@ -770,63 +770,63 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
     }
 
     func prefetchData(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
-        var dependencies = PrefetchResult.Dependencies()
+        var coverage = PrefetchResult(time.range)
         switch derived {
         case .et0_fao_evapotranspiration_sum:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_max, time: time))
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_min, time: time))
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_mean, time: time))
-            dependencies.merge(try await prefetchData(raw: .wind_speed_10m_mean, time: time))
-            dependencies.merge(try await prefetchData(raw: .shortwave_radiation_sum, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_min, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .wind_speed_10m_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .shortwave_radiation_sum, time: time))
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_min, time: time))
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_max, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_min, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_max, time: time))
             } else {
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_mean, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_mean, time: time))
             }
         case .vapour_pressure_deficit_max:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_max, time: time))
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_min, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_min, time: time))
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_min, time: time))
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_max, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_min, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_max, time: time))
             } else {
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_mean, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_mean, time: time))
             }
         case .leaf_wetness_probability_mean:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_max, time: time))
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_min, time: time))
-            dependencies.merge(try await prefetchData(raw: .precipitation_sum, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_min, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .precipitation_sum, time: time))
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_min, time: time))
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_max, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_min, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_max, time: time))
             } else {
-                dependencies.merge(try await prefetchData(raw: .relative_humidity_2m_mean, time: time))
+                coverage.formIntersection(try await prefetchData(raw: .relative_humidity_2m_mean, time: time))
             }
         case .soil_moisture_0_to_100cm_mean:
-            dependencies.merge(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
         case .soil_moisture_0_to_7cm_mean:
-            dependencies.merge(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
         case .soil_moisture_7_to_28cm_mean:
-            dependencies.merge(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
         case .soil_moisture_28_to_100cm_mean:
-            dependencies.merge(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time))
         case .soil_temperature_0_to_100cm_mean:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_mean, time: time))
         case .soil_temperature_0_to_7cm_mean:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_max, time: time))
         case .soil_temperature_7_to_28cm_mean:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_max, time: time))
         case .soil_temperature_28_to_100cm_mean:
-            dependencies.merge(try await prefetchData(raw: .temperature_2m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .temperature_2m_max, time: time))
         case .wind_gusts_10m_mean:
-            dependencies.merge(try await prefetchData(raw: .wind_speed_10m_mean, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .wind_speed_10m_mean, time: time))
         case .wind_gusts_10m_max:
-            dependencies.merge(try await prefetchData(raw: .wind_speed_10m_max, time: time))
+            coverage.formIntersection(try await prefetchData(raw: .wind_speed_10m_max, time: time))
         }
-        return dependencies.result
+        return coverage
     }
 }
