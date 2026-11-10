@@ -34,10 +34,15 @@ struct GenericReaderMixerByVariableName<Variable: GenericVariable>: GenericReade
         try await reader.last?.getStatic(type: type)
     }
 
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
+        var result = PrefetchResult.noData
         for reader in reader {
-            _ = try await reader.prefetchData(mixed: variable.rawValue, time: time)
+            let coverage = try await reader.prefetchData(mixed: variable.rawValue, time: time)
+            if coverage == .full || (coverage == .partial && result == .noData) {
+                result = coverage
+            }
         }
+        return result
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
@@ -72,15 +77,20 @@ extension GenericReaderMixerRaw {
         reader.last?.modelDtSeconds ?? 3600
     }
 
-    func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
+        var result = PrefetchResult.noData
         for reader in reader {
-            try await reader.prefetchData(variable: variable, time: time)
+            let coverage = try await reader.prefetchData(variable: variable, time: time)
+            if coverage == .full || (coverage == .partial && result == .noData) {
+                result = coverage
+            }
         }
+        return result
     }
 
     func prefetchData(variables: [Reader.MixingVar], time: TimerangeDtAndSettings) async throws {
         for variable in variables {
-            try await prefetchData(variable: variable, time: time)
+            _ = try await prefetchData(variable: variable, time: time)
         }
     }
 

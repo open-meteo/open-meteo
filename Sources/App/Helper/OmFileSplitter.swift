@@ -67,10 +67,14 @@ struct OmFileSplitter {
     }
 
     /// Prefetch all required data into memory
-    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws {
+    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws -> PrefetchResult {
         // TODO: maybe we can keep the file handles better in scope
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
+        guard nTime > 0 else { return .noData }
+        // TODO: Add an OM-file metadata attribute describing each file's valid data range.
+        // File coverage currently includes unmarked NaNs and can overestimate availability.
+        var coverage = PrefetchCoverage(requested: indexTime)
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var start = indexTime.lowerBound
         
@@ -78,27 +82,30 @@ struct OmFileSplitter {
         if let run {
             let file = OmFileType.run(domain: domain, variable: variable, run: run)
             try await OmFileSystemManager.instance.with(file: file) { omFile in
-                guard let timestamps = omFile.timestamps else {
+                guard let timestamps = omFile.timestamps, !timestamps.isEmpty else {
                     return
                 }
                 let fullRunTime = TimerangeDt(start: timestamps[0], to: timestamps[timestamps.count - 1].add(time.dtSeconds), dtSeconds: time.dtSeconds)
                 
+                guard let offsets = indexTime.intersect(fileTime: fullRunTime.toIndexTime()) else {
+                    return
+                }
                 /// Fixed time resolution. Can use linear reads into output array
                 if fullRunTime.count == timestamps.count {
-                    if let offsets = indexTime.intersect(fileTime: fullRunTime.toIndexTime()) {
-                        try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
-                    }
+                    try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                    coverage.insert(fullRunTime.toIndexTime())
                     return
                 }
                 /// Prefetch entire run
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: timestamps.count, nMembers: nMembers, location: location, level: level, timeOffsets: (file: 0..<timestamps.count, array:  0..<timestamps.count))
+                coverage.insert(fullRunTime.toIndexTime())
             }
-            return
+            return coverage.result
         }
 
 
         guard let directory = try await OmFileSystemManager.instance.getSeriesDirectory(domain: domain, variable: variable, ensembleMember: time.ensembleMember, previousDay: time.previousDay) else {
-            return
+            return coverage.result
         }
 
         if let masterTimeRange {
@@ -106,12 +113,13 @@ struct OmFileSplitter {
             if let offsets = indexTime.intersect(fileTime: fileTime), let file = directory.getMaster() {
                 try await file.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                    coverage.insert(fileTime)
                     start = fileTime.upperBound
                 }
             }
         }
         if start >= indexTime.upperBound {
-            return
+            return coverage.result
         }
 
         if !directory.yearRange.isEmpty {
@@ -128,12 +136,13 @@ struct OmFileSplitter {
                 let file = directory.getYear(year: year)
                 try await file?.with(payloadType: OmFileType.self) { omFile in
                     try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                    coverage.insert(fileTime)
                     start = fileTime.upperBound
                 }
             }
         }
         if start >= indexTime.upperBound {
-            return
+            return coverage.result
         }
         
         // Rolling files for ensemble data
@@ -147,9 +156,10 @@ struct OmFileSplitter {
                     return true
                 }
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                coverage.insert(fileTime.toIndexTime())
                 return true
             }) == true {
-                return
+                return coverage.result
             }
         }
         
@@ -162,8 +172,10 @@ struct OmFileSplitter {
             let file = directory.getChunk(index: timeChunk)
             try await file?.with(payloadType: OmFileType.self) { omFile in
                 try await omFile.reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                coverage.insert(fileTime.clamped(to: subring))
             }
         }
+        return coverage.result
     }
 
     func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws -> Array2DFastTime {

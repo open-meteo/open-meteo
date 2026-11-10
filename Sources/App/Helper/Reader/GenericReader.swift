@@ -2,6 +2,63 @@ import Foundation
 import OmFileFormat
 import Vapor
 
+/// Estimated coverage of a prefetch request, based on available file ranges.
+enum PrefetchResult: Equatable {
+    case noData
+    case partial
+    case full
+
+    /// Combine dependencies without assuming that partial ranges overlap.
+    func merged(with other: PrefetchResult) -> PrefetchResult {
+        self == other ? self : .partial
+    }
+
+    /// Accumulates dependency coverage without allocating an array.
+    struct Dependencies {
+        private var coverage: PrefetchResult?
+
+        mutating func merge(_ result: PrefetchResult) {
+            coverage = coverage.map { $0.merged(with: result) } ?? result
+        }
+
+        /// Variables computed without file dependencies cover the whole request.
+        var result: PrefetchResult { coverage ?? .full }
+    }
+}
+
+/// Tracks file coverage incrementally without retaining individual ranges.
+/// Insert ranges chronologically. Later ranges that fill earlier gaps may leave
+/// the estimate partial, unless they cover the entire request themselves.
+struct PrefetchCoverage {
+    let requested: Range<Int>
+    private var coveredUntil: Int
+    private var hasData = false
+    private var hasGap = false
+
+    init(requested: Range<Int>) {
+        self.requested = requested
+        self.coveredUntil = requested.lowerBound
+    }
+
+    mutating func insert(_ range: Range<Int>) {
+        let overlap = range.clamped(to: requested)
+        guard !overlap.isEmpty else { return }
+        hasData = true
+        if overlap == requested {
+            hasGap = false
+            coveredUntil = requested.upperBound
+            return
+        }
+        if overlap.lowerBound > coveredUntil { hasGap = true }
+        coveredUntil = max(coveredUntil, overlap.upperBound)
+    }
+
+    var result: PrefetchResult {
+        guard hasData else { return .noData }
+        return !hasGap && coveredUntil >= requested.upperBound ? .full : .partial
+    }
+}
+
 protocol GenericReaderBaseProtocol {
     var modelLat: Float { get }
     var modelLon: Float { get }
@@ -22,14 +79,14 @@ protocol GenericReaderProtocol: GenericReaderBaseProtocol {
     associatedtype MixingVar: GenericVariableMixable
 
     func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws
+    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> PrefetchResult
 }
 
 protocol GenericReaderOptionalProtocol<VariableOpt>: GenericReaderBaseProtocol {
     associatedtype VariableOpt: GenericVariableMixable
 
     func get(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> DataAndUnit?
-    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> Bool
+    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> PrefetchResult
 }
 
 extension GenericReaderProtocol {
@@ -160,10 +217,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         if time.dtSeconds == domain.dtSeconds {
-            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
-            return
+            return try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
         }
 
         let interpolationType = variable.interpolation
@@ -171,7 +227,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
             time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
 
-        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), run: run)
+        return try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), run: run)
     }
 
     /// Read

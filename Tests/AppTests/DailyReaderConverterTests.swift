@@ -110,9 +110,9 @@ import Testing
             }
         }
 
-        func prefetchData(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> Bool {
+        func prefetchData(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
             prefetches.append((variable.rawValue, time))
-            return true
+            return .full
         }
     }
 }

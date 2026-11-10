@@ -14,7 +14,7 @@ import Testing
         var nativeValues: [Float]?
 
         func getStatic(type: ReaderStaticVariable) async throws -> Float? { nil }
-        func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {}
+        func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult { .full }
         func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
             if let nativeValues { return DataAndUnit(nativeValues, variable.unit) }
             let depth = try #require(Float(variable.rawValue.split(separator: "_").last!.dropLast(2)))

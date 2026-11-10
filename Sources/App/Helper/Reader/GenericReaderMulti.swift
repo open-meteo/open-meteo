@@ -35,13 +35,15 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
         }
     }
 
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
+        // Stop on partial coverage too; get() still fills gaps from lower-priority readers.
         for reader in reader.reversed() {
-            if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
-                return true
+            let result = try await reader.prefetchData(mixed: variable.rawValue, time: time)
+            if result != .noData {
+                return result
             }
         }
-        return false
+        return .noData
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
@@ -70,12 +72,11 @@ extension GenericReaderProtocol {
         return try await self.get(variable: v, time: time)
     }
 
-    func prefetchData(mixed: String, time: TimerangeDtAndSettings) async throws -> Bool {
+    func prefetchData(mixed: String, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         guard let v = MixingVar(rawValue: mixed) else {
-            return false
+            return .noData
         }
-        try await self.prefetchData(variable: v, time: time)
-        return true
+        return try await self.prefetchData(variable: v, time: time)
     }
 }
 
@@ -115,12 +116,14 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
         return try await reader.last?.getStatic(type: type)
     }
 
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
-        var prefetched = false
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
+        var prefetched = PrefetchResult.noData
         for reader in reader.reversed() {
             let accepted = try await reader.prefetchData(variable: variable, time: time)
-            prefetched = prefetched || accepted
-            if accepted && !prefetchAllReaders {
+            if accepted == .full || (accepted == .partial && prefetched == .noData) {
+                prefetched = accepted
+            }
+            if accepted != .noData && !prefetchAllReaders {
                 break
             }
         }

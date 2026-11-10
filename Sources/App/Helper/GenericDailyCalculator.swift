@@ -157,22 +157,23 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
         }
     }
     
-    func prefetchData(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> Bool {
+    func prefetchData(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> PrefetchResult {
+        var dependencies = PrefetchResult.Dependencies()
         let modelDtSeconds = max(3600, reader.modelDtSeconds)
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         if let v0 = variable.aggregation.variables.0 {
             switch variable.aggregation {
             case .minTwo, .maxTwo:
                 let timeInterval = time.with(time: time.time.add(modelDtSeconds))
-                let _ = try await reader.prefetchData(variable: v0, time: timeInterval)
+                dependencies.merge(try await reader.prefetchData(variable: v0, time: timeInterval))
             default:
-                let _ = try await reader.prefetchData(variable: v0, time: time)
+                dependencies.merge(try await reader.prefetchData(variable: v0, time: time))
             }
         }
         if let v1 = variable.aggregation.variables.1 {
-            let _ = try await reader.prefetchData(variable: v1, time: time)
+            dependencies.merge(try await reader.prefetchData(variable: v1, time: time))
         }
-        return true
+        return dependencies.result
     }
     
 }
@@ -237,10 +238,10 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             if let v0 = variable.aggregation.variables.0 {
-                try await prefetchData(variable: v0, time: time)
+                _ = try await prefetchData(variable: v0, time: time)
             }
             if let v1 = variable.aggregation.variables.1 {
-                try await prefetchData(variable: v1, time: time)
+                _ = try await prefetchData(variable: v1, time: time)
             }
         }
     }
@@ -248,10 +249,10 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     func prefetchData<V: DailyVariableCalculatable>(variable: V, time timeDaily: TimerangeDtAndSettings) async throws where V.Variable == MixingVar {
         let time = timeDaily.with(dtSeconds: 3600)
         if let v0 = variable.aggregation.variables.0 {
-            try await prefetchData(variable: v0, time: time)
+            _ = try await prefetchData(variable: v0, time: time)
         }
         if let v1 = variable.aggregation.variables.1 {
-            try await prefetchData(variable: v1, time: time)
+            _ = try await prefetchData(variable: v1, time: time)
         }
     }
 }*/
