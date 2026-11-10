@@ -116,8 +116,6 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let handles = try await (0..<hours).mapConcurrent(nConcurrent: concurrency) { index in
             let started = Date()
             logger.info("WeatherNext 3: starting forecast hour \(index + 1)/\(hours)")
-            let store = try await storage()
-            let root = try await ZarrGroup(storage: store, path: prefix + "predictions.zarr/")
             var handles = [GenericVariableHandle]()
             for domain in WeatherNext3Domain.allCases {
                 let writer = OmSpatialTimestepWriter(
@@ -134,6 +132,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                     func read(_ statistic: String) async throws -> [Float] {
                         let name = field.source + "_" + statistic
                         logger.debug("WeatherNext 3: reading \(name), hour \(index + 1)")
+                        let store = try await storage()
+                        let root = try await ZarrGroup(storage: store, path: prefix + "predictions.zarr/")
                         guard try await store.exists(path: prefix + "predictions.zarr/" + name + "/c/\(index)/0/0")
                         else {
                             throw Abort(.badRequest, reason: "Missing WeatherNext 3 chunk: \(name), hour \(index + 1)")
