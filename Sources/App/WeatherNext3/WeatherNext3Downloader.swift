@@ -16,9 +16,12 @@ struct DownloadWeatherNext3Command: AsyncCommand {
     var help: String { "Download WeatherNext 3 hourly surface statistics on both native grids" }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        Process.alarm(seconds: 60 * 60)
+        defer { Process.alarm(seconds: 0) }
+
         let app = context.application
         let logger = context.application.logger
-        logger.info("WeatherNext 3: starting downloader")
+        logger.info("WeatherNext 3: starting downloader; runtime limit 60 minutes")
         let downloadConcurrency = signature.concurrentDownload ?? 8
         let conversionConcurrency = signature.concurrent ?? 1
         guard downloadConcurrency > 0 else {
@@ -88,11 +91,12 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         logger.info(
             "WeatherNext 3: selected run \(run.iso8601_YYYY_MM_dd_HH_mm), download concurrency \(downloadConcurrency), conversion concurrency \(conversionConcurrency); obtaining Google access token"
         )
-        let initialStorage = try await storage()
+        var initialStorage = try await storage()
         logger.info("WeatherNext 3: checking success marker at \(prefix)success")
-        guard try await initialStorage.exists(path: prefix + "success") else {
-            logger.info("WeatherNext 3 run \(run) is not complete yet")
-            return
+        while try await !initialStorage.exists(path: prefix + "success") {
+            logger.info("WeatherNext 3: run \(run.iso8601_YYYY_MM_dd_HH_mm) is not complete; retrying in 60 seconds")
+            try await Task.sleep(for: .seconds(60))
+            initialStorage = try await storage()
         }
 
         let hours = WeatherNext3Domain.hours(run: run)
