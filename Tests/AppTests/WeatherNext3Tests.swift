@@ -27,6 +27,14 @@ import Testing
         #expect(WeatherNext3Domain.path(run: interim).contains("20261108_01hr_01_preds"))
     }
 
+    @Test func latestExpectedRun() {
+        let midnight = Timestamp(2026, 11, 10)
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 44 * 60)) == midnight.add(hours: -1))
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 45 * 60)) == midnight)
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(8 * 3600 + 9 * 60)) == midnight)
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(8 * 3600 + 10 * 60)) == midnight.add(hours: 1))
+    }
+
     @Test func observedZstdDatetimeChunk() throws {
         // Authenticated statistics run 20261108_00hr_01_preds, datetime/c/0.
         let compressed = Data([40, 181, 47, 253, 32, 8, 65, 0, 0, 0, 160, 171, 165, 20, 236, 229, 24])

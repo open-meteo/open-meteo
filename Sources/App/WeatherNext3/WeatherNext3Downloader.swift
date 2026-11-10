@@ -17,7 +17,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
     func run(using context: CommandContext, signature: Signature) async throws {
         let app = context.application
         let logger = context.application.logger
-        logger.info("WeatherNext 3: starting downloader; reading local run metadata")
+        logger.info("WeatherNext 3: starting downloader")
         let downloadConcurrency = signature.concurrentDownload ?? 8
         let conversionConcurrency = signature.concurrent ?? 1
         guard downloadConcurrency > 0 else {
@@ -33,23 +33,15 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             onlyProbabilityTimeSeries: false
         )
 
-        let oldSurface = try await WeatherNext3Domain.surface.getMetaJson()
-        let oldStation = try await WeatherNext3Domain.station.getMetaJson()
-        let last = [oldSurface, oldStation].compactMap { $0?.last_run_initialisation_time }.min()
-
         let run: Timestamp
         if let specified = signature.run {
             run = try Timestamp.fromRunHourOrYYYYMMDD(specified)
-        } else if let last {
-            run = Timestamp(last).add(hours: oldSurface != nil && oldStation != nil ? 1 : 0)
         } else {
-            run = Timestamp.now().add(-(7 * 3600 + 45 * 60)).floor(toNearest: 6 * 3600)
+            run = WeatherNext3Domain.latestRun()
         }
 
-        let newest = [oldSurface, oldStation].compactMap { $0?.last_run_initialisation_time }.max()
-        guard newest == nil || run.timeIntervalSince1970 >= newest! else {
-            throw Abort(.badRequest, reason: "Refusing an older WeatherNext 3 run")
-        }
+        let oldSurface = try await WeatherNext3Domain.surface.getMetaJson()
+        let oldStation = try await WeatherNext3Domain.station.getMetaJson()
 
         let httpClient = app.dedicatedHttpClient
         let auth = GoogleCloudStorageAuth(client: httpClient, logger: logger)
@@ -224,6 +216,9 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         logger.info("WeatherNext 3: conversion complete; publishing run metadata")
         for domain in WeatherNext3Domain.allCases {
             let old = domain == .surface ? oldSurface : oldStation
+            if let old, run.timeIntervalSince1970 < old.last_run_initialisation_time {
+                continue
+            }
             let end = max(run.add(hours: hours + 1).timeIntervalSince1970, old?.data_end_time ?? 0)
             let metadata = try ModelUpdateMetaJson.update(domain: domain, run: run, end: Timestamp(end))
             for queue in queues {
