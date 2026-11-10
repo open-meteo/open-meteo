@@ -163,21 +163,33 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 )
             }
         )
-        let chunks = (0..<hours).flatMap { hour in arrays.indices.map { (hour, $0) } }
+        let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
         logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(concurrency)")
         try await chunks.foreachConcurrent(nConcurrent: concurrency) { index, arrayIndex in
             let (field, variable, template) = arrays[arrayIndex]
             let domain = field.domain
-            logger.info("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
+            logger.debug("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
             let array = try await ZarrArray(metadata: template.metadata, storage: storage(), path: template.path)
+            let readStarted = DispatchTime.now().uptimeNanoseconds
             var data: [Float] = try await array.retrieveArraySubset([
                 index..<index + 1, 0..<domain.grid.ny, 0..<domain.grid.nx,
             ])
+            let transformStarted = DispatchTime.now().uptimeNanoseconds
             data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
             if field.scale != 1 || field.offset != 0 {
                 data.multiplyAdd(multiply: field.scale, add: field.offset)
             }
+            let writeStarted = DispatchTime.now().uptimeNanoseconds
             try await writers[domain]![index].write(member: 0, variable: variable, data: data)
+            let finished = DispatchTime.now().uptimeNanoseconds
+            logger.info(
+                """
+                WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
+                read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
+                transform \((writeStarted - transformStarted) / 1_000_000)ms, \
+                writer wait/write \((finished - writeStarted) / 1_000_000)ms
+                """
+            )
         }
 
         var handles = [GenericVariableHandle]()
