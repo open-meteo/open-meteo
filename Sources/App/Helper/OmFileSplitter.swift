@@ -72,8 +72,8 @@ struct OmFileSplitter {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         guard nTime > 0 else { return .noData }
-        // TODO: Add an OM-file metadata attribute describing each file's valid data range.
-        // File coverage currently includes unmarked NaNs and can overestimate availability.
+        // TODO: Use recorded chunk valid-time metadata here, falling back to chunk bounds for legacy files.
+        // Even valid-time ranges can include unmarked NaNs and overestimate availability.
         var coverage = PrefetchCoverage(requested: indexTime)
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var start = indexTime.lowerBound
@@ -320,7 +320,7 @@ struct OmFileSplitter {
         precondition(array2d.nLocations == nx * ny)
 
         // Process at most 8 MB at once
-        try await updateFromTimeOrientedStreaming3D(variable: variable, run: run, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { yRange, xRange, _ in
+        try await updateFromTimeOrientedStreaming3D(variable: variable, run: run, validTimeEnd: time.range.upperBound, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { yRange, xRange, _ in
             guard yRange.count == 1 || xRange.count == nx else {
                 fatalError("chunk dimensions need to be either parts of X or a mutliple or X")
             }
@@ -335,8 +335,9 @@ struct OmFileSplitter {
     /**
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
+     `validTimeEnd` is the exclusive end of the run. Each updated chunk stores the last valid timestamp, one timestep earlier.
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, multipartUploadQueues: [S3MultiFileUploadQueue] = [], supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, validTimeEnd: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, multipartUploadQueues: [S3MultiFileUploadQueue] = [], supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         if nMembers > 1, let retainDays = domain.useRollingDays {
             // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
@@ -479,7 +480,11 @@ struct OmFileSplitter {
 
         /// Write end of file and move it in position
         for writer in writers {
-            let root = try writer.writeFile.write(array: writer.write.finalise(), name: "", children: [])
+            let finalised = try writer.write.finalise()
+            let root = try writer.writeFile.write(array: finalised, name: "", children: [
+                try writer.writeFile.write(value: validTimeEnd.add(-time.dtSeconds).timeIntervalSince1970, name: "forecast_last_valid_time", children: []),
+                try writer.writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
+            ])
             try writer.writeFile.writeTrailer(rootVariable: root)
             // Overwrite existing file, with newly created
             try writer.writeFn.linkTemporary(file: writer.fileName)
@@ -617,7 +622,8 @@ struct OmFileSplitter {
         let root = try writeFile.write(array: finalised, name: "", children: [
             try writeFile.write(value: fileTime.range.lowerBound.timeIntervalSince1970, name: "time_start", children: []),
             try writeFile.write(value: fileTime.range.upperBound.timeIntervalSince1970, name: "time_end", children: []),
-            try writeFile.write(value: fileTime.dtSeconds, name: "dt_seconds", children: [])
+            try writeFile.write(value: fileTime.dtSeconds, name: "dt_seconds", children: []),
+            try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
         ])
         try writeFile.writeTrailer(rootVariable: root)
         try writeFn.linkTemporary(file: fileName)
@@ -634,7 +640,7 @@ struct OmFileSplitter {
 }
 
 extension OmFileReader {
-    /// Read time axis user in rolling OM files for ensemble data
+    /// Read the time axis in rolling OM files for ensemble data.
     func getTimeRangeDt() async throws -> TimerangeDt? {
         let readStart: Int? = try await getChild(name: "time_start")?.readScalar()
         let readEnd: Int? = try await getChild(name: "time_end")?.readScalar()
