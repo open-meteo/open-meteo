@@ -4,7 +4,7 @@ import Vapor
 
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    func toCsvResponse(concurrencySlot: Int?, withLocationHeader: Bool = true, prefetchLookAhead: Int = 3, logger: Logger) throws -> Response {
+    func toCsvResponse(concurrencySlot: Int?, withLocationHeader: Bool = true, prefetchLookAhead: Int = OpenMeteo.prefetchLookAhead, logger: Logger) throws -> Response {
         let response = Response(body: .init(asyncStream: { writer in
             try await writer.submit(concurrencySlot: concurrencySlot, logger: logger) {
                 var prefetchDone = prefetchLookAhead <= 0

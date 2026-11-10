@@ -7,6 +7,14 @@ import OmFileIO
 enum OpenMeteo {
     static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
 
+    /// Number of locations to prefetch ahead while writing API responses. Zero disables prefetching.
+    static let prefetchLookAhead: Int = {
+        guard let value = Int(Environment.get("PREFETCH_LOOK_AHEAD") ?? "3"), value >= 0 else {
+            fatalError("PREFETCH_LOOK_AHEAD must be a non-negative integer")
+        }
+        return value
+    }()
+
     /// Data directory with trailing slash
     static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
