@@ -288,7 +288,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             case .showers:
                 return nil
             case .snowfall_water_equivalent:
-                return "SDWE_SFC_0"
+                return "WEASN_SFC_0"
             case .soil_temperature_0_to_10cm:
                 return nil // Not available in HRDPS West
             case .soil_moisture_0_to_10cm:
