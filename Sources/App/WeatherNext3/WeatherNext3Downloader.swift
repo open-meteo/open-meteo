@@ -5,7 +5,9 @@ import Vapor
 struct DownloadWeatherNext3Command: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "run") var run: String?
-        @Option(name: "concurrent", help: "Maximum concurrent chunk download/processing tasks (default: 16)")
+        @Option(name: "concurrent-download", help: "Maximum concurrent chunk download/decoding tasks (default: 8)")
+        var concurrentDownload: Int?
+        @Option(name: "concurrent", help: "Maximum concurrent temporal OM conversion tasks (default: 1)")
         var concurrent: Int?
         @Option(name: "upload-s3-bucket") var uploadS3Bucket: String?
     }
@@ -16,8 +18,14 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let app = context.application
         let logger = context.application.logger
         logger.info("WeatherNext 3: starting downloader; reading local run metadata")
-        let concurrency = signature.concurrent ?? 16
-        guard concurrency > 0 else { throw Abort(.badRequest, reason: "concurrent must be positive") }
+        let downloadConcurrency = signature.concurrentDownload ?? 8
+        let conversionConcurrency = signature.concurrent ?? 1
+        guard downloadConcurrency > 0 else {
+            throw Abort(.badRequest, reason: "concurrent-download must be positive")
+        }
+        guard conversionConcurrency > 0 else {
+            throw Abort(.badRequest, reason: "concurrent must be positive")
+        }
 
         let queues = await app.s3SyncManager.getQueues(
             bucketsOpt: signature.uploadS3Bucket,
@@ -43,7 +51,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "Refusing an older WeatherNext 3 run")
         }
 
-        let auth = GoogleCloudStorageAuth(client: app.dedicatedHttpClient, logger: logger)
+        let httpClient = app.dedicatedHttpClient
+        let auth = GoogleCloudStorageAuth(client: httpClient, logger: logger)
         let prefix = WeatherNext3Domain.path(run: run)
 
         @Sendable func storage() async throws -> S3CompatibleStorage {
@@ -51,7 +60,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             return try S3CompatibleStorage(
                 baseURL: "https://storage.googleapis.com/weathernext3_statistics_spatial",
                 retryingClient: .init(
-                    httpClient: app.dedicatedHttpClient,
+                    httpClient: httpClient,
                     config: .init(
                         maxAttempts: 5,
                         baseDelay: .milliseconds(500),
@@ -64,7 +73,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             )
         }
         logger.info(
-            "WeatherNext 3: selected run \(run.iso8601_YYYY_MM_dd_HH_mm), concurrency \(concurrency); obtaining Google access token"
+            "WeatherNext 3: selected run \(run.iso8601_YYYY_MM_dd_HH_mm), download concurrency \(downloadConcurrency), conversion concurrency \(conversionConcurrency); obtaining Google access token"
         )
         let initialStorage = try await storage()
         logger.info("WeatherNext 3: checking success marker at \(prefix)success")
@@ -117,7 +126,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let statistics = WeatherNext3Variable.fields.flatMap { field in
             WeatherNext3Variable.Statistic.allCases.map { (field, $0) }
         }
-        let arrays = try await statistics.mapConcurrent(nConcurrent: concurrency) { field, statistic in
+        let arrays = try await statistics.mapConcurrent(nConcurrent: downloadConcurrency) { field, statistic in
             let name = field.source + "_" + statistic.rawValue
             let array = try await root.openArray(name: name)
             let domain = field.domain
@@ -164,8 +173,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             }
         )
         let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
-        logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(concurrency)")
-        try await chunks.foreachConcurrent(nConcurrent: concurrency) { index, arrayIndex in
+        logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(downloadConcurrency)")
+        try await chunks.foreachConcurrent(nConcurrent: downloadConcurrency) { index, arrayIndex in
             let (field, variable, template) = arrays[arrayIndex]
             let domain = field.domain
             logger.debug("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
@@ -206,7 +215,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             createNetcdf: false,
             run: run,
             handles: handles,
-            concurrent: concurrency,
+            concurrent: conversionConcurrency,
             writeUpdateJson: false,
             uploadQueues: queues,
             generateFullRun: false
