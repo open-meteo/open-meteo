@@ -28,7 +28,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
-        .package(url: "https://github.com/open-meteo/swift-zarr.git", revision: "75ce083bcc879a398c49cd065355b82228570817"),
+        .package(url: "https://github.com/open-meteo/swift-zarr.git", revision: "36fbceeeec8ce0451832e0b4b19d75a948c3c717"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
