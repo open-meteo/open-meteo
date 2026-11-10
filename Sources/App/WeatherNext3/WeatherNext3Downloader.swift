@@ -1,3 +1,4 @@
+import AsyncHTTPClient
 import Foundation
 import SwiftZarr
 import Vapor
@@ -43,7 +44,27 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let oldSurface = try await WeatherNext3Domain.surface.getMetaJson()
         let oldStation = try await WeatherNext3Domain.station.getMetaJson()
 
-        let httpClient = app.dedicatedHttpClient
+        let httpConfiguration = HTTPClient.Configuration(
+            redirectConfiguration: .follow(max: 5, allowCycles: false),
+            timeout: .init(connect: .seconds(30), read: .minutes(5)),
+            connectionPool: .init(
+                idleTimeout: .minutes(10),
+                concurrentHTTP1ConnectionsPerHostSoftLimit: max(8, downloadConcurrency)
+            )
+        )
+        let httpClient = HTTPClient(
+            eventLoopGroupProvider: .shared(app.eventLoopGroup),
+            configuration: httpConfiguration,
+            backgroundActivityLogger: logger
+        )
+        defer {
+            httpClient.shutdown { error in
+                if let error {
+                    logger.warning("WeatherNext 3: HTTP client shutdown failed: \(error)")
+                }
+            }
+        }
+
         let auth = GoogleCloudStorageAuth(client: httpClient, logger: logger)
         let prefix = WeatherNext3Domain.path(run: run)
 
@@ -90,7 +111,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                     throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 coordinate shape")
                 }
                 let values: [Float] = try await array.retrieveArraySubset([0..<count])
-                guard values.enumerated().allSatisfy({ abs($0.element - (start + Float($0.offset) * step)) < 0.0001 })
+                guard
+                    values.enumerated().allSatisfy({ abs($0.element - (start + Float($0.offset) * step)) < 0.0001 })
                 else {
                     throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 coordinate ordering")
                 }
@@ -200,7 +222,9 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             }
         }
 
-        logger.info("WeatherNext 3: downloads complete; converting \(handles.count) variable handles to time series")
+        logger.info(
+            "WeatherNext 3: downloads complete; converting \(handles.count) variable handles to time series"
+        )
         try await GenericVariableHandle.convert(
             application: app,
             domain: WeatherNext3Domain.surface,
