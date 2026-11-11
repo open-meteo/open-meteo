@@ -354,13 +354,33 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// Preload file block ranges and await all deliveries without assembling an output buffer.
     /// Clip ranges to EOF and register every super block before suspending. Cached blocks are skipped
     /// without page advice; missing blocks share normal merging and deadline scheduling. Errors
-    /// propagate without cancelling shared work. Cost is the sum of scheduling the requested ranges.
+    /// propagate without cancelling shared work. Skip the entire preload when the queue is above
+    /// 10% full or estimated queue occupancy after registration would exceed 30%.
+    /// Capacity estimation assumes uncached ranges and costs O(number of ranges); the scheduler
+    /// still handles shared work and enforces queue capacity during registration.
+    @discardableResult
     func preload(
         fileKey: Key, blockRanges: [Range<Int>], fileSize: Int,
         deadline: ContinuousClock.Instant, provider: @escaping FetchProvider
-    ) async throws {
+    ) async throws -> Bool {
         try Task.checkCancellation()
+        // Exactly 10% is eligible. Round down so fractional job limits never exceed the cap.
+        guard queuedFetches.count <= maxPendingFetches / 10 else { return false }
         let fileBlocks = 0..<fileSize.divideRoundedUp(divisor: cache.blockSize)
+        // Jobs that can start immediately do not consume the 30% pending-queue budget.
+        // Divide before multiplying to avoid overflow for large configured capacities.
+        let preloadQueueLimit = (maxPendingFetches / 10) * 3 + (maxPendingFetches % 10) * 3 / 10
+        let availableJobs = maxConcurrentFetches - activeFetches + preloadQueueLimit - queuedFetches.count
+        var requiredJobs = 0
+        // Assume uncached ranges: each intersecting super block needs one job. Count
+        // ranges without visiting individual blocks or looking up cache reservations.
+        // Registration follows without suspension, so other requests cannot take capacity.
+        for range in blockRanges {
+            let blocks = range.clamped(to: fileBlocks)
+            guard !blocks.isEmpty else { continue }
+            requiredJobs += (blocks.upperBound - 1) / superBlockLength - blocks.lowerBound / superBlockLength + 1
+            guard requiredJobs <= availableJobs else { return false }
+        }
         let _: ReadStorage = try await withCheckedThrowingContinuation { continuation in
             // An empty byte range counts deliveries without retaining or copying their bytes.
             let request = ReadRequest(byteRange: 0..<0, allocate: false, continuation: continuation)
@@ -392,6 +412,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             request.completeOne()
         }
         try Task.checkCancellation()
+        return true
     }
 
     /// Number of cache blocks in an 8 MB super block, shared by scheduling and reader fast paths.

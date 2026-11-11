@@ -64,7 +64,7 @@ public struct OmFileSystemS3: Sendable {
                 }
                 return try await fn(payload)
             } catch CurlError.fileNotFound {
-                await file.receivedObjectDeletedError()
+                await file.receivedObjectDeletedError(context: context)
                 return nil
             } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                 guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true) else {
@@ -228,16 +228,50 @@ public struct OmFileSystemS3: Sendable {
             }
         }
 
-        func receivedObjectDeletedError() {
-            /// If this is called, we know for sure the file hast been deleted
+        /// Notify every retained revision before dropping a deleted file's payload.
+        /// Finish metadata registration first so its owner can safely release queued readers.
+        func receivedObjectDeletedError(context: S3ServerHealth) async {
+            let retired: [any OmRemotePayload]
             switch payload {
-            case .none, .ready(_), .updatingPrefetchBackground(_, _, _), .error(_, _):
-                payload = .deleted
-            case .initialising(_), .updatingMetaData(old: _, _), .deleted:
-                break // do not modify queued requests
+            case .ready(let value):
+                retired = [value]
+            case .updatingPrefetchBackground(let old, let new, _):
+                retired = [old, new]
+            case .initialising(let queue):
+                let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
+                    payload = .initialising(queue + [continuation])
+                }
+                await receivedObjectDeletedError(context: context)
+                return
+            case .updatingMetaData(let old, _):
+                // Retire the old revision even if metadata construction subsequently fails.
+                do { try await old.remoteDeleted() } catch {
+                    context.logger.warning("Payload retirement failed for \(objectName): \(error)")
+                }
+                // Retirement suspended; inspect the current state again before registering.
+                guard case .updatingMetaData(let current, let currentQueue) = payload else {
+                    await receivedObjectDeletedError(context: context)
+                    return
+                }
+                let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
+                    payload = .updatingMetaData(old: current, currentQueue + [continuation])
+                }
+                await receivedObjectDeletedError(context: context)
+                return
+            case .none, .error:
+                retired = []
+            case .deleted:
+                return
+            }
+            // Invalidate the prefetch identity before invoking hooks that can suspend.
+            payload = .deleted
+            for value in retired {
+                do { try await value.remoteDeleted() } catch {
+                    context.logger.warning("Payload retirement failed for \(objectName): \(error)")
+                }
             }
         }
-        
+
         /// Resolve payload
         func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool, refreshMetadata: Bool = false) async throws -> T? {
             // Reset errors if they are older than one minute
@@ -515,12 +549,16 @@ public struct OmFileSystemS3: Sendable {
 
                 for name in Array(files.keys) where !listedFiles.contains(name) {
                     OmFileSystemMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
-                    files.removeValue(forKey: name)
+                    if let removed = files.removeValue(forKey: name) {
+                        await removed.receivedObjectDeletedError(context: context)
+                    }
                 }
 
                 for name in Array(directories.keys) where !listedDirectories.contains(name) {
                     OmFileSystemMetrics.fileRemoteDirectoryModifiedTotal.add(1, ordering: .relaxed)
-                    directories.removeValue(forKey: name)
+                    if let removed = directories.removeValue(forKey: name) {
+                        await removed.retireContents(context: context)
+                    }
                 }
 
                 lastValidated = .now()
@@ -537,6 +575,16 @@ public struct OmFileSystemS3: Sendable {
                 })
                 throw error
             }
+        }
+
+        /// Retire already-loaded descendants when their directory disappears from inventory.
+        private func retireContents(context: S3ServerHealth) async {
+            let removedFiles = Array(files.values)
+            let removedDirectories = Array(directories.values)
+            files.removeAll()
+            directories.removeAll()
+            for file in removedFiles { await file.receivedObjectDeletedError(context: context) }
+            for directory in removedDirectories { await directory.retireContents(context: context) }
         }
 
         /// Periodic lifecycle callback.

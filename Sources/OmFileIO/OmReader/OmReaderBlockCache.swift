@@ -243,10 +243,12 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     /// Clip old ranges to this file's size and skip cached blocks without page advice. All ranges
     /// are registered before waiting, without allocating or copying an output buffer. Errors propagate
     /// and leave shared fetches running. Loaded blocks remain subject to normal cache eviction.
-    public func preloadBlocks(blocks: [Range<Int>]) async throws {
+    /// Returns false without scheduling when the coordinator is too busy or lacks capacity.
+    @discardableResult
+    public func preloadBlocks(blocks: [Range<Int>]) async throws -> Bool {
         let blockSize = coordinator.cache.blockSize
         let fileSize = backend.count
-        try await coordinator.preload(fileKey: cacheKey, blockRanges: blocks, fileSize: fileSize,
+        return try await coordinator.preload(fileKey: cacheKey, blockRanges: blocks, fileSize: fileSize,
                                       deadline: .now.advanced(by: .seconds(30)), provider: { [self] block, count in
             let start = Int(block) * blockSize
             return try await backend.getData(offset: start, count: min((Int(block) + count) * blockSize, fileSize) - start)

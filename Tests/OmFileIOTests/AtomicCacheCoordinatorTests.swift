@@ -419,6 +419,49 @@ struct AtomicCacheCoordinatorTests {
         #expect(storage.advisedRanges.withLock { $0.map(\.count) } == [range.count])
     }
 
+    @Test(arguments: [
+        (10, 1, 2, true),  // Exactly 10% before and 30% after queuing.
+        (10, 2, 1, false), // Already above 10%.
+        (10, 1, 3, false), // Would exceed 30%.
+        (9, 1, 1, false),  // Fractional thresholds round down.
+        (9, 0, 2, true),
+        (9, 0, 3, false),
+        (2, 0, 1, false)   // No queued preload fits below 30% of two slots.
+    ])
+    func preloadRequiresLowQueueOccupancyAndCapacity(pendingLimit: Int, queued: Int, ranges: Int, admitted: Bool) async throws {
+        let cache = try coordinator(limit: 1, pendingLimit: pendingLimit)
+        let probe = FetchProbe()
+        let running = request(cache, probe, key: 100, allowedWait: .zero)
+        try await waitUntil { await probe.started.count == 1 }
+        var existing: [Task<Void, Error>] = []
+        for index in 0..<queued {
+            existing.append(request(cache, probe, key: UInt64(101 + index), allowedWait: .zero))
+        }
+        try await waitUntil { await cache.queuedFetchCount == queued }
+        let reader = OmReaderBlockCache(backend: GatedReaderBackend(count: 1024, probe: probe), cache: cache, cacheKey: 456)
+        let preload = Task {
+            try await reader.preloadBlocks(blocks: (0..<ranges).map { (5 + $0 * 2)..<(6 + $0 * 2) })
+        }
+        if admitted {
+            try await waitUntil { await cache.queuedFetchCount == queued + ranges }
+        } else {
+            try await preload.value
+            // Rejection is all-or-nothing and does not wait for the occupied backend slot.
+            #expect(await cache.queuedFetchCount == queued)
+            #expect(await probe.started == [100])
+        }
+        await probe.finish(100)
+        for index in 0..<(queued + (admitted ? ranges : 0)) {
+            try await waitUntil { await probe.started.count == index + 2 }
+            let key = try #require(await probe.started.last)
+            await probe.finish(key)
+        }
+        try await running.value
+        for task in existing { try await task.value }
+        #expect(try await preload.value == admitted)
+        #expect(await cache.queuedFetchCount == 0)
+    }
+
     @Test(arguments: [false, true])
     func preloadWaitsForAllBackendDeliveries(failLast: Bool) async throws {
         let cache = try coordinator(limit: 2)

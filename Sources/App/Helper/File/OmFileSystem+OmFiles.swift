@@ -56,9 +56,9 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         reader.fn.deleteCachedBlocksOnDeinit()
         
         // Relative block positions are an estimate when the replacement file's internal layout changes.
-        try await file.preloadBlocks(blocks: activeBlocks)
+        let preloaded = try await file.preloadBlocks(blocks: activeBlocks)
         let blocksToFree = reader.fn.countCachedBlocks()
-        logger.warning("OmFileRemoteOmReader: Blocks to free on deinit=\(blocksToFree) preloaded=\(activeBlocks.reduce(0) { $0 + $1.count }) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
+        logger.warning("OmFileRemoteOmReader: Blocks to free on deinit=\(blocksToFree) preloaded=\(preloaded ? activeBlocks.reduce(0) { $0 + $1.count } : 0) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
     }
     
     func remoteDeleted() async throws {

@@ -1,9 +1,14 @@
 import Testing
 import Vapor
+import Synchronization
 @testable import OmFileIO
 import OmTime
 
 private actor PrefetchGate {
+    private(set) var deletions = 0
+
+    func deleted() { deletions += 1 }
+
     private var started = false
     private var startWaiters: [CheckedContinuation<Void, Never>] = []
     private var completion: CheckedContinuation<Void, Never>?
@@ -46,7 +51,7 @@ private struct TestRemotePayload: OmRemotePayload {
         if version == "\"failure\"" { throw CancellationError() }
     }
 
-    func remoteDeleted() async throws {}
+    func remoteDeleted() async throws { await gate.deleted() }
 }
 
 struct RemotePayloadTests {
@@ -89,6 +94,65 @@ struct RemotePayloadTests {
             try #require(ContinuousClock.now < deadline)
             await Task.yield()
         }
+    }
+
+    @Test(arguments: [false, true])
+    func deletionRetiresRetainedPayloads(prefetching: Bool) async throws {
+        let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
+        let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
+        let old = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
+        var new: TestRemotePayload?
+        if prefetching {
+            await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: "\"new\"")
+            new = try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true)
+            await new?.gate.waitUntilStarted()
+        }
+        let result: Int? = try await OmFileSystemS3.FileWithContext(file: file, context: context).with { (_: TestRemotePayload) in
+            throw CurlError.fileNotFound
+        }
+        #expect(result == nil)
+        await file.receivedObjectDeletedError(context: context)
+        #expect(await old.gate.deletions == 1)
+        if let new {
+            #expect(await new.gate.deletions == 1)
+            await new.gate.finish()
+        }
+        #expect(try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false) == nil)
+    }
+
+    @Test func inventoryRemovalNotifiesPayload() async throws {
+        let app = try await Application.make(.testing)
+        let deleted = Mutex(false)
+        do {
+            app.get { _ -> String in
+                if deleted.withLock({ $0 }) { return "<ListBucketResult/>" }
+                return """
+                <ListBucketResult><Contents><Key>test.om</Key><Size>1</Size>
+                <LastModified>2026-11-11T12:00:00.000Z</LastModified>
+                <ETag>&quot;old&quot;</ETag></Contents></ListBucketResult>
+                """
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let context = S3ServerHealth(logger: .init(label: "test"), servers: [
+                .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
+            ], checksHealth: false)
+            let directory = OmFileSystemS3.Directory(prefix: "")
+            try await directory.update(context: context)
+            let file = try #require(await directory.getFile(name: "test.om"))
+            let payload = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
+            deleted.withLock { $0 = true }
+            try await directory.update(context: context)
+            #expect(await directory.getFile(name: "test.om") == nil)
+            #expect(await payload.gate.deletions == 1)
+            #expect(try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false) == nil)
+        } catch {
+            await app.http.server.shared.shutdown()
+            try await app.asyncShutdown()
+            throw error
+        }
+        await app.http.server.shared.shutdown()
+        try await app.asyncShutdown()
     }
 
     @Test func staleReplacementRefreshesWhilePrefetchIsPending() async throws {
