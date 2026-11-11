@@ -73,6 +73,13 @@ private final class PrefetchStorage: AtomicBlockCacheStorable, Sendable {
     init(storage: MmapFile) { self.storage = storage }
     var count: Int { storage.count }
 
+    let writebackRanges = Mutex<[Range<Int>]>([])
+
+    func requestWriteback(offset: Int, count: Int) throws {
+        try storage.requestWriteback(offset: offset, count: count)
+        writebackRanges.withLock { $0.append(offset..<(offset + count)) }
+    }
+
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
         try storage.withMutableUnsafeBytes(body)
     }
@@ -364,6 +371,43 @@ struct AtomicCacheCoordinatorTests {
             let data = try await reader.getData(offset: 61, count: 74)
             #expect(data == contents.subdata(in: 61..<135))
         }
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func requestWritebackOnlyForWrittenPayloadRanges(wrap: Bool, collision: Bool) async throws {
+        let blockSize = 64 * 1024
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let backing = try AtomicBlockCache(file: path, blockSize: blockSize, blockCount: 8)
+        let storage = PrefetchStorage(storage: backing.data)
+        let cache = AtomicCacheCoordinator(cache: AtomicBlockCache(data: storage, blockSize: blockSize))
+        let firstSlot = wrap ? 6 : 1
+        let fileKey = (UInt64(0)...UInt64(1000)).first {
+            cache.calculateCacheKey(fileKey: $0, block: 0) % 8 == UInt64(firstSlot)
+        }!
+        let firstKey = cache.calculateCacheKey(fileKey: fileKey, block: 0)
+        if collision {
+            cache.cache.set(key: firstKey &+ 9, value: Data(repeating: 9, count: blockSize))
+        }
+        let contents = Data(repeating: 7, count: 2 * blockSize + 17)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: contents), cache: cache, cacheKey: fileKey)
+        #expect(try await reader.getData(offset: 0, count: contents.count) == contents)
+        // Enter the actor after delivery to ensure the worker has submitted its final writeback.
+        _ = await cache.waiterCount(for: firstKey)
+        let indexSize = 8 * MemoryLayout<WordPair>.size
+        let slots = collision ? [firstSlot, (firstSlot + 2) % 8, (firstSlot + 3) % 8]
+                              : [firstSlot, (firstSlot + 1) % 8, (firstSlot + 2) % 8]
+        var expected = [Range<Int>]()
+        for (block, slot) in slots.enumerated() {
+            let offset = indexSize + slot * blockSize
+            let end = offset + (block == 2 ? 17 : blockSize)
+            if let last = expected.last, last.upperBound == offset {
+                expected[expected.count - 1] = last.lowerBound..<end
+            } else {
+                expected.append(offset..<end)
+            }
+        }
+        #expect(storage.writebackRanges.withLock { $0 } == expected)
     }
 
     @Test func prefetchAndAdviceKeepRequestedByteRanges() async throws {

@@ -1,6 +1,9 @@
 import Foundation
 import OmFileFormat
 import Synchronization
+#if os(Linux)
+import Glibc
+#endif
 
 /**
  Needs to be some kind of writeable memory region
@@ -9,10 +12,30 @@ public protocol AtomicBlockCacheStorable: Sendable {
     var count: Int { get }
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R
     func prefetchData(offset: Int, count: Int)
+    func requestWriteback(offset: Int, count: Int) throws
     func adviseData(offset: Int, count: Int, advice: MmapFile.MAdvice)
 }
 
 extension MmapFile: AtomicBlockCacheStorable {
+    /// Request payload writeback without waiting for disk completion.
+    public func requestWriteback(offset: Int, count: Int) throws {
+        precondition(offset >= 0 && count >= 0 && offset <= data.count && count <= data.count - offset)
+        guard count > 0 else { return }
+        #if os(Linux)
+        // Submit only this range, retaining cached pages. Queue pressure may still block.
+        let result = sync_file_range(file.fileDescriptor, off_t(offset), off_t(count), UInt32(SYNC_FILE_RANGE_WRITE))
+        #else
+        // msync requires a page-aligned address and flushes all intersecting pages.
+        let pageSize = Int(getpagesize())
+        let pageStart = offset / pageSize * pageSize
+        let address = UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart))
+        let result = msync(address, offset - pageStart + count, MS_ASYNC)
+        #endif
+        guard result == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
     public func prefetchData(offset: Int, count: Int) {
         self.prefetchData(offset: offset, count: count, advice: .willneed)
     }
@@ -25,6 +48,10 @@ extension MmapFile: AtomicBlockCacheStorable {
 }
 
 extension DataAsClass: AtomicBlockCacheStorable {
+    public func requestWriteback(offset: Int, count: Int) throws {
+        // In-memory storage needs no writeback.
+    }
+
     public func prefetchData(offset: Int, count: Int) {
         // Not necessary
     }
