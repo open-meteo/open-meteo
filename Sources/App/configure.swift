@@ -15,6 +15,14 @@ enum OpenMeteo {
         return value
     }()
 
+    /// Preload replacement-file blocks accessed within this many seconds. Defaults to 15 minutes.
+    static let remoteDataPreloadMaxAgeSeconds: UInt = {
+        guard let value = UInt(Environment.get("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS") ?? "900") else {
+            fatalError("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS must be a non-negative integer")
+        }
+        return value
+    }()
+
     /// Data directory with trailing slash
     static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {

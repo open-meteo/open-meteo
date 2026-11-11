@@ -50,7 +50,7 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         }
         let file = updatedReader.fn
         let logger = reader.fn.backend.server.logger
-        let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: 15*60, scaledToFileSize: file.count)
+        let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: OpenMeteo.remoteDataPreloadMaxAgeSeconds, scaledToFileSize: file.count)
         
         // Relative block positions are an estimate when the replacement file's internal layout changes.
         try await file.preloadBlocks(blocks: activeBlocks)
