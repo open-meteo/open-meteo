@@ -3,7 +3,7 @@ import Vapor
 
 
 extension ForecastapiResult {
-    func toXlsxResponse(timestamp: Timestamp, withLocationHeader: Bool = true, prefetchLookAhead: Int = 3) async throws -> Response {
+    func toXlsxResponse(timestamp: Timestamp, withLocationHeader: Bool = true, prefetchLookAhead: Int = OpenMeteo.prefetchLookAhead) async throws -> Response {
         var prefetchDone = prefetchLookAhead <= 0
         let multiLocation = results.count > 1
 

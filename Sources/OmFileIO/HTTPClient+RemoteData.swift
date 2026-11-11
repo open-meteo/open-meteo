@@ -1,20 +1,25 @@
 import AsyncHTTPClient
 import Synchronization
-import Vapor
 
 /// One process-wide connection pool for remote data listings, metadata and range reads.
 /// Health checks use `HTTPClient.shared` independently.
+/// See `docs/remote-data.md` at the repository root for HTTP connection settings.
 extension HTTPClient {
     private static let remoteDataInitialized = Atomic(false)
+    private static let remoteDataHTTPConnections = Atomic(8)
+
+    /// Set the HTTP/1 per-host connection limit during startup, before any remote data requests.
+    /// Does not initialize the pool; standalone users retain the default of eight connections.
+    public static func configureRemoteDataHTTPConnections(_ limit: Int) {
+        precondition(limit > 0)
+        precondition(!remoteDataInitialized.load(ordering: .acquiring), "Configure remote data connections before using the pool")
+        remoteDataHTTPConnections.store(limit, ordering: .releasing)
+    }
 
     public static let sharedRemoteData: HTTPClient = {
-        let rawLimit = Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "8"
-        guard let limit = Int(rawLimit), limit > 0 else {
-            fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
-        }
         var configuration = HTTPClient.Configuration.singletonConfiguration
         // HTTP/2 uses the peer's concurrent-stream limit instead.
-        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = limit
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = remoteDataHTTPConnections.load(ordering: .acquiring)
         let client = HTTPClient(eventLoopGroup: HTTPClient.defaultEventLoopGroup, configuration: configuration)
         remoteDataInitialized.store(true, ordering: .releasing)
         return client

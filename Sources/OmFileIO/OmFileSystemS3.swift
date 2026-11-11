@@ -1,4 +1,5 @@
 import AsyncHTTPClient
+import Foundation
 import Logging
 import OmFileFormat
 import OmTime
@@ -12,6 +13,8 @@ enum OmFileSystemS3Error: Error {
  It is used concurrently to get meta data from objects or return if a object does not exist.
 
  Performs S3 List operations on demand recursively.
+
+ See `docs/remote-data.md` at the repository root for endpoint configuration and file-update behavior.
  
  Each file can be bound to a "payload" type. E.g. an open OM-File which maintains meta data about timestamps and arrays available
  
@@ -63,14 +66,22 @@ public struct OmFileSystemS3: Sendable {
                 }
                 return try await fn(payload)
             } catch CurlError.fileNotFound {
-                await file.receivedObjectDeletedError()
+                await file.receivedObjectDeletedError(context: context)
                 return nil
             } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                 guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true) else {
                     return nil
                 }
-                /// Catch error again? If there would a file modified error again, this could indicate some remote server issues
-                return try await fn(payload)
+                do {
+                    return try await fn(payload)
+                } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                    // The replacement can also become stale while its preload is still pending.
+                    // Refresh metadata once instead of selecting the same replacement again.
+                    guard let refreshed = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true, refreshMetadata: true) else {
+                        return nil
+                    }
+                    return try await fn(refreshed)
+                }
             }
         }
     }
@@ -85,7 +96,7 @@ public struct OmFileSystemS3: Sendable {
         /// Reference to the open-meteo file or json file
         private var payload: RemotePayloadState
         
-        /// If state is `updating`, a remote modification was detected and the old payload is now being updated
+        /// If state is `updatingMetaData`, a remote modification was detected and the old payload is now being updated
         /// The old payload is still available, because in many cases it can be reused
         private enum RemotePayloadState {
             /// Payload has not been requested yet by the application
@@ -97,8 +108,11 @@ public struct OmFileSystemS3: Sendable {
             /// Payload got initialised and should be in sync with remote server
             case ready(any OmRemotePayload)
             
-            /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload, but keep the old payload
-            case updating(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
+            /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload meta data, but no preloaded data yet
+            case updatingMetaData(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
+
+            /// After an S3 directory update, the new file is available, but background updates are still running. If possible, use the old payload
+            case updatingPrefetchBackground(old: any OmRemotePayload, new: any OmRemotePayload, identity: UUID)
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
             case deleted
@@ -157,21 +171,21 @@ public struct OmFileSystemS3: Sendable {
             assert(eTag.hasSuffix("\""))
             self.eTag = eTag
             switch payload {
-            case .ready(let old):
-                payload = .updating(old: old, [])
+            case .ready(let old), .updatingPrefetchBackground(_, let old, _):
+                payload = .updatingMetaData(old: old, [])
                 do {
                     let file = makeCachedClient(context: context)
-                    let new = try await old.remoteUpdated(file: file)
-                    guard case .updating(_, let queued) = payload else {
-                        fatalError("State was not .updating()")
+                    let new = try await old.updateMetaData(file: file)
+                    guard case .updatingMetaData(_, let queued) = payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
-                    self.payload = .ready(new)
                     queued.forEach {
                         $0.resume(with: .success(new))
                     }
+                    startBackgroundPrefetch(old: old, new: new, context: context)
                 } catch {
-                    guard case .updating(_, let queued) = payload else {
-                        fatalError("State was not .updating()")
+                    guard case .updatingMetaData(_, let queued) = payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
                     if Self.shouldResetPayload(after: error) {
                         self.payload = .none
@@ -189,24 +203,79 @@ public struct OmFileSystemS3: Sendable {
                 break
             case .initialising(_):
                 break
-            case .updating(old: _, _):
+            case .updatingMetaData(old: _, _):
                 // most likely the new file is already being fetched
                 break
             }
         }
         
-        func receivedObjectDeletedError() {
-            /// If this is called, we know for sure the file hast been deleted
-            switch payload {
-            case .none, .ready(_), .error(_, _):
-                payload = .deleted
-            case .initialising(_), .updating(old: _, _), .deleted:
-                break // do not modify queued requests
+        /// Publish metadata immediately; warming the data cache must not delay waiting readers.
+        private func startBackgroundPrefetch(old: any OmRemotePayload, new: any OmRemotePayload, context: S3ServerHealth) {
+            // Identify this update so its task can recognise whether it still owns the state after awaiting I/O.
+            let identity = UUID()
+            payload = .updatingPrefetchBackground(old: old, new: new, identity: identity)
+            Task {
+                do {
+                    try await new.prefetchBackground(from: old)
+                } catch {
+                    // Prefetch is optional. The new payload can still fetch data on demand.
+                    context.logger.warning("Background prefetch failed for \(objectName): \(error)")
+                }
+                // Another update or deletion may have occurred while prefetch was suspended.
+                // Even if the state is still prefetching, a different identity belongs to a newer update.
+                guard case .updatingPrefetchBackground(_, _, let currentIdentity) = payload, currentIdentity == identity else {
+                    return
+                }
+                payload = .ready(new)
             }
         }
-        
+
+        /// Notify every retained revision before dropping a deleted file's payload.
+        /// Finish metadata registration first so its owner can safely release queued readers.
+        func receivedObjectDeletedError(context: S3ServerHealth) async {
+            let retired: [any OmRemotePayload]
+            switch payload {
+            case .ready(let value):
+                retired = [value]
+            case .updatingPrefetchBackground(let old, let new, _):
+                retired = [old, new]
+            case .initialising(let queue):
+                let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
+                    payload = .initialising(queue + [continuation])
+                }
+                await receivedObjectDeletedError(context: context)
+                return
+            case .updatingMetaData(let old, _):
+                // Retire the old revision even if metadata construction subsequently fails.
+                do { try await old.remoteDeleted() } catch {
+                    context.logger.warning("Payload retirement failed for \(objectName): \(error)")
+                }
+                // Retirement suspended; inspect the current state again before registering.
+                guard case .updatingMetaData(let current, let currentQueue) = payload else {
+                    await receivedObjectDeletedError(context: context)
+                    return
+                }
+                let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
+                    payload = .updatingMetaData(old: current, currentQueue + [continuation])
+                }
+                await receivedObjectDeletedError(context: context)
+                return
+            case .none, .error:
+                retired = []
+            case .deleted:
+                return
+            }
+            // Invalidate the prefetch identity before invoking hooks that can suspend.
+            payload = .deleted
+            for value in retired {
+                do { try await value.remoteDeleted() } catch {
+                    context.logger.warning("Payload retirement failed for \(objectName): \(error)")
+                }
+            }
+        }
+
         /// Resolve payload
-        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool) async throws -> T? {
+        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool, refreshMetadata: Bool = false) async throws -> T? {
             // Reset errors if they are older than one minute
             if case .error(_, let issueDate) = payload, issueDate.olderThan(seconds: 60, now: .now()) {
                 payload = .none
@@ -256,14 +325,14 @@ public struct OmFileSystemS3: Sendable {
                 return try await withCheckedThrowingContinuation { continuation in
                     payload = .initialising(queue + [continuation])
                 } as? T
-            case .updating(let old, let queue):
+            case .updatingMetaData(let old, let queue):
                 // If the file is actively being updated, allow access to the old file, because cached responses still work
                 if receivedFileModifiedError {
                     // If the access fails, enqueue to get the new file
                     OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.add(1, ordering: .relaxed)
                     defer { OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.add(-1, ordering: .relaxed) }
                     let payload = try await withCheckedThrowingContinuation { continuation in
-                        self.payload = .updating(old: old, queue + [continuation])
+                        self.payload = .updatingMetaData(old: old, queue + [continuation])
                     }
                     guard let payload = payload as? T else {
                         fatalError("Payload was not of correct type \(T.self)")
@@ -274,6 +343,17 @@ public struct OmFileSystemS3: Sendable {
                     fatalError("Payload was not of correct type \(T.self)")
                 }
                 return old
+            case .updatingPrefetchBackground(let old, let new, _):
+                if refreshMetadata {
+                    // Supersede the background task's identity before starting a HEAD refresh.
+                    // Its eventual completion must not publish this stale replacement.
+                    payload = .ready(new)
+                    return try await getPayload(ofType: T.self, context: context, receivedFileModifiedError: true)
+                }
+                guard let selected = (receivedFileModifiedError ? new : old) as? T else {
+                    fatalError("Payload was not of correct type \(T.self)")
+                }
+                return selected
             case .ready(let payload):
                 guard let payload = payload as? T else {
                     fatalError("Payload was not of correct type \(T.self)")
@@ -283,24 +363,24 @@ public struct OmFileSystemS3: Sendable {
                 }
                 // Old file got modified, we have to download it from the remote server again
                 // At this stage there could be dozens of failing calls coming in
-                self.payload = .updating(old: payload, [])
+                self.payload = .updatingMetaData(old: payload, [])
                 do {
                     let newReader = try await OmHttpReaderBackend(context: context, object: objectName)
                     self.contentLength = newReader.count
                     self.lastModified = newReader.lastModified
                     self.eTag = newReader.eTag
-                    let new = try await payload.remoteUpdated(file: newReader)
-                    guard case .updating(old: _, let queued) = self.payload else {
-                        fatalError("State was not .updating()")
+                    let new = try await payload.updateMetaData(file: newReader)
+                    guard case .updatingMetaData(old: _, let queued) = self.payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
-                    self.payload = .ready(new)
                     queued.forEach({
                         $0.resume(returning: new)
                     })
+                    startBackgroundPrefetch(old: payload, new: new, context: context)
                     return new
                 } catch {
-                    guard case .updating(old: _, let queued) = self.payload else {
-                        fatalError("State was not .updating()")
+                    guard case .updatingMetaData(old: _, let queued) = self.payload else {
+                        fatalError("State was not .updatingMetaData()")
                     }
                     if Self.shouldResetPayload(after: error) {
                         self.payload = .none
@@ -413,6 +493,7 @@ public struct OmFileSystemS3: Sendable {
         private var directories = [String: Directory]()
         private var lastValidated = Timestamp(0)
         private var lastAccessed = Timestamp(0)
+        private var isRetired = false
         
         /// If set to an array, a revalidation is running in the background
         var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
@@ -428,6 +509,7 @@ public struct OmFileSystemS3: Sendable {
         
         /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
         func update(context: S3ServerHealth) async throws {
+            guard !isRetired else { return }
             let logger = context.logger
             guard revalidationQueue == nil else {
                 OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
@@ -441,9 +523,16 @@ public struct OmFileSystemS3: Sendable {
             }
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
+            defer {
+                // Also release waiters when retirement discards an in-flight listing.
+                let waiters = revalidationQueue
+                revalidationQueue = nil
+                waiters?.forEach { $0.resume() }
+            }
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
                 let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: HTTPClient.sharedRemoteData, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                guard !isRetired else { return }
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))
@@ -453,6 +542,7 @@ public struct OmFileSystemS3: Sendable {
                     assert(file.eTag.hasSuffix("\""))
                     if let existing = files[name] {
                         await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
+                        guard !isRetired else { return }
                     } else {
                         OmFileSystemMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
                         files[name] = File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
@@ -471,20 +561,19 @@ public struct OmFileSystemS3: Sendable {
 
                 for name in Array(files.keys) where !listedFiles.contains(name) {
                     OmFileSystemMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
-                    files.removeValue(forKey: name)
+                    if let removed = files.removeValue(forKey: name) {
+                        await removed.receivedObjectDeletedError(context: context)
+                    }
                 }
 
                 for name in Array(directories.keys) where !listedDirectories.contains(name) {
                     OmFileSystemMetrics.fileRemoteDirectoryModifiedTotal.add(1, ordering: .relaxed)
-                    directories.removeValue(forKey: name)
+                    if let removed = directories.removeValue(forKey: name) {
+                        await removed.retireContents(context: context)
+                    }
                 }
 
                 lastValidated = .now()
-                let waiters = revalidationQueue
-                revalidationQueue = nil
-                waiters?.forEach({
-                    $0.resume()
-                })
             } catch {
                 let waiters = revalidationQueue
                 revalidationQueue = nil
@@ -493,6 +582,19 @@ public struct OmFileSystemS3: Sendable {
                 })
                 throw error
             }
+        }
+
+        /// Retire already-loaded descendants when their directory disappears from inventory.
+        private func retireContents(context: S3ServerHealth) async {
+            // Set before any suspension so both pending and future listings are discarded.
+            guard !isRetired else { return }
+            isRetired = true
+            let removedFiles = Array(files.values)
+            let removedDirectories = Array(directories.values)
+            files.removeAll()
+            directories.removeAll()
+            for file in removedFiles { await file.receivedObjectDeletedError(context: context) }
+            for directory in removedDirectories { await directory.retireContents(context: context) }
         }
 
         /// Periodic lifecycle callback.

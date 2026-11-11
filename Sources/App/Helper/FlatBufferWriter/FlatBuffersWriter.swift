@@ -7,7 +7,7 @@ extension ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
-    func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, prefetchLookAhead: Int = 3, logger: Logger) throws -> Response {
+    func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, prefetchLookAhead: Int = OpenMeteo.prefetchLookAhead, logger: Logger) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in

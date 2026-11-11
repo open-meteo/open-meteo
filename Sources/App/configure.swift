@@ -4,8 +4,26 @@ import Synchronization
 @_exported import OmTime
 import OmFileIO
 
+/// Application environment settings. Remote backend, cache, and prefetch configuration
+/// is documented in `docs/remote-data.md` at the repository root.
 enum OpenMeteo {
     static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
+
+    /// Number of locations to prefetch ahead while writing API responses. Zero disables prefetching.
+    static let prefetchLookAhead: Int = {
+        guard let value = Int(Environment.get("PREFETCH_LOOK_AHEAD") ?? "3"), value >= 0 else {
+            fatalError("PREFETCH_LOOK_AHEAD must be a non-negative integer")
+        }
+        return value
+    }()
+
+    /// Preload replacement-file blocks accessed within this many seconds. Defaults to 15 minutes.
+    static let remoteDataPreloadMaxAgeSeconds: UInt = {
+        guard let value = UInt(Environment.get("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS") ?? "900") else {
+            fatalError("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS must be a non-negative integer")
+        }
+        return value
+    }()
 
     /// Data directory with trailing slash
     static let dataDirectory = {
@@ -42,7 +60,17 @@ enum OpenMeteo {
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
-        let cache = AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        guard let maxConcurrentFetches = Int(Environment.get("REMOTE_DATA_MAX_CONCURRENT_FETCHES") ?? "12"), maxConcurrentFetches > 0 else {
+            fatalError("REMOTE_DATA_MAX_CONCURRENT_FETCHES must be a positive integer")
+        }
+        guard let maxPendingFetches = Int(Environment.get("REMOTE_DATA_MAX_PENDING_FETCHES") ?? "65536"), maxPendingFetches > 0 else {
+            fatalError("REMOTE_DATA_MAX_PENDING_FETCHES must be a positive integer")
+        }
+        let cache = AtomicCacheCoordinator(
+            cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount),
+            maxConcurrentFetches: maxConcurrentFetches,
+            maxPendingFetches: maxPendingFetches
+        )
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache
     }()
@@ -185,6 +213,10 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone.gmt
+    guard let remoteDataHTTPConnections = Int(Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "16"), remoteDataHTTPConnections > 0 else {
+        fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
+    }
+    HTTPClient.configureRemoteDataHTTPConnections(remoteDataHTTPConnections)
     app.lifecycle.use(RemoteDataHttpClientLifecycle())
 
     let corsConfiguration = CORSMiddleware.Configuration(
