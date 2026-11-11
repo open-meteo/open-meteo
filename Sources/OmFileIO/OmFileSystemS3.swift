@@ -13,6 +13,8 @@ enum OmFileSystemS3Error: Error {
  It is used concurrently to get meta data from objects or return if a object does not exist.
 
  Performs S3 List operations on demand recursively.
+
+ See `docs/remote-data.md` at the repository root for endpoint configuration and file-update behavior.
  
  Each file can be bound to a "payload" type. E.g. an open OM-File which maintains meta data about timestamps and arrays available
  

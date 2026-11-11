@@ -4,6 +4,8 @@ import Synchronization
 @_exported import OmTime
 import OmFileIO
 
+/// Application environment settings. Remote backend, cache, and prefetch configuration
+/// is documented in `docs/remote-data.md` at the repository root.
 enum OpenMeteo {
     static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
 

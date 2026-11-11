@@ -1,6 +1,7 @@
 import Foundation
 
 /// Coordinates backend concurrency, shared block fetches, and result assembly for an atomic cache.
+/// See `docs/remote-data.md` at the repository root for application fetch limits and preload settings.
 /// `OmReaderBlockCache` handles file byte ranges, contiguous cache hits, and cached-page advice.
 /// This actor receives explicit ranges, deadlines, and providers; it does not depend on a reader
 /// instance. It owns the super-block size and cache-key calculation used by both paths.

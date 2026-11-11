@@ -3,6 +3,7 @@ import Synchronization
 
 /// One process-wide connection pool for remote data listings, metadata and range reads.
 /// Health checks use `HTTPClient.shared` independently.
+/// See `docs/remote-data.md` at the repository root for HTTP connection settings.
 extension HTTPClient {
     private static let remoteDataInitialized = Atomic(false)
     private static let remoteDataHTTPConnections = Atomic(8)

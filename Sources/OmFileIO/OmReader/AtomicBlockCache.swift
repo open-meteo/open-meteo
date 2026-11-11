@@ -67,6 +67,8 @@ extension AtomicBlockCache where Backend == MmapFile {
  Key-value cache for fixed block sizes and a fixed amount of blocks. Uses a hash map with LRU strategy.
  The entire cache size is preallocated. Due to the fixed number of elements, the hash map does not need rebalancing
 
+ See `docs/remote-data.md` at the repository root for cache storage and block-size settings.
+
  Returned pointers borrow cache storage; they do not pin entries against eviction. A later write
  can overwrite the bytes before or during a read. Copies are independent once taken, but the source
  is not pinned while copying.
