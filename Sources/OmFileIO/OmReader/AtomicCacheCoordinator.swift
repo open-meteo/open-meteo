@@ -27,7 +27,7 @@ import Foundation
 /// including after a miss; otherwise it copies into owned storage. Reads crossing super blocks
 /// allocate once up front. Owned results are 32-byte aligned and are released automatically.
 /// Borrowed slices may have arbitrary alignment and must never be freed. Prefetches allocate no
-/// result buffer and return after scheduling; mixed ranges advise only the requested cached pages.
+/// result buffer. Prefetch returns after scheduling; preload waits for all deliveries without page advice.
 ///
 /// The first read error disables late writes, frees owned storage, and resumes the caller. Shared
 /// work continues for other subscribers. Cancellation also leaves shared work running and is checked
@@ -68,7 +68,8 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         }
     }
 
-    /// Assembles one read on the actor. Single ranges borrow until a noncontiguous block arrives;
+    /// Assembles one read on the actor. An empty byte range tracks preload completion without data.
+    /// Single ranges borrow until a noncontiguous block arrives;
     /// reads across super blocks start with an allocation. Waiters identify byte positions, not cache keys.
     private final class ReadRequest {
         let byteRange: Range<Int>
@@ -340,6 +341,47 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                      provider: provider, request: nil, outputOffset: 0, prefetchByteRange: byteRange)
     }
 
+    /// Preload file block ranges and await all deliveries without assembling an output buffer.
+    /// Clip ranges to EOF and register every super block before suspending. Cached blocks are skipped
+    /// without page advice; missing blocks share normal merging and deadline scheduling. Errors
+    /// propagate without cancelling shared work. Cost is the sum of scheduling the requested ranges.
+    func preload(
+        fileKey: Key, blockRanges: [Range<Int>], fileSize: Int,
+        deadline: ContinuousClock.Instant, provider: @escaping FetchProvider
+    ) async throws {
+        try Task.checkCancellation()
+        let fileBlocks = 0..<fileSize.divideRoundedUp(divisor: cache.blockSize)
+        let _: ReadStorage = try await withCheckedThrowingContinuation { continuation in
+            // An empty byte range counts deliveries without retaining or copying their bytes.
+            let request = ReadRequest(byteRange: 0..<0, allocate: false, continuation: continuation)
+            do {
+                for range in blockRanges {
+                    let blocks = range.clamped(to: fileBlocks)
+                    var firstBlock = blocks.lowerBound
+                    while firstBlock < blocks.upperBound {
+                        try Task.checkCancellation()
+                        let start = firstBlock
+                        let superBlockStart = start / superBlockLength * superBlockLength
+                        let end = min(blocks.upperBound, superBlockStart + superBlockLength)
+                        let key = calculateCacheKey(fileKey: fileKey, block: start)
+                        if cache.get(key: key, count: UInt64(end - start)) == nil {
+                            try schedule(key: key, count: end - start, deadline: deadline,
+                                         superBlockKey: calculateCacheKey(fileKey: fileKey, block: superBlockStart),
+                                         provider: { fetchKey, count in
+                                try await provider(UInt64(start) &+ (fetchKey &- key), count)
+                            }, request: request, outputOffset: 0, prefetchByteRange: 0..<0)
+                        }
+                        firstBlock = end
+                    }
+                }
+            } catch {
+                request.fail(error)
+            }
+            request.completeOne()
+        }
+        try Task.checkCancellation()
+    }
+
     /// Number of cache blocks in an 8 MB super block, shared by scheduling and reader fast paths.
     nonisolated var superBlockLength: Int { 8 * 1024 * 1024 / cache.blockSize }
 
@@ -430,7 +472,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                     // Advise only the requested bytes within this cached block.
                     let blockStart = offset * cache.blockSize
                     let adviceRange = prefetchByteRange.clamped(to: blockStart..<(blockStart + cache.blockSize))
-                    cache.advise(key: key, byteRange: (adviceRange.lowerBound - blockStart)..<(adviceRange.upperBound - blockStart), advice: .willneed)
+                    if !adviceRange.isEmpty {
+                        cache.advise(key: key, byteRange: (adviceRange.lowerBound - blockStart)..<(adviceRange.upperBound - blockStart), advice: .willneed)
+                    }
                 }
                 offset += 1
                 continue

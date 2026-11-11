@@ -393,15 +393,114 @@ struct AtomicCacheCoordinatorTests {
         #expect(storage.advisedRanges.withLock { $0.map(\.count) } == [range.count])
     }
 
-    @Test func preloadAdvisesCachedPagesAndClipsOldRanges() async throws {
+    @Test(arguments: [false, true])
+    func preloadWaitsForAllBackendDeliveries(failLast: Bool) async throws {
+        let cache = try coordinator(limit: 2)
+        let probe = FetchProbe()
+        let boundary = cache.superBlockLength
+        let reader = OmReaderBlockCache(backend: GatedReaderBackend(count: (boundary + 1) * 64, probe: probe), cache: cache, cacheKey: 456)
+        let completed = Mutex(false)
+        let preload = Task {
+            defer { completed.withLock { $0 = true } }
+            try await reader.preloadBlocks(blocks: [1..<2, boundary..<(boundary + 1)])
+        }
+        // Register both ranges before either provider completes.
+        try await waitUntil { await probe.started.count == 2 }
+        let firstKey = cache.calculateCacheKey(fileKey: reader.cacheKey, block: 1)
+        let lastKey = cache.calculateCacheKey(fileKey: reader.cacheKey, block: boundary)
+        #expect(cache.cache.get(key: firstKey, count: 1) == nil)
+        #expect(cache.cache.get(key: lastKey, count: 1) == nil)
+        #expect(!completed.withLock { $0 })
+        await probe.finish(1)
+        try await waitUntil { await cache.waiterCount(for: firstKey) == 0 }
+        #expect(!completed.withLock { $0 })
+        await probe.finish(UInt64(boundary), fail: failLast)
+        if failLast {
+            await #expect(throws: FetchProbe.Failure.self) { try await preload.value }
+        } else {
+            try await preload.value
+            #expect(cache.cache.get(key: lastKey, count: 1) != nil)
+        }
+        #expect(cache.cache.get(key: firstKey, count: 1) != nil)
+        #expect(completed.withLock { $0 })
+    }
+
+    @Test func cachedBlockCountIncludesOldEntriesWithoutRefreshingThem() throws {
+        let cache = try coordinator(blockCount: 16)
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 7, count: 8 * 64)), cache: cache, cacheKey: 123)
+        let keys = [1, 2, 4].map { cache.calculateCacheKey(fileKey: reader.cacheKey, block: $0) }
+        for key in keys { cache.cache.set(key: key, value: Data(repeating: 7, count: 64)) }
+        cache.cache.set(key: cache.calculateCacheKey(fileKey: 456, block: 1), value: Data(repeating: 8, count: 64))
+        let before = cache.cache.data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            return (0..<cache.cache.blockCount).map { index in
+                var entry = entries[index].load(ordering: .relaxed)
+                if entry.first == keys[0] { entry.second = 1 } // Committed but very old.
+                if entry.first == keys[2] { entry.second &= ~UInt(1) } // Not yet committed.
+                entries[index].store(entry, ordering: .relaxed)
+                return entry.second
+            }
+        }
+        #expect(reader.countCachedBlocks() == 2)
+        let after = cache.cache.data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            return (0..<cache.cache.blockCount).map { entries[$0].load(ordering: .relaxed).second }
+        }
+        #expect(after == before)
+    }
+
+    @Test(arguments: [false, true])
+    func onlyRetiredReadersDeleteRecentBlocksOnDeinit(retire: Bool) async throws {
+        let cache = try coordinator()
+        let boundary = cache.superBlockLength
+        let probe = FetchProbe()
+        var reader: OmReaderBlockCache<GatedReaderBackend, MmapFile>? = OmReaderBlockCache(
+            backend: GatedReaderBackend(count: (boundary + 1) * 64, probe: probe), cache: cache, cacheKey: 123)
+        weak var released = reader
+        let oldKeys = [1, boundary].map { cache.calculateCacheKey(fileKey: reader!.cacheKey, block: $0) }
+        let replacementKey = cache.calculateCacheKey(fileKey: 456, block: boundary)
+        for key in oldKeys + [replacementKey] {
+            cache.cache.set(key: key, value: Data(repeating: 7, count: 64))
+        }
+        if retire {
+            // Retirement only marks the reader; all entries survive until deinit.
+            reader!.deleteCachedBlocksOnDeinit()
+        }
+        for key in oldKeys { #expect(cache.cache.get(key: key, count: 1) != nil) }
+        reader = nil
+        #expect(released == nil)
+        for key in oldKeys { #expect((cache.cache.get(key: key, count: 1) == nil) == retire) }
+        #expect(cache.cache.get(key: replacementKey, count: 1) != nil)
+    }
+
+    @Test func retiredReaderWaitsForBackgroundFetchBeforeDeinitCleanup() async throws {
+        let cache = try coordinator(limit: 1)
+        let probe = FetchProbe()
+        var reader: OmReaderBlockCache<GatedReaderBackend, MmapFile>? = OmReaderBlockCache(
+            backend: GatedReaderBackend(count: 128, probe: probe), cache: cache, cacheKey: 123)
+        weak var released = reader
+        let key = cache.calculateCacheKey(fileKey: reader!.cacheKey, block: 1)
+        try await reader!.prefetchData(offset: 64, count: 64)
+        reader!.deleteCachedBlocksOnDeinit()
+        reader = nil
+        try await waitUntil { await probe.started == [1] }
+        #expect(released != nil)
+        await probe.finish(1)
+        try await waitUntil { released == nil }
+        #expect(cache.cache.get(key: key, count: 1) == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func preloadSkipsPageAdviceAndClipsOldRanges(fullyCached: Bool) async throws {
         let storage = PrefetchStorage(storage: try coordinator().cache.data)
         let cache = AtomicCacheCoordinator(cache: AtomicBlockCache(data: storage, blockSize: 64))
         let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 7, count: 100)), cache: cache, cacheKey: 123)
-        for block in 0..<2 {
+        for block in 0..<(fullyCached ? 2 : 1) {
             cache.cache.set(key: cache.calculateCacheKey(fileKey: reader.cacheKey, block: block), value: Data(repeating: 7, count: 64))
         }
         try await reader.preloadBlocks(blocks: [-2..<4, 5..<9])
-        #expect(storage.advisedRanges.withLock { $0.map(\.count) } == [100])
+        #expect(storage.advisedRanges.withLock { $0.isEmpty })
+        #expect(reader.listOfActiveBlocks(maxAgeSeconds: 60) == [0..<2])
     }
 
     @Test func prefetchAdvisesCachedPagesAndSharesBackgroundWork() async throws {
@@ -877,8 +976,8 @@ struct AtomicCacheCoordinatorTests {
             }
         }
         try await waitUntil { await cache.queuedFetchCount == 1 }
-        // Both prefetch entry points return while the backend slot is still occupied.
-        if path != "read" { try await original.value }
+        // Ordinary prefetch returns after scheduling; preload waits for delivery like a read.
+        if path == "prefetch" { try await original.value }
         let prepended = Task<Void, Error> {
             let data = try await reader.getData(offset: (firstBlock - 1) * 64 + 7, count: 42)
             #expect(data == Data(repeating: UInt8(truncatingIfNeeded: firstBlock - 1), count: 42))

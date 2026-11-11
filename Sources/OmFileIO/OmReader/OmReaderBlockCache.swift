@@ -1,6 +1,7 @@
 import OmFileFormat
 import Foundation
 import NIOCore
+import Synchronization
 
 /// Adapts file byte-range reads to a shared `AtomicCacheCoordinator` and its atomic block cache.
 /// `cacheKey` identifies this file's contents and must change when those contents are replaced.
@@ -18,15 +19,17 @@ import NIOCore
 /// into independent storage. Temporary owned buffers are released after use. Borrowed slices have
 /// no SIMD alignment guarantee and retain the eviction tradeoff documented by the coordinator.
 ///
-/// Prefetching and inventory preloading return after scheduling background work. Fully cached linear
-/// ranges receive page advice directly; mixed ranges go to the coordinator. WILLNEED advice covers
-/// only pages intersecting the requested bytes, while backend misses fetch whole blocks. Preloading
+/// Prefetching returns after scheduling; inventory preloading waits for backend deliveries.
+/// Prefetch advises cached pages intersecting the requested bytes; preload skips
+/// cached blocks without page advice. Backend misses fetch whole blocks. Preloading
 /// clips ranges from an older file revision to the current size. Active-block tracking can scale
-/// recently accessed ranges for a replacement file, and deletion removes sufficiently old entries.
+/// recently accessed ranges for a replacement file. Retired readers delete their cached entries
+/// only when their final reference is released.
 public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheStorable>: OmFileReaderBackend, Sendable {
     public let backend: Backend
     private let coordinator: AtomicCacheCoordinator<Cache>
     let cacheKey: UInt64
+    private let deleteOnDeinit = Atomic(false)
     
     public typealias DataType = Data
     
@@ -38,9 +41,10 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         self.cacheKey = cacheKey
     }
     
-    /// Derive this file's block key, preserving the existing wrapping hash and absolute block index. O(1).
-    func calculateCacheKey(block: Int) -> UInt64 {
-        coordinator.calculateCacheKey(fileKey: cacheKey, block: block)
+    deinit {
+        if deleteOnDeinit.load(ordering: .relaxed) {
+            _ = deleteCachedBlocks(olderThanSeconds: 0)
+        }
     }
 
     /// Apply memory advice only to cached pages intersecting the requested file byte range.
@@ -54,7 +58,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         for block in blocks {
             let blockStart = block * blockSize
             let requested = dataRange.clamped(to: blockStart..<(blockStart + blockSize))
-            coordinator.cache.advise(key: calculateCacheKey(block: block),
+            coordinator.cache.advise(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: block),
                                byteRange: (requested.lowerBound - blockStart)..<(requested.upperBound - blockStart), advice: advice)
         }
     }
@@ -86,7 +90,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
             let blockStart = blocks.lowerBound * blockSize
             let requested = byteRange.clamped(to: blockStart..<(blocks.upperBound * blockSize))
             let localBytes = (requested.lowerBound - blockStart)..<(requested.upperBound - blockStart)
-            let key = calculateCacheKey(block: blocks.lowerBound)
+            let key = coordinator.calculateCacheKey(fileKey: cacheKey, block: blocks.lowerBound)
 
             if let cached = coordinator.cache.get(key: key, count: UInt64(blocks.count)) {
                 let offset = coordinator.cache.data.withMutableUnsafeBytes { UnsafeRawPointer($0.baseAddress!).distance(to: cached.baseAddress!) }
@@ -94,7 +98,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
                 continue
             }
             try await coordinator.prefetch(key: key, count: blocks.count, byteRange: localBytes, deadline: deadline,
-                                     superBlockKey: calculateCacheKey(block: superBlockStart), provider: { [self] fetchKey, count in
+                                     superBlockKey: coordinator.calculateCacheKey(fileKey: cacheKey, block: superBlockStart), provider: { [self] fetchKey, count in
                 let block = Int(UInt64(blocks.lowerBound) &+ (fetchKey &- key))
                 let start = block * blockSize
                 return try await backend.getData(offset: start, count: min((block + count) * blockSize, fileSize) - start)
@@ -121,13 +125,14 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         let start = offset - blockRange.lowerBound * blockSize
         let localBytes = start..<(start + count)
         if blockRange.lowerBound / coordinator.superBlockLength == (blockRange.upperBound - 1) / coordinator.superBlockLength,
-           let cached = coordinator.cache.get(key: calculateCacheKey(block: blockRange.lowerBound), count: UInt64(blockRange.count)) {
+           let cached = coordinator.cache.get(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: blockRange.lowerBound), count: UInt64(blockRange.count)) {
             return .borrowed(UnsafeRawBufferPointer(rebasing: cached[localBytes]))
         }
         let fileSize = backend.count
+        // Backend work retains this reader so retirement cleanup cannot run before its final cache write.
         return try await coordinator.get(fileKey: cacheKey, blockRange: blockRange, byteRange: localBytes,
                                    deadline: .now.advanced(by: allowedWait),
-                                   provider: { [backend] block, count in
+                                   provider: { [self] block, count in
             let start = Int(block) * blockSize
             return try await backend.getData(offset: start, count: min((Int(block) + count) * blockSize, fileSize) - start)
         })
@@ -163,7 +168,7 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         let blockSize = coordinator.cache.blockSize
         let blocks = 0..<totalCount.divideRoundedUp(divisor: blockSize)
         var activeRanges = [Range<Int>]()
-        for block in blocks where coordinator.cache.get(key: calculateCacheKey(block: block), maxAccessedAgeInSeconds: maxAgeSeconds) != nil {
+        for block in blocks where coordinator.cache.get(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: block), maxAccessedAgeInSeconds: maxAgeSeconds) != nil {
             if activeRanges.last?.upperBound == block {
                 activeRanges[activeRanges.count - 1] = activeRanges.last!.lowerBound..<(block + 1)
             } else {
@@ -198,6 +203,19 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         return scaledRanges
     }
     
+    /// Count this file's cached blocks regardless of age, without refreshing access timestamps.
+    /// Scans file blocks with bounded cache lookups and no allocations. Concurrent eviction or writes
+    /// can change the count; this is a snapshot for logging, not a reservation of cache entries.
+    public func countCachedBlocks() -> Int {
+        var count = 0
+        for block in 0..<backend.count.divideRoundedUp(divisor: coordinator.cache.blockSize) {
+            if coordinator.cache.contains(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: block)) {
+                count += 1
+            }
+        }
+        return count
+    }
+
     /// Remove this file's cached blocks last accessed more than `olderThanSeconds` ago.
     /// Return the number removed. Visits the file's block ranges without fetching data or cancelling
     /// in-flight work; a concurrent fetch may populate the cache again.
@@ -209,31 +227,29 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         var deletedCount = 0
         for superBlock in superBlocks {
             let blocks = (superBlock * coordinator.superBlockLength ..< (superBlock + 1) * coordinator.superBlockLength).clamped(to: blocks)
-            deletedCount += coordinator.cache.delete(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count), olderThanSeconds: olderThanSeconds)
+            deletedCount += coordinator.cache.delete(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: blocks.lowerBound), count: UInt64(blocks.count), olderThanSeconds: olderThanSeconds)
         }
         return deletedCount
     }
     
-    /// Preload absolute block-index ranges after rotating files, with a 30-second scheduling allowance.
-    /// Clamp old ranges to the current file size, skip empty ranges, and clip the final block at EOF.
-    /// Cached blocks receive WILLNEED advice for their requested bytes; missing blocks fetch in the
-    /// background. The reader splits super blocks; the coordinator shares overlapping work.
-    /// Returns after scheduling, not backend completion. Cancellation or queue exhaustion may throw
-    /// after earlier ranges have been registered; backend failures are not returned. Work is proportional
-    /// to the examined blocks plus coordinator scheduling, without an output-buffer allocation.
+    /// Mark a replaced or deleted file for cache cleanup when its final reference is released. O(1).
+    /// All blocks remain available to live readers and backend jobs until deinit. Ordinary reader
+    /// eviction leaves cache contents intact; retirement itself does not delete any blocks.
+    public func deleteCachedBlocksOnDeinit() {
+        deleteOnDeinit.store(true, ordering: .relaxed)
+    }
+
+    /// Preload block ranges with a 30-second scheduling allowance and await all backend deliveries.
+    /// Clip old ranges to this file's size and skip cached blocks without page advice. All ranges
+    /// are registered before waiting, without allocating or copying an output buffer. Errors propagate
+    /// and leave shared fetches running. Loaded blocks remain subject to normal cache eviction.
     public func preloadBlocks(blocks: [Range<Int>]) async throws {
         let blockSize = coordinator.cache.blockSize
-        let totalCount = self.backend.count
-        let totalBlockCount = totalCount.divideRoundedUp(divisor: blockSize)
-        for range in blocks {
-            let range = range.clamped(to: 0..<totalBlockCount)
-            guard !range.isEmpty else {
-                /// The list of blocks is from an older file revision.
-                /// The new file could be smaller and contain fewer blocks.
-                continue
-            }
-            try await prefetch(byteRange: (range.lowerBound * blockSize)..<min(range.upperBound * blockSize, totalCount),
-                               allowedWait: .seconds(30))
-        }
+        let fileSize = backend.count
+        try await coordinator.preload(fileKey: cacheKey, blockRanges: blocks, fileSize: fileSize,
+                                      deadline: .now.advanced(by: .seconds(30)), provider: { [self] block, count in
+            let start = Int(block) * blockSize
+            return try await backend.getData(offset: start, count: min((Int(block) + count) * blockSize, fileSize) - start)
+        })
     }
 }

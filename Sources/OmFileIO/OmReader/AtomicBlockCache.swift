@@ -178,6 +178,20 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
+    /// Check for a committed block regardless of age, without reading its data or refreshing LRU.
+    /// Examines at most 1,024 candidate slots and allocates no storage.
+    func contains(key: UInt64) -> Bool {
+        let blockCount = blockCount
+        return data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            for lookAhead: UInt64 in 0..<1024 {
+                let entry = entries[Int((key &+ lookAhead) % UInt64(blockCount))].load(ordering: .relaxed)
+                if entry.first == key && entry.second & 0x1 == 1 { return true }
+            }
+            return false
+        }
+    }
+
     /// Find key in cache, updates the LRU timestamp and returns a pointer to the memory region. There is a slight chance, that data is modified while reading, but it should practically never happen
     func get(key: UInt64, maxAccessedAgeInSeconds: UInt) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
@@ -281,8 +295,10 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 guard entry.second <= olderThan else {
                     continue
                 }
-                entries[slot].store(.init(first: 0, second: 0), ordering: .relaxed)
-                deleted += 1
+                // A concurrent writer or reader may have replaced/refreshed this entry since the load.
+                if entries[slot].compareExchange(expected: entry, desired: .init(first: 0, second: 0), ordering: .relaxed).exchanged {
+                    deleted += 1
+                }
             }
             return deleted
         }

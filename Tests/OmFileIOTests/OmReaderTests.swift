@@ -82,7 +82,7 @@ import OmFileFormat
 
         #expect(reader.listOfActiveBlocks(maxAgeSeconds: 60) == [blocks])
         for block in blocks {
-            let cached = try #require(cache.get(key: reader.calculateCacheKey(block: block), count: 1))
+            let cached = try #require(cache.get(key: coordinator.calculateCacheKey(fileKey: reader.cacheKey, block: block), count: 1))
             let cachedAddress = UInt(bitPattern: cached.baseAddress!)
             // A single-block hit must borrow the cache buffer, including after 8 MB.
             try await reader.withData(offset: block * blockSize + 17, count: 31) { data in
