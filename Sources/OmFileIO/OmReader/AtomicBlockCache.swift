@@ -2,6 +2,7 @@ import Foundation
 import OmFileFormat
 import Synchronization
 #if os(Linux)
+import CHelper
 import Glibc
 #endif
 
@@ -23,7 +24,7 @@ extension MmapFile: AtomicBlockCacheStorable {
         guard count > 0 else { return }
         #if os(Linux)
         // Submit only this range, retaining cached pages. Queue pressure may still block.
-        let result = sync_file_range(file.fileDescriptor, off_t(offset), off_t(count), UInt32(SYNC_FILE_RANGE_WRITE))
+        let result = om_request_writeback(file.fileDescriptor, Int64(offset), Int64(count))
         #else
         // msync requires a page-aligned address and flushes all intersecting pages.
         let pageSize = Int(getpagesize())
