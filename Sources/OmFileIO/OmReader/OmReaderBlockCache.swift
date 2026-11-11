@@ -110,9 +110,9 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     /// Prepare a valid file byte range and borrow contiguous cache hits without an actor hop.
     /// Misses use one actor call to register all ranges and await shared completion. `allowedWait`
     /// controls queue ordering; scheduling, backend, and cancellation errors propagate to the caller.
-    /// An owned result must be deallocated; borrowed cache storage remains unpinned. Range preparation
+    /// An owned result is released automatically; borrowed cache storage remains unpinned. Range preparation
     /// is O(1), cache lookup examines the requested blocks, and misses incur coordinator scheduling.
-    func fetch(offset: Int, count: Int, allowedWait: Duration = .zero) async throws -> DataOwnership {
+    func fetch(offset: Int, count: Int, allowedWait: Duration = .zero) async throws -> OwnedOrBorrowedBuffer {
         precondition(offset >= 0 && count >= 0 && allowedWait >= .zero)
         try Task.checkCancellation()
         guard count > 0 else { return .borrowed(UnsafeRawBufferPointer(start: nil, count: 0)) }
@@ -138,41 +138,20 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
     /// cache storage remains unpinned. Propagates both read errors and errors thrown by `fn`.
     /// Adds no copy beyond those required by the coordinator.
     public func withData<T: Sendable>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
-        switch try await fetch(offset: offset, count: count) {
-        case .borrowed(let data):
-            return try fn(data)
-        case .owned(let data):
-            defer { data.deallocate() }
-            return try fn(data)
-        }
+        let result = try await fetch(offset: offset, count: count)
+        return try result.withUnsafeBytes(fn)
     }
-    
-    /// Read a valid file byte range into an independent NIO buffer, propagating read errors.
-    /// Copies O(count) bytes and releases any temporary owned read storage.
+
+    /// Read into independent NIO storage, copying bytes and automatically releasing temporary allocations.
     public func getByteBuffer(offset: Int, count: Int) async throws -> ByteBuffer {
-        switch try await fetch(offset: offset, count: count) {
-        case .borrowed(let data):
-            return ByteBufferAllocator().buffer(bytes: data)
-        case .owned(let data):
-            let bb = ByteBufferAllocator().buffer(bytes: data)
-            data.deallocate()
-            return bb
-        }
+        let result = try await fetch(offset: offset, count: count)
+        return result.withUnsafeBytes { ByteBufferAllocator().buffer(bytes: $0) }
     }
-    
-    /// Read a valid file byte range into `Data` whose lifetime is independent of the cache.
-    /// Copies borrowed bytes in O(count); transfers owned storage to `Data` without another copy.
-    /// Propagates scheduling, backend, and cancellation errors.
+
+    /// Copy borrowed bytes or transfer an owned allocation into independent Foundation storage.
     public func getData(offset: Int, count: Int) async throws -> Data {
-        switch try await fetch(offset: offset, count: count) {
-        case .borrowed(let data):
-            // Copy data
-            return Data(data)
-        case .owned(let data):
-            // Reuse existing buffer
-            let ptr = UnsafeMutableRawPointer(mutating: data.baseAddress!)
-            return Data(bytesNoCopy: ptr, count: count, deallocator: .free)
-        }
+        let result = try await fetch(offset: offset, count: count)
+        return result.intoData()
     }
     
     /// Return sorted, coalesced ranges of cached blocks accessed within `maxAgeSeconds`.

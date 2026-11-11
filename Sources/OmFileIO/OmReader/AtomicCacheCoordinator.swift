@@ -1,14 +1,5 @@
 import Foundation
 
-/// Result storage: callers must release owned buffers and must never release borrowed cache memory.
-enum DataOwnership: Sendable {
-    /// Only usable for a short time. Must not be freed.
-    case borrowed(UnsafeRawBufferPointer)
-
-    /// The caller owns this allocation and must call `deallocate()` exactly once after use.
-    case owned(UnsafeRawBufferPointer)
-}
-
 /// Coordinates backend concurrency, shared block fetches, and result assembly for an atomic cache.
 /// `OmReaderBlockCache` handles file byte ranges, contiguous cache hits, and cached-page advice.
 /// This actor receives explicit ranges, deadlines, and providers; it does not depend on a reader
@@ -34,7 +25,7 @@ enum DataOwnership: Sendable {
 ///
 /// A read within one super block borrows cache storage when its delivered bytes are contiguous,
 /// including after a miss; otherwise it copies into owned storage. Reads crossing super blocks
-/// allocate once up front. Owned results are 32-byte aligned and must be deallocated by the caller.
+/// allocate once up front. Owned results are 32-byte aligned and are released automatically.
 /// Borrowed slices may have arbitrary alignment and must never be freed. Prefetches allocate no
 /// result buffer and return after scheduling; mixed ranges advise only the requested cached pages.
 ///
@@ -59,29 +50,42 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// A queued job may expand in either direction within its super block, beyond the original request.
     typealias FetchProvider = @Sendable (_ key: Key, _ count: Int) async throws -> any ContiguousBytes & Sendable
 
+    /// Raw assembly storage, transferred once through the continuation before gaining an owner.
+    private enum ReadStorage: Sendable {
+        // Borrowed spans may begin after the start of the result until earlier blocks arrive.
+        case borrowed(UnsafeRawBufferPointer, offset: Int)
+        // Keep capacity and delivered extent separate for partial final blocks.
+        case owned(UnsafeMutableRawBufferPointer, receivedEnd: Int)
+
+        /// Take ownership of completed storage without copying bytes. Call exactly once after delivery.
+        consuming func takeResult() -> OwnedOrBorrowedBuffer {
+            switch self {
+            case .owned(let buffer, let receivedEnd):
+                return .owned(OwnedRawBuffer(UnsafeRawBufferPointer(start: buffer.baseAddress, count: receivedEnd)))
+            case .borrowed(let buffer, _):
+                return .borrowed(buffer)
+            }
+        }
+    }
+
     /// Assembles one read on the actor. Single ranges borrow until a noncontiguous block arrives;
     /// reads across super blocks start with an allocation. Waiters identify byte positions, not cache keys.
     private final class ReadRequest {
         let byteRange: Range<Int>
-        let continuation: CheckedContinuation<DataOwnership, Error>
+        let continuation: CheckedContinuation<ReadStorage, Error>
         // The extra completion keeps cached deliveries from finishing during registration.
         var pendingCompletions = 1
-        private enum ReadStorage {
-            // Borrowed spans may begin after the start of the result until earlier blocks arrive.
-            case borrowed(UnsafeRawBufferPointer, offset: Int)
-            // Keep capacity in the buffer and the delivered extent separately for partial final blocks.
-            case owned(UnsafeMutableRawBufferPointer, receivedEnd: Int)
-        }
         private var storage: ReadStorage?
 
         /// Create a request for bytes relative to the first requested block. `allocate` reserves the
         /// final output immediately; otherwise the request borrows until noncontiguous data arrives.
         /// The initial completion sentinel must be released after all blocks have been registered.
-        init(byteRange: Range<Int>, allocate: Bool, continuation: CheckedContinuation<DataOwnership, Error>) {
+        init(byteRange: Range<Int>, allocate: Bool, continuation: CheckedContinuation<ReadStorage, Error>) {
             self.byteRange = byteRange
             self.continuation = continuation
             if allocate {
-                storage = .owned(.allocate(byteCount: byteRange.count, alignment: 32), receivedEnd: 0) // 32-byte alignment for 256-bit SIMD.
+                let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: byteRange.count, alignment: 32) // 32-byte alignment for 256-bit SIMD.
+                storage = .owned(buffer, receivedEnd: 0)
             }
         }
 
@@ -110,14 +114,12 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         } else {
                             let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: byteRange.count, alignment: 32) // 32-byte alignment for 256-bit SIMD.
                             previous.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: buffer[borrowedOffset..<(borrowedOffset + previous.count)]))
-                            storage = .owned(buffer, receivedEnd: borrowedOffset + previous.count)
+                            source.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: buffer[destinationOffset..<(destinationOffset + source.count)]))
+                            storage = .owned(buffer, receivedEnd: max(borrowedOffset + previous.count, destinationOffset + source.count))
                         }
                     case nil:
                         storage = .borrowed(source, offset: destinationOffset)
-                    case .owned?:
-                        break
-                    }
-                    if case .owned(let output, let receivedEnd)? = storage {
+                    case .owned(let output, let receivedEnd)?:
                         source.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: output[destinationOffset..<(destinationOffset + source.count)]))
                         storage = .owned(output, receivedEnd: max(receivedEnd, destinationOffset + source.count))
                     }
@@ -140,21 +142,13 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         }
 
         /// Account for a delivery or release the registration sentinel. The last completion transfers
-        /// ownership to the caller; a failed request cannot resume again. O(1).
+        /// storage to the caller; a failed request cannot resume again. O(1).
         func completeOne() {
             guard pendingCompletions > 0 else { return }
             pendingCompletions -= 1
             guard pendingCompletions == 0 else { return }
-            let result: DataOwnership
-            switch storage {
-            case .owned(let buffer, let receivedEnd)?:
-                result = .owned(UnsafeRawBufferPointer(start: buffer.baseAddress, count: receivedEnd))
-            case .borrowed(let buffer, _)?:
-                result = .borrowed(buffer)
-            case nil:
-                result = .borrowed(UnsafeRawBufferPointer(start: nil, count: 0))
-            }
-            storage = nil // Transfer ownership to the caller.
+            let result = storage ?? .borrowed(UnsafeRawBufferPointer(start: nil, count: 0), offset: 0)
+            storage = nil // Late waiters must no longer retain the transferred allocation.
             continuation.resume(returning: result)
         }
     }
@@ -368,10 +362,12 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     func get(
         fileKey: Key, blockRange: Range<Int>, byteRange: Range<Int>,
         deadline: ContinuousClock.Instant, provider: @escaping FetchProvider
-    ) async throws -> DataOwnership {
+    ) async throws -> OwnedOrBorrowedBuffer {
         try Task.checkCancellation()
-        let result = try await withCheckedThrowingContinuation { continuation in
-            let spansSuperBlocks = blockRange.lowerBound / superBlockLength != (blockRange.upperBound - 1) / superBlockLength
+        let spansSuperBlocks = blockRange.lowerBound / superBlockLength != (blockRange.upperBound - 1) / superBlockLength
+
+        // Transfer raw storage through the copyable continuation, then wrap owned allocations once.
+        let storage = try await withCheckedThrowingContinuation { continuation in
             let request = ReadRequest(byteRange: byteRange, allocate: spansSuperBlocks, continuation: continuation)
             do {
                 var lowerBound = blockRange.lowerBound
@@ -393,13 +389,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             }
             request.completeOne()
         }
-        do {
-            try Task.checkCancellation()
-            return result
-        } catch {
-            if case .owned(let buffer) = result { buffer.deallocate() }
-            throw error
-        }
+        let result = storage.takeResult()
+        try Task.checkCancellation() // OwnedRawBuffer releases owned storage if cancellation throws.
+        return result
     }
 
     /// Reserve and schedule missing ranges without suspension. Backend tasks cannot complete any

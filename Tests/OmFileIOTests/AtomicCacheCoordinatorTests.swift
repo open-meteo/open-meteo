@@ -27,7 +27,7 @@ private struct ProviderReaderBackend: OmFileReaderBackend {
 // Inspect returned ownership without retaining borrowed pointers beyond this read.
 extension AtomicCacheCoordinator {
     nonisolated func get(fileKey: UInt64, byteRange: Range<Int>, allowedWait: Duration = .zero,
-                         provider: @escaping FetchProvider) async throws -> DataOwnership {
+                         provider: @escaping FetchProvider) async throws -> OwnedOrBorrowedBuffer {
         let reader = OmReaderBlockCache(backend: ProviderReaderBackend(blockSize: cache.blockSize, provider: provider), cache: self, cacheKey: fileKey)
         return try await reader.fetch(offset: byteRange.lowerBound, count: byteRange.count, allowedWait: allowedWait)
     }
@@ -50,14 +50,11 @@ extension AtomicCacheCoordinator {
     ) async throws {
         let result = try await get(fileKey: fileKey, byteRange: (Int(key) * cache.blockSize)..<((Int(key) + count) * cache.blockSize),
                                    allowedWait: allowedWait, provider: provider)
-        let bytes: UnsafeRawBufferPointer
-        switch result {
-        case .borrowed(let buffer), .owned(let buffer): bytes = buffer
-        }
-        defer { if case .owned = result { bytes.deallocate() } }
-        for block in 0..<count {
-            let range = block * cache.blockSize..<min((block + 1) * cache.blockSize, bytes.count)
-            check(key &+ UInt64(block), UnsafeRawBufferPointer(rebasing: bytes[range]))
+        result.withUnsafeBytes { bytes in
+            for block in 0..<count {
+                let range = block * cache.blockSize..<min((block + 1) * cache.blockSize, bytes.count)
+                check(key &+ UInt64(block), UnsafeRawBufferPointer(rebasing: bytes[range]))
+            }
         }
     }
 
@@ -140,6 +137,31 @@ private struct GatedReaderBackend: OmFileReaderBackend {
 }
 
 struct AtomicCacheCoordinatorTests {
+    @Test(arguments: [0, 64, 128])
+    func ownedRawBufferTransfersDeliveredBytes(count: Int) {
+        let allocation = UnsafeMutableRawBufferPointer.allocate(byteCount: 128, alignment: 32)
+        allocation.initializeMemory(as: UInt8.self, repeating: 42)
+        let owner = OwnedRawBuffer(UnsafeRawBufferPointer(start: allocation.baseAddress, count: count))
+        let data = owner.intoData()
+        #expect(data == Data(repeating: 42, count: count))
+        if count > 0 {
+            data.withUnsafeBytes { #expect($0.baseAddress == UnsafeRawPointer(allocation.baseAddress)) }
+        }
+    }
+
+    @Test func ownedRawBufferSurvivesThrowingBorrow() throws {
+        enum Failure: Error { case expected }
+        let allocation = UnsafeMutableRawBufferPointer.allocate(byteCount: 64, alignment: 32)
+        allocation.initializeMemory(as: UInt8.self, repeating: 42)
+        let owner = OwnedRawBuffer(UnsafeRawBufferPointer(allocation))
+        do {
+            try owner.withUnsafeBytes { _ in throw Failure.expected }
+            Issue.record("Expected the borrowing closure to throw")
+        } catch Failure.expected {}
+        // Throwing from a borrow must not consume or free the owner.
+        owner.withUnsafeBytes { #expect(Data($0) == Data(repeating: 42, count: 64)) }
+    }
+
     @Test(arguments: [false, true])
     func readerSchedulesSuperBlocksTogetherAndStopsWritesOnError(fail: Bool) async throws {
         let cache = try coordinator(limit: 2)
@@ -177,10 +199,16 @@ struct AtomicCacheCoordinatorTests {
         let boundary = cache.superBlockLength
         let blocks = (boundary - 2)..<(boundary + 2)
         let tasks = (0..<2).map { _ in Task {
-            try await cache.get(fileKey: 123, byteRange: (blocks.lowerBound * 64 + (trim ? 7 : 0))..<(blocks.upperBound * 64 - (trim ? 7 : 0)),
+            let result = try await cache.get(fileKey: 123, byteRange: (blocks.lowerBound * 64 + (trim ? 7 : 0))..<(blocks.upperBound * 64 - (trim ? 7 : 0)),
                                 provider: { key, count in
                 try await probe.fetch(key: key, count: count)
             })
+            switch consume result {
+            case .owned(let buffer): return buffer.intoData()
+            case .borrowed(let buffer):
+                Issue.record("Cross-super-block reads must own their storage")
+                return Data(buffer)
+            }
         } }
         let firstKey = cache.calculateCacheKey(fileKey: 123, block: blocks.lowerBound)
         let lastKey = cache.calculateCacheKey(fileKey: 123, block: boundary)
@@ -193,9 +221,7 @@ struct AtomicCacheCoordinatorTests {
         let expected = blocks.reduce(into: Data()) { $0.append(Data(repeating: UInt8(truncatingIfNeeded: $1), count: 64)) }
         for task in tasks {
             let result = try await task.value
-            guard case .owned(let bytes) = result else { Issue.record("Cross-super-block reads must own their storage"); continue }
-            defer { bytes.deallocate() }
-            #expect(Data(bytes) == expected.subdata(in: trim ? 7..<249 : 0..<256))
+            #expect(result == expected.subdata(in: trim ? 7..<249 : 0..<256))
         }
     }
 
@@ -204,9 +230,10 @@ struct AtomicCacheCoordinatorTests {
         let cache = try coordinator(limit: 1, pendingLimit: 1, blockSize: 8 * 1024 * 1024, blockCount: 4)
         let probe = FetchProbe()
         let task = Task {
-            try await cache.get(fileKey: 123, byteRange: cache.cache.blockSize..<(4 * cache.cache.blockSize), provider: { key, count in
+            let result = try await cache.get(fileKey: 123, byteRange: cache.cache.blockSize..<(4 * cache.cache.blockSize), provider: { key, count in
                 try await probe.fetch(key: key, count: count)
             })
+            return result.intoData()
         }
         await #expect(throws: Coordinator.CacheCoordinatorError.pendingQueueFull) { try await task.value }
         try await waitUntil { await probe.started == [1] }
@@ -241,9 +268,15 @@ struct AtomicCacheCoordinatorTests {
         let returned = Mutex(false)
         let reader = Task {
             defer { returned.withLock { $0 = true } }
-            return try await cache.get(fileKey: 0, byteRange: 64..<256, provider: { key, count in
+            let result = try await cache.get(fileKey: 0, byteRange: 64..<256, provider: { key, count in
                 try await probe.fetch(key: key, count: count)
             })
+            switch consume result {
+            case .borrowed(let buffer): return Data(buffer)
+            case .owned(let buffer):
+                Issue.record("Out-of-order linear cache blocks should still be borrowed")
+                return buffer.intoData()
+            }
         }
         try await waitUntil { await probe.started.count == 2 }
         await probe.finish(3, fail: fail)
@@ -258,15 +291,7 @@ struct AtomicCacheCoordinatorTests {
             #expect(!returned.withLock { $0 })
             await probe.finish(1)
             let result = try await reader.value
-            let bytes: UnsafeRawBufferPointer
-            switch result {
-            case .borrowed(let buffer): bytes = buffer
-            case .owned(let buffer):
-                bytes = buffer
-                Issue.record("Out-of-order linear cache blocks should still be borrowed")
-            }
-            defer { if case .owned = result { bytes.deallocate() } }
-            #expect(Data(bytes) == Data(repeating: 1, count: 64) + Data(repeating: 2, count: 64) + Data(repeating: 3, count: 64))
+            #expect(result == Data(repeating: 1, count: 64) + Data(repeating: 2, count: 64) + Data(repeating: 3, count: 64))
         }
     }
 
@@ -288,9 +313,8 @@ struct AtomicCacheCoordinatorTests {
                 #expect(bytes.baseAddress == cached.baseAddress?.advanced(by: requested.lowerBound))
                 #expect(Data(bytes) == expected)
             case .owned(let bytes):
-                defer { bytes.deallocate() }
                 #expect(key == 1023)
-                #expect(Data(bytes) == expected)
+                bytes.withUnsafeBytes { #expect(Data($0) == expected) }
             }
         }
     }
@@ -1178,9 +1202,10 @@ struct AtomicCacheCoordinatorTests {
         let returned = Mutex(false)
         let reader = Task {
             defer { returned.withLock { $0 = true } }
-            return try await cache.get(fileKey: 0, byteRange: 64..<(6 * 64), allowedWait: .zero, provider: { key, count in
+            let result = try await cache.get(fileKey: 0, byteRange: 64..<(6 * 64), allowedWait: .zero, provider: { key, count in
                 try await probe.fetch(key: key, count: count)
             })
+            return result.intoData()
         }
         try await waitUntil { await probe.started.count == 1 }
         #expect(await cache.queuedFetchCount == 1)
@@ -1209,10 +1234,9 @@ struct AtomicCacheCoordinatorTests {
             return Data(repeating: UInt8(truncatingIfNeeded: key), count: blockSize)
         })
         guard case .owned(let bytes) = result else { Issue.record("Cross-super-block reads must allocate"); return }
-        defer { bytes.deallocate() }
         let first = UInt8(truncatingIfNeeded: cache.superBlockLength - 1)
         let second = UInt8(truncatingIfNeeded: cache.superBlockLength)
-        #expect(Data(bytes) == Data(repeating: first, count: blockSize) + Data(repeating: second, count: blockSize))
+        bytes.withUnsafeBytes { #expect(Data($0) == Data(repeating: first, count: blockSize) + Data(repeating: second, count: blockSize)) }
     }
 
     @Test func runningRangeSharesEveryRegisteredBlock() async throws {
