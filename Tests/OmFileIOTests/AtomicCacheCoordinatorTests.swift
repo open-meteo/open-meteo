@@ -137,6 +137,45 @@ private struct GatedReaderBackend: OmFileReaderBackend {
 }
 
 struct AtomicCacheCoordinatorTests {
+    @Test func cacheMetricsTrackQueueingBatchingAndPreloads() async throws {
+        let cache = try coordinator(limit: 1, pendingLimit: 2)
+        let probe = FetchProbe()
+        let initialBytes = OmFileSystemMetrics.blockCacheFetchedBytesTotal.load(ordering: .relaxed)
+        let initialMerged = OmFileSystemMetrics.blockCacheMergedBlocksTotal.load(ordering: .relaxed)
+        let initialFull = OmFileSystemMetrics.blockCacheQueueFullTotal.load(ordering: .relaxed)
+        let initialPreload = OmFileSystemMetrics.blockCachePreloadsBytesTotal.load(ordering: .relaxed)
+        let running = request(cache, probe, key: 100, allowedWait: .zero)
+        try await waitUntil { await probe.started == [100] }
+        let left = request(cache, probe, key: 5, allowedWait: .zero, mergeAdjacent: true)
+        try await waitUntil { await cache.queuedFetchCount == 1 }
+        let right = request(cache, probe, key: 7, allowedWait: .zero, mergeAdjacent: true)
+        try await waitUntil { await cache.queuedFetchCount == 2 }
+        // Metrics aggregate all coordinators, including other concurrently running tests.
+        #expect(OmFileSystemMetrics.blockCacheFetchesRunning.load(ordering: .relaxed) >= 1)
+        #expect(OmFileSystemMetrics.blockCacheFetchesQueued.load(ordering: .relaxed) >= 2)
+        let rejected = request(cache, probe, key: 20, allowedWait: .zero)
+        await #expect(throws: Coordinator.CacheCoordinatorError.pendingQueueFull) { try await rejected.value }
+        #expect(OmFileSystemMetrics.blockCacheQueueFullTotal.load(ordering: .relaxed) >= initialFull + 1)
+        let bridge = request(cache, probe, key: 6, allowedWait: .zero, mergeAdjacent: true)
+        try await waitUntil { await cache.testWaiterCount(forBlock: 6) == 1 }
+        #expect(await cache.queuedFetchCount == 1)
+        #expect(OmFileSystemMetrics.blockCacheFetchesQueued.load(ordering: .relaxed) >= 1)
+        await probe.finish(100)
+        try await waitUntil { await probe.started == [100, 5] }
+        #expect(await probe.startedCounts == [1, 3])
+        #expect(OmFileSystemMetrics.blockCacheMergedBlocksTotal.load(ordering: .relaxed) >= initialMerged + 2)
+        await probe.finish(5)
+        for task in [running, left, right, bridge] { try await task.value }
+        #expect(OmFileSystemMetrics.blockCacheFetchedBytesTotal.load(ordering: .relaxed) >= initialBytes + 256)
+
+        let reader = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 7, count: 100)), cache: cache, cacheKey: 789)
+        cache.cache.set(key: cache.calculateCacheKey(fileKey: reader.cacheKey, block: 0), value: Data(repeating: 7, count: 64))
+        try await reader.preloadBlocks(blocks: [-2..<4, 9..<10])
+        // Preload volume includes the 64 cached bytes, but backend volume adds only the 36-byte tail.
+        #expect(OmFileSystemMetrics.blockCachePreloadsBytesTotal.load(ordering: .relaxed) >= initialPreload + 100)
+        #expect(OmFileSystemMetrics.blockCacheFetchedBytesTotal.load(ordering: .relaxed) >= initialBytes + 292)
+    }
+
     @Test(arguments: [0, 64, 128])
     func ownedRawBufferTransfersDeliveredBytes(count: Int) {
         let allocation = UnsafeMutableRawBufferPointer.allocate(byteCount: 128, alignment: 32)

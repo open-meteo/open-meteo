@@ -270,6 +270,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         if let other {
             let deadline = queuedFetches.priority(for: other.queueKey)!
             queuedFetches.remove(key: other.queueKey)
+            OmFileSystemMetrics.blockCacheFetchesQueued.subtract(1, ordering: .relaxed)
             // Keep the earliest deadline across the combined requests.
             queuedFetches.decreasePriority(for: fetch.queueKey, to: deadline)
         }
@@ -291,15 +292,23 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// Each job costs O(B + W + log Q) bookkeeping for B blocks, W deliveries, and Q queued jobs,
     /// plus backend I/O, cache access, and byte copying. The slot is released when the queue is empty.
     private func run(key: Key, count: Int, provider: @escaping FetchProvider) async {
-        defer { activeFetches -= 1 }
+        defer {
+            activeFetches -= 1
+            OmFileSystemMetrics.blockCacheFetchesRunning.subtract(1, ordering: .relaxed)
+        }
         var start = key
         var blockCount = count
         var fetch = provider
         // Reuse this task and its backend slot until the queue is empty.
         while true {
+            // Count batching once when the final range starts, not on each merge or promotion.
+            if blockCount > 1 {
+                OmFileSystemMetrics.blockCacheMergedBlocksTotal.add(blockCount - 1, ordering: .relaxed)
+            }
             do {
                 let fetched = try await fetch(start, blockCount)
                 fetched.withUnsafeBytes { bytes in
+                    OmFileSystemMetrics.blockCacheFetchedBytesTotal.add(bytes.count, ordering: .relaxed)
                     assert(blockCount == bytes.count.divideRoundedUp(divisor: cache.blockSize))
                     for block in 0..<blockCount {
                         let key = start &+ UInt64(block)
@@ -318,6 +327,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                 }
             }
             guard let next = queuedFetches.popMin() else { break }
+            OmFileSystemMetrics.blockCacheFetchesQueued.subtract(1, ordering: .relaxed)
             start = next.startKey
             blockCount = next.blockCount
             fetch = next.provider
@@ -364,6 +374,8 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         let superBlockStart = start / superBlockLength * superBlockLength
                         let end = min(blocks.upperBound, superBlockStart + superBlockLength)
                         let key = calculateCacheKey(fileKey: fileKey, block: start)
+                        let requestedBytes = min(end * cache.blockSize, fileSize) - start * cache.blockSize
+                        OmFileSystemMetrics.blockCachePreloadsBytesTotal.add(requestedBytes, ordering: .relaxed)
                         if cache.get(key: key, count: UInt64(end - start)) == nil {
                             try schedule(key: key, count: end - start, deadline: deadline,
                                          superBlockKey: calculateCacheKey(fileKey: fileKey, block: superBlockStart),
@@ -534,15 +546,18 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         // Start directly from the range; only queued work needs a FetchJob allocation.
                         newStatus = .running
                         activeFetches += 1
+                        OmFileSystemMetrics.blockCacheFetchesRunning.add(1, ordering: .relaxed)
                         Task { [rangeBlockCount] in await run(key: key, count: rangeBlockCount, provider: provider) }
                     } else {
                         // Existing shared/merged jobs bypass this limit because they need no new entry.
                         guard queuedFetches.count < maxPendingFetches else {
+                            OmFileSystemMetrics.blockCacheQueueFullTotal.add(1, ordering: .relaxed)
                             throw CacheCoordinatorError.pendingQueueFull
                         }
                         let work = FetchJob(queueKey: key, superBlockKey: superBlockKey, blockCount: rangeBlockCount, provider: provider)
                         newStatus = .queued(work.queueKey)
                         queuedFetches.insert(key: work.queueKey, priority: deadline, value: work)
+                        OmFileSystemMetrics.blockCacheFetchesQueued.add(1, ordering: .relaxed)
                     }
                 }
             }
