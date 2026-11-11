@@ -491,6 +491,7 @@ public struct OmFileSystemS3: Sendable {
         private var directories = [String: Directory]()
         private var lastValidated = Timestamp(0)
         private var lastAccessed = Timestamp(0)
+        private var isRetired = false
         
         /// If set to an array, a revalidation is running in the background
         var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
@@ -506,6 +507,7 @@ public struct OmFileSystemS3: Sendable {
         
         /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
         func update(context: S3ServerHealth) async throws {
+            guard !isRetired else { return }
             let logger = context.logger
             guard revalidationQueue == nil else {
                 OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
@@ -519,9 +521,16 @@ public struct OmFileSystemS3: Sendable {
             }
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
+            defer {
+                // Also release waiters when retirement discards an in-flight listing.
+                let waiters = revalidationQueue
+                revalidationQueue = nil
+                waiters?.forEach { $0.resume() }
+            }
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
                 let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: HTTPClient.sharedRemoteData, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                guard !isRetired else { return }
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))
@@ -531,6 +540,7 @@ public struct OmFileSystemS3: Sendable {
                     assert(file.eTag.hasSuffix("\""))
                     if let existing = files[name] {
                         await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
+                        guard !isRetired else { return }
                     } else {
                         OmFileSystemMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
                         files[name] = File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
@@ -562,11 +572,6 @@ public struct OmFileSystemS3: Sendable {
                 }
 
                 lastValidated = .now()
-                let waiters = revalidationQueue
-                revalidationQueue = nil
-                waiters?.forEach({
-                    $0.resume()
-                })
             } catch {
                 let waiters = revalidationQueue
                 revalidationQueue = nil
@@ -579,6 +584,9 @@ public struct OmFileSystemS3: Sendable {
 
         /// Retire already-loaded descendants when their directory disappears from inventory.
         private func retireContents(context: S3ServerHealth) async {
+            // Set before any suspension so both pending and future listings are discarded.
+            guard !isRetired else { return }
+            isRetired = true
             let removedFiles = Array(files.values)
             let removedDirectories = Array(directories.values)
             files.removeAll()

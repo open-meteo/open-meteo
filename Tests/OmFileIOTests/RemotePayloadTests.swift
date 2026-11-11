@@ -155,6 +155,56 @@ struct RemotePayloadTests {
         try await app.asyncShutdown()
     }
 
+    @Test func retiredDirectoryDiscardsInFlightListing() async throws {
+        let app = try await Application.make(.testing)
+        let state = Mutex((removed: false, hold: false))
+        let gate = PrefetchGate()
+        do {
+            app.get { request async -> String in
+                let current = state.withLock { $0 }
+                if request.query[String.self, at: "prefix"] == "child/" {
+                    if current.hold { await gate.run() }
+                    return """
+                    <ListBucketResult><Contents><Key>child/test.om</Key><Size>1</Size>
+                    <LastModified>2026-11-11T12:00:00.000Z</LastModified>
+                    <ETag>&quot;old&quot;</ETag></Contents>
+                    <CommonPrefixes><Prefix>child/nested/</Prefix></CommonPrefixes></ListBucketResult>
+                    """
+                }
+                return current.removed ? "<ListBucketResult/>" : "<ListBucketResult><CommonPrefixes><Prefix>child/</Prefix></CommonPrefixes></ListBucketResult>"
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let context = S3ServerHealth(logger: .init(label: "test"), servers: [
+                .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
+            ], checksHealth: false)
+            let parent = OmFileSystemS3.Directory(prefix: "")
+            try await parent.update(context: context)
+            let child = try #require(await parent.getDirectory(name: "child", context: context))
+            let file = try #require(await child.getFile(name: "test.om"))
+            let payload = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
+            state.withLock { $0 = (removed: true, hold: true) }
+            let updating = Task { try await child.update(context: context) }
+            await gate.waitUntilStarted()
+            try await parent.update(context: context)
+            await gate.finish()
+            try await updating.value
+            #expect(await payload.gate.deletions == 1)
+            #expect(await child.getFile(name: "test.om") == nil)
+            #expect(try await child.getDirectory(name: "nested", context: context) == nil)
+            // A retired actor must not issue another listing, which would block on the gate.
+            try await child.update(context: context)
+            #expect(await child.getFile(name: "test.om") == nil)
+        } catch {
+            await gate.finish()
+            await app.http.server.shared.shutdown()
+            try await app.asyncShutdown()
+            throw error
+        }
+        await app.http.server.shared.shutdown()
+        try await app.asyncShutdown()
+    }
+
     @Test func staleReplacementRefreshesWhilePrefetchIsPending() async throws {
         let app = try await Application.make(.testing)
         do {
