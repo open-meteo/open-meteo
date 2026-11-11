@@ -64,14 +64,22 @@ public struct OmFileSystemS3: Sendable {
                 }
                 return try await fn(payload)
             } catch CurlError.fileNotFound {
-                await file.receivedObjectDeletedError()
+                await file.receivedObjectDeletedError(context: context)
                 return nil
             } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
                 guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true) else {
                     return nil
                 }
-                /// Catch error again? If there would a file modified error again, this could indicate some remote server issues
-                return try await fn(payload)
+                do {
+                    return try await fn(payload)
+                } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                    // The replacement can also become stale while its preload is still pending.
+                    // Refresh metadata once instead of selecting the same replacement again.
+                    guard let refreshed = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true, refreshMetadata: true) else {
+                        return nil
+                    }
+                    return try await fn(refreshed)
+                }
             }
         }
     }
@@ -220,18 +228,52 @@ public struct OmFileSystemS3: Sendable {
             }
         }
 
-        func receivedObjectDeletedError() {
-            /// If this is called, we know for sure the file hast been deleted
+        /// Notify every retained revision before dropping a deleted file's payload.
+        /// Finish metadata registration first so its owner can safely release queued readers.
+        func receivedObjectDeletedError(context: S3ServerHealth) async {
+            let retired: [any OmRemotePayload]
             switch payload {
-            case .none, .ready(_), .updatingPrefetchBackground(_, _, _), .error(_, _):
-                payload = .deleted
-            case .initialising(_), .updatingMetaData(old: _, _), .deleted:
-                break // do not modify queued requests
+            case .ready(let value):
+                retired = [value]
+            case .updatingPrefetchBackground(let old, let new, _):
+                retired = [old, new]
+            case .initialising(let queue):
+                let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
+                    payload = .initialising(queue + [continuation])
+                }
+                await receivedObjectDeletedError(context: context)
+                return
+            case .updatingMetaData(let old, _):
+                // Retire the old revision even if metadata construction subsequently fails.
+                do { try await old.remoteDeleted() } catch {
+                    context.logger.warning("Payload retirement failed for \(objectName): \(error)")
+                }
+                // Retirement suspended; inspect the current state again before registering.
+                guard case .updatingMetaData(let current, let currentQueue) = payload else {
+                    await receivedObjectDeletedError(context: context)
+                    return
+                }
+                let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
+                    payload = .updatingMetaData(old: current, currentQueue + [continuation])
+                }
+                await receivedObjectDeletedError(context: context)
+                return
+            case .none, .error:
+                retired = []
+            case .deleted:
+                return
+            }
+            // Invalidate the prefetch identity before invoking hooks that can suspend.
+            payload = .deleted
+            for value in retired {
+                do { try await value.remoteDeleted() } catch {
+                    context.logger.warning("Payload retirement failed for \(objectName): \(error)")
+                }
             }
         }
-        
+
         /// Resolve payload
-        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool) async throws -> T? {
+        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool, refreshMetadata: Bool = false) async throws -> T? {
             // Reset errors if they are older than one minute
             if case .error(_, let issueDate) = payload, issueDate.olderThan(seconds: 60, now: .now()) {
                 payload = .none
@@ -300,6 +342,12 @@ public struct OmFileSystemS3: Sendable {
                 }
                 return old
             case .updatingPrefetchBackground(let old, let new, _):
+                if refreshMetadata {
+                    // Supersede the background task's identity before starting a HEAD refresh.
+                    // Its eventual completion must not publish this stale replacement.
+                    payload = .ready(new)
+                    return try await getPayload(ofType: T.self, context: context, receivedFileModifiedError: true)
+                }
                 guard let selected = (receivedFileModifiedError ? new : old) as? T else {
                     fatalError("Payload was not of correct type \(T.self)")
                 }
@@ -443,6 +491,7 @@ public struct OmFileSystemS3: Sendable {
         private var directories = [String: Directory]()
         private var lastValidated = Timestamp(0)
         private var lastAccessed = Timestamp(0)
+        private var isRetired = false
         
         /// If set to an array, a revalidation is running in the background
         var revalidationQueue: [CheckedContinuation<Void, Error>]? = nil
@@ -458,6 +507,7 @@ public struct OmFileSystemS3: Sendable {
         
         /// Revalidate the current directory using a S3 list operation. If a revalidation is already running, queue in.
         func update(context: S3ServerHealth) async throws {
+            guard !isRetired else { return }
             let logger = context.logger
             guard revalidationQueue == nil else {
                 OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.add(1, ordering: .relaxed)
@@ -471,9 +521,16 @@ public struct OmFileSystemS3: Sendable {
             }
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
+            defer {
+                // Also release waiters when retirement discards an in-flight listing.
+                let waiters = revalidationQueue
+                revalidationQueue = nil
+                waiters?.forEach { $0.resume() }
+            }
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
                 let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: HTTPClient.sharedRemoteData, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                guard !isRetired else { return }
                 var listedFiles = Set<String>()
                 for file in listed.files {
                     let name = String(file.name.dropFirst(prefix.count))
@@ -483,6 +540,7 @@ public struct OmFileSystemS3: Sendable {
                     assert(file.eTag.hasSuffix("\""))
                     if let existing = files[name] {
                         await existing.updateFromDirectoryListing(context: context, objectKey: file.name, contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
+                        guard !isRetired else { return }
                     } else {
                         OmFileSystemMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
                         files[name] = File(objectName: "\(prefix)\(name)", contentLength: file.fileSize, lastModified: file.modificationTime, eTag: file.eTag)
@@ -501,20 +559,19 @@ public struct OmFileSystemS3: Sendable {
 
                 for name in Array(files.keys) where !listedFiles.contains(name) {
                     OmFileSystemMetrics.fileRemoteModifiedTotal.add(1, ordering: .relaxed)
-                    files.removeValue(forKey: name)
+                    if let removed = files.removeValue(forKey: name) {
+                        await removed.receivedObjectDeletedError(context: context)
+                    }
                 }
 
                 for name in Array(directories.keys) where !listedDirectories.contains(name) {
                     OmFileSystemMetrics.fileRemoteDirectoryModifiedTotal.add(1, ordering: .relaxed)
-                    directories.removeValue(forKey: name)
+                    if let removed = directories.removeValue(forKey: name) {
+                        await removed.retireContents(context: context)
+                    }
                 }
 
                 lastValidated = .now()
-                let waiters = revalidationQueue
-                revalidationQueue = nil
-                waiters?.forEach({
-                    $0.resume()
-                })
             } catch {
                 let waiters = revalidationQueue
                 revalidationQueue = nil
@@ -523,6 +580,19 @@ public struct OmFileSystemS3: Sendable {
                 })
                 throw error
             }
+        }
+
+        /// Retire already-loaded descendants when their directory disappears from inventory.
+        private func retireContents(context: S3ServerHealth) async {
+            // Set before any suspension so both pending and future listings are discarded.
+            guard !isRetired else { return }
+            isRetired = true
+            let removedFiles = Array(files.values)
+            let removedDirectories = Array(directories.values)
+            files.removeAll()
+            directories.removeAll()
+            for file in removedFiles { await file.receivedObjectDeletedError(context: context) }
+            for directory in removedDirectories { await directory.retireContents(context: context) }
         }
 
         /// Periodic lifecycle callback.

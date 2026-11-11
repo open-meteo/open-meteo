@@ -1,14 +1,5 @@
 import Foundation
 
-/// Result storage: callers must release owned buffers and must never release borrowed cache memory.
-enum DataOwnership: Sendable {
-    /// Only usable for a short time. Must not be freed.
-    case borrowed(UnsafeRawBufferPointer)
-
-    /// The caller owns this allocation and must call `deallocate()` exactly once after use.
-    case owned(UnsafeRawBufferPointer)
-}
-
 /// Coordinates backend concurrency, shared block fetches, and result assembly for an atomic cache.
 /// `OmReaderBlockCache` handles file byte ranges, contiguous cache hits, and cached-page advice.
 /// This actor receives explicit ranges, deadlines, and providers; it does not depend on a reader
@@ -34,9 +25,9 @@ enum DataOwnership: Sendable {
 ///
 /// A read within one super block borrows cache storage when its delivered bytes are contiguous,
 /// including after a miss; otherwise it copies into owned storage. Reads crossing super blocks
-/// allocate once up front. Owned results are 32-byte aligned and must be deallocated by the caller.
+/// allocate once up front. Owned results are 32-byte aligned and are released automatically.
 /// Borrowed slices may have arbitrary alignment and must never be freed. Prefetches allocate no
-/// result buffer and return after scheduling; mixed ranges advise only the requested cached pages.
+/// result buffer. Prefetch returns after scheduling; preload waits for all deliveries without page advice.
 ///
 /// The first read error disables late writes, frees owned storage, and resumes the caller. Shared
 /// work continues for other subscribers. Cancellation also leaves shared work running and is checked
@@ -59,29 +50,43 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// A queued job may expand in either direction within its super block, beyond the original request.
     typealias FetchProvider = @Sendable (_ key: Key, _ count: Int) async throws -> any ContiguousBytes & Sendable
 
-    /// Assembles one read on the actor. Single ranges borrow until a noncontiguous block arrives;
+    /// Raw assembly storage, transferred once through the continuation before gaining an owner.
+    private enum ReadStorage: Sendable {
+        // Borrowed spans may begin after the start of the result until earlier blocks arrive.
+        case borrowed(UnsafeRawBufferPointer, offset: Int)
+        // Keep capacity and delivered extent separate for partial final blocks.
+        case owned(UnsafeMutableRawBufferPointer, receivedEnd: Int)
+
+        /// Take ownership of completed storage without copying bytes. Call exactly once after delivery.
+        consuming func takeResult() -> OwnedOrBorrowedBuffer {
+            switch self {
+            case .owned(let buffer, let receivedEnd):
+                return .owned(OwnedRawBuffer(UnsafeRawBufferPointer(start: buffer.baseAddress, count: receivedEnd)))
+            case .borrowed(let buffer, _):
+                return .borrowed(buffer)
+            }
+        }
+    }
+
+    /// Assembles one read on the actor. An empty byte range tracks preload completion without data.
+    /// Single ranges borrow until a noncontiguous block arrives;
     /// reads across super blocks start with an allocation. Waiters identify byte positions, not cache keys.
     private final class ReadRequest {
         let byteRange: Range<Int>
-        let continuation: CheckedContinuation<DataOwnership, Error>
+        let continuation: CheckedContinuation<ReadStorage, Error>
         // The extra completion keeps cached deliveries from finishing during registration.
         var pendingCompletions = 1
-        private enum ReadStorage {
-            // Borrowed spans may begin after the start of the result until earlier blocks arrive.
-            case borrowed(UnsafeRawBufferPointer, offset: Int)
-            // Keep capacity in the buffer and the delivered extent separately for partial final blocks.
-            case owned(UnsafeMutableRawBufferPointer, receivedEnd: Int)
-        }
         private var storage: ReadStorage?
 
         /// Create a request for bytes relative to the first requested block. `allocate` reserves the
         /// final output immediately; otherwise the request borrows until noncontiguous data arrives.
         /// The initial completion sentinel must be released after all blocks have been registered.
-        init(byteRange: Range<Int>, allocate: Bool, continuation: CheckedContinuation<DataOwnership, Error>) {
+        init(byteRange: Range<Int>, allocate: Bool, continuation: CheckedContinuation<ReadStorage, Error>) {
             self.byteRange = byteRange
             self.continuation = continuation
             if allocate {
-                storage = .owned(.allocate(byteCount: byteRange.count, alignment: 32), receivedEnd: 0) // 32-byte alignment for 256-bit SIMD.
+                let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: byteRange.count, alignment: 32) // 32-byte alignment for 256-bit SIMD.
+                storage = .owned(buffer, receivedEnd: 0)
             }
         }
 
@@ -110,14 +115,12 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         } else {
                             let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: byteRange.count, alignment: 32) // 32-byte alignment for 256-bit SIMD.
                             previous.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: buffer[borrowedOffset..<(borrowedOffset + previous.count)]))
-                            storage = .owned(buffer, receivedEnd: borrowedOffset + previous.count)
+                            source.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: buffer[destinationOffset..<(destinationOffset + source.count)]))
+                            storage = .owned(buffer, receivedEnd: max(borrowedOffset + previous.count, destinationOffset + source.count))
                         }
                     case nil:
                         storage = .borrowed(source, offset: destinationOffset)
-                    case .owned?:
-                        break
-                    }
-                    if case .owned(let output, let receivedEnd)? = storage {
+                    case .owned(let output, let receivedEnd)?:
                         source.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: output[destinationOffset..<(destinationOffset + source.count)]))
                         storage = .owned(output, receivedEnd: max(receivedEnd, destinationOffset + source.count))
                     }
@@ -140,21 +143,13 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         }
 
         /// Account for a delivery or release the registration sentinel. The last completion transfers
-        /// ownership to the caller; a failed request cannot resume again. O(1).
+        /// storage to the caller; a failed request cannot resume again. O(1).
         func completeOne() {
             guard pendingCompletions > 0 else { return }
             pendingCompletions -= 1
             guard pendingCompletions == 0 else { return }
-            let result: DataOwnership
-            switch storage {
-            case .owned(let buffer, let receivedEnd)?:
-                result = .owned(UnsafeRawBufferPointer(start: buffer.baseAddress, count: receivedEnd))
-            case .borrowed(let buffer, _)?:
-                result = .borrowed(buffer)
-            case nil:
-                result = .borrowed(UnsafeRawBufferPointer(start: nil, count: 0))
-            }
-            storage = nil // Transfer ownership to the caller.
+            let result = storage ?? .borrowed(UnsafeRawBufferPointer(start: nil, count: 0), offset: 0)
+            storage = nil // Late waiters must no longer retain the transferred allocation.
             continuation.resume(returning: result)
         }
     }
@@ -275,6 +270,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         if let other {
             let deadline = queuedFetches.priority(for: other.queueKey)!
             queuedFetches.remove(key: other.queueKey)
+            OmFileSystemMetrics.blockCacheFetchesQueued.subtract(1, ordering: .relaxed)
             // Keep the earliest deadline across the combined requests.
             queuedFetches.decreasePriority(for: fetch.queueKey, to: deadline)
         }
@@ -296,15 +292,23 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// Each job costs O(B + W + log Q) bookkeeping for B blocks, W deliveries, and Q queued jobs,
     /// plus backend I/O, cache access, and byte copying. The slot is released when the queue is empty.
     private func run(key: Key, count: Int, provider: @escaping FetchProvider) async {
-        defer { activeFetches -= 1 }
+        defer {
+            activeFetches -= 1
+            OmFileSystemMetrics.blockCacheFetchesRunning.subtract(1, ordering: .relaxed)
+        }
         var start = key
         var blockCount = count
         var fetch = provider
         // Reuse this task and its backend slot until the queue is empty.
         while true {
+            // Count batching once when the final range starts, not on each merge or promotion.
+            if blockCount > 1 {
+                OmFileSystemMetrics.blockCacheMergedBlocksTotal.add(blockCount - 1, ordering: .relaxed)
+            }
             do {
                 let fetched = try await fetch(start, blockCount)
                 fetched.withUnsafeBytes { bytes in
+                    OmFileSystemMetrics.blockCacheFetchedBytesTotal.add(bytes.count, ordering: .relaxed)
                     assert(blockCount == bytes.count.divideRoundedUp(divisor: cache.blockSize))
                     for block in 0..<blockCount {
                         let key = start &+ UInt64(block)
@@ -323,6 +327,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                 }
             }
             guard let next = queuedFetches.popMin() else { break }
+            OmFileSystemMetrics.blockCacheFetchesQueued.subtract(1, ordering: .relaxed)
             start = next.startKey
             blockCount = next.blockCount
             fetch = next.provider
@@ -344,6 +349,70 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     ) throws {
         try schedule(key: key, count: count, deadline: deadline, superBlockKey: superBlockKey,
                      provider: provider, request: nil, outputOffset: 0, prefetchByteRange: byteRange)
+    }
+
+    /// Preload file block ranges and await all deliveries without assembling an output buffer.
+    /// Clip ranges to EOF and register every super block before suspending. Cached blocks are skipped
+    /// without page advice; missing blocks share normal merging and deadline scheduling. Errors
+    /// propagate without cancelling shared work. Skip the entire preload when the queue is above
+    /// 10% full or estimated queue occupancy after registration would exceed 30%.
+    /// Capacity estimation assumes uncached ranges and costs O(number of ranges); the scheduler
+    /// still handles shared work and enforces queue capacity during registration.
+    @discardableResult
+    func preload(
+        fileKey: Key, blockRanges: [Range<Int>], fileSize: Int,
+        deadline: ContinuousClock.Instant, provider: @escaping FetchProvider
+    ) async throws -> Bool {
+        try Task.checkCancellation()
+        // Exactly 10% is eligible. Round down so fractional job limits never exceed the cap.
+        guard queuedFetches.count <= maxPendingFetches / 10 else { return false }
+        let fileBlocks = 0..<fileSize.divideRoundedUp(divisor: cache.blockSize)
+        // Jobs that can start immediately do not consume the 30% pending-queue budget.
+        // Divide before multiplying to avoid overflow for large configured capacities.
+        let preloadQueueLimit = (maxPendingFetches / 10) * 3 + (maxPendingFetches % 10) * 3 / 10
+        let availableJobs = maxConcurrentFetches - activeFetches + preloadQueueLimit - queuedFetches.count
+        var requiredJobs = 0
+        // Assume uncached ranges: each intersecting super block needs one job. Count
+        // ranges without visiting individual blocks or looking up cache reservations.
+        // Registration follows without suspension, so other requests cannot take capacity.
+        for range in blockRanges {
+            let blocks = range.clamped(to: fileBlocks)
+            guard !blocks.isEmpty else { continue }
+            requiredJobs += (blocks.upperBound - 1) / superBlockLength - blocks.lowerBound / superBlockLength + 1
+            guard requiredJobs <= availableJobs else { return false }
+        }
+        let _: ReadStorage = try await withCheckedThrowingContinuation { continuation in
+            // An empty byte range counts deliveries without retaining or copying their bytes.
+            let request = ReadRequest(byteRange: 0..<0, allocate: false, continuation: continuation)
+            do {
+                for range in blockRanges {
+                    let blocks = range.clamped(to: fileBlocks)
+                    var firstBlock = blocks.lowerBound
+                    while firstBlock < blocks.upperBound {
+                        try Task.checkCancellation()
+                        let start = firstBlock
+                        let superBlockStart = start / superBlockLength * superBlockLength
+                        let end = min(blocks.upperBound, superBlockStart + superBlockLength)
+                        let key = calculateCacheKey(fileKey: fileKey, block: start)
+                        let requestedBytes = min(end * cache.blockSize, fileSize) - start * cache.blockSize
+                        OmFileSystemMetrics.blockCachePreloadsBytesTotal.add(requestedBytes, ordering: .relaxed)
+                        if cache.get(key: key, count: UInt64(end - start)) == nil {
+                            try schedule(key: key, count: end - start, deadline: deadline,
+                                         superBlockKey: calculateCacheKey(fileKey: fileKey, block: superBlockStart),
+                                         provider: { fetchKey, count in
+                                try await provider(UInt64(start) &+ (fetchKey &- key), count)
+                            }, request: request, outputOffset: 0, prefetchByteRange: 0..<0)
+                        }
+                        firstBlock = end
+                    }
+                }
+            } catch {
+                request.fail(error)
+            }
+            request.completeOne()
+        }
+        try Task.checkCancellation()
+        return true
     }
 
     /// Number of cache blocks in an 8 MB super block, shared by scheduling and reader fast paths.
@@ -368,10 +437,12 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     func get(
         fileKey: Key, blockRange: Range<Int>, byteRange: Range<Int>,
         deadline: ContinuousClock.Instant, provider: @escaping FetchProvider
-    ) async throws -> DataOwnership {
+    ) async throws -> OwnedOrBorrowedBuffer {
         try Task.checkCancellation()
-        let result = try await withCheckedThrowingContinuation { continuation in
-            let spansSuperBlocks = blockRange.lowerBound / superBlockLength != (blockRange.upperBound - 1) / superBlockLength
+        let spansSuperBlocks = blockRange.lowerBound / superBlockLength != (blockRange.upperBound - 1) / superBlockLength
+
+        // Transfer raw storage through the copyable continuation, then wrap owned allocations once.
+        let storage = try await withCheckedThrowingContinuation { continuation in
             let request = ReadRequest(byteRange: byteRange, allocate: spansSuperBlocks, continuation: continuation)
             do {
                 var lowerBound = blockRange.lowerBound
@@ -393,13 +464,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             }
             request.completeOne()
         }
-        do {
-            try Task.checkCancellation()
-            return result
-        } catch {
-            if case .owned(let buffer) = result { buffer.deallocate() }
-            throw error
-        }
+        let result = storage.takeResult()
+        try Task.checkCancellation() // OwnedRawBuffer releases owned storage if cancellation throws.
+        return result
     }
 
     /// Reserve and schedule missing ranges without suspension. Backend tasks cannot complete any
@@ -438,7 +505,9 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                     // Advise only the requested bytes within this cached block.
                     let blockStart = offset * cache.blockSize
                     let adviceRange = prefetchByteRange.clamped(to: blockStart..<(blockStart + cache.blockSize))
-                    cache.advise(key: key, byteRange: (adviceRange.lowerBound - blockStart)..<(adviceRange.upperBound - blockStart), advice: .willneed)
+                    if !adviceRange.isEmpty {
+                        cache.advise(key: key, byteRange: (adviceRange.lowerBound - blockStart)..<(adviceRange.upperBound - blockStart), advice: .willneed)
+                    }
                 }
                 offset += 1
                 continue
@@ -498,15 +567,18 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         // Start directly from the range; only queued work needs a FetchJob allocation.
                         newStatus = .running
                         activeFetches += 1
+                        OmFileSystemMetrics.blockCacheFetchesRunning.add(1, ordering: .relaxed)
                         Task { [rangeBlockCount] in await run(key: key, count: rangeBlockCount, provider: provider) }
                     } else {
                         // Existing shared/merged jobs bypass this limit because they need no new entry.
                         guard queuedFetches.count < maxPendingFetches else {
+                            OmFileSystemMetrics.blockCacheQueueFullTotal.add(1, ordering: .relaxed)
                             throw CacheCoordinatorError.pendingQueueFull
                         }
                         let work = FetchJob(queueKey: key, superBlockKey: superBlockKey, blockCount: rangeBlockCount, provider: provider)
                         newStatus = .queued(work.queueKey)
                         queuedFetches.insert(key: work.queueKey, priority: deadline, value: work)
+                        OmFileSystemMetrics.blockCacheFetchesQueued.add(1, ordering: .relaxed)
                     }
                 }
             }

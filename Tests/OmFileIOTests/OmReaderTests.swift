@@ -26,17 +26,16 @@ import OmFileFormat
         let blockSize = 64
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
         defer { try? FileManager.default.removeItem(atPath: path) }
-        // Background preloads and cache polling require storage that supports concurrent access.
+        // Backend fetches require storage that supports concurrent access.
         let cache = AtomicCacheCoordinator(cache: try AtomicBlockCache(file: path, blockSize: blockSize, blockCount: 128))
         let old = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 1, count: oldSize)), cache: cache, cacheKey: 123)
         try await old.preloadBlocks(blocks: active)
-        try await waitForPrefetch { old.listOfActiveBlocks(maxAgeSeconds: 60) == active }
+        #expect(old.listOfActiveBlocks(maxAgeSeconds: 60) == active)
         let scaled = old.listOfActiveBlocks(maxAgeSeconds: 60, scaledToFileSize: newSize)
         #expect(scaled == expected)
 
         let replacement = OmReaderBlockCache(backend: DataAsClass(data: Data(repeating: 2, count: newSize)), cache: cache, cacheKey: 456)
         try await replacement.preloadBlocks(blocks: scaled)
-        try await waitForPrefetch { replacement.listOfActiveBlocks(maxAgeSeconds: 60) == expected }
         #expect(replacement.listOfActiveBlocks(maxAgeSeconds: 60) == expected)
         for range in expected {
             let offset = range.lowerBound * blockSize
@@ -76,13 +75,13 @@ import OmFileFormat
         default:
             try await reader.prefetchData(offset: offset, count: count)
         }
-        if path == "preload" || path == "prefetch" {
+        if path == "prefetch" {
             try await waitForPrefetch { reader.listOfActiveBlocks(maxAgeSeconds: 60) == [blocks] }
         }
 
         #expect(reader.listOfActiveBlocks(maxAgeSeconds: 60) == [blocks])
         for block in blocks {
-            let cached = try #require(cache.get(key: reader.calculateCacheKey(block: block), count: 1))
+            let cached = try #require(cache.get(key: coordinator.calculateCacheKey(fileKey: reader.cacheKey, block: block), count: 1))
             let cachedAddress = UInt(bitPattern: cached.baseAddress!)
             // A single-block hit must borrow the cache buffer, including after 8 MB.
             try await reader.withData(offset: block * blockSize + 17, count: 31) { data in

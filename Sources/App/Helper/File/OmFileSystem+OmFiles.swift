@@ -69,12 +69,15 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         }
         let file = updatedReader.fn
         let logger = reader.fn.backend.server.logger
-        let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: 15*60, scaledToFileSize: file.count)
+        let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: OpenMeteo.remoteDataPreloadMaxAgeSeconds, scaledToFileSize: file.count)
+        // Retire old blocks even if optional preloading fails. Live readers and backend
+        // jobs retain this reader, so deletion still waits for their final reference.
+        reader.fn.deleteCachedBlocksOnDeinit()
         
         // Relative block positions are an estimate when the replacement file's internal layout changes.
-        try await file.preloadBlocks(blocks: activeBlocks)
-        let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
-        logger.warning("OmFileRemoteOmReader: Blocks freed=\(deletedBlocks) preloaded=\(activeBlocks.reduce(0) { $0 + $1.count }) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
+        let preloaded = try await file.preloadBlocks(blocks: activeBlocks)
+        let blocksToFree = reader.fn.countCachedBlocks()
+        logger.warning("OmFileRemoteOmReader: Blocks to free on deinit=\(blocksToFree) preloaded=\(preloaded ? activeBlocks.reduce(0) { $0 + $1.count } : 0) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
     }
     
     func remoteDeleted() async throws {
@@ -82,7 +85,8 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
             fatalError("remoteDeleted cannot be called on a non-OmFileRemoteOmReader")
         }
         let logger = reader.fn.backend.server.logger
-        let deletedBlocks = reader.fn.deleteCachedBlocks(olderThanSeconds: 60)
-        logger.warning("OmFileRemoteOmReader: File deleted from server. \(deletedBlocks) previously cached blocks have been deleted.")
+        reader.fn.deleteCachedBlocksOnDeinit()
+        let blocksToFree = reader.fn.countCachedBlocks()
+        logger.warning("OmFileRemoteOmReader: File deleted from server. Blocks to free on deinit=\(blocksToFree). Cached blocks will be deleted when the last reader is released.")
     }
 }
