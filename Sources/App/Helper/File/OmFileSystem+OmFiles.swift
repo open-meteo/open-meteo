@@ -51,11 +51,12 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         let file = updatedReader.fn
         let logger = reader.fn.backend.server.logger
         let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: OpenMeteo.remoteDataPreloadMaxAgeSeconds, scaledToFileSize: file.count)
+        // Retire old blocks even if optional preloading fails. Live readers and backend
+        // jobs retain this reader, so deletion still waits for their final reference.
+        reader.fn.deleteCachedBlocksOnDeinit()
         
         // Relative block positions are an estimate when the replacement file's internal layout changes.
         try await file.preloadBlocks(blocks: activeBlocks)
-        // Preloading has completed. Keep all old blocks until the last reader is released.
-        reader.fn.deleteCachedBlocksOnDeinit()
         let blocksToFree = reader.fn.countCachedBlocks()
         logger.warning("OmFileRemoteOmReader: Blocks to free on deinit=\(blocksToFree) preloaded=\(activeBlocks.reduce(0) { $0 + $1.count }) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
     }

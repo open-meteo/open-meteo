@@ -1,4 +1,5 @@
 import Testing
+import Vapor
 @testable import OmFileIO
 import OmTime
 
@@ -36,13 +37,8 @@ private struct TestRemotePayload: OmRemotePayload {
         gate = PrefetchGate()
     }
 
-    private init(version: String, gate: PrefetchGate) {
-        self.version = version
-        self.gate = gate
-    }
-
     func updateMetaData(file: OmHttpReaderBackend) async throws -> Self {
-        Self(version: file.eTag, gate: gate)
+        Self(file: file)
     }
 
     func prefetchBackground(from previous: any OmRemotePayload) async throws {
@@ -76,15 +72,16 @@ struct RemotePayloadTests {
     func metadataAvailableBeforePrefetchFinishes(prefetchFails: Bool) async throws {
         let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
         let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
-        let old = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
+        _ = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
         let version = prefetchFails ? "\"failure\"" : "\"new\""
         await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: version)
-        await old.gate.waitUntilStarted()
+        let new = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true))
+        await new.gate.waitUntilStarted()
 
         // Cached requests keep using the old version while retries can use the new metadata.
         #expect(try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false)?.version == "\"old\"")
         #expect(try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true)?.version == version)
-        await old.gate.finish()
+        await new.gate.finish()
 
         // Failed optional prefetch must also publish the new payload for on-demand reads.
         let deadline = ContinuousClock.now.advanced(by: .seconds(5))
@@ -92,5 +89,50 @@ struct RemotePayloadTests {
             try #require(ContinuousClock.now < deadline)
             await Task.yield()
         }
+    }
+
+    @Test func staleReplacementRefreshesWhilePrefetchIsPending() async throws {
+        let app = try await Application.make(.testing)
+        do {
+            app.on(.HEAD, "test.om") { _ -> Response in
+                Response(status: .ok, headers: [
+                    "Content-Length": "3", "ETag": "\"latest\"",
+                    "Last-Modified": "Wed, 11 Nov 2026 12:00:00 GMT"
+                ])
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let context = S3ServerHealth(logger: .init(label: "test"), servers: [
+                .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
+            ], checksHealth: false)
+            let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
+            _ = try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false)
+            await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: "\"new\"")
+            let pending = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true))
+            await pending.gate.waitUntilStarted()
+
+            let latest = try #require(await OmFileSystemS3.FileWithContext(file: file, context: context).with { (payload: TestRemotePayload) in
+                guard payload.version == "\"latest\"" else {
+                    throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
+                }
+                return payload
+            })
+            await latest.gate.waitUntilStarted()
+            #expect(latest.version == "\"latest\"")
+            // Finishing the superseded task must not publish its stale replacement.
+            await pending.gate.finish()
+            await latest.gate.finish()
+            let deadline = ContinuousClock.now.advanced(by: .seconds(60))
+            while try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false)?.version != latest.version {
+                try #require(ContinuousClock.now < deadline)
+                try await Task.sleep(for: .milliseconds(1))
+            }
+        } catch {
+            await app.http.server.shared.shutdown()
+            try await app.asyncShutdown()
+            throw error
+        }
+        await app.http.server.shared.shutdown()
+        try await app.asyncShutdown()
     }
 }

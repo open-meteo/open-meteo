@@ -70,8 +70,16 @@ public struct OmFileSystemS3: Sendable {
                 guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true) else {
                     return nil
                 }
-                /// Catch error again? If there would a file modified error again, this could indicate some remote server issues
-                return try await fn(payload)
+                do {
+                    return try await fn(payload)
+                } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                    // The replacement can also become stale while its preload is still pending.
+                    // Refresh metadata once instead of selecting the same replacement again.
+                    guard let refreshed = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: true, refreshMetadata: true) else {
+                        return nil
+                    }
+                    return try await fn(refreshed)
+                }
             }
         }
     }
@@ -231,7 +239,7 @@ public struct OmFileSystemS3: Sendable {
         }
         
         /// Resolve payload
-        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool) async throws -> T? {
+        func getPayload<T: OmRemotePayload>(ofType: T.Type, context: S3ServerHealth, receivedFileModifiedError: Bool, refreshMetadata: Bool = false) async throws -> T? {
             // Reset errors if they are older than one minute
             if case .error(_, let issueDate) = payload, issueDate.olderThan(seconds: 60, now: .now()) {
                 payload = .none
@@ -300,6 +308,12 @@ public struct OmFileSystemS3: Sendable {
                 }
                 return old
             case .updatingPrefetchBackground(let old, let new, _):
+                if refreshMetadata {
+                    // Supersede the background task's identity before starting a HEAD refresh.
+                    // Its eventual completion must not publish this stale replacement.
+                    payload = .ready(new)
+                    return try await getPayload(ofType: T.self, context: context, receivedFileModifiedError: true)
+                }
                 guard let selected = (receivedFileModifiedError ? new : old) as? T else {
                     fatalError("Payload was not of correct type \(T.self)")
                 }
