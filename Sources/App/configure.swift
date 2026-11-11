@@ -50,10 +50,10 @@ enum OpenMeteo {
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
-        guard let maxConcurrentFetches = Int(Environment.get("REMOTE_DATA_MAX_CONCURRENT_FETCHES") ?? "4"), maxConcurrentFetches > 0 else {
+        guard let maxConcurrentFetches = Int(Environment.get("REMOTE_DATA_MAX_CONCURRENT_FETCHES") ?? "12"), maxConcurrentFetches > 0 else {
             fatalError("REMOTE_DATA_MAX_CONCURRENT_FETCHES must be a positive integer")
         }
-        guard let maxPendingFetches = Int(Environment.get("REMOTE_DATA_MAX_PENDING_FETCHES") ?? "16384"), maxPendingFetches > 0 else {
+        guard let maxPendingFetches = Int(Environment.get("REMOTE_DATA_MAX_PENDING_FETCHES") ?? "65536"), maxPendingFetches > 0 else {
             fatalError("REMOTE_DATA_MAX_PENDING_FETCHES must be a positive integer")
         }
         let cache = AtomicCacheCoordinator(
@@ -203,7 +203,7 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone.gmt
-    guard let remoteDataHTTPConnections = Int(Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "8"), remoteDataHTTPConnections > 0 else {
+    guard let remoteDataHTTPConnections = Int(Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "16"), remoteDataHTTPConnections > 0 else {
         fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
     }
     HTTPClient.configureRemoteDataHTTPConnections(remoteDataHTTPConnections)
