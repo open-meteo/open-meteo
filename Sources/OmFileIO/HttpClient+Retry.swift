@@ -143,7 +143,7 @@ public extension HTTPClient {
                 let info = try await handle.info()
                 var headers = HTTPHeaders()
                 headers.add(name: "content-length", value: "\(info.size)")
-                headers.lastModified?.value = Date(timeIntervalSince1970: TimeInterval(info.lastDataModificationTime.seconds))
+                headers.add(name: "Last-Modified", value: DateFormatter.httpLastModifiedFormater.string(from: Date(timeIntervalSince1970: TimeInterval(info.lastDataModificationTime.seconds))))
                 let response = HTTPClientResponse(status: .ok, headers: headers, body: .stream(handle.readChunks()))
                 return try await body(response)
             }
@@ -338,20 +338,10 @@ public extension HTTPClient {
 
 fileprivate extension HTTPHeaders {
     var rangePrettyPrint: String {
-        guard let range = self.range else {
+        guard let range = first(name: "Range") else {
             return ""
         }
-        let count = range.ranges.reduce(0, {
-            switch $1 {
-            case .start(value: _):
-                return $0
-            case .tail(value: _):
-                return $0
-            case .within(start: let start, end: let end):
-                return $0 - start + end
-            }
-        })
-        return " [\(count.bytesHumanReadable) Range: \(range.serialize())]"
+        return " [Range: \(range)]"
     }
 }
 

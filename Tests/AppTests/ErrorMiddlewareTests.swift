@@ -1,8 +1,22 @@
 @testable import App
 import Foundation
 import Testing
+import OmFileIO
+import Vapor
 
 @Suite struct ErrorMiddlewareTests {
+    @Test func signingErrorsPreserveHTTPResponses() throws {
+        let signatureError: any Error = AWSSigner.SigningError.invalidSignature
+        let signatureAbort = try #require(signatureError as? any AbortError)
+        #expect(signatureAbort.status == .unauthorized)
+        #expect(signatureAbort.reason == "Invalid signature")
+
+        let payloadError: any Error = AWSSigner.SigningError.payloadHashMismatch
+        let payloadAbort = try #require(payloadError as? any AbortError)
+        #expect(payloadAbort.status == .internalServerError)
+        #expect(payloadAbort.reason == "Payload hash mismatch")
+    }
+
     private enum Model: String, Decodable {
         case bestMatch = "best_match"
     }

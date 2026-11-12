@@ -2,7 +2,7 @@ import OmFileFormat
 import AsyncHTTPClient
 import Foundation
 import Logging
-import NIO
+import NIOCore
 import Synchronization
 import OmTime
 
