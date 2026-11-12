@@ -1,6 +1,7 @@
 import AsyncHTTPClient
 import Foundation
 import Logging
+import NIOCore
 import OmTime
 
 public enum S3List {
@@ -30,11 +31,17 @@ public enum S3List {
 
     /// List files and directories with AWS ListObjectsV2, following all continuation pages.
     /// Pass an empty delimiter to list all objects recursively under the prefix.
-    public static func s3list(server: String, client: HTTPClient, logger: Logger, prefix: String, apikey: String?, deadLineHours: Double, delimiter: String = "/") async throws -> (files: [S3List.ListV2File], directories: [String]) {
+    /// The retry deadline is shared across all pages; an in-flight attempt may finish after it.
+    public static func s3list(server: String, client: HTTPClient, logger: Logger, prefix: String, apikey: String?, deadLineHours: Double, delimiter: String = "/", timeoutPerRequest: TimeAmount = .seconds(90)) async throws -> (files: [S3List.ListV2File], directories: [String]) {
+        let deadline = Date.hours(deadLineHours)
         var allFiles: [S3List.ListV2File] = []
         var allDirectories: [String] = []
         var continuation: String? = nil
         while true {
+            try Task.checkCancellation()
+            guard Date() < deadline else {
+                throw CurlError.timeoutReached
+            }
             var url = "\(server)?list-type=2&delimiter=\(delimiter.awsPercentEncoded)&prefix=\(prefix.awsPercentEncoded)"
             if let continuation {
                 url += "&continuation-token=\(continuation.awsPercentEncoded)"
@@ -44,7 +51,7 @@ public enum S3List {
             }
             let request = HTTPClientRequest(url: url)
 
-            var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, timeoutPerRequest: .seconds(90))
+            var response = try await client.executeRetryAndCollect(request, logger: logger, upTo: 50 * 1024 * 1024, deadline: deadline, timeoutPerRequest: timeoutPerRequest)
             guard let body = response.readString(length: response.readableBytes) else {
                 return (allFiles, allDirectories)
             }

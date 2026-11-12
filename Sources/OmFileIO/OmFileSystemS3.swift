@@ -13,6 +13,8 @@ enum OmFileSystemS3Error: Error {
  It is used concurrently to get meta data from objects or return if a object does not exist.
 
  Performs S3 List operations on demand recursively.
+
+ See `docs/remote-data.md` at the repository root for endpoint configuration and file-update behavior.
  
  Each file can be bound to a "payload" type. E.g. an open OM-File which maintains meta data about timestamps and arrays available
  
@@ -529,7 +531,8 @@ public struct OmFileSystemS3: Sendable {
             }
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
-                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: HTTPClient.sharedRemoteData, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 3)
+                // Directory readers wait for this refresh, so use a short retry budget.
+                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: context.client, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 30.0 / 3600, timeoutPerRequest: .seconds(10))
                 guard !isRetired else { return }
                 var listedFiles = Set<String>()
                 for file in listed.files {

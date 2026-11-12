@@ -70,7 +70,7 @@ Apps:
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LSPC Weather](https://amelia-m.github.io/lspc-weather/) Skydiving weather dashboard for one drop zone (Lincoln Sport Parachute Club, Nebraska): winds aloft by altitude for freefall drift, cloud cover and a 10-day outlook from Open-Meteo beside the NWS forecast and the nearest METAR. Free, open source, no account. ([source](https://github.com/amelia-m/lspc-weather)).
-- [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values (including moon brightness) as well as the weather for individual locations in Central Europe.
+- [LunaLink](https://www.lunalink.de/) Sun and moon calendar for hunters, anglers and nature observers: hour-by-hour moon brightness, twilight and solunar times next to a 10-day hourly weather forecast for any location in Europe, from the Mediterranean to the North Pole. Free, no account, available in 24 languages.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 - [Meteograph](https://github.com/timbortnik/widget) Open-source Android home-screen weather widget showing a meteogram with 48-hour and 7-day forecasts; no ads, no tracking, no account. ([Google Play](https://play.google.com/store/apps/details?id=org.bortnik.meteogram))
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
@@ -91,6 +91,7 @@ Apps:
 - [ShackScreen](https://github.com/maxhayim/ShackScreen) Free, open-source launcher dashboard for the TV in a ham radio shack (Android TV, Google TV, Fire TV and tablets). Its Weather widget shows current conditions, the next hours, sunrise or sunset and UV from Open-Meteo.
 - [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
+- [Snowlist](https://snowlist.org) Ski resort ratings from open data, with snow forecasts and ERA5 snowfall history for 150+ resorts.
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [ThaiFloodRisk](https://thaifloodrisk.com/en) Flood risk scores and daily flood odds for Bangkok and Thailand, built on Open-Meteo forecast, historical weather, river discharge (Flood API) and marine data.
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application

@@ -1,4 +1,6 @@
-import Vapor
+import Foundation
+import Logging
+import NIOCore
 import Synchronization
 
 /// Same as above, but not an actor

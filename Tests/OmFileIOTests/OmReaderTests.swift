@@ -110,7 +110,7 @@ import OmFileFormat
     
     @Test func httpRead() async throws {
         let object = "data/dwd_icon_d2_eps/static/HSURF.om"
-        let context = S3ServerHealth(logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
         let readFn = try await OmHttpReaderBackend(context: context, object: object)
         let read = try await OmFileReader(fn: readFn).expectArray(of: Float.self)
         let value = try await read.read(range: [250..<251, 420..<421])
@@ -119,7 +119,7 @@ import OmFileFormat
 
     @Test func blockCache() async throws {
         let object = "data/dwd_icon_d2_eps/static/HSURF.om"
-        let context = S3ServerHealth(logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
         let readFn = try await OmHttpReaderBackend(context: context, object: object)
         let file = "cache64k50.bin"
         try? FileManager.default.removeItem(atPath: file)
@@ -199,7 +199,7 @@ import OmFileFormat
 
     @Test func blockCacheConcurrent() async throws {
         let object = "data/dwd_icon_d2_eps/static/HSURF.om"
-        let context = S3ServerHealth(logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "logger"), servers: [.init(rawEndpoint: "https://openmeteo.s3.amazonaws.com/", profile: nil)])
         let readFn = try await OmHttpReaderBackend(context: context, object: object)
         let file = "cache64k50_2.bin"
         try? FileManager.default.removeItem(atPath: file)

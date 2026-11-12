@@ -4,6 +4,7 @@ import NIOCore
 import Synchronization
 
 /// Adapts file byte-range reads to a shared `AtomicCacheCoordinator` and its atomic block cache.
+/// See `docs/remote-data.md` at the repository root for remote access, caching, and prefetch configuration.
 /// `cacheKey` identifies this file's contents and must change when those contents are replaced.
 /// Read and prefetch offsets and counts must describe valid ranges within the backend file.
 ///

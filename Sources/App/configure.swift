@@ -4,9 +4,18 @@ import Synchronization
 @_exported import OmTime
 import OmFileIO
 
+/// Application environment settings. Remote backend, cache, and prefetch configuration
+/// is documented in `docs/remote-data.md` at the repository root.
 enum OpenMeteo {
     static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
 
+    /// HTTP/1 connection limit per remote host, with headroom for metadata and health checks.
+    static let remoteDataHTTPConnections: Int = {
+        guard let value = Int(Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "16"), value > 0 else {
+            fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
+        }
+        return value
+    }()
     /// Number of locations to prefetch ahead while writing API responses. Zero disables prefetching.
     static let prefetchLookAhead: Int = {
         guard let value = Int(Environment.get("PREFETCH_LOOK_AHEAD") ?? "3"), value >= 0 else {
@@ -211,10 +220,7 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone.gmt
-    guard let remoteDataHTTPConnections = Int(Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "16"), remoteDataHTTPConnections > 0 else {
-        fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
-    }
-    HTTPClient.configureRemoteDataHTTPConnections(remoteDataHTTPConnections)
+    HTTPClient.configureRemoteDataHTTPConnections(OpenMeteo.remoteDataHTTPConnections)
     app.lifecycle.use(RemoteDataHttpClientLifecycle())
 
     let corsConfiguration = CORSMiddleware.Configuration(

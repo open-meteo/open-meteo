@@ -1,13 +1,13 @@
 import AsyncHTTPClient
 import Foundation
-import Vapor
+import NIOHTTP1
 
 public enum CurlError: Error {
     case didNotFindAllVariablesInGribIndex
     case gribIndexMatchedTwice
     case sizeTooSmall
     case didNotGetAllGribMessages(got: Int, expected: Int)
-    case downloadFailed(code: HTTPStatus)
+    case downloadFailed(code: HTTPResponseStatus)
     case fileNotFound
     case timeoutReached
     case timeoutPerChunkReached(httpRange: Range<Int>)
