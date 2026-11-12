@@ -47,9 +47,6 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "WeatherNext 3 supports only main runs at 00, 06, 12 or 18 UTC")
         }
 
-        let oldSurface = try await WeatherNext3Domain.surface.getMetaJson()
-        let oldStation = try await WeatherNext3Domain.station.getMetaJson()
-
         let httpConfiguration = HTTPClient.Configuration(
             redirectConfiguration: .follow(max: 5, allowCycles: false),
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
@@ -104,28 +101,9 @@ struct DownloadWeatherNext3Command: AsyncCommand {
 
         let hours = WeatherNext3Domain.hours
         logger.info(
-            "WeatherNext 3: success marker found; validating Zarr metadata and coordinates (\(hours) forecast hours)"
+            "WeatherNext 3: success marker found; validating Zarr metadata (\(hours) forecast hours)"
         )
         let root = try await ZarrGroup(storage: initialStorage, path: prefix + "predictions.zarr/")
-        for domain in WeatherNext3Domain.allCases {
-            let suffix = domain == .surface ? "0p1" : "0p05"
-            let step: Float = domain == .surface ? 0.1 : 0.05
-            for (coordinate, count, start) in [
-                ("lat_", domain.grid.ny, Float(-90)), ("lon_", domain.grid.nx, Float(0)),
-            ] {
-                let array = try await root.openArray(name: coordinate + suffix)
-                guard array.shape == [count] else {
-                    throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 coordinate shape")
-                }
-                let values: [Float] = try await array.retrieveArraySubset([0..<count])
-                guard
-                    values.enumerated().allSatisfy({ abs($0.element - (start + Float($0.offset) * step)) < 0.0001 })
-                else {
-                    throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 coordinate ordering")
-                }
-            }
-        }
-
         let datetime = try await root.openArray(name: "datetime")
         let firstTime: [Int64] = try await datetime.retrieveArraySubset([0..<1])
         guard firstTime == [Int64(run.add(hours: 1).timeIntervalSince1970) * 1_000_000_000] else {
@@ -151,48 +129,23 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             let name = field.source + "_" + statistic.rawValue
             let array = try await root.openArray(name: name)
             let domain = field.domain
-            let suffix = domain == .surface ? "0p1" : "0p05"
-            let expectedUnit: String
-            switch field.unit {
-            case .celsius: expectedUnit = "K"
-            case .hectopascal: expectedUnit = "Pa"
-            case .millimetre: expectedUnit = "m"
-            case .percentage: expectedUnit = "(0 - 1)"
-            case .wattPerSquareMetre: expectedUnit = "J m**-2"
-            default: expectedUnit = "m s**-1"
-            }
-
+            let suffix = domain.coordinateSuffix
             guard case .v3(let metadata) = array.metadata,
                 metadata.dataType == "float32",
                 metadata.dimensionNames == ["lead_time", "lat_" + suffix, "lon_" + suffix],
-                metadata.attributes?["units"]?.stringValue == expectedUnit,
+                metadata.attributes?["units"]?.stringValue == field.sourceUnit,
                 array.chunkShape == [1, domain.grid.ny, domain.grid.nx],
                 array.shape == [hours, domain.grid.ny, domain.grid.nx]
             else {
                 throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
             }
 
-            let variableName = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
-            return (field: field, variable: WeatherNext3Variable(rawValue: variableName)!, array: array)
+            return (field: field, variable: WeatherNext3Variable(field: field, statistic: statistic), array: array)
         }
 
-        let writers = Dictionary(
-            uniqueKeysWithValues: WeatherNext3Domain.allCases.map { domain in
-                (
-                    domain,
-                    (0..<hours).map { index in
-                        OmSpatialTimestepWriter(
-                            domain: domain,
-                            run: run,
-                            time: run.add(hours: index + 1),
-                            storeOnDisk: false,
-                            realm: nil,
-                            logger: logger
-                        )
-                    }
-                )
-            }
-        )
+        let writers = Dictionary(uniqueKeysWithValues: WeatherNext3Domain.allCases.map { domain in
+            (domain, OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger))
+        })
         let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
         logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(downloadConcurrency)")
         try await chunks.foreachConcurrent(nConcurrent: downloadConcurrency) { index, arrayIndex in
@@ -210,7 +163,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 data.multiplyAdd(multiply: field.scale, add: field.offset)
             }
             let writeStarted = DispatchTime.now().uptimeNanoseconds
-            try await writers[domain]![index].write(member: 0, variable: variable, data: data)
+            let writer = try await writers[domain]!.getWriter(time: run.add(hours: index + 1))
+            try await writer.write(member: 0, variable: variable, data: data)
             let finished = DispatchTime.now().uptimeNanoseconds
             logger.info(
                 """
@@ -224,9 +178,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
 
         var handles = [GenericVariableHandle]()
         for domain in WeatherNext3Domain.allCases {
-            for writer in writers[domain]! {
-                handles += try await writer.finalise()
-            }
+            handles += try await writers[domain]!.finalise()
         }
 
         logger.info(
@@ -239,28 +191,10 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             run: run,
             handles: handles,
             concurrent: conversionConcurrency,
-            writeUpdateJson: false,
+            writeUpdateJson: true,
             uploadQueues: queues,
             generateFullRun: false
         )
-
-        logger.info("WeatherNext 3: conversion complete; publishing run metadata")
-        for domain in WeatherNext3Domain.allCases {
-            let old = domain == .surface ? oldSurface : oldStation
-            if let old, run.timeIntervalSince1970 < old.last_run_initialisation_time {
-                continue
-            }
-            let end = max(run.add(hours: hours + 1).timeIntervalSince1970, old?.data_end_time ?? 0)
-            let metadata = try ModelUpdateMetaJson.update(domain: domain, run: run, end: Timestamp(end))
-            for queue in queues {
-                await queue.upload(
-                    data: metadata,
-                    objectName: "data/\(domain.domainRegistry.rawValue)/static/meta.json",
-                    contentType: "application/json",
-                    lastModified: .now()
-                )
-            }
-        }
 
         logger.info("WeatherNext 3: completed run \(run.iso8601_YYYY_MM_dd_HH_mm)")
     }

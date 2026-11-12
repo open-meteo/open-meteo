@@ -34,6 +34,13 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
 
     var dtSeconds: Int { 3600 }
 
+    var coordinateSuffix: String {
+        switch self {
+        case .surface: "0p1"
+        case .station: "0p05"
+        }
+    }
+
     var updateIntervalSeconds: Int { 6 * 3600 }
 
     var omFileLength: Int { 360 }
@@ -64,6 +71,7 @@ struct WeatherNext3Variable: GenericVariable {
         let source: String
         let domain: WeatherNext3Domain
         let unit: SiUnit
+        let sourceUnit: String
         let scale: Float
         let offset: Float
         let spread: Bool
@@ -75,6 +83,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "station_head_temperature_2m",
             domain: .station,
             unit: .celsius,
+            sourceUnit: "K",
             scale: 1.0,
             offset: -273.15,
             spread: true
@@ -84,6 +93,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "station_head_dewpoint_temperature_2m",
             domain: .station,
             unit: .celsius,
+            sourceUnit: "K",
             scale: 1.0,
             offset: -273.15,
             spread: true
@@ -93,6 +103,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "mean_sea_level_pressure",
             domain: .surface,
             unit: .hectopascal,
+            sourceUnit: "Pa",
             scale: 0.01,
             offset: 0.0,
             spread: true
@@ -102,6 +113,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "sea_surface_temperature",
             domain: .surface,
             unit: .celsius,
+            sourceUnit: "K",
             scale: 1.0,
             offset: -273.15,
             spread: false
@@ -111,6 +123,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "total_precipitation_1hr",
             domain: .surface,
             unit: .millimetre,
+            sourceUnit: "m",
             scale: 1000.0,
             offset: 0.0,
             spread: false
@@ -120,6 +133,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "surface_solar_radiation_downwards_1hr",
             domain: .surface,
             unit: .wattPerSquareMetre,
+            sourceUnit: "J m**-2",
             scale: 0.0002777777777777778,
             offset: 0.0,
             spread: false
@@ -129,6 +143,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "total_sky_direct_solar_radiation_at_surface_1hr",
             domain: .surface,
             unit: .wattPerSquareMetre,
+            sourceUnit: "J m**-2",
             scale: 0.0002777777777777778,
             offset: 0.0,
             spread: false
@@ -138,6 +153,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "u_component_of_wind_10m",
             domain: .surface,
             unit: .metrePerSecond,
+            sourceUnit: "m s**-1",
             scale: 1.0,
             offset: 0.0,
             spread: true
@@ -147,6 +163,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "v_component_of_wind_10m",
             domain: .surface,
             unit: .metrePerSecond,
+            sourceUnit: "m s**-1",
             scale: 1.0,
             offset: 0.0,
             spread: true
@@ -156,6 +173,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "wind_speed_10m",
             domain: .surface,
             unit: .metrePerSecond,
+            sourceUnit: "m s**-1",
             scale: 1.0,
             offset: 0.0,
             spread: false
@@ -165,6 +183,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "u_component_of_wind_100m",
             domain: .surface,
             unit: .metrePerSecond,
+            sourceUnit: "m s**-1",
             scale: 1.0,
             offset: 0.0,
             spread: true
@@ -174,6 +193,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "v_component_of_wind_100m",
             domain: .surface,
             unit: .metrePerSecond,
+            sourceUnit: "m s**-1",
             scale: 1.0,
             offset: 0.0,
             spread: true
@@ -183,6 +203,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "wind_speed_100m",
             domain: .surface,
             unit: .metrePerSecond,
+            sourceUnit: "m s**-1",
             scale: 1.0,
             offset: 0.0,
             spread: false
@@ -192,6 +213,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "total_cloud_cover",
             domain: .surface,
             unit: .percentage,
+            sourceUnit: "(0 - 1)",
             scale: 100.0,
             offset: 0.0,
             spread: false
@@ -201,6 +223,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "low_cloud_cover",
             domain: .surface,
             unit: .percentage,
+            sourceUnit: "(0 - 1)",
             scale: 100.0,
             offset: 0.0,
             spread: false
@@ -210,6 +233,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "medium_cloud_cover",
             domain: .surface,
             unit: .percentage,
+            sourceUnit: "(0 - 1)",
             scale: 100.0,
             offset: 0.0,
             spread: false
@@ -219,6 +243,7 @@ struct WeatherNext3Variable: GenericVariable {
             source: "high_cloud_cover",
             domain: .surface,
             unit: .percentage,
+            sourceUnit: "(0 - 1)",
             scale: 100.0,
             offset: 0.0,
             spread: false
@@ -232,13 +257,17 @@ struct WeatherNext3Variable: GenericVariable {
     let statistic: Statistic
     let field: Field
 
+    init(field: Field, statistic: Statistic) {
+        self.field = field
+        self.statistic = statistic
+        self.rawValue = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
+    }
+
     init?(rawValue: String) {
         let statistic = Statistic.allCases.first { $0 != .mean && rawValue.hasSuffix("_" + $0.rawValue) } ?? .mean
         let name = statistic == .mean ? rawValue : String(rawValue.dropLast(statistic.rawValue.count + 1))
         guard let field = Self.fields.first(where: { $0.name == name }) else { return nil }
-        self.rawValue = rawValue
-        self.statistic = statistic
-        self.field = field
+        self.init(field: field, statistic: statistic)
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.rawValue == rhs.rawValue }

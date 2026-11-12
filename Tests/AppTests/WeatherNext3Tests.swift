@@ -13,6 +13,7 @@ import Testing
                 #expect(variable?.statistic == statistic)
                 #expect(variable?.unit == field.unit)
                 #expect(variable?.omFileName.file == name)
+                #expect(variable == WeatherNext3Variable(field: field, statistic: statistic))
             }
             #expect(WeatherNext3Variable(rawValue: field.name + "_spread") == nil)
         }
