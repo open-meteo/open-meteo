@@ -318,6 +318,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                         let range = block * cache.blockSize ..< min((block + 1) * cache.blockSize, bytes.count)
                         let value = UnsafeRawBufferPointer(rebasing: bytes[range])
                         let cached = cache.set(key: key, value: value)
+                        // Measure from the full mapping, so the file offset includes the index exactly once.
                         let offset = baseAddress.distance(to: cached.baseAddress!)
                         let payloadRange = offset..<(offset + value.count)
                         if let previous = writtenRange, previous.upperBound == payloadRange.lowerBound {

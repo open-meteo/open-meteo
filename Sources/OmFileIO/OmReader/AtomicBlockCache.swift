@@ -2,7 +2,7 @@ import Foundation
 import OmFileFormat
 import Synchronization
 #if os(Linux)
-import CHelper
+import OmFileIOC
 import Glibc
 #endif
 
@@ -18,23 +18,18 @@ public protocol AtomicBlockCacheStorable: Sendable {
 }
 
 extension MmapFile: AtomicBlockCacheStorable {
-    /// Request payload writeback without waiting for disk completion.
+    /// Request payload writeback on Linux without waiting for disk completion; no-op elsewhere.
+    /// Offset is relative to the start of the file, including the cache index.
     public func requestWriteback(offset: Int, count: Int) throws {
+        #if os(Linux)
         precondition(offset >= 0 && count >= 0 && offset <= data.count && count <= data.count - offset)
         guard count > 0 else { return }
-        #if os(Linux)
         // Submit only this range, retaining cached pages. Queue pressure may still block.
         let result = om_request_writeback(file.fileDescriptor, Int64(offset), Int64(count))
-        #else
-        // msync requires a page-aligned address and flushes all intersecting pages.
-        let pageSize = Int(getpagesize())
-        let pageStart = offset / pageSize * pageSize
-        let address = UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart))
-        let result = msync(address, offset - pageStart + count, MS_ASYNC)
-        #endif
         guard result == 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
+        #endif
     }
 
     public func prefetchData(offset: Int, count: Int) {

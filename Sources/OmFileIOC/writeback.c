@@ -5,7 +5,7 @@
 #endif
 #define _FILE_OFFSET_BITS 64
 #include <fcntl.h>
-#include "shim.h"
+#include "OmFileIOC.h"
 
 int om_request_writeback(int fd, int64_t offset, int64_t count) {
     return sync_file_range(fd, (off_t)offset, (off_t)count, SYNC_FILE_RANGE_WRITE);
