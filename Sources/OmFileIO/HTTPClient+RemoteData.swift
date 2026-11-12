@@ -18,7 +18,7 @@ extension HTTPClient {
 
     public static let sharedRemoteData: HTTPClient = {
         var configuration = HTTPClient.Configuration.singletonConfiguration
-        // HTTP/2 uses the peer's concurrent-stream limit instead.
+        configuration.httpVersion = .http1Only
         configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = remoteDataHTTPConnections.load(ordering: .acquiring)
         let client = HTTPClient(eventLoopGroup: HTTPClient.defaultEventLoopGroup, configuration: configuration)
         remoteDataInitialized.store(true, ordering: .releasing)
