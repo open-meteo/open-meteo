@@ -91,6 +91,7 @@ Apps:
 - [ShackScreen](https://github.com/maxhayim/ShackScreen) Free, open-source launcher dashboard for the TV in a ham radio shack (Android TV, Google TV, Fire TV and tablets). Its Weather widget shows current conditions, the next hours, sunrise or sunset and UV from Open-Meteo.
 - [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
+- [Snowlist](https://snowlist.org) Ski resort ratings from open data, with snow forecasts and ERA5 snowfall history for 150+ resorts.
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [ThaiFloodRisk](https://thaifloodrisk.com/en) Flood risk scores and daily flood odds for Bangkok and Thailand, built on Open-Meteo forecast, historical weather, river discharge (Flood API) and marine data.
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
