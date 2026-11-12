@@ -607,7 +607,7 @@ struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericRe
         try await reader.get(mixed: variable.rawValue, time: time)
     }
     
-    func prefetchData(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> Bool {
+    func prefetchData(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         return try await reader.prefetchData(mixed: variable.rawValue, time: time)
     }
     

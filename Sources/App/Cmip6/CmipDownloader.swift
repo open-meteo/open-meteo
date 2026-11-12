@@ -1215,7 +1215,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 for (l,gridpoint) in locationRange.enumerated() {
                     let reader = Cmip6ReaderPreBiasCorrection(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint, options: options), domain: domain)
-                    try await reader.prefetchData(variable: variable, time: time)
+                    _ = try await reader.prefetchData(variable: variable, time: time)
                     let data = try reader.get(variable: variable, time: time).data
                     bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(data), time: time.time, binsPerYear: binsPerYear).meansPerYear)
                 }

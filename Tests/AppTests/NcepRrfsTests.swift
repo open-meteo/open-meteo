@@ -117,7 +117,7 @@ import OpenMeteoSdk
         let targetElevation: Float = 100
         let modelDtSeconds = 3600
         func getStatic(type: ReaderStaticVariable) async throws -> Float? { nil }
-        func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {}
+        func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult { PrefetchResult(time.range) }
         func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
             DataAndUnit([12.5], variable.unit)
         }

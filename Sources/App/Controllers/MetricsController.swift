@@ -97,24 +97,24 @@ om_file_remote_payload_waiting \(OmFileSystemMetrics.fileRemotePayloadWaiting.lo
 # HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
 om_file_remote_payload_update_waiting \(OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
 # TYPE om_block_cache_fetches_running gauge
-# HELP om_block_cache_fetches_running Running remote data fetches
+# HELP om_block_cache_fetches_running Occupied backend fetch slots across cache coordinators
 om_block_cache_fetches_running \(OmFileSystemMetrics.blockCacheFetchesRunning.load(ordering: .relaxed))
 # TYPE om_block_cache_fetches_queued gauge
-# HELP om_block_cache_fetches_queued Queued remote data fetches
+# HELP om_block_cache_fetches_queued Backend fetch jobs waiting in cache coordinator queues
 om_block_cache_fetches_queued \(OmFileSystemMetrics.blockCacheFetchesQueued.load(ordering: .relaxed))
 # TYPE om_block_cache_queue_full_total counter
-# HELP om_block_cache_queue_full_total Queue full errors
+# HELP om_block_cache_queue_full_total Scheduling attempts rejected because the pending fetch queue was full
 om_block_cache_queue_full_total \(OmFileSystemMetrics.blockCacheQueueFullTotal.load(ordering: .relaxed))
 # TYPE om_block_cache_fetched_bytes_total counter
 # UNIT om_block_cache_fetched_bytes_total bytes
-# HELP om_block_cache_fetched_bytes_total Remote data fetched bytes
+# HELP om_block_cache_fetched_bytes_total Bytes returned by successful backend provider fetches, counted once per shared fetch
 om_block_cache_fetched_bytes_total \(OmFileSystemMetrics.blockCacheFetchedBytesTotal.load(ordering: .relaxed))
 # TYPE om_block_cache_preloads_bytes_total counter
 # UNIT om_block_cache_preloads_bytes_total bytes
-# HELP om_block_cache_preloads_bytes_total Remote data preloaded bytes
+# HELP om_block_cache_preloads_bytes_total Requested preload bytes clipped to EOF, including cached and repeated ranges and attempts that fail
 om_block_cache_preloads_bytes_total \(OmFileSystemMetrics.blockCachePreloadsBytesTotal.load(ordering: .relaxed))
 # TYPE om_block_cache_merged_blocks_total counter
-# HELP om_block_cache_merged_blocks_total Merged blocks
+# HELP om_block_cache_merged_blocks_total Blocks beyond the first batched into each started backend fetch, including failed fetches
 om_block_cache_merged_blocks_total \(OmFileSystemMetrics.blockCacheMergedBlocksTotal.load(ordering: .relaxed))
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes

@@ -79,7 +79,6 @@ private final class PrefetchStorage: AtomicBlockCacheStorable, Sendable {
         try storage.requestWriteback(offset: offset, count: count)
         writebackRanges.withLock { $0.append(offset..<(offset + count)) }
     }
-
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
         try storage.withMutableUnsafeBytes(body)
     }
@@ -409,7 +408,6 @@ struct AtomicCacheCoordinatorTests {
         }
         #expect(storage.writebackRanges.withLock { $0 } == expected)
     }
-
     @Test func prefetchAndAdviceKeepRequestedByteRanges() async throws {
         let blockSize = 64 * 1024
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path

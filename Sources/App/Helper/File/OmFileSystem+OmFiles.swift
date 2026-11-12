@@ -8,12 +8,27 @@ struct OmFileLocalRemoteOmReader {
     let reader: any OmFileReaderArrayProtocol<Float>
     let timestamps: [Timestamp]?
     let timeRangeDt: TimerangeDt?
+    let forecastReferenceTime: Timestamp?
+    /// Inclusive last valid timestamp of the forecast run, not necessarily this chunk.
+    let forecastLastValidTime: Timestamp?
     
+    /// Limit file coverage while retaining its origin for array offsets.
+    func prefetchTimeRange(fileTime: Range<Int>, dtSeconds: Int) -> Range<Int> {
+        guard let forecastLastValidTime else { return fileTime }
+        let lastIndex = dtSeconds == .dtSecondsMonthly ? forecastLastValidTime.monthIntervalSince1970Average : forecastLastValidTime.timeIntervalSince1970 / dtSeconds
+        let end = max(fileTime.lowerBound, min(fileTime.upperBound, lastIndex + 1))
+        return fileTime.lowerBound..<end
+    }
+
     init(remoteFile: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws {
         let readerRaw = try await OmFileReader(fn: remoteFile)
         self.reader = try readerRaw.expectArray(of: Float.self)
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
+        let referenceTime: Int? = try await readerRaw.getChild(name: "forecast_reference_time")?.readScalar()
+        let lastValidTime: Int? = try await readerRaw.getChild(name: "forecast_last_valid_time")?.readScalar()
+        self.forecastReferenceTime = referenceTime.map(Timestamp.init)
+        self.forecastLastValidTime = lastValidTime.map(Timestamp.init)
     }
 }
 
@@ -25,6 +40,10 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         self.reader = try readerRaw.expectArray(of: Float.self)
         self.timestamps = try await readerRaw.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
         self.timeRangeDt = try await readerRaw.getTimeRangeDt()
+        let referenceTime: Int? = try await readerRaw.getChild(name: "forecast_reference_time")?.readScalar()
+        let lastValidTime: Int? = try await readerRaw.getChild(name: "forecast_last_valid_time")?.readScalar()
+        self.forecastReferenceTime = referenceTime.map(Timestamp.init)
+        self.forecastLastValidTime = lastValidTime.map(Timestamp.init)
     }
     
     init(file: OmHttpReaderBackend) async throws {

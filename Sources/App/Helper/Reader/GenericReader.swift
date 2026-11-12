@@ -2,6 +2,79 @@ import Foundation
 import OmFileFormat
 import Vapor
 
+/// A contiguous interval whose data has been prefetched. An empty range means no data was prefetched.
+/// Bounds are timestamps, independent of the reader's timestep; the upper bound is exclusive.
+struct PrefetchResult: Equatable {
+    private(set) var range: Range<Timestamp>
+
+    init(_ range: Range<Timestamp> = Timestamp(0)..<Timestamp(0)) {
+        self.range = range.isEmpty ? Timestamp(0)..<Timestamp(0) : range
+    }
+
+    func covers(_ requested: Range<Timestamp>) -> Bool {
+        if requested.isEmpty { return true }
+        guard !range.isEmpty else { return false }
+        return range.lowerBound <= requested.lowerBound && range.upperBound >= requested.upperBound
+    }
+
+    /// Join overlapping or adjacent model/file coverage without claiming data across gaps.
+    /// Keep the first interval when disjoint: this is conservative and requires no range array.
+    mutating func include(_ other: PrefetchResult) {
+        let other = other.range
+        guard !other.isEmpty else { return }
+        guard !range.isEmpty else { range = other; return }
+        guard other.lowerBound <= range.upperBound && range.lowerBound <= other.upperBound else { return }
+        self.range = min(range.lowerBound, other.lowerBound)..<max(range.upperBound, other.upperBound)
+    }
+
+    /// Derived data is available only where all required inputs are available.
+    func intersecting(_ other: PrefetchResult) -> PrefetchResult {
+        guard !range.isEmpty, !other.range.isEmpty else { return PrefetchResult() }
+        return PrefetchResult(range.clamped(to: other.range))
+    }
+
+    /// Translate dependency coverage to the output timeline, accounting for read padding
+    /// or a time shift. Partial padded reads are conservatively rounded to output steps.
+    func mapped(from input: TimerangeDt, to output: TimerangeDt) -> PrefetchResult {
+        if covers(input.range) { return PrefetchResult(output.range) }
+        if input.range == output.range && input.dtSeconds == output.dtSeconds {
+            return intersecting(PrefetchResult(output.range))
+        }
+        let range = intersecting(PrefetchResult(input.range)).range
+        guard !range.isEmpty else { return PrefetchResult() }
+        let missingStart = range.lowerBound.timeIntervalSince1970 - input.range.lowerBound.timeIntervalSince1970
+        let missingEnd = input.range.upperBound.timeIntervalSince1970 - range.upperBound.timeIntervalSince1970
+        let dt = output.dtSeconds
+        let start = output.range.lowerBound.add(((missingStart + dt - 1) / dt) * dt)
+        let end = output.range.upperBound.add(-((missingEnd + dt - 1) / dt) * dt)
+        guard start < end else { return PrefetchResult() }
+        return PrefetchResult(start..<end)
+    }
+
+    /// Restrict coverage to the interval shared with another required input.
+    mutating func formIntersection(_ other: PrefetchResult) {
+        self = intersecting(other)
+    }
+
+}
+
+/// Accumulates file index ranges as timestamps without allocating a range array.
+struct PrefetchCoverage {
+    let requested: TimerangeDt
+    private(set) var result = PrefetchResult()
+
+    mutating func insert(_ range: Range<Int>) {
+        let overlap = range.clamped(to: requested.toIndexTime())
+        guard !overlap.isEmpty else { return }
+        if requested.dtSeconds == .dtSecondsMonthly {
+            let epoch = YearMonth(year: 1970, month: 1)
+            result.include(PrefetchResult(epoch.advanced(by: overlap.lowerBound).timestamp..<epoch.advanced(by: overlap.upperBound).timestamp))
+        } else {
+            result.include(PrefetchResult(Timestamp(overlap.lowerBound * requested.dtSeconds)..<Timestamp(overlap.upperBound * requested.dtSeconds)))
+        }
+    }
+}
+
 protocol GenericReaderBaseProtocol {
     var modelLat: Float { get }
     var modelLon: Float { get }
@@ -22,14 +95,14 @@ protocol GenericReaderProtocol: GenericReaderBaseProtocol {
     associatedtype MixingVar: GenericVariableMixable
 
     func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws
+    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> PrefetchResult
 }
 
 protocol GenericReaderOptionalProtocol<VariableOpt>: GenericReaderBaseProtocol {
     associatedtype VariableOpt: GenericVariableMixable
 
     func get(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> DataAndUnit?
-    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> Bool
+    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> PrefetchResult
 }
 
 extension GenericReaderProtocol {
@@ -160,10 +233,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> PrefetchResult {
         if time.dtSeconds == domain.dtSeconds {
-            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
-            return
+            return try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
         }
 
         let interpolationType = variable.interpolation
@@ -171,7 +243,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
             time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
 
-        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), run: run)
+        let prefetched = try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), run: run)
+        return prefetched.mapped(from: timeRead, to: time.time)
     }
 
     /// Read

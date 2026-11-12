@@ -16,7 +16,6 @@ enum OpenMeteo {
         }
         return value
     }()
-
     /// Number of locations to prefetch ahead while writing API responses. Zero disables prefetching.
     static let prefetchLookAhead: Int = {
         guard let value = Int(Environment.get("PREFETCH_LOOK_AHEAD") ?? "3"), value >= 0 else {
@@ -221,6 +220,7 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone.gmt
+    HTTPClient.configureRemoteDataHTTPConnections(OpenMeteo.remoteDataHTTPConnections)
     app.lifecycle.use(RemoteDataHttpClientLifecycle())
 
     let corsConfiguration = CORSMiddleware.Configuration(
