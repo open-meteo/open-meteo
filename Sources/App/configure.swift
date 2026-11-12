@@ -276,6 +276,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(GoesDownloader(), as: "download-goes")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
     app.asyncCommands.use(DownloadWeatherNextCommand(), as: "download-weathernext")
+    app.asyncCommands.use(EumetnetDownloader(), as: "download-eumetnet")
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
