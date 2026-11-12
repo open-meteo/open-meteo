@@ -16,7 +16,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
     var help: String { "Download WeatherNext 3 hourly surface statistics on both native grids" }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        Process.alarm(seconds: 60 * 60)
+        Process.alarm(seconds: 4 * 60 * 60)
         defer { Process.alarm(seconds: 0) }
 
         let app = context.application
