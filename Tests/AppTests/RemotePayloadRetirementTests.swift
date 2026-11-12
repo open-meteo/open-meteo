@@ -12,7 +12,7 @@ struct RemotePayloadRetirementTests {
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
         defer { try? FileManager.default.removeItem(atPath: path) }
         let cache = AtomicCacheCoordinator(cache: try AtomicBlockCache(file: path, blockSize: 4096, blockCount: 16))
-        let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
         let oldKey = cache.calculateCacheKey(fileKey: 123, block: 0)
 
         // Keep reader references in this scope so returning exercises their actual deinitializers.
