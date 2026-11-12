@@ -90,8 +90,7 @@ public actor S3ServerHealth {
                 var request = HTTPClientRequest(url: server.uploadServer)
                 request.method = .HEAD
                 request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
-                // Keep health checks independent of the remote-data connection pool.
-                _ = try await HTTPClient.shared.executeRetry(
+                _ = try await HTTPClient.sharedRemoteData.executeRetry(
                     request,
                     logger: logger,
                     deadline: .seconds(60),

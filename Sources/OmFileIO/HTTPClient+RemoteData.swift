@@ -1,14 +1,14 @@
 import AsyncHTTPClient
 import Synchronization
 
-/// One process-wide connection pool for remote data listings, metadata and range reads.
-/// Health checks use `HTTPClient.shared` independently.
+/// One process-wide connection pool for remote data listings, metadata, range reads and health checks.
 /// See `docs/remote-data.md` at the repository root for HTTP connection settings.
 extension HTTPClient {
     private static let remoteDataInitialized = Atomic(false)
     private static let remoteDataHTTPConnections = Atomic(8)
 
     /// Set the HTTP/1 per-host connection limit during startup, before any remote data requests.
+    /// Leave headroom above the concurrent-fetch limit for health checks, listings and metadata.
     /// Does not initialize the pool; standalone users retain the default of eight connections.
     public static func configureRemoteDataHTTPConnections(_ limit: Int) {
         precondition(limit > 0)
