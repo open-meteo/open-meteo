@@ -1,6 +1,7 @@
 import Foundation
 import AsyncHTTPClient
 import NIOCore
+import NIOFoundationCompat
 import Logging
 import NIOFileSystem
 import OmTime
