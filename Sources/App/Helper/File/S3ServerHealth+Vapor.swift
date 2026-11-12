@@ -1,3 +1,4 @@
+import OmFileIO
 import Vapor
 
 public extension Application {
@@ -14,7 +15,7 @@ public extension Application {
             return existing
         }
         let servers = S3BucketEndpoint.loadFromEnvironment(variable: "S3_UPLOAD_REPLICATION_SERVERS")
-        let manager = S3ServerHealth(logger: logger, servers: servers)
+        let manager = S3ServerHealth(client: .sharedRemoteData, logger: logger, servers: servers)
         self.storage[S3ServerHealthKey.self] = manager
         return manager
     }

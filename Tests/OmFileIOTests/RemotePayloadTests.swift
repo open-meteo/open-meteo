@@ -57,7 +57,7 @@ private struct TestRemotePayload: OmRemotePayload {
 struct RemotePayloadTests {
     @Test func modifiedBackendRejectsReadsWithoutContactingServer() async throws {
         // With no endpoints, attempting network access would fail with a server selection error.
-        let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
         let backend = OmHttpReaderBackend(context: context, object: "test.om", count: 1, eTag: "\"old\"", lastModified: Timestamp(0))
         backend.markModified()
 
@@ -75,7 +75,7 @@ struct RemotePayloadTests {
 
     @Test(arguments: [false, true])
     func metadataAvailableBeforePrefetchFinishes(prefetchFails: Bool) async throws {
-        let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
         let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
         _ = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
         let version = prefetchFails ? "\"failure\"" : "\"new\""
@@ -98,7 +98,7 @@ struct RemotePayloadTests {
 
     @Test(arguments: [false, true])
     func deletionRetiresRetainedPayloads(prefetching: Bool) async throws {
-        let context = S3ServerHealth(logger: .init(label: "test"), servers: [], checksHealth: false)
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
         let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
         let old = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
         var new: TestRemotePayload?
@@ -134,7 +134,7 @@ struct RemotePayloadTests {
             }
             try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
             let port = try #require(app.http.server.shared.localAddress?.port)
-            let context = S3ServerHealth(logger: .init(label: "test"), servers: [
+            let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [
                 .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
             ], checksHealth: false)
             let directory = OmFileSystemS3.Directory(prefix: "")
@@ -175,7 +175,7 @@ struct RemotePayloadTests {
             }
             try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
             let port = try #require(app.http.server.shared.localAddress?.port)
-            let context = S3ServerHealth(logger: .init(label: "test"), servers: [
+            let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [
                 .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
             ], checksHealth: false)
             let parent = OmFileSystemS3.Directory(prefix: "")
@@ -216,7 +216,7 @@ struct RemotePayloadTests {
             }
             try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
             let port = try #require(app.http.server.shared.localAddress?.port)
-            let context = S3ServerHealth(logger: .init(label: "test"), servers: [
+            let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [
                 .init(rawEndpoint: "http://127.0.0.1:\(port)/", profile: nil)
             ], checksHealth: false)
             let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")

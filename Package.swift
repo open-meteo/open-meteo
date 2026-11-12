@@ -43,7 +43,10 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
-        //.package(url: "https://github.com/swift-server/async-http-client.git", from: "1.9.0")
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.37.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.17.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.7.5"),
+        .package(url: "https://github.com/apple/swift-system.git", from: "1.8.1"),
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.3")
@@ -96,13 +99,17 @@ let package = Package(
         .target(
             name: "OmFileIO",
             dependencies: [
-                //.product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Collections", package: "swift-collections"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "OmFileFormat", package: "om-file-format"),
-                .product(name: "Vapor", package: "vapor"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 "OmFileIOC",
                 "OmTime"

@@ -41,9 +41,9 @@ Queued jobs are ordered by scheduling deadline. Demand reads normally take prece
 |---|---|---|
 | `REMOTE_DATA_MAX_CONCURRENT_FETCHES` | Number of concurrent backend fetches. | `12` |
 | `REMOTE_DATA_MAX_PENDING_FETCHES` | Maximum number of queued fetches. | `65536` |
-| `REMOTE_DATA_HTTP_CONNECTIONS` | HTTP/1 connection-pool soft limit per remote backend host. HTTP/2 uses the server's concurrent-stream limit. | `16` |
+| `REMOTE_DATA_HTTP_CONNECTIONS` | HTTP/1.1 connection-pool soft limit per remote backend host. | `16` |
 
-The HTTP connection setting controls the shared remote HTTP client, which also handles listings and metadata requests. It is separate from the cache's concurrent-fetch limit.
+The shared HTTP/1.1 pool also handles listings, metadata requests and health checks, so allow headroom above `REMOTE_DATA_MAX_CONCURRENT_FETCHES`.
 
 ## Prefetching and File Updates
 

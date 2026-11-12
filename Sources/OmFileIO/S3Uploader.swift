@@ -1,6 +1,7 @@
 import Foundation
 import AsyncHTTPClient
 import NIOCore
+import NIOFoundationCompat
 import Logging
 import NIOFileSystem
 import OmTime
@@ -74,7 +75,7 @@ public enum S3Uploader {
                 req.method = .PUT
                 req.body = .bytes(chunk)
                 req.headers.add(name: "x-amz-content-sha256", value: chunk.readableBytesView.sha256Hex)
-                req.headers.add(name: .contentLength, value: "\(chunk.readableBytes)")
+                req.headers.add(name: "Content-Length", value: "\(chunk.readableBytes)")
                 let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(120))
                 guard let etag = response.headers.first(name: "ETag") else {
                     throw S3UploaderError.missingETag(partNumber: partNumber)

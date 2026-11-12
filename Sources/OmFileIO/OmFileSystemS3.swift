@@ -532,7 +532,7 @@ public struct OmFileSystemS3: Sendable {
             OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.add(1, ordering: .relaxed)
             do {
                 // Directory readers wait for this refresh, so use a short retry budget.
-                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: HTTPClient.sharedRemoteData, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 30.0 / 3600, timeoutPerRequest: .seconds(10))
+                let listed = try await S3List.s3list(server: context.getServerFor(hash: prefix.fnv1aHash64).uploadServer, client: context.client, logger: context.logger, prefix: prefix, apikey: nil, deadLineHours: 30.0 / 3600, timeoutPerRequest: .seconds(10))
                 guard !isRetired else { return }
                 var listedFiles = Set<String>()
                 for file in listed.files {
