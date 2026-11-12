@@ -104,10 +104,12 @@ let package = Package(
                 .product(name: "OmFileFormat", package: "om-file-format"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                "OmFileIOC",
                 "OmTime"
             ]
         ),
         .target(name: "OmTime"),
+        .target(name: "OmFileIOC"),
         .target(
             name: "Lbzip2"
         ),

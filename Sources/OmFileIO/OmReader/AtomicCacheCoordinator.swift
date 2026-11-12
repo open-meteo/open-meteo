@@ -308,17 +308,35 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             }
             do {
                 let fetched = try await fetch(start, blockCount)
-                fetched.withUnsafeBytes { bytes in
+                try fetched.withUnsafeBytes { bytes in
                     OmFileSystemMetrics.blockCacheFetchedBytesTotal.add(bytes.count, ordering: .relaxed)
                     assert(blockCount == bytes.count.divideRoundedUp(divisor: cache.blockSize))
+                    let baseAddress = cache.data.withMutableUnsafeBytes { UnsafeRawPointer($0.baseAddress!) }
+                    var writtenRange: Range<Int>?
                     for block in 0..<blockCount {
                         let key = start &+ UInt64(block)
                         let range = block * cache.blockSize ..< min((block + 1) * cache.blockSize, bytes.count)
                         let value = UnsafeRawBufferPointer(rebasing: bytes[range])
                         let cached = cache.set(key: key, value: value)
+                        // Measure from the full mapping, so the file offset includes the index exactly once.
+                        let offset = baseAddress.distance(to: cached.baseAddress!)
+                        let payloadRange = offset..<(offset + value.count)
+                        if let previous = writtenRange, previous.upperBound == payloadRange.lowerBound {
+                            writtenRange = previous.lowerBound..<payloadRange.upperBound
+                        } else {
+                            // Collisions and wraparound can split the physical storage of a super block.
+                            if let previous = writtenRange {
+                                try cache.data.requestWriteback(offset: previous.lowerBound, count: previous.count)
+                            }
+                            writtenRange = payloadRange
+                        }
                         // Deliver cache storage so a single-block reader can retain a borrowed pointer.
                         let delivered = UnsafeRawBufferPointer(rebasing: cached[..<value.count])
                         blockStates.removeValue(forKey: key)?.complete(with: .success(delivered))
+                    }
+                    // Flush only written payload ranges, including a partial final block.
+                    if let writtenRange {
+                        try cache.data.requestWriteback(offset: writtenRange.lowerBound, count: writtenRange.count)
                     }
                 }
             } catch {
