@@ -18,6 +18,15 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         }
     }
 
+    /// The public hail amount includes graupel. RUC additionally resolves hail separately.
+    var hailGribVariables: [String] {
+        switch self {
+        case .iconD2, .iconD2Eps: return ["GRAU_GSP"]
+        case .iconD2Ruc: return ["GRAU_GSP", "HAIL_GSP"]
+        default: return []
+        }
+    }
+
     func getVarAndLevel(_ variable: any IconVariableDownloadable) -> (variable: String, cat: String, level: Int?)? {
         if self == .aicon {
             guard let variable = variable as? AiconSurfaceVariable else { return nil }
@@ -48,9 +57,9 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
               let variable = variable as? IconSurfaceVariable else { return false }
         switch self {
         case .iconD2Ruc:
-            return [.direct_radiation, .diffuse_radiation, .precipitation, .rain, .snowfall_water_equivalent, .cape, .convective_inhibition, .lightning_potential, .snowfall_height, .freezing_level_height, .updraft, .visibility].contains(variable)
+            return [.direct_radiation, .diffuse_radiation, .precipitation, .rain, .hail, .snowfall_water_equivalent, .cape, .convective_inhibition, .lightning_potential, .snowfall_height, .freezing_level_height, .updraft, .visibility].contains(variable)
         case .iconD2:
-            return [.direct_radiation, .diffuse_radiation, .precipitation, .cape, .lightning_potential, .snowfall_height, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .freezing_level_height, .rain, .showers].contains(variable)
+            return [.direct_radiation, .diffuse_radiation, .precipitation, .cape, .lightning_potential, .snowfall_height, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .freezing_level_height, .rain, .showers, .hail].contains(variable)
         default:
             return false
         }
@@ -257,7 +266,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         case .direct_radiation: return true
         case .diffuse_radiation: return true
         case .weather_code: return true
-        case .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .precipitation, .showers, .rain: return true
+        case .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .precipitation, .showers, .rain, .hail: return true
         case .updraft: return true
         default: return false
         }
@@ -364,6 +373,8 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         case .latent_heat_flux: return ("alhfl_s", "single-level", nil)
         case .showers: return ("rain_con", "single-level", nil)
         case .rain: return ("rain_gsp", "single-level", nil)
+        case .hail:
+            return nil // Derived from hailGribVariables, not a single upstream field.
         case .wind_gusts_10m: return ("vmax_10m", "single-level", nil)
         case .freezing_level_height: return ("hzerocl", "single-level", nil)
         case .relative_humidity_2m: return ("relhum_2m", "single-level", nil)

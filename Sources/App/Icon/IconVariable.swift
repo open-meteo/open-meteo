@@ -149,6 +149,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
     /// Large scale rain in mm
     case rain
 
+    /// Hail including graupel, in mm water equivalent.
+    case hail
+
     /// convective snowfall. Note: Only downloaded and then added to `snowfall_water_equivalent`
     case snowfall_convective_water_equivalent
 
@@ -197,7 +200,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .showers, .precipitation, .snowfall_water_equivalent: return true
+        case .showers, .precipitation, .snowfall_water_equivalent, .hail: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .diffuse_radiation, .direct_radiation: return true
@@ -248,6 +251,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .direct_radiation: return 1
         case .showers: return 10
         case .rain: return 10
+        case .hail: return 10
         case .pressure_msl: return 10
         case .snowfall_convective_water_equivalent: return 10
         case .snowfall_water_equivalent: return 10
@@ -301,6 +305,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .latent_heat_flux: return .wattPerSquareMetre
         case .showers: return .millimetre
         case .rain: return .millimetre
+        case .hail: return .millimetre
         case .wind_gusts_10m: return .metrePerSecond
         case .freezing_level_height: return .metre
         case .relative_humidity_2m: return .percentage
@@ -406,6 +411,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .showers:
             return .backwards_sum
         case .rain:
+            return .backwards_sum
+        case .hail:
             return .backwards_sum
         case .snowfall_convective_water_equivalent:
             return .backwards_sum
@@ -633,6 +640,8 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
     case precipitation
     case rain
     case showers
+    /// Hail including graupel, in mm water equivalent.
+    case hail
     case direct_radiation
     case diffuse_radiation
     case pressure_msl
@@ -682,6 +691,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .precipitation: return .millimetre
         case .rain: return .millimetre
         case .showers: return .millimetre
+        case .hail: return .millimetre
         case .snowfall_water_equivalent: return .millimetre
         case .snow_depth: return .metre
         case .pressure_msl: return .hectopascal
@@ -715,6 +725,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .precipitation: return 10
         case .rain: return 10
         case .showers: return 10
+        case .hail: return 10
         case .snowfall_water_equivalent: return 10
         case .snow_depth: return 100
         case .pressure_msl: return 10
@@ -757,6 +768,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .precipitation: return .backwards_sum
         case .rain: return .backwards_sum
         case .showers: return .backwards_sum
+        case .hail: return .backwards_sum
         case .snowfall_water_equivalent: return .backwards_sum
         case .wind_v_component_10m: return .hermite(bounds: nil)
         case .wind_u_component_10m: return .hermite(bounds: nil)
