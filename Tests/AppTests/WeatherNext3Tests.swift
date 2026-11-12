@@ -19,20 +19,19 @@ import Testing
         #expect(WeatherNext3Variable(rawValue: "temperature_2m_p99") == nil)
     }
 
-    @Test func hourlyPathsAndHorizons() throws {
+    @Test func mainRunPathsAndHorizons() throws {
         let main = try Timestamp.fromRunHourOrYYYYMMDD("2026110800")
-        let interim = main.add(hours: 1)
-        #expect(WeatherNext3Domain.hours(run: main) == 360)
-        #expect(WeatherNext3Domain.hours(run: interim) == 48)
-        #expect(WeatherNext3Domain.path(run: interim).contains("20261108_01hr_01_preds"))
+        #expect(WeatherNext3Domain.hours == 360)
+        #expect(WeatherNext3Domain.path(run: main).contains("20261108_00hr_01_preds"))
     }
 
     @Test func latestExpectedRun() {
         let midnight = Timestamp(2026, 11, 10)
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 44 * 60)) == midnight.add(hours: -1))
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 44 * 60)) == midnight.add(hours: -6))
         #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 45 * 60)) == midnight)
         #expect(WeatherNext3Domain.latestRun(now: midnight.add(8 * 3600 + 9 * 60)) == midnight)
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(8 * 3600 + 10 * 60)) == midnight.add(hours: 1))
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(13 * 3600 + 44 * 60)) == midnight)
+        #expect(WeatherNext3Domain.latestRun(now: midnight.add(13 * 3600 + 45 * 60)) == midnight.add(hours: 6))
     }
 
     @Test func observedZstdDatetimeChunk() throws {

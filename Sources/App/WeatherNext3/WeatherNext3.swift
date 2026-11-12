@@ -22,7 +22,7 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
 
     var dtSeconds: Int { 3600 }
 
-    var updateIntervalSeconds: Int { 3600 }
+    var updateIntervalSeconds: Int { 6 * 3600 }
 
     var omFileLength: Int { 360 }
 
@@ -33,15 +33,11 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
     var generateFullRun: Bool { false }
 
     static func latestRun(now: Timestamp = .now()) -> Timestamp {
-        // GCS targets init + 7h10 for interim runs and init + 7h45 for main six-hourly runs.
-        let run = now.add(-(7 * 3600 + 10 * 60)).floor(toNearest: 3600)
-        if run.hour % 6 == 0, run.add(7 * 3600 + 45 * 60) > now {
-            return run.add(hours: -1)
-        }
-        return run
+        // GCS targets publication of the six-hourly main runs at init + 7h45.
+        now.add(-(7 * 3600 + 45 * 60)).floor(toNearest: 6 * 3600)
     }
 
-    static func hours(run: Timestamp) -> Int { run.hour % 6 == 0 ? 360 : 48 }
+    static let hours = 360
 
     static func path(run: Timestamp) -> String {
         "weathernext_3_0_0_statistics/zarr/2026_to_present/\(run.format_YYYYMMdd)_\(run.hour.zeroPadded(len: 2))hr_01_preds/"

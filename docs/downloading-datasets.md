@@ -209,9 +209,8 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json openmeteo-api downl
 ```
 
 The service account needs access to the WeatherNext 3 statistics bucket. Without
-`--run`, the downloader starts with the latest expected main cycle, then advances
-one initialization per invocation. Main runs cover 360 hours; interim runs cover
-48 hours and preserve the previous long-range forecast.
+`--run`, the downloader selects the latest expected main cycle. Only main runs at
+00, 06, 12 and 18 UTC are supported, each covering 360 hours.
 
 Model: `google_weathernext3_ensemble_mean`. Temperature and dew point use the 0.05°
 station heads; other surface variables use the 0.1° grid. The downloader stores

@@ -5,7 +5,7 @@ import Vapor
 
 struct DownloadWeatherNext3Command: AsyncCommand {
     struct Signature: CommandSignature {
-        @Option(name: "run") var run: String?
+        @Option(name: "run", help: "Main run initialization (00, 06, 12 or 18 UTC)") var run: String?
         @Option(name: "concurrent-download", help: "Maximum concurrent chunk download/decoding tasks (default: 8)")
         var concurrentDownload: Int?
         @Option(name: "concurrent", help: "Maximum concurrent temporal OM conversion tasks (default: 1)")
@@ -42,6 +42,9 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             run = try Timestamp.fromRunHourOrYYYYMMDD(specified)
         } else {
             run = WeatherNext3Domain.latestRun()
+        }
+        guard run.hour % 6 == 0 else {
+            throw Abort(.badRequest, reason: "WeatherNext 3 supports only main runs at 00, 06, 12 or 18 UTC")
         }
 
         let oldSurface = try await WeatherNext3Domain.surface.getMetaJson()
@@ -99,7 +102,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             initialStorage = try await storage()
         }
 
-        let hours = WeatherNext3Domain.hours(run: run)
+        let hours = WeatherNext3Domain.hours
         logger.info(
             "WeatherNext 3: success marker found; validating Zarr metadata and coordinates (\(hours) forecast hours)"
         )
