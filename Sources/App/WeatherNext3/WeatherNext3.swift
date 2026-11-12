@@ -10,14 +10,26 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
     var domainRegistryStatic: DomainRegistry? { nil }
 
     var grid: any Gridable {
-        RegularGrid(
-            nx: self == .surface ? 3600 : 7200,
-            ny: self == .surface ? 1801 : 3601,
-            latMin: -90,
-            lonMin: -180,
-            dx: self == .surface ? 0.1 : 0.05,
-            dy: self == .surface ? 0.1 : 0.05
-        )
+        switch self {
+        case .surface:
+            RegularGrid(
+                nx: 3600,
+                ny: 1801,
+                latMin: -90,
+                lonMin: -180,
+                dx: 0.1,
+                dy: 0.1
+            )
+        case .station:
+            RegularGrid(
+                nx: 7200,
+                ny: 3601,
+                latMin: -90,
+                lonMin: -180,
+                dx: 0.05,
+                dy: 0.05
+            )
+        }
     }
 
     var dtSeconds: Int { 3600 }
