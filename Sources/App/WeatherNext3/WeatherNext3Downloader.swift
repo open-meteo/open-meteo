@@ -47,7 +47,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "WeatherNext 3 supports only main runs at 00, 06, 12 or 18 UTC")
         }
 
-        let httpConfiguration = HTTPClient.Configuration(
+        var httpConfiguration = HTTPClient.Configuration(
             redirectConfiguration: .follow(max: 5, allowCycles: false),
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(
@@ -55,6 +55,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 concurrentHTTP1ConnectionsPerHostSoftLimit: max(8, downloadConcurrency)
             )
         )
+        httpConfiguration.maximumUsesPerConnection = 64
         let httpClient = HTTPClient(
             eventLoopGroupProvider: .shared(app.eventLoopGroup),
             configuration: httpConfiguration,
