@@ -3,6 +3,10 @@ import Foundation
 import NIOCore
 import Synchronization
 
+public enum OmReaderCacheError: Error {
+    case cacheMiss
+}
+
 /// Adapts file byte-range reads to a shared `AtomicCacheCoordinator` and its atomic block cache.
 /// See `docs/remote-data.md` at the repository root for remote access, caching, and prefetch configuration.
 /// `cacheKey` identifies this file's contents and must change when those contents are replaced.
@@ -41,7 +45,30 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         self.coordinator = cache
         self.cacheKey = cacheKey
     }
-    
+
+    /// Adapt cached reads to the OM reader backend interface without changing this reader's mode.
+    public func cachedOnly() -> CachedOnly {
+        CachedOnly(reader: self)
+    }
+
+    public struct CachedOnly: OmFileReaderBackend {
+        // Retain the reader so retirement cannot delete its blocks while this view is in use.
+        let reader: OmReaderBlockCache
+
+        public var count: Int { reader.count }
+
+        public func prefetchData(offset: Int, count: Int) async throws {}
+
+        public func getData(offset: Int, count: Int) throws -> Data {
+            try reader.fetchCachedOnly(offset: offset, count: count).intoData()
+        }
+
+        public func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) throws -> T {
+            let result = try reader.fetchCachedOnly(offset: offset, count: count)
+            return try result.withUnsafeBytes(fn)
+        }
+    }
+
     deinit {
         if deleteOnDeinit.load(ordering: .relaxed) {
             _ = deleteCachedBlocks(olderThanSeconds: 0)
@@ -137,6 +164,35 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
             let start = Int(block) * blockSize
             return try await backend.getData(offset: start, count: min((Int(block) + count) * blockSize, fileSize) - start)
         })
+    }
+
+    /// Read cached blocks without scheduling or waiting for backend work. Throws cacheMiss on a miss.
+    func fetchCachedOnly(offset: Int, count: Int) throws -> OwnedOrBorrowedBuffer {
+        precondition(offset >= 0 && count >= 0)
+        try Task.checkCancellation()
+        guard count > 0 else { return .borrowed(UnsafeRawBufferPointer(start: nil, count: 0)) }
+        let blockSize = coordinator.cache.blockSize
+        let blockRange = (offset..<(offset + count)).divideRoundedUp(divisor: blockSize)
+        let start = offset - blockRange.lowerBound * blockSize
+        if blockRange.lowerBound / coordinator.superBlockLength == (blockRange.upperBound - 1) / coordinator.superBlockLength,
+           let cached = coordinator.cache.get(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: blockRange.lowerBound), count: UInt64(blockRange.count)) {
+            return .borrowed(UnsafeRawBufferPointer(rebasing: cached[start..<(start + count)]))
+        }
+        // Copy one block at a time, including noncontiguous cache hits and super-block boundaries.
+        // A miss never enters the scheduler or waits for an in-flight fetch.
+        let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 8)
+        let owned = OwnedRawBuffer(UnsafeRawBufferPointer(buffer))
+        for block in blockRange {
+            guard let cached = coordinator.cache.get(key: coordinator.calculateCacheKey(fileKey: cacheKey, block: block), count: 1) else {
+                throw OmReaderCacheError.cacheMiss
+            }
+            let lower = max(offset, block * blockSize)
+            let upper = min(offset + count, (block + 1) * blockSize)
+            let destination = UnsafeMutableRawBufferPointer(rebasing: buffer[(lower - offset)..<(upper - offset)])
+            let source = UnsafeRawBufferPointer(rebasing: cached[(lower - block * blockSize)..<(upper - block * blockSize)])
+            destination.copyMemory(from: source)
+        }
+        return .owned(owned)
     }
 
     /// Read a valid file byte range and invoke `fn` synchronously with its bytes.

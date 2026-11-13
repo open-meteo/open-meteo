@@ -29,6 +29,9 @@ extension OmFilePayloadCodable {
         self = try decoder.decode(Self.self, from: buffer)
     }
     
+    // This payload is already fully loaded locally.
+    func cachedOnly() async throws -> Self { self }
+
     func updateMetaData(file: OmHttpReaderBackend) async throws -> Self {
         return try await Self(file: file)
     }

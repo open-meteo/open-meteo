@@ -36,10 +36,17 @@ private actor PrefetchGate {
 private struct TestRemotePayload: OmRemotePayload {
     let version: String
     let gate: PrefetchGate
+    var cacheOnly = false
 
     init(file: OmHttpReaderBackend) {
         version = file.eTag
         gate = PrefetchGate()
+    }
+
+    func cachedOnly() async throws -> Self {
+        var copy = self
+        copy.cacheOnly = true
+        return copy
     }
 
     func updateMetaData(file: OmHttpReaderBackend) async throws -> Self {
@@ -55,6 +62,39 @@ private struct TestRemotePayload: OmRemotePayload {
 }
 
 struct RemotePayloadTests {
+    @Test(arguments: ["hit", "miss", "bothMiss"])
+    func triesCachedReplacementBeforeOldPayload(scenario: String) async throws {
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
+        let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
+        _ = try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false)
+        await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: "\"new\"")
+        let new = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true))
+        await new.gate.waitUntilStarted()
+        var attempts = [String]()
+        let result = try await OmFileSystemS3.FileWithContext(file: file, context: context).with { (payload: TestRemotePayload) in
+            attempts.append(payload.cacheOnly ? "cached" : payload.version)
+            if payload.cacheOnly && scenario != "hit" { throw OmReaderCacheError.cacheMiss }
+            if payload.version == "\"old\"" && scenario == "bothMiss" {
+                throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
+            }
+            return payload.version
+        }
+        #expect(result == (scenario == "miss" ? "\"old\"" : "\"new\""))
+        let expected = scenario == "hit" ? ["cached"] : scenario == "miss" ? ["cached", "\"old\""] : ["cached", "\"old\"", "\"new\""]
+        #expect(attempts == expected)
+        await new.gate.finish()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while await file.getPrefetchingPayload(ofType: TestRemotePayload.self) != nil {
+            try #require(ContinuousClock.now < deadline)
+            await Task.yield()
+        }
+        let ready = try await OmFileSystemS3.FileWithContext(file: file, context: context).with { (payload: TestRemotePayload) in
+            #expect(!payload.cacheOnly)
+            return payload.version
+        }
+        #expect(ready == "\"new\"")
+    }
+
     @Test func modifiedBackendRejectsReadsWithoutContactingServer() async throws {
         // With no endpoints, attempting network access would fail with a server selection error.
         let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)

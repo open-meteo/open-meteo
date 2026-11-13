@@ -104,6 +104,9 @@ struct IconNativeGridPayload: OmFilePayload {
         storage = try await domain.nativeGridFile.load(file: cached)
     }
 
+    // This payload is already fully loaded locally.
+    func cachedOnly() async throws -> Self { self }
+
     func updateMetaData(file: OmHttpReaderBackend) async throws -> Self {
         try await Self(file: file)
     }

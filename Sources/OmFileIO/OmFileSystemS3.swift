@@ -61,6 +61,14 @@ public struct OmFileSystemS3: Sendable {
         /// Execute a closure with the resolved payload. May retries if file modified errors occur
         public func with<R, Payload: OmRemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
             do {
+                if let new = await file.getPrefetchingPayload(ofType: Payload.self) {
+                    do {
+                        let cached = try await new.cachedOnly()
+                        return try await fn(cached)
+                    } catch OmReaderCacheError.cacheMiss {
+                        // Retry the operation with the old revision below.
+                    }
+                }
                 guard let payload = try await file.getPayload(ofType: Payload.self, context: context, receivedFileModifiedError: false) else {
                     return nil
                 }
@@ -111,7 +119,7 @@ public struct OmFileSystemS3: Sendable {
             /// The S3 directory listing detected a modification or a HTTP request threw a file modified error. Start reloading the new payload meta data, but no preloaded data yet
             case updatingMetaData(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
 
-            /// After an S3 directory update, the new file is available, but background updates are still running. If possible, use the old payload
+            /// The new file is preloading. Try its cached blocks first, falling back to the old payload on a miss.
             case updatingPrefetchBackground(old: any OmRemotePayload, new: any OmRemotePayload, identity: UUID)
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
@@ -272,6 +280,12 @@ public struct OmFileSystemS3: Sendable {
                     context.logger.warning("Payload retirement failed for \(objectName): \(error)")
                 }
             }
+        }
+
+        /// During preloading, callers may try the replacement without fetching missing blocks.
+        func getPrefetchingPayload<T: OmRemotePayload>(ofType: T.Type) -> T? {
+            guard case .updatingPrefetchBackground(_, let new, _) = payload else { return nil }
+            return new as? T
         }
 
         /// Resolve payload
