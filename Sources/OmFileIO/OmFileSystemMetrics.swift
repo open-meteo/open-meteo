@@ -12,6 +12,8 @@ public enum OmFileSystemMetrics {
     public static let fileRemoteModifiedUnexpectedlyTotal = Atomic(0)
     public static let fileRemoteDirectoriesOpen = Atomic(0)
     public static let fileRemoteDirectoryUpdatedTotal = Atomic(0)
+    /// In-flight directory loads and revalidations, excluding callers sharing an existing update.
+    public static let fileRemoteDirectoryUpdateRunning = Atomic(0)
     public static let fileRemoteDirectoryUpdateWaiting = Atomic(0)
     public static let fileRemoteDirectoryModifiedTotal = Atomic(0)
     

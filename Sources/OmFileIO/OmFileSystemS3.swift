@@ -537,7 +537,9 @@ public struct OmFileSystemS3: Sendable {
             }
             logger.debug("Revalidating remote directory: \(prefix)")
             revalidationQueue = []
+            OmFileSystemMetrics.fileRemoteDirectoryUpdateRunning.add(1, ordering: .relaxed)
             defer {
+                OmFileSystemMetrics.fileRemoteDirectoryUpdateRunning.add(-1, ordering: .relaxed)
                 // Also release waiters when retirement discards an in-flight listing.
                 let waiters = revalidationQueue
                 revalidationQueue = nil
