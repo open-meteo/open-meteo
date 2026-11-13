@@ -51,14 +51,16 @@ Multi-location API requests can prefetch upcoming locations while producing the 
 
 When inventory refreshes detect a changed file, Open-Meteo loads its new metadata and preloads recently accessed regions from the previous revision. Cached data from the old revision remains available to existing readers. Its blocks are marked for deletion when the old reader's final reference is released.
 
-Inventory preloading is optional. It is skipped when the pending queue is more than 10% full, or when estimated queue occupancy after adding the preload would exceed 30%. The estimate assumes uncached ranges; these thresholds do not replace the overall queue limit.
+Inventory preloading is optional. It is skipped when estimated queue occupancy after adding the preload would exceed `REMOTE_DATA_PRELOAD_QUEUE_PERCENT` (50% by default). The estimate assumes uncached ranges; this threshold does not replace the overall queue limit.
 
 | Environment variable | Description | Default |
 |---|---|---|
-| `REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS` | When a remote file changes, preload data blocks accessed within the last N seconds. | `900` (15 minutes) |
+| `REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS` | When a remote file changes, preload data blocks accessed within the last N seconds. Set to `0` to disable inventory preloading. | `900` (15 minutes) |
+| `REMOTE_DATA_PRELOAD_QUEUE_PERCENT` | Maximum estimated pending-queue occupancy after admitting a preload, as an integer from `0` to `100`. Rounded down to whole jobs. `0` allows only jobs that can start immediately; `100` allows the full queue. | `50` |
+| `REMOTE_DATA_PRELOAD_DEADLINE_SECONDS` | Scheduling deadline offset for inventory preloads. Controls queue ordering, not a request timeout. Set to `0` for an immediate scheduling deadline. | `600` (10 minutes) |
 | `PREFETCH_LOOK_AHEAD` | Number of locations prefetched ahead for multi-location API requests. Set to `0` to disable location prefetching. | `3` |
 
-The concurrent-fetch, pending-fetch, and HTTP-connection limits must be positive integers. The preload age and location look-ahead may be zero.
+The concurrent-fetch, pending-fetch, and HTTP-connection limits must be positive integers. The preload age, preload deadline offset, and location look-ahead must be non-negative integers and may be zero.
 
 ## Multiple Endpoints
 

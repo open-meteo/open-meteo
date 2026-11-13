@@ -240,17 +240,18 @@ public final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: Atomi
         deleteOnDeinit.store(true, ordering: .relaxed)
     }
 
-    /// Preload block ranges with a 30-second scheduling allowance and await all backend deliveries.
+    /// Preload block ranges with a configurable scheduling allowance (default 10 minutes).
+    /// Await all backend deliveries; the allowance controls queue ordering, not a timeout.
     /// Clip old ranges to this file's size and skip cached blocks without page advice. All ranges
     /// are registered before waiting, without allocating or copying an output buffer. Errors propagate
     /// and leave shared fetches running. Loaded blocks remain subject to normal cache eviction.
     /// Returns false without scheduling when the coordinator is too busy or lacks capacity.
     @discardableResult
-    public func preloadBlocks(blocks: [Range<Int>]) async throws -> Bool {
+    public func preloadBlocks(blocks: [Range<Int>], allowedWait: Duration = .seconds(600)) async throws -> Bool {
         let blockSize = coordinator.cache.blockSize
         let fileSize = backend.count
         return try await coordinator.preload(fileKey: cacheKey, blockRanges: blocks, fileSize: fileSize,
-                                      deadline: .now.advanced(by: .seconds(30)), provider: { [self] block, count in
+                                      deadline: .now.advanced(by: allowedWait), provider: { [self] block, count in
             let start = Int(block) * blockSize
             return try await backend.getData(offset: start, count: min((Int(block) + count) * blockSize, fileSize) - start)
         })

@@ -48,15 +48,16 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
               let updatedReader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {
             fatalError("prefetchBackground requires remote OM readers")
         }
+        // Retire old blocks even if optional preloading is disabled or fails. Live readers and backend
+        // jobs retain this reader, so deletion still waits for their final reference.
+        reader.fn.deleteCachedBlocksOnDeinit()
+        guard OpenMeteo.remoteDataPreloadMaxAgeSeconds > 0 else { return }
+
         let file = updatedReader.fn
         let logger = reader.fn.backend.server.logger
         let activeBlocks = reader.fn.listOfActiveBlocks(maxAgeSeconds: OpenMeteo.remoteDataPreloadMaxAgeSeconds, scaledToFileSize: file.count)
-        // Retire old blocks even if optional preloading fails. Live readers and backend
-        // jobs retain this reader, so deletion still waits for their final reference.
-        reader.fn.deleteCachedBlocksOnDeinit()
-        
         // Relative block positions are an estimate when the replacement file's internal layout changes.
-        let preloaded = try await file.preloadBlocks(blocks: activeBlocks)
+        let preloaded = try await file.preloadBlocks(blocks: activeBlocks, allowedWait: .seconds(OpenMeteo.remoteDataPreloadDeadlineSeconds))
         let blocksToFree = reader.fn.countCachedBlocks()
         logger.warning("OmFileRemoteOmReader: Blocks to free on deinit=\(blocksToFree) preloaded=\(preloaded ? activeBlocks.reduce(0) { $0 + $1.count } : 0) ranges=\(activeBlocks.count). Updated file \(file.backend.object) (old size=\(reader.fn.count) new size=\(file.count)). ")
     }
