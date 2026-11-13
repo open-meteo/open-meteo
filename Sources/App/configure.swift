@@ -26,9 +26,18 @@ enum OpenMeteo {
     }()
 
     /// Preload replacement-file blocks accessed within this many seconds. Defaults to 15 minutes.
+    /// Zero disables inventory preloading.
     static let remoteDataPreloadMaxAgeSeconds: UInt = {
         guard let value = UInt(Environment.get("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS") ?? "900") else {
             fatalError("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS must be a non-negative integer")
+        }
+        return value
+    }()
+
+    /// Scheduling allowance for replacement-file preloads. Defaults to 10 minutes.
+    static let remoteDataPreloadDeadlineSeconds: Int = {
+        guard let value = Int(Environment.get("REMOTE_DATA_PRELOAD_DEADLINE_SECONDS") ?? "600"), value >= 0 else {
+            fatalError("REMOTE_DATA_PRELOAD_DEADLINE_SECONDS must be a non-negative integer")
         }
         return value
     }()
@@ -74,10 +83,14 @@ enum OpenMeteo {
         guard let maxPendingFetches = Int(Environment.get("REMOTE_DATA_MAX_PENDING_FETCHES") ?? "65536"), maxPendingFetches > 0 else {
             fatalError("REMOTE_DATA_MAX_PENDING_FETCHES must be a positive integer")
         }
+        guard let preloadQueuePercent = Int(Environment.get("REMOTE_DATA_PRELOAD_QUEUE_PERCENT") ?? "50"), (0...100).contains(preloadQueuePercent) else {
+            fatalError("REMOTE_DATA_PRELOAD_QUEUE_PERCENT must be an integer between 0 and 100")
+        }
         let cache = AtomicCacheCoordinator(
             cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount),
             maxConcurrentFetches: maxConcurrentFetches,
-            maxPendingFetches: maxPendingFetches
+            maxPendingFetches: maxPendingFetches,
+            preloadQueuePercent: preloadQueuePercent
         )
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache

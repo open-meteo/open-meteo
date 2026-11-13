@@ -464,16 +464,26 @@ struct AtomicCacheCoordinatorTests {
     }
 
     @Test(arguments: [
-        (10, 1, 2, true),  // Exactly 10% before and 30% after queuing.
-        (10, 2, 1, false), // Already above 10%.
-        (10, 1, 3, false), // Would exceed 30%.
-        (9, 1, 1, false),  // Fractional thresholds round down.
-        (9, 0, 2, true),
-        (9, 0, 3, false),
-        (2, 0, 1, false)   // No queued preload fits below 30% of two slots.
+        (10, 50, 1, 4, true),  // Exactly 50% after queuing.
+        (10, 50, 2, 3, true),  // Above the former 10% threshold remains eligible.
+        (10, 50, 1, 5, false), // Would exceed 50%.
+        (10, 50, 6, 1, false), // Already above 50%.
+        (9, 50, 1, 3, true),   // Fractional thresholds round down to four jobs.
+        (9, 50, 1, 4, false),
+        (2, 50, 0, 1, true),
+        (1, 50, 0, 1, false),
+        (10, 30, 1, 2, true),
+        (10, 30, 1, 3, false),
+        (10, 80, 6, 2, true),
+        (10, 80, 6, 3, false),
+        (9, 33, 1, 1, true),
+        (9, 33, 1, 2, false),
+        (10, 0, 0, 1, false),  // Zero allows no pending preload jobs.
+        (10, 100, 9, 1, true), // The full queue can be used.
+        (Int.max, 100, 0, 1, true) // Percentage calculation does not overflow.
     ])
-    func preloadRequiresLowQueueOccupancyAndCapacity(pendingLimit: Int, queued: Int, ranges: Int, admitted: Bool) async throws {
-        let cache = try coordinator(limit: 1, pendingLimit: pendingLimit)
+    func preloadRequiresQueueCapacity(pendingLimit: Int, preloadQueuePercent: Int, queued: Int, ranges: Int, admitted: Bool) async throws {
+        let cache = try coordinator(limit: 1, pendingLimit: pendingLimit, preloadQueuePercent: preloadQueuePercent)
         let probe = FetchProbe()
         let running = request(cache, probe, key: 100, allowedWait: .zero)
         try await waitUntil { await probe.started.count == 1 }
@@ -680,13 +690,13 @@ struct AtomicCacheCoordinatorTests {
         }
     }
 
-    private func coordinator(limit: Int? = nil, pendingLimit: Int = 16_384, blockSize: Int = 64, blockCount: Int = 1024) throws -> Coordinator {
+    private func coordinator(limit: Int? = nil, pendingLimit: Int = 16_384, preloadQueuePercent: Int = 50, blockSize: Int = 64, blockCount: Int = 1024) throws -> Coordinator {
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
         defer { try? FileManager.default.removeItem(atPath: path) }
         // Use the production mmap storage: Data's mutable access is not safe for concurrent cache hits.
         let cache = try AtomicBlockCache(file: path, blockSize: blockSize, blockCount: blockCount)
-        if let limit { return Coordinator(cache: cache, maxConcurrentFetches: limit, maxPendingFetches: pendingLimit) }
-        return Coordinator(cache: cache, maxPendingFetches: pendingLimit)
+        if let limit { return Coordinator(cache: cache, maxConcurrentFetches: limit, maxPendingFetches: pendingLimit, preloadQueuePercent: preloadQueuePercent) }
+        return Coordinator(cache: cache, maxPendingFetches: pendingLimit, preloadQueuePercent: preloadQueuePercent)
     }
 
     private func request(_ cache: Coordinator, _ probe: FetchProbe, key: UInt64, allowedWait: Duration, mergeAdjacent: Bool = false) -> Task<Void, Error> {

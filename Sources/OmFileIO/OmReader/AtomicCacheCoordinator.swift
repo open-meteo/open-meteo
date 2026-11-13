@@ -43,6 +43,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
 
     public nonisolated let cache: AtomicBlockCache<Backend>
     private let maxConcurrentFetches: Int
+    private let preloadQueueLimit: Int
     private let maxPendingFetches: Int
     private var activeFetches = 0
     
@@ -246,16 +247,22 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// Coordinate reads against an existing cache. Both limits must be positive and count backend
     /// jobs, not blocks: running jobs use concurrency slots, and waiting jobs use queue capacity.
     /// Defaults are 4 concurrent and 16,384 queued jobs. Construction does not start background work.
+    /// Preloads may fill up to preloadQueuePercent (0...100, default 50) of the pending queue.
     public init(
         cache: AtomicBlockCache<Backend>,
         maxConcurrentFetches: Int = 4,
-        maxPendingFetches: Int = 16_384
+        maxPendingFetches: Int = 16_384,
+        preloadQueuePercent: Int = 50
     ) {
         precondition(maxConcurrentFetches > 0)
         precondition(maxPendingFetches > 0)
+        precondition((0...100).contains(preloadQueuePercent))
         self.cache = cache
         self.maxConcurrentFetches = maxConcurrentFetches
         self.maxPendingFetches = maxPendingFetches
+        // Round down without overflowing for large configured queue capacities.
+        self.preloadQueueLimit = (maxPendingFetches / 100) * preloadQueuePercent
+            + (maxPendingFetches % 100) * preloadQueuePercent / 100
     }
 
     /// Expand a queued job to cover an adjacent or overlapping range in the same super block.
@@ -373,8 +380,8 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     /// Preload file block ranges and await all deliveries without assembling an output buffer.
     /// Clip ranges to EOF and register every super block before suspending. Cached blocks are skipped
     /// without page advice; missing blocks share normal merging and deadline scheduling. Errors
-    /// propagate without cancelling shared work. Skip the entire preload when the queue is above
-    /// 10% full or estimated queue occupancy after registration would exceed 30%.
+    /// propagate without cancelling shared work. Skip the entire preload when estimated
+    /// queue occupancy after registration would exceed the configured cap (default 50%).
     /// Capacity estimation assumes uncached ranges and costs O(number of ranges); the scheduler
     /// still handles shared work and enforces queue capacity during registration.
     @discardableResult
@@ -383,13 +390,10 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         deadline: ContinuousClock.Instant, provider: @escaping FetchProvider
     ) async throws -> Bool {
         try Task.checkCancellation()
-        // Exactly 10% is eligible. Round down so fractional job limits never exceed the cap.
-        guard queuedFetches.count <= maxPendingFetches / 10 else { return false }
         let fileBlocks = 0..<fileSize.divideRoundedUp(divisor: cache.blockSize)
-        // Jobs that can start immediately do not consume the 30% pending-queue budget.
-        // Divide before multiplying to avoid overflow for large configured capacities.
-        let preloadQueueLimit = (maxPendingFetches / 10) * 3 + (maxPendingFetches % 10) * 3 / 10
-        let availableJobs = maxConcurrentFetches - activeFetches + preloadQueueLimit - queuedFetches.count
+        // Jobs that can start immediately do not consume the pending-queue budget.
+        let availableQueuedJobs = preloadQueueLimit - queuedFetches.count
+        let availableConcurrentJobs = maxConcurrentFetches - activeFetches
         var requiredJobs = 0
         // Assume uncached ranges: each intersecting super block needs one job. Count
         // ranges without visiting individual blocks or looking up cache reservations.
@@ -398,7 +402,7 @@ public final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             let blocks = range.clamped(to: fileBlocks)
             guard !blocks.isEmpty else { continue }
             requiredJobs += (blocks.upperBound - 1) / superBlockLength - blocks.lowerBound / superBlockLength + 1
-            guard requiredJobs <= availableJobs else { return false }
+            guard requiredJobs - availableConcurrentJobs <= availableQueuedJobs else { return false }
         }
         let _: ReadStorage = try await withCheckedThrowingContinuation { continuation in
             // An empty byte range counts deliveries without retaining or copying their bytes.
