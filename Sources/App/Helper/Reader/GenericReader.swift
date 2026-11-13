@@ -119,44 +119,35 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         return domain.dtSeconds
     }
 
-    /// Initialise reader to read a single grid-point
-    // TODO: Use decoded cached elevations for icon native domains in both initializers 
-    // and getStatic(.elevation) to avoid redundant filesystem-cache access and OM reads.
-    public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, elevation: Float = .nan, options: GenericReaderOptions) async throws {
-        try await options.validateRun(domain: domain)
+    /// Construct from resolved inputs. Selection, terrain I/O and run validation happen before this point.
+    init(domain: Domain, location: ReaderLocation, run: IsoDateTime?) {
         self.domain = domain
-        self.position = position
-        if let elevationFile = await domain.getStaticFile(type: .elevation) {
-            self.modelElevation = try await domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
-        } else {
-            self.modelElevation = .noData
-        }
-        // Mixed sources share a target elevation; standalone grid-point reads use model terrain.
-        self.targetElevation = elevation.isNaN ? self.modelElevation.numeric : elevation
-        let coords = modelCoordinates ?? domain.grid.getCoordinates(gridpoint: position)
-        self.modelLat = coords.latitude
-        self.modelLon = coords.longitude
+        self.position = location.source.position
+        self.modelElevation = location.source.elevation
+        self.targetElevation = location.output.elevation
+        self.modelLat = location.output.latitude
+        self.modelLon = location.output.longitude
         self.omFileSplitter = OmFileSplitter(domain)
-        self.run = options.run
+        self.run = run
     }
 
-    /// Return nil outside the grid. A missing requested run throws during initialization.
+    /// Standalone grid-point reads use model terrain unless an explicit elevation is supplied.
+    public init(domain: Domain, position: Int, modelCoordinates: (latitude: Float, longitude: Float)? = nil, elevation: Float? = nil, options: GenericReaderOptions) async throws {
+        try await options.validateRun(domain: domain)
+        let resources = await ReaderDomainResources(domain: domain)
+        let source = try await resources.sourceLocation(position: position)
+        let coordinates = modelCoordinates ?? resources.grid.getCoordinates(gridpoint: position)
+        self.init(domain: domain, location: .init(source: source, output: .init(
+            latitude: coordinates.latitude, longitude: coordinates.longitude, elevation: elevation ?? source.elevation.numeric
+        )), run: options.run)
+    }
+
+    /// Return nil outside the grid. A missing requested run throws before checking coverage.
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         try await options.validateRun(domain: domain)
-        // check if coordinates are in domain, otherwise return nil
-        let elevationFile = await domain.getStaticFile(type: .elevation)
-        guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {
-            return nil
-        }
-        self.domain = domain
-        self.position = gridpoint.gridpoint
-        self.modelElevation = gridpoint.gridElevation
-        self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
-        self.run = options.run
-
-        omFileSplitter = OmFileSplitter(domain)
-
-        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
+        let resources = await ReaderDomainResources(domain: domain)
+        guard let location = try await resources.point(lat: lat, lon: lon, elevation: elevation, mode: mode) else { return nil }
+        self.init(domain: domain, location: location, run: options.run)
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
