@@ -35,7 +35,7 @@ The cache uses a memory-mapped file with least-recently-used eviction. Keep its 
 
 The fetch limit applies across the shared cache coordinator. Once all concurrent fetch slots are occupied, additional jobs queue. Queue limits count backend jobs, which may contain multiple blocks and serve multiple readers.
 
-Queued jobs are ordered by scheduling deadline. Demand reads normally take precedence over newly queued prefetches; older background work can move ahead as its deadline passes. These deadlines control ordering, not request timeouts. A full queue rejects new jobs, while readers can still share or merge into existing work.
+Queued jobs are ordered by scheduling deadline. Demand reads normally take precedence over newly queued prefetches and preloads; older background work can move ahead as its deadline passes. These deadlines control ordering, not request timeouts. A full queue rejects new jobs, while readers can still share or merge into existing work.
 
 | Environment variable | Description | Default |
 |---|---|---|
@@ -45,7 +45,9 @@ Queued jobs are ordered by scheduling deadline. Demand reads normally take prece
 
 The shared HTTP/1.1 pool also handles listings, metadata requests and health checks, so allow headroom above `REMOTE_DATA_MAX_CONCURRENT_FETCHES`.
 
-## Prefetching and File Updates
+## API Prefetching and Modified-File Preloading
+
+Prefetching prepares blocks for active API requests. Preloading warms the cache after a remote file is modified.
 
 Multi-location API requests can prefetch upcoming locations while producing the current location's response. This lets backend reads overlap with response generation.
 

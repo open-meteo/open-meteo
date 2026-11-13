@@ -61,7 +61,7 @@ public struct OmFileSystemS3: Sendable {
         /// Execute a closure with the resolved payload. May retries if file modified errors occur
         public func with<R, Payload: OmRemotePayload>(fn: (_ value: Payload) async throws -> R) async throws -> R? {
             do {
-                if let new = await file.getPrefetchingPayload(ofType: Payload.self) {
+                if let new = await file.getPreloadingPayload(ofType: Payload.self) {
                     do {
                         let cached = try await new.cachedOnly()
                         return try await fn(cached)
@@ -120,7 +120,7 @@ public struct OmFileSystemS3: Sendable {
             case updatingMetaData(old: any OmRemotePayload, [CheckedContinuation<any OmRemotePayload, Error>])
 
             /// The new file is preloading. Try its cached blocks first, falling back to the old payload on a miss.
-            case updatingPrefetchBackground(old: any OmRemotePayload, new: any OmRemotePayload, identity: UUID)
+            case updatingPreloadBackground(old: any OmRemotePayload, new: any OmRemotePayload, identity: UUID)
             
             /// Received HTTP file not found error, while the directory did not yet update. Returns nil if payload is requested
             case deleted
@@ -179,7 +179,7 @@ public struct OmFileSystemS3: Sendable {
             assert(eTag.hasSuffix("\""))
             self.eTag = eTag
             switch payload {
-            case .ready(let old), .updatingPrefetchBackground(_, let old, _):
+            case .ready(let old), .updatingPreloadBackground(_, let old, _):
                 payload = .updatingMetaData(old: old, [])
                 do {
                     let file = makeCachedClient(context: context)
@@ -190,7 +190,7 @@ public struct OmFileSystemS3: Sendable {
                     queued.forEach {
                         $0.resume(with: .success(new))
                     }
-                    startBackgroundPrefetch(old: old, new: new, context: context)
+                    startBackgroundPreload(old: old, new: new, context: context)
                 } catch {
                     guard case .updatingMetaData(_, let queued) = payload else {
                         fatalError("State was not .updatingMetaData()")
@@ -218,20 +218,20 @@ public struct OmFileSystemS3: Sendable {
         }
         
         /// Publish metadata immediately; warming the data cache must not delay waiting readers.
-        private func startBackgroundPrefetch(old: any OmRemotePayload, new: any OmRemotePayload, context: S3ServerHealth) {
+        private func startBackgroundPreload(old: any OmRemotePayload, new: any OmRemotePayload, context: S3ServerHealth) {
             // Identify this update so its task can recognise whether it still owns the state after awaiting I/O.
             let identity = UUID()
-            payload = .updatingPrefetchBackground(old: old, new: new, identity: identity)
+            payload = .updatingPreloadBackground(old: old, new: new, identity: identity)
             Task {
                 do {
-                    try await new.prefetchBackground(from: old)
+                    try await new.preloadBackground(from: old)
                 } catch {
-                    // Prefetch is optional. The new payload can still fetch data on demand.
-                    context.logger.warning("Background prefetch failed for \(objectName): \(error)")
+                    // Preload is optional. The new payload can still fetch data on demand.
+                    context.logger.warning("Background preload failed for \(objectName): \(error)")
                 }
-                // Another update or deletion may have occurred while prefetch was suspended.
-                // Even if the state is still prefetching, a different identity belongs to a newer update.
-                guard case .updatingPrefetchBackground(_, _, let currentIdentity) = payload, currentIdentity == identity else {
+                // Another update or deletion may have occurred while preload was suspended.
+                // Even if the state is still preloading, a different identity belongs to a newer update.
+                guard case .updatingPreloadBackground(_, _, let currentIdentity) = payload, currentIdentity == identity else {
                     return
                 }
                 payload = .ready(new)
@@ -245,7 +245,7 @@ public struct OmFileSystemS3: Sendable {
             switch payload {
             case .ready(let value):
                 retired = [value]
-            case .updatingPrefetchBackground(let old, let new, _):
+            case .updatingPreloadBackground(let old, let new, _):
                 retired = [old, new]
             case .initialising(let queue):
                 let _: (any OmRemotePayload)? = try? await withCheckedThrowingContinuation { continuation in
@@ -273,7 +273,7 @@ public struct OmFileSystemS3: Sendable {
             case .deleted:
                 return
             }
-            // Invalidate the prefetch identity before invoking hooks that can suspend.
+            // Invalidate the preload identity before invoking hooks that can suspend.
             payload = .deleted
             for value in retired {
                 do { try await value.remoteDeleted() } catch {
@@ -283,8 +283,8 @@ public struct OmFileSystemS3: Sendable {
         }
 
         /// During preloading, callers may try the replacement without fetching missing blocks.
-        func getPrefetchingPayload<T: OmRemotePayload>(ofType: T.Type) -> T? {
-            guard case .updatingPrefetchBackground(_, let new, _) = payload else { return nil }
+        func getPreloadingPayload<T: OmRemotePayload>(ofType: T.Type) -> T? {
+            guard case .updatingPreloadBackground(_, let new, _) = payload else { return nil }
             return new as? T
         }
 
@@ -357,7 +357,7 @@ public struct OmFileSystemS3: Sendable {
                     fatalError("Payload was not of correct type \(T.self)")
                 }
                 return old
-            case .updatingPrefetchBackground(let old, let new, _):
+            case .updatingPreloadBackground(let old, let new, _):
                 if refreshMetadata {
                     // Supersede the background task's identity before starting a HEAD refresh.
                     // Its eventual completion must not publish this stale replacement.
@@ -390,7 +390,7 @@ public struct OmFileSystemS3: Sendable {
                     queued.forEach({
                         $0.resume(returning: new)
                     })
-                    startBackgroundPrefetch(old: payload, new: new, context: context)
+                    startBackgroundPreload(old: payload, new: new, context: context)
                     return new
                 } catch {
                     guard case .updatingMetaData(old: _, let queued) = self.payload else {

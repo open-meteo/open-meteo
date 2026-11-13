@@ -49,11 +49,11 @@ extension OmFileLocalRemoteOmReader: OmFilePayload {
         return try await Self(file: file)
     }
 
-    func prefetchBackground(from previous: any OmRemotePayload) async throws {
+    func preloadBackground(from previous: any OmRemotePayload) async throws {
         guard let previous = previous as? Self,
               let reader = previous.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>,
               let updatedReader = self.reader as? OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float> else {
-            fatalError("prefetchBackground requires remote OM readers")
+            fatalError("preloadBackground requires remote OM readers")
         }
         // Retire old blocks even if optional preloading is disabled or fails. Live readers and backend
         // jobs retain this reader, so deletion still waits for their final reference.

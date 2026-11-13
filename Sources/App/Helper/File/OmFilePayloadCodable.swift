@@ -36,8 +36,8 @@ extension OmFilePayloadCodable {
         return try await Self(file: file)
     }
 
-    // Decoding already reads the entire payload, so there is no data left to prefetch.
-    func prefetchBackground(from previous: any OmRemotePayload) async throws {}
+    // Decoding already reads the entire payload, so there is no data left to preload.
+    func preloadBackground(from previous: any OmRemotePayload) async throws {}
     
     func remoteDeleted() async throws {
         return

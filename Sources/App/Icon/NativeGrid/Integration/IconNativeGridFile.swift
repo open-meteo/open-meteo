@@ -112,7 +112,7 @@ struct IconNativeGridPayload: OmFilePayload {
     }
 
     // Initialisation already materializes the complete grid artifact locally.
-    func prefetchBackground(from previous: any OmRemotePayload) async throws {}
+    func preloadBackground(from previous: any OmRemotePayload) async throws {}
 
     // The complete artifact is already local, and active readers deliberately pin its mapping.
     func remoteDeleted() async throws {}
