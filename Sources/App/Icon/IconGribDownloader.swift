@@ -10,6 +10,18 @@ struct IconGribDownloader: Sendable {
     let curl: Curl
     let gridIdentity: IconNativeGridIdentity
 
+    /// Hail including graupel, or nil when the feed does not provide these fields.
+    func downloadHail(run: Timestamp, leadSeconds: Int, member: Int = 0) async throws -> (message: GribMessage, data: Array2D)? {
+        guard let graupelVariable = domain.hailGribVariables.first else { return nil }
+        let (message, graupel) = try await download(field: (graupelVariable, "single-level", nil), run: run, leadSeconds: leadSeconds, member: member)
+        guard domain == .iconD2Ruc else { return (message, graupel) }
+
+        let (_, hail) = try await download(field: (domain.hailGribVariables[1], "single-level", nil), run: run, leadSeconds: leadSeconds, member: member)
+        var combined = graupel
+        combined.data = zip(graupel.data, hail.data).map(+)
+        return (message, combined)
+    }
+
     func download(field: (variable: String, cat: String, level: Int?), run: Timestamp, leadSeconds: Int, member: Int = 0) async throws -> (message: GribMessage, data: Array2D) {
         let url = domain.getGribUrl(field: field, run: run, leadSeconds: leadSeconds, member: member)
         let messages = try await curl.downloadGrib(url: url, bzip2Decode: false)
