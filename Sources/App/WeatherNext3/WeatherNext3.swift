@@ -277,7 +277,12 @@ struct WeatherNext3Variable: GenericVariable {
     var omFileName: (file: String, level: Int) { (rawValue, 0) }
 
     var scalefactor: Float {
-        if statistic != .mean { return 100 }
+        if statistic != .mean {
+            switch field.unit {
+            case .hectopascal, .wattPerSquareMetre, .millimetre: return 10
+            default: return 100
+            }
+        }
         switch field.unit {
         case .celsius: return 20
         case .percentage, .wattPerSquareMetre: return 1
