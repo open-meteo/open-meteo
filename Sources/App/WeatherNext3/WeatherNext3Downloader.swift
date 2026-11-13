@@ -55,6 +55,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 concurrentHTTP1ConnectionsPerHostSoftLimit: max(8, downloadConcurrency)
             )
         )
+        httpConfiguration.httpVersion = .http1Only
         httpConfiguration.maximumUsesPerConnection = 64
         let httpClient = HTTPClient(
             eventLoopGroupProvider: .shared(app.eventLoopGroup),
