@@ -84,6 +84,9 @@ om_file_remote_directories_open \(OmFileSystemMetrics.fileRemoteDirectoriesOpen.
 # TYPE om_file_remote_directory_updated_total counter
 # HELP om_file_remote_directory_updated_total Number of remote directory refreshes
 om_file_remote_directory_updated_total \(OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_directory_update_running gauge
+# HELP om_file_remote_directory_update_running Number of remote directory loads and revalidations currently running
+om_file_remote_directory_update_running \(OmFileSystemMetrics.fileRemoteDirectoryUpdateRunning.load(ordering: .relaxed))
 # TYPE om_file_remote_directory_update_waiting gauge
 # HELP om_file_remote_directory_update_waiting Number of callers waiting for a remote directory update
 om_file_remote_directory_update_waiting \(OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.load(ordering: .relaxed))
