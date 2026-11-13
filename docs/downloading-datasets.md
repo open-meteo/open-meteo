@@ -200,3 +200,36 @@ For further installation instructions see, [Install or update the latest version
 - Linux: `apt install gdal`
 
 Afterwards it can be converted with `<exe> download-dem dem-90m` and input data can be removed with `rm -R dem-90m data/dem90/`. The converted files will be available at `data/omfile-dem90`
+
+
+## WeatherNext 3 statistics
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json openmeteo-api download-weathernext3 --run 2026110800 --concurrent 1
+```
+
+The service account needs access to the WeatherNext 3 statistics bucket. Without
+`--run`, the downloader selects the latest expected main cycle. Only main runs at
+00, 06, 12 and 18 UTC are supported, each covering 360 hours.
+
+Model: `google_weathernext3_ensemble_mean`. Temperature and dew point use the 0.05°
+station heads; other surface variables use the 0.1° grid. The downloader stores
+the mean and P10/P25/P50/P75/P90 for each field.
+
+The API estimates spread as `(p90 - p10) / 2.5631031311`, assuming a Gaussian
+distribution.
+
+| Spread | Grid | Measured WeatherNext conversion error |
+| --- | --- | --- |
+| Temperature | 0.05° | Not measured |
+| Dew point | 0.05° | Not measured |
+| Mean sea-level pressure | 0.1° | Not measured |
+| U wind, 10 m | 0.1° | Not measured |
+| V wind, 10 m | 0.1° | Not measured |
+| U wind, 100 m | 0.1° | Not measured |
+| V wind, 100 m | 0.1° | Not measured |
+
+Synthetic benchmark: 30,000 independent 64-member Gaussian ensembles with linear
+percentiles gave −2.7% relative bias, 6.7% relative RMSE, and a central 95% error
+interval of −15.3% to +8.6%, relative to sample standard deviation. These are
+synthetic results, not measured WeatherNext errors.

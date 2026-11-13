@@ -1340,6 +1340,9 @@ extension MultiDomains {
             return .cmcGemGepsEnsembleMean
         case .bom_access_global_ensemble_mean:
             return .bomAccessGlobalEnsembleMean
+        case .google_weathernext3_ensemble_mean:
+            // TODO: Replace with the WeatherNext 3 model identifier once available in the SDK.
+            return .undefined
         case .google_weathernext2_ensemble_mean:
             return .googleWeathernext2EnsembleMean
         case .ukmo_global_ensemble_mean_20km:
