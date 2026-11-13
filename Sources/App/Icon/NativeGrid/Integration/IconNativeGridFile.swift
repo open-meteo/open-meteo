@@ -104,12 +104,15 @@ struct IconNativeGridPayload: OmFilePayload {
         storage = try await domain.nativeGridFile.load(file: cached)
     }
 
+    // This payload is already fully loaded locally.
+    func cachedOnly() async throws -> Self { self }
+
     func updateMetaData(file: OmHttpReaderBackend) async throws -> Self {
         try await Self(file: file)
     }
 
     // Initialisation already materializes the complete grid artifact locally.
-    func prefetchBackground(from previous: any OmRemotePayload) async throws {}
+    func preloadBackground(from previous: any OmRemotePayload) async throws {}
 
     // The complete artifact is already local, and active readers deliberately pin its mapping.
     func remoteDeleted() async throws {}

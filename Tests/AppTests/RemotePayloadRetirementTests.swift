@@ -31,7 +31,7 @@ struct RemotePayloadRetirementTests {
             #expect(newReader.deleteCachedBlocks(olderThanSeconds: 0) == 1)
             newBackend.markModified()
             do {
-                try await new.prefetchBackground(from: old)
+                try await new.preloadBackground(from: old)
                 Issue.record("Expected preloading the modified replacement to fail")
             } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {}
             // Failure marks retirement but must not remove blocks from a still-live reader.

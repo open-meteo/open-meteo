@@ -4,7 +4,7 @@ import Synchronization
 @testable import OmFileIO
 import OmTime
 
-private actor PrefetchGate {
+private actor PreloadGate {
     private(set) var deletions = 0
 
     func deleted() { deletions += 1 }
@@ -35,18 +35,25 @@ private actor PrefetchGate {
 
 private struct TestRemotePayload: OmRemotePayload {
     let version: String
-    let gate: PrefetchGate
+    let gate: PreloadGate
+    var cacheOnly = false
 
     init(file: OmHttpReaderBackend) {
         version = file.eTag
-        gate = PrefetchGate()
+        gate = PreloadGate()
+    }
+
+    func cachedOnly() async throws -> Self {
+        var copy = self
+        copy.cacheOnly = true
+        return copy
     }
 
     func updateMetaData(file: OmHttpReaderBackend) async throws -> Self {
         Self(file: file)
     }
 
-    func prefetchBackground(from previous: any OmRemotePayload) async throws {
+    func preloadBackground(from previous: any OmRemotePayload) async throws {
         await gate.run()
         if version == "\"failure\"" { throw CancellationError() }
     }
@@ -55,6 +62,39 @@ private struct TestRemotePayload: OmRemotePayload {
 }
 
 struct RemotePayloadTests {
+    @Test(arguments: ["hit", "miss", "bothMiss"])
+    func triesCachedReplacementBeforeOldPayload(scenario: String) async throws {
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
+        let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
+        _ = try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false)
+        await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: "\"new\"")
+        let new = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true))
+        await new.gate.waitUntilStarted()
+        var attempts = [String]()
+        let result = try await OmFileSystemS3.FileWithContext(file: file, context: context).with { (payload: TestRemotePayload) in
+            attempts.append(payload.cacheOnly ? "cached" : payload.version)
+            if payload.cacheOnly && scenario != "hit" { throw OmReaderCacheError.cacheMiss }
+            if payload.version == "\"old\"" && scenario == "bothMiss" {
+                throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed
+            }
+            return payload.version
+        }
+        #expect(result == (scenario == "miss" ? "\"old\"" : "\"new\""))
+        let expected = scenario == "hit" ? ["cached"] : scenario == "miss" ? ["cached", "\"old\""] : ["cached", "\"old\"", "\"new\""]
+        #expect(attempts == expected)
+        await new.gate.finish()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while await file.getPreloadingPayload(ofType: TestRemotePayload.self) != nil {
+            try #require(ContinuousClock.now < deadline)
+            await Task.yield()
+        }
+        let ready = try await OmFileSystemS3.FileWithContext(file: file, context: context).with { (payload: TestRemotePayload) in
+            #expect(!payload.cacheOnly)
+            return payload.version
+        }
+        #expect(ready == "\"new\"")
+    }
+
     @Test func modifiedBackendRejectsReadsWithoutContactingServer() async throws {
         // With no endpoints, attempting network access would fail with a server selection error.
         let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
@@ -74,11 +114,11 @@ struct RemotePayloadTests {
     }
 
     @Test(arguments: [false, true])
-    func metadataAvailableBeforePrefetchFinishes(prefetchFails: Bool) async throws {
+    func metadataAvailableBeforePreloadFinishes(preloadFails: Bool) async throws {
         let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
         let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
         _ = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
-        let version = prefetchFails ? "\"failure\"" : "\"new\""
+        let version = preloadFails ? "\"failure\"" : "\"new\""
         await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: version)
         let new = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true))
         await new.gate.waitUntilStarted()
@@ -88,7 +128,7 @@ struct RemotePayloadTests {
         #expect(try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true)?.version == version)
         await new.gate.finish()
 
-        // Failed optional prefetch must also publish the new payload for on-demand reads.
+        // Failed optional preload must also publish the new payload for on-demand reads.
         let deadline = ContinuousClock.now.advanced(by: .seconds(5))
         while try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false)?.version != version {
             try #require(ContinuousClock.now < deadline)
@@ -97,12 +137,12 @@ struct RemotePayloadTests {
     }
 
     @Test(arguments: [false, true])
-    func deletionRetiresRetainedPayloads(prefetching: Bool) async throws {
+    func deletionRetiresRetainedPayloads(preloading: Bool) async throws {
         let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
         let file = OmFileSystemS3.File(objectName: "test.om", contentLength: 1, lastModified: Timestamp(0), eTag: "\"old\"")
         let old = try #require(await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: false))
         var new: TestRemotePayload?
-        if prefetching {
+        if preloading {
             await file.updateFromDirectoryListing(context: context, objectKey: "test.om", contentLength: 2, lastModified: Timestamp(1), eTag: "\"new\"")
             new = try await file.getPayload(ofType: TestRemotePayload.self, context: context, receivedFileModifiedError: true)
             await new?.gate.waitUntilStarted()
@@ -158,7 +198,7 @@ struct RemotePayloadTests {
     @Test func retiredDirectoryDiscardsInFlightListing() async throws {
         let app = try await Application.make(.testing)
         let state = Mutex((removed: false, hold: false))
-        let gate = PrefetchGate()
+        let gate = PreloadGate()
         do {
             app.get { request async -> String in
                 let current = state.withLock { $0 }
@@ -205,7 +245,7 @@ struct RemotePayloadTests {
         try await app.asyncShutdown()
     }
 
-    @Test func staleReplacementRefreshesWhilePrefetchIsPending() async throws {
+    @Test func staleReplacementRefreshesWhilePreloadIsPending() async throws {
         let app = try await Application.make(.testing)
         do {
             app.on(.HEAD, "test.om") { _ -> Response in

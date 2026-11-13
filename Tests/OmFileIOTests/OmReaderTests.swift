@@ -4,6 +4,31 @@ import Testing
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test func cacheOnlyReadsNeverFetchMissingBlocks() async throws {
+        let blockSize = 64 * 1024
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let cache = try AtomicBlockCache(file: path, blockSize: blockSize, blockCount: 256)
+        let coordinator = AtomicCacheCoordinator(cache: cache)
+        // A modified HTTP backend throws a different error if any fetch reaches it.
+        let context = S3ServerHealth(client: .shared, logger: .init(label: "test"), servers: [], checksHealth: false)
+        let backend = OmHttpReaderBackend(context: context, object: "test.om", count: 130 * blockSize, eTag: "\"new\"", lastModified: .init(0))
+        backend.markModified()
+        let reader = OmReaderBlockCache(backend: backend, cache: coordinator, cacheKey: 123).cachedOnly()
+        for block in [127, 129] {
+            cache.set(key: coordinator.calculateCacheKey(fileKey: 123, block: block), value: Data(repeating: UInt8(block), count: blockSize))
+        }
+        #expect(try await reader.getData(offset: 127 * blockSize + 17, count: 31) == Data(repeating: 127, count: 31))
+        do {
+            _ = try await reader.getData(offset: 127 * blockSize, count: 3 * blockSize)
+            Issue.record("Missing blocks must fail locally")
+        } catch OmReaderCacheError.cacheMiss {}
+        cache.set(key: coordinator.calculateCacheKey(fileKey: 123, block: 128), value: Data(repeating: 128, count: blockSize))
+        let expected = Data(repeating: 127, count: blockSize - 17) + Data(repeating: 128, count: blockSize) + Data(repeating: 129, count: blockSize - 17)
+        #expect(try await reader.getData(offset: 127 * blockSize + 17, count: expected.count) == expected)
+        #expect(try await reader.getData(offset: 130 * blockSize, count: 0).isEmpty)
+    }
+
     private func waitForPrefetch(sourceLocation: SourceLocation = #_sourceLocation, _ ready: () -> Bool) async throws {
         // Allow for executor contention from unrelated tests in the full Linux CI suite.
         let deadline = ContinuousClock.now.advanced(by: .seconds(60))
