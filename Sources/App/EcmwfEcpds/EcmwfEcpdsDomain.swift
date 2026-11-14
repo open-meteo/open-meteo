@@ -1,5 +1,5 @@
 /// ECMWF weather models directly retrieved via ECPDS delivery
-enum EcmwfEcpdsDomain: String, GenericDomain {
+enum EcmwfEcpdsDomain: String, SyncGridDomain {
     case ifs
     case wam
     
@@ -40,14 +40,16 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .ifs_europe_ensemble_mean:
+        case .ifs:
+            return .ecmwf_ifs
+        case .wam:
+            return .ecmwf_wam
+        case .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
             return .ecmwf_ifs_europe_ensemble
-        case .aifs_europe_ensemble_mean:
+        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
             return .ecmwf_aifs_europe_ensemble
-        default:
-            return domainRegistry
         }
     }
 
@@ -79,17 +81,6 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         switch self {
         case .ifs, .wam, .ifs_europe_ensemble, .ifs_europe_ensemble_mean, .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
             return 6 * 3600
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .ifs, .wam:
-            return GaussianGrid(type: .o1280)
-        case .ifs_europe_ensemble, .ifs_europe_ensemble_mean:
-            return GaussianGridArea(type: .o1280, bounds: BoundingBoxWGS84(latitude: 33.005..<70.967, longitude: -11..<37))
-        case .aifs_europe_ensemble, .aifs_europe_ensemble_mean:
-            return GaussianGridArea(type: .n320, bounds: BoundingBoxWGS84(latitude: 33.0211..<70.9601, longitude: -11..<37))
         }
     }
 

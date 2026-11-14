@@ -6,7 +6,7 @@ import OmFileFormat
 /**
  ICON Domains including ensemble
  */
-enum IconDomains: String, CaseIterable, GenericDomain {
+enum IconDomains: String, CaseIterable, SyncGridDomain {
     /// hourly data until forecast hour 78, then 3 h until 180
     case icon
     case iconEu = "icon-eu"
@@ -65,18 +65,20 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .iconD2_15min:
+        case .icon:
+            return .dwd_icon
+        case .iconEu:
+            return .dwd_icon_eu
+        case .iconD2, .iconD2_15min:
             return .dwd_icon_d2
-        case .iconEpsEnsembleMean:
+        case .iconEps, .iconEpsEnsembleMean:
             return .dwd_icon_eps
-        case .iconEuEpsEnsembleMean:
+        case .iconEuEps, .iconEuEpsEnsembleMean:
             return .dwd_icon_eu_eps
-        case .iconD2EpsEnsembleMean:
+        case .iconD2Eps, .iconD2EpsEnsembleMean:
             return .dwd_icon_d2_eps
-        default:
-            return domainRegistry
         }
     }
 
@@ -119,7 +121,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     }
 
     var sourceGridIdentity: IconNativeGridIdentity {
-        nativeDomain.nativeGridFile.identity
+        IconNativeGridFile.forGrid(nativeDomain.asyncGridRegistry).identity
     }
 
     var nativeDomain: IconNativeDomains {
@@ -131,27 +133,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconEps, .iconEpsEnsembleMean: return .iconEpsNative
         case .iconEuEps, .iconEuEpsEnsembleMean: return .iconEuEpsNative
         case .iconD2Eps, .iconD2EpsEnsembleMean: return .iconD2EpsNative
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .icon:
-            return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
-        case .iconEu:
-            return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
-        case .iconD2_15min, .iconD2:
-            return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
-        case .iconEps, .iconEpsEnsembleMean:
-            // R03B06 avg 26.5 km
-            return RegularGrid(nx: 1439, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .iconEuEps, .iconEuEpsEnsembleMean:
-            // R03B07 avg 13.2 km
-            return RegularGrid(nx: 689, ny: 329, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
-        case .iconD2Eps, .iconD2EpsEnsembleMean:
-            // R19B07 avg 2 km
-            // Retain the existing extent, one point smaller per axis than deterministic D2.
-            return RegularGrid(nx: 1214, ny: 745, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         }
     }
 

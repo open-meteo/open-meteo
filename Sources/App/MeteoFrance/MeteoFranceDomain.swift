@@ -23,7 +23,7 @@ Docs https://mf-models-on-aws.org/en/doc
  - SP3, dist, brightness temperature
  
  */
-enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
+enum MeteoFranceDomain: String, SyncGridDomain, CaseIterable {
     case arpege_europe
     case arpege_world
     case arome_france
@@ -65,18 +65,16 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .arome_france_15min:
-            return .meteofrance_arome_france0025
-        case .arome_france_hd_15min:
-            return .meteofrance_arome_france_hd
-        case .arpege_europe_probabilities:
+        case .arpege_europe, .arpege_europe_probabilities:
             return .meteofrance_arpege_europe
-        case .arpege_world_probabilities:
+        case .arpege_world, .arpege_world_probabilities:
             return .meteofrance_arpege_world025
-        default:
-            return domainRegistry
+        case .arome_france, .arome_france_15min:
+            return .meteofrance_arome_france0025
+        case .arome_france_hd, .arome_france_hd_15min:
+            return .meteofrance_arome_france_hd
         }
     }
 
@@ -336,18 +334,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: any Gridable {
-        switch self {
-        case .arpege_europe, .arpege_europe_probabilities:
-            return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: -32, dx: 0.1, dy: 0.1)
-        case .arpege_world, .arpege_world_probabilities:
-            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .arome_france, .arome_france_15min:
-            return RegularGrid(nx: 1121, ny: 717, latMin: 37.5, lonMin: -12.0, dx: 0.025, dy: 0.025)
-        case .arome_france_hd, .arome_france_hd_15min:
-            return RegularGrid(nx: 2801, ny: 1791, latMin: 37.5, lonMin: -12.0, dx: 0.01, dy: 0.01)
-        }
-    }
 }
 
 /**

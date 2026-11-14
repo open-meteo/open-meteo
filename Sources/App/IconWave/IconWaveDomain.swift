@@ -4,7 +4,7 @@ import OmFileFormat
 /**
  Domain definition for ICON wave models
  */
-enum IconWaveDomain: String, CaseIterable, GenericDomain {
+enum IconWaveDomain: String, CaseIterable, SyncGridDomain {
     case gwam
     case ewam
 
@@ -25,8 +25,13 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .gwam:
+            return .dwd_gwam
+        case .ewam:
+            return .dwd_ewam
+        }
     }
 
     /// Number of time steps in each time series optimised file. 5 days more than each run.
@@ -41,15 +46,6 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
             return 3 * 3600
         case .ewam:
             return 3600
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .gwam:
-            return RegularGrid(nx: 1440, ny: 699, latMin: -85.25, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .ewam:
-            return RegularGrid(nx: 526, ny: 721, latMin: 30, lonMin: -10.5, dx: 0.1, dy: 0.05)
         }
     }
 
