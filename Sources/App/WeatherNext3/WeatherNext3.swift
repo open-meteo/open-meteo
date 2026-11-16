@@ -79,8 +79,7 @@ struct WeatherNext3Variable: GenericVariable {
         let domain: WeatherNext3Domain
         let unit: SiUnit
         let sourceUnit: String
-        let scale: Float
-        let offset: Float
+        let multiplyAdd: (multiply: Float, add: Float)?
         let spread: Bool
     }
 
@@ -91,8 +90,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .station,
             unit: .celsius,
             sourceUnit: "K",
-            scale: 1.0,
-            offset: -273.15,
+            multiplyAdd: (1, -273.15),
             spread: true
         ),
         .init(
@@ -101,8 +99,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .station,
             unit: .celsius,
             sourceUnit: "K",
-            scale: 1.0,
-            offset: -273.15,
+            multiplyAdd: (1, -273.15),
             spread: true
         ),
         .init(
@@ -111,8 +108,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .hectopascal,
             sourceUnit: "Pa",
-            scale: 0.01,
-            offset: 0.0,
+            multiplyAdd: (0.01, 0),
             spread: true
         ),
         .init(
@@ -121,8 +117,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .celsius,
             sourceUnit: "K",
-            scale: 1.0,
-            offset: -273.15,
+            multiplyAdd: (1, -273.15),
             spread: false
         ),
         .init(
@@ -131,8 +126,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .millimetre,
             sourceUnit: "m",
-            scale: 1000.0,
-            offset: 0.0,
+            multiplyAdd: (1000, 0),
             spread: false
         ),
         .init(
@@ -141,8 +135,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .wattPerSquareMetre,
             sourceUnit: "J m**-2",
-            scale: 0.0002777777777777778,
-            offset: 0.0,
+            multiplyAdd: (1 / 3600, 0),
             spread: false
         ),
         .init(
@@ -151,8 +144,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .wattPerSquareMetre,
             sourceUnit: "J m**-2",
-            scale: 0.0002777777777777778,
-            offset: 0.0,
+            multiplyAdd: (1 / 3600, 0),
             spread: false
         ),
         .init(
@@ -161,8 +153,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .metrePerSecond,
             sourceUnit: "m s**-1",
-            scale: 1.0,
-            offset: 0.0,
+            multiplyAdd: nil,
             spread: true
         ),
         .init(
@@ -171,8 +162,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .metrePerSecond,
             sourceUnit: "m s**-1",
-            scale: 1.0,
-            offset: 0.0,
+            multiplyAdd: nil,
             spread: true
         ),
         .init(
@@ -181,8 +171,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .metrePerSecond,
             sourceUnit: "m s**-1",
-            scale: 1.0,
-            offset: 0.0,
+            multiplyAdd: nil,
             spread: false
         ),
         .init(
@@ -191,8 +180,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .metrePerSecond,
             sourceUnit: "m s**-1",
-            scale: 1.0,
-            offset: 0.0,
+            multiplyAdd: nil,
             spread: true
         ),
         .init(
@@ -201,8 +189,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .metrePerSecond,
             sourceUnit: "m s**-1",
-            scale: 1.0,
-            offset: 0.0,
+            multiplyAdd: nil,
             spread: true
         ),
         .init(
@@ -211,8 +198,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .metrePerSecond,
             sourceUnit: "m s**-1",
-            scale: 1.0,
-            offset: 0.0,
+            multiplyAdd: nil,
             spread: false
         ),
         .init(
@@ -221,8 +207,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .percentage,
             sourceUnit: "(0 - 1)",
-            scale: 100.0,
-            offset: 0.0,
+            multiplyAdd: (100, 0),
             spread: false
         ),
         .init(
@@ -231,8 +216,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .percentage,
             sourceUnit: "(0 - 1)",
-            scale: 100.0,
-            offset: 0.0,
+            multiplyAdd: (100, 0),
             spread: false
         ),
         .init(
@@ -241,8 +225,7 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .percentage,
             sourceUnit: "(0 - 1)",
-            scale: 100.0,
-            offset: 0.0,
+            multiplyAdd: (100, 0),
             spread: false
         ),
         .init(
@@ -251,14 +234,18 @@ struct WeatherNext3Variable: GenericVariable {
             domain: .surface,
             unit: .percentage,
             sourceUnit: "(0 - 1)",
-            scale: 100.0,
-            offset: 0.0,
+            multiplyAdd: (100, 0),
             spread: false
         ),
     ]
 
     enum Statistic: String, CaseIterable {
-        case mean, p10, p25, p50, p75, p90
+        case mean
+        case p10
+        case p25
+        case p50
+        case p75
+        case p90
     }
 
     let statistic: Statistic

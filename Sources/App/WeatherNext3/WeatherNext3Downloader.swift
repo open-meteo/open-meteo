@@ -145,8 +145,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 ])
                 let transformStarted = DispatchTime.now().uptimeNanoseconds
                 data.shift180Longitude(nt: 1, ny: grid.ny, nx: grid.nx)
-                if field.scale != 1 || field.offset != 0 {
-                    data.multiplyAdd(multiply: field.scale, add: field.offset)
+                if let multiplyAdd = field.multiplyAdd {
+                    data.multiplyAdd(multiply: multiplyAdd.multiply, add: multiplyAdd.add)
                 }
                 let writeStarted = DispatchTime.now().uptimeNanoseconds
                 try await writer.write(
