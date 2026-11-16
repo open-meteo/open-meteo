@@ -4,38 +4,9 @@ import Foundation
  https://opendatadocs.dmi.govcloud.dk/Data/Forecast_Data_Weather_Model_HARMONIE_DINI_IG
  
  */
-enum DmiDomain: String, GenericDomain, CaseIterable {
+enum DmiDomain: String, SyncGridDomain, CaseIterable {
     case harmonie_arome_europe
 
-    var grid: any Gridable {
-        switch self {
-        case .harmonie_arome_europe:
-            /*
-             (key: "Nx", value: "1906")
-             (key: "Ny", value: "1606")
-             (key: "Latin1InDegrees", value: "55.5")
-             (key: "Latin2InDegrees", value: "55.5")
-             (key: "LaDInDegrees", value: "55.5")
-             (key: "LoVInDegrees", value: "352")
-             (key: "latitudeOfSouthernPoleInDegrees", value: "-90")
-             (key: "longitudeOfSouthernPoleInDegrees", value: "0")
-             (key: "gridType", value: "lambert")
-             Coords(i: 0, x: 0, y: 0, latitude: 39.671, longitude: -25.421997)
-             Coords(i: 3061035, x: 1905, y: 1605, latitude: 62.667614, longitude: 40.069885)
-             +proj=lcc +lon_0=352.000000 +lat_0=55.500000 +lat_1=55.500000 +lat_2=55.500000 +R=6371229.000000
-             */
-            return ProjectionGrid(
-                nx: 1906,
-                ny: 1606,
-                latitude: 39.671,
-                longitude: -25.421997,
-                dx: 2000,
-                dy: 2000,
-                projection: LambertConformalConicProjection(λ0: 352, ϕ0: 55.5, ϕ1: 55.5, ϕ2: 55.5, radius: 6371229)
-            )
-        }
-    }
-    
     var countEnsembleMember: Int {
         return 1
     }
@@ -47,9 +18,7 @@ enum DmiDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .dmi_harmonie_arome_europe }
 
     var dtSeconds: Int {
         return 1 * 3600

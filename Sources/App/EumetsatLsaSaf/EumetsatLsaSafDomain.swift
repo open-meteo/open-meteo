@@ -1,4 +1,4 @@
-enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
+enum EumetsatLsaSafDomain: String, SyncGridDomain, CaseIterable {
     case msg
     case iodc
 
@@ -11,8 +11,13 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .msg:
+            return .eumetsat_lsa_saf_msg_15min
+        case .iodc:
+            return .eumetsat_lsa_saf_iodc_15min
+        }
     }
 
     var masterTimeRange: Range<Timestamp>? {
@@ -32,15 +37,6 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
     
     var countEnsembleMember: Int {
         return 1
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .msg:
-            return RegularGrid(nx: 3201, ny: 3201, latMin: -80, lonMin: -80, dx: 0.05, dy: 0.05)
-        case .iodc:
-            return RegularGrid(nx: 3201, ny: 3201, latMin: -80, lonMin: -40, dx: 0.05, dy: 0.05)
-        }
     }
 
     var updateIntervalSeconds: Int {

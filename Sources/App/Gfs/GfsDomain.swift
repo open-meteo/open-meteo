@@ -9,7 +9,7 @@ import OmFileFormat
  
  
  */
-enum GfsDomain: String, GenericDomain, CaseIterable {
+enum GfsDomain: String, SyncGridDomain, CaseIterable {
     /// T1534 sflux grid
     case gfs013
 
@@ -80,20 +80,22 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .hrrr_conus_15min:
+        case .gfs013:
+            return .ncep_gfs013
+        case .gfs025:
+            return .ncep_gfs025
+        case .hrrr_conus, .hrrr_conus_15min:
             return .ncep_hrrr_conus
-        case .gfswave025, .gfswave025_ens:
+        case .gfs025_ens, .gfswave025, .gfswave025_ens, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
             return .ncep_gefs025
-        case .gefs025_ensemble_mean:
-            return .ncep_gefs025
-        case .gefs05_ensemble_mean:
+        case .gfs05_ens, .gefs05_ensemble_mean:
             return .ncep_gefs05
-        case .gefswave025_ensemble_mean:
-            return .ncep_gefswave025
-        default:
-            return domainRegistry
+        case .gfswave016:
+            return .ncep_gfswave016
+        case .nam_conus:
+            return .ncep_nam_conus
         }
     }
 
@@ -226,38 +228,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 384 + 1 + 4 * 24
         case .gfswave025_ens, .gefswave025_ensemble_mean:
             return (384 + 4 * 24) / 3 + 1
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .gfs05_ens ,.gefs05_ensemble_mean:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .gfs013:
-            // Coordinates confirmed with eccodes coordinate output
-            return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536 - 1) / 2, lonMin: -180, dx: 360 / 3072, dy: 0.11714935)
-        case .gfs025_ens, .gfs025, .gfswave025, .gfswave025_ens, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
-            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .nam_conus:
-            /// labert conformal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
-            let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5, radius: 6371229)
-            return ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
-        case .gfswave016:
-            /// 0.166° resolution
-            return RegularGrid(nx: 2160, ny: 406, latMin: -15, lonMin: -180, dx: 360 / 2160, dy: (52.5 + 15) / (406 - 1))
-        case .hrrr_conus_15min, .hrrr_conus:
-            /*
-             (key: "Nx", value: "1799")
-             (key: "Ny", value: "1059")
-             (key: "latitudeOfFirstGridPointInDegrees", value: "21.1381")
-             (key: "longitudeOfFirstGridPointInDegrees", value: "237.28")
-             (key: "LaDInDegrees", value: "38.5")
-             (key: "LoVInDegrees", value: "262.5") 262.5-360=-97.5
-             (key: "Latin1InDegrees", value: "38.5")
-             (key: "Latin2InDegrees", value: "38.5")
-             */
-            let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5, radius: 6371229)
-            return ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         }
     }
 

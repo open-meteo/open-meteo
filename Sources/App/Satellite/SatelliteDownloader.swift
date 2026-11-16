@@ -187,7 +187,7 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
     }
 }
 
-enum SatelliteDomain: String, CaseIterable, GenericDomain {
+enum SatelliteDomain: String, CaseIterable, SyncGridDomain {
     case imerg_daily
 
     var dtSeconds: Int {
@@ -208,9 +208,7 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .nasa_imerg_daily }
 
     var masterTimeRange: Range<Timestamp>? {
         return Timestamp(2000, 06, 01) ..< Timestamp(2023, 1, 1)
@@ -230,13 +228,6 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         // 6 * 504 = 3024 values per compressed chunk
         // In case for a 1 year API call, around 51 kb will have to be decompressed with 34 IO operations
         return 24 * 21
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .imerg_daily:
-            return RegularGrid(nx: 3600, ny: 1800, latMin: -89.95, lonMin: -179.95, dx: 0.1, dy: 0.1)
-        }
     }
 
     var isElevationCorrectable: Bool {

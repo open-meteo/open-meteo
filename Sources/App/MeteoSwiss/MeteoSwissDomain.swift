@@ -1,5 +1,5 @@
 
-enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
+enum MeteoSwissDomain: String, SyncGridDomain, CaseIterable {
     case icon_ch1
     case icon_ch2
     
@@ -37,7 +37,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
         case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
             return .meteoswiss_icon_ch1
@@ -87,36 +87,6 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             return 48
         case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
             return 144
-        }
-    }
-
-    var grid: any Gridable {
-        let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
-        // Domain area selected by OpenMeteo to exclude
-        // ICON CH2: 2 pixel at the boarder contain invalid data. Additional 18 pixel are removed because the model is not stable at the border
-        switch self {
-        case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
-            let dx: Float = 0.01, dy: Float = 0.01
-            return ProjectionGrid(
-                nx: 1089,
-                ny: 705,
-                latitudeProjectionOrigin: -4.06,
-                longitudeProjectionOrigin: -6.46,
-                dx: dx,
-                dy: dy,
-                projection: projection
-            )
-        case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
-            let dx: Float = 0.02, dy: Float = 0.02
-            return ProjectionGrid(
-                nx: 545,
-                ny: 353,
-                latitudeProjectionOrigin: -4.06,
-                longitudeProjectionOrigin: -6.46,
-                dx: dx,
-                dy: dy,
-                projection: projection
-            )
         }
     }
 
