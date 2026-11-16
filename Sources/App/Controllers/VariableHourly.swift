@@ -1067,6 +1067,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let spread = zip(low.data, high.data).map { lower, upper -> Float in
                     guard lower.isFinite, upper.isFinite, upper >= lower else { return .nan }
                     // Gaussian-equivalent standard deviation from the central 80% interval.
+                    // Exact for Gaussian population quantiles; finite-ensemble percentiles add sampling error.
+                    // Temperature, pressure and wind components can be approximately Gaussian, but skewness,
+                    // heavy tails or bounded distributions change the interval-to-standard-deviation ratio.
+                    // Using population quantiles, this overestimates standard deviation by about 8% for a
+                    // uniform distribution, and underestimates it by 11% for Laplace and 14% for exponential.
+                    // Zero-inflated distributions can yield zero spread despite a nonzero standard deviation
+                    // when at least 90% of values are zero; rare extremes outside P10-P90 are not represented.
+                    // Accuracy therefore depends on the source variable and local forecast distribution.
                     return (upper - lower) / 2.5631031311
                 }
                 return DataAndUnit(spread, unit)
