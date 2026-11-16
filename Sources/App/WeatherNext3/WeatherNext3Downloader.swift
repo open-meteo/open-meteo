@@ -46,12 +46,33 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "WeatherNext 3 supports only main runs at 00, 06, 12 or 18 UTC")
         }
 
-        let auth = GoogleCloudStorageAuth(client: .shared, logger: logger)
-        let prefix = WeatherNext3Domain.path(run: run)
-
         logger.info(
             "WeatherNext 3: selected run \(run.iso8601_YYYY_MM_dd_HH_mm), download concurrency \(downloadConcurrency), conversion concurrency \(conversionConcurrency); obtaining Google access token"
         )
+        let handles = try await download(application: app, run: run, downloadConcurrency: downloadConcurrency)
+        logger.info(
+            "WeatherNext 3: downloads complete; converting \(handles.count) variable handles to time series"
+        )
+        try await GenericVariableHandle.convert(
+            application: app,
+            domain: WeatherNext3Domain.surface,
+            createNetcdf: false,
+            run: run,
+            handles: handles,
+            concurrent: conversionConcurrency,
+            writeUpdateJson: true,
+            uploadQueues: queues,
+            generateFullRun: false
+        )
+
+        logger.info("WeatherNext 3: completed run \(run.iso8601_YYYY_MM_dd_HH_mm)")
+    }
+
+    func download(application: Application, run: Timestamp, downloadConcurrency: Int) async throws -> [GenericVariableHandle] {
+        let logger = application.logger
+        let auth = GoogleCloudStorageAuth(client: .shared, logger: logger)
+        let prefix = WeatherNext3Domain.path(run: run)
+
         var initialStorage = try await auth.storage(bucket: "weathernext3_statistics_spatial")
         logger.info("WeatherNext 3: checking success marker at \(prefix)success")
         while try await !initialStorage.exists(path: prefix + "success") {
@@ -147,21 +168,6 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             handles += try await writers[domain]!.finalise()
         }
 
-        logger.info(
-            "WeatherNext 3: downloads complete; converting \(handles.count) variable handles to time series"
-        )
-        try await GenericVariableHandle.convert(
-            application: app,
-            domain: WeatherNext3Domain.surface,
-            createNetcdf: false,
-            run: run,
-            handles: handles,
-            concurrent: conversionConcurrency,
-            writeUpdateJson: true,
-            uploadQueues: queues,
-            generateFullRun: false
-        )
-
-        logger.info("WeatherNext 3: completed run \(run.iso8601_YYYY_MM_dd_HH_mm)")
+        return handles
     }
 }
