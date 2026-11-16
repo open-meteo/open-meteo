@@ -1,4 +1,3 @@
-import AsyncHTTPClient
 import Foundation
 import SwiftZarr
 import Vapor
@@ -47,45 +46,13 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "WeatherNext 3 supports only main runs at 00, 06, 12 or 18 UTC")
         }
 
-        var httpConfiguration = HTTPClient.Configuration(
-            redirectConfiguration: .follow(max: 5, allowCycles: false),
-            timeout: .init(connect: .seconds(30), read: .minutes(5)),
-            connectionPool: .init(
-                idleTimeout: .minutes(10),
-                concurrentHTTP1ConnectionsPerHostSoftLimit: max(8, downloadConcurrency)
-            )
-        )
-        httpConfiguration.maximumUsesPerConnection = 64
-        let httpClient = HTTPClient(
-            eventLoopGroupProvider: .shared(app.eventLoopGroup),
-            configuration: httpConfiguration,
-            backgroundActivityLogger: logger
-        )
-        defer {
-            httpClient.shutdown { error in
-                if let error {
-                    logger.warning("WeatherNext 3: HTTP client shutdown failed: \(error)")
-                }
-            }
-        }
-
-        let auth = GoogleCloudStorageAuth(client: httpClient, logger: logger)
+        let auth = GoogleCloudStorageAuth(client: .shared, logger: logger)
         let prefix = WeatherNext3Domain.path(run: run)
 
         @Sendable func storage() async throws -> S3CompatibleStorage {
             let token = try await auth.getAccessToken()
             return try S3CompatibleStorage(
                 baseURL: "https://storage.googleapis.com/weathernext3_statistics_spatial",
-                retryingClient: .init(
-                    httpClient: httpClient,
-                    config: .init(
-                        maxAttempts: 5,
-                        baseDelay: .milliseconds(500),
-                        maxDelay: .seconds(60),
-                        jitter: 0.2,
-                        timeout: .seconds(180)
-                    )
-                ),
                 additionalHeaders: ["Authorization": "Bearer \(token)"]
             )
         }
