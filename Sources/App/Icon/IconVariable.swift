@@ -149,13 +149,13 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
     /// Large scale rain in mm
     case rain
 
-    /// Hail including graupel, in mm water equivalent.
+    /// Hail in mm water equivalent.
     case hail
 
     /// convective snowfall. Note: Only downloaded and then added to `snowfall_water_equivalent`
     case snowfall_convective_water_equivalent
 
-    /// largescale snowfall
+    /// Large-scale snowfall water equivalent, including graupel for D2 models.
     case snowfall_water_equivalent
 
     /// Convective available potential energy
@@ -640,7 +640,7 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
     case precipitation
     case rain
     case showers
-    /// Hail including graupel, in mm water equivalent.
+    /// Legacy D2 EPS hail (graupel) in mm water equivalent. Kept for historical readers.
     case hail
     case direct_radiation
     case diffuse_radiation

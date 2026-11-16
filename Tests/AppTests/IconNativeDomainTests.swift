@@ -91,6 +91,12 @@ import Logging
 
     @Test func downloadAvailability() {
         let run = Timestamp(2026, 10, 7, 6)
+        #expect(IconDownloadDomains.iconD2Ruc.getVarAndLevel(IconSurfaceVariable.hail)?.variable == "HAIL_GSP")
+        for feed in IconDownloadDomains.allCases where feed != .iconD2Ruc {
+            #expect(feed.getVarAndLevel(IconSurfaceVariable.hail) == nil)
+        }
+        #expect(IconDownloadDomains.iconD2Ruc.downloadBatch(variable: IconSurfaceVariable.hail, hour: 1)
+            == IconDownloadDomains.iconD2Ruc.downloadBatch(variable: IconSurfaceVariable.snowfall_water_equivalent, hour: 1))
         #expect(IconDownloadDomains.iconD2.downloadBatch(variable: IconSurfaceVariable.showers, hour: 1).output == .quarterHourly)
         #expect(IconDownloadDomains.iconD2Ruc.downloadBatch(variable: IconSurfaceVariable.showers, hour: 1).output == .hourly)
         #expect(IconDownloadDomains.icon.downloadBatch(variable: IconSurfaceVariable.precipitation, hour: 1).output == .hourly)

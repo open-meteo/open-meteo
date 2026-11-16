@@ -18,15 +18,6 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         }
     }
 
-    /// The public hail amount includes graupel. RUC additionally resolves hail separately.
-    var hailGribVariables: [String] {
-        switch self {
-        case .iconD2, .iconD2Eps: return ["GRAU_GSP"]
-        case .iconD2Ruc: return ["GRAU_GSP", "HAIL_GSP"]
-        default: return []
-        }
-    }
-
     func getVarAndLevel(_ variable: any IconVariableDownloadable) -> (variable: String, cat: String, level: Int?)? {
         if self == .aicon {
             guard let variable = variable as? AiconSurfaceVariable else { return nil }
@@ -59,7 +50,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         case .iconD2Ruc:
             return [.direct_radiation, .diffuse_radiation, .precipitation, .rain, .hail, .snowfall_water_equivalent, .cape, .convective_inhibition, .lightning_potential, .snowfall_height, .freezing_level_height, .updraft, .visibility].contains(variable)
         case .iconD2:
-            return [.direct_radiation, .diffuse_radiation, .precipitation, .cape, .lightning_potential, .snowfall_height, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .freezing_level_height, .rain, .showers, .hail].contains(variable)
+            return [.direct_radiation, .diffuse_radiation, .precipitation, .cape, .lightning_potential, .snowfall_height, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .freezing_level_height, .rain, .showers].contains(variable)
         default:
             return false
         }
@@ -374,7 +365,7 @@ enum IconDownloadDomains: String, CaseIterable, Sendable {
         case .showers: return ("rain_con", "single-level", nil)
         case .rain: return ("rain_gsp", "single-level", nil)
         case .hail:
-            return nil // Derived from hailGribVariables, not a single upstream field.
+            return self == .iconD2Ruc ? ("HAIL_GSP", "single-level", nil) : nil
         case .wind_gusts_10m: return ("vmax_10m", "single-level", nil)
         case .freezing_level_height: return ("hzerocl", "single-level", nil)
         case .relative_humidity_2m: return ("relhum_2m", "single-level", nil)

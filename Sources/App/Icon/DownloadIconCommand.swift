@@ -240,8 +240,8 @@ struct DownloadIconCommand: AsyncCommand {
                 let variable = job.variable
                 if feed.skipHour(variable, hour: hour, forDownload: true, run: run) { return }
                 let messages = try await job.batch.steps.asyncCompactMap { step in
-                    if variable as? IconSurfaceVariable == .hail {
-                        return try await downloader.downloadHail(run: run, leadSeconds: step, member: job.member)
+                    if variable as? IconSurfaceVariable == .snowfall_water_equivalent {
+                        return try await downloader.downloadSnowfall(run: run, leadSeconds: step, member: job.member)
                     }
                     guard let field = feed.getVarAndLevel(variable) else { return nil }
                     return try await downloader.download(field: field, run: run, leadSeconds: step, member: job.member)

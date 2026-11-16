@@ -10,15 +10,15 @@ struct IconGribDownloader: Sendable {
     let curl: Curl
     let gridIdentity: IconNativeGridIdentity
 
-    /// Hail including graupel, or nil when the feed does not provide these fields.
-    func downloadHail(run: Timestamp, leadSeconds: Int, member: Int = 0) async throws -> (message: GribMessage, data: Array2D)? {
-        guard let graupelVariable = domain.hailGribVariables.first else { return nil }
-        let (message, graupel) = try await download(field: (graupelVariable, "single-level", nil), run: run, leadSeconds: leadSeconds, member: member)
-        guard domain == .iconD2Ruc else { return (message, graupel) }
+    /// Snow water equivalent, including graupel for the D2 models.
+    func downloadSnowfall(run: Timestamp, leadSeconds: Int, member: Int = 0) async throws -> (message: GribMessage, data: Array2D)? {
+        guard let field = domain.getVarAndLevel(IconSurfaceVariable.snowfall_water_equivalent) else { return nil }
+        let (message, snow) = try await download(field: field, run: run, leadSeconds: leadSeconds, member: member)
+        guard [.iconD2, .iconD2Eps, .iconD2Ruc].contains(domain) else { return (message, snow) }
 
-        let (_, hail) = try await download(field: (domain.hailGribVariables[1], "single-level", nil), run: run, leadSeconds: leadSeconds, member: member)
-        var combined = graupel
-        combined.data = zip(graupel.data, hail.data).map(+)
+        let (_, graupel) = try await download(field: ("GRAU_GSP", "single-level", nil), run: run, leadSeconds: leadSeconds, member: member)
+        var combined = snow
+        combined.data = zip(snow.data, graupel.data).map(+)
         return (message, combined)
     }
 
