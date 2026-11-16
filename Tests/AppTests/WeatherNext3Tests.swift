@@ -3,6 +3,25 @@ import Testing
 @testable import App
 
 @Suite struct WeatherNext3Tests {
+    @Test func rawPercentiles() async throws {
+        let reader = VariableHourlyDeriver(
+            reader: SampleReader<WeatherNext3Variable>(values: ["temperature_2m_p10": 18, "precipitation_p90": 12]),
+            options: try GenericReaderOptions(),
+            domainRegistry: .google_weathernext3_station_ensemble_mean
+        )
+        let time = TimerangeDt(start: Timestamp(2026, 11, 8), nTime: 1, dtSeconds: 3600).toSettings()
+        for (name, value, unit) in [("temperature_2m_p10", Float(18), SiUnit.celsius), ("precipitation_p90", Float(12), SiUnit.millimetre)] {
+            let variable = try #require(ForecastVariable(rawValue: name))
+            let normalized = variable.variableAndPreviousDay.0
+            #expect(normalized.rawValue == name)
+            let output = try #require(await reader.get(variable: normalized, time: time))
+            #expect(output.data == [value])
+            #expect(output.unit == unit)
+        }
+        #expect(ForecastVariable(rawValue: "temperature_2m_p99") == nil)
+        #expect(ForecastVariable(rawValue: "relative_humidity_2m_p90") == nil)
+    }
+
     private struct SampleReader<V: GenericVariable>: GenericReaderProtocol {
         let modelLat: Float = 10
         let modelLon: Float = 100

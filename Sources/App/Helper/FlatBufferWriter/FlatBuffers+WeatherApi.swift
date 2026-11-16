@@ -4,6 +4,10 @@ import OpenMeteoSdk
 
 extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        if percentile != nil {
+            // TODO: Encode percentile metadata once supported by the SDK.
+            return .init(variable: .undefined)
+        }
         let previousDay = Int16(previousDay)
         switch variable {
         case .soil_moisture_0cm:

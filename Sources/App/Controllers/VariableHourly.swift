@@ -534,7 +534,10 @@ extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
-            return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
+            var normalized = surface
+            normalized.variable = surface.variable.remapped
+            normalized.previousDay = 0
+            return (ForecastVariable.surface(normalized), surface.previousDay)
         case .pressure(let pressure):
             return (ForecastVariable.pressure(pressure), 0)
         case .height(let height):
@@ -1995,6 +1998,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     func getDeriverMap(variable: ForecastVariable) -> DerivedMapping<Reader.MixingVar>? {
         switch variable {
         case .surface(let variable):
+            if variable.percentile != nil {
+                guard isWeatherNext3 else { return nil }
+                return .direct(Reader.variableFromString(variable.rawValue))
+            }
             return getDeriverMap(variable: variable.variable.remapped)
         case .pressure(let variable):
             return getDeriverMap(variable: variable)
