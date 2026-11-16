@@ -36,12 +36,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             onlyProbabilityTimeSeries: false
         )
 
-        let run: Timestamp
-        if let specified = signature.run {
-            run = try Timestamp.fromRunHourOrYYYYMMDD(specified)
-        } else {
-            run = WeatherNext3Domain.latestRun()
-        }
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? WeatherNext3Domain.latestRun()
         guard run.hour % 6 == 0 else {
             throw Abort(.badRequest, reason: "WeatherNext 3 supports only main runs at 00, 06, 12 or 18 UTC")
         }
@@ -104,11 +99,14 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         }
 
         logger.info("WeatherNext 3: loading and validating field metadata")
-        let statistics = WeatherNext3Variable.fields.flatMap { field in
-            WeatherNext3Variable.Statistic.allCases.map { (field, $0) }
+        let variables = WeatherNext3Variable.fields.flatMap { field in
+            WeatherNext3Variable.Statistic.allCases.map {
+                WeatherNext3Variable(field: field, statistic: $0)
+            }
         }
-        let arrays = try await statistics.mapConcurrent(nConcurrent: downloadConcurrency) { field, statistic in
-            let name = field.source + "_" + statistic.rawValue
+        let arrays = try await variables.mapConcurrent(nConcurrent: downloadConcurrency) { variable in
+            let field = variable.field
+            let name = field.source + "_" + variable.statistic.rawValue
             let array = try await root.openArray(name: name)
             let domain = field.domain
             let suffix = domain.coordinateSuffix
@@ -122,7 +120,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
             }
 
-            return (variable: WeatherNext3Variable(field: field, statistic: statistic), array: array)
+            return (variable: variable, array: array)
         }
 
         let writers = Dictionary(uniqueKeysWithValues: WeatherNext3Domain.allCases.map { domain in
