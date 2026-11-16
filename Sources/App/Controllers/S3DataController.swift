@@ -42,24 +42,22 @@ struct S3DataController: RouteCollection {
     }
     
     func boot(routes: RoutesBuilder) throws {
-        if Self.syncApiKeys.isEmpty && readCredentials.isEmpty && uploadCredentials.isEmpty {
-            return
-        }
-        
         if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
             routes.get("", use: self.list)
             routes.get("index.html", use: self.index)
             routes.get("openmeteo", use: self.list)
             routes.get("openmeteo-local", use: self.list)
             routes.on(.HEAD, [], use: self.headRoot)
-            for root in ["data", "data_run", "data_spatial"] {
-                routes.on(.HEAD, [PathComponent(stringLiteral: root), .catchall], use: self.get)
-                routes.on(.HEAD, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.get)
-                routes.on(.HEAD, ["openmeteo-local", PathComponent(stringLiteral: root), .catchall], use: self.get)
-                routes.get(PathComponent(stringLiteral: root), "**", use: self.get)
-                routes.get("openmeteo", PathComponent(stringLiteral: root), "**", use: self.get)
-                routes.get("openmeteo-local", PathComponent(stringLiteral: root), "**", use: self.get)
-            }
+        }
+
+        // JSON metadata is public even without credentials. Other downloads authenticate in get.
+        for root in ["data", "data_run", "data_spatial"] {
+            routes.on(.HEAD, [PathComponent(stringLiteral: root), .catchall], use: self.get)
+            routes.on(.HEAD, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.get)
+            routes.on(.HEAD, ["openmeteo-local", PathComponent(stringLiteral: root), .catchall], use: self.get)
+            routes.get(PathComponent(stringLiteral: root), "**", use: self.get)
+            routes.get("openmeteo", PathComponent(stringLiteral: root), "**", use: self.get)
+            routes.get("openmeteo-local", PathComponent(stringLiteral: root), "**", use: self.get)
         }
         
         if !self.uploadCredentials.isEmpty {
