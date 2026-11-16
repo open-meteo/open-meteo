@@ -50,7 +50,7 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
 
     var updateIntervalSeconds: Int { 6 * 3600 }
 
-    var omFileLength: Int { 360 }
+    var omFileLength: Int { 360 + 24 }
 
     var countEnsembleMember: Int { 1 }
 
