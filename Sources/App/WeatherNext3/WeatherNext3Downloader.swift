@@ -108,7 +108,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
             }
 
-            return (field: field, variable: WeatherNext3Variable(field: field, statistic: statistic), array: array)
+            return (variable: WeatherNext3Variable(field: field, statistic: statistic), array: array)
         }
 
         let writers = Dictionary(uniqueKeysWithValues: WeatherNext3Domain.allCases.map { domain in
@@ -117,7 +117,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
         logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(downloadConcurrency)")
         try await chunks.foreachConcurrent(nConcurrent: downloadConcurrency) { index, arrayIndex in
-            let (field, variable, template) = arrays[arrayIndex]
+            let (variable, template) = arrays[arrayIndex]
+            let field = variable.field
             let domain = field.domain
             logger.debug("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
             let array = try await ZarrArray(metadata: template.metadata, storage: storage(), path: template.path)
