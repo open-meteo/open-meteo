@@ -640,8 +640,6 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
     case precipitation
     case rain
     case showers
-    /// Legacy D2 EPS hail (graupel) in mm water equivalent. Kept for historical readers.
-    case hail
     case direct_radiation
     case diffuse_radiation
     case pressure_msl
@@ -691,7 +689,6 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .precipitation: return .millimetre
         case .rain: return .millimetre
         case .showers: return .millimetre
-        case .hail: return .millimetre
         case .snowfall_water_equivalent: return .millimetre
         case .snow_depth: return .metre
         case .pressure_msl: return .hectopascal
@@ -725,7 +722,6 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .precipitation: return 10
         case .rain: return 10
         case .showers: return 10
-        case .hail: return 10
         case .snowfall_water_equivalent: return 10
         case .snow_depth: return 100
         case .pressure_msl: return 10
@@ -768,7 +764,6 @@ enum DwdIconD2EpsGlobalVariable: String, Hashable, GenericVariable {
         case .precipitation: return .backwards_sum
         case .rain: return .backwards_sum
         case .showers: return .backwards_sum
-        case .hail: return .backwards_sum
         case .snowfall_water_equivalent: return .backwards_sum
         case .wind_v_component_10m: return .hermite(bounds: nil)
         case .wind_u_component_10m: return .hermite(bounds: nil)
