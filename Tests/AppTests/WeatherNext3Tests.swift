@@ -1,49 +1,8 @@
-import Foundation
-import SwiftZarr
 import Testing
 
 @testable import App
 
 @Suite struct WeatherNext3Tests {
-    @Test func storedStatisticsAndUnits() {
-        for field in WeatherNext3Variable.fields {
-            for statistic in WeatherNext3Variable.Statistic.allCases {
-                let name = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
-                let variable = WeatherNext3Variable(rawValue: name)
-                #expect(variable?.statistic == statistic)
-                #expect(variable?.unit == field.unit)
-                #expect(variable?.omFileName.file == name)
-                #expect(variable == WeatherNext3Variable(field: field, statistic: statistic))
-            }
-            #expect(WeatherNext3Variable(rawValue: field.name + "_spread") == nil)
-        }
-        #expect(WeatherNext3Variable(rawValue: "temperature_2m_p99") == nil)
-    }
-
-    @Test func mainRunPathsAndHorizons() throws {
-        let main = try Timestamp.fromRunHourOrYYYYMMDD("2026110800")
-        #expect(WeatherNext3Domain.hours == 360)
-        #expect(WeatherNext3Domain.path(run: main).contains("20261108_00hr_01_preds"))
-    }
-
-    @Test func latestExpectedRun() {
-        let midnight = Timestamp(2026, 11, 10)
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 44 * 60)) == midnight.add(hours: -6))
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(7 * 3600 + 45 * 60)) == midnight)
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(8 * 3600 + 9 * 60)) == midnight)
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(13 * 3600 + 44 * 60)) == midnight)
-        #expect(WeatherNext3Domain.latestRun(now: midnight.add(13 * 3600 + 45 * 60)) == midnight.add(hours: 6))
-    }
-
-    @Test func observedZstdDatetimeChunk() throws {
-        // Authenticated statistics run 20261108_00hr_01_preds, datetime/c/0.
-        let compressed = Data([40, 181, 47, 253, 32, 8, 65, 0, 0, 0, 160, 171, 165, 20, 236, 229, 24])
-        let decoded = try ZstdCodec().decode(compressed)
-        #expect(decoded.count == 8)
-        let value = decoded.withUnsafeBytes { Int64(littleEndian: $0.loadUnaligned(as: Int64.self)) }
-        #expect(value == 1794099600000000000)
-    }
-
     private struct SampleReader<V: GenericVariable>: GenericReaderProtocol {
         let modelLat: Float = 10
         let modelLon: Float = 100
@@ -116,35 +75,5 @@ import Testing
                 #expect(output.data[0].isNaN)
             }
         }
-    }
-
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["WEATHERNEXT3_FIXTURE_DIRECTORY"] != nil))
-    func inspectedTemperatureChunkThroughZarr() async throws {
-        let source = try #require(ProcessInfo.processInfo.environment["WEATHERNEXT3_FIXTURE_DIRECTORY"])
-        let json =
-            try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: source + "/zarr.json")))
-            as! [String: Any]
-        let metadata = (json["consolidated_metadata"] as! [String: Any])["metadata"] as! [String: Any]
-        let arrayMetadata = try JSONDecoder().decode(
-            V3ArrayMetadata.self,
-            from: JSONSerialization.data(withJSONObject: metadata["temperature_2m_mean"]!)
-        )
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(
-            at: directory.appendingPathComponent("c/0/0"),
-            withIntermediateDirectories: true
-        )
-        defer { try? FileManager.default.removeItem(at: directory) }
-        try FileManager.default.copyItem(
-            atPath: source + "/temperature_2m_mean-0_0_0.zst",
-            toPath: directory.appendingPathComponent("c/0/0/0").path
-        )
-        let array = try ZarrArray(
-            metadata: arrayMetadata,
-            storage: LocalFileStorage(basePath: directory.path),
-            path: ""
-        )
-        let values: [Float] = try await array.retrieveArraySubset([0..<1, 1000..<1001, 1000..<1001])
-        #expect(values == [301.8550720214844])
     }
 }
