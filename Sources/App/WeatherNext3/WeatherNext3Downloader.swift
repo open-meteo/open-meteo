@@ -20,7 +20,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
 
         let app = context.application
         let logger = context.application.logger
-        logger.info("WeatherNext 3: starting downloader; runtime limit 60 minutes")
+        logger.info("WeatherNext 3: starting downloader; runtime limit 5 hours")
         let downloadConcurrency = signature.concurrentDownload ?? 8
         let conversionConcurrency = signature.concurrent ?? 1
         guard downloadConcurrency > 0 else {
@@ -120,7 +120,6 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             let (variable, template) = arrays[arrayIndex]
             let field = variable.field
             let domain = field.domain
-            logger.debug("WeatherNext 3: hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
             let array = try await ZarrArray(metadata: template.metadata, storage: storage(), path: template.path)
             let readStarted = DispatchTime.now().uptimeNanoseconds
             var data: [Float] = try await array.retrieveArraySubset([
@@ -135,7 +134,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             let writer = try await writers[domain]!.getWriter(time: run.add(hours: index + 1))
             try await writer.write(member: 0, variable: variable, data: data)
             let finished = DispatchTime.now().uptimeNanoseconds
-            logger.info(
+            logger.info("WeatherNext 3: completed hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
+            logger.debug(
                 """
                 WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
                 read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
