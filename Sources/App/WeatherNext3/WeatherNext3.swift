@@ -4,9 +4,16 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
     case surface, station
 
     var domainRegistry: DomainRegistry {
-        self == .surface ? .google_weathernext3_ensemble_mean : .google_weathernext3_station_ensemble_mean
+        switch self {
+        case .surface:
+            .google_weathernext3_ensemble_mean
+        case .station:
+            .google_weathernext3_station_ensemble_mean
+        }
     }
 
+    // Surface (0.1°): ECMWF surface geopotential and land/sea mask provide static forcings; these grids are not included in the forecast buckets.
+    // Station (0.05°): GMTED2010 elevation and ESA WorldCover 10m v200 land/sea data are averaged onto the grid for the station decoder; these grids are not included in the forecast buckets.
     var domainRegistryStatic: DomainRegistry? { nil }
 
     var grid: any Gridable {
