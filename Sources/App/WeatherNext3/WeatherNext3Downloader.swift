@@ -98,72 +98,76 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 hourly lead coordinates")
         }
 
-        logger.info("WeatherNext 3: loading and validating field metadata")
-        let variables = WeatherNext3Variable.fields.flatMap { field in
-            WeatherNext3Variable.Statistic.allCases.map {
-                WeatherNext3Variable(field: field, statistic: $0)
-            }
-        }
-        let arrays = try await variables.mapConcurrent(nConcurrent: downloadConcurrency) { variable in
-            let field = variable.field
-            let name = field.source + "_" + variable.statistic.rawValue
-            let array = try await root.openArray(name: name)
-            let domain = field.domain
-            let suffix = domain.coordinateSuffix
-            guard case .v3(let metadata) = array.metadata,
-                metadata.dataType == "float32",
-                metadata.dimensionNames == ["lead_time", "lat_" + suffix, "lon_" + suffix],
-                metadata.attributes?["units"]?.stringValue == field.sourceUnit,
-                array.chunkShape == [1, domain.grid.ny, domain.grid.nx],
-                array.shape == [hours, domain.grid.ny, domain.grid.nx]
-            else {
-                throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
-            }
-
-            return (variable: variable, array: array)
-        }
-
-        let writers = Dictionary(uniqueKeysWithValues: WeatherNext3Domain.allCases.map { domain in
-            (domain, OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger))
-        })
-        let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
-        logger.info("WeatherNext 3: downloading \(chunks.count) chunks with concurrency \(downloadConcurrency)")
-        try await chunks.foreachConcurrent(nConcurrent: downloadConcurrency) { index, arrayIndex in
-            let (variable, template) = arrays[arrayIndex]
-            let field = variable.field
-            let domain = field.domain
-            let array = try await ZarrArray(
-                metadata: template.metadata,
-                storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
-                path: template.path
-            )
-            let readStarted = DispatchTime.now().uptimeNanoseconds
-            var data: [Float] = try await array.retrieveArraySubset([
-                index..<index + 1, 0..<domain.grid.ny, 0..<domain.grid.nx,
-            ])
-            let transformStarted = DispatchTime.now().uptimeNanoseconds
-            data.shift180Longitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-            if field.scale != 1 || field.offset != 0 {
-                data.multiplyAdd(multiply: field.scale, add: field.offset)
-            }
-            let writeStarted = DispatchTime.now().uptimeNanoseconds
-            let writer = try await writers[domain]!.getWriter(time: run.add(hours: index + 1))
-            try await writer.write(member: 0, variable: variable, data: data)
-            let finished = DispatchTime.now().uptimeNanoseconds
-            logger.info("WeatherNext 3: completed hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
-            logger.debug(
-                """
-                WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
-                read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
-                transform \((writeStarted - transformStarted) / 1_000_000)ms, \
-                writer wait/write \((finished - writeStarted) / 1_000_000)ms
-                """
-            )
-        }
-
         var handles = [GenericVariableHandle]()
         for domain in WeatherNext3Domain.allCases {
-            handles += try await writers[domain]!.finalise()
+            let grid = domain.grid
+            let suffix = domain.coordinateSuffix
+            let root = try await ZarrGroup(
+                storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
+                path: prefix + "predictions.zarr/"
+            )
+            logger.info("WeatherNext 3: loading and validating \(domain.rawValue) field metadata")
+            let variables = WeatherNext3Variable.fields.filter { $0.domain == domain }.flatMap { field in
+                WeatherNext3Variable.Statistic.allCases.map {
+                    WeatherNext3Variable(field: field, statistic: $0)
+                }
+            }
+            let arrays = try await variables.mapConcurrent(nConcurrent: downloadConcurrency) { variable in
+                let name = variable.field.source + "_" + variable.statistic.rawValue
+                let array = try await root.openArray(name: name)
+                guard case .v3(let metadata) = array.metadata,
+                    metadata.dataType == "float32",
+                    metadata.dimensionNames == ["lead_time", "lat_" + suffix, "lon_" + suffix],
+                    metadata.attributes?["units"]?.stringValue == variable.field.sourceUnit,
+                    array.chunkShape == [1, grid.ny, grid.nx],
+                    array.shape == [hours, grid.ny, grid.nx]
+                else {
+                    throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 shape: \(name)")
+                }
+
+                return (variable: variable, array: array)
+            }
+
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
+            let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
+            logger.info("WeatherNext 3: downloading \(chunks.count) \(domain.rawValue) chunks with concurrency \(downloadConcurrency)")
+            try await chunks.foreachConcurrent(nConcurrent: downloadConcurrency) { index, arrayIndex in
+                let (variable, template) = arrays[arrayIndex]
+                let field = variable.field
+                let array = try await ZarrArray(
+                    metadata: template.metadata,
+                    storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
+                    path: template.path
+                )
+                let readStarted = DispatchTime.now().uptimeNanoseconds
+                var data: [Float] = try await array.retrieveArraySubset([
+                    index..<index + 1, 0..<grid.ny, 0..<grid.nx,
+                ])
+                let transformStarted = DispatchTime.now().uptimeNanoseconds
+                data.shift180Longitude(nt: 1, ny: grid.ny, nx: grid.nx)
+                if field.scale != 1 || field.offset != 0 {
+                    data.multiplyAdd(multiply: field.scale, add: field.offset)
+                }
+                let writeStarted = DispatchTime.now().uptimeNanoseconds
+                try await writer.write(
+                    time: run.add(hours: index + 1),
+                    member: 0,
+                    variable: variable,
+                    data: data
+                )
+                let finished = DispatchTime.now().uptimeNanoseconds
+                logger.info("WeatherNext 3: completed hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
+                logger.debug(
+                    """
+                    WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
+                    read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
+                    transform \((writeStarted - transformStarted) / 1_000_000)ms, \
+                    writer wait/write \((finished - writeStarted) / 1_000_000)ms
+                    """
+                )
+            }
+
+            handles += try await writer.finalise()
         }
 
         return handles
