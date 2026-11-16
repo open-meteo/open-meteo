@@ -4,6 +4,7 @@ import AsyncHTTPClient
 import NIOCore
 import Crypto
 import CryptoExtras
+import SwiftZarr
 
 enum GoogleCloudStorageError: Error {
     case missingGoogleCredentials(String)
@@ -19,6 +20,15 @@ actor GoogleCloudStorageAuth {
     init(client: HTTPClient, logger: Logger) {
         self.client = client
         self.logger = logger
+    }
+
+    func storage(bucket: String, retryConfiguration: RetryConfiguration = .default) async throws -> S3CompatibleStorage {
+        let token = try await getAccessToken()
+        return try S3CompatibleStorage(
+            baseURL: "https://storage.googleapis.com/\(bucket)",
+            retryingClient: .init(httpClient: client, config: retryConfiguration),
+            additionalHeaders: ["Authorization": "Bearer \(token)"]
+        )
     }
 
     /// returns an access token which is valid at least 5 more minutes, if not a fresh token is requested

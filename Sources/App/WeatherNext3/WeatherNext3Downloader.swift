@@ -49,22 +49,15 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let auth = GoogleCloudStorageAuth(client: .shared, logger: logger)
         let prefix = WeatherNext3Domain.path(run: run)
 
-        @Sendable func storage() async throws -> S3CompatibleStorage {
-            let token = try await auth.getAccessToken()
-            return try S3CompatibleStorage(
-                baseURL: "https://storage.googleapis.com/weathernext3_statistics_spatial",
-                additionalHeaders: ["Authorization": "Bearer \(token)"]
-            )
-        }
         logger.info(
             "WeatherNext 3: selected run \(run.iso8601_YYYY_MM_dd_HH_mm), download concurrency \(downloadConcurrency), conversion concurrency \(conversionConcurrency); obtaining Google access token"
         )
-        var initialStorage = try await storage()
+        var initialStorage = try await auth.storage(bucket: "weathernext3_statistics_spatial")
         logger.info("WeatherNext 3: checking success marker at \(prefix)success")
         while try await !initialStorage.exists(path: prefix + "success") {
             logger.info("WeatherNext 3: run \(run.iso8601_YYYY_MM_dd_HH_mm) is not complete; retrying in 60 seconds")
             try await Task.sleep(for: .seconds(60))
-            initialStorage = try await storage()
+            initialStorage = try await auth.storage(bucket: "weathernext3_statistics_spatial")
         }
 
         let hours = WeatherNext3Domain.hours
@@ -120,7 +113,11 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             let (variable, template) = arrays[arrayIndex]
             let field = variable.field
             let domain = field.domain
-            let array = try await ZarrArray(metadata: template.metadata, storage: storage(), path: template.path)
+            let array = try await ZarrArray(
+                metadata: template.metadata,
+                storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
+                path: template.path
+            )
             let readStarted = DispatchTime.now().uptimeNanoseconds
             var data: [Float] = try await array.retrieveArraySubset([
                 index..<index + 1, 0..<domain.grid.ny, 0..<domain.grid.nx,
