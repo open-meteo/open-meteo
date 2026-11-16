@@ -70,174 +70,124 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
     }
 }
 
-struct WeatherNext3Variable: GenericVariable {
-    let rawValue: String
+enum WeatherNext3Field: String, CaseIterable, Sendable {
+    case temperature_2m
+    case dew_point_2m
+    case pressure_msl
+    case sea_surface_temperature
+    case precipitation
+    case shortwave_radiation
+    case direct_radiation
+    case wind_u_component_10m
+    case wind_v_component_10m
+    case wind_speed_10m
+    case wind_u_component_100m
+    case wind_v_component_100m
+    case wind_speed_100m
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
 
-    struct Field: Sendable {
-        let name: String
-        let source: String
-        let domain: WeatherNext3Domain
-        let unit: SiUnit
-        let sourceUnit: String
-        let multiplyAdd: (multiply: Float, add: Float)?
-        let spread: Bool
+    var source: String {
+        switch self {
+        case .temperature_2m: "station_head_temperature_2m"
+        case .dew_point_2m: "station_head_dewpoint_temperature_2m"
+        case .pressure_msl: "mean_sea_level_pressure"
+        case .sea_surface_temperature, .wind_speed_10m, .wind_speed_100m: rawValue
+        case .precipitation: "total_precipitation_1hr"
+        case .shortwave_radiation: "surface_solar_radiation_downwards_1hr"
+        case .direct_radiation: "total_sky_direct_solar_radiation_at_surface_1hr"
+        case .wind_u_component_10m: "u_component_of_wind_10m"
+        case .wind_v_component_10m: "v_component_of_wind_10m"
+        case .wind_u_component_100m: "u_component_of_wind_100m"
+        case .wind_v_component_100m: "v_component_of_wind_100m"
+        case .cloud_cover: "total_cloud_cover"
+        case .cloud_cover_low: "low_cloud_cover"
+        case .cloud_cover_mid: "medium_cloud_cover"
+        case .cloud_cover_high: "high_cloud_cover"
+        }
     }
 
-    static let fields: [Field] = [
-        .init(
-            name: "temperature_2m",
-            source: "station_head_temperature_2m",
-            domain: .station,
-            unit: .celsius,
-            sourceUnit: "K",
-            multiplyAdd: (1, -273.15),
-            spread: true
-        ),
-        .init(
-            name: "dew_point_2m",
-            source: "station_head_dewpoint_temperature_2m",
-            domain: .station,
-            unit: .celsius,
-            sourceUnit: "K",
-            multiplyAdd: (1, -273.15),
-            spread: true
-        ),
-        .init(
-            name: "pressure_msl",
-            source: "mean_sea_level_pressure",
-            domain: .surface,
-            unit: .hectopascal,
-            sourceUnit: "Pa",
-            multiplyAdd: (0.01, 0),
-            spread: true
-        ),
-        .init(
-            name: "sea_surface_temperature",
-            source: "sea_surface_temperature",
-            domain: .surface,
-            unit: .celsius,
-            sourceUnit: "K",
-            multiplyAdd: (1, -273.15),
-            spread: false
-        ),
-        .init(
-            name: "precipitation",
-            source: "total_precipitation_1hr",
-            domain: .surface,
-            unit: .millimetre,
-            sourceUnit: "m",
-            multiplyAdd: (1000, 0),
-            spread: false
-        ),
-        .init(
-            name: "shortwave_radiation",
-            source: "surface_solar_radiation_downwards_1hr",
-            domain: .surface,
-            unit: .wattPerSquareMetre,
-            sourceUnit: "J m**-2",
-            multiplyAdd: (1 / 3600, 0),
-            spread: false
-        ),
-        .init(
-            name: "direct_radiation",
-            source: "total_sky_direct_solar_radiation_at_surface_1hr",
-            domain: .surface,
-            unit: .wattPerSquareMetre,
-            sourceUnit: "J m**-2",
-            multiplyAdd: (1 / 3600, 0),
-            spread: false
-        ),
-        .init(
-            name: "wind_u_component_10m",
-            source: "u_component_of_wind_10m",
-            domain: .surface,
-            unit: .metrePerSecond,
-            sourceUnit: "m s**-1",
-            multiplyAdd: nil,
-            spread: true
-        ),
-        .init(
-            name: "wind_v_component_10m",
-            source: "v_component_of_wind_10m",
-            domain: .surface,
-            unit: .metrePerSecond,
-            sourceUnit: "m s**-1",
-            multiplyAdd: nil,
-            spread: true
-        ),
-        .init(
-            name: "wind_speed_10m",
-            source: "wind_speed_10m",
-            domain: .surface,
-            unit: .metrePerSecond,
-            sourceUnit: "m s**-1",
-            multiplyAdd: nil,
-            spread: false
-        ),
-        .init(
-            name: "wind_u_component_100m",
-            source: "u_component_of_wind_100m",
-            domain: .surface,
-            unit: .metrePerSecond,
-            sourceUnit: "m s**-1",
-            multiplyAdd: nil,
-            spread: true
-        ),
-        .init(
-            name: "wind_v_component_100m",
-            source: "v_component_of_wind_100m",
-            domain: .surface,
-            unit: .metrePerSecond,
-            sourceUnit: "m s**-1",
-            multiplyAdd: nil,
-            spread: true
-        ),
-        .init(
-            name: "wind_speed_100m",
-            source: "wind_speed_100m",
-            domain: .surface,
-            unit: .metrePerSecond,
-            sourceUnit: "m s**-1",
-            multiplyAdd: nil,
-            spread: false
-        ),
-        .init(
-            name: "cloud_cover",
-            source: "total_cloud_cover",
-            domain: .surface,
-            unit: .percentage,
-            sourceUnit: "(0 - 1)",
-            multiplyAdd: (100, 0),
-            spread: false
-        ),
-        .init(
-            name: "cloud_cover_low",
-            source: "low_cloud_cover",
-            domain: .surface,
-            unit: .percentage,
-            sourceUnit: "(0 - 1)",
-            multiplyAdd: (100, 0),
-            spread: false
-        ),
-        .init(
-            name: "cloud_cover_mid",
-            source: "medium_cloud_cover",
-            domain: .surface,
-            unit: .percentage,
-            sourceUnit: "(0 - 1)",
-            multiplyAdd: (100, 0),
-            spread: false
-        ),
-        .init(
-            name: "cloud_cover_high",
-            source: "high_cloud_cover",
-            domain: .surface,
-            unit: .percentage,
-            sourceUnit: "(0 - 1)",
-            multiplyAdd: (100, 0),
-            spread: false
-        ),
-    ]
+    var domain: WeatherNext3Domain {
+        switch self {
+        case .temperature_2m, .dew_point_2m:
+            .station
+        case .pressure_msl, .sea_surface_temperature, .precipitation, .shortwave_radiation, .direct_radiation,
+            .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
+            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m,
+            .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            .surface
+        }
+    }
+
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m, .dew_point_2m, .sea_surface_temperature:
+            .celsius
+        case .pressure_msl:
+            .hectopascal
+        case .precipitation:
+            .millimetre
+        case .shortwave_radiation, .direct_radiation:
+            .wattPerSquareMetre
+        case .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
+            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m:
+            .metrePerSecond
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            .percentage
+        }
+    }
+
+    var sourceUnit: String {
+        switch self {
+        case .temperature_2m, .dew_point_2m, .sea_surface_temperature:
+            "K"
+        case .pressure_msl:
+            "Pa"
+        case .precipitation:
+            "m"
+        case .shortwave_radiation, .direct_radiation:
+            "J m**-2"
+        case .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
+            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m:
+            "m s**-1"
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            "(0 - 1)"
+        }
+    }
+
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m, .dew_point_2m, .sea_surface_temperature:
+            (1, -273.15)
+        case .pressure_msl:
+            (0.01, 0)
+        case .precipitation:
+            (1000, 0)
+        case .shortwave_radiation, .direct_radiation:
+            (1 / 3600, 0)
+        case .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
+            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m:
+            nil
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            (100, 0)
+        }
+    }
+
+    var spread: Bool {
+        switch self {
+        case .temperature_2m, .dew_point_2m, .pressure_msl,
+            .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m:
+            true
+        case .sea_surface_temperature, .precipitation, .shortwave_radiation, .direct_radiation,
+            .wind_speed_10m, .wind_speed_100m, .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            false
+        }
+    }
+}
+
+struct WeatherNext3Variable: GenericVariable {
 
     enum Statistic: String, CaseIterable {
         case mean
@@ -249,18 +199,21 @@ struct WeatherNext3Variable: GenericVariable {
     }
 
     let statistic: Statistic
-    let field: Field
+    let field: WeatherNext3Field
 
-    init(field: Field, statistic: Statistic) {
+    var rawValue: String {
+        statistic == .mean ? field.rawValue : field.rawValue + "_" + statistic.rawValue
+    }
+
+    init(field: WeatherNext3Field, statistic: Statistic) {
         self.field = field
         self.statistic = statistic
-        self.rawValue = statistic == .mean ? field.name : field.name + "_" + statistic.rawValue
     }
 
     init?(rawValue: String) {
         let statistic = Statistic.allCases.first { $0 != .mean && rawValue.hasSuffix("_" + $0.rawValue) } ?? .mean
         let name = statistic == .mean ? rawValue : String(rawValue.dropLast(statistic.rawValue.count + 1))
-        guard let field = Self.fields.first(where: { $0.name == name }) else { return nil }
+        guard let field = WeatherNext3Field(rawValue: name) else { return nil }
         self.init(field: field, statistic: statistic)
     }
 
@@ -288,7 +241,7 @@ struct WeatherNext3Variable: GenericVariable {
 
     var interpolation: ReaderInterpolation {
         if statistic != .mean { return .linear }
-        if rawValue == "precipitation" { return .backwards_sum }
+        if field == .precipitation { return .backwards_sum }
         if field.unit == .wattPerSquareMetre { return .solar_backwards_averaged }
         return .linear
     }

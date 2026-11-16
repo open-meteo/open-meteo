@@ -1056,7 +1056,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
         if isWeatherNext3 && variable.rawValue.hasSuffix("_spread") {
             let name = String(variable.rawValue.dropLast(7))
-            guard let field = WeatherNext3Variable.fields.first(where: { $0.name == name && $0.spread }),
+            guard let field = WeatherNext3Field(rawValue: name), field.spread,
                 let low = Reader.variableFromString(name + "_p10"),
                 let high = Reader.variableFromString(name + "_p90")
             else {
