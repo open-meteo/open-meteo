@@ -184,12 +184,11 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
 
     struct RepairStats: CustomStringConvertible {
         var changed = 0
-        var ignoredRounding = 0
         var maxAddition: Float = 0
         var skippedHail = 0
 
         var description: String {
-            "corrected \(changed) values; max addition \(maxAddition) mm; ignored \(ignoredRounding) rounding residuals; skipped \(skippedHail) values with hail data"
+            "corrected \(changed) values; max addition \(maxAddition) mm; skipped \(skippedHail) values with hail data"
         }
     }
 
@@ -203,8 +202,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         // Subtract whole storage increments to avoid floating-point residuals.
         let snowTenths = (snow * 10).rounded()
         let missingTenths = (precipitation * 10).rounded() - (rain * 10).rounded() - snowTenths
-        if missingTenths == 1 { stats.ignoredRounding += 1 }
-        guard missingTenths > 1 else { return snow }
+        guard missingTenths > 0 else { return snow }
         stats.changed += 1
         stats.maxAddition = max(stats.maxAddition, missingTenths / 10)
         return (snowTenths + missingTenths) / 10
