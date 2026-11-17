@@ -5,6 +5,29 @@ import NIO
 // import Vapor
 
 @Suite struct HelperTests {
+    @Test func indexedDownloadSharesConcurrencyBudget() {
+        for (rangeCount, budget, expectedRanges, expectedChunks) in [
+            (1, 12, 1, 12),
+            (3, 12, 3, 4),
+            (5, 12, 5, 2),
+            (12, 12, 12, 1),
+            (100, 12, 12, 1),
+            (100, 1, 1, 1)
+        ] {
+            let concurrency = Curl.indexedDownloadConcurrency(rangeCount: rangeCount, concurrent: budget)
+            #expect(concurrency.ranges == expectedRanges)
+            #expect(concurrency.chunks == expectedChunks)
+        }
+        for budget in 1...16 {
+            for rangeCount in 1...32 {
+                let concurrency = Curl.indexedDownloadConcurrency(rangeCount: rangeCount, concurrent: budget)
+                #expect(concurrency.ranges >= 1 && concurrency.ranges <= rangeCount)
+                #expect(concurrency.chunks >= 1)
+                #expect(concurrency.ranges * concurrency.chunks <= budget)
+            }
+        }
+    }
+
     @Test func mapStream() async {
         let a = (0..<100).map { $0 }
         let res = try! await a.mapStream(nConcurrent: 4) {
