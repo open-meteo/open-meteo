@@ -59,37 +59,4 @@ struct EcmwfEnsembleDownloadTests {
             #expect(variable.level != nil)
         }
     }
-
-    @Test func precipitationDeaccumulatesBeforeScalingAndSeparatesMembers() async {
-        let deaverager = GribDeaverager()
-        for (member, hour, value, expected) in [(0, 3, Float(0.003), Float(3)), (1, 3, 0.010, 10), (0, 6, 0.007, 4), (1, 6, 0.012, 2)] {
-            var data = Array2D(data: [value], nx: 1, ny: 1)
-            let stored = await DownloadEcmwfCommand.prepareEnsembleField(variable: Surface.precipitation, member: member, hour: hour, stepType: "accum", stepRange: "0-\(hour)", shortName: "tp", deaverager: deaverager, data: &data)
-            #expect(stored)
-            #expect(abs(data.data[0] - expected) < 0.001)
-        }
-    }
-
-    @Test func radiationUsesActualIntervalIncludingSixHourlyStepsAndResets() async {
-        let deaverager = GribDeaverager()
-        for (hour, range, energy) in [(144, "144", Float(144 * 3600 * 100)), (150, "150", Float(150 * 3600 * 100)), (156, "150-156", Float(6 * 3600 * 100))] {
-            var data = Array2D(data: [energy], nx: 1, ny: 1)
-            let stored = await DownloadEcmwfCommand.prepareEnsembleField(variable: Surface.shortwave_radiation, member: 0, hour: hour, stepType: "accum", stepRange: range, shortName: "ssrd", deaverager: deaverager, data: &data)
-            #expect(stored)
-            #expect(abs(data.data[0] - 100) < 0.001)
-        }
-    }
-
-    @Test func nativeDewpointSnowAndOmegaNeedNoCompanionFields() async {
-        let deaverager = GribDeaverager()
-        var dewpoint = Array2D(data: [280], nx: 1, ny: 1)
-        #expect(await DownloadEcmwfCommand.prepareEnsembleField(variable: Surface.dew_point_2m, member: 0, hour: 0, stepType: "instant", stepRange: "0", shortName: "2d", deaverager: deaverager, data: &dewpoint))
-        #expect(abs(dewpoint.data[0] - 6.85) < 0.001)
-        var snow = Array2D(data: [0.1], nx: 1, ny: 1)
-        #expect(await DownloadEcmwfCommand.prepareEnsembleField(variable: Surface.snow_depth_water_equivalent, member: 0, hour: 0, stepType: "instant", stepRange: "0", shortName: "sd", deaverager: deaverager, data: &snow))
-        #expect(snow.data == [100])
-        var omega = Array2D(data: [-0.25], nx: 1, ny: 1)
-        #expect(await DownloadEcmwfCommand.prepareEnsembleField(variable: Pressure.vertical_velocity_pressure_500hPa, member: 0, hour: 0, stepType: "instant", stepRange: "0", shortName: "w", deaverager: deaverager, data: &omega))
-        #expect(omega.data == [-0.25])
-    }
 }

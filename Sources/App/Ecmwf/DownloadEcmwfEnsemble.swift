@@ -1,5 +1,6 @@
 import Foundation
 import NIOCore
+import NIOConcurrencyHelpers
 import OmFileIO
 import Vapor
 
@@ -15,6 +16,15 @@ extension DownloadEcmwfCommand {
         let member: Int
         let url: String
         let range: Range<Int>
+    }
+
+    struct DecodedEnsembleField: Sendable {
+        let hour: Int
+        let member: Int
+        let shortName: String
+        let stepType: String
+        let stepRange: String
+        var grib: GribArray2D
     }
 
     /// Member-major ordering keeps only one member's previous accumulation in memory.
@@ -61,7 +71,7 @@ extension DownloadEcmwfCommand {
             let downloads = try Self.ensembleDownloads(inventories: inventories, variable: variable, memberCount: domain.countEnsembleMember)
             guard !downloads.isEmpty else { continue }
             logger.info("Downloading \(variable.rawValue): \(downloads.count) fields")
-            let handles = try await downloadEnsembleVariable(application: application, domain: domain, run: run, variable: variable, downloads: downloads, curl: curl, nConcurrent: downloadConcurrent)
+            let handles = try await downloadEnsembleVariable(application: application, domain: domain, run: run, variable: variable, downloads: downloads, curl: curl, downloadConcurrent: downloadConcurrent, concurrent: concurrent)
             // Finish the previous conversion before starting another; its work overlaps
             // the download above.
             try await conversionJob?.value
@@ -84,63 +94,63 @@ extension DownloadEcmwfCommand {
         await curl.printStatistics()
     }
 
-    private func downloadEnsembleVariable<V: EcmwfEnsembleVariable>(application: Application, domain: EcmwfDomain, run: Timestamp, variable: V, downloads: [EnsembleDownload], curl: Curl, nConcurrent: Int) async throws -> [GenericVariableHandle] {
+    private func downloadEnsembleVariable<V: EcmwfEnsembleVariable>(application: Application, domain: EcmwfDomain, run: Timestamp, variable: V, downloads: [EnsembleDownload], curl: Curl, downloadConcurrent: Int, concurrent: Int) async throws -> [GenericVariableHandle] {
         // Match the converter's member count, including control-only selections.
         let nMembers = downloads.contains { $0.member > 0 } ? domain.countEnsembleMember : 1
         let chunks = OmFileSplitter(domain, nMembers: nMembers).spatialReadChunkDimensions
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: application.logger, chunkDimensions: [chunks.y, chunks.x])
-        var deaverager = GribDeaverager()
-        var previousMember: Int?
+        let deaveragingState = NIOLockedValueBox((member: Optional<Int>.none, deaverager: GribDeaverager()))
         // mapStream preserves input order even when requests finish out of order.
-        for try await (download, buffer) in downloads.mapStream(nConcurrent: nConcurrent, nBuffered: 2 * nConcurrent, body: { download in
+        let decoded = downloads.mapStream(nConcurrent: downloadConcurrent, nBuffered: 2 * downloadConcurrent, body: { download -> DecodedEnsembleField? in
             let range = "\(download.range.lowerBound)-\(download.range.upperBound - 1)"
             let buffer = try await curl.downloadInMemoryAsync(url: download.url, range: range, minSize: download.range.count, cacheDirectory: nil)
-            return (download, buffer)
-        }) {
-            // ecCodes messages may reference the compressed buffer during processing.
-            defer { withExtendedLifetime(buffer) {} }
-            let messages = try buffer.withUnsafeReadableBytes { try GribAsyncStreamHelper.decodeMessages(memory: $0) }
-            guard !messages.isEmpty else { throw GribAsyncStreamError.didNotFindGibHeader }
-            for message in messages {
+            // Decode while the compressed buffer is alive; only owned arrays leave this job.
+            return try buffer.withUnsafeReadableBytes { bytes in
+                guard let message = try GribAsyncStreamHelper.decodeMessages(memory: bytes).first else {
+                    throw GribAsyncStreamError.didNotFindGibHeader
+                }
                 guard let shortName = message.get(attribute: "shortName"),
                       let level = message.get(attribute: "level").flatMap(Int.init),
                       let stepType = message.get(attribute: "stepType"),
                       let stepRange = message.get(attribute: "stepRange") else {
                     throw CurlMemoryDownloadError.invalidRangeResponse
                 }
-                // Inventories can group soil layers under one parameter/range.
-                guard variable.matches(shortName: shortName, level: level) else { continue }
+                guard variable.matches(shortName: shortName, level: level) else { return nil }
                 guard (message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0) == download.member else {
                     throw CurlMemoryDownloadError.invalidRangeResponse
-                }
-                let time = run.add(hours: download.hour)
-                if previousMember != download.member {
-                    deaverager = GribDeaverager()
-                    previousMember = download.member
                 }
                 var grib = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib.load(message: message)
                 grib.array.flipLatitude()
-                guard await Self.prepareEnsembleField(variable: variable, member: download.member, hour: download.hour, stepType: stepType, stepRange: stepRange, shortName: shortName, deaverager: deaverager, data: &grib.array) else { continue }
-                try await writer.write(time: time, member: download.member, variable: variable, data: grib.array.data)
+                return DecodedEnsembleField(hour: download.hour, member: download.member, shortName: shortName, stepType: stepType, stepRange: stepRange, grib: grib)
             }
+        })
+        // AsyncSequence.map advances serially, preserving each member's accumulation history.
+        let prepared = decoded.map { field -> (time: Timestamp, member: Int, data: [Float])? in
+            guard var field else { return nil }
+            let deaverager = deaveragingState.withLockedValue { state in
+                if state.member != field.member {
+                    state.deaverager = GribDeaverager()
+                    state.member = field.member
+                }
+                return state.deaverager
+            }
+            // Deaccumulate before converting units; retain the previous field in its original units.
+            let stepRange = field.stepType == "accum" && !field.stepRange.contains("-") ? "0-\(field.stepRange)" : field.stepRange
+            let previousStep = await deaverager.lastStep(variable, field.member)
+            guard await deaverager.deaccumulateIfRequired(variable: variable, member: field.member, stepType: field.stepType, stepRange: stepRange, array2d: &field.grib.array) else { return nil }
+            // Respect both cumulative fields and fields that reset their accumulation interval.
+            let start = stepRange.splitTo2Integer()?.0 ?? field.hour
+            let dtSeconds = max(1, field.hour - max(start, previousStep ?? start)) * 3600
+            if field.shortName == "z" { field.grib.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
+            if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                field.grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+            }
+            return (run.add(hours: field.hour), field.member, field.grib.array.data)
+        }.compactMap { $0 }
+        try await prepared.foreachConcurrent(nConcurrent: concurrent) { field in
+            try await writer.write(time: field.time, member: field.member, variable: variable, data: field.data)
         }
         return try await writer.finalise()
     }
-
-    /// Deaccumulate before converting units; keep the previous field in its original units.
-    static func prepareEnsembleField<V: EcmwfEnsembleVariable>(variable: V, member: Int, hour: Int, stepType: String, stepRange: String, shortName: String, deaverager: GribDeaverager, data: inout Array2D) async -> Bool {
-        let stepRange = stepType == "accum" && !stepRange.contains("-") ? "0-\(stepRange)" : stepRange
-        let previousStep = await deaverager.lastStep(variable, member)
-        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &data) else { return false }
-        // Respect both cumulative fields and fields that reset their accumulation interval.
-        let start = stepRange.splitTo2Integer()?.0 ?? hour
-        let dtSeconds = max(1, hour - max(start, previousStep ?? start)) * 3600
-        if shortName == "z" { data.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
-        if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-            data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-        }
-        return true
-    }
-
 }
