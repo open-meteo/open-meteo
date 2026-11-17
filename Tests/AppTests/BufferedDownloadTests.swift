@@ -156,6 +156,14 @@ struct BufferedDownloadTests {
         }
     }
 
+    @Test func singleRequestRangeDeterminesByteBounds() {
+        #expect(CurlMemoryDownloadError.singleRange("4-7") == 4..<8)
+        #expect(CurlMemoryDownloadError.singleRange("0-0") == 0..<1)
+        for range in ["4-", "-4", "0-3,8-11", "7-4", "-1-4", "invalid", "0-\(Int.max)"] {
+            #expect(CurlMemoryDownloadError.singleRange(range) == nil)
+        }
+    }
+
     @Test func invalidSizesAndResponses() async throws {
         await #expect(throws: BufferedGribDownload.ValidationError.self) {
             try await BufferedGribDownload.process(ranges: [0..<9], downloadConcurrent: 1, processingConcurrent: 1, byteLimit: 8, download: { _ in ByteBuffer() }) { _ in }

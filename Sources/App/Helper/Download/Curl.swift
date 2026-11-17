@@ -308,9 +308,10 @@ final class Curl: Sendable {
 
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    /// `expectedRange` validates the response range and limits the collected body to its byte count.
+    /// A single closed `range` validates the HTTP response and limits the downloaded byte count.
     /// Pass `cacheDirectory: nil` to bypass the cache, which buffers responses independently.
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, cacheDirectory: String? = Curl.cacheDirectory, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], quiet: Bool = false, expectedRange: Range<Int>? = nil) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, cacheDirectory: String? = Curl.cacheDirectory, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], quiet: Bool = false) async throws -> ByteBuffer {
+        let expectedRange = range.flatMap(CurlMemoryDownloadError.singleRange)
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
@@ -319,7 +320,8 @@ final class Curl: Sendable {
 
             // Retry failed file transfers after this point
             do {
-                if let expectedRange {
+                // Cached and concurrently assembled responses have synthetic headers.
+                if let expectedRange, cacheDirectory == nil, nConcurrent == 1, !url.hasPrefix("file://") {
                     try CurlMemoryDownloadError.validateRange(status: Int(response.status.code), contentRange: response.headers.first(name: "Content-Range"), expected: expectedRange)
                 }
                 var buffer = ByteBuffer()
@@ -332,7 +334,7 @@ final class Curl: Sendable {
                 if bzip2Decode {
                     for try await fragement in response.body.tracker(tracker).decodeBzip2() {
                         try Task.checkCancellation()
-                        try CurlMemoryDownloadError.validateSize(current: buffer.readableBytes, additional: fragement.readableBytes, limit: expectedRange?.count)
+                        // The byte range describes compressed bytes, not the decoded size.
                         buffer.writeImmutableBuffer(fragement)
                     }
                 } else {
