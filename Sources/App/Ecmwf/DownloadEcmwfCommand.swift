@@ -59,9 +59,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Flag(name: "download-full-grib-file", help: "Skip GRIB inventory and process entire file")
         var downloadFullGribFile: Bool
 
-        @Flag(name: "batch-variables", help: "Reduce temporary disk usage by processing ensemble variables in batches. Requires indexed downloads; unavailable with --timeinterval or wave models.")
-        var batchVariables: Bool
-        
         @Flag(name: "skip-timeseries")
         var skipTimeseries: Bool
     }
@@ -86,11 +83,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let logger = context.application.logger
         let isWave = domain == .wam025 || domain == .wam025_ensemble
 
-        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
-        let variables = (onlyVariables ?? EcmwfVariable.allCases).filter { domain.includes(variable: $0) }
-        if domain.isIfs01 && variables.isEmpty {
-            throw Abort(.badRequest, reason: "No selected variables belong to \(domain.rawValue)")
-        }
         let nConcurrent = signature.concurrent ?? 1
         let nDownloadConcurrent = signature.downloadConcurrent ?? (2 * nConcurrent)
         guard nConcurrent > 0, nDownloadConcurrent > 0 else {
@@ -103,18 +95,31 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let downloadBufferBytes = downloadBufferMB * 1024 * 1024
         let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 
-        if signature.batchVariables {
+        if domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels {
             guard !signature.downloadFullGribFile else {
-                throw Abort(.badRequest, reason: "--batch-variables cannot be combined with --download-full-grib-file")
+                throw Abort(.badRequest, reason: "IFS 0.1° ensemble downloads require index inventories")
             }
-            guard domain.countEnsembleMember > 1 && !isWave else {
-                throw Abort(.badRequest, reason: "--batch-variables is only supported for non-wave ensemble models")
+            let runs = try signature.timeinterval.map {
+                Array(try Timestamp.parseRange(yyyymmdd: $0).toRange(dt: 86400).with(dtSeconds: 86400 / 4))
+            } ?? [run]
+            for run in runs {
+                try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run, uploadQueues: resolvedUploadQueues)
+                if domain.isPressureLevels {
+                    let selected = try EcmwfIfs01EnsemblePressureVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? EcmwfIfs01EnsemblePressureVariable.allCases
+                    try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: resolvedUploadQueues)
+                } else {
+                    let selected = try EcmwfIfs01EnsembleSurfaceVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? EcmwfIfs01EnsembleSurfaceVariable.allCases
+                    try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: resolvedUploadQueues)
+                }
             }
-            guard signature.timeinterval == nil else {
-                throw Abort(.badRequest, reason: "--batch-variables cannot be combined with --timeinterval")
-            }
+            return
         }
 
+        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
+        let variables = (onlyVariables ?? EcmwfVariable.allCases).filter { domain.includes(variable: $0) }
+        if domain.isIfs01 && variables.isEmpty {
+            throw Abort(.badRequest, reason: "No selected variables belong to \(domain.rawValue)")
+        }
         let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_peak_period]
 
         // Historical exports also generate full-run products; keep their existing single-pass path.
@@ -131,72 +136,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if !isWave {
             try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run, uploadQueues: resolvedUploadQueues)
         }
-        if signature.batchVariables {
-            try await downloadEnsembleBatches(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, downloadBufferBytes: downloadBufferBytes, uploadQueues: resolvedUploadQueues)
-            return
-        }
         let generateFullRun = domain.countEnsembleMember == 1
         let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: resolvedUploadQueues, downloadFullGribFile: signature.downloadFullGribFile, downloadBufferBytes: downloadBufferBytes) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: resolvedUploadQueues, downloadFullGribFile: signature.downloadFullGribFile, downloadBufferBytes: downloadBufferBytes)
         try await GenericVariableHandle.convert(application: context.application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadQueues: resolvedUploadQueues, generateFullRun: generateFullRun, generateTimeSeries: !signature.skipTimeseries)
-    }
-
-    /// Keep derived-variable inputs together; never split a dependency group to meet the target size.
-    static func variableBatches(variables: [EcmwfVariable], domain: EcmwfDomain, size: Int = 6) -> [[EcmwfVariable]] {
-        precondition(size > 0)
-        let groups = variables.groupedPreservedOrder { variable -> String in
-            if [.temperature_2m, .relative_humidity_2m].contains(variable) { return "surface-humidity" }
-            if [.snow_depth, .snow_depth_water_equivalent].contains(variable) { return "snow" }
-            let name = variable.gribName
-            let isAifs = domain == .aifs025_ensemble
-            // Legacy clouds need humidity at all pressure levels. AIFS derives it from T and Q.
-            if domain.requiresCloudCoverFromHumidity && (
-                name == "r" || (isAifs && ["t", "q", "w"].contains(name)) ||
-                [.cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high].contains(variable)
-            ) {
-                return "clouds"
-            }
-            if let level = variable.level, ["t", "w", "q"].contains(name) {
-                return "pressure-\(level)"
-            }
-            // The inventory selects all soil layers together under the same parameter.
-            return variable.isPressureLevel ? variable.rawValue : (name ?? variable.rawValue)
-        }
-        var batches = [[EcmwfVariable]]()
-        var batch = [EcmwfVariable]()
-        for (_, group) in groups {
-            if !batch.isEmpty && batch.count + group.count > size {
-                batches.append(batch)
-                batch = []
-            }
-            batch.append(contentsOf: group)
-        }
-        if !batch.isEmpty { batches.append(batch) }
-        return batches
-    }
-
-    private func downloadEnsembleBatches(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, downloadBufferBytes: Int, uploadQueues: [S3UploadQueue]) async throws {
-        let batches = Self.variableBatches(variables: variables, domain: domain)
-        // Retain only metadata between batches, never readers of temporary spatial files.
-        var ends = [DomainRegistry: (domain: any GenericDomain, end: Timestamp)]()
-        for (index, batch) in batches.enumerated() {
-            application.logger.info("Downloading variable batch \(index + 1)/\(batches.count): \(batch.map(\.rawValue).joined(separator: ","))")
-            let handles = try await downloadEcmwf(application: application, domain: domain, base: base, run: run, variables: batch, concurrent: concurrent, downloadConcurrent: downloadConcurrent, maxForecastHour: signature.maxForecastHour, uploadQueues: uploadQueues, downloadFullGribFile: false, downloadBufferBytes: downloadBufferBytes, allowEmptySelection: true)
-            try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: false, generateTimeSeries: !signature.skipTimeseries)
-            for handle in handles {
-                let domain = handle.domain
-                let end = handle.time.range.lowerBound.add(domain.dtSeconds)
-                ends[domain.domainRegistry] = (domain, max(ends[domain.domainRegistry]?.end ?? end, end))
-            }
-        }
-        guard !ends.isEmpty else { throw CurlError.didNotFindAllVariablesInGribIndex }
-        if !signature.skipTimeseries {
-            for (_, entry) in ends.sorted(by: { $0.key.rawValue < $1.key.rawValue }) where entry.domain.generateTimeSeries {
-                let data = try ModelUpdateMetaJson.update(domain: entry.domain, run: run, end: entry.end, now: .now())
-                for queue in uploadQueues {
-                    await queue.upload(data: data, objectName: "data/\(entry.domain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json", lastModified: .now())
-                }
-            }
-        }
     }
 
     /// Download elevation file

@@ -66,6 +66,14 @@ struct OmFileSplitter {
         self.chunknLocations = chunknLocations ?? min(nLocations, Self.calcChunknLocations(nTimePerFile: nTimePerFile))
     }
 
+    /// Spatial blocks read while converting to time-series files. Align temporary
+    /// input chunks with these blocks to avoid repeatedly decoding partial chunks.
+    var spatialReadChunkDimensions: (y: Int, x: Int) {
+        let x = max(1, min(nx, 2 * 1024 * 1024 / nTimePerFile / nMembers / chunknLocations * chunknLocations))
+        let y = max(1, min(ny, 2 * 1024 * 1024 / nTimePerFile / nMembers / x))
+        return (y, x)
+    }
+
     /// Prefetch all required data into memory
     func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, run: IsoDateTime? = nil) async throws {
         // TODO: maybe we can keep the file handles better in scope
@@ -387,9 +395,7 @@ struct OmFileSplitter {
 
         let nIndexTime = indexTime.count
 
-        /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
-        let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTimePerFile / nMembers / chunknLocations * chunknLocations))
-        let processChunkY = max(1, min(ny, 2 * 1024 * 1024 / nTimePerFile / nMembers / processChunkX))
+        let (processChunkY, processChunkX) = spatialReadChunkDimensions
         // print("Chunks [\(processChunkY),\(processChunkX)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         
         var fileData = [Float](repeating: .nan, count: processChunkY * processChunkX * nTimePerFile * nMembers)
@@ -532,9 +538,7 @@ struct OmFileSplitter {
             fatalError("invalid file time")
         }
 
-        /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
-        let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTimePerFile / nMembers / chunknLocations * chunknLocations))
-        let processChunkY = max(1, min(ny, 2 * 1024 * 1024 / nTimePerFile / nMembers / processChunkX))
+        let (processChunkY, processChunkX) = spatialReadChunkDimensions
         // print("Chunks [\(processChunkY),\(processChunkX)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         
         var fileData = [Float](repeating: .nan, count: processChunkY * processChunkX * fileTime.count * nMembers)

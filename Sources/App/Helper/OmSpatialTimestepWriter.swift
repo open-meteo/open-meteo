@@ -42,6 +42,7 @@ actor OmSpatialTimestepWriter {
     let realm: String?
     var fn: FileHandle?
     let storeOnDisk: Bool
+    let chunkDimensions: [Int]
     let logger: Logger
     
     /// Separate ensemble mean+spread calculator and writer. Data is automatically ingested on write() call
@@ -60,13 +61,18 @@ actor OmSpatialTimestepWriter {
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
+    /// Override `chunkDimensions` for temporary files consumed in conversion blocks.
+    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil, chunkDimensions: [Int]? = nil) {
         self.writer = nil
         self.domain = domain
         self.run = run
         self.time = time
         self.realm = realm
         self.storeOnDisk = storeOnDisk
+        let y = min(domain.grid.ny, 32)
+        let chunks = chunkDimensions ?? [y, min(domain.grid.nx, 1024 / y)]
+        precondition(chunks.count == 2 && chunks[0] > 0 && chunks[0] <= domain.grid.ny && chunks[1] > 0 && chunks[1] <= domain.grid.nx)
+        self.chunkDimensions = chunks
         self.fn = nil
         self.logger = logger
         self.ensembleMean = ensembleMeanDomain.map { ens in
@@ -122,17 +128,14 @@ actor OmSpatialTimestepWriter {
         
         let writer = try getWriter()
         
-        let y = min(domain.grid.ny, 32)
-        let x = min(domain.grid.nx, 1024 / y)
         let dimensions = [domain.grid.ny, domain.grid.nx]
-        let chunks = [y, x]
         guard dimensions.reduce(1, *) == data.count else {
             fatalError(#function + ": Array size \(data.count) does not match dimensions \(dimensions)")
         }
         let arrayWriter = try writer.prepareArray(
             type: Float.self,
             dimensions: dimensions.map(UInt64.init),
-            chunkDimensions: chunks.map(UInt64.init),
+            chunkDimensions: chunkDimensions.map(UInt64.init),
             compression: compressionType,
             scale_factor: variable.scalefactor,
             add_offset: 0
@@ -318,15 +321,17 @@ actor OmSpatialMultistepWriter {
     let domain: GenericDomain
     let ensembleMeanDomain: GenericDomain?
     let logger: Logger
+    let chunkDimensions: [Int]?
     
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil, chunkDimensions: [Int]? = nil) {
         self.storeOnDisk = storeOnDisk
         self.realm = realm
         self.domain = domain
         self.run = run
         self.ensembleMeanDomain = ensembleMeanDomain
         self.logger = logger
+        self.chunkDimensions = chunkDimensions
     }
     
     /// Write a single variable to the file
@@ -338,7 +343,7 @@ actor OmSpatialMultistepWriter {
         if let writer = writer.first(where: {$0.time == time}) {
             return writer
         }
-        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, logger: logger, ensembleMeanDomain: ensembleMeanDomain)
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, logger: logger, ensembleMeanDomain: ensembleMeanDomain, chunkDimensions: chunkDimensions)
         self.writer.append(writer)
         return writer
     }
@@ -360,7 +365,7 @@ actor OmSpatialMultistepWriter {
     
     /// Finalize the time step
     func finalise() async throws -> [GenericVariableHandle] {
-        let handles = try await writer.asyncFlatMap({
+        let handles = try await writer.sorted { $0.time < $1.time }.asyncFlatMap({
             return try await $0.finalise()
         })
         return handles
