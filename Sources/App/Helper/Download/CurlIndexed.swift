@@ -44,69 +44,22 @@ extension Curl {
         }
     }
 
-    /// Share one request budget between independent ranges and chunks within each range.
-    static func indexedDownloadConcurrency(rangeCount: Int, concurrent: Int) -> (ranges: Int, chunks: Int) {
-        precondition(rangeCount > 0 && concurrent > 0)
-        let ranges = min(concurrent, rangeCount)
-        return (ranges, max(1, concurrent / ranges))
-    }
-
     /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
     /// If `downloadFullGribFile` is set, skip inventory and perform full download. This can be faster if all variables are processed anyway
     /// URLs must already be authenticated. The caller supplies the source's range capability.
-    func downloadEcmwfIndexed(url: String, indexURL: String, allowMultipleRanges: Bool, concurrent: Int, downloadFullGribFile: Bool, allowEmptySelection: Bool = false, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
+    func downloadEcmwfIndexed(url: String, indexURL: String, allowMultipleRanges: Bool, concurrent: Int, downloadFullGribFile: Bool, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
         if downloadFullGribFile {
             return try await getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent)
         }
         
         let index = try await downloadInMemoryAsync(url: indexURL, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
         guard !index.isEmpty else {
-            if allowEmptySelection {
-                return [GribMessage]().mapStream(nConcurrent: 1, body: { $0 }).eraseToAnyAsyncSequence()
-            }
-            throw CurlError.didNotFindAllVariablesInGribIndex
+            fatalError("Empty grib selection")
         }
         let ranges = index.indexToRange(allowMultipleRanges: allowMultipleRanges)
-        let concurrency = Self.indexedDownloadConcurrency(rangeCount: ranges.count, concurrent: concurrent)
-        return ranges.mapStream(nConcurrent: concurrency.ranges, body: {
-            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrency.chunks)
+        return ranges.mapStream(nConcurrent: 1, body: {
+            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
         }).flatMap({ $0.mapStream(nConcurrent: 1, body: { $0 }) }).eraseToAnyAsyncSequence()
-    }
-
-    /// Single-range cloud downloads prefetch compressed bytes independently of GRIB processing.
-    func foreachEcmwfIndexed(
-        url: String, indexURL: String, allowMultipleRanges: Bool, downloadConcurrent: Int,
-        processingConcurrent: Int, downloadFullGribFile: Bool, allowEmptySelection: Bool = false, bufferBytes: Int = 256 * 1024 * 1024,
-        isIncluded: (EcmwfIndexEntry) -> Bool,
-        body: @escaping @Sendable (BufferedGribMessage) async throws -> Void
-    ) async throws {
-        // full grib files or multi range requests
-        if allowMultipleRanges || downloadFullGribFile {
-            try await downloadEcmwfIndexed(url: url, indexURL: indexURL, allowMultipleRanges: allowMultipleRanges,
-                concurrent: downloadConcurrent, downloadFullGribFile: downloadFullGribFile, allowEmptySelection: allowEmptySelection, isIncluded: isIncluded)
-                .foreachConcurrent(nConcurrent: processingConcurrent) { message in
-                    try await body(BufferedGribMessage(unbufferedMessage: message))
-                }
-            return
-        }
-
-        // single range requests, e.g. from AWS S3
-        let index = try await downloadInMemoryAsync(url: indexURL, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
-        guard !index.isEmpty else {
-            if allowEmptySelection { return }
-            throw CurlError.didNotFindAllVariablesInGribIndex
-        }
-        let ranges = try index.downloadBatches(targetBytes: min(8 * 1024 * 1024, bufferBytes))
-
-        logger.info("Prefetching \(ranges.count) GRIB batches with \(downloadConcurrent) download workers and \(bufferBytes.bytesHumanReadable) compressed buffer")
-        let peak = try await BufferedGribDownload.process(
-            ranges: ranges, downloadConcurrent: downloadConcurrent, processingConcurrent: processingConcurrent, byteLimit: bufferBytes,
-            download: { range in
-                try await self.downloadInMemoryAsync(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)",
-                    minSize: range.count, cacheDirectory: nil, nConcurrent: 1)
-            }, body: body
-        )
-        logger.info("Compressed download buffer peak: \(peak.bytesHumanReadable)")
     }
 
     /// Download index file and match against curl variable
@@ -242,25 +195,6 @@ extension ByteBuffer {
 }
 
 extension Array where Element == Curl.EcmwfIndexEntry {
-    /// Group selected adjacent messages, without splitting messages or fetching excluded gaps.
-    func downloadBatches(targetBytes: Int) throws -> [Range<Int>] {
-        precondition(targetBytes > 0)
-        var batches = [Range<Int>]()
-        for entry in self {
-            let (end, overflow) = entry._offset.addingReportingOverflow(entry._length)
-            guard entry._offset >= 0, entry._length > 0, !overflow else {
-                throw CurlMemoryDownloadError.invalidRangeResponse
-            }
-            if let last = batches.last, last.upperBound == entry._offset,
-               entry._length <= targetBytes - last.count {
-                batches[batches.count - 1] = last.lowerBound..<end
-            } else {
-                batches.append(entry._offset..<end)
-            }
-        }
-        return batches
-    }
-
     /// Convert grib entries to http range download command
     /// Split large range downloads to multiple individual downloads to prevent `request header too large` error
     func indexToRange(allowMultipleRanges: Bool = true) -> [(range: String, minSize: Int)] {

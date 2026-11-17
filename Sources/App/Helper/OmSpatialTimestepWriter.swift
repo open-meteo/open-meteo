@@ -144,10 +144,7 @@ actor OmSpatialTimestepWriter {
         self.variables.append(VariableWithOffset(variable: variable, member: member, writer: arrayWriter))
         writtenVariables.insert(key)
         
-        if let ensembleMean,
-           let completed = await ensembleMean.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data, expectedMemberCount: domain.countEnsembleMember) {
-            try await completed.write(to: ensembleMean.writer)
-        }
+        await ensembleMean?.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data)
     }
     
     /// Finalize and upload
