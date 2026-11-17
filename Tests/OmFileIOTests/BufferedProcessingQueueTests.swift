@@ -2,7 +2,7 @@ import Testing
 @testable import OmFileIO
 
 @Suite(.timeLimit(.minutes(1)))
-struct ProcessingParallelQueueTests {
+struct BufferedProcessingQueueTests {
     actor Signal {
         var count = 0
         var waiters = [(Int, CheckedContinuation<Void, Never>)]()
@@ -20,7 +20,7 @@ struct ProcessingParallelQueueTests {
 
     @Test(arguments: [1, 2])
     func boundedEnqueueBackpressuresWhileConsumerDrains(concurrent: Int) async throws {
-        let queue = ProcessingParallelQueue<Int>(concurrent: concurrent)
+        let queue = BufferedProcessingQueue<Int>(concurrent: concurrent)
         let consumer = Task {
             var values = [Int]()
             for try await result in queue.results { values.append(result) }
@@ -51,7 +51,7 @@ struct ProcessingParallelQueueTests {
 
     @Test func queuesRespectSharedExecutor() async throws {
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 2)
-        let queues = (0..<2).map { _ in ProcessingParallelQueue<Int>(concurrent: 2) }
+        let queues = (0..<2).map { _ in BufferedProcessingQueue<Int>(concurrent: 2) }
         let started = Signal()
         let gate = Signal()
         for queue in queues {
@@ -81,7 +81,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func cancellingBlockedEnqueueDoesNotCloseQueue() async throws {
-        let queue = ProcessingParallelQueue<Int>(concurrent: 1)
+        let queue = BufferedProcessingQueue<Int>(concurrent: 1)
         let consumer = Task {
             var values = [Int]()
             for try await result in queue.results { values.append(result) }
@@ -107,7 +107,7 @@ struct ProcessingParallelQueueTests {
 
     @Test(arguments: [false, true])
     func finishingDrainsEnqueuesAlreadyInProgress(cancelWaitingEnqueue: Bool) async throws {
-        let queue = ProcessingParallelQueue<Int>(concurrent: 1)
+        let queue = BufferedProcessingQueue<Int>(concurrent: 1)
         let gate = Signal()
         let entered = Signal()
         let admitted = Signal()
@@ -145,7 +145,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func completedWorkBackpressuresUntilDelivered() async throws {
-        let queue = ProcessingParallelQueue<Int>(concurrent: 1)
+        let queue = BufferedProcessingQueue<Int>(concurrent: 1)
         let completed = Signal()
         let admitted = Signal()
         try await queue.enqueue {
@@ -170,7 +170,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func retainedOutputsDoNotBlockDeliveryOrCompletion() async throws {
-        try await ProcessingParallelQueue<Output>.withResults(
+        try await BufferedProcessingQueue<Output>.withResults(
             inputs: [1, 2], concurrent: 1, work: { Output($0) }
         ) { results in
             var iterator = results.makeAsyncIterator()
@@ -186,7 +186,7 @@ struct ProcessingParallelQueueTests {
     @Test func streamingDoesNotWaitForEarlierWork() async throws {
         let slowStarted = Signal()
         let slowStopped = Signal()
-        let value = try await ProcessingParallelQueue<Int>.withResults(
+        let value = try await BufferedProcessingQueue<Int>.withResults(
             inputs: [0, 1], concurrent: 2,
             work: { value in
                 if value == 0 {
@@ -208,7 +208,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func boundedPipelineCompletes() async throws {
-        let count = try await ProcessingParallelQueue<Int>.withResults(
+        let count = try await BufferedProcessingQueue<Int>.withResults(
             inputs: Array(0..<100), concurrent: 12,
             work: { $0 }
         ) { results in
@@ -220,7 +220,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func earlyReturnWakesCapacityWaiters() async throws {
-        try await ProcessingParallelQueue<Int>.withResults(
+        try await BufferedProcessingQueue<Int>.withResults(
             inputs: [0, 1, 2], concurrent: 3,
             work: { $0 }
         ) { results in
@@ -232,7 +232,7 @@ struct ProcessingParallelQueueTests {
     enum Failure: Error { case injected }
 
     @Test func queueFailureCancelsOtherWorkersAndWakesProducer() async throws {
-        let queue = ProcessingParallelQueue<Int>(concurrent: 2)
+        let queue = BufferedProcessingQueue<Int>(concurrent: 2)
         let started = Signal()
         let stopped = Signal()
         let fail = Signal()
@@ -261,7 +261,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func cancellingQueueDrainsWorkersAndWakesConsumer() async throws {
-        let queue = ProcessingParallelQueue<Int>(concurrent: 1)
+        let queue = BufferedProcessingQueue<Int>(concurrent: 1)
         let started = Signal()
         let stopped = Signal()
         try await queue.enqueue {
@@ -284,7 +284,7 @@ struct ProcessingParallelQueueTests {
 
     @Test func workerFailureWakesConsumer() async {
         await #expect(throws: Failure.self) {
-            try await ProcessingParallelQueue<Int>.withResults(
+            try await BufferedProcessingQueue<Int>.withResults(
                 inputs: [0, 1], concurrent: 2,
                 work: { _ in throw Failure.injected }
             ) { results in
@@ -297,7 +297,7 @@ struct ProcessingParallelQueueTests {
         let started = Signal()
         let stopped = Signal()
         let task = Task {
-            try await ProcessingParallelQueue<Int>.withResults(
+            try await BufferedProcessingQueue<Int>.withResults(
                 inputs: [0, 1], concurrent: 1,
                 work: { value in
                     await started.increment()
@@ -319,7 +319,7 @@ struct ProcessingParallelQueueTests {
 
     @Test func consumerFailureWakesCapacityWaiters() async {
         await #expect(throws: Failure.self) {
-            try await ProcessingParallelQueue<Int>.withResults(
+            try await BufferedProcessingQueue<Int>.withResults(
                 inputs: [0, 1], concurrent: 2,
                 work: { $0 }
             ) { results in
@@ -329,7 +329,7 @@ struct ProcessingParallelQueueTests {
     }
 
     @Test func emptyInputCompletes() async throws {
-        try await ProcessingParallelQueue<Int>.withResults(
+        try await BufferedProcessingQueue<Int>.withResults(
             inputs: [Int](), concurrent: 2, work: { $0 }
         ) { results in
             for try await _ in results { Issue.record("Unexpected result") }

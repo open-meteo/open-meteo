@@ -3,7 +3,7 @@ import NIOConcurrencyHelpers
 
 /// Executes jobs in completion order, with at most `concurrent` jobs running or awaiting delivery.
 /// Consume results concurrently with enqueueing: both channels apply backpressure.
-public final class ProcessingParallelQueue<T: Sendable>: Sendable {
+public final class BufferedProcessingQueue<T: Sendable>: Sendable {
     private let state = ProcessingQueueState<T>()
     private let processingTask: Task<Void, Never>
 
@@ -98,7 +98,7 @@ public final class ProcessingParallelQueue<T: Sendable>: Sendable {
         work: @escaping @Sendable (Input) async throws -> T,
         body: (Results) async throws -> Result
     ) async throws -> Result {
-        let queue = ProcessingParallelQueue(concurrent: concurrent)
+        let queue = BufferedProcessingQueue(concurrent: concurrent)
         return try await withTaskCancellationHandler {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {

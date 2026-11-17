@@ -55,7 +55,7 @@ enum BufferedGribDownload {
             guard range.count <= byteLimit else { throw ValidationError.rangeExceedsBudget(bytes: range.count, limit: byteLimit) }
         }
         let budget = DownloadByteBudget(capacity: byteLimit)
-        return try await ProcessingParallelQueue<BufferedGribBatch>.withResults(
+        return try await BufferedProcessingQueue<BufferedGribBatch>.withResults(
             inputs: ranges, concurrent: downloadConcurrent,
             work: { range in
                 try await budget.reserve(range.count)

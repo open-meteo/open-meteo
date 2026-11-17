@@ -30,10 +30,10 @@ final class BufferedGribMessage: Sendable {
 /// Decode batches incrementally. Each emitted message owns its backing batch through ARC.
 struct BufferedGribSequence: AsyncSequence, Sendable {
     typealias Element = BufferedGribMessage
-    let downloads: ProcessingParallelQueue<BufferedGribBatch>.Results
+    let downloads: BufferedProcessingQueue<BufferedGribBatch>.Results
 
     struct AsyncIterator: AsyncIteratorProtocol {
-        var downloads: ProcessingParallelQueue<BufferedGribBatch>.Results.AsyncIterator
+        var downloads: BufferedProcessingQueue<BufferedGribBatch>.Results.AsyncIterator
         var current: BufferedGribBatch?
         var offset = 0
         var messages = [BufferedGribMessage]()
