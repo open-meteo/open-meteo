@@ -5,7 +5,6 @@ import OmFileIO
 
 /// Repair the historical RUC precipitation split using the original grid temperature.
 struct RepairIconD2RucSnowCommand: AsyncCommand {
-    // Resume cached work for the same range; refresh from remote when the range changes.
     var help: String { "Repair ICON-D2 RUC snow in remote historical chunks and individual runs." }
 
     struct Signature: CommandSignature {
@@ -53,68 +52,80 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
             throw Abort(.badRequest, reason: "REMOTE_DATA_DIRECTORY is required")
         }
         let root = try await remote.getRoot()
-        try Self.prepareWorkspace(directory, selection: start..<end, refresh: signature.installLocal)
+        func input(_ path: String, optional: Bool = false) async throws -> OmFileReader<MmapFile>? {
+            if signature.installLocal {
+                let local = try Self.livePath(path)
+                if FileManager.default.fileExists(atPath: local) {
+                    return try await OmFileReader(mmapFile: local)
+                }
+            }
+            guard let file = try await root.getFile(fullPath: path) else {
+                if optional { return nil }
+                throw Abort(.notFound, reason: "Missing input \(path)")
+            }
+            logger.info("Downloading \(path)")
+            let local = "\(source)/\(path)"
+            try await Self.download(file, to: local)
+            return try await OmFileReader(mmapFile: local)
+        }
+
         var outputs = [String]()
         if storage != "data_run" {
-            guard let snowDirectory = try await root.getDirectory(fullPath: snowPath + "/snowfall_water_equivalent/"),
-                  let temperatureDirectory = try await root.getDirectory(fullPath: temperaturePath + "/") else {
-                throw Abort(.notFound, reason: "Remote RUC snow or temperature directory missing")
-            }
-            var directories = Set<String>()
-            var snowFiles = [String: (lastModified: Timestamp, size: Int64)]()
-            var temperatureFiles = [String: (lastModified: Timestamp, size: Int64)]()
-            await snowDirectory.directory.exportDirectories(directories: &directories, files: &snowFiles)
-            await temperatureDirectory.directory.exportDirectories(directories: &directories, files: &temperatureFiles)
-            let targets = snowFiles.keys.sorted().filter {
-                Self.fileTime($0, domain: snowDomain)?.overlaps(start..<end) == true
-            }
-            guard !targets.isEmpty else { throw Abort(.notFound, reason: "No remote snow chunks in the selected dates") }
-            let targetTimes = targets.map { Self.fileTime($0, domain: snowDomain)! }
-            for name in targets {
-                for variable in ["snowfall_water_equivalent", "precipitation", "rain", "hail"] {
-                    let path = "\(snowPath)/\(variable)/\(name)"
-                    let local = try signature.installLocal ? Self.livePath(path) : nil
-                    let file = try await root.getFile(fullPath: path)
-                    if variable == "hail", file == nil, local.map({ FileManager.default.fileExists(atPath: $0) }) != true { continue }
-                    logger.info("Downloading or snapshotting \(path)")
-                    try await Self.download(file, to: "\(source)/\(path)", local: local)
+            for chunk in Self.chunks(for: start..<end, domain: snowDomain) {
+                let name = "chunk_\(chunk).om"
+                let path = "\(snowPath)/snowfall_water_equivalent/\(name)"
+                guard let snow = try await input(path, optional: true) else { continue }
+                var inputs = ["snowfall_water_equivalent": try snow.expectArray(of: Float.self)]
+                for variable in ["precipitation", "rain", "hail"] {
+                    inputs[variable] = try await input("\(snowPath)/\(variable)/\(name)", optional: variable == "hail")?.expectArray(of: Float.self)
                 }
-            }
-            for name in temperatureFiles.keys.sorted() {
-                guard let time = Self.fileTime(name, domain: temperatureDomain), targetTimes.contains(where: { $0.overlaps(time) }),
-                      let file = await temperatureDirectory.getFile(name: name) else { continue }
-                logger.info("Downloading or reusing \(temperaturePath)/\(name)")
-                try await Self.download(file, to: "\(source)/\(temperaturePath)/\(name)", local: signature.installLocal ? Self.livePath("\(temperaturePath)/\(name)") : nil)
-            }
-            let fm = FileManager.default
-            let localTemperatureFiles = temperatureFiles.keys.sorted()
-            for name in targets {
-                let time = Self.fileTime(name, domain: snowDomain)!
-                var inputs = [String: OmFileReaderArray<MmapFile, Float>]()
-                for variable in ["snowfall_water_equivalent", "precipitation", "rain", "hail"] {
-                    let path = "\(source)/\(snowPath)/\(variable)/\(name)"
-                    if variable == "hail", !fm.fileExists(atPath: path) { continue }
-                    inputs[variable] = try await OmFileReader(mmapFile: path).expectArray(of: Float.self)
-                }
+                let duration = snowDomain.omFileLength * snowDomain.dtSeconds
+                let time = chunk * duration ..< (chunk + 1) * duration
+                let selected = max(start, time.lowerBound)..<min(end, time.upperBound)
                 var temperatures = [(time: [Int], reader: OmFileReaderArray<MmapFile, Float>)]()
-                for temperatureName in localTemperatureFiles {
-                    guard let temperatureTime = Self.fileTime(temperatureName, domain: temperatureDomain), temperatureTime.overlaps(time) else { continue }
-                    let reader = try await OmFileReader(mmapFile: "\(source)/\(temperaturePath)/\(temperatureName)").expectArray(of: Float.self)
-                    temperatures.append((Array(stride(from: temperatureTime.lowerBound, to: temperatureTime.upperBound, by: 3600)), reader))
+                // Calculate required temperature chunks; remote listings may lag local data.
+                for temperatureChunk in Self.chunks(for: selected, domain: temperatureDomain) {
+                    let file = try await input("\(temperaturePath)/chunk_\(temperatureChunk).om")!
+                    let first = temperatureChunk * temperatureDomain.omFileLength * 3600
+                    let times = (0..<temperatureDomain.omFileLength).map { first + $0 * 3600 }
+                    temperatures.append((times, try file.expectArray(of: Float.self)))
                 }
-                guard !temperatures.isEmpty else { throw Abort(.notFound, reason: "No temperature files for \(name)") }
-                let output = "\(destination)/\(snowPath)/snowfall_water_equivalent/\(name)"
-                let changed = try await Self.repair(inputs: inputs, temperatures: temperatures, time: Array(stride(from: time.lowerBound, to: time.upperBound, by: 900)), selection: start..<end, output: output)
-                outputs.append("\(snowPath)/snowfall_water_equivalent/\(name)")
-                logger.info(changed.map { "\(name): corrected \($0) values" } ?? "Skipping completed \(name)")
+                let changed = try await Self.repair(inputs: inputs, temperatures: temperatures,
+                    time: Array(stride(from: time.lowerBound, to: time.upperBound, by: 900)),
+                    selection: start..<end, output: "\(destination)/\(path)")
+                logger.info("\(name): corrected \(changed) values")
+                outputs.append(path)
             }
-
         }
         if storage != "data" {
-            outputs += try await repairRuns(root: root, source: source, destination: destination, selection: start..<end, logger: logger, installLocal: signature.installLocal)
+            // Include earlier runs whose forecasts overlap the requested valid dates.
+            let horizon = IconDownloadDomains.iconD2Ruc.quarterHourlyForecastHorizon!
+            for run in stride(from: start - horizon, to: end, by: 3600) {
+                let date = Timestamp(run).format_directoriesYYYYMMddhhmm
+                let path = "data_run/\(snowDomain.domainRegistry.rawValue)/\(date)"
+                let outputPath = "\(path)/snowfall_water_equivalent.om"
+                guard let snow = try await input(outputPath, optional: true) else { continue }
+                let times = try await Self.runTimes(snow, run: run)
+                guard times.contains(where: { (start..<end).contains($0) }) else { continue }
+                var inputs = ["snowfall_water_equivalent": try snow.expectArray(of: Float.self)]
+                for variable in ["precipitation", "rain", "hail"] {
+                    guard let file = try await input("\(path)/\(variable).om", optional: variable == "hail") else { continue }
+                    guard try await Self.runTimes(file, run: run) == times else {
+                        throw Abort(.badRequest, reason: "Mismatched run timestamps in \(path)/\(variable).om")
+                    }
+                    inputs[variable] = try file.expectArray(of: Float.self)
+                }
+                let temperature = try await input("data_run/\(temperatureDomain.domainRegistry.rawValue)/\(date)/temperature_2m.om")!
+                let temperatureTimes = try await Self.runTimes(temperature, run: run)
+                let changed = try await Self.repair(inputs: inputs,
+                    temperatures: [(temperatureTimes, try temperature.expectArray(of: Float.self))],
+                    time: times, selection: start..<end, output: "\(destination)/\(outputPath)", metadata: snow)
+                logger.info("Run \(date): corrected \(changed) values")
+                outputs.append(outputPath)
+            }
         }
+        guard !outputs.isEmpty else { throw Abort(.notFound, reason: "No RUC files in the selected dates") }
 
-        // Replace the downloader's inputs before publishing the same corrected files remotely.
         if signature.installLocal {
             for path in outputs {
                 let live = try Self.livePath(path)
@@ -123,7 +134,6 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
             }
         }
 
-        // Publish only after all local corrections have completed.
         guard !endpoints.isEmpty else { return }
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
         for path in outputs {
@@ -134,54 +144,6 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 try await upload.commit(client: context.application.http1Client)
             }
         }
-    }
-
-    private func repairRuns(root: OmFileSystemS3.DirectoryWithContext, source: String, destination: String,
-                            selection: Range<Int>, logger: Logger, installLocal: Bool) async throws -> [String] {
-        var outputs = [String]()
-        // RUC runs hourly and forecasts up to 27 hours ahead. Include earlier runs
-        // whose valid times overlap the requested dates.
-        for run in stride(from: selection.lowerBound - IconDownloadDomains.iconD2Ruc.quarterHourlyForecastHorizon!, to: selection.upperBound, by: 3600) {
-            let date = Timestamp(run).format_directoriesYYYYMMddhhmm
-            let path = "data_run/\(IconNativeDomains.iconD2RucNative15min.domainRegistry.rawValue)/\(date)"
-            guard let snow = try await root.getFile(fullPath: path + "/snowfall_water_equivalent.om") else { continue }
-            logger.info("Downloading or reusing run \(date)")
-            try await Self.download(snow, to: "\(source)/\(path)/snowfall_water_equivalent.om", local: installLocal ? Self.livePath("\(path)/snowfall_water_equivalent.om") : nil)
-            for variable in ["precipitation", "rain", "hail"] {
-                let local = try installLocal ? Self.livePath("\(path)/\(variable).om") : nil
-                let file = try await root.getFile(fullPath: "\(path)/\(variable).om")
-                if variable == "hail", file == nil, local.map({ FileManager.default.fileExists(atPath: $0) }) != true { continue }
-                try await Self.download(file, to: "\(source)/\(path)/\(variable).om", local: local)
-            }
-            let temperaturePath = "data_run/\(IconNativeDomains.iconD2RucNative.domainRegistry.rawValue)/\(date)/temperature_2m.om"
-            guard let temperature = try await root.getFile(fullPath: temperaturePath) else {
-                throw Abort(.notFound, reason: "Missing run temperature \(temperaturePath)")
-            }
-            try await Self.download(temperature, to: "\(source)/\(temperaturePath)", local: installLocal ? Self.livePath(temperaturePath) : nil)
-            let localSnow = try await OmFileReader(mmapFile: "\(source)/\(path)/snowfall_water_equivalent.om")
-            let times = try await Self.runTimes(localSnow, run: run)
-            guard times.contains(where: selection.contains) else { continue }
-            var inputs = [String: OmFileReaderArray<MmapFile, Float>]()
-            for variable in ["snowfall_water_equivalent", "precipitation", "rain", "hail"] {
-                let localPath = "\(source)/\(path)/\(variable).om"
-                if variable == "hail", !FileManager.default.fileExists(atPath: localPath) { continue }
-                let file = try await OmFileReader(mmapFile: localPath)
-                guard try await Self.runTimes(file, run: run) == times else {
-                    throw Abort(.badRequest, reason: "Mismatched run timestamps in \(localPath)")
-                }
-                inputs[variable] = try file.expectArray(of: Float.self)
-            }
-            let localTemperature = try await OmFileReader(mmapFile: "\(source)/\(temperaturePath)")
-            let temperatureTimes = try await Self.runTimes(localTemperature, run: run)
-            let outputPath = "\(path)/snowfall_water_equivalent.om"
-            let changed = try await Self.repair(inputs: inputs,
-                temperatures: [(temperatureTimes, try localTemperature.expectArray(of: Float.self))],
-                time: times, selection: selection, output: "\(destination)/\(outputPath)", metadata: localSnow)
-            logger.info(changed.map { "Run \(date): corrected \($0) values" } ?? "Skipping completed run \(date)")
-            outputs.append(outputPath)
-        }
-        if outputs.isEmpty { logger.warning("No matching RUC files found in data_run") }
-        return outputs
     }
 
     static func runTimes(_ file: OmFileReader<MmapFile>, run: Int) async throws -> [Int] {
@@ -221,41 +183,13 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         try fm.moveFileOverwrite(from: temporary, to: destination)
     }
 
-    static func prepareWorkspace(_ directory: String, selection: Range<Int>, refresh: Bool = false) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(atPath: directory, withIntermediateDirectories: true)
-        let marker = URL(fileURLWithPath: "\(directory)/selection")
-        let range = "\(selection.lowerBound)-\(selection.upperBound)"
-        if !refresh, fm.fileExists(atPath: marker.path), try String(contentsOf: marker, encoding: .utf8) == range {
-            return
-        }
-        // Invalidate the marker first so an interrupted reset cannot resume stale files.
-        try fm.removeItemIfExists(at: marker.path)
-        try fm.removeItemIfExists(at: "\(directory)/original")
-        try fm.removeItemIfExists(at: "\(directory)/corrected")
-        try range.write(to: marker, atomically: true, encoding: .utf8)
+    static func chunks(for time: Range<Int>, domain: IconNativeDomains) -> Range<Int> {
+        let duration = domain.omFileLength * domain.dtSeconds
+        return time.lowerBound / duration ..< (time.upperBound - 1) / duration + 1
     }
 
-    static func fileTime(_ name: String, domain: IconNativeDomains) -> Range<Int>? {
-        if name.hasPrefix("chunk_"), name.hasSuffix(".om"), let chunk = Int(name.dropFirst(6).dropLast(3)) {
-            let duration = domain.omFileLength * domain.dtSeconds
-            return chunk * duration ..< (chunk + 1) * duration
-        }
-        return nil
-    }
-
-    private static func download(_ file: OmFileSystemS3.FileWithContext?, to path: String, local: String? = nil) async throws {
-        if let local, FileManager.default.fileExists(atPath: local) {
-            try install(from: local, to: path)
-            _ = try await OmFileReader(mmapFile: path).expectArray(of: Float.self)
-            return
-        }
-        if FileManager.default.fileExists(atPath: path) {
-            _ = try await OmFileReader(mmapFile: path).expectArray(of: Float.self)
-            return
-        }
+    private static func download(_ file: OmFileSystemS3.FileWithContext, to path: String) async throws {
         try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: path).deletingLastPathComponent().path, withIntermediateDirectories: true)
-        guard let file else { throw Abort(.notFound, reason: "Missing input for \(path)") }
         let backend = await file.file.makeCachedClient(context: file.context)
         let temporary = path + ".partial"
         let handle = try FileHandle.createNewFile(file: temporary, overwrite: true)
@@ -278,7 +212,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
 
     static func repair(inputs: [String: OmFileReaderArray<MmapFile, Float>],
                        temperatures: [(time: [Int], reader: OmFileReaderArray<MmapFile, Float>)],
-                       time: [Int], selection: Range<Int>, output: String, metadata: OmFileReader<MmapFile>? = nil) async throws -> Int? {
+                       time: [Int], selection: Range<Int>, output: String, metadata: OmFileReader<MmapFile>? = nil) async throws -> Int {
         guard let snow = inputs["snowfall_water_equivalent"], inputs["precipitation"] != nil, inputs["rain"] != nil else {
             throw Abort(.badRequest, reason: "Missing precipitation inputs")
         }
@@ -287,10 +221,6 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
               inputs.values.allSatisfy({ Array($0.getDimensions()) == dimensions }),
               temperatures.allSatisfy({ Array($0.reader.getDimensions()) == [1, dimensions[1], UInt64($0.time.count)] }) else {
             throw Abort(.badRequest, reason: "Unexpected RUC file dimensions")
-        }
-        if FileManager.default.fileExists(atPath: output) {
-            try await validate(output, dimensions: dimensions)
-            return nil
         }
         try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: output).deletingLastPathComponent().path, withIntermediateDirectories: true)
         let temporary = output + ".partial"
@@ -304,7 +234,6 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
             return time.map { indices[$0 / 3600 * 3600] }
         }
         var changed = 0
-        // Process one spatial chunk at a time.
         let spatialChunk = snow.getChunkDimensions()[1]
         for x in stride(from: UInt64(0), to: dimensions[1], by: Int(spatialChunk)) {
             let locations = x..<min(x + spatialChunk, dimensions[1])

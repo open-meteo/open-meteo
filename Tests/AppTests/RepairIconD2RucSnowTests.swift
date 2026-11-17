@@ -4,33 +4,12 @@ import OmFileFormat
 @testable import App
 
 @Suite struct RepairIconD2RucSnowTests {
-    @Test func workspaceSelection() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let fm = FileManager.default
-        try RepairIconD2RucSnowCommand.prepareWorkspace(directory.path, selection: 0..<86400)
-        let original = directory.appendingPathComponent("original")
-        let corrected = directory.appendingPathComponent("corrected")
-        for folder in [original, corrected] {
-            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Data([1, 2, 3]).write(to: folder.appendingPathComponent("chunk.om"))
-        }
-        try RepairIconD2RucSnowCommand.prepareWorkspace(directory.path, selection: 0..<86400)
-        #expect(fm.fileExists(atPath: original.appendingPathComponent("chunk.om").path))
-        #expect(fm.fileExists(atPath: corrected.appendingPathComponent("chunk.om").path))
-        try RepairIconD2RucSnowCommand.prepareWorkspace(directory.path, selection: 86400..<172800)
-        #expect(!fm.fileExists(atPath: original.path))
-        #expect(!fm.fileExists(atPath: corrected.path))
-        #expect(try String(contentsOf: directory.appendingPathComponent("selection"), encoding: .utf8) == "86400-172800")
-        // A missing marker (including an interrupted reset) also invalidates cached files.
-        try fm.createDirectory(at: corrected, withIntermediateDirectories: true)
-        try Data([1]).write(to: corrected.appendingPathComponent("chunk.om"))
-        try fm.removeItem(at: directory.appendingPathComponent("selection"))
-        try RepairIconD2RucSnowCommand.prepareWorkspace(directory.path, selection: 86400..<172800)
-        #expect(!fm.fileExists(atPath: corrected.path))
-        #expect(RepairIconD2RucSnowCommand.fileTime("year_2026.om", domain: .iconD2RucNative15min) == nil)
-        let duration = IconNativeDomains.iconD2RucNative15min.omFileLength * 900
-        #expect(RepairIconD2RucSnowCommand.fileTime("chunk_2.om", domain: .iconD2RucNative15min) == 2 * duration..<3 * duration)
+    @Test func temperatureChunks() {
+        let domain = IconNativeDomains.iconD2RucNative
+        let duration = domain.omFileLength * domain.dtSeconds
+        #expect(RepairIconD2RucSnowCommand.chunks(for: 0..<duration, domain: domain) == 0..<1)
+        #expect(RepairIconD2RucSnowCommand.chunks(for: duration - 900..<duration + 900, domain: domain) == 0..<2)
+        #expect(RepairIconD2RucSnowCommand.chunks(for: duration..<duration + 900, domain: domain) == 1..<2)
     }
 
     @Test func installLocal() throws {
@@ -55,12 +34,7 @@ import OmFileFormat
         #expect(throws: (any Error).self) {
             try RepairIconD2RucSnowCommand.livePath("data_run/model/run/snow.om", dataRunDirectory: nil)
         }
-        let workspace = directory.appendingPathComponent("workspace")
-        try RepairIconD2RucSnowCommand.prepareWorkspace(workspace.path, selection: 0..<86400)
-        let cache = workspace.appendingPathComponent("corrected")
-        try fm.createDirectory(at: cache, withIntermediateDirectories: true)
-        try RepairIconD2RucSnowCommand.prepareWorkspace(workspace.path, selection: 0..<86400, refresh: true)
-        #expect(!fm.fileExists(atPath: cache.path))
+
     }
 
     @Test func residual() {
@@ -127,7 +101,7 @@ import OmFileFormat
         let completed = try Data(contentsOf: URL(fileURLWithPath: output))
         let resumed = try await RepairIconD2RucSnowCommand.repair(inputs: inputs, temperatures: temperatures,
                                                                 time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200, output: output)
-        #expect(resumed == nil)
+        #expect(resumed == 12)
         #expect(try Data(contentsOf: URL(fileURLWithPath: output)) == completed)
         var correctedInputs = inputs
         correctedInputs["snowfall_water_equivalent"] = result
