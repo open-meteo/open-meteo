@@ -88,10 +88,10 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                     let times = (0..<temperatureDomain.omFileLength).map { first + $0 * 3600 }
                     temperatures.append((times, try file.expectArray(of: Float.self)))
                 }
-                let changed = try await Self.repair(inputs: inputs, temperatures: temperatures,
+                let stats = try await Self.repair(inputs: inputs, temperatures: temperatures,
                     time: Array(stride(from: time.lowerBound, to: time.upperBound, by: 900)),
                     selection: start..<end, output: "\(destination)/\(path)")
-                logger.info("\(name): corrected \(changed) values")
+                logger.info("\(name): \(stats)")
                 outputs.append(path)
             }
             if signature.installLocal {
@@ -102,19 +102,25 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 }
             }
         }
+        var skippedRuns = 0
         if storage != "data" {
             // Include earlier runs whose forecasts overlap the requested valid dates.
             let horizon = IconDownloadDomains.iconD2Ruc.quarterHourlyForecastHorizon!
             for run in stride(from: start - horizon, to: end, by: 3600) {
                 let date = Timestamp(run).format_directoriesYYYYMMddhhmm
                 let path = "data_run/\(snowDomain.domainRegistry.rawValue)/\(date)"
+                if try await root.getFile(fullPath: "\(path)/hail.om") != nil {
+                    logger.info("Skipping run \(date): hail.om present")
+                    skippedRuns += 1
+                    continue
+                }
                 let outputPath = "\(path)/snowfall_water_equivalent.om"
                 guard let snow = try await input(outputPath, optional: true) else { continue }
                 let times = try await Self.runTimes(snow, run: run)
                 guard times.contains(where: { (start..<end).contains($0) }) else { continue }
                 var inputs = ["snowfall_water_equivalent": try snow.expectArray(of: Float.self)]
-                for variable in ["precipitation", "rain", "hail"] {
-                    guard let file = try await input("\(path)/\(variable).om", optional: variable == "hail") else { continue }
+                for variable in ["precipitation", "rain"] {
+                    let file = try await input("\(path)/\(variable).om")!
                     guard try await Self.runTimes(file, run: run) == times else {
                         throw Abort(.badRequest, reason: "Mismatched run timestamps in \(path)/\(variable).om")
                     }
@@ -122,13 +128,14 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 }
                 let temperature = try await input("data_run/\(temperatureDomain.domainRegistry.rawValue)/\(date)/temperature_2m.om")!
                 let temperatureTimes = try await Self.runTimes(temperature, run: run)
-                let changed = try await Self.repair(inputs: inputs,
+                let stats = try await Self.repair(inputs: inputs,
                     temperatures: [(temperatureTimes, try temperature.expectArray(of: Float.self))],
                     time: times, selection: start..<end, output: "\(destination)/\(outputPath)", metadata: snow)
-                logger.info("Run \(date): corrected \(changed) values")
+                logger.info("Run \(date): \(stats)")
                 outputs.append(outputPath)
             }
         }
+        if outputs.isEmpty && skippedRuns > 0 { return }
         guard !outputs.isEmpty else { throw Abort(.notFound, reason: "No RUC files in the selected dates") }
 
         guard !endpoints.isEmpty else { return }
@@ -171,15 +178,37 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         return time.lowerBound / duration ..< (time.upperBound - 1) / duration + 1
     }
 
-    static func correctedSnow(snow: Float, precipitation: Float, rain: Float, hail: Float, temperature: Float) -> Float {
-        guard snow.isFinite, precipitation.isFinite, rain.isFinite, hail.isFinite,
+    struct RepairStats: CustomStringConvertible {
+        var changed = 0
+        var ignoredRounding = 0
+        var maxAddition: Float = 0
+        var skippedHail = 0
+
+        var description: String {
+            "corrected \(changed) values; max addition \(maxAddition) mm; ignored \(ignoredRounding) rounding residuals; skipped \(skippedHail) values with hail data"
+        }
+    }
+
+    static func correctedSnow(snow: Float, precipitation: Float, rain: Float, hail: Float, temperature: Float, stats: inout RepairStats) -> Float {
+        guard hail.isNaN else {
+            stats.skippedHail += 1
+            return snow
+        }
+        guard snow.isFinite, precipitation.isFinite, rain.isFinite,
               temperature.isFinite, temperature <= IconDomains.tMelt else { return snow }
-        return snow + max(0, precipitation - rain - hail - snow)
+        // Subtract whole storage increments to avoid floating-point residuals.
+        let snowTenths = (snow * 10).rounded()
+        let missingTenths = (precipitation * 10).rounded() - (rain * 10).rounded() - snowTenths
+        if missingTenths == 1 { stats.ignoredRounding += 1 }
+        guard missingTenths > 1 else { return snow }
+        stats.changed += 1
+        stats.maxAddition = max(stats.maxAddition, missingTenths / 10)
+        return (snowTenths + missingTenths) / 10
     }
 
     static func repair(inputs: [String: OmFileReaderArray<MmapFile, Float>],
                        temperatures: [(time: [Int], reader: OmFileReaderArray<MmapFile, Float>)],
-                       time: [Int], selection: Range<Int>, output: String, metadata: OmFileReader<MmapFile>? = nil) async throws -> Int {
+                       time: [Int], selection: Range<Int>, output: String, metadata: OmFileReader<MmapFile>? = nil) async throws -> RepairStats {
         guard let snow = inputs["snowfall_water_equivalent"], inputs["precipitation"] != nil, inputs["rain"] != nil else {
             throw Abort(.badRequest, reason: "Missing precipitation inputs")
         }
@@ -199,7 +228,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
             let indices = Dictionary(uniqueKeysWithValues: source.time.enumerated().map { ($0.element, $0.offset) })
             return time.map { indices[$0 / 3600 * 3600] }
         }
-        var changed = 0
+        var stats = RepairStats()
         let spatialChunk = snow.getChunkDimensions()[1]
         for x in stride(from: UInt64(0), to: dimensions[1], by: Int(spatialChunk)) {
             let locations = x..<min(x + spatialChunk, dimensions[1])
@@ -220,9 +249,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 }
             }
             for i in values.indices where selection.contains(time[i % nt]) {
-                let updated = correctedSnow(snow: values[i], precipitation: precipitation[i], rain: rain[i], hail: hail?[i] ?? 0, temperature: temperature[i])
-                if updated.isFinite && updated != values[i] { changed += 1 }
-                values[i] = updated
+                values[i] = correctedSnow(snow: values[i], precipitation: precipitation[i], rain: rain[i], hail: hail?[i] ?? .nan, temperature: temperature[i], stats: &stats)
             }
             try writer.writeData(array: values, arrayDimensions: [1, UInt64(locations.count), dimensions[2]], arrayOffset: nil, arrayCount: nil)
         }
@@ -250,7 +277,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         try file.writeTrailer(rootVariable: root)
         try handle.synchronize()
         try handle.linkTemporary(file: output)
-        return changed
+        return stats
     }
 
 }

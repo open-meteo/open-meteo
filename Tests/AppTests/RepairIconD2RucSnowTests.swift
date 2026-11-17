@@ -35,14 +35,37 @@ import OmFileFormat
     }
 
     @Test func residual() {
-        let fix = RepairIconD2RucSnowCommand.correctedSnow
-        #expect(fix(1, 5, 1, 0.5, 1.5) == 3.5)
+        func fix(_ snow: Float, _ precipitation: Float, _ rain: Float, _ hail: Float, _ temperature: Float) -> Float {
+            var stats = RepairIconD2RucSnowCommand.RepairStats()
+            return RepairIconD2RucSnowCommand.correctedSnow(snow: snow, precipitation: precipitation, rain: rain, hail: hail, temperature: temperature, stats: &stats)
+        }
+        #expect(fix(1, 5, 1, 0.5, 1.5) == 1)
+        #expect(fix(1, 5, 1, 0, -2) == 1)
         #expect(fix(1, 5, 1, 0.5, 1.6) == 1)
         #expect(fix(4, 5, 1, 0.5, -2) == 4)
         #expect(fix(1, .nan, 1, 0, -2) == 1)
-        #expect(fix(1, 5, 1, .nan, -2) == 1)
+        #expect(fix(1, 5, 1, .nan, -2) == 4)
         #expect(fix(1, 5, 1, 0, .nan) == 1)
         #expect(fix(3.5, 5, 1, 0.5, -2) == 3.5)
+    }
+
+    @Test func roundingToleranceAndStatistics() {
+        var stats = RepairIconD2RucSnowCommand.RepairStats()
+        let unchanged = RepairIconD2RucSnowCommand.correctedSnow(snow: 0.1, precipitation: 0.3, rain: 0.2, hail: .nan, temperature: -2, stats: &stats)
+        #expect(unchanged == 0.1)
+        #expect(stats.changed == 0)
+        #expect(stats.ignoredRounding == 0)
+        let rounded = RepairIconD2RucSnowCommand.correctedSnow(snow: 0.1, precipitation: 0.4, rain: 0.2, hail: .nan, temperature: -2, stats: &stats)
+        #expect(rounded == 0.1)
+        #expect(stats.ignoredRounding == 1)
+        let corrected = RepairIconD2RucSnowCommand.correctedSnow(snow: 0.1, precipitation: 0.5, rain: 0.2, hail: .nan, temperature: 1.5, stats: &stats)
+        #expect(corrected == 0.3)
+        #expect(stats.changed == 1)
+        #expect(stats.maxAddition == 0.2)
+        let repeated = RepairIconD2RucSnowCommand.correctedSnow(snow: corrected, precipitation: 0.5, rain: 0.2, hail: .nan, temperature: 1.5, stats: &stats)
+        #expect(repeated == corrected)
+        #expect(stats.changed == 1)
+        #expect(stats.skippedHail == 0)
     }
 
     @Test func rewriteFile() async throws {
@@ -76,34 +99,49 @@ import OmFileFormat
         let snow = try await make("snow", Array(repeating: 1, count: 24), nt: 8)
         let precipitation = try await make("precipitation", Array(repeating: 5, count: 24), nt: 8)
         let rain = try await make("rain", Array(repeating: 1, count: 24), nt: 8)
-        let hail = try await make("hail", Array(repeating: 0.5, count: 24), nt: 8)
         let temperature = try await make("temperature", [-1, 2, 1.5, 1.5, .nan, -2], nt: 2)
         let output = directory.appendingPathComponent("fixed").path
-        let inputs = ["snowfall_water_equivalent": snow, "precipitation": precipitation, "rain": rain, "hail": hail]
+        let inputs = ["snowfall_water_equivalent": snow, "precipitation": precipitation, "rain": rain]
         // Snow starts at :15, exercising alignment across an hourly temperature file boundary.
         let laterTemperature = try await make("temperature-later", [2, 2, 1.5, 1.5, -2, -2], nt: 2)
         let temperatures = [(time: [0, 3600], reader: temperature), (time: [7200, 10800], reader: laterTemperature)]
         let changed = try await RepairIconD2RucSnowCommand.repair(inputs: inputs, temperatures: temperatures,
                                                                time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200, output: output)
-        #expect(changed == 12)
+        #expect(changed.changed == 12)
+        #expect(changed.maxAddition == 3)
+        #expect(changed.ignoredRounding == 0)
+        #expect(changed.skippedHail == 0)
         let result = try await OmFileReader(mmapFile: output).expectArray(of: Float.self)
         let data = try await result.read()
-        #expect(data == [1, 3.5, 3.5, 1, 1, 1, 1, 1,
-                         1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 1,
-                         1, 1, 1, 3.5, 3.5, 3.5, 3.5, 1])
+        #expect(data == [1, 4, 4, 1, 1, 1, 1, 1,
+                         1, 4, 4, 4, 4, 4, 4, 1,
+                         1, 1, 1, 4, 4, 4, 4, 1])
         #expect(Array(result.getChunkDimensions()) == Array(snow.getChunkDimensions()))
         #expect(!FileManager.default.fileExists(atPath: output + "~"))
         let completed = try Data(contentsOf: URL(fileURLWithPath: output))
         let resumed = try await RepairIconD2RucSnowCommand.repair(inputs: inputs, temperatures: temperatures,
                                                                 time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200, output: output)
-        #expect(resumed == 12)
+        #expect(resumed.changed == 12)
         #expect(try Data(contentsOf: URL(fileURLWithPath: output)) == completed)
         var correctedInputs = inputs
         correctedInputs["snowfall_water_equivalent"] = result
         let again = try await RepairIconD2RucSnowCommand.repair(inputs: correctedInputs, temperatures: temperatures,
                                                               time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200,
                                                               output: directory.appendingPathComponent("again").path)
-        #expect(again == 0)
+        #expect(again.changed == 0)
+
+        // A single chunk can contain both old data and already-corrected data.
+        var mixedInputs = inputs
+        mixedInputs["hail"] = try await make("mixed-hail", (0..<24).map { i in
+            i % 8 == 2 ? 0 : i % 8 == 3 ? 0.5 : Float.nan
+        }, nt: 8)
+        let mixedOutput = directory.appendingPathComponent("mixed").path
+        let mixed = try await RepairIconD2RucSnowCommand.repair(inputs: mixedInputs, temperatures: temperatures,
+            time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200, output: mixedOutput)
+        #expect(mixed.changed == 8)
+        #expect(mixed.skippedHail == 6)
+        let mixedData = try await OmFileReader(mmapFile: mixedOutput).expectArray(of: Float.self).read()
+        #expect(mixedData == data.enumerated().map { i, value in i % 8 == 2 || i % 8 == 3 ? 1 : value })
 
         // Run files may omit individual forecast steps. Preserve timestamps and metadata.
         let runTimes = [900, 1800, 2700, 4500, 5400, 6300, 7200, 8100]
@@ -114,7 +152,7 @@ import OmFileFormat
         let runOutput = directory.appendingPathComponent("run-fixed").path
         let runChanged = try await RepairIconD2RucSnowCommand.repair(inputs: runInputs, temperatures: temperatures,
             time: runTimes, selection: 1800..<7200, output: runOutput, metadata: metadata)
-        #expect(runChanged == 10)
+        #expect(runChanged.changed == 10)
         let repairedRun = try await OmFileReader(mmapFile: runOutput)
         #expect(try await RepairIconD2RucSnowCommand.runTimes(repairedRun, run: 0) == runTimes)
         let created: Int? = try await repairedRun.getChild(name: "created_at")?.readScalar()
@@ -124,9 +162,9 @@ import OmFileFormat
             #expect(value == expected)
         }
         let runValues = try await repairedRun.expectArray(of: Float.self).read()
-        #expect(runValues == [1, 3.5, 3.5, 1, 1, 1, 1, 1,
-                              1, 3.5, 3.5, 3.5, 3.5, 3.5, 1, 1,
-                              1, 1, 1, 3.5, 3.5, 3.5, 1, 1])
+        #expect(runValues == [1, 4, 4, 1, 1, 1, 1, 1,
+                              1, 4, 4, 4, 4, 4, 1, 1,
+                              1, 1, 1, 4, 4, 4, 1, 1])
 
     }
 }
