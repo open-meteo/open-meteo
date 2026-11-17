@@ -62,8 +62,7 @@ struct OmFileSplitter {
         self.ny = ny
         self.nTimePerFile = nTimePerFile
         self.masterTimeRange = masterTimeRange
-        let nLocations = nx * ny * nMembers
-        self.chunknLocations = chunknLocations ?? min(nLocations, Self.calcChunknLocations(nTimePerFile: nTimePerFile))
+        self.chunknLocations = chunknLocations ?? min(nx, Self.calcChunknLocations(nTimePerFile: nTimePerFile))
     }
 
     /// Spatial blocks read while converting to time-series files. Align temporary

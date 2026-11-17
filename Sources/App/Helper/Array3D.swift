@@ -139,9 +139,9 @@ public struct Array3DFastTime {
             precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
             precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
             precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            precondition(newValue.count == location.count, "Array and location count do not match")
-            for loc in location {
-                data[time.add(loc * nTime * nLevel + level * nTime)] = newValue[(time.count * loc ..< time.count * (loc + 1)).add(newValue.startIndex)]
+            precondition(newValue.count == location.count * time.count, "Array and location count do not match")
+            for (index, loc) in location.enumerated() {
+                data[time.add(loc * nTime * nLevel + level * nTime)] = newValue[(time.count * index ..< time.count * (index + 1)).add(newValue.startIndex)]
             }
         }
     }
