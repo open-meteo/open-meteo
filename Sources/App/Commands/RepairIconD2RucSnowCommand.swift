@@ -16,7 +16,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         var uploadS3Bucket: String?
         @Flag(name: "install-local", help: "Install corrected chunks into DATA_DIRECTORY before uploading. Requires the working directory on the same filesystem. Stop ICON jobs and drain uploads first.")
         var installLocal: Bool
-        @Option(name: "storage", help: "data, data_run, or both (default). Dates select forecast valid times.")
+        @Option(name: "storage", help: "data, data_run, or both (default).")
         var storage: String?
         @Option(name: "directory", help: "Local working directory. Defaults to DATA_DIRECTORY/repair-icon-d2-ruc.")
         var directory: String?
@@ -77,19 +77,17 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 for variable in ["precipitation", "rain", "hail"] {
                     inputs[variable] = try await input("\(snowPath)/\(variable)/\(name)", optional: variable == "hail")?.expectArray(of: Float.self)
                 }
-                let duration = snowDomain.omFileLength * snowDomain.dtSeconds
-                let time = chunk * duration ..< (chunk + 1) * duration
-                let selected = max(start, time.lowerBound)..<min(end, time.upperBound)
+                let time = Self.chunkTime(chunk, domain: snowDomain)
+                let selected = max(start, time[0])..<min(end, time[0] + time.count * snowDomain.dtSeconds)
                 var temperatures = [(time: [Int], reader: OmFileReaderArray<MmapFile, Float>)]()
                 // Calculate required temperature chunks; remote listings may lag local data.
                 for temperatureChunk in Self.chunks(for: selected, domain: temperatureDomain) {
                     let file = try await input("\(temperaturePath)/chunk_\(temperatureChunk).om")!
-                    let first = temperatureChunk * temperatureDomain.omFileLength * 3600
-                    let times = (0..<temperatureDomain.omFileLength).map { first + $0 * 3600 }
+                    let times = Self.chunkTime(temperatureChunk, domain: temperatureDomain)
                     temperatures.append((times, try file.expectArray(of: Float.self)))
                 }
                 let stats = try await Self.repair(inputs: inputs, temperatures: temperatures,
-                    time: Array(stride(from: time.lowerBound, to: time.upperBound, by: 900)),
+                    time: time,
                     selection: start..<end, output: "\(destination)/\(path)")
                 logger.info("\(name): \(stats)")
                 outputs.append(path)
@@ -104,9 +102,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         }
         var skippedRuns = 0
         if storage != "data" {
-            // Include earlier runs whose forecasts overlap the requested valid dates.
-            let horizon = IconDownloadDomains.iconD2Ruc.quarterHourlyForecastHorizon!
-            for run in stride(from: start - horizon, to: end, by: 3600) {
+            for run in stride(from: start, to: end, by: 3600) {
                 let date = Timestamp(run).format_directoriesYYYYMMddhhmm
                 let path = "data_run/\(snowDomain.domainRegistry.rawValue)/\(date)"
                 if try await root.getFile(fullPath: "\(path)/hail.om") != nil {
@@ -176,6 +172,11 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
     static func chunks(for time: Range<Int>, domain: IconNativeDomains) -> Range<Int> {
         let duration = domain.omFileLength * domain.dtSeconds
         return time.lowerBound / duration ..< (time.upperBound - 1) / duration + 1
+    }
+
+    static func chunkTime(_ chunk: Int, domain: IconNativeDomains) -> [Int] {
+        let start = chunk * domain.omFileLength * domain.dtSeconds
+        return Array(stride(from: start, to: start + domain.omFileLength * domain.dtSeconds, by: domain.dtSeconds))
     }
 
     struct RepairStats: CustomStringConvertible {
