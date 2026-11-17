@@ -27,8 +27,8 @@ import OmFileFormat
         try RepairIconD2RucSnowCommand.install(from: source.path, to: live.path)
         #expect(try oldReader.readToEnd() == Data([1, 2]))
         #expect(try Data(contentsOf: live) == Data([3, 4]))
-        #expect(try Data(contentsOf: source) == Data([3, 4]))
-        #expect(!fm.fileExists(atPath: live.path + ".repair.partial"))
+        #expect(!fm.fileExists(atPath: source.path))
+        #expect(!fm.fileExists(atPath: live.path + "~"))
         #expect(RepairIconD2RucSnowCommand.localChunkPath("data/model/snow/chunk_1.om", dataDirectory: "/live/data/") == "/live/data/model/snow/chunk_1.om")
         #expect(RepairIconD2RucSnowCommand.localChunkPath("data_run/model/run/snow.om") == nil)
 
@@ -83,8 +83,6 @@ import OmFileFormat
         // Snow starts at :15, exercising alignment across an hourly temperature file boundary.
         let laterTemperature = try await make("temperature-later", [2, 2, 1.5, 1.5, -2, -2], nt: 2)
         let temperatures = [(time: [0, 3600], reader: temperature), (time: [7200, 10800], reader: laterTemperature)]
-        // An interrupted output is discarded and rebuilt.
-        try Data([1, 2, 3]).write(to: URL(fileURLWithPath: output + ".partial"))
         let changed = try await RepairIconD2RucSnowCommand.repair(inputs: inputs, temperatures: temperatures,
                                                                time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200, output: output)
         #expect(changed == 12)
@@ -94,7 +92,7 @@ import OmFileFormat
                          1, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 1,
                          1, 1, 1, 3.5, 3.5, 3.5, 3.5, 1])
         #expect(Array(result.getChunkDimensions()) == Array(snow.getChunkDimensions()))
-        #expect(!FileManager.default.fileExists(atPath: output + ".partial"))
+        #expect(!FileManager.default.fileExists(atPath: output + "~"))
         let completed = try Data(contentsOf: URL(fileURLWithPath: output))
         let resumed = try await RepairIconD2RucSnowCommand.repair(inputs: inputs, temperatures: temperatures,
                                                                 time: Array(stride(from: 900, to: 8100, by: 900)), selection: 1800..<7200, output: output)

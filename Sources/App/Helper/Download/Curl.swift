@@ -405,6 +405,30 @@ extension AsyncSequence where Element == ByteBuffer {
     }
 }
 
+extension HTTPClient {
+    /// Restart the complete download if the remote file changes between range requests.
+    @discardableResult
+    func downloadWholeFile(url: String, download: S3List.ListV2File? = nil, localFile: String, logger: Logger) async throws -> Int {
+        try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: localFile).deletingLastPathComponent().path, withIntermediateDirectories: true)
+        var attempts = 0
+        while true {
+            try _Concurrency.Task.checkCancellation()
+            attempts += 1
+            do {
+                let response = try await executeRetryChunked(.init(url: url), logger: logger, file: attempts == 1 ? download : nil)
+                let size = try response.contentLength()
+                // Download in 8 MiB parts, with four requests in parallel.
+                try await response.body.saveTo(file: localFile, size: size, modificationDate: response.headers.lastModified?.value, logger: logger)
+                return size ?? 0
+            } catch CurlErrorNonRetry.fileModifiedOrPrevalidationFailed {
+                try FileManager.default.removeItemIfExists(at: localFile)
+                guard attempts < 10 else { throw CurlErrorNonRetry.fileModifiedOrPrevalidationFailed }
+            }
+        }
+    }
+
+}
+
 extension HTTPClientResponse {
     /// Optionally wait to stay delayed a fixed time amount after last modified header
     func waitAfterLastModified(logger: Logger, wait: TimeInterval?) async throws {

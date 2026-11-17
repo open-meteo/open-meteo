@@ -14,7 +14,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         var endDate: String
         @Option(name: "upload-s3-bucket", help: "Optional comma-separated S3 upload destinations. If omitted, corrected files remain local.")
         var uploadS3Bucket: String?
-        @Flag(name: "install-local", help: "Install corrected chunks into DATA_DIRECTORY before uploading. Stop ICON jobs and drain uploads first.")
+        @Flag(name: "install-local", help: "Install corrected chunks into DATA_DIRECTORY before uploading. Requires the working directory on the same filesystem. Stop ICON jobs and drain uploads first.")
         var installLocal: Bool
         @Option(name: "storage", help: "data, data_run, or both (default). Dates select forecast valid times.")
         var storage: String?
@@ -60,8 +60,10 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 throw Abort(.notFound, reason: "Missing input \(path)")
             }
             logger.info("Downloading \(path)")
+            let backend = await file.file.makeCachedClient(context: file.context)
+            let server = try await backend.server.getServerFor(hash: backend.object.fnv1aHash64)
             let local = "\(source)/\(path)"
-            try await Self.download(file, to: local)
+            try await backend.server.client.downloadWholeFile(url: server.uploadURL(remotePath: backend.object), localFile: local, logger: logger)
             return try await OmFileReader(mmapFile: local)
         }
 
@@ -134,8 +136,9 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
         for path in outputs {
             logger.info("Uploading \(path)")
+            let local = (signature.installLocal ? Self.localChunkPath(path) : nil) ?? "\(destination)/\(path)"
             for endpoint in endpoints {
-                let upload = try await S3Uploader.uploadMultipart(client: context.application.http1Client, file: "\(destination)/\(path)",
+                let upload = try await S3Uploader.uploadMultipart(client: context.application.http1Client, file: local,
                     url: endpoint.uploadURL(remotePath: path), lastModified: .now(), executor: executor)
                 try await upload.commit(client: context.application.http1Client)
             }
@@ -159,39 +162,14 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         return URL(fileURLWithPath: dataDirectory).appendingPathComponent(String(object.dropFirst(5))).path
     }
 
-    /// Copy to a sibling temporary file, then replace the live inode atomically.
     static func install(from source: String, to destination: String) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(atPath: URL(fileURLWithPath: destination).deletingLastPathComponent().path, withIntermediateDirectories: true)
-        let temporary = destination + ".repair.partial"
-        try fm.removeItemIfExists(at: temporary)
-        try fm.copyItem(atPath: source, toPath: temporary)
-        let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: temporary))
-        defer { try? handle.close() }
-        try handle.synchronize()
-        try handle.close()
-        try fm.moveFileOverwrite(from: temporary, to: destination)
+        try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: destination).deletingLastPathComponent().path, withIntermediateDirectories: true)
+        try FileManager.default.moveFileOverwrite(from: source, to: destination)
     }
 
     static func chunks(for time: Range<Int>, domain: IconNativeDomains) -> Range<Int> {
         let duration = domain.omFileLength * domain.dtSeconds
         return time.lowerBound / duration ..< (time.upperBound - 1) / duration + 1
-    }
-
-    private static func download(_ file: OmFileSystemS3.FileWithContext, to path: String) async throws {
-        try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: path).deletingLastPathComponent().path, withIntermediateDirectories: true)
-        let backend = await file.file.makeCachedClient(context: file.context)
-        let temporary = path + ".partial"
-        let handle = try FileHandle.createNewFile(file: temporary, overwrite: true)
-        defer { try? handle.close() }
-        for offset in stride(from: 0, to: backend.count, by: 8 * 1024 * 1024) {
-            let buffer = try await backend.getData(offset: offset, count: min(8 * 1024 * 1024, backend.count - offset))
-            try handle.write(contentsOf: Data(buffer.readableBytesView))
-        }
-        try handle.synchronize()
-        try handle.close()
-        _ = try await OmFileReader(mmapFile: temporary).expectArray(of: Float.self)
-        try FileManager.default.moveFileOverwrite(from: temporary, to: path)
     }
 
     static func correctedSnow(snow: Float, precipitation: Float, rain: Float, hail: Float, temperature: Float) -> Float {
@@ -213,8 +191,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
             throw Abort(.badRequest, reason: "Unexpected RUC file dimensions")
         }
         try FileManager.default.createDirectory(atPath: URL(fileURLWithPath: output).deletingLastPathComponent().path, withIntermediateDirectories: true)
-        let temporary = output + ".partial"
-        let handle = try FileHandle.createNewFile(file: temporary, overwrite: true)
+        let handle = try FileHandle.createNewFile(file: output, overwrite: true, temporary: true)
         defer { try? handle.close() }
         let file = OmFileWriter(fn: handle, initialCapacity: 1024 * 1024)
         let writer = try file.prepareArray(type: Float.self, dimensions: dimensions, chunkDimensions: Array(snow.getChunkDimensions()),
@@ -273,16 +250,8 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         let root = try file.write(array: array, name: "", children: children)
         try file.writeTrailer(rootVariable: root)
         try handle.synchronize()
-        try handle.close()
-        try await validate(temporary, dimensions: dimensions)
-        try FileManager.default.moveFileOverwrite(from: temporary, to: output)
+        try handle.linkTemporary(file: output)
         return changed
     }
 
-    private static func validate(_ path: String, dimensions: [UInt64]) async throws {
-        let reader = try await OmFileReader(mmapFile: path).expectArray(of: Float.self)
-        guard Array(reader.getDimensions()) == dimensions else {
-            throw Abort(.badRequest, reason: "Unexpected output dimensions in \(path)")
-        }
-    }
 }
