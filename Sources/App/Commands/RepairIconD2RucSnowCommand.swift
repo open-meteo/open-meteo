@@ -14,7 +14,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         var endDate: String
         @Option(name: "upload-s3-bucket", help: "Optional comma-separated S3 upload destinations. If omitted, corrected files remain local.")
         var uploadS3Bucket: String?
-        @Flag(name: "install-local", help: "Install corrected files into live data directories before uploading. Stop ICON jobs and drain uploads first.")
+        @Flag(name: "install-local", help: "Install corrected chunks into DATA_DIRECTORY before uploading. Stop ICON jobs and drain uploads first.")
         var installLocal: Bool
         @Option(name: "storage", help: "data, data_run, or both (default). Dates select forecast valid times.")
         var storage: String?
@@ -30,12 +30,9 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         guard ["data", "data_run", "both"].contains(storage) else {
             throw Abort(.badRequest, reason: "Unknown storage \(storage)")
         }
-        if signature.installLocal && storage != "data" && OpenMeteo.dataRunDirectory == nil {
-            throw Abort(.badRequest, reason: "DATA_RUN_DIRECTORY is required to install run files")
-        }
         let logger = context.application.logger
-        if signature.installLocal {
-            logger.warning("Installing into live storage. ICON jobs and queued uploads must remain stopped until this command finishes.")
+        if signature.installLocal && storage != "data_run" {
+            logger.warning("Installing chunks into live storage. ICON jobs and queued uploads must remain stopped until this command finishes.")
         }
         let directory = signature.directory ?? OpenMeteo.dataDirectory + "repair-icon-d2-ruc"
         let snowDomain = IconNativeDomains.iconD2RucNative15min
@@ -53,8 +50,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         }
         let root = try await remote.getRoot()
         func input(_ path: String, optional: Bool = false) async throws -> OmFileReader<MmapFile>? {
-            if signature.installLocal {
-                let local = try Self.livePath(path)
+            if signature.installLocal, let local = Self.localChunkPath(path) {
                 if FileManager.default.fileExists(atPath: local) {
                     return try await OmFileReader(mmapFile: local)
                 }
@@ -128,7 +124,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
 
         if signature.installLocal {
             for path in outputs {
-                let live = try Self.livePath(path)
+                guard let live = Self.localChunkPath(path) else { continue }
                 logger.info("Installing \(live)")
                 try Self.install(from: "\(destination)/\(path)", to: live)
             }
@@ -158,15 +154,9 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         return times
     }
 
-    static func livePath(_ object: String, dataDirectory: String = OpenMeteo.dataDirectory,
-                         dataRunDirectory: String? = OpenMeteo.dataRunDirectory) throws -> String {
-        if object.hasPrefix("data/") {
-            return URL(fileURLWithPath: dataDirectory).appendingPathComponent(String(object.dropFirst(5))).path
-        }
-        if object.hasPrefix("data_run/"), let dataRunDirectory {
-            return URL(fileURLWithPath: dataRunDirectory).appendingPathComponent(String(object.dropFirst(9))).path
-        }
-        throw Abort(.badRequest, reason: "No local storage configured for \(object)")
+    static func localChunkPath(_ object: String, dataDirectory: String = OpenMeteo.dataDirectory) -> String? {
+        guard object.hasPrefix("data/") else { return nil }
+        return URL(fileURLWithPath: dataDirectory).appendingPathComponent(String(object.dropFirst(5))).path
     }
 
     /// Copy to a sibling temporary file, then replace the live inode atomically.

@@ -29,11 +29,8 @@ import OmFileFormat
         #expect(try Data(contentsOf: live) == Data([3, 4]))
         #expect(try Data(contentsOf: source) == Data([3, 4]))
         #expect(!fm.fileExists(atPath: live.path + ".repair.partial"))
-        #expect(try RepairIconD2RucSnowCommand.livePath("data/model/snow/chunk_1.om", dataDirectory: "/live/data/") == "/live/data/model/snow/chunk_1.om")
-        #expect(try RepairIconD2RucSnowCommand.livePath("data_run/model/run/snow.om", dataRunDirectory: "/live/runs/") == "/live/runs/model/run/snow.om")
-        #expect(throws: (any Error).self) {
-            try RepairIconD2RucSnowCommand.livePath("data_run/model/run/snow.om", dataRunDirectory: nil)
-        }
+        #expect(RepairIconD2RucSnowCommand.localChunkPath("data/model/snow/chunk_1.om", dataDirectory: "/live/data/") == "/live/data/model/snow/chunk_1.om")
+        #expect(RepairIconD2RucSnowCommand.localChunkPath("data_run/model/run/snow.om") == nil)
 
     }
 
