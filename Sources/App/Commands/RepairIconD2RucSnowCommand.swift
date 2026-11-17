@@ -14,7 +14,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         var endDate: String
         @Option(name: "upload-s3-bucket", help: "Optional comma-separated S3 upload destinations. If omitted, corrected files remain local.")
         var uploadS3Bucket: String?
-        @Flag(name: "install-local", help: "Install corrected chunks into DATA_DIRECTORY before uploading. Requires the working directory on the same filesystem. Stop ICON jobs and drain uploads first.")
+        @Flag(name: "install-local", help: "Install corrected chunks into DATA_DIRECTORY after chunk uploads finish. Requires the working directory on the same filesystem. Stop ICON jobs and drain uploads first.")
         var installLocal: Bool
         @Option(name: "storage", help: "data, data_run, or both (default).")
         var storage: String?
@@ -41,11 +41,12 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
         let temperaturePath = "data/\(temperatureDomain.domainRegistry.rawValue)/temperature_2m"
         let source = "\(directory)/original"
         let destination = "\(directory)/corrected"
-        let endpoints = signature.uploadS3Bucket.map(S3BucketEndpoint.parseList) ?? []
-        if endpoints.isEmpty {
+        let uploadQueues = await context.application.s3SyncManager.getQueues(bucketsOpt: signature.uploadS3Bucket)
+        if uploadQueues.isEmpty {
             logger.warning("No --upload-s3-bucket configured. Corrected files will remain local at \(destination).")
         }
-        guard let remote = OmFileSystemManager.instance.remoteFileSystem else {
+        guard let remote = OmFileSystemManager.instance.remoteFileSystem,
+              let server = OpenMeteo.remoteDataDirectory?.first else {
             throw Abort(.badRequest, reason: "REMOTE_DATA_DIRECTORY is required")
         }
         let root = try await remote.getRoot()
@@ -55,16 +56,25 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                     return try await OmFileReader(mmapFile: local)
                 }
             }
-            guard let file = try await root.getFile(fullPath: path) else {
+            guard try await root.getFile(fullPath: path) != nil else {
                 if optional { return nil }
                 throw Abort(.notFound, reason: "Missing input \(path)")
             }
             logger.info("Downloading \(path)")
-            let backend = await file.file.makeCachedClient(context: file.context)
-            let server = try await backend.server.getServerFor(hash: backend.object.fnv1aHash64)
             let local = "\(source)/\(path)"
-            try await backend.server.client.downloadWholeFile(url: server.uploadURL(remotePath: backend.object), localFile: local, logger: logger)
+            try await remote.server.client.downloadWholeFile(url: server.uploadURL(remotePath: path), localFile: local, logger: logger)
             return try await OmFileReader(mmapFile: local)
+        }
+
+        func enqueueUpload(_ path: String) async {
+            for queue in uploadQueues {
+                await queue.enqueueUpload(path) { client, endpoint in
+                    let upload = try await S3Uploader.uploadMultipart(client: client, file: "\(destination)/\(path)",
+                        url: endpoint.uploadURL(remotePath: path), lastModified: .now(),
+                        executor: LimitedConcurrencyExecutor(maxConcurrency: 4))
+                    try await upload.commit(client: client)
+                }
+            }
         }
 
         var outputs = [String]()
@@ -91,8 +101,10 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                     selection: start..<end, output: "\(destination)/\(path)")
                 logger.info("\(name): \(stats)")
                 outputs.append(path)
+                await enqueueUpload(path)
             }
             if signature.installLocal {
+                await context.application.s3SyncManager.finish()
                 for path in outputs {
                     guard let live = Self.localChunkPath(path) else { continue }
                     logger.info("Installing \(live)")
@@ -100,6 +112,7 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 }
             }
         }
+        
         var skippedRuns = 0
         if storage != "data" {
             for run in stride(from: start, to: end, by: 3600) {
@@ -129,21 +142,11 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                     time: times, selection: start..<end, output: "\(destination)/\(outputPath)", metadata: snow)
                 logger.info("Run \(date): \(stats)")
                 outputs.append(outputPath)
+                await enqueueUpload(outputPath)
             }
         }
-        if outputs.isEmpty && skippedRuns > 0 { return }
-        guard !outputs.isEmpty else { throw Abort(.notFound, reason: "No RUC files in the selected dates") }
-
-        guard !endpoints.isEmpty else { return }
-        let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
-        for path in outputs {
-            logger.info("Uploading \(path)")
-            let local = (signature.installLocal ? Self.localChunkPath(path) : nil) ?? "\(destination)/\(path)"
-            for endpoint in endpoints {
-                let upload = try await S3Uploader.uploadMultipart(client: context.application.http1Client, file: local,
-                    url: endpoint.uploadURL(remotePath: path), lastModified: .now(), executor: executor)
-                try await upload.commit(client: context.application.http1Client)
-            }
+        guard !outputs.isEmpty || skippedRuns > 0 else {
+            throw Abort(.notFound, reason: "No RUC files in the selected dates")
         }
     }
 
