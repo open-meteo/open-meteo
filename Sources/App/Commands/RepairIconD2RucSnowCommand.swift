@@ -94,6 +94,13 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
                 logger.info("\(name): corrected \(changed) values")
                 outputs.append(path)
             }
+            if signature.installLocal {
+                for path in outputs {
+                    guard let live = Self.localChunkPath(path) else { continue }
+                    logger.info("Installing \(live)")
+                    try Self.install(from: "\(destination)/\(path)", to: live)
+                }
+            }
         }
         if storage != "data" {
             // Include earlier runs whose forecasts overlap the requested valid dates.
@@ -123,14 +130,6 @@ struct RepairIconD2RucSnowCommand: AsyncCommand {
             }
         }
         guard !outputs.isEmpty else { throw Abort(.notFound, reason: "No RUC files in the selected dates") }
-
-        if signature.installLocal {
-            for path in outputs {
-                guard let live = Self.localChunkPath(path) else { continue }
-                logger.info("Installing \(live)")
-                try Self.install(from: "\(destination)/\(path)", to: live)
-            }
-        }
 
         guard !endpoints.isEmpty else { return }
         let executor = LimitedConcurrencyExecutor(maxConcurrency: 4)
