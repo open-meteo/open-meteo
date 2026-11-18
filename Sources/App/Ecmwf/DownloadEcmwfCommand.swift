@@ -32,6 +32,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "download-concurrent", help: "Number of concurrent download requests (defaults to twice --concurrent)")
         var downloadConcurrent: Int?
 
+        @Option(name: "variables-concurrent", help: "Number of IFS ensemble variables to download and convert concurrently (default: 1)")
+        var variablesConcurrent: Int?
+
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
 
@@ -82,8 +85,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
         let nConcurrent = signature.concurrent ?? 1
         let nDownloadConcurrent = signature.downloadConcurrent ?? (2 * nConcurrent)
-        guard nConcurrent > 0, nDownloadConcurrent > 0 else {
-            throw Abort(.badRequest, reason: "--concurrent and --download-concurrent must be greater than zero")
+        guard nConcurrent > 0, nDownloadConcurrent > 0, (signature.variablesConcurrent ?? 1) > 0 else {
+            throw Abort(.badRequest, reason: "--concurrent, --download-concurrent and --variables-concurrent must be greater than zero")
         }
         let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 

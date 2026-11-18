@@ -46,7 +46,7 @@ extension DownloadEcmwfCommand {
         }
     }
 
-    /// Fetch every inventory once, then overlap each variable download with the previous conversion.
+    /// Fetch every inventory once, then download and convert a bounded number of variables concurrently.
     func downloadEnsembleVariables<V: EcmwfEnsembleVariable>(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [V], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
         guard !variables.isEmpty else { throw CurlError.didNotFindAllVariablesInGribIndex }
         let logger = application.logger
@@ -64,24 +64,24 @@ extension DownloadEcmwfCommand {
             inventories.append(inventory)
         }
 
+        let allInventories = inventories
+        let createNetcdf = signature.createNetcdf
+        let generateTimeSeries = !signature.skipTimeseries
         var end: Timestamp?
-        var conversionJob: Task<Void, any Error>? = nil
-        for variable in variables {
-            let downloads = try Self.ensembleDownloads(inventories: inventories, variable: variable, memberCount: domain.countEnsembleMember)
-            guard !downloads.isEmpty else { continue }
+        for try await latest in variables.mapStream(nConcurrent: signature.variablesConcurrent ?? 1, body: { variable -> Timestamp? in
+            let downloads = try Self.ensembleDownloads(inventories: allInventories, variable: variable, memberCount: domain.countEnsembleMember)
+            guard !downloads.isEmpty else { return nil }
             logger.info("Downloading \(variable.rawValue): \(downloads.count) fields")
             let handles = try await downloadEnsembleVariable(domain: domain, run: run, variable: variable, downloads: downloads, curl: curl, downloadConcurrent: downloadConcurrent)
-            // Finish the previous conversion before starting another; its work overlaps
-            // the download above.
-            try await conversionJob?.value
-            conversionJob = Task { [createNetcdf = signature.createNetcdf, generateTimeSeries = !signature.skipTimeseries] in
-                try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: false, generateTimeSeries: generateTimeSeries)
-            }
-            if let latest = handles.map({ $0.time.range.upperBound }).max() {
+            let conversionStart = DispatchTime.now()
+            try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: false, generateTimeSeries: generateTimeSeries)
+            logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
+            return handles.map { $0.time.range.upperBound }.max()
+        }) {
+            if let latest {
                 end = max(end ?? latest, latest)
             }
         }
-        try await conversionJob?.value
         guard let end else { throw CurlError.didNotFindAllVariablesInGribIndex }
         // Publish the run only after all available variables have been converted.
         if !signature.skipTimeseries && signature.timeinterval == nil && domain.generateTimeSeries {
@@ -94,7 +94,7 @@ extension DownloadEcmwfCommand {
     }
 
     private func downloadEnsembleVariable<V: EcmwfEnsembleVariable>(domain: EcmwfDomain, run: Timestamp, variable: V, downloads: [EnsembleDownload], curl: Curl, downloadConcurrent: Int) async throws -> [GenericVariableHandle] {
-        // TODO: directly generate rolling.om instead of Gerneric handle
+        // Note: directly generate rolling.om instead of Gerneric handle is not faster, because for every member it has to read the entire rolling file
         // TODO: implement ens mean+spread and precip probability
 
         let progress = TransferAmountTracker(logger: curl.logger, totalSize: downloads.reduce(0) { $0 + $1.range.count }, name: "Download \(variable.rawValue)")
@@ -104,70 +104,96 @@ extension DownloadEcmwfCommand {
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         var handles = [GenericVariableHandle]()
         var writeJob: Task<GenericVariableHandle, any Error>? = nil
-        for (member, downloads) in downloads.groupedPreservedOrder(by: { $0.member }) {
-            let time = TimerangeDt(start: run, nTime: downloads.last!.hour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
-            // [y, x, time]: each location's complete time series is contiguous.
-            // Fill time columns directly to avoid allocating a second full array to transpose.
-            var data = Array2DFastTime(nLocations: domain.grid.count, nTime: time.count)
-            let deaverager = GribDeaverager()
-            // mapStream preserves input order even when requests finish out of order.
-            let decoded = downloads.mapStream(nConcurrent: downloadConcurrent, nBuffered: 2 * downloadConcurrent, body: { download -> DecodedEnsembleField? in
-                let range = "\(download.range.lowerBound)-\(download.range.upperBound - 1)"
-                let buffer = try await curl.downloadInMemoryAsync(url: download.url, range: range, minSize: download.range.count, cacheDirectory: nil, quiet: true)
-                await progress.add(buffer.readableBytes)
-                // Decode while the compressed buffer is alive; only owned arrays leave this job.
-                return try buffer.withUnsafeReadableBytes { bytes in
-                    guard let message = try GribAsyncStreamHelper.decodeMessages(memory: bytes).first else {
-                        throw GribAsyncStreamError.didNotFindGibHeader
-                    }
-                    guard let shortName = message.get(attribute: "shortName"),
-                          let level = message.get(attribute: "level").flatMap(Int.init),
-                          let stepType = message.get(attribute: "stepType"),
-                          let stepRange = message.get(attribute: "stepRange") else {
-                        throw CurlMemoryDownloadError.invalidRangeResponse
-                    }
-                    guard variable.matches(shortName: shortName, level: level) else { return nil }
-                    guard (message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0) == download.member else {
-                        throw CurlMemoryDownloadError.invalidRangeResponse
-                    }
-                    var grib = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    try grib.load(message: message)
-                    grib.array.flipLatitude()
-                    return DecodedEnsembleField(hour: download.hour, member: download.member, shortName: shortName, stepType: stepType, stepRange: stepRange, grib: grib)
+        guard let firstHour = downloads.first?.hour, let lastHour = downloads.last?.hour else { return handles }
+        let time = TimerangeDt(start: run, nTime: lastHour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
+        // [y, x, time]: each location's complete time series is contiguous.
+        var data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
+        var deaverager = GribDeaverager()
+        var loopActiveTime = 0.0
+        var downloadStart = DispatchTime.now()
+
+        // Keep one ordered stream alive so downloads can cross member boundaries.
+        let decoded = downloads.mapStream(nConcurrent: downloadConcurrent, nBuffered: 2 * downloadConcurrent, body: { download -> (member: Int, hour: Int, field: DecodedEnsembleField?) in
+            let range = "\(download.range.lowerBound)-\(download.range.upperBound - 1)"
+            let buffer = try await curl.downloadInMemoryAsync(url: download.url, range: range, minSize: download.range.count, cacheDirectory: nil, quiet: true)
+            await progress.add(buffer.readableBytes)
+            // Decode while the compressed buffer is alive; only owned arrays leave this job.
+            let field: DecodedEnsembleField? = try buffer.withUnsafeReadableBytes { bytes in
+                guard let message = try GribAsyncStreamHelper.decodeMessages(memory: bytes).first else {
+                    throw GribAsyncStreamError.didNotFindGibHeader
                 }
-            })
-            for try await field in decoded {
-                guard var field else { continue }
+                guard let shortName = message.get(attribute: "shortName"),
+                      let level = message.get(attribute: "level").flatMap(Int.init),
+                      let stepType = message.get(attribute: "stepType"),
+                      let stepRange = message.get(attribute: "stepRange") else {
+                    throw CurlMemoryDownloadError.invalidRangeResponse
+                }
+                guard variable.matches(shortName: shortName, level: level) else { return nil }
+                guard (message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0) == download.member else {
+                    throw CurlMemoryDownloadError.invalidRangeResponse
+                }
+                var grib = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                try grib.load(message: message)
+                grib.array.flipLatitude()
+                return DecodedEnsembleField(hour: download.hour, member: download.member, shortName: shortName, stepType: stepType, stepRange: stepRange, grib: grib)
+            }
+            return (download.member, download.hour, field)
+        })
+        for try await decodedField in decoded {
+            let member = decodedField.member
+            if decodedField.hour == firstHour {
+                data = Array2DFastTime(nLocations: domain.grid.count, nTime: time.count)
+                deaverager = GribDeaverager()
+                loopActiveTime = 0
+            }
+            let loopStart = DispatchTime.now()
+            if var field = decodedField.field {
                 // Deaccumulate before converting units; retain the previous field in its original units.
                 let stepRange = field.stepType == "accum" && !field.stepRange.contains("-") ? "0-\(field.stepRange)" : field.stepRange
                 let previousStep = await deaverager.lastStep(variable, field.member)
-                guard await deaverager.deaccumulateIfRequired(variable: variable, member: field.member, stepType: field.stepType, stepRange: stepRange, array2d: &field.grib.array) else { continue }
-                // Respect both cumulative fields and fields that reset their accumulation interval.
-                let start = stepRange.splitTo2Integer()?.0 ?? field.hour
-                let dtSeconds = max(1, field.hour - max(start, previousStep ?? start)) * 3600
-                if field.shortName == "z" { field.grib.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
-                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                    field.grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                if await deaverager.deaccumulateIfRequired(variable: variable, member: field.member, stepType: field.stepType, stepRange: stepRange, array2d: &field.grib.array) {
+                    // Respect both cumulative fields and fields that reset their accumulation interval.
+                    let start = stepRange.splitTo2Integer()?.0 ?? field.hour
+                    let dtSeconds = max(1, field.hour - max(start, previousStep ?? start)) * 3600
+                    if field.shortName == "z" { field.grib.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                        field.grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    data[0..<domain.grid.count, field.hour * 3600 / domain.dtSeconds] = field.grib.array.data
                 }
-                data[0..<domain.grid.count, field.hour * 3600 / domain.dtSeconds] = field.grib.array.data
             }
+            loopActiveTime += loopStart.timeElapsedSeconds()
+            guard decodedField.hour == lastHour else { continue }
+
+            let downloadTime = downloadStart.timeElapsedPretty()
+            let interpolationStart = DispatchTime.now()
             data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count)
+            let interpolationTime = interpolationStart.timeElapsedPretty()
+            let convertLoopTime = loopActiveTime.asSecondsPrettyPrint
             // Match spatial chunk boundaries used by the rolling converter, keeping
             // the full time axis contiguous in each chunk.
             let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [1, chunkLocations, time.count])
+            let waitStart = DispatchTime.now()
             if let writeJob {
                 handles.append(try await writeJob.value)
             }
+            let writeJobWait = waitStart.timeElapsedPretty()
             // Overlap compression and writing with the next member's download.
             writeJob = Task { [values = data.data] in
+                let writeStart = DispatchTime.now()
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: values)
-                return try await GenericVariableHandle(variable: variable, time: run, member: member, fn: fn, domain: domain)
+                let handle = try await GenericVariableHandle(variable: variable, time: run, member: member, fn: fn, domain: domain)
+                curl.logger.info("\(variable.rawValue) member \(member): write=\(writeStart.timeElapsedPretty()), interpolation=\(interpolationTime), wait=\(writeJobWait), download=\(downloadTime), fma+deaccum=\(convertLoopTime)")
+                return handle
             }
+            downloadStart = DispatchTime.now()
         }
         await progress.finish()
+        let waitStart = DispatchTime.now()
         if let writeJob {
             handles.append(try await writeJob.value)
         }
+        curl.logger.info("\(variable.rawValue) final write wait=\(waitStart.timeElapsedPretty())")
         return handles
     }
 }
