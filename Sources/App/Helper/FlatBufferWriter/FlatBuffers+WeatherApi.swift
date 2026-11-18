@@ -4,10 +4,19 @@ import OpenMeteoSdk
 
 extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        if percentile != nil {
-            // TODO: Encode percentile metadata once supported by the SDK.
-            return .init(variable: .undefined)
+        var meta = getBaseFlatBuffersMeta()
+        switch percentile {
+        case .p10: meta.aggregation = .p10
+        case .p25: meta.aggregation = .p25
+        case .p50: meta.aggregation = .median
+        case .p75: meta.aggregation = .p75
+        case .p90: meta.aggregation = .p90
+        case .mean, nil: break
         }
+        return meta
+    }
+
+    private func getBaseFlatBuffersMeta() -> FlatBufferVariableMeta {
         let previousDay = Int16(previousDay)
         switch variable {
         case .soil_moisture_0cm:
