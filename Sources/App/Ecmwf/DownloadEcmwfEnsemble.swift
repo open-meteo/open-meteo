@@ -176,7 +176,7 @@ extension DownloadEcmwfCommand {
 
             let downloadTime = downloadStart.timeElapsedPretty()
             let interpolationStart = DispatchTime.now()
-            data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count)
+            await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
             let interpolationTime = interpolationStart.timeElapsedPretty()
             let convertLoopTime = loopActiveTime.asSecondsPrettyPrint
             // Match spatial chunk boundaries used by the rolling converter, keeping

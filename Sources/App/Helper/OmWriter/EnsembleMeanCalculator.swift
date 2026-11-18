@@ -80,7 +80,6 @@ actor ArrayMeanStdDevSampler {
     private func processConcurrent(_ values: UnsafePointer<Float>, valueCount: Int, means: UnsafeMutablePointer<Float>, m2s: UnsafeMutablePointer<Float>, nConcurrent: Int) async {
         let n = Float(count)
         // The caller owns all buffers for this call; child tasks read shared input and update disjoint ranges.
-        nonisolated(unsafe) let valuesPointer = values
         nonisolated(unsafe) let meansPointer = means
         nonisolated(unsafe) let m2Pointer = m2s
         await withTaskGroup(of: Void.self) { group in
@@ -90,7 +89,7 @@ actor ArrayMeanStdDevSampler {
                 }
                 group.addTask {
                     for i in range {
-                        let x = valuesPointer[i]
+                        let x = values[i]
                         let delta = x - meansPointer[i]
                         meansPointer[i] += delta / n
                         let delta2 = x - meansPointer[i]
