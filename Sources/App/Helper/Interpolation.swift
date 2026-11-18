@@ -129,7 +129,7 @@ extension Array where Element == Float {
             let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
             let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
             let A = self[index]
-            let B = index + 1 >= self.count ? A : self[index + 1]
+            let B = fraction == 0 || index + 1 >= self.count ? A : self[index + 1]
             let A2 = (abs(B - A) > 180 && A < B) ? A + 360 : A
             let B2 = (abs(B - A) > 180 && A > B) ? B + 360 : B
             let h = A2 * (1 - fraction) + B2 * fraction
@@ -144,7 +144,7 @@ extension Array where Element == Float {
             let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
             let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
             let A = self[index]
-            let B = index + 1 >= self.count ? A : self[index + 1]
+            let B = fraction == 0 || index + 1 >= self.count ? A : self[index + 1]
             let h = A * (1 - fraction) + B * fraction
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
             return roundf(h * scalefactor) / scalefactor
