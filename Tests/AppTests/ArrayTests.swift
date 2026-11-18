@@ -3,6 +3,52 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
+    @Test func concurrentTimeColumnAssignmentMatchesSerial() async {
+        let original = Array2DFastTime(nLocations: 1031, nTime: 361)
+        for locations in [0..<1031, 3..<1028, 1031..<1031] {
+            let values = locations.map { $0 == 5 ? Float.nan : Float($0) }
+            for concurrency in [1, 2, 4, 32] {
+                var expected = original
+                var actual = original
+                for time in [0, 180, 360] {
+                    expected[locations, time] = values
+                    await actual.setConcurrent(location: locations, time: time, values: values, nConcurrent: concurrency)
+                }
+                #expect(zip(actual.data, expected.data).allSatisfy { $0.bitPattern == $1.bitPattern || ($0.isNaN && $1.isNaN) })
+            }
+        }
+        #expect(original.data.allSatisfy { $0.isNaN })
+        var small = Array2DFastTime(nLocations: 2, nTime: 3)
+        await small.setConcurrent(location: 0..<2, time: 1, values: [7, 9])
+        #expect(small[0, 1] == 7)
+        #expect(small[1, 1] == 9)
+        #expect(small[0, 0].isNaN)
+        #expect(small[1, 2].isNaN)
+    }
+
+    @Test func concurrentMultiplyAddMatchesFusedSerialResults() async {
+        let special: [Float] = [0, -0.0, .nan, .infinity, -.infinity, 1.0000001, .greatestFiniteMagnitude]
+        for length in [0, 1, 7, 65_539] {
+            let input = (0..<length).map { $0 < special.count ? special[$0] : Float($0 % 101) / 7 }
+            for (multiply, add): (Float, Float) in [(2.5, -3), (0, 0), (0.9999999, -1)] {
+                var expected = input
+                expected.multiplyAdd(multiply: multiply, add: add)
+                for concurrency in [1, 2, 4, 8] {
+                    var actual = input
+                    await actual.multiplyAddConcurrent(multiply: multiply, add: add, nConcurrent: concurrency)
+                    for i in input.indices {
+                        #expect(actual[i].bitPattern == expected[i].bitPattern || (actual[i].isNaN && expected[i].isNaN))
+                    }
+                }
+            }
+        }
+        let input: [Float] = [1, 2, 3]
+        var actual = input
+        await actual.multiplyAddConcurrent(multiply: 2, add: 1)
+        #expect(actual == [3, 5, 7])
+        #expect(input == [1, 2, 3])
+    }
+
     @Test func solarInterpolationSparseLocationsAndMembers() {
         let grid = RegularGrid(nx: 4, ny: 1, latMin: 40, lonMin: -76, dx: 1, dy: 1)
         let time = TimerangeDt(start: Timestamp(2026, 6, 1, 12), nTime: 8, dtSeconds: 600)

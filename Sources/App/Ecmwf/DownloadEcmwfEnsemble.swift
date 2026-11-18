@@ -164,11 +164,11 @@ extension DownloadEcmwfCommand {
                     // Respect both cumulative fields and fields that reset their accumulation interval.
                     let start = stepRange.splitTo2Integer()?.0 ?? field.hour
                     let dtSeconds = max(1, field.hour - max(start, previousStep ?? start)) * 3600
-                    if field.shortName == "z" { field.grib.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
+                    if field.shortName == "z" { await field.grib.array.data.multiplyAddConcurrent(multiply: 1 / 9.80665, add: 0) }
                     if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                        field.grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        await field.grib.array.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
                     }
-                    data[0..<domain.grid.count, field.hour * 3600 / domain.dtSeconds] = field.grib.array.data
+                    await data.setConcurrent(location: 0..<domain.grid.count, time: field.hour * 3600 / domain.dtSeconds, values: field.grib.array.data)
                 }
             }
             loopActiveTime += loopStart.timeElapsedSeconds()

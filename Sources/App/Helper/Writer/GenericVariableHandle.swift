@@ -494,52 +494,60 @@ actor GribDeaverager {
         self.data = data
     }
     
-    /// Returns false if step should be skipped
-    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, array2d: inout Array2D) async -> Bool {
+    /// Returns false if step should be skipped.
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, array2d: inout Array2D, nConcurrent: Int = 4) async -> Bool {
         if stepType != "accum" && stepType != "avg" { return true }
         guard let (start, end) = stepRange.splitTo2Integer() else { return false }
-        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, startStep: start, currentStep: end, array2d: &array2d)
+        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, startStep: start, currentStep: end, array2d: &array2d, nConcurrent: nConcurrent)
     }
 
     /// Numeric intervals must use the same unit for every step of a variable/member stream.
-    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, startStep: Int, currentStep: Int, array2d: inout Array2D) async -> Bool {
-        // Deaccumulate precipitation
-        if stepType == "accum" {
-            guard startStep != currentStep else {
-                return false
-            }
-            // Store data for next timestep
-            let previous = set(variable: variable, member: member, step: currentStep, data: array2d.data)
-            // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-            if let previous, previous.step != startStep, currentStep > previous.step {
-                for l in previous.data.indices {
-                    array2d.data[l] -= previous.data[l]
-                }
-            }
-        }
-
-        // Deaverage data
-        if stepType == "avg" {
-            guard startStep != currentStep else {
-                return false
-            }
-            // Store data for next timestep
-            let previous = set(variable: variable, member: member, step: currentStep, data: array2d.data)
-            // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-            if let previous, previous.step != startStep, currentStep > previous.step {
-                let deltaHours = Float(currentStep - startStep)
-                let deltaHoursPrevious = Float(previous.step - startStep)
-                for l in previous.data.indices {
-                    array2d.data[l] = (array2d.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
-                }
-            }
-        }
-
+    /// Callers process timesteps for each variable/member in order; only spatial work runs concurrently.
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, startStep: Int, currentStep: Int, array2d: inout Array2D, nConcurrent: Int = 4) async -> Bool {
+        precondition(nConcurrent > 0)
+        guard stepType == "accum" || stepType == "avg" else { return true }
+        guard startStep != currentStep else { return false }
+        // Retain the original cumulative field before the output array is modified.
+        let previous = set(variable: variable, member: member, step: currentStep, data: array2d.data)
+        // First timesteps and interval resets do not need deaccumulation.
+        guard let previous, previous.step != startStep, currentStep > previous.step else { return true }
+        precondition(previous.data.count == array2d.data.count)
+        guard !array2d.data.isEmpty else { return true }
+        await deaccumulateConcurrent(&array2d.data, previous: previous.data, count: previous.data.count, isAverage: stepType == "avg", delta: Float(currentStep - startStep), previousDelta: Float(previous.step - startStep), nConcurrent: nConcurrent)
         return true
     }
 
-    /// Returns false if step should be skipped
-    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
-        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &grib2d.array)
+    private func deaccumulateConcurrent(_ values: UnsafeMutablePointer<Float>, previous: UnsafePointer<Float>, count: Int, isAverage: Bool, delta: Float, previousDelta: Float, nConcurrent: Int) async {
+        // Array-to-pointer conversions keep both buffers alive until every worker has finished.
+        nonisolated(unsafe) let output = values
+        let input = previous
+        let process: @Sendable (Range<Int>) -> Void = { range in
+            if isAverage {
+                for i in range {
+                    output[i] = (output[i] * delta - input[i] * previousDelta) / (delta - previousDelta)
+                }
+            } else {
+                for i in range {
+                    output[i] -= input[i]
+                }
+            }
+        }
+        let workers = min(nConcurrent, count)
+        if workers == 1 {
+            process(0..<count)
+            return
+        }
+        await withTaskGroup(of: Void.self) { group in
+            for worker in 0..<workers {
+                let range = (count * worker / workers)..<(count * (worker + 1) / workers)
+                group.addTask { process(range) }
+            }
+            await group.waitForAll()
+        }
+    }
+
+    /// Returns false if step should be skipped.
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D, nConcurrent: Int = 4) async -> Bool {
+        return await deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &grib2d.array, nConcurrent: nConcurrent)
     }
 }

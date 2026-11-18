@@ -335,6 +335,39 @@ public struct Array2DFastTime {
         }
     }
 
+    /// Store a spatial field in one time column, keeping time as the fastest dimension.
+    mutating func setConcurrent(location: Range<Int>, time: Int, values: [Float], nConcurrent: Int = 4) async {
+        precondition(nConcurrent > 0)
+        precondition(location.lowerBound >= 0 && location.upperBound <= nLocations)
+        precondition(time >= 0 && time < nTime)
+        precondition(values.count == location.count)
+        guard !location.isEmpty else { return }
+        if nConcurrent == 1 {
+            self[location, time] = values
+            return
+        }
+        await Self.setConcurrent(&data, values: values, location: location, time: time, nTime: nTime, nConcurrent: nConcurrent)
+    }
+
+    private static func setConcurrent(_ data: UnsafeMutablePointer<Float>, values: UnsafePointer<Float>, location: Range<Int>, time: Int, nTime: Int, nConcurrent: Int) async {
+        // Both arrays remain borrowed until the group completes; workers write disjoint locations.
+        nonisolated(unsafe) let destination = data
+        nonisolated(unsafe) let source = values
+        let workers = min(nConcurrent, location.count)
+        await withTaskGroup(of: Void.self) { group in
+            for worker in 0..<workers {
+                let lower = location.count * worker / workers
+                let upper = location.count * (worker + 1) / workers
+                group.addTask {
+                    for i in lower..<upper {
+                        destination[(location.lowerBound + i) * nTime + time] = source[i]
+                    }
+                }
+            }
+            await group.waitForAll()
+        }
+    }
+
     /// Transpose to fast space
     func transpose() -> Array2DFastSpace {
         precondition(data.count == nLocations * nTime)
