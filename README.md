@@ -100,6 +100,7 @@ Apps:
 - [UVI Today](https://uvi.today) UV index forecasts with WHO sun protection guidelines, using CAMS air quality data via Open-Meteo.
 - [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
 - [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
+- [Weather Pulse](https://weatherpulse.eu/) Weather forecasts in Bulgarian and six other languages: the median of ECMWF, ICON and GFS with a forecast-confidence indicator, mountain passes, ski resorts, sea temperature and air quality for Bulgaria and Europe.
 - [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
 - [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) WeatherAI offers an intuitive user experience that makes checking the weather a breeze.
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
