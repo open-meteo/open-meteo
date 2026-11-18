@@ -46,7 +46,7 @@ extension DownloadEcmwfCommand {
         }
     }
 
-    /// Fetch every inventory once, then download and convert a bounded number of variables concurrently.
+    /// Fetch inventories once, then overlap bounded variable downloads with statistics writing and conversion.
     func downloadEnsembleVariables<V: EcmwfEnsembleVariable>(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [V], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
         guard !variables.isEmpty else { throw CurlError.didNotFindAllVariablesInGribIndex }
         let logger = application.logger
@@ -67,35 +67,42 @@ extension DownloadEcmwfCommand {
         let allInventories = inventories
         let createNetcdf = signature.createNetcdf
         let generateTimeSeries = !signature.skipTimeseries
-        var end: Timestamp?
-        for try await latest in variables.mapStream(nConcurrent: signature.variablesConcurrent ?? 1, body: { variable -> Timestamp? in
+        let variablesConcurrent = signature.variablesConcurrent ?? 1
+        let downloadedVariables = variables.mapStream(nConcurrent: variablesConcurrent, body: { variable in
             let downloads = try Self.ensembleDownloads(inventories: allInventories, variable: variable, memberCount: domain.countEnsembleMember)
-            guard !downloads.isEmpty else { return nil }
             logger.info("Downloading \(variable.rawValue): \(downloads.count) fields")
-            let handles = try await downloadEnsembleVariable(domain: domain, run: run, variable: variable, downloads: downloads, curl: curl, downloadConcurrent: downloadConcurrent)
+            return try await downloadEnsembleVariable(domain: domain, run: run, variable: variable, downloads: downloads, curl: curl, concurrent: concurrent, downloadConcurrent: downloadConcurrent)
+        })
+        let ends = try await downloadedVariables.mapConcurrent(nConcurrent: variablesConcurrent) { downloaded -> Timestamp? in
+            var handles = downloaded.handles
+            guard let first = handles.first else { return nil }
+            // mapStream has already started the next variable download.
+            if let statistics = downloaded.statistics, let meanDomain = domain.ensembleMeanDomain {
+                let statisticsStart = DispatchTime.now()
+                handles += try await statistics.writeTimeSeries(variable: first.variable, time: first.time, domain: meanDomain)
+                logger.info("Statistics write \(first.variable.rawValue): total=\(statisticsStart.timeElapsedPretty())")
+            }
             let conversionStart = DispatchTime.now()
             try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: false, generateTimeSeries: generateTimeSeries)
-            logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
+            logger.info("Convert \(first.variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
             return handles.map { $0.time.range.upperBound }.max()
-        }) {
-            if let latest {
-                end = max(end ?? latest, latest)
-            }
         }
-        guard let end else { throw CurlError.didNotFindAllVariablesInGribIndex }
+        guard let end = ends.compactMap({ $0 }).max() else { throw CurlError.didNotFindAllVariablesInGribIndex }
         // Publish the run only after all available variables have been converted.
         if !signature.skipTimeseries && signature.timeinterval == nil && domain.generateTimeSeries {
-            let data = try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: .now())
-            for queue in uploadQueues {
-                await queue.upload(data: data, objectName: "data/\(domain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json", lastModified: .now())
+            for outputDomain in [domain, domain.ensembleMeanDomain].compactMap({ $0 }) {
+                let data = try ModelUpdateMetaJson.update(domain: outputDomain, run: run, end: end, now: .now())
+                for queue in uploadQueues {
+                    await queue.upload(data: data, objectName: "data/\(outputDomain.domainRegistry.rawValue)/static/meta.json", contentType: "application/json", lastModified: .now())
+                }
             }
         }
         await curl.printStatistics()
     }
 
-    private func downloadEnsembleVariable<V: EcmwfEnsembleVariable>(domain: EcmwfDomain, run: Timestamp, variable: V, downloads: [EnsembleDownload], curl: Curl, downloadConcurrent: Int) async throws -> [GenericVariableHandle] {
+    private func downloadEnsembleVariable<V: EcmwfEnsembleVariable>(domain: EcmwfDomain, run: Timestamp, variable: V, downloads: [EnsembleDownload], curl: Curl, concurrent: Int, downloadConcurrent: Int) async throws -> (handles: [GenericVariableHandle], statistics: ArrayMeanStdDevSampler?) {
         // Note: directly generate rolling.om instead of Gerneric handle is not faster, because for every member it has to read the entire rolling file
-        // TODO: implement ens mean+spread and precip probability
+        // TODO: implement precip probability
 
         let progress = TransferAmountTracker(logger: curl.logger, totalSize: downloads.reduce(0) { $0 + $1.range.count }, name: "Download \(variable.rawValue)")
         // Match the converter's member count, including control-only selections.
@@ -104,8 +111,10 @@ extension DownloadEcmwfCommand {
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         var handles = [GenericVariableHandle]()
         var writeJob: Task<GenericVariableHandle, any Error>? = nil
-        guard let firstHour = downloads.first?.hour, let lastHour = downloads.last?.hour else { return handles }
+        var statisticsJob: Task<Void, Never>? = nil
+        guard let firstHour = downloads.first?.hour, let lastHour = downloads.last?.hour else { return (handles, nil) }
         let time = TimerangeDt(start: run, nTime: lastHour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
+        let statistics = domain.ensembleMeanDomain.map { _ in ArrayMeanStdDevSampler() }
         // [y, x, time]: each location's complete time series is contiguous.
         var data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
         var deaverager = GribDeaverager()
@@ -178,7 +187,17 @@ extension DownloadEcmwfCommand {
                 handles.append(try await writeJob.value)
             }
             let writeJobWait = waitStart.timeElapsedPretty()
-            // Overlap compression and writing with the next member's download.
+            let statisticsWaitStart = DispatchTime.now()
+            await statisticsJob?.value
+            let statisticsWait = statisticsWaitStart.timeElapsedPretty()
+            if let statistics {
+                statisticsJob = Task { [values = data.data] in
+                    let statisticsStart = DispatchTime.now()
+                    await statistics.ingest(values, nConcurrent: concurrent)
+                    curl.logger.info("\(variable.rawValue) member \(member): stats=\(statisticsStart.timeElapsedPretty()), wait=\(statisticsWait)")
+                }
+            }
+            // Statistics and compression run alongside the next member's download.
             writeJob = Task { [values = data.data] in
                 let writeStart = DispatchTime.now()
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: values)
@@ -194,6 +213,10 @@ extension DownloadEcmwfCommand {
             handles.append(try await writeJob.value)
         }
         curl.logger.info("\(variable.rawValue) final write wait=\(waitStart.timeElapsedPretty())")
-        return handles
+        let statisticsWaitStart = DispatchTime.now()
+        await statisticsJob?.value
+        let statisticsWait = statisticsWaitStart.timeElapsedPretty()
+        curl.logger.info("\(variable.rawValue) final statistics wait=\(statisticsWait)")
+        return (handles, statistics)
     }
 }

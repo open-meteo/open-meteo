@@ -1,4 +1,5 @@
 import Foundation
+import OmFileIO
 
 
 /** Actor isolation to calculate ensemble mean and spread for a single timestep */
@@ -51,36 +52,80 @@ actor EnsembleMeanCalculatorMultistep {
 /// Calculate mean and std dev for individual indices of multiple arrays
 /// Streams data from 20-50 ensemble members
 /// Welford's algorithm
-fileprivate actor ArrayMeanStdDevSampler {
+actor ArrayMeanStdDevSampler {
     private(set) var count: Int = 0
-    private(set) var means: [Float] = []
-    /// Sum of squares of differences from the current mean
-    private var m2s: [Float] = []
+    private final class Storage {
+        var means: [Float] = []
+        /// Sum of squares of differences from the current mean.
+        var m2s: [Float] = []
+    }
 
-    func ingest(_ values: [Float]) {
-        if means.count == 0 {
-            means = Array(repeating: 0.0, count: values.count )
-            m2s = Array(repeating: 0.0, count: values.count )
+    private let storage = Storage()
+
+    var means: [Float] { storage.means }
+
+    /// Callers await each member's ingestion before submitting the next member.
+    func ingest(_ values: [Float], nConcurrent: Int = 4) async {
+        precondition(nConcurrent > 0)
+        let storage = storage
+        if storage.means.isEmpty {
+            storage.means = Array(repeating: 0, count: values.count)
+            storage.m2s = Array(repeating: 0, count: values.count)
         }
-        precondition(values.count == means.count, "Input array must have \(means.count) elements")
+        precondition(values.count == storage.means.count, "Input array must have \(storage.means.count) elements")
         count += 1
+        await processConcurrent(values, valueCount: values.count, means: &storage.means, m2s: &storage.m2s, nConcurrent: nConcurrent)
+    }
+
+    private func processConcurrent(_ values: UnsafePointer<Float>, valueCount: Int, means: UnsafeMutablePointer<Float>, m2s: UnsafeMutablePointer<Float>, nConcurrent: Int) async {
         let n = Float(count)
-        for i in values.indices {
-            let x = values[i]
-            let delta = x - means[i]
-            means[i] += delta / n
-            let delta2 = x - means[i]
-            m2s[i] += delta * delta2
+        // The caller owns all buffers for this call; child tasks read shared input and update disjoint ranges.
+        nonisolated(unsafe) let valuesPointer = values
+        nonisolated(unsafe) let meansPointer = means
+        nonisolated(unsafe) let m2Pointer = m2s
+        await withTaskGroup(of: Void.self) { group in
+            for (index, range) in (0..<valueCount).chunks(ofCount: 65_536).enumerated() {
+                if index >= nConcurrent {
+                    await group.next()
+                }
+                group.addTask {
+                    for i in range {
+                        let x = valuesPointer[i]
+                        let delta = x - meansPointer[i]
+                        meansPointer[i] += delta / n
+                        let delta2 = x - meansPointer[i]
+                        m2Pointer[i] += delta * delta2
+                    }
+                }
+            }
+            await group.waitForAll()
         }
     }
 
-    /// Per-element variance (sample variance, n - 1)
-    var variance: [Float] {
-        return m2s.map { $0 / Float(count - 1) }
+    /// Per-element standard deviation (sample stddev).
+    var standardDeviation: [Float] {
+        storage.m2s.map { sqrt($0 / Float(count - 1)) }
     }
 
-    /// Per-element standard deviation (sample stddev)
-    var standardDeviation: [Float] {
-        return m2s.map { sqrt($0 / Float(count - 1)) }
+    /// Write the accumulated time series and release the statistics arrays.
+    func writeTimeSeries(variable: any GenericVariable, time: TimerangeDt, domain: any GenericDomain) async throws -> [GenericVariableHandle] {
+        guard count > 0 else { return [] }
+        let grid = domain.grid
+        let chunkLocations = min(grid.nx, OmFileSplitter(domain, nMembers: 1).chunknLocations)
+        let writer = OmFileWriterHelper(dimensions: [grid.ny, grid.nx, time.count], chunks: [1, chunkLocations, time.count])
+        try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
+        let meanFile = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: means)
+        storage.means = []
+        let mean = try await GenericVariableHandle(variable: variable, time: time.range.lowerBound, member: 0, fn: meanFile, domain: domain)
+        // Reuse M2 storage for the sample standard deviation.
+        for i in storage.m2s.indices {
+            storage.m2s[i] = sqrt(storage.m2s[i] / Float(count - 1))
+        }
+        let spreadVariable = variable.asSpreadVariableGeneric
+        let spreadFile = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: spreadVariable.scalefactor, all: storage.m2s)
+        storage.m2s = []
+        count = 0
+        let spread = try await GenericVariableHandle(variable: spreadVariable, time: time.range.lowerBound, member: 0, fn: spreadFile, domain: domain)
+        return [mean, spread]
     }
 }

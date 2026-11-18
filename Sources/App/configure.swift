@@ -217,12 +217,11 @@ extension Application {
         configuration.httpVersion = httpVersion
         // Keep AsyncHTTPClient's default unless explicitly configured. HTTP/2
         // concurrency is controlled by the peer's stream limit instead.
-        if let rawLimit = Environment.get("DEDICATED_HTTP_CONNECTIONS") {
-            guard let limit = Int(rawLimit), limit > 0 else {
-                fatalError("DEDICATED_HTTP_CONNECTIONS must be a positive integer")
-            }
-            configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = limit
+        let rawLimit = Environment.get("DEDICATED_HTTP_CONNECTIONS") ?? "24"
+        guard let limit = Int(rawLimit), limit > 0 else {
+            fatalError("DEDICATED_HTTP_CONNECTIONS must be a positive integer")
         }
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = limit
 
         return HTTPClient(
             eventLoopGroupProvider: .shared(eventLoopGroup),
