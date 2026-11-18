@@ -334,7 +334,8 @@ struct OmFileSplitter {
     func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, multipartUploadQueues: [S3MultiFileUploadQueue] = [], supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         if nMembers > 1, let retainDays = domain.useRollingDays {
-            // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
+            // Single-member fields such as precipitation probability use normal time chunks,
+            // even when their main ensemble domain uses rolling files.
             return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, multipartUploadQueues: multipartUploadQueues, supplyChunk: supplyChunk)
         }
         

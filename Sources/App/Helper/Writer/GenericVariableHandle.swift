@@ -39,7 +39,7 @@ struct GenericVariableHandle: Sendable {
     /// Process concurrently
     /// Note: domain is now ignored, because GenericVariableHandle can now domain property. Makes it easier for ensemble mean calculation
     /// If `fullRunSkipMeta` do not generate meta.json for each run
-    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadQueues: [S3UploadQueue], compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, storeFullRunOnDisk: Bool = true) async throws {
+    static func convert(application: Application, domain domainIgnored: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadQueues: [S3UploadQueue], compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true, generateTimeSeries: Bool = true, fullRunSkipMeta: Bool = false, storeFullRunOnDisk: Bool = true, ensembleMeanDomain: (any GenericDomain)? = nil, precipitationProbability: Bool = false) async throws {
         let logger = application.logger
         let groups = handles.groupedPreservedOrder(by: {"\($0.domain)"}).map { (_, handles) in
             (domain: handles[0].domain, handles: handles)
@@ -53,8 +53,9 @@ struct GenericVariableHandle: Sendable {
                 logger.info("Start Convert [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
 
                 let multipartUploadQueues = uploadQueues.map { $0.startMultiPartUploads() }
+                var statisticsHandles = [Self]()
                 do {
-                    try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues)
+                    statisticsHandles = try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues, ensembleMeanDomain: ensembleMeanDomain, precipitationProbability: precipitationProbability)
                     for (queue, multipartUploadQueue) in zip(uploadQueues, multipartUploadQueues) {
                         await queue.finishMultiPartUploads(multipartUploadQueue)
                     }
@@ -66,6 +67,11 @@ struct GenericVariableHandle: Sendable {
                 }
 
                 logger.info("Convert completed in \(startTime.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
+                if !statisticsHandles.isEmpty {
+                    // Each handle carries its destination: mean/spread use the mean
+                    // domain; probability uses member 0 of the original ensemble domain.
+                    try await convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: statisticsHandles, concurrent: concurrent, writeUpdateJson: writeUpdateJson, uploadQueues: uploadQueues, compression: compression, generateFullRun: generateFullRun, generateTimeSeries: generateTimeSeries, fullRunSkipMeta: fullRunSkipMeta, storeFullRunOnDisk: storeFullRunOnDisk)
+                }
             }
 
             if generateTimeSeries, writeUpdateJson, let run {
@@ -121,7 +127,7 @@ struct GenericVariableHandle: Sendable {
                 let previousDayUploadQueues = uploadQueues.filter { !$0.onlyProbabilityTimeSeries }
                 let multipartUploadQueues = previousDayUploadQueues.map { $0.startMultiPartUploads() }
                 do {
-                    try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues)
+                    _ = try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, multipartUploadQueues: multipartUploadQueues)
                     for (queue, multipartUploadQueue) in zip(previousDayUploadQueues, multipartUploadQueues) {
                         await queue.finishMultiPartUploads(multipartUploadQueue)
                     }
@@ -274,21 +280,22 @@ struct GenericVariableHandle: Sendable {
         }
     }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]) async throws {
-        if concurrent > 1 {
-            try await handles
-                .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
-                .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
-                .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues)
-            })
-        } else {
-            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues)
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue], ensembleMeanDomain: (any GenericDomain)? = nil, precipitationProbability: Bool = false) async throws -> [Self] {
+        var statisticsHandles = [Self]()
+        let groups = handles
+            .filter { !onlyGeneratePreviousDays || $0.variable.storePreviousForecast }
+            .groupedPreservedOrder(by: { $0.variable.omFileName.file })
+        for try await outputs in groups.mapStream(nConcurrent: concurrent, body: { group in
+            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: group.values, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, multipartUploadQueues: multipartUploadQueues, ensembleMeanDomain: ensembleMeanDomain, precipitationProbability: precipitationProbability)
+        }) {
+            statisticsHandles += outputs
         }
+        return statisticsHandles
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue]) async throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType, multipartUploadQueues: [S3MultiFileUploadQueue], ensembleMeanDomain: (any GenericDomain)? = nil, precipitationProbability: Bool = false) async throws -> [Self] {
+        var statisticsHandles = [Self]()
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -298,15 +305,15 @@ struct GenericVariableHandle: Sendable {
         for (_, handles) in handles.groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" }) {
             guard let timeMin = handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound else {
                 logger.warning("No data to convert")
-                return
+                return statisticsHandles
             }
             guard let timeMax = handles.max(by: { $0.time.range.upperBound < $1.time.range.upperBound })?.time.range.upperBound else {
                 logger.warning("No data to convert")
-                return
+                return statisticsHandles
             }
             guard let maxTimeStepsPerFile = handles.max(by: { $0.time.count < $1.time.count })?.time.count else {
                 logger.warning("No data to convert")
-                return
+                return statisticsHandles
             }
             /// `timeMinMax.min.time` has issues with `skip`
             /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hind-cast data
@@ -356,7 +363,7 @@ struct GenericVariableHandle: Sendable {
                 try ncVariable.setAttribute("add_offset", Float(0))
                 try ncVariable.setAttribute("_FillValue", Int16.max)
                 for reader in handles {
-                    let data = try! await reader.reader.read()
+                    let data = try await reader.reader.read()
                     let nt = reader.time.count
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
                     if nt > 1 {
@@ -382,6 +389,14 @@ struct GenericVariableHandle: Sendable {
                 !$0.onlyProbabilityTimeSeries || variable.omFileName.file == ProbabilityVariable.precipitation_probability.omFileName.file
             }
 
+            let statisticsWriter: OmEnsembleStatisticsWriter?
+            let probabilityDomain: (any GenericDomain)? = precipitationProbability && variable.omFileName.file == "precipitation" ? domain : nil
+            if nMembers > 1, !onlyGeneratePreviousDays, ensembleMeanDomain != nil || probabilityDomain != nil {
+                statisticsWriter = try OmEnsembleStatisticsWriter(domain: ensembleMeanDomain, variable: variable, time: time, chunkLocations: om.chunknLocations, probabilityDomain: probabilityDomain)
+            } else {
+                statisticsWriter = nil
+            }
+
             try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, multipartUploadQueues: variableUploadQueues) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
@@ -394,7 +409,7 @@ struct GenericVariableHandle: Sendable {
                     }
                     if reader.time.count == 1 && dimensions.count == 3 && dimensions[0] == nMembers && dimensions[1] == ny && dimensions[2] == nx {
                         /// Dimensions [member, y, x]
-                        try! await reader.reader.read(into: &readTemp, range: [UInt64(reader.member)..<UInt64(reader.member+1), yRange, xRange])
+                        try await reader.reader.read(into: &readTemp, range: [UInt64(reader.member)..<UInt64(reader.member+1), yRange, xRange])
                         data3d[0..<nLoc, Int(reader.member), timeArrayIndex] = readTemp[0..<nLoc]
                     } else if dimensions.count == 3 {
                         /// Dimensions [y, x, time]
@@ -403,11 +418,11 @@ struct GenericVariableHandle: Sendable {
                         guard nt == reader.time.count else {
                             fatalError("invalid timesteps")
                         }
-                        try! await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
+                        try await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
                         data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
                     } else {
                         // Single time step
-                        try! await reader.reader.read(into: &readTemp, range: [yRange, xRange])
+                        try await reader.reader.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }
@@ -422,11 +437,16 @@ struct GenericVariableHandle: Sendable {
                     locationRange: locationRange1D
                 )
 
+                try statisticsWriter?.write(data: data3d, yCount: yRange.count, xCount: xRange.count)
                 await progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
                 return ArraySlice(data3d.data)
             }
+            if let statisticsWriter {
+                statisticsHandles += try await statisticsWriter.finalise()
+            }
             await progress.finish()
         }
+        return statisticsHandles
     }
 }
 
@@ -483,6 +503,14 @@ actor GribDeaverager {
         hash.combine(member)
         let key = hash.finalize()
         return data[key]?.step
+    }
+
+    /// Release the final cumulative field after its variable/member is complete.
+    func remove<V: Hashable>(variable: V, member: Int) {
+        var hash = Hasher()
+        hash.combine(variable)
+        hash.combine(member)
+        data.removeValue(forKey: hash.finalize())
     }
 
     /// Make a deep copy

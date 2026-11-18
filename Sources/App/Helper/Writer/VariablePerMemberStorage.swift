@@ -46,6 +46,12 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
         return remove(.init(variable: variable, timestamp: timestamp, member: member))
     }
 
+    /// Atomically claim a buffered field together with its variable metadata.
+    func remove(where predicate: @Sendable (VariableAndMember) -> Bool) -> (key: VariableAndMember, data: Array2D)? {
+        guard let key = data.keys.first(where: predicate), let values = data.removeValue(forKey: key) else { return nil }
+        return (key, values)
+    }
+
     func remove(_ variable: VariableAndMember) -> Array2D? {
         return data.removeValue(forKey: variable)
     }

@@ -82,13 +82,13 @@ actor ArrayMeanStdDevSampler {
         // The caller owns all buffers for this call; child tasks read shared input and update disjoint ranges.
         nonisolated(unsafe) let meansPointer = means
         nonisolated(unsafe) let m2Pointer = m2s
+        let workers = min(nConcurrent, valueCount)
         await withTaskGroup(of: Void.self) { group in
-            for (index, range) in (0..<valueCount).chunks(ofCount: 65_536).enumerated() {
-                if index >= nConcurrent {
-                    await group.next()
-                }
+            for worker in 0..<workers {
+                let lower = valueCount * worker / workers
+                let upper = valueCount * (worker + 1) / workers
                 group.addTask {
-                    for i in range {
+                    for i in lower..<upper {
                         let x = values[i]
                         let delta = x - meansPointer[i]
                         meansPointer[i] += delta / n
