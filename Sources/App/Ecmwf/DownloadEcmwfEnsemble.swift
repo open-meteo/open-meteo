@@ -122,12 +122,12 @@ extension DownloadEcmwfCommand {
         var downloadStart = DispatchTime.now()
 
         // Keep one ordered stream alive so downloads can cross member boundaries.
-        let decoded = downloads.mapStream(nConcurrent: downloadConcurrent, nBuffered: 2 * downloadConcurrent, body: { download -> (member: Int, hour: Int, field: DecodedEnsembleField?) in
+        let decoded = downloads.mapStream(nConcurrent: downloadConcurrent, nBuffered: 2 * downloadConcurrent, body: { download -> DecodedEnsembleField in
             let range = "\(download.range.lowerBound)-\(download.range.upperBound - 1)"
             let buffer = try await curl.downloadInMemoryAsync(url: download.url, range: range, minSize: download.range.count, cacheDirectory: nil, quiet: true)
             await progress.add(buffer.readableBytes)
             // Decode while the compressed buffer is alive; only owned arrays leave this job.
-            let field: DecodedEnsembleField? = try buffer.withUnsafeReadableBytes { bytes in
+            return try buffer.withUnsafeReadableBytes { bytes in
                 guard let message = try GribAsyncStreamHelper.decodeMessages(memory: bytes).first else {
                     throw GribAsyncStreamError.didNotFindGibHeader
                 }
@@ -137,7 +137,9 @@ extension DownloadEcmwfCommand {
                       let stepRange = message.get(attribute: "stepRange") else {
                     throw CurlMemoryDownloadError.invalidRangeResponse
                 }
-                guard variable.matches(shortName: shortName, level: level) else { return nil }
+                guard variable.matches(shortName: shortName, level: level) else {
+                    throw CurlMemoryDownloadError.invalidRangeResponse
+                }
                 guard (message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0) == download.member else {
                     throw CurlMemoryDownloadError.invalidRangeResponse
                 }
@@ -146,7 +148,6 @@ extension DownloadEcmwfCommand {
                 grib.array.flipLatitude()
                 return DecodedEnsembleField(hour: download.hour, member: download.member, shortName: shortName, stepType: stepType, stepRange: stepRange, grib: grib)
             }
-            return (download.member, download.hour, field)
         })
         for try await decodedField in decoded {
             let member = decodedField.member
@@ -156,20 +157,19 @@ extension DownloadEcmwfCommand {
                 loopActiveTime = 0
             }
             let loopStart = DispatchTime.now()
-            if var field = decodedField.field {
-                // Deaccumulate before converting units; retain the previous field in its original units.
-                let stepRange = field.stepType == "accum" && !field.stepRange.contains("-") ? "0-\(field.stepRange)" : field.stepRange
-                let previousStep = await deaverager.lastStep(variable, field.member)
-                if await deaverager.deaccumulateIfRequired(variable: variable, member: field.member, stepType: field.stepType, stepRange: stepRange, array2d: &field.grib.array) {
-                    // Respect both cumulative fields and fields that reset their accumulation interval.
-                    let start = stepRange.splitTo2Integer()?.0 ?? field.hour
-                    let dtSeconds = max(1, field.hour - max(start, previousStep ?? start)) * 3600
-                    if field.shortName == "z" { await field.grib.array.data.multiplyAddConcurrent(multiply: 1 / 9.80665, add: 0) }
-                    if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                        await field.grib.array.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
-                    }
-                    await data.setConcurrent(location: 0..<domain.grid.count, time: field.hour * 3600 / domain.dtSeconds, values: field.grib.array.data)
+            var field = decodedField
+            // Deaccumulate before converting units; retain the previous field in its original units.
+            let stepRange = field.stepType == "accum" && !field.stepRange.contains("-") ? "0-\(field.stepRange)" : field.stepRange
+            let previousStep = await deaverager.lastStep(variable, field.member)
+            if await deaverager.deaccumulateIfRequired(variable: variable, member: field.member, stepType: field.stepType, stepRange: stepRange, array2d: &field.grib.array) {
+                // Respect both cumulative fields and fields that reset their accumulation interval.
+                let start = stepRange.splitTo2Integer()?.0 ?? field.hour
+                let dtSeconds = max(1, field.hour - max(start, previousStep ?? start)) * 3600
+                if field.shortName == "z" { await field.grib.array.data.multiplyAddConcurrent(multiply: 1 / 9.80665, add: 0) }
+                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                    await field.grib.array.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
                 }
+                await data.setConcurrent(location: 0..<domain.grid.count, time: field.hour * 3600 / domain.dtSeconds, values: field.grib.array.data)
             }
             loopActiveTime += loopStart.timeElapsedSeconds()
             guard decodedField.hour == lastHour else { continue }
