@@ -473,7 +473,7 @@ struct OmFileSplitter {
                 [UInt64(block.y.count), UInt64(block.x.count), UInt64(nTimePerFile)] :
                 [UInt64(block.y.count), UInt64(block.x.count), UInt64(nMembers), UInt64(nTimePerFile)]
             for (writer, data) in zip(writers, block.data) {
-                try writer.write.writeData(array: data, arrayDimensions: dimensions)
+                try await writer.write.writeDataConcurrent(array: data, arrayDimensions: dimensions, nConcurrent: concurrent)
             }
         }
 
@@ -605,11 +605,12 @@ struct OmFileSplitter {
         })
         for try await block in prepared {
             try statisticsWriter?.write(arrays: block.statistics, yCount: block.y.count, xCount: block.x.count)
-            try writer.writeData(
+            try await writer.writeDataConcurrent(
                 array: block.data,
                 arrayDimensions: nMembers <= 1 ?
                     [UInt64(block.y.count), UInt64(block.x.count), UInt64(fileTime.count)] :
-                    [UInt64(block.y.count), UInt64(block.x.count), UInt64(nMembers), UInt64(fileTime.count)]
+                    [UInt64(block.y.count), UInt64(block.x.count), UInt64(nMembers), UInt64(fileTime.count)],
+                nConcurrent: concurrent
             )
         }
 

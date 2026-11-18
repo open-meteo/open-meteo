@@ -322,7 +322,7 @@ extension DownloadEcmwfCommand {
             writeJob = Task {
                 let writeStart = DispatchTime.now()
                 let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [1, chunkLocations, time.count])
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: values)
+                let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: values, nConcurrent: concurrent)
                 let handle = try await GenericVariableHandle(variable: variable, time: run, member: member, fn: fn, domain: domain)
                 curl.logger.info("\(variable.rawValue) member \(member): write=\(writeStart.timeElapsedPretty()), interpolation=\(interpolationTime), wait=\(writeJobWait), download=\(downloadTime), transpose=\(convertLoopTime)")
                 return handle

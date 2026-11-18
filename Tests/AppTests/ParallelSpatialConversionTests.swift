@@ -6,6 +6,20 @@ import Testing
 @testable import App
 
 struct ParallelSpatialConversionTests {
+    @Test
+    func concurrentTemporaryWritePreservesTimeFastData() async throws {
+        let values = (0..<3 * 17 * 7).map { $0.isMultiple(of: 19) ? Float.nan : Float($0 % 101) }
+        let writer = OmFileWriterHelper(dimensions: [3, 17, 7], chunks: [1, 8, 7])
+        let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: values, nConcurrent: 4)
+        let reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
+        #expect(reader.getDimensions() == [3, 17, 7])
+        let actual = try await reader.read()
+        #expect(actual.count == values.count)
+        for (actual, expected) in zip(actual, values) {
+            #expect(actual == expected || (actual.isNaN && expected.isNaN))
+        }
+    }
+
     private actor Work {
         var active = 0
         var peak = 0
