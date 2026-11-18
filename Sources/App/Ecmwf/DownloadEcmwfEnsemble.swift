@@ -342,7 +342,7 @@ extension DownloadEcmwfCommand {
                     let handles = completedHandles
                     guard let first = handles.first else { throw CurlError.didNotFindAllVariablesInGribIndex }
                     let conversionStart = DispatchTime.now()
-                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
+                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
                     logger.info("Convert \(first.variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
                 }
             }

@@ -38,17 +38,31 @@ struct OmEnsembleStatisticsWriter {
         }
     }
 
+    /// Pure block calculation can run in parallel; file writes stay ordered.
+    static func calculate(data: Array3DFastTime, meanAndSpread: Bool, probability: Bool, dtSeconds: Int) -> [[Float]] {
+        var arrays = [[Float]]()
+        if meanAndSpread {
+            let statistics = data.ensembleMeanAndSpread()
+            arrays += [statistics.mean, statistics.spread]
+        }
+        if probability {
+            arrays.append(data.precipitationProbability(dtSeconds: dtSeconds))
+        }
+        return arrays
+    }
+
+    func write(arrays: [[Float]], yCount: Int, xCount: Int) throws {
+        precondition(arrays.count == outputs.count)
+        let dimensions = [UInt64(yCount), UInt64(xCount), UInt64(time.count)]
+        for (output, array) in zip(outputs, arrays) {
+            precondition(array.count == yCount * xCount * time.count)
+            try output.array.writeData(array: array, arrayDimensions: dimensions)
+        }
+    }
+
     func write(data: Array3DFastTime, yCount: Int, xCount: Int) throws {
         precondition(data.nLocations == yCount * xCount && data.nTime == time.count)
-        let dimensions = [UInt64(yCount), UInt64(xCount), UInt64(time.count)]
-        if calculateMeanAndSpread {
-            let statistics = data.ensembleMeanAndSpread()
-            try outputs[0].array.writeData(array: statistics.mean, arrayDimensions: dimensions)
-            try outputs[1].array.writeData(array: statistics.spread, arrayDimensions: dimensions)
-        }
-        if calculateProbability {
-            try outputs.last!.array.writeData(array: data.precipitationProbability(dtSeconds: time.dtSeconds), arrayDimensions: dimensions)
-        }
+        try write(arrays: Self.calculate(data: data, meanAndSpread: calculateMeanAndSpread, probability: calculateProbability, dtSeconds: time.dtSeconds), yCount: yCount, xCount: xCount)
     }
 
     func finalise() async throws -> [GenericVariableHandle] {
