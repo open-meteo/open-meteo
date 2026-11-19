@@ -94,7 +94,7 @@ public enum S3Uploader {
             logger.info("Upload \(url.asUrlGetQueryForLogging) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
         } catch {
-            try await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified).abort(client: client)
+            try? await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified).abort(client: client)
             throw error
         }
     }

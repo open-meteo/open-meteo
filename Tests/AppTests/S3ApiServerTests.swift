@@ -1,6 +1,7 @@
 import Foundation
 @testable import App
 import Testing
+import Synchronization
 import Vapor
 import VaporTesting
 import AsyncHTTPClient
@@ -173,6 +174,9 @@ struct S3ApiServerTests {
             )
             let duplicateCompleteResponse = try await controller.postObject(duplicateCompleteRequest)
             #expect(duplicateCompleteResponse.status == .ok)
+            await #expect(throws: S3ApiError.noSuchUpload) {
+                _ = try await controller.postObject(completeRequestInvalidSHA)
+            }
             
             /// Check that the cached local directory got updated and now contains the new file
             let storedFile = await dir?.getFile(name: file)
@@ -204,6 +208,43 @@ struct S3ApiServerTests {
             let getResponse = try await controller.get(getRequest)
             #expect(getResponse.status == .ok)
             #expect(try await getResponse.body.collect(on: app.eventLoopGroup.next()).get()?.string == "multipart-upload-body")
+        }
+    }
+
+    @Test func missingMultipartSessionReturnsGone() async throws {
+        try await withApp { app in
+            let credential = S3DataController.UploadCredential(accessKey: "test", secretKey: "secret")
+            let controller = S3DataController(uploadCredentials: [credential])
+            let path = "/data/s3-upload-tests/\(UUID().uuidString).om?uploadId=1234567891"
+            let part = try makeSignedRequest(app: app, method: .PUT, uri: path + "&partNumber=1",
+                                             body: ByteBuffer(string: "part"), credential: credential, additionalHeaders: [:])
+            let complete = try makeSignedRequest(app: app, method: .POST, uri: path,
+                                                 body: ByteBuffer(string: "<CompleteMultipartUpload></CompleteMultipartUpload>"),
+                                                 credential: credential, additionalHeaders: [:])
+            #expect(S3ApiError.noSuchUpload.status == .gone)
+            await #expect(throws: S3ApiError.noSuchUpload) { _ = try await controller.putObject(part) }
+            await #expect(throws: S3ApiError.noSuchUpload) { _ = try await controller.postObject(complete) }
+        }
+    }
+
+    @Test func replicaMissingMultipartSessionIsForwardedWithoutRetry() async throws {
+        try await withApp { app in
+            let attempts = Atomic<Int>(0)
+            app.put("replica-part") { _ -> HTTPStatus in
+                attempts.wrappingAdd(1, ordering: .relaxed)
+                return .gone
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let controller = S3DataController()
+            let req = Request(application: app, on: app.eventLoopGroup.next())
+            var forwarded = HTTPClientRequest(url: "http://127.0.0.1:\(port)/replica-part")
+            forwarded.method = .PUT
+            await #expect(throws: S3ApiError.noSuchUpload) {
+                try await controller.forwardMultipartRequest(forwarded, req: req, deadline: .seconds(5), timeout: .seconds(2))
+            }
+            #expect(attempts.load(ordering: .relaxed) == 1)
+            await app.http.server.shared.shutdown()
         }
     }
 
