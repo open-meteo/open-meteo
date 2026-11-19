@@ -234,61 +234,93 @@ struct S3ApiServerTests {
                 attempts.wrappingAdd(1, ordering: .relaxed)
                 return .gone
             }
-            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
-            let port = try #require(app.http.server.shared.localAddress?.port)
-            let controller = S3DataController()
-            let req = Request(application: app, on: app.eventLoopGroup.next())
-            var forwarded = HTTPClientRequest(url: "http://127.0.0.1:\(port)/replica-part")
-            forwarded.method = .PUT
-            await #expect(throws: S3ApiError.noSuchUpload) {
-                try await controller.forwardMultipartRequest(forwarded, req: req, deadline: .seconds(5), timeout: .seconds(2))
+            try await withLoopbackServer(app) { port in
+                let controller = S3DataController()
+                let req = Request(application: app, on: app.eventLoopGroup.next())
+                var forwarded = HTTPClientRequest(url: "http://127.0.0.1:\(port)/replica-part")
+                forwarded.method = .PUT
+                await #expect(throws: S3ApiError.noSuchUpload) {
+                    try await controller.forwardMultipartRequest(forwarded, req: req, deadline: .seconds(5), timeout: .seconds(2))
+                }
+                #expect(attempts.load(ordering: .relaxed) == 1)
             }
-            #expect(attempts.load(ordering: .relaxed) == 1)
-            await app.http.server.shared.shutdown()
         }
     }
 
-    @Test(arguments: [false, true])
-    func missingPartRestartsUploadOnce(secondUploadFails: Bool) async throws {
+    enum MissingPartScenario: CaseIterable {
+        case replaySucceeds
+        case fileReplaySucceeds
+        case replayFails
+    }
+
+    @Test(arguments: MissingPartScenario.allCases)
+    func missingPartRestartsUploadOnce(scenario: MissingPartScenario) async throws {
         try await withApp { app in
             let initiations = Atomic<Int>(0)
             let aborts = Atomic<Int>(0)
+            let replayedParts = Atomic<Int>(0)
             app.post("object") { _ -> String in
                 let id = initiations.wrappingAdd(1, ordering: .relaxed).newValue
                 return "<UploadId>\(id)</UploadId>"
             }
             app.put("object") { req -> Response in
                 let id = try req.query.get(Int.self, at: "uploadId")
-                if id == 1 || secondUploadFails {
+                if id == 1 || scenario == .replayFails {
                     return Response(status: .gone)
                 }
+                #expect(req.body.data == ByteBuffer(string: "part"))
+                replayedParts.wrappingAdd(1, ordering: .relaxed)
                 return Response(status: .ok, headers: ["ETag": "part"])
             }
             app.delete("object") { _ -> HTTPStatus in
                 aborts.wrappingAdd(1, ordering: .relaxed)
                 return .noContent
             }
-            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
-            let port = try #require(app.http.server.shared.localAddress?.port)
-            let client = app.dedicatedHttpClient
-            let executor = LimitedConcurrencyExecutor(maxConcurrency: 1)
-            let upload = {
-                try await S3Uploader.uploadMultipart(client: client, data: ByteBuffer(string: "part"), url: "http://127.0.0.1:\(port)/object", lastModified: .now(), executor: executor)
-            }
-            if secondUploadFails {
-                do {
-                    _ = try await upload()
-                    Issue.record("Expected the replacement upload to fail")
-                } catch CurlErrorNonRetry.other(.gone) {
-                    // The second session's terminal error reaches the caller.
+            try await withLoopbackServer(app) { port in
+                let client = app.dedicatedHttpClient
+                let executor = LimitedConcurrencyExecutor(maxConcurrency: 1)
+                let source = ByteBuffer(string: "part")
+                let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+                if scenario == .fileReplaySucceeds {
+                    try Data("part".utf8).write(to: file)
                 }
-            } else {
-                _ = try await upload()
+                defer {
+                    if scenario == .fileReplaySucceeds { try? FileManager.default.removeItem(at: file) }
+                }
+                let upload = {
+                    if scenario == .fileReplaySucceeds {
+                        return try await S3Uploader.uploadMultipart(client: client, file: file.path, url: "http://127.0.0.1:\(port)/object", lastModified: .now(), executor: executor)
+                    }
+                    return try await S3Uploader.uploadMultipart(client: client, data: source, url: "http://127.0.0.1:\(port)/object", lastModified: .now(), executor: executor)
+                }
+                if scenario == .replayFails {
+                    do {
+                        _ = try await upload()
+                        Issue.record("Expected the upload to fail")
+                    } catch CurlErrorNonRetry.other(.gone) {
+                        // The terminal error reaches the caller.
+                    }
+                } else {
+                    _ = try await upload()
+                    #expect(replayedParts.load(ordering: .relaxed) == 1)
+                }
+                #expect(initiations.load(ordering: .relaxed) == 2)
+                #expect(aborts.load(ordering: .relaxed) == (scenario == .replayFails ? 2 : 1))
             }
-            #expect(initiations.load(ordering: .relaxed) == 2)
-            #expect(aborts.load(ordering: .relaxed) == (secondUploadFails ? 2 : 1))
-            await app.http.server.shared.shutdown()
         }
+    }
+
+    private func withLoopbackServer(_ app: Application, _ run: (Int) async throws -> Void) async throws {
+        let server = app.http.server.shared
+        try await server.start(address: .hostname("127.0.0.1", port: 0))
+        do {
+            let port = try #require(server.localAddress?.port)
+            try await run(port)
+        } catch {
+            await server.shutdown()
+            throw error
+        }
+        await server.shutdown()
     }
 
     private func makeSignedRequest(

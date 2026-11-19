@@ -58,7 +58,8 @@ public enum S3Uploader {
         initiateRequest.headers.add(name: "Content-Type", value: contentType)
         initiateRequest.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
         // custom header to set the total expected upload file size. Might be used by a custom upload implementation in the future
-        initiateRequest.headers.add(name: "x-file-size", value: "\(try await data.getFileSize())")
+        let fileSize = try await data.getFileSize()
+        initiateRequest.headers.add(name: "x-file-size", value: "\(fileSize)")
         let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
         guard
             let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
@@ -73,7 +74,7 @@ public enum S3Uploader {
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let chunks = data.readChunks(chunkLength: .mebibytes(8))
+        let chunks = data.readChunks(chunkLength: .mebibytes(8), fileSize: fileSize)
         do {
             let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(executor: executor) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
