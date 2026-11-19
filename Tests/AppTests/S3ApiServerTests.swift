@@ -248,6 +248,49 @@ struct S3ApiServerTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func missingPartRestartsUploadOnce(secondUploadFails: Bool) async throws {
+        try await withApp { app in
+            let initiations = Atomic<Int>(0)
+            let aborts = Atomic<Int>(0)
+            app.post("object") { _ -> String in
+                let id = initiations.wrappingAdd(1, ordering: .relaxed).newValue
+                return "<UploadId>\(id)</UploadId>"
+            }
+            app.put("object") { req -> Response in
+                let id = try req.query.get(Int.self, at: "uploadId")
+                if id == 1 || secondUploadFails {
+                    return Response(status: .gone)
+                }
+                return Response(status: .ok, headers: ["ETag": "part"])
+            }
+            app.delete("object") { _ -> HTTPStatus in
+                aborts.wrappingAdd(1, ordering: .relaxed)
+                return .noContent
+            }
+            try await app.http.server.shared.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let client = app.dedicatedHttpClient
+            let executor = LimitedConcurrencyExecutor(maxConcurrency: 1)
+            let upload = {
+                try await S3Uploader.uploadMultipart(client: client, data: ByteBuffer(string: "part"), url: "http://127.0.0.1:\(port)/object", lastModified: .now(), executor: executor)
+            }
+            if secondUploadFails {
+                do {
+                    _ = try await upload()
+                    Issue.record("Expected the replacement upload to fail")
+                } catch CurlErrorNonRetry.other(.gone) {
+                    // The second session's terminal error reaches the caller.
+                }
+            } else {
+                _ = try await upload()
+            }
+            #expect(initiations.load(ordering: .relaxed) == 2)
+            #expect(aborts.load(ordering: .relaxed) == (secondUploadFails ? 2 : 1))
+            await app.http.server.shared.shutdown()
+        }
+    }
+
     private func makeSignedRequest(
         app: Application,
         method: HTTPMethod,

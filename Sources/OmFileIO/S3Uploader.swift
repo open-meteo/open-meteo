@@ -45,6 +45,10 @@ public enum S3Uploader {
     /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
     public static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp, executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
+        try await uploadMultipart(client: client, data: data, url: url, contentType: contentType, lastModified: lastModified, executor: executor, restartOnMissingPart: true)
+    }
+
+    private static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String, lastModified: Timestamp, executor: LimitedConcurrencyExecutor, restartOnMissingPart: Bool) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
         
         // Step 1: Initiate multipart upload
@@ -65,6 +69,7 @@ public enum S3Uploader {
         
         // uploadId may contain '+', '/' or '=' — percent-encode for use in query strings
         let encodedUploadId = uploadId.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? uploadId
+        let session = S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified)
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
@@ -93,8 +98,14 @@ public enum S3Uploader {
             let rate = Double(size) / timeChunkedRequest
             logger.info("Upload \(url.asUrlGetQueryForLogging) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
+        } catch CurlErrorNonRetry.other(.gone) {
+            try? await session.abort(client: client, timeout: .seconds(5))
+            guard restartOnMissingPart else { throw CurlErrorNonRetry.other(.gone) }
+            try Task.checkCancellation()
+            logger.warning("Restarting multipart upload after a missing session: \(url.asUrlGetQueryForLogging)")
+            return try await uploadMultipart(client: client, data: data, url: url, contentType: contentType, lastModified: lastModified, executor: executor, restartOnMissingPart: false)
         } catch {
-            try? await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified).abort(client: client)
+            try? await session.abort(client: client)
             throw error
         }
     }
@@ -246,11 +257,16 @@ public struct S3MultiPartUploadPrepared: Sendable {
     let encodedUploadId: String
     let lastModified: Timestamp
 
-    public func abort(client: HTTPClient) async throws {
+    public func abort(client: HTTPClient, timeout: TimeAmount? = nil) async throws {
         let logger = Logger(label: "S3Uploader")
         var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
         abortRequest.method = .DELETE
-        let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+        if let timeout {
+            // Recovery cleanup gets one attempt so it can't delay a fresh upload.
+            _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .now, timeoutPerRequest: timeout)
+        } else {
+            _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+        }
     }
 
     /// complete multipart upload. This may take longer than expected
