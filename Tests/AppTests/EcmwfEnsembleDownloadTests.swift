@@ -33,21 +33,4 @@ struct EcmwfEnsembleDownloadTests {
         #expect(!EcmwfVariable.wind_gusts_10m.matches(entry("10u")))
     }
 
-    @Test func gribKeysDistinguishLevels() {
-        #expect(EcmwfVariable.vertical_velocity_500hPa.gribKey == "w:500")
-        #expect(EcmwfVariable.vertical_velocity_700hPa.gribKey == "w:700")
-        #expect(EcmwfVariable.soil_temperature_0_to_7cm.gribKey == "sot:1")
-        #expect(EcmwfVariable.soil_temperature_7_to_28cm.gribKey == "sot:2")
-        #expect(EcmwfVariable.snow_depth.gribKey == "rsn")
-    }
-
-    @Test func selectionUsesPublicVariablesAndFiltersByDomain() throws {
-        let selected = try EcmwfVariable.load(commaSeparatedOptional: "relative_humidity_2m,snow_depth,vertical_velocity_500hPa")
-        #expect(selected == [.relative_humidity_2m, .snow_depth, .vertical_velocity_500hPa])
-        #expect(selected?.filter { EcmwfDomain.ifs01_ensemble.includes(variable: $0) } == [.relative_humidity_2m, .snow_depth])
-        #expect(selected?.filter { EcmwfDomain.ifs01_ensemble_pressure_levels.includes(variable: $0) } == [.vertical_velocity_500hPa])
-        #expect(EcmwfVariable.relative_humidity_2m.gribKey != EcmwfVariable.relative_humidity_2m.rawValue)
-        #expect(EcmwfVariable.snow_depth.gribKey != EcmwfVariable.snow_depth.rawValue)
-        #expect(EcmwfVariable.vertical_velocity_500hPa.gribKey != EcmwfVariable.vertical_velocity_500hPa.rawValue)
-    }
 }

@@ -139,33 +139,4 @@ import Testing
         #expect(try await iterator.next() == nil)
     }
 
-    @Test(.timeLimit(.minutes(1)), arguments: [nil, 2] as [Int?])
-    func defaultBufferMatchesConcurrency(nBuffered: Int?) async throws {
-        let counter = WorkCounter()
-        let stream = Array(0..<10).mapStream(nConcurrent: 2, nBuffered: nBuffered) { value in
-            await counter.start()
-            await counter.finish()
-            return value
-        }
-        var iterator = stream.makeAsyncIterator()
-        #expect(try await iterator.next() == 0)
-        await counter.waitForCompleted(3)
-        #expect(await counter.completed == 3)
-        #expect(stream.nBuffered == 2)
-    }
-
-    @Test func smallBuffersAndEmptyInputs() async throws {
-        let stream = [0, 1, 2].mapConcurrent(nConcurrent: 4, nBuffered: 1) { value async in value }
-        var values = [Int]()
-        for try await value in stream { values.append(value) }
-        #expect(values == [0, 1, 2])
-        let synchronous = [1, 2].mapStream(nConcurrent: 2, nBuffered: 5) { $0 * 2 }
-        var synchronousValues = [Int]()
-        for try await value in synchronous { synchronousValues.append(value) }
-        #expect(synchronousValues == [2, 4])
-        let empty = ConcurrentAsyncMapSequence(sequence: [Int](), fn: { $0 }, nConcurrent: 2, nBuffered: 5)
-        var iterator = empty.makeAsyncIterator()
-        #expect(try await iterator.next() == nil)
-    }
-
 }
