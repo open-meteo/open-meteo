@@ -23,7 +23,7 @@ struct S3UploadQueueTests {
             }
             try file.write(contentsOf: Data(expected))
             #expect(file.wasDeleted())
-            return file.readChunks(chunkLength: .bytes(3))
+            return file.readChunks(chunkLength: .bytes(3), fileSize: Int64(expected.count))
         }
         // Only the sequence now retains the file handle.
         let chunks = try prepareChunks()
@@ -52,7 +52,7 @@ struct S3UploadQueueTests {
         let file = try FileHandle.createNewFile(file: path, temporary: true)
         try file.write(contentsOf: Data("abcdefgh".utf8))
         var retained: [ByteBuffer] = []
-        for try await chunk in file.readChunks(chunkLength: .bytes(3)) {
+        for try await chunk in file.readChunks(chunkLength: .bytes(3), fileSize: 8) {
             retained.append(chunk)
         }
         #expect(retained.map { String(decoding: $0.readableBytesView, as: UTF8.self) } == ["abc", "def", "gh"])
@@ -63,7 +63,7 @@ struct S3UploadQueueTests {
         defer { try? FileManager.default.removeItem(atPath: "\(path)~") }
         let file = try FileHandle.createNewFile(file: path, temporary: true)
         try file.write(contentsOf: Data("forecast".utf8))
-        let chunks = file.readChunks(chunkLength: .bytes(3))
+        let chunks = file.readChunks(chunkLength: .bytes(3), fileSize: 8)
         try file.truncate(atOffset: 2)
         await #expect(throws: S3UploaderError.self) {
             for try await _ in chunks {}

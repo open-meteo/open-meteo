@@ -17,6 +17,7 @@ ExecStopPost=/bin/bash -c 'if [ "$$EXIT_STATUS" != 0 ]; then /usr/local/bin/open
 Restart=always
 RestartSec=1
 LimitNOFILE=infinity
+LimitNICE=-4
 
 [Install]
 WantedBy = default.target
