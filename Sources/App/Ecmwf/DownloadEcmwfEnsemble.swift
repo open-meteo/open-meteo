@@ -44,6 +44,15 @@ extension DownloadEcmwfCommand {
 
     /// Fetch inventories once, then overlap bounded variable downloads with writing and conversion.
     func downloadEnsembleVariables(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
+        let variables = domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels || domain == .ifs025_ensemble
+            ? variables.filter {
+                switch $0 {
+                case .ocean_u_current, .ocean_v_current, .precipitation_type, .sea_ice_thickness, .sea_level_height_msl:
+                    return false
+                default:
+                    return true
+                }
+            } : variables
         guard !variables.isEmpty else { throw CurlError.didNotFindAllVariablesInGribIndex }
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, retryUnauthorized: true, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
