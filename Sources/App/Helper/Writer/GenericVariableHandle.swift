@@ -548,26 +548,21 @@ actor GribDeaverager {
         // Array-to-pointer conversions keep both buffers alive until every worker has finished.
         nonisolated(unsafe) let output = values
         let input = previous
-        let process: @Sendable (Range<Int>) -> Void = { range in
-            if isAverage {
-                for i in range {
-                    output[i] = (output[i] * delta - input[i] * previousDelta) / (delta - previousDelta)
-                }
-            } else {
-                for i in range {
-                    output[i] -= input[i]
-                }
-            }
-        }
         let workers = min(nConcurrent, count)
-        if workers == 1 {
-            process(0..<count)
-            return
-        }
         await withTaskGroup(of: Void.self) { group in
             for worker in 0..<workers {
                 let range = (count * worker / workers)..<(count * (worker + 1) / workers)
-                group.addTask { process(range) }
+                group.addTask {
+                    if isAverage {
+                        for i in range {
+                            output[i] = (output[i] * delta - input[i] * previousDelta) / (delta - previousDelta)
+                        }
+                    } else {
+                        for i in range {
+                            output[i] -= input[i]
+                        }
+                    }
+                }
             }
             await group.waitForAll()
         }
