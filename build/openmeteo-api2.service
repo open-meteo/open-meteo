@@ -17,6 +17,7 @@ ExecStopPost=/bin/bash -c 'if [[ "$$EXIT_STATUS" != 0 && -n "$API_BIND2" ]]; the
 Restart=always
 RestartSec=1
 LimitNOFILE=infinity
+LimitNICE=-4
 ExecCondition=/bin/bash -c '/bin/test -n "$API_BIND2"'
 
 [Install]

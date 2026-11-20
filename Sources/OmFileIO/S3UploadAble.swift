@@ -5,9 +5,12 @@ import NIOConcurrencyHelpers
 import NIOFileSystem
 
 /// Protocol of how a file can be chunked into 8 MB parts and upload as individual ByteBuffers. Unfortunately, `AsyncHTTPClient` only accepts ByteBuffers so a memory copy can not be avoided.
+/// Sources must remain unchanged for the duration of the upload, including retries.
 public protocol S3UploadAble {
     associatedtype ByteBufferSequence: AsyncSequence where ByteBufferSequence.Element == ByteBuffer, ByteBufferSequence: Sendable
-    func readChunks(chunkLength: ByteCount) -> ByteBufferSequence
+    /// Each call must return a fresh sequence starting at the beginning of the same data,
+    /// even if a previous sequence was only partially consumed. One-shot streams are not supported.
+    func readChunks(chunkLength: ByteCount, fileSize: Int64) -> ByteBufferSequence
     
     func getFileSize() async throws -> Int64
 }
@@ -15,6 +18,11 @@ public protocol S3UploadAble {
 extension ReadFileHandle: S3UploadAble {
     public func getFileSize() async throws -> Int64 {
         return try await self.info().size
+    }
+
+    public func readChunks(chunkLength: ByteCount, fileSize: Int64) -> FileChunks {
+        // A bounded range uses positional reads; the default reader advances the shared file offset.
+        readChunks(in: 0..<fileSize, chunkLength: chunkLength)
     }
 }
 
@@ -25,8 +33,8 @@ extension Foundation.FileHandle: S3UploadAble {
         Int64(fileSize())
     }
 
-    public func readChunks(chunkLength: ByteCount) -> FileHandleUploadChunks {
-        FileHandleUploadChunks(file: self, size: fileSize(), chunkSize: Int(chunkLength.bytes))
+    public func readChunks(chunkLength: ByteCount, fileSize: Int64) -> FileHandleUploadChunks {
+        FileHandleUploadChunks(file: self, size: Int(fileSize), chunkSize: Int(chunkLength.bytes))
     }
 }
 
@@ -92,7 +100,7 @@ extension ByteBuffer: S3UploadAble {
         return Int64(self.readableBytes)
     }
     
-    public func readChunks(chunkLength: ByteCount) -> AsyncStream<ByteBuffer> {
+    public func readChunks(chunkLength: ByteCount, fileSize: Int64) -> AsyncStream<ByteBuffer> {
         let chunkSize = Int(chunkLength.bytes)
         var copy = self
         return AsyncStream { continuation in
