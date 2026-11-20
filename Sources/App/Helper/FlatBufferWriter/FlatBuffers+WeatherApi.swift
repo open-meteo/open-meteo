@@ -4,6 +4,19 @@ import OpenMeteoSdk
 
 extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        var meta = getBaseFlatBuffersMeta()
+        switch percentile {
+        case .p10: meta.aggregation = .p10
+        case .p25: meta.aggregation = .p25
+        case .p50: meta.aggregation = .median
+        case .p75: meta.aggregation = .p75
+        case .p90: meta.aggregation = .p90
+        case .mean, nil: break
+        }
+        return meta
+    }
+
+    private func getBaseFlatBuffersMeta() -> FlatBufferVariableMeta {
         let previousDay = Int16(previousDay)
         switch variable {
         case .soil_moisture_0cm:
@@ -1340,6 +1353,9 @@ extension MultiDomains {
             return .cmcGemGepsEnsembleMean
         case .bom_access_global_ensemble_mean:
             return .bomAccessGlobalEnsembleMean
+        case .google_weathernext3_ensemble_mean:
+            // TODO: Replace with the WeatherNext 3 model identifier once available in the SDK.
+            return .undefined
         case .google_weathernext2_ensemble_mean:
             return .googleWeathernext2EnsembleMean
         case .ukmo_global_ensemble_mean_20km:

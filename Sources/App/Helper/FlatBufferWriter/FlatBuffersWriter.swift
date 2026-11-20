@@ -50,7 +50,7 @@ extension ForecastapiResult {
 /// Encode meta data for flatbuffer variables
 struct FlatBufferVariableMeta {
     let variable: openmeteo_sdk_Variable
-    let aggregation: openmeteo_sdk_Aggregation
+    var aggregation: openmeteo_sdk_Aggregation
     let probability: openmeteo_sdk_Probability
     let altitude: Int16
     let pressureLevel: Int16

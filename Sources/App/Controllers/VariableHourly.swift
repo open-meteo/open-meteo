@@ -534,7 +534,10 @@ extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
-            return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
+            var normalized = surface
+            normalized.variable = surface.variable.remapped
+            normalized.previousDay = 0
+            return (ForecastVariable.surface(normalized), surface.previousDay)
         case .pressure(let pressure):
             return (ForecastVariable.pressure(pressure), 0)
         case .height(let height):
@@ -812,6 +815,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
     /// Correct wind direction for HRRR and NAM models on the demand
     private let trueNorth: Float?
+    private let isWeatherNext3: Bool
 
     init(
         reader: Reader,
@@ -820,6 +824,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     ) {
         self.reader = reader
         self.options = options
+        self.isWeatherNext3 = domainRegistry == .google_weathernext3_ensemble_mean || domainRegistry == .google_weathernext3_station_ensemble_mean
         self.compatibility = .init(domain: domainRegistry)
         self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
         let windGridDomain: GfsDomain?
@@ -1052,6 +1057,33 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
+        if isWeatherNext3 && variable.rawValue.hasSuffix("_spread") {
+            let name = String(variable.rawValue.dropLast(7))
+            guard let field = WeatherNext3Field(rawValue: name), field.spread,
+                let low = Reader.variableFromString(name + "_p10"),
+                let high = Reader.variableFromString(name + "_p90")
+            else {
+                return nil
+            }
+            let unit = field.unit == .celsius ? SiUnit.kelvin : field.unit
+            return .two(.raw(low), .raw(high)) { low, high, _ in
+                let spread = zip(low.data, high.data).map { lower, upper -> Float in
+                    guard lower.isFinite, upper.isFinite, upper >= lower else { return .nan }
+                    // Gaussian-equivalent standard deviation from the central 80% interval.
+                    // Exact for Gaussian population quantiles; finite-ensemble percentiles add sampling error.
+                    // Temperature, pressure and wind components can be approximately Gaussian, but skewness,
+                    // heavy tails or bounded distributions change the interval-to-standard-deviation ratio.
+                    // Using population quantiles, this overestimates standard deviation by about 8% for a
+                    // uniform distribution, and underestimates it by 11% for Laplace and 14% for exponential.
+                    // Zero-inflated distributions can yield zero spread despite a nonzero standard deviation
+                    // when at least 90% of values are zero; rare extremes outside P10-P90 are not represented.
+                    // Accuracy therefore depends on the source variable and local forecast distribution.
+                    return (upper - lower) / 2.5631031311
+                }
+                return DataAndUnit(spread, unit)
+            }
+        }
+
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
         if compatibility.usesLegacyIconEpsRadiationStorage {
             switch variable {
@@ -1966,6 +1998,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     func getDeriverMap(variable: ForecastVariable) -> DerivedMapping<Reader.MixingVar>? {
         switch variable {
         case .surface(let variable):
+            if variable.percentile != nil {
+                guard isWeatherNext3 else { return nil }
+                return .direct(Reader.variableFromString(variable.rawValue))
+            }
             return getDeriverMap(variable: variable.variable.remapped)
         case .pressure(let variable):
             return getDeriverMap(variable: variable)

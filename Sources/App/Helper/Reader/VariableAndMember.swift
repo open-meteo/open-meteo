@@ -3,6 +3,7 @@ import Foundation
 struct VariableAndPreviousDay: RawRepresentableString {
     var variable: ForecastSurfaceVariable
     var previousDay: Int
+    var percentile: WeatherNext3Variable.Statistic? = nil
 
     init(_ variable: ForecastSurfaceVariable, _ previousDay: Int) {
         self.variable = variable
@@ -10,6 +11,13 @@ struct VariableAndPreviousDay: RawRepresentableString {
     }
 
     init?(rawValue: String) {
+        if let native = WeatherNext3Variable(rawValue: rawValue), native.statistic != .mean,
+            let variable = ForecastSurfaceVariable(rawValue: native.field.rawValue) {
+            self.variable = variable
+            self.previousDay = 0
+            self.percentile = native.statistic
+            return
+        }
         guard
             let pos = rawValue.range(of: "_previous_day"),
             let previousDay = Int(rawValue[pos.upperBound..<rawValue.endIndex])
@@ -29,6 +37,9 @@ struct VariableAndPreviousDay: RawRepresentableString {
     }
 
     var rawValue: String {
+        if let percentile {
+            return variable.rawValue + "_" + percentile.rawValue
+        }
         if previousDay == 0 {
             return variable.rawValue
         }
