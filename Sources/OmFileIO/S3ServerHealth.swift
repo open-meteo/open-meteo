@@ -9,7 +9,7 @@ public enum S3ServerHealthError: Error {
 /// Wraps `S3ServerHealth` into a vapor usable service that does not allow an async init
 public actor S3ServerHealth {
     public nonisolated let logger: Logger
-    /// Caller-owned client shared by health checks, listings and remote reads.
+    /// Caller-owned client for listings and remote reads.
     public nonisolated let client: HTTPClient
     var states: [ServerState]
     var monitor: Task<Void, Never>?
@@ -93,7 +93,8 @@ public actor S3ServerHealth {
                 var request = HTTPClientRequest(url: server.uploadServer)
                 request.method = .HEAD
                 request.headers.add(name: "x-amz-content-sha256", value: Data().sha256Hex)
-                _ = try await client.executeRetry(
+                // Keep probes independent of the remote-data connection limit.
+                _ = try await HTTPClient.shared.executeRetry(
                     request,
                     logger: logger,
                     deadline: .seconds(60),

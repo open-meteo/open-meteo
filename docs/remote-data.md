@@ -43,7 +43,7 @@ Queued jobs are ordered by scheduling deadline. Demand reads normally take prece
 | `REMOTE_DATA_MAX_PENDING_FETCHES` | Maximum number of queued fetches. | `65536` |
 | `REMOTE_DATA_HTTP_CONNECTIONS` | HTTP/1.1 connection-pool soft limit per remote backend host. | `16` |
 
-The shared HTTP/1.1 pool also handles listings, metadata requests and health checks, so allow headroom above `REMOTE_DATA_MAX_CONCURRENT_FETCHES`.
+The shared HTTP/1.1 pool also handles listings and metadata requests, so allow headroom above `REMOTE_DATA_MAX_CONCURRENT_FETCHES`. S3 health checks use the default HTTP client pool.
 
 ## API Prefetching and Modified-File Preloading
 
