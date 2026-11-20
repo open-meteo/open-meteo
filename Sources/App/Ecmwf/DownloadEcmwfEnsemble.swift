@@ -64,7 +64,7 @@ extension DownloadEcmwfCommand {
         var inventories = [EnsembleInventory]()
         for try await inventory in files.mapStream(nConcurrent: downloadConcurrent, nBuffered: 2 * downloadConcurrent, body: { file in
             let request = try EcmwfOpenDataSource.prepareDownload(url: file.url)
-            let entries = try await curl.downloadInMemoryAsync(url: request.indexURL, minSize: nil, quiet: true).readEcmwfIndexEntries()
+            let entries = try await curl.downloadInMemoryAsync(url: request.indexURL, minSize: nil, quiet: false).readEcmwfIndexEntries()
             return EnsembleInventory(hour: file.hour, url: request.url, entries: entries)
         }) {
             inventories.append(inventory)

@@ -113,6 +113,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let uploadQueues = signature.timeinterval == nil ? resolvedUploadQueues : []
             let selected = variables.filter { $0.gribName != nil }
             for run in runs {
+                logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run, uploadQueues: uploadQueues)
                 try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
             }
