@@ -3,6 +3,31 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
+    @Test func concurrentTimeColumnAssignmentMatchesSerial() async {
+        let original = Array2DFastTime(nLocations: 9, nTime: 3)
+        var expected = original
+        var actual = original
+        let values: [Float] = [1, 2, .nan, 4, 5, 6, 7]
+        expected[1..<8, 1] = values
+        await actual.setConcurrent(location: 1..<8, time: 1, values: values)
+        await actual.setConcurrent(location: 9..<9, time: 0, values: [])
+        #expect(zip(actual.data, expected.data).allSatisfy { $0 == $1 || ($0.isNaN && $1.isNaN) })
+        #expect(original.data.allSatisfy { $0.isNaN })
+    }
+
+    @Test func concurrentMultiplyAddMatchesFusedSerialResults() async {
+        let input: [Float] = [0, -0.0, .nan, .infinity, -.infinity, 1.0000001, .greatestFiniteMagnitude]
+        var expected = input
+        expected.multiplyAdd(multiply: 0.9999999, add: -1)
+        var actual = input
+        await actual.multiplyAddConcurrent(multiply: 0.9999999, add: -1)
+        #expect(zip(actual, expected).allSatisfy { $0.bitPattern == $1.bitPattern || ($0.isNaN && $1.isNaN) })
+        #expect(input[0] == 0)
+        var empty = [Float]()
+        await empty.multiplyAddConcurrent(multiply: 2, add: 1)
+        #expect(empty.isEmpty)
+    }
+
     @Test func solarInterpolationSparseLocationsAndMembers() {
         let grid = RegularGrid(nx: 4, ny: 1, latMin: 40, lonMin: -76, dx: 1, dy: 1)
         let time = TimerangeDt(start: Timestamp(2026, 6, 1, 12), nTime: 8, dtSeconds: 600)
