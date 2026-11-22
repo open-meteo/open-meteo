@@ -42,12 +42,12 @@ struct S3DataController: RouteCollection {
     }
     
     func boot(routes: RoutesBuilder) throws {
+        routes.on(.HEAD, [], use: self.headRoot)
         if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
             routes.get("", use: self.list)
             routes.get("index.html", use: self.index)
             routes.get("openmeteo", use: self.list)
             routes.get("openmeteo-local", use: self.list)
-            routes.on(.HEAD, [], use: self.headRoot)
         }
 
         // JSON metadata is public even without credentials. Other downloads authenticate in get.
@@ -74,7 +74,6 @@ struct S3DataController: RouteCollection {
     }
     
     func headRoot(_ req: Request) throws -> HTTPStatus {
-        try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
         return .ok
     }
     
