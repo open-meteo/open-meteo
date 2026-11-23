@@ -16,18 +16,14 @@ struct VariableAndPreviousDay: RawRepresentableString {
 
     init?(rawValue: String) {
         if let separator = rawValue.lastIndex(of: "_"),
-           let percentile = Percentile(rawValue: String(rawValue[rawValue.index(after: separator)...])),
-           let variable = ForecastSurfaceVariable(rawValue: String(rawValue[..<separator])) {
-            switch variable {
-            case .temperature_2m, .dew_point_2m, .pressure_msl, .sea_surface_temperature,
-                 .precipitation, .shortwave_radiation, .direct_radiation, .wind_speed_10m, .wind_speed_100m,
-                 .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
-                self.init(variable, 0)
-                self.percentile = percentile
-                return
-            default:
+           let percentile = Percentile(rawValue: String(rawValue[rawValue.index(after: separator)...])) {
+            guard let native = WeatherNext3Variable(rawValue: rawValue),
+                  let variable = ForecastSurfaceVariable(rawValue: native.field.rawValue) else {
                 return nil
             }
+            self.init(variable, 0)
+            self.percentile = percentile
+            return
         }
         guard
             let pos = rawValue.range(of: "_previous_day"),
