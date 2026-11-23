@@ -13,10 +13,16 @@ struct OmSpatialTimestepWriterTests {
         let chunks = alignedChunks ? [readChunks.y, readChunks.x] : nil
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: Logger(label: "multistep-test"), chunkDimensions: chunks)
         let variable = EcmwfVariable.temperature_2m
-        for (hour, member) in [(6, 0), (3, 0), (3, 1)] {
-            try await writer.write(time: run.add(hours: hour), member: member, variable: variable, data: Array(repeating: Float(hour + member), count: domain.grid.count))
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for (hour, member) in [(6, 0), (3, 0), (3, 1)] {
+                group.addTask {
+                    try await writer.write(time: run.add(hours: hour), member: member, variable: variable, data: Array(repeating: Float(hour + member), count: domain.grid.count))
+                }
+            }
+            try await group.waitForAll()
         }
         let handles = try await writer.finalise()
+        #expect(await writer.writer.isEmpty)
         #expect(handles.count == 3)
         #expect(handles.map { $0.time.range.lowerBound } == [run.add(hours: 3), run.add(hours: 3), run.add(hours: 6)])
         for handle in handles {

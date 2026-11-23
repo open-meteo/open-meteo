@@ -21,6 +21,13 @@ extension DownloadEcmwfCommand {
         var grib: GribArray2D
     }
 
+    struct AccumulatedVariable: Hashable, Sendable {
+        let variable: EcmwfVariable
+        let shortName: String
+        let stepType: String
+        let stepRange: String
+    }
+
     /// Cache and index complete GRIB files, then write spatial fields for conversion.
     func downloadEnsembleVariables(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
         let variables = domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels || domain == .ifs025_ensemble
@@ -72,7 +79,7 @@ extension DownloadEcmwfCommand {
             return (variable, (parameter, level, priority, variable.rawValue))
         })
         var fields = [EnsembleField]()
-        var availableVariables = [EcmwfVariable]()
+        var availableVariableCount = 0
         for variable in variables {
             var hoursPerMember = [Set<Int>](repeating: [], count: domain.countEnsembleMember)
             for inventory in inventories {
@@ -94,7 +101,7 @@ extension DownloadEcmwfCommand {
                 logger.error("Incomplete local GRIBs: \(variable.rawValue) member \(member) has hours \(actualHours.sorted()), expected \(expectedHours.sorted())")
                 throw EcmwfLocalGribFile.Failure.invalidMetadata
             }
-            availableVariables.append(variable)
+            availableVariableCount += 1
         }
         fields.sort {
             let a = order[$0.variable]!
@@ -109,7 +116,7 @@ extension DownloadEcmwfCommand {
             if $0.variable != $1.variable { return a < b }
             return $0.field.range.lowerBound < $1.field.range.lowerBound
         }
-        logger.info("Reading \(availableVariables.count) variables: \(fields.count) local fields")
+        logger.info("Reading \(availableVariableCount) variables: \(fields.count) local fields")
         // Convert each variable once all its spatial fields have been written.
         var conversionJob: Task<Void, any Error>?
 
@@ -119,45 +126,27 @@ extension DownloadEcmwfCommand {
         guard !fields.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         let time = TimerangeDt(start: run, nTime: lastHour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
         let isAifs = domain == .aifs025_single || domain == .aifs025_ensemble || domain == .aifs025_ensemble_mean
-        let inputs = Set(availableVariables.map(\.gribKey))
-        // Map each derived output to its source field and output variable.
-        var dependencies = [EcmwfVariable: EcmwfVariable]()
-        var outputVariables = [EcmwfVariable: EcmwfVariable]()
-        for variable in availableVariables {
-            switch variable.gribName {
-            case "2d" where inputs.contains("2t:2"):
-                dependencies[variable] = .temperature_2m
-                outputVariables[variable] = .relative_humidity_2m
-            case "rsn" where !isAifs && inputs.contains("sd"):
-                dependencies[variable] = .snow_depth_water_equivalent
-                outputVariables[variable] = .snow_depth
-            case "w", "q":
-                let level = variable.level!
-                if inputs.contains("t:\(level)"), variable.gribName == "w" || (isAifs && level != 10) {
-                    dependencies[variable] = EcmwfVariable.from(shortName: "t", levelhPa: level)!
-                    outputVariables[variable] = variable.gribName == "w" ? variable : EcmwfVariable.from(shortName: "r", levelhPa: level)!
-                }
-            default:
-                if !["2d", "rsn", "w", "q"].contains(variable.gribName) { outputVariables[variable] = variable }
-            }
-        }
-        let sourceUses = Dictionary(dependencies.values.map { ($0, 1) }, uniquingKeysWith: +)
-        var spatialInputs = [EcmwfVariable: (data: Array2D, remaining: Int)]()
-        let expectedHours = Dictionary(outputVariables.map { input, output in
-            (output, hours.count - (input.skipHourZero && hours.first == 0 ? 1 : 0))
-        }, uniquingKeysWith: { first, _ in first })
-        // Match the converter's read blocks to avoid decompressing the same
-        // spatial chunk repeatedly for neighboring blocks.
-        let spatialChunks = OmFileSplitter(domain).spatialReadChunkDimensions
-        var writers = [EcmwfVariable: OmSpatialMultistepWriter]()
-        var writtenFields = [EcmwfVariable: Int]()
-        var timings = [EcmwfVariable: (count: Int, decodeWait: Double, process: Double, write: Double)]()
+        let snowDepthCalculator = SnowDepthCalculator()
+        let verticalVelocityCalculator = VerticalVelocityCalculator<EcmwfVariable>()
+        let specificHumidityCalculator = SpecificHumidityCalculator<EcmwfVariable>()
+        let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
+        let chunks = OmFileSplitter(domain).spatialReadChunkDimensions
+        // Writers create timestep files lazily, including outputs produced by calculators.
+        let writers = Dictionary(uniqueKeysWithValues: EcmwfVariable.allCases.map { variable in
+            (variable, OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, chunkDimensions: [chunks.y, chunks.x]))
+        })
         let deaverager = GribDeaverager()
+        let inMemoryAccumulated = VariablePerMemberStorage<AccumulatedVariable>()
+        let positiveHours = hours.filter { $0 > 0 }
+        let nextHours = Dictionary(uniqueKeysWithValues: zip([0] + positiveHours, positiveHours))
+        var writtenFields = [EcmwfVariable: Int]()
+        var timings = [EcmwfVariable: (count: Int, process: Double, write: Double)]()
+        defer { conversionJob?.cancel() }
 
-        // One ordered local stream reads timesteps in parallel and keeps related
-        // variable/member inputs adjacent for derivation and spatial writing.
-        let decoded = fields.mapStream(nConcurrent: concurrent, nBuffered: 2 * concurrent, body: { entry -> DecodedEnsembleField in
-            let field = try entry.file.withMessage(field: entry.field) { message in
+        // Workers decode, deaccumulate, derive and write spatial fields. Only
+        // completed-field accounting and conversion scheduling run in the consumer.
+        let processed = fields.mapStream(nConcurrent: concurrent, nBuffered: 2 * concurrent, body: { entry -> [(variable: EcmwfVariable, member: Int, process: Double, write: Double)] in
+            var field = try entry.file.withMessage(field: entry.field) { message in
                 guard let shortName = message.get(attribute: "shortName"),
                       let level = message.get(attribute: "level").flatMap(Int.init),
                       let stepType = message.get(attribute: "stepType"),
@@ -182,96 +171,132 @@ extension DownloadEcmwfCommand {
                 }
                 return DecodedEnsembleField(variable: entry.variable, hour: entry.hour, member: entry.member, shortName: shortName, stepType: stepType, stepRange: stepRange, grib: grib)
             }
-            await progress.add(entry.field.range.count)
-            return field
-        })
-        // mapStream yields in input order, so deaccumulation and derivation need
-        // no reorder buffers. GRIB decoding still runs concurrently ahead of this loop.
-        var iterator = decoded.makeAsyncIterator()
-        while true {
-            let readStart = DispatchTime.now()
-            guard var field = try await iterator.next() else { break }
-            let decodeWait = readStart.timeElapsedSeconds()
+            var written = [(variable: EcmwfVariable, member: Int, process: Double, write: Double)]()
             let processStart = DispatchTime.now()
-            if field.stepType != "instant" {
-                let isAccumulated = field.stepType == "accum" || field.stepType == "avg"
-                var dtSeconds: Int
-                if isAccumulated && field.hour == 0 {
+            let start = field.stepRange.splitTo2Integer()?.0 ?? field.hour
+            let dtSeconds = field.stepType == "instant" ? domain.dtSeconds : max(1, field.hour - start) * 3600
+            if field.stepType == "accum" || field.stepType == "avg" {
+                if field.hour == 0 {
                     field.grib.array.data = [Float](repeating: .nan, count: field.grib.array.data.count)
-                    dtSeconds = domain.dtSeconds
-                } else if isAccumulated {
-                    var stepRange = field.stepRange
-                    if field.stepType == "accum" && !stepRange.contains("-") { stepRange = "0-\(stepRange)" }
-                    if domain == .aifs025_single && field.stepType == "accum" { stepRange = "0-\(field.hour)" }
-                    guard let (start, end) = stepRange.splitTo2Integer(), start < end, end == field.hour else {
-                        throw EcmwfLocalGribFile.Failure.invalidMetadata
-                    }
-                    let previousStep = await deaverager.lastStep(field.variable, field.member)
-                    guard await deaverager.deaccumulateIfRequired(variable: field.variable, member: field.member, stepType: field.stepType, startStep: start, currentStep: end, array2d: &field.grib.array) else {
-                        throw EcmwfLocalGribFile.Failure.invalidMetadata
-                    }
-                    dtSeconds = max(1, end - max(start, previousStep ?? start)) * 3600
-                    if field.hour == lastHour { await deaverager.remove(variable: field.variable, member: field.member) }
                 } else {
-                    let start = field.stepRange.splitTo2Integer()?.0 ?? field.hour
-                    dtSeconds = max(1, field.hour - start) * 3600
+                    let accumulated = AccumulatedVariable(variable: field.variable, shortName: field.shortName, stepType: field.stepType, stepRange: field.stepRange)
+                    await inMemoryAccumulated.set(variable: accumulated, timestamp: run.add(hours: field.hour), member: field.member, data: field.grib.array)
+                    // Drain buffered timesteps in sequence. Each result keeps its own timestamp.
+                    while true {
+                        try Task.checkCancellation()
+                        let processStart = DispatchTime.now()
+                        let lastStep = await deaverager.lastStep(field.variable, field.member) ?? 0
+                        guard let step = nextHours[lastStep] else { break }
+                        let timestamp = run.add(hours: step)
+                        guard let next = await inMemoryAccumulated.remove(timestamp: timestamp, member: field.member, matching: { $0.variable == field.variable }) else { break }
+                        let metadata = next.variable
+                        var data = next.data
+                        var stepRange = metadata.stepRange
+                        if metadata.stepType == "accum" && !stepRange.contains("-") { stepRange = "0-\(stepRange)" }
+                        if domain == .aifs025_single && metadata.stepType == "accum" { stepRange = "0-\(step)" }
+                        guard let (start, end) = stepRange.splitTo2Integer(), start < end, end == step else {
+                            throw EcmwfLocalGribFile.Failure.invalidMetadata
+                        }
+                        guard await deaverager.deaccumulateIfRequired(variable: metadata.variable, member: field.member, stepType: metadata.stepType, startStep: start, currentStep: step, array2d: &data) else { continue }
+                        if step == lastHour { await deaverager.remove(variable: metadata.variable, member: field.member) }
+                        let dtSeconds = (step - max(start, lastStep)) * 3600
+                        if metadata.shortName == "z" { await data.data.multiplyAddConcurrent(multiply: 1 / 9.80665, add: 0) }
+                        if let fma = metadata.variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
+                            await data.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
+                        }
+                        let processTime = processStart.timeElapsedSeconds()
+                        let writeStart = DispatchTime.now()
+                        try await writers[metadata.variable]!.write(time: timestamp, member: field.member, variable: metadata.variable, data: data.data)
+                        written.append((metadata.variable, field.member, processTime, writeStart.timeElapsedSeconds()))
+                    }
+                    await progress.add(entry.field.range.count)
+                    return written
                 }
+            }
+            if field.stepType != "instant" {
                 if field.shortName == "z" { await field.grib.array.data.multiplyAddConcurrent(multiply: 1 / 9.80665, add: 0) }
                 if let fma = field.variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
                     await field.grib.array.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
                 }
             }
-            if let uses = sourceUses[field.variable] {
-                guard field.stepType == "instant", spatialInputs[field.variable] == nil else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-                spatialInputs[field.variable] = (field.grib.array, uses)
-            }
-            if let source = dependencies[field.variable] {
-                guard field.stepType == "instant", var input = spatialInputs.removeValue(forKey: source) else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-                switch field.variable.gribName {
-                case "2d":
-                    field.grib.array.data = zip(input.data.data, field.grib.array.data).map(Meteorology.relativeHumidity)
-                case "rsn":
-                    field.grib.array.data = zip(input.data.data, field.grib.array.data).map(/)
-                case "w":
-                    field.grib.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: field.grib.array.data, temperature: input.data.data, pressureLevel: Float(field.variable.level!))
-                case "q":
-                    field.grib.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: field.grib.array.data, temperature: input.data.data, pressure: Float(field.variable.level!))
-                default: throw EcmwfLocalGribFile.Failure.invalidMetadata
+            let timestamp = run.add(hours: field.hour)
+            var results = [(variable: EcmwfVariable, data: [Float])]()
+            let parameter = field.variable.gribName
+            switch parameter {
+            case "2t", "2d":
+                guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+                let input: RelativeHumidityCalculator.Input = parameter == "2t" ? .temperature(field.grib.array) : .dewpoint(field.grib.array)
+                if let data = await rhCalculator.calculate(input, member: field.member, timestamp: timestamp) {
+                    results.append((.relative_humidity_2m, data))
                 }
-                input.remaining -= 1
-                if input.remaining > 0 { spatialInputs[source] = input }
+            case "sd", "rsn":
+                if !isAifs {
+                    guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+                    let input: SnowDepthCalculator.Input = parameter == "sd" ? .waterEquivalent(field.grib.array) : .density(field.grib.array)
+                    if let data = await snowDepthCalculator.calculate(input, member: field.member, timestamp: timestamp) {
+                        results.append((.snow_depth, data))
+                    }
+                }
+            case "t", "w", "q":
+                let level = field.variable.level!
+                if parameter != "q", let output = EcmwfVariable.from(shortName: "w", levelhPa: level) {
+                    guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+                    let input: VerticalVelocityCalculator<EcmwfVariable>.Input = parameter == "t" ? .temperature(field.grib.array) : .omega(field.grib.array)
+                    if let data = await verticalVelocityCalculator.calculate(input, member: field.member, timestamp: timestamp, pressureLevel: Float(level), outVariable: output) {
+                        results.append((output, data))
+                    }
+                }
+                if isAifs && level != 10 && parameter != "w", let output = EcmwfVariable.from(shortName: "r", levelhPa: level) {
+                    guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+                    let input: SpecificHumidityCalculator<EcmwfVariable>.Input = parameter == "t" ? .temperature(field.grib.array) : .specificHumidity(field.grib.array)
+                    if let data = await specificHumidityCalculator.calculate(input, member: field.member, timestamp: timestamp, pressureLevel: Float(level), outVariable: output) {
+                        results.append((output, data))
+                    }
+                }
+            default:
+                break
             }
-            guard let variable = outputVariables[field.variable] else { continue }
-            let writer = writers[variable] ?? OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, chunkDimensions: [spatialChunks.y, spatialChunks.x])
-            writers[variable] = writer
-            let processTime = processStart.timeElapsedSeconds()
-            let writeStart = DispatchTime.now()
-            try await writer.write(time: run.add(hours: field.hour), member: field.member, variable: variable, data: field.grib.array.data)
-            let writeTime = writeStart.timeElapsedSeconds()
-            var timing = timings.removeValue(forKey: variable) ?? (0, 0, 0, 0)
-            timing.count += 1
-            timing.decodeWait += decodeWait
-            timing.process += processTime
-            timing.write += writeTime
-            if timing.count == expectedHours[variable]! {
-                logger.info("\(variable.rawValue) member \(field.member): decodeWait=\(timing.decodeWait.asSecondsPrettyPrint), process=\(timing.process.asSecondsPrettyPrint), write=\(timing.write.asSecondsPrettyPrint)")
-            } else {
-                timings[variable] = timing
+            // Derived inputs are never written as if they were the final output.
+            if !["2d", "rsn", "w", "q"].contains(parameter) {
+                results.append((field.variable, field.grib.array.data))
             }
-            writtenFields[variable, default: 0] += 1
-            guard writtenFields[variable] == expectedHours[variable]! * nMembers else { continue }
+            let processTime = processStart.timeElapsedSeconds() / Double(max(1, results.count))
+            for result in results {
+                let writer = writers[result.variable]!
+                let writeStart = DispatchTime.now()
+                try await writer.write(time: timestamp, member: field.member, variable: result.variable, data: result.data)
+                written.append((result.variable, field.member, processTime, writeStart.timeElapsedSeconds()))
+            }
+            await progress.add(entry.field.range.count)
+            return written
+        })
+        for try await written in processed {
+            for field in written {
+                let variable = field.variable
+                let expectedHours = hours.count - (variable.skipHourZero && hours.first == 0 ? 1 : 0)
+                var timing = timings.removeValue(forKey: variable) ?? (0, 0, 0)
+                timing.count += 1
+                timing.process += field.process
+                timing.write += field.write
+                if timing.count == expectedHours {
+                    logger.info("\(variable.rawValue) member \(field.member): process=\(timing.process.asSecondsPrettyPrint), write=\(timing.write.asSecondsPrettyPrint)")
+                } else {
+                    timings[variable] = timing
+                }
+                writtenFields[variable, default: 0] += 1
+                guard writtenFields[variable] == expectedHours * nMembers else { continue }
 
-            let handles = try await writer.finalise()
-            writers.removeValue(forKey: variable)
-            writtenFields.removeValue(forKey: variable)
-            try await conversionJob?.value
-            conversionJob = Task {
-                let conversionStart = DispatchTime.now()
-                try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
-                logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
+                let handles = try await writers[variable]!.finalise()
+                writtenFields.removeValue(forKey: variable)
+                try await conversionJob?.value
+                conversionJob = Task {
+                    let conversionStart = DispatchTime.now()
+                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
+                    logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
+                }
             }
         }
-        guard writers.isEmpty, spatialInputs.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        guard writtenFields.isEmpty, await deaverager.data.isEmpty, await inMemoryAccumulated.data.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         await progress.finish()
         try await conversionJob?.value
         // Publish the run only after all available variables have been converted.

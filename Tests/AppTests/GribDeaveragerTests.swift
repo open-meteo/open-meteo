@@ -2,6 +2,22 @@ import Testing
 @testable import App
 
 struct GribDeaveragerTests {
+    @Test func bufferedFieldsRetainTheirOwnAccumulationInterval() async throws {
+        let storage = VariablePerMemberStorage<DownloadEcmwfCommand.AccumulatedVariable>()
+        let time = Timestamp(2026, 11, 18)
+        let first = DownloadEcmwfCommand.AccumulatedVariable(variable: .precipitation, shortName: "tp", stepType: "accum", stepRange: "0-3")
+        let reset = DownloadEcmwfCommand.AccumulatedVariable(variable: .precipitation, shortName: "tp", stepType: "accum", stepRange: "3-6")
+        await storage.set(variable: first, timestamp: time, member: 0, data: Array2D(data: [3], nx: 1, ny: 1))
+        await storage.set(variable: reset, timestamp: time.add(hours: 3), member: 0, data: Array2D(data: [5], nx: 1, ny: 1))
+        await storage.set(variable: first, timestamp: time, member: 1, data: Array2D(data: [9], nx: 1, ny: 1))
+        let field = try #require(await storage.remove(timestamp: time.add(hours: 3), member: 0, matching: { $0.variable == .precipitation }))
+        #expect(field.variable.stepRange == "3-6")
+        #expect(field.data.data == [5])
+        #expect(await storage.remove(timestamp: time.add(hours: 3), member: 0, matching: { $0.variable == .precipitation }) == nil)
+        #expect(await storage.get(variable: first, timestamp: time, member: 0)?.data == [3])
+        #expect(await storage.get(variable: first, timestamp: time, member: 1)?.data == [9])
+    }
+
     @Test func concurrentAccumulationAndAveragesPreserveHistoryAndResets() async {
         for length in [0, 1, 7] {
             for stepType in ["accum", "avg"] {

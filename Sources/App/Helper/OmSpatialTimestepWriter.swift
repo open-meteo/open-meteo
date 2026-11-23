@@ -366,6 +366,9 @@ actor OmSpatialMultistepWriter {
         let handles = try await writer.sorted { $0.time < $1.time }.asyncFlatMap({
             return try await $0.finalise()
         })
+        // Returned handles own the mappings. Temporary writers need not retain
+        // their files and compression buffers after conversion has been scheduled.
+        if !storeOnDisk { writer.removeAll() }
         return handles
     }
     

@@ -46,6 +46,13 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
         return remove(.init(variable: variable, timestamp: timestamp, member: member))
     }
 
+    /// Remove a field atomically while retaining metadata carried by its variable key.
+    func remove(timestamp: Timestamp, member: Int, matching: (V) -> Bool) -> (variable: V, data: Array2D)? {
+        guard let key = data.keys.first(where: { $0.timestamp == timestamp && $0.member == member && matching($0.variable) }),
+              let array = data.removeValue(forKey: key) else { return nil }
+        return (key.variable, array)
+    }
+
     func remove(_ variable: VariableAndMember) -> Array2D? {
         return data.removeValue(forKey: variable)
     }
