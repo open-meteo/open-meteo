@@ -53,25 +53,16 @@ extension DownloadEcmwfCommand {
         guard let lastHour = hours.last else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         let files = hours.flatMap { hour in domain.getUrl(base: base, run: run, hour: hour).map { (hour: hour, url: $0) } }
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let elevationURL = domain.elevationDomain.getUrl(base: base, run: run, hour: 0)[0]
-        let elevationPath = domain.downloadDirectory + URL(string: elevationURL)!.lastPathComponent
-        let needsElevation = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath())
-        let localFiles = files.map { (hour: $0.hour, path: domain.downloadDirectory + URL(string: $0.url)!.lastPathComponent) }
-        var downloads = zip(files, localFiles).map { (url: $0.0.url, path: $0.1.path) }
-        // Pressure-level downloads need one additional surface control file at hour zero.
-        if needsElevation && !files.contains(where: { $0.url == elevationURL }) {
-            downloads.insert((url: elevationURL, path: elevationPath), at: 0)
-        }
+        let downloads = files.map { (url: $0.url, path: domain.downloadDirectory + URL(string: $0.url)!.lastPathComponent) }
         let hoursByURL = Dictionary(uniqueKeysWithValues: files.map { ($0.url, $0.hour) })
         logger.info("Scanning GRIB headers as files become available")
         let inventories = try await curl.download(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
-            .mapConcurrent(nConcurrent: concurrent) { file -> (hour: Int, file: EcmwfLocalGribFile)? in
-                // The additional surface file is only needed for elevation.
-                guard let hour = hoursByURL[file.url] else { return nil }
-                return (hour: hour, file: try EcmwfLocalGribFile(handle: file.handle, source: file.url))
-            }.compactMap { $0 }
-        // Elevation must also use a complete local file, never an index inventory.
-        if needsElevation {
+            .mapConcurrent(nConcurrent: concurrent) { file in
+                (hour: hoursByURL[file.url]!, file: try EcmwfLocalGribFile(handle: file.handle, source: file.url))
+            }
+        if !domain.isPressureLevels && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            let elevationURL = domain.getUrl(base: base, run: run, hour: 0)[0]
+            let elevationPath = domain.downloadDirectory + URL(string: elevationURL)!.lastPathComponent
             try await downloadEcmwfElevation(application: application, domain: domain, base: base, run: run, uploadQueues: uploadQueues, localGribPath: elevationPath)
         }
 
