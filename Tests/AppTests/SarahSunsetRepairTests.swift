@@ -35,9 +35,11 @@ import Testing
     }
 
     @Test func correctedOutputPaths() {
-        for name in ["year_2020.om", "chunk_12345.om"] {
-            #expect(EumetsatSarahRepairSunsetCommand.correctedFilePath("/data/eumetsat_sarah3_30min/shortwave_radiation/" + name)
-                == "/data/eumetsat_sarah3_30min/shortwave_radiation_corrected/" + name)
+        for variable in ["shortwave_radiation", "direct_radiation"] {
+            for name in ["year_2020.om", "chunk_12345.om"] {
+                #expect(EumetsatSarahRepairSunsetCommand.correctedFilePath("/data/eumetsat_sarah3_30min/" + variable + "/" + name)
+                    == "/data/eumetsat_sarah3_30min/" + variable + "_corrected/" + name)
+            }
         }
     }
 

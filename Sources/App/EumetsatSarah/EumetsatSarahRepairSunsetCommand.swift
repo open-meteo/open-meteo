@@ -5,41 +5,61 @@ import OmFileFormat
 
 /// Repair already timestamp-corrected SARAH-3 archives. Run with ingestion stopped.
 /// Run repair-eumetsat-sarah-sunset --execute to write all yearly and chunk files
-/// to shortwave_radiation_corrected for API review, leaving the originals untouched.
+/// to shortwave_radiation_corrected and direct_radiation_corrected for API review, leaving the originals untouched.
 /// Omit --execute to count repairs without writing. Use --file year_2020.om to test one file.
 struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
     struct Signature: CommandSignature {
-        @Option(name: "file", help: "Only process this filename in the SARAH shortwave_radiation directory, e.g. year_2020.om or chunk_12345.om")
+        @Option(name: "file", help: "Only process this filename for both SARAH radiation variables, e.g. year_2020.om or chunk_12345.om")
         var file: String?
 
-        @Flag(name: "execute", help: "Write shortwave_radiation_corrected files; otherwise only count repairs")
+        @Flag(name: "execute", help: "Write both radiation variables to _corrected files; otherwise only count repairs")
         var execute: Bool
     }
 
-    var help: String { "Fill sunset NaNs in all timestamp-corrected SARAH-3 shortwave radiation files" }
+    var help: String { "Fill sunset NaNs in all timestamp-corrected SARAH-3 shortwave and direct radiation files" }
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let domain = EumetsatSarahDomain.sarah3_30min
-        let directory = domain.domainRegistry.directory + "shortwave_radiation/"
-        var files = try FileManager.default.contentsOfDirectory(atPath: directory).filter {
-            $0.hasSuffix(".om") && ($0.hasPrefix("year_") || $0.hasPrefix("chunk_"))
-        }.sorted(by: >)
+        let variables = ["shortwave_radiation", "direct_radiation"]
+        var names = Set<String>()
+        for variable in variables {
+            let directory = domain.domainRegistry.directory + variable
+            guard FileManager.default.fileExists(atPath: directory) else { continue }
+            names.formUnion(try FileManager.default.contentsOfDirectory(atPath: directory).filter {
+                $0.hasSuffix(".om") && ($0.hasPrefix("year_") || $0.hasPrefix("chunk_"))
+            })
+        }
         if let file = signature.file {
-            guard files.contains(file) else {
-                throw Abort(.badRequest, reason: "SARAH shortwave file not found: \(file). Pass a filename from \(directory)")
+            guard names.contains(file) else {
+                throw Abort(.badRequest, reason: "SARAH file not found: \(file). Pass a year_YYYY.om or chunk_INDEX.om filename")
             }
-            files = [file]
+            names = [file]
         }
-        for file in files {
-            try await repairFile(file: directory + file, domain: domain,
-                execute: signature.execute, logger: context.application.logger)
+        for name in names.sorted(by: >) {
+            let files = variables.map { domain.domainRegistry.directory + $0 + "/" + name }
+                .filter { FileManager.default.fileExists(atPath: $0) }
+            try await repairFiles(files: files, domain: domain, execute: signature.execute, logger: context.application.logger)
         }
-        context.application.logger.info("Processed \(files.count) SARAH shortwave radiation files")
+        context.application.logger.info("Processed \(names.count) SARAH radiation file groups")
     }
 
-    func repairFile(file: String, domain: EumetsatSarahDomain, execute: Bool, logger: Logger) async throws {
+    private struct FileState {
+        let file: String
+        let reader: OmFileReaderArray<MmapFile, Float>
+        let dimensions: [UInt64]
+        let chunks: [UInt64]
+        let handle: FileHandle?
+        let fileWriter: OmFileWriter<FileHandle>?
+        let writer: OmFileWriterArray<Float, FileHandle>?
+        let output: String
+        let temporary: String
+        var repaired = 0
+    }
+
+    func repairFiles(files: [String], domain: EumetsatSarahDomain, execute: Bool, logger: Logger) async throws {
+        guard let first = files.first else { return }
         let grid = domain.grid
-        let name = URL(fileURLWithPath: file).deletingPathExtension().lastPathComponent
+        let name = URL(fileURLWithPath: first).deletingPathExtension().lastPathComponent
         let start: Timestamp
         let expectedCount: Int
         if name.hasPrefix("year_"), let year = Int(name.dropFirst(5)), (1983...2100).contains(year) {
@@ -51,96 +71,104 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
         } else {
             throw Abort(.badRequest, reason: "Expected year_YYYY.om or chunk_INDEX.om")
         }
-        let reader = try await OmFileReader(mmapFile: file).expectArray(of: Float.self)
-        let dimensions = Array(reader.getDimensions())
-        guard dimensions == [UInt64(grid.count), UInt64(expectedCount)] || dimensions == [UInt64(grid.ny), UInt64(grid.nx), UInt64(expectedCount)] else {
-            throw Abort(.badRequest, reason: "Unexpected SARAH-3 file dimensions: \(dimensions)")
-        }
-        let chunks = Array(reader.getChunkDimensions())
-        logger.info("Processing \(file), chunks=\(chunks)")
-        let output = Self.correctedFilePath(file)
-        if execute {
-            try FileManager.default.createDirectory(at: URL(fileURLWithPath: output).deletingLastPathComponent(), withIntermediateDirectories: true)
-        }
-        let temporary = output + ".sunset-repair~"
-        let handle = execute ? try FileHandle.createNewFile(file: temporary) : nil
+        var states = [FileState]()
+        var handles = [(FileHandle, String)]()
         defer {
-            try? handle?.close()
-            if execute { try? FileManager.default.removeItem(atPath: temporary) }
+            for (handle, temporary) in handles {
+                try? handle.close()
+                try? FileManager.default.removeItem(atPath: temporary)
+            }
         }
-        let fileWriter = handle.map { OmFileWriter(fn: $0, initialCapacity: 1024 * 1024 * 10) }
-        let writer = try fileWriter?.prepareArray(type: Float.self,
-            dimensions: dimensions,
-            chunkDimensions: chunks, compression: reader.compression,
-            scale_factor: reader.scaleFactor, add_offset: reader.addOffset)
-        var repaired = 0
-        // Flattened legacy files have one spatial dimension; current files have Y and X.
-        let spatialDimensions = Array(dimensions.dropLast()).map(Int.init)
-        let spatialChunks = Array(chunks.dropLast()).map(Int.init)
+        for file in files {
+            let reader = try await OmFileReader(mmapFile: file).expectArray(of: Float.self)
+            let dimensions = Array(reader.getDimensions())
+            guard dimensions == [UInt64(grid.count), UInt64(expectedCount)] || dimensions == [UInt64(grid.ny), UInt64(grid.nx), UInt64(expectedCount)] else {
+                throw Abort(.badRequest, reason: "Unexpected SARAH-3 file dimensions: \(dimensions)")
+            }
+            let chunks = Array(reader.getChunkDimensions())
+            logger.info("Processing \(file), chunks=\(chunks)")
+            let output = Self.correctedFilePath(file)
+            if execute {
+                try FileManager.default.createDirectory(at: URL(fileURLWithPath: output).deletingLastPathComponent(), withIntermediateDirectories: true)
+            }
+            let temporary = output + ".sunset-repair~"
+            let handle = execute ? try FileHandle.createNewFile(file: temporary) : nil
+            if let handle { handles.append((handle, temporary)) }
+            let fileWriter = handle.map { OmFileWriter(fn: $0, initialCapacity: 1024 * 1024 * 10) }
+            let writer = try fileWriter?.prepareArray(type: Float.self,
+                dimensions: dimensions, chunkDimensions: chunks, compression: reader.compression,
+                scale_factor: reader.scaleFactor, add_offset: reader.addOffset)
+            states.append(FileState(file: file, reader: reader, dimensions: dimensions, chunks: chunks,
+                handle: handle, fileWriter: fileWriter, writer: writer, output: output, temporary: temporary))
+        }
+        // Both variables use the same spatial chunks. Compute solar radiation once per
+        // native spatial chunk for the entire time interval and reuse it for both fields.
+        let spatialDimensions = Array(states[0].dimensions.dropLast()).map(Int.init)
+        let spatialChunks = Array(states[0].chunks.dropLast()).map(Int.init)
         let blocks = Self.spatialBlocks(dimensions: spatialDimensions, chunks: spatialChunks)
         let solarTime = TimerangeDt(start: start, nTime: expectedCount + 1, dtSeconds: domain.dtSeconds)
         for (blockIndex, spatialRange) in blocks.enumerated() {
-            let locations: [Int]
-            if spatialRange.count == 1 {
-                locations = Array(spatialRange[0])
-            } else {
-                locations = spatialRange[0].flatMap { y in spatialRange[1].map { y * grid.nx + $0 } }
-            }
-            // Precompute the complete time interval (plus the following solar interval) for every grid
-            // point in this spatial block. A whole 2600x2600 yearly field would use ~474 GB,
-            // so retain only one spatial block at a time. No solar calculations in the gap loop.
+            let locations = spatialRange.count == 1 ? Array(spatialRange[0]) : spatialRange[0].flatMap { y in spatialRange[1].map { y * grid.nx + $0 } }
             let solar = Zensun.calculateRadiationBackwardsAveraged(grid: grid,
                 locationRange: locations, timerange: solarTime)
-            for t in stride(from: 0, to: expectedCount, by: Int(chunks.last!)) {
-                let end = min(t + Int(chunks.last!), expectedCount)
-                // Include i-1 from this same file when a hole starts a time chunk.
-                let lower = max(t - 1, 0)
-                let readCount = end - lower
-                let ranges = spatialRange.map { $0.toUInt64() } + [UInt64(lower)..<UInt64(end)]
-                let source: [Float]
-                if ranges.count == 2 {
-                    source = try await reader.read(range: [ranges[0], ranges[1]])
-                } else {
-                    source = try await reader.read(range: [ranges[0], ranges[1], ranges[2]])
-                }
-                var output = [Float]()
-                output.reserveCapacity(locations.count * (end - t))
-                for i in locations.indices {
-                    for step in t..<end {
-                        let index = i * readCount + step - lower
-                        let value = source[index]
-                        // At the file start there is no previous KT; use zero if the next interval is dark.
-                        if step == 0, value.isNaN, solar[i, step + 1] == 0 {
-                            output.append(0)
-                            repaired += 1
-                        } else if step > 0, value.isNaN, let replacement = Self.reconstruct(previous: source[index - 1],
-                            solarPrevious: solar[i, step - 1], solarCurrent: solar[i, step], solarNext: solar[i, step + 1]) {
-                            output.append(replacement)
-                            repaired += 1
-                        } else {
-                            output.append(value)
+            for stateIndex in states.indices {
+                let state = states[stateIndex]
+                let chunks = state.chunks
+                let reader = state.reader
+                let writer = state.writer
+                for t in stride(from: 0, to: expectedCount, by: Int(chunks.last!)) {
+                    let end = min(t + Int(chunks.last!), expectedCount)
+                    // Include i-1 from this same file when a hole starts a time chunk.
+                    let lower = max(t - 1, 0)
+                    let readCount = end - lower
+                    let ranges = spatialRange.map { $0.toUInt64() } + [UInt64(lower)..<UInt64(end)]
+                    let source: [Float]
+                    if ranges.count == 2 {
+                        source = try await reader.read(range: [ranges[0], ranges[1]])
+                    } else {
+                        source = try await reader.read(range: [ranges[0], ranges[1], ranges[2]])
+                    }
+                    var output = [Float]()
+                    output.reserveCapacity(locations.count * (end - t))
+                    for i in locations.indices {
+                        for step in t..<end {
+                            let index = i * readCount + step - lower
+                            let value = source[index]
+                            // At the file start there is no previous KT; use zero if the next interval is dark.
+                            if step == 0, value.isNaN, solar[i, step + 1] == 0 {
+                                output.append(0)
+                                states[stateIndex].repaired += 1
+                            } else if step > 0, value.isNaN, let replacement = Self.reconstruct(previous: source[index - 1],
+                                solarPrevious: solar[i, step - 1], solarCurrent: solar[i, step], solarNext: solar[i, step + 1]) {
+                                output.append(replacement)
+                                states[stateIndex].repaired += 1
+                            } else {
+                                output.append(value)
+                            }
                         }
                     }
+                    try writer?.writeData(array: output,
+                        arrayDimensions: spatialRange.map { UInt64($0.count) } + [UInt64(end - t)],
+                        arrayOffset: nil, arrayCount: nil)
                 }
-                try writer?.writeData(array: output,
-                    arrayDimensions: spatialRange.map { UInt64($0.count) } + [UInt64(end - t)],
-                    arrayOffset: nil, arrayCount: nil)
             }
-            if blockIndex % 1000 == 0 { logger.info("SARAH sunset repair: block \(blockIndex)/\(blocks.count), \(repaired) values") }
+            if blockIndex % 1000 == 0 { logger.info("SARAH sunset repair: block \(blockIndex)/\(blocks.count)") }
         }
-        if let writer, let fileWriter, let handle {
-            let root = try fileWriter.write(array: try writer.finalise(), name: "", children: [])
-            try fileWriter.writeTrailer(rootVariable: root)
-            try handle.close()
-            try FileManager.default.moveFileOverwrite(from: temporary, to: output)
+        for state in states {
+            if let writer = state.writer, let fileWriter = state.fileWriter, let handle = state.handle {
+                let root = try fileWriter.write(array: try writer.finalise(), name: "", children: [])
+                try fileWriter.writeTrailer(rootVariable: root)
+                try handle.close()
+                try FileManager.default.moveFileOverwrite(from: state.temporary, to: state.output)
+            }
+            logger.info("\(execute ? "Wrote" : "Would write") \(state.output), repairing \(state.repaired) sunset NaNs from \(state.file)")
         }
-        logger.info("\(execute ? "Wrote" : "Would write") \(output), repairing \(repaired) sunset NaNs from \(file)")
     }
 
     static func correctedFilePath(_ file: String) -> String {
         let source = URL(fileURLWithPath: file)
         return source.deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("shortwave_radiation_corrected")
+            .appendingPathComponent(source.deletingLastPathComponent().lastPathComponent + "_corrected")
             .appendingPathComponent(source.lastPathComponent).path
     }
 
