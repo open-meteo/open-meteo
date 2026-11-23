@@ -46,7 +46,9 @@ import Testing
         #expect(Surface(rawValue: "temperature_2m") == nil)
         let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<Station, Surface>>(reader: [
             SampleReader<Surface>(values: [
-                "wind_speed_10m": 8, "wind_u_component_10m": 3, "wind_v_component_10m": 4, "pressure_msl": 1013,
+                "wind_speed_10m": 8, "pressure_msl": 1013,
+                "wind_u_component_10m": 0, "wind_v_component_10m": 5,
+                "wind_u_component_100m": -6, "wind_v_component_100m": 0,
                 "wind_speed_10m_p10": 0, "wind_speed_10m_p25": 1, "wind_speed_10m_p50": 2,
                 "wind_speed_10m_p75": 5, "wind_speed_10m_p90": 10,
                 "wind_speed_100m_p10": 2, "wind_speed_100m_p25": 3, "wind_speed_100m_p50": 5,
@@ -82,7 +84,15 @@ import Testing
             #expect(abs(output.data[0] - intervalWidth / 2.5631) < 0.00001)
             #expect(output.unit == .metrePerSecond)
         }
+        for (height, expected) in [(10, Float(180)), (100, 90)] {
+            let variable = try #require(ForecastVariable(rawValue: "wind_direction_\(height)m"))
+            let output = try #require(await reader.get(variable: variable, time: time))
+            #expect(output.data == [expected])
+            #expect(output.unit == .degreeDirection)
+        }
         for name in [
+            "wind_u_component_10m_spread", "wind_v_component_10m_spread",
+            "wind_u_component_100m_spread", "wind_v_component_100m_spread",
             "wind_direction_10m_spread", "relative_humidity_2m_spread", "precipitation_spread",
         ] {
             let variable = try #require(ForecastVariable(rawValue: name))

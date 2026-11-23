@@ -108,7 +108,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             )
             logger.info("WeatherNext 3: loading and validating \(domain.rawValue) field metadata")
             let variables = WeatherNext3Field.allCases.filter { $0.domain == domain }.flatMap { field in
-                WeatherNext3Variable.Statistic.allCases.map {
+                field.statistics.map {
                     WeatherNext3Variable(field: field, statistic: $0)
                 }
             }

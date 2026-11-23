@@ -175,14 +175,23 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
         }
     }
 
+    var statistics: [WeatherNext3Variable.Statistic] {
+        switch self {
+        case .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m:
+            // The mean vector supplies the point forecast for wind direction.
+            return [.mean]
+        default:
+            return WeatherNext3Variable.Statistic.allCases
+        }
+    }
+
     /// Whether the API exposes a Gaussian-equivalent spread, calculated as (p90 - p10) / 2.5631.
     var spread: Bool {
         switch self {
-        case .temperature_2m, .dew_point_2m, .pressure_msl,
-            .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
-            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m:
+        case .temperature_2m, .dew_point_2m, .pressure_msl, .wind_speed_10m, .wind_speed_100m:
             true
         case .sea_surface_temperature, .precipitation, .shortwave_radiation, .direct_radiation,
+            .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m,
             .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             false
         }
@@ -215,7 +224,9 @@ struct WeatherNext3Variable: GenericVariable {
     init?(rawValue: String) {
         let statistic = Statistic.allCases.first { $0 != .mean && rawValue.hasSuffix("_" + $0.rawValue) } ?? .mean
         let name = statistic == .mean ? rawValue : String(rawValue.dropLast(statistic.rawValue.count + 1))
-        guard let field = WeatherNext3Field(rawValue: name) else { return nil }
+        guard let field = WeatherNext3Field(rawValue: name), field.statistics.contains(statistic) else {
+            return nil
+        }
         self.init(field: field, statistic: statistic)
     }
 
