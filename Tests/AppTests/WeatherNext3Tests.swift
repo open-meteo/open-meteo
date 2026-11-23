@@ -3,6 +3,24 @@ import Testing
 @testable import App
 
 @Suite struct WeatherNext3Tests {
+    @Test func intervalPercentilesRetainFieldSemantics() {
+        let start = Timestamp(2026, 11, 8)
+        let hourly = TimerangeDt(start: start, nTime: 2, dtSeconds: 3600)
+        let quarterHourly = TimerangeDt(start: start.add(900), nTime: 4, dtSeconds: 900)
+        let twoHourly = TimerangeDt(start: start.add(3600), nTime: 1, dtSeconds: 7200)
+
+        let precipitation = WeatherNext3Variable(field: .precipitation, statistic: .p90)
+        let amounts: [Float] = [2, 4]
+        #expect(amounts.interpolate(type: precipitation.interpolation, timeOld: hourly, timeNew: quarterHourly, latitude: 0, longitude: 0, scalefactor: precipitation.scalefactor) == [1, 1, 1, 1])
+        #expect(amounts.aggregate(type: precipitation.interpolation, timeOld: hourly, timeNew: twoHourly) == [6])
+
+        for field in [WeatherNext3Field.shortwave_radiation, .direct_radiation] {
+            let radiation = WeatherNext3Variable(field: field, statistic: .p90)
+            let fluxes: [Float] = [100, 300]
+            #expect(fluxes.aggregate(type: radiation.interpolation, timeOld: hourly, timeNew: twoHourly) == [200])
+        }
+    }
+
     @Test func rawPercentiles() async throws {
         let reader = VariableHourlyDeriver(
             reader: SampleReader<WeatherNext3Variable>(values: ["temperature_2m_p10": 18, "precipitation_p90": 12]),

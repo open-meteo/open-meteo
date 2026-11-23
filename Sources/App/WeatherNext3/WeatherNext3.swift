@@ -253,7 +253,6 @@ struct WeatherNext3Variable: GenericVariable {
     var unit: SiUnit { field.unit }
 
     var interpolation: ReaderInterpolation {
-        if statistic != .mean { return .linear }
         if field == .precipitation { return .backwards_sum }
         if field.unit == .wattPerSquareMetre { return .solar_backwards_averaged }
         return .linear
