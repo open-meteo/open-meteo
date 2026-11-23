@@ -12,6 +12,9 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
         @Option(name: "file", help: "Only process this filename for both SARAH radiation variables, e.g. year_2020.om or chunk_12345.om")
         var file: String?
 
+        @Option(name: "concurrent", short: "c", help: "Number of radiation file pairs to process in parallel (default: 1)")
+        var concurrent: Int?
+
         @Flag(name: "execute", help: "Write both radiation variables to _corrected files; otherwise only count repairs")
         var execute: Bool
     }
@@ -19,6 +22,12 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
     var help: String { "Fill sunset NaNs in all timestamp-corrected SARAH-3 shortwave and direct radiation files" }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let concurrent = signature.concurrent ?? 1
+        guard concurrent > 0 else {
+            throw Abort(.badRequest, reason: "--concurrent must be greater than zero")
+        }
+        let logger = context.application.logger
+        let execute = signature.execute
         let domain = EumetsatSarahDomain.sarah3_30min
         let variables = ["shortwave_radiation", "direct_radiation"]
         var names = Set<String>()
@@ -35,10 +44,10 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
             }
             names = [file]
         }
-        for name in names.sorted(by: >) {
+        try await names.sorted(by: >).foreachConcurrent(nConcurrent: concurrent) { name in
             let files = variables.map { domain.domainRegistry.directory + $0 + "/" + name }
                 .filter { FileManager.default.fileExists(atPath: $0) }
-            try await repairFiles(files: files, domain: domain, execute: signature.execute, logger: context.application.logger)
+            try await repairFiles(files: files, domain: domain, execute: execute, logger: logger)
         }
         context.application.logger.info("Processed \(names.count) SARAH radiation file groups")
     }
@@ -108,6 +117,7 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
         let blocks = Self.spatialBlocks(dimensions: spatialDimensions, chunks: spatialChunks)
         let solarTime = TimerangeDt(start: start, nTime: expectedCount + 1, dtSeconds: domain.dtSeconds)
         for (blockIndex, spatialRange) in blocks.enumerated() {
+            try Task.checkCancellation()
             let locations = spatialRange.count == 1 ? Array(spatialRange[0]) : spatialRange[0].flatMap { y in spatialRange[1].map { y * grid.nx + $0 } }
             let solar = Zensun.calculateRadiationBackwardsAveraged(grid: grid,
                 locationRange: locations, timerange: solarTime)
