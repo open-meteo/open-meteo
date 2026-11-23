@@ -109,8 +109,11 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
                     for step in t..<end {
                         let index = i * readCount + step - lower
                         let value = source[index]
-                        // Index 0 has no preceding sample within this file.
-                        if step > 0, value.isNaN, let replacement = Self.reconstruct(previous: source[index - 1],
+                        // At the file start there is no previous KT; use zero if the next interval is dark.
+                        if step == 0, value.isNaN, solar[i, step + 1] == 0 {
+                            output.append(0)
+                            repaired += 1
+                        } else if step > 0, value.isNaN, let replacement = Self.reconstruct(previous: source[index - 1],
                             solarPrevious: solar[i, step - 1], solarCurrent: solar[i, step], solarNext: solar[i, step + 1]) {
                             output.append(replacement)
                             repaired += 1
