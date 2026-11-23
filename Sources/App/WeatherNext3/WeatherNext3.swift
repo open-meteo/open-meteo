@@ -175,13 +175,15 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
         }
     }
 
+    /// Whether the API exposes a Gaussian-equivalent spread, calculated as (p90 - p10) / 2.5631.
     var spread: Bool {
         switch self {
         case .temperature_2m, .dew_point_2m, .pressure_msl,
-            .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m:
+            .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
+            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m:
             true
         case .sea_surface_temperature, .precipitation, .shortwave_radiation, .direct_radiation,
-            .wind_speed_10m, .wind_speed_100m, .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             false
         }
     }
