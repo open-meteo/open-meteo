@@ -21,8 +21,9 @@ extension Curl {
     /// chunks are written immediately at their offsets, without an ordered buffer.
     /// Existing destinations are reused; incomplete files never become visible
     /// at their final paths. Yield cached files immediately and new files in
-    /// completion order. Parent directories must already exist.
-    func download(files: [(url: String, path: String)], nConcurrent: Int, deadLineHours: Double? = nil) -> AsyncThrowingStream<(url: String, path: String), any Error> {
+    /// completion order. Handles are positioned at zero and owned by the consumer.
+    /// Parent directories must already exist.
+    func download(files: [(url: String, path: String)], nConcurrent: Int, deadLineHours: Double? = nil) -> AsyncThrowingStream<(url: String, handle: FileHandle), any Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -31,7 +32,7 @@ extension Curl {
                         try Task.checkCancellation()
                         if FileManager.default.fileExists(atPath: file.path) {
                             logger.info("Using cached file \(file.path)")
-                            if case .terminated = continuation.yield(file) { throw CancellationError() }
+                            if case .terminated = continuation.yield((url: file.url, handle: try FileHandle.openFileReading(file: file.path))) { throw CancellationError() }
                             return false
                         }
                         return true
@@ -94,9 +95,9 @@ extension Curl {
                                 logger.info("Downloading file \(files[index].url) length=\(size.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)")
                                 if size == 0 {
                                     try handle.linkTemporary(file: path)
-                                    try handle.close()
+                                    try handle.seek(toOffset: 0)
                                     states.removeValue(forKey: index)
-                                    if case .terminated = continuation.yield(files[index]) { throw CancellationError() }
+                                    if case .terminated = continuation.yield((url: files[index].url, handle: handle)) { throw CancellationError() }
                                 }
                             case .chunk(let index, let range, let data):
                                 var state = states[index]!
@@ -107,9 +108,9 @@ extension Curl {
                                 await progress.add(data.readableBytes)
                                 if state.written == state.size {
                                     try state.handle.linkTemporary(file: files[index].path)
-                                    try state.handle.close()
+                                    try state.handle.seek(toOffset: 0)
                                     states.removeValue(forKey: index)
-                                    if case .terminated = continuation.yield(files[index]) { throw CancellationError() }
+                                    if case .terminated = continuation.yield((url: files[index].url, handle: state.handle)) { throw CancellationError() }
                                     logger.info("Downloaded \(files[index].path)")
                                 }
                             }

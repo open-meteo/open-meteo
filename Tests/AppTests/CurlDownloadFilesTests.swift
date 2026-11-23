@@ -50,19 +50,20 @@ struct CurlDownloadFilesTests {
             let port = try #require(app.http.server.shared.localAddress?.port)
             let curl = Curl(logger: app.logger, client: HTTPClient.shared, chunkSizeMB: 1)
             let files = payloads.indices.map { (url: "http://127.0.0.1:\(port)/\($0)", path: directory.appendingPathComponent("\($0)").path) }
-            var yieldedPaths = [String]()
+            var yieldedURLs = [String]()
             var yieldedBeforeFirstFinished = false
             for try await file in curl.download(files: files, nConcurrent: concurrent) {
-                let index = try #require(files.firstIndex(where: { $0.path == file.path }))
-                #expect(file.url == files[index].url)
-                #expect(try Data(contentsOf: URL(fileURLWithPath: file.path)) == payloads[index])
+                let index = try #require(files.firstIndex(where: { $0.url == file.url }))
+                #expect(try file.handle.offset() == 0)
+                #expect(try (file.handle.readToEnd() ?? Data()) == payloads[index])
+                try file.handle.close()
                 if index == 1 && !observed.withLock({ $0.firstFinished }) {
                     yieldedBeforeFirstFinished = true
                 }
-                yieldedPaths.append(file.path)
+                yieldedURLs.append(file.url)
             }
-            #expect(yieldedPaths.count == files.count)
-            #expect(Set(yieldedPaths) == Set(files.map(\.path)))
+            #expect(yieldedURLs.count == files.count)
+            #expect(Set(yieldedURLs) == Set(files.map(\.url)))
             if concurrent > 1 { #expect(yieldedBeforeFirstFinished) }
             let result = observed.withLock { $0 }
             #expect(result.maximum <= concurrent)

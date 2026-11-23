@@ -1,6 +1,7 @@
 import AsyncHTTPClient
 import Foundation
 import Logging
+import OmFileFormat
 import Testing
 @testable import App
 
@@ -18,7 +19,7 @@ struct EcmwfLocalGribFileTests {
                 let path = directory.appendingPathComponent("\(i).grib2")
                 try (data + data).write(to: path)
                 group.addTask {
-                    let file = try EcmwfLocalGribFile(path: path.path)
+                    let file = try EcmwfLocalGribFile(handle: FileHandle.openFileReading(file: path.path), source: path.path)
                     #expect(file.fields.count == 4)
                     #expect(file.fields.map(\.submessage) == [0, 1, 0, 1])
                     #expect(file.fields.map(\.range) == [0..<data.count, 0..<data.count, data.count..<2 * data.count, data.count..<2 * data.count])
@@ -32,7 +33,7 @@ struct EcmwfLocalGribFileTests {
         }
         let truncated = directory.appendingPathComponent("truncated.grib2")
         try data.dropLast().write(to: truncated)
-        #expect(throws: EcmwfLocalGribFile.Failure.self) { try EcmwfLocalGribFile(path: truncated.path) }
+        #expect(throws: EcmwfLocalGribFile.Failure.self) { try EcmwfLocalGribFile(handle: FileHandle.openFileReading(file: truncated.path), source: truncated.path) }
     }
 
     @Test func existingFilesAreReusedWithoutAnyHTTPRequests() async throws {
@@ -44,9 +45,11 @@ struct EcmwfLocalGribFileTests {
         // Any attempted HTTP request would fail with this invalid URL.
         let files = try await curl.download(files: [(url: "not a URL", path: path.path)], nConcurrent: 8).collect()
         #expect(files.count == 1)
-        #expect(files.first?.path == path.path)
         #expect(files.first?.url == "not a URL")
-        #expect(try Data(contentsOf: path) == data)
+        let handle = try #require(files.first?.handle)
+        #expect(try handle.offset() == 0)
+        #expect(try handle.readToEnd() == data)
+        try handle.close()
     }
 
     @Test func selectsProviderChunkSizes() {
