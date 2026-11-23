@@ -105,26 +105,4 @@ actor ArrayMeanStdDevSampler {
     var standardDeviation: [Float] {
         storage.m2s.map { sqrt($0 / Float(count - 1)) }
     }
-
-    /// Write the accumulated time series and release the statistics arrays.
-    func writeTimeSeries(variable: any GenericVariable, time: TimerangeDt, domain: any GenericDomain) async throws -> [GenericVariableHandle] {
-        guard count > 0 else { return [] }
-        let grid = domain.grid
-        let chunkLocations = min(grid.nx, OmFileSplitter(domain, nMembers: 1).chunknLocations)
-        let writer = OmFileWriterHelper(dimensions: [grid.ny, grid.nx, time.count], chunks: [1, chunkLocations, time.count])
-        try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
-        let meanFile = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: means)
-        storage.means = []
-        let mean = try await GenericVariableHandle(variable: variable, time: time.range.lowerBound, member: 0, fn: meanFile, domain: domain)
-        // Reuse M2 storage for the sample standard deviation.
-        for i in storage.m2s.indices {
-            storage.m2s[i] = sqrt(storage.m2s[i] / Float(count - 1))
-        }
-        let spreadVariable = variable.asSpreadVariableGeneric
-        let spreadFile = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: spreadVariable.scalefactor, all: storage.m2s)
-        storage.m2s = []
-        count = 0
-        let spread = try await GenericVariableHandle(variable: spreadVariable, time: time.range.lowerBound, member: 0, fn: spreadFile, domain: domain)
-        return [mean, spread]
-    }
 }

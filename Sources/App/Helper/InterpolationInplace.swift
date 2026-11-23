@@ -11,11 +11,6 @@ extension Array3DFastTime {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
-
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: some RandomAccessCollection<Int> & Sendable, nConcurrent: Int) async {
-        precondition(nTime == time.count)
-        await data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange, nConcurrent: nConcurrent)
-    }
 }
 extension Array2DFastTime {
     /// Fill in missing data by interpolating using different interpolation types
