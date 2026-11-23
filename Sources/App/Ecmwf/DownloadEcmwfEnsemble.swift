@@ -151,6 +151,7 @@ extension DownloadEcmwfCommand {
         let spatialChunks = OmFileSplitter(domain).spatialReadChunkDimensions
         var writers = [EcmwfVariable: OmSpatialMultistepWriter]()
         var writtenFields = [EcmwfVariable: Int]()
+        var timings = [EcmwfVariable: (count: Int, decodeWait: Double, process: Double, write: Double)]()
         let deaverager = GribDeaverager()
 
         // One ordered local stream reads timesteps in parallel and keeps related
@@ -186,8 +187,12 @@ extension DownloadEcmwfCommand {
         })
         // mapStream yields in input order, so deaccumulation and derivation need
         // no reorder buffers. GRIB decoding still runs concurrently ahead of this loop.
-        for try await decodedField in decoded {
-            var field = decodedField
+        var iterator = decoded.makeAsyncIterator()
+        while true {
+            let readStart = DispatchTime.now()
+            guard var field = try await iterator.next() else { break }
+            let decodeWait = readStart.timeElapsedSeconds()
+            let processStart = DispatchTime.now()
             if field.stepType != "instant" {
                 let isAccumulated = field.stepType == "accum" || field.stepType == "avg"
                 var dtSeconds: Int
@@ -239,10 +244,20 @@ extension DownloadEcmwfCommand {
             guard let variable = outputVariables[field.variable] else { continue }
             let writer = writers[variable] ?? OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, chunkDimensions: [spatialChunks.y, spatialChunks.x])
             writers[variable] = writer
-            if writtenFields[variable, default: 0] % expectedHours[variable]! == 0 {
-                logger.info("Writing \(variable.rawValue) member \(field.member)")
-            }
+            let processTime = processStart.timeElapsedSeconds()
+            let writeStart = DispatchTime.now()
             try await writer.write(time: run.add(hours: field.hour), member: field.member, variable: variable, data: field.grib.array.data)
+            let writeTime = writeStart.timeElapsedSeconds()
+            var timing = timings.removeValue(forKey: variable) ?? (0, 0, 0, 0)
+            timing.count += 1
+            timing.decodeWait += decodeWait
+            timing.process += processTime
+            timing.write += writeTime
+            if timing.count == expectedHours[variable]! {
+                logger.info("\(variable.rawValue) member \(field.member): decodeWait=\(timing.decodeWait.asSecondsPrettyPrint), process=\(timing.process.asSecondsPrettyPrint), write=\(timing.write.asSecondsPrettyPrint)")
+            } else {
+                timings[variable] = timing
+            }
             writtenFields[variable, default: 0] += 1
             guard writtenFields[variable] == expectedHours[variable]! * nMembers else { continue }
 
