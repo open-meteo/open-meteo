@@ -266,6 +266,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DmiDownload(), as: "download-dmi")
     app.asyncCommands.use(UkmoDownload(), as: "download-ukmo")
     app.asyncCommands.use(EumetsatSarahDownload(), as: "download-eumetsat-sarah")
+    app.asyncCommands.use(EumetsatSarahRepairSunsetCommand(), as: "repair-eumetsat-sarah-sunset")
     app.asyncCommands.use(EumetsatLsaSafDownload(), as: "download-eumetsat-lsa-saf")
     app.asyncCommands.use(JaxaHimawariDownload(), as: "download-jaxa-himawari")
     app.asyncCommands.use(ItaliaMeteoArpaeDownload(), as: "download-italia-meteo-arpae")
