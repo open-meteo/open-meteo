@@ -252,6 +252,16 @@ struct WeatherNext3Variable: GenericVariable {
 
     var unit: SiUnit { field.unit }
 
+    var supportsTemporalAggregation: Bool {
+        switch field {
+        case .precipitation, .shortwave_radiation, .direct_radiation:
+            // Multi-hour percentiles require the individual members' interval totals or averages.
+            return statistic == .mean
+        default:
+            return true
+        }
+    }
+
     var interpolation: ReaderInterpolation {
         if field == .precipitation { return .backwards_sum }
         if field.unit == .wattPerSquareMetre { return .solar_backwards_averaged }
@@ -294,6 +304,8 @@ struct WeatherNext3GridVariable<Grid: WeatherNext3Grid>: GenericVariable {
     var unit: SiUnit { variable.unit }
 
     var interpolation: ReaderInterpolation { variable.interpolation }
+
+    var supportsTemporalAggregation: Bool { variable.supportsTemporalAggregation }
 
     var isElevationCorrectable: Bool { false }
 

@@ -3,21 +3,30 @@ import Testing
 @testable import App
 
 @Suite struct WeatherNext3Tests {
-    @Test func intervalPercentilesRetainFieldSemantics() {
+    @Test func intervalPercentilesRetainFieldSemantics() async throws {
         let start = Timestamp(2026, 11, 8)
         let hourly = TimerangeDt(start: start, nTime: 2, dtSeconds: 3600)
         let quarterHourly = TimerangeDt(start: start.add(900), nTime: 4, dtSeconds: 900)
-        let twoHourly = TimerangeDt(start: start.add(3600), nTime: 1, dtSeconds: 7200)
 
         let precipitation = WeatherNext3Variable(field: .precipitation, statistic: .p90)
         let amounts: [Float] = [2, 4]
         #expect(amounts.interpolate(type: precipitation.interpolation, timeOld: hourly, timeNew: quarterHourly, latitude: 0, longitude: 0, scalefactor: precipitation.scalefactor) == [1, 1, 1, 1])
-        #expect(amounts.aggregate(type: precipitation.interpolation, timeOld: hourly, timeNew: twoHourly) == [6])
 
-        for field in [WeatherNext3Field.shortwave_radiation, .direct_radiation] {
-            let radiation = WeatherNext3Variable(field: field, statistic: .p90)
-            let fluxes: [Float] = [100, 300]
-            #expect(fluxes.aggregate(type: radiation.interpolation, timeOld: hourly, timeNew: twoHourly) == [200])
+        typealias Surface = WeatherNext3GridVariable<WeatherNext3SurfaceGrid>
+        let reader = try await GenericReader<WeatherNext3Domain, Surface>(domain: .surface, position: 0, options: GenericReaderOptions())
+        for field in [WeatherNext3Field.precipitation, .shortwave_radiation, .direct_radiation] {
+            let mean = try #require(Surface(rawValue: field.rawValue))
+            #expect(mean.supportsTemporalAggregation)
+            for statistic in field.statistics where statistic != .mean {
+                let variable = try #require(Surface(rawValue: WeatherNext3Variable(field: field, statistic: statistic).rawValue))
+                #expect(!variable.supportsTemporalAggregation)
+                for hours in [3, 6] {
+                    let time = TimerangeDt(start: start, nTime: 2, dtSeconds: hours * 3600).toSettings()
+                    let output = try await reader.get(variable: variable, time: time)
+                    #expect(output.unit == field.unit)
+                    #expect(output.data.count == 2 && output.data.allSatisfy { $0.isNaN })
+                }
+            }
         }
     }
 

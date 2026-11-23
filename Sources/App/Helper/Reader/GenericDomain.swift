@@ -122,6 +122,9 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// Kind of interpolation for this variable. Used to interpolate from 1 to 3 hours
     var interpolation: ReaderInterpolation { get }
 
+    /// Whether the reader can produce this variable at a coarser time resolution.
+    var supportsTemporalAggregation: Bool { get }
+
     /// SI unit of this variable
     var unit: SiUnit { get }
 
@@ -132,6 +135,9 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     var storePreviousForecast: Bool { get }
 }
 
+extension GenericVariable {
+    var supportsTemporalAggregation: Bool { true }
+}
 
 enum ReaderInterpolation {
     /// Simple linear interpolation
