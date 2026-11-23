@@ -196,13 +196,15 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
         }
     }
 
-    /// Use the last sunlit backwards interval, followed by a fully dark interval, to
-    /// identify sunset. KT uses the immediately preceding observed interval, never a repair.
+    /// Fill the final sunlit interval or a fully dark interval followed by darkness.
+    /// KT uses the immediately preceding observed interval, never a repair.
     static func reconstruct(previous: Float, solarPrevious: Float, solarCurrent: Float, solarNext: Float) -> Float? {
         guard previous.isFinite, previous >= 0,
               solarPrevious.isFinite, solarCurrent.isFinite, solarNext.isFinite,
-              solarPrevious * Zensun.solarConstant > 5,
-              solarCurrent > 0, solarCurrent < solarPrevious, solarNext <= 0 else { return nil }
+              solarNext <= 0 else { return nil }
+        // A missing interval just after sunset needs no KT: its solar integral is zero.
+        if solarCurrent == 0 { return 0 }
+        guard solarPrevious > 0, solarCurrent > 0, solarCurrent < solarPrevious else { return nil }
         let kt = previous / (solarPrevious * Zensun.solarConstant)
         let result = kt * solarCurrent * Zensun.solarConstant
         return result.isFinite ? result : nil

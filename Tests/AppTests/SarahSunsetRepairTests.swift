@@ -18,9 +18,7 @@ import Testing
         for (previous, current, next): (Float, Float, Float) in [
             (0.1, 0.2, 0.3), // sunrise
             (0.6, 0.5, 0.4), // afternoon
-            (0.1, 0, 0), // darkness
-            (0, 0, 0),
-            (0.001, 0.0001, 0), // insufficient solar denominator
+            (0, 0.01, 0), // no usable previous solar denominator
             (.nan, 0.01, 0)
         ] {
             #expect(EumetsatSarahRepairSunsetCommand.reconstruct(previous: 100,
@@ -32,6 +30,24 @@ import Testing
         }
         #expect(EumetsatSarahRepairSunsetCommand.reconstruct(previous: 0,
             solarPrevious: 0.1, solarCurrent: 0.01, solarNext: 0) == 0)
+    }
+
+    @Test func holeImmediatelyAfterSunset() {
+        // Observed 1 W/m², then a hole in a dark interval, then nighttime zero.
+        for previousSolar: Float in [0.1, 0.001, 0] {
+            #expect(EumetsatSarahRepairSunsetCommand.reconstruct(previous: 1,
+                solarPrevious: previousSolar, solarCurrent: 0, solarNext: 0) == 0)
+        }
+        // Missing history still must not turn an unobserved location into nighttime zeros.
+        #expect(EumetsatSarahRepairSunsetCommand.reconstruct(previous: .nan,
+            solarPrevious: 0.001, solarCurrent: 0, solarNext: 0) == nil)
+    }
+
+    @Test func lowSunHistoryRemainsUsable() throws {
+        // A previous solar integral below 5 W/m² is still usable for the KT ratio.
+        let result = try #require(EumetsatSarahRepairSunsetCommand.reconstruct(previous: 1,
+            solarPrevious: 0.001, solarCurrent: 0.0001, solarNext: 0))
+        #expect(abs(result - 0.1) < 0.0001)
     }
 
     @Test func correctedOutputPaths() {
