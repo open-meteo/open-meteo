@@ -3,28 +3,36 @@ import Testing
 @testable import App
 
 @Suite struct WeatherNext3Tests {
-    @Test func intervalPercentilesRetainFieldSemantics() async throws {
+    @Test func percentilesUseNativeHourlySamples() async throws {
         let start = Timestamp(2026, 11, 8)
-        let hourly = TimerangeDt(start: start, nTime: 2, dtSeconds: 3600)
-        let quarterHourly = TimerangeDt(start: start.add(900), nTime: 4, dtSeconds: 900)
+        let hourly = TimerangeDt(start: start, nTime: 7, dtSeconds: 3600)
+        let quarterHourly = TimerangeDt(start: start, nTime: 4, dtSeconds: 900)
+        let offsetHourly = TimerangeDt(start: start.add(900), nTime: 2, dtSeconds: 3600)
+        let hourlyValues: [Float] = [10, 8, 5, 4, 3, 7, 9]
 
-        let precipitation = WeatherNext3Variable(field: .precipitation, statistic: .p90)
-        let amounts: [Float] = [2, 4]
-        #expect(amounts.interpolate(type: precipitation.interpolation, timeOld: hourly, timeNew: quarterHourly, latitude: 0, longitude: 0, scalefactor: precipitation.scalefactor) == [1, 1, 1, 1])
-
-        typealias Surface = WeatherNext3GridVariable<WeatherNext3SurfaceGrid>
-        let reader = try await GenericReader<WeatherNext3Domain, Surface>(domain: .surface, position: 0, options: GenericReaderOptions())
-        for field in [WeatherNext3Field.precipitation, .shortwave_radiation, .direct_radiation] {
-            let mean = try #require(Surface(rawValue: field.rawValue))
-            #expect(mean.supportsTemporalAggregation)
+        for field in WeatherNext3Field.allCases {
+            let reader = try await GenericReader<WeatherNext3Domain, WeatherNext3Variable>(domain: field.domain, position: 0, options: GenericReaderOptions())
+            #expect(WeatherNext3Variable(field: field, statistic: .mean).supportsTimeRange(quarterHourly))
             for statistic in field.statistics where statistic != .mean {
-                let variable = try #require(Surface(rawValue: WeatherNext3Variable(field: field, statistic: statistic).rawValue))
-                #expect(!variable.supportsTemporalAggregation)
+                let variable = WeatherNext3Variable(field: field, statistic: statistic)
+                #expect(variable.supportsTimeRange(hourly))
+                var unsupported = [quarterHourly, offsetHourly]
                 for hours in [3, 6] {
-                    let time = TimerangeDt(start: start, nTime: 2, dtSeconds: hours * 3600).toSettings()
-                    let output = try await reader.get(variable: variable, time: time)
+                    let time = TimerangeDt(start: start, nTime: 1 + 6 / hours, dtSeconds: hours * 3600)
+                    switch field {
+                    case .precipitation, .shortwave_radiation, .direct_radiation:
+                        unsupported.append(time)
+                    default:
+                        #expect(variable.supportsTimeRange(time))
+                        let selected = hourlyValues.aggregate(type: variable.interpolation, timeOld: hourly, timeNew: time)
+                        #expect(selected == (hours == 3 ? [10, 4, 9] : [10, 9]))
+                    }
+                }
+                for time in unsupported {
+                    #expect(!variable.supportsTimeRange(time))
+                    let output = try await reader.get(variable: variable, time: time.toSettings())
                     #expect(output.unit == field.unit)
-                    #expect(output.data.count == 2 && output.data.allSatisfy { $0.isNaN })
+                    #expect(output.data.count == time.count && output.data.allSatisfy { $0.isNaN })
                 }
             }
         }

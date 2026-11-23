@@ -122,8 +122,8 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// Kind of interpolation for this variable. Used to interpolate from 1 to 3 hours
     var interpolation: ReaderInterpolation { get }
 
-    /// Whether the reader can produce this variable at a coarser time resolution.
-    var supportsTemporalAggregation: Bool { get }
+    /// Whether the reader can produce this variable at the requested time resolution.
+    func supportsTimeRange(_ time: TimerangeDt) -> Bool
 
     /// SI unit of this variable
     var unit: SiUnit { get }
@@ -136,7 +136,7 @@ protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
 }
 
 extension GenericVariable {
-    var supportsTemporalAggregation: Bool { true }
+    func supportsTimeRange(_ time: TimerangeDt) -> Bool { true }
 }
 
 enum ReaderInterpolation {

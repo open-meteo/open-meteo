@@ -252,13 +252,17 @@ struct WeatherNext3Variable: GenericVariable {
 
     var unit: SiUnit { field.unit }
 
-    var supportsTemporalAggregation: Bool {
+    func supportsTimeRange(_ time: TimerangeDt) -> Bool {
+        guard statistic != .mean else { return true }
+        let nativeStep = field.domain.dtSeconds
+        guard time.range.lowerBound.timeIntervalSince1970.isMultiple(of: nativeStep) else { return false }
         switch field {
         case .precipitation, .shortwave_radiation, .direct_radiation:
-            // Multi-hour percentiles require the individual members' interval totals or averages.
-            return statistic == .mean
+            // Interval percentiles require member-level data to calculate at a different resolution.
+            return time.dtSeconds == nativeStep
         default:
-            return true
+            // Coarser requests can select instantaneous percentiles at native timestamps.
+            return time.dtSeconds.isMultiple(of: nativeStep)
         }
     }
 
@@ -305,7 +309,7 @@ struct WeatherNext3GridVariable<Grid: WeatherNext3Grid>: GenericVariable {
 
     var interpolation: ReaderInterpolation { variable.interpolation }
 
-    var supportsTemporalAggregation: Bool { variable.supportsTemporalAggregation }
+    func supportsTimeRange(_ time: TimerangeDt) -> Bool { variable.supportsTimeRange(time) }
 
     var isElevationCorrectable: Bool { false }
 

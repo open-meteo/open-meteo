@@ -161,7 +161,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
-        if time.dtSeconds > domain.dtSeconds && !variable.supportsTemporalAggregation { return }
+        guard variable.supportsTimeRange(time.time) else { return }
         if time.dtSeconds == domain.dtSeconds {
             try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, run: run)
             return
@@ -197,6 +197,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Read data and interpolate if required
     func readAndInterpolate(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        guard variable.supportsTimeRange(time.time) else {
+            return DataAndUnit(Array(repeating: .nan, count: time.time.count), variable.unit)
+        }
         if time.dtSeconds == domain.dtSeconds {
             let data = try await readRaw(variable: variable, time: time)
             return scale(data: data, isElevationCorrectable: variable.isElevationCorrectable, unit: variable.unit)
@@ -204,9 +207,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         let interpolationType = variable.interpolation
 
         if time.dtSeconds > domain.dtSeconds {
-            guard variable.supportsTemporalAggregation else {
-                return DataAndUnit(Array(repeating: .nan, count: time.time.count), variable.unit)
-            }
             // Aggregate data
             let timeRead = time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
             let data = try await readRaw(variable: variable, time: time.with(time: timeRead))
