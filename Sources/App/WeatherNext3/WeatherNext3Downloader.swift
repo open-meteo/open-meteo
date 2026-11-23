@@ -5,7 +5,7 @@ import Vapor
 struct DownloadWeatherNext3Command: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "run", help: "Main run initialization (00, 06, 12 or 18 UTC)") var run: String?
-        @Option(name: "concurrent-download", help: "Maximum concurrent chunk download/decoding tasks (default: 8)")
+        @Option(name: "concurrent-download", help: "Maximum forecast hours downloaded in parallel (defaults to --concurrent if supplied, otherwise 8)")
         var concurrentDownload: Int?
         @Option(name: "concurrent", help: "Maximum concurrent temporal OM conversion tasks (default: 1)")
         var concurrent: Int?
@@ -21,7 +21,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         let app = context.application
         let logger = context.application.logger
         logger.info("WeatherNext 3: starting downloader; runtime limit 5 hours")
-        let downloadConcurrency = signature.concurrentDownload ?? 8
+        let downloadConcurrency = signature.concurrentDownload ?? signature.concurrent ?? 8
         let conversionConcurrency = signature.concurrent ?? 1
         guard downloadConcurrency > 0 else {
             throw Abort(.badRequest, reason: "concurrent-download must be positive")
@@ -128,46 +128,46 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 return (variable: variable, array: array)
             }
 
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
-            let chunks = arrays.indices.flatMap { arrayIndex in (0..<hours).map { ($0, arrayIndex) } }
-            logger.info("WeatherNext 3: downloading \(chunks.count) \(domain.rawValue) chunks with concurrency \(downloadConcurrency)")
-            try await chunks.foreachConcurrent(nConcurrent: downloadConcurrency) { index, arrayIndex in
-                let (variable, template) = arrays[arrayIndex]
-                let field = variable.field
-                let array = try await ZarrArray(
-                    metadata: template.metadata,
-                    storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
-                    path: template.path
-                )
-                let readStarted = DispatchTime.now().uptimeNanoseconds
-                var data: [Float] = try await array.retrieveArraySubset([
-                    index..<index + 1, 0..<grid.ny, 0..<grid.nx,
-                ])
-                let transformStarted = DispatchTime.now().uptimeNanoseconds
-                data.shift180Longitude(nt: 1, ny: grid.ny, nx: grid.nx)
-                if let multiplyAdd = field.multiplyAdd {
-                    data.multiplyAdd(multiply: multiplyAdd.multiply, add: multiplyAdd.add)
+            logger.info("WeatherNext 3: downloading \(hours) \(domain.rawValue) forecast hours with concurrency \(downloadConcurrency)")
+            let hourlyHandles = try await (0..<hours).mapConcurrent(nConcurrent: downloadConcurrency) { index in
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: run.add(hours: index + 1), storeOnDisk: false, realm: nil, logger: logger)
+                for (variable, template) in arrays {
+                    let field = variable.field
+                    let array = try await ZarrArray(
+                        metadata: template.metadata,
+                        storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
+                        path: template.path
+                    )
+                    let readStarted = DispatchTime.now().uptimeNanoseconds
+                    var data: [Float] = try await array.retrieveArraySubset([
+                        index..<index + 1, 0..<grid.ny, 0..<grid.nx,
+                    ])
+                    let transformStarted = DispatchTime.now().uptimeNanoseconds
+                    data.shift180Longitude(nt: 1, ny: grid.ny, nx: grid.nx)
+                    if let multiplyAdd = field.multiplyAdd {
+                        data.multiplyAdd(multiply: multiplyAdd.multiply, add: multiplyAdd.add)
+                    }
+                    let writeStarted = DispatchTime.now().uptimeNanoseconds
+                    try await writer.write(
+                        member: 0,
+                        variable: variable,
+                        data: data
+                    )
+                    let finished = DispatchTime.now().uptimeNanoseconds
+                    logger.debug(
+                        """
+                        WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
+                        read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
+                        transform \((writeStarted - transformStarted) / 1_000_000)ms, \
+                        writer wait/write \((finished - writeStarted) / 1_000_000)ms
+                        """
+                    )
                 }
-                let writeStarted = DispatchTime.now().uptimeNanoseconds
-                try await writer.write(
-                    time: run.add(hours: index + 1),
-                    member: 0,
-                    variable: variable,
-                    data: data
-                )
-                let finished = DispatchTime.now().uptimeNanoseconds
-                logger.info("WeatherNext 3: completed hour \(index + 1)/\(hours), \(domain.rawValue), \(variable.rawValue)")
-                logger.debug(
-                    """
-                    WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
-                    read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
-                    transform \((writeStarted - transformStarted) / 1_000_000)ms, \
-                    writer wait/write \((finished - writeStarted) / 1_000_000)ms
-                    """
-                )
+                let handles = try await writer.finalise()
+                logger.info("WeatherNext 3: completed hour \(index + 1)/\(hours), \(domain.rawValue)")
+                return handles
             }
-
-            handles += try await writer.finalise()
+            handles += hourlyHandles.joined()
         }
 
         return handles
