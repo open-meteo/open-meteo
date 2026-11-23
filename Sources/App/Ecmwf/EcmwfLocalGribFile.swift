@@ -23,15 +23,6 @@ final class EcmwfLocalGribFile: Sendable {
     let mapping: MmapFile
     let fields: [Field]
 
-    static func download(curl: Curl, url: String, path: String, concurrent: Int) async throws {
-        if FileManager.default.fileExists(atPath: path) {
-            curl.logger.info("Using cached GRIB \(path)")
-            return
-        }
-        // Curl publishes the final path atomically only after a successful transfer.
-        try await curl.download(url: url, toFile: path, bzip2Decode: false, cacheDirectory: nil, nConcurrent: concurrent, deadLineHours: 5.5)
-    }
-
     init(path: String) throws {
         let mapping = try MmapFile(fn: FileHandle.openFileReading(file: path))
         var fields = [Field]()

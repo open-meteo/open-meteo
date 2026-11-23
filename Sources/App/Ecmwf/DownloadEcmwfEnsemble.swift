@@ -53,22 +53,16 @@ extension DownloadEcmwfCommand {
         guard let lastHour = hours.last else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         let files = hours.flatMap { hour in domain.getUrl(base: base, run: run, hour: hour).map { (hour: hour, url: $0) } }
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        // Timestamp order, control before perturbed. Concurrency applies only to
-        // large chunks within the current file. Keep completed files for later runs.
         let elevationURL = domain.elevationDomain.getUrl(base: base, run: run, hour: 0)[0]
         let elevationPath = domain.downloadDirectory + URL(string: elevationURL)!.lastPathComponent
         let needsElevation = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath())
+        let localFiles = files.map { (hour: $0.hour, path: domain.downloadDirectory + URL(string: $0.url)!.lastPathComponent) }
+        var downloads = zip(files, localFiles).map { (url: $0.0.url, path: $0.1.path) }
         // Pressure-level downloads need one additional surface control file at hour zero.
         if needsElevation && !files.contains(where: { $0.url == elevationURL }) {
-            try await EcmwfLocalGribFile.download(curl: curl, url: elevationURL, path: elevationPath, concurrent: downloadConcurrent)
+            downloads.insert((url: elevationURL, path: elevationPath), at: 0)
         }
-        var localFiles = [(hour: Int, path: String)]()
-        for file in files {
-            try Task.checkCancellation()
-            let path = domain.downloadDirectory + URL(string: file.url)!.lastPathComponent
-            try await EcmwfLocalGribFile.download(curl: curl, url: file.url, path: path, concurrent: downloadConcurrent)
-            localFiles.append((file.hour, path))
-        }
+        try await curl.download(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
         // Elevation must also use a complete local file, never an index inventory.
         if needsElevation {
             try await downloadEcmwfElevation(application: application, domain: domain, base: base, run: run, uploadQueues: uploadQueues, localGribPath: elevationPath)

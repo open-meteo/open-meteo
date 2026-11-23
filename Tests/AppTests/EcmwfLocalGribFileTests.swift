@@ -42,7 +42,7 @@ struct EcmwfLocalGribFileTests {
         defer { try? FileManager.default.removeItem(at: path) }
         let curl = Curl(logger: Logger(label: "cache-test"), client: HTTPClient.shared)
         // Any attempted HTTP request would fail with this invalid URL.
-        try await EcmwfLocalGribFile.download(curl: curl, url: "not a URL", path: path.path, concurrent: 8)
+        try await curl.download(files: [(url: "not a URL", path: path.path)], nConcurrent: 8)
         #expect(try Data(contentsOf: path) == data)
     }
 

@@ -30,7 +30,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Number of concurrent processing/conversion jobs (default: 1)")
         var concurrent: Int?
 
-        @Option(name: "download-concurrent", help: "Number of concurrent download requests; chunks per file for IFS 0.1° ensembles (defaults to twice --concurrent)")
+        @Option(name: "download-concurrent", help: "Number of concurrent download requests; shared across files for IFS 0.1° ensembles (defaults to twice --concurrent)")
         var downloadConcurrent: Int?
 
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
