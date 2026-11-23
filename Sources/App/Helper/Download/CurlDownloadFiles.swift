@@ -2,11 +2,18 @@ import Foundation
 import NIOCore
 import OmFileFormat
 import OmFileIO
+#if os(Linux)
+import Glibc
+#endif
 
 extension Curl {
     private enum FileDownloadResult: Sendable {
         case prepared(index: Int, size: Int)
-        case chunk(index: Int, range: Range<Int>, data: ByteBuffer)
+        case chunk(index: Int, size: Int)
+    }
+
+    private enum FileWriteError: NonRetryError {
+        case failed(errno: Int32)
     }
 
     private struct FileDownloadState {
@@ -17,8 +24,8 @@ extension Curl {
     }
 
     /// Download complete objects with one shared request limit across files.
-    /// Schedule chunks in input order, prefetching up to three files. Completed
-    /// chunks are written immediately at their offsets, without an ordered buffer.
+    /// Schedule chunks in input order, prefetching up to three files. Response
+    /// fragments are written directly at their offsets without buffering chunks.
     /// Existing destinations are reused; incomplete files never become visible
     /// at their final paths. Yield cached files immediately and new files in
     /// completion order. Handles are positioned at zero and owned by the consumer.
@@ -79,9 +86,45 @@ extension Curl {
                                 states[index] = state
                                 let url = files[index].url
                                 active += 1
+                                let handle = state.handle
                                 group.addTask {
-                                    let data = try await self.downloadInMemoryAsync(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)", minSize: range.count, cacheDirectory: nil, nConcurrent: 1, deadLineHours: deadLineHours, quiet: true)
-                                    return .chunk(index: index, range: range, data: data)
+                                    let deadline = deadLineHours.map { Date().addingTimeInterval($0 * 3600) } ?? self.deadline
+                                    let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
+                                    while true {
+                                        try Task.checkCancellation()
+                                        do {
+                                            let response = try await self.initiateDownload(url: url, range: "\(range.lowerBound)-\(range.upperBound - 1)", minSize: range.count, cacheDirectory: nil, deadline: deadline, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
+                                            try CurlMemoryDownloadError.validateRange(status: Int(response.status.code), contentRange: response.headers.first(name: "Content-Range"), expected: range)
+                                            if let length = try response.contentLength() {
+                                                try CurlMemoryDownloadError.validateSize(current: 0, additional: length, limit: range.count)
+                                            }
+                                            // A retry overwrites this range from the beginning. Other
+                                            // workers write disjoint ranges using independent offsets.
+                                            var received = 0
+                                            for try await fragment in response.body {
+                                                try Task.checkCancellation()
+                                                guard Date() <= deadline else { throw CurlError.timeoutReached }
+                                                try CurlMemoryDownloadError.validateSize(current: received, additional: fragment.readableBytes, limit: range.count)
+                                                try fragment.withUnsafeReadableBytes { bytes in
+                                                    var written = 0
+                                                    while written < bytes.count {
+                                                        let count = pwrite(handle.fileDescriptor, bytes.baseAddress!.advanced(by: written), bytes.count - written, off_t(range.lowerBound + received + written))
+                                                        if count < 0 && errno == EINTR { continue }
+                                                        guard count > 0 else { throw FileWriteError.failed(errno: count < 0 ? errno : EIO) }
+                                                        written += count
+                                                    }
+                                                }
+                                                received += fragment.readableBytes
+                                                self.totalBytesTransfered.add(fragment.readableBytes, ordering: .relaxed)
+                                                await progress.add(fragment.readableBytes)
+                                            }
+                                            guard received == range.count else { throw CurlError.sizeTooSmall }
+                                            try await response.waitAfterLastModified(logger: self.logger, wait: self.waitAfterLastModified)
+                                            return .chunk(index: index, size: received)
+                                        } catch {
+                                            try await timeout.check(error: error)
+                                        }
+                                    }
                                 }
                             }
                             guard let result = try await group.next() else { break }
@@ -99,13 +142,10 @@ extension Curl {
                                     states.removeValue(forKey: index)
                                     if case .terminated = continuation.yield((url: files[index].url, handle: handle)) { throw CancellationError() }
                                 }
-                            case .chunk(let index, let range, let data):
+                            case .chunk(let index, let size):
                                 var state = states[index]!
-                                try state.handle.seek(toOffset: UInt64(range.lowerBound))
-                                try state.handle.write(contentsOf: data.readableBytesView)
-                                state.written += data.readableBytes
+                                state.written += size
                                 states[index] = state
-                                await progress.add(data.readableBytes)
                                 if state.written == state.size {
                                     try state.handle.linkTemporary(file: files[index].path)
                                     try state.handle.seek(toOffset: 0)

@@ -70,4 +70,42 @@ struct CurlDownloadFilesTests {
             if concurrent > 1 { #expect(result.overlapped) }
         }
     }
+
+    @Test func truncatedChunkRetriesOverwritePartialWrites() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let payload = Data((0..<50_000).map { UInt8($0 % 251) })
+        let attempts = Mutex(0)
+        try await withApp { app in
+            app.lifecycle.use(ShutdownServer())
+            app.on(.HEAD, "file") { _ in Response(status: .ok, body: .init(data: payload)) }
+            app.get("file") { _ -> Response in
+                let attempt = attempts.withLock { $0 += 1; return $0 }
+                return Response(status: .partialContent, headers: ["Content-Range": "bytes 0-49999/50000"], body: .init(managedAsyncStream: { writer in
+                    if attempt == 1 {
+                        // End early after writing incorrect bytes. A retry must replace them.
+                        try await writer.write(.buffer(ByteBuffer(bytes: Array(repeating: UInt8(255), count: 1024))))
+                    } else {
+                        for offset in stride(from: 0, to: payload.count, by: 1024) {
+                            let end = min(offset + 1024, payload.count)
+                            try await writer.write(.buffer(ByteBuffer(data: payload.subdata(in: offset..<end))))
+                        }
+                    }
+                }))
+            }
+            try await app.server.start(address: .hostname("127.0.0.1", port: 0))
+            let port = try #require(app.http.server.shared.localAddress?.port)
+            let curl = Curl(logger: app.logger, client: HTTPClient.shared)
+            var completed = 0
+            for try await file in curl.download(files: [(url: "http://127.0.0.1:\(port)/file", path: directory.appendingPathComponent("file").path)], nConcurrent: 2) {
+                #expect(try file.handle.readToEnd() == payload)
+                try file.handle.close()
+                completed += 1
+            }
+            #expect(completed == 1)
+            #expect(attempts.withLock { $0 } == 2)
+        }
+    }
+
 }
