@@ -11,11 +11,9 @@ extension EcmwfVariable {
         ["10fg", "mx2t3", "mn2t3", "ssrd", "tp", "sf", "ro"].contains(gribName)
     }
 
-    func matches(_ entry: Curl.EcmwfIndexEntry) -> Bool {
-        guard (entry.levtype == .pl) == isPressureLevel else { return false }
-        if isPressureLevel && entry.level != level { return false }
-        if entry.levtype == .sol, let entryLevel = entry.level, entryLevel != level { return false }
-        return matchesParameter(entry.param)
+    func matches(_ field: EcmwfLocalGribFile.Field) -> Bool {
+        guard field.typeOfLevel.hasPrefix("isobaric") == isPressureLevel else { return false }
+        return matches(shortName: field.shortName, level: field.level)
     }
 
     func matches(shortName: String, level: Int) -> Bool {

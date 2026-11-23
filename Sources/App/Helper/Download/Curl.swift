@@ -224,10 +224,12 @@ final class Curl: Sendable {
                     // Start the download and wait for the header
                     let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadLineChunk, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
                 
+                    try CurlMemoryDownloadError.validateRange(status: Int(response.status.code), contentRange: response.headers.first(name: "Content-Range"), expected: chunk)
                     var buffer = ByteBuffer()
                     let contentLength = try response.contentLength()
                     // let tracker = TransferAmountTracker(logger: self.logger, totalSize: contentLength)
                     if let contentLength {
+                        try CurlMemoryDownloadError.validateSize(current: 0, additional: contentLength, limit: chunk.count)
                         buffer.reserveCapacity(contentLength)
                     }
                     for try await fragement in response.body {
@@ -239,8 +241,10 @@ final class Curl: Sendable {
                             throw CurlError.timeoutReached
                         }
                         try Task.checkCancellation()
+                        try CurlMemoryDownloadError.validateSize(current: buffer.readableBytes, additional: fragement.readableBytes, limit: chunk.count)
                         buffer.writeImmutableBuffer(fragement)
                     }
+                    guard buffer.readableBytes == chunk.count else { throw CurlError.sizeTooSmall }
                     self.totalBytesTransfered.add(buffer.readableBytes, ordering: .relaxed)
                     if let minSize = minSize, buffer.readableBytes < minSize {
                         throw CurlError.sizeTooSmall

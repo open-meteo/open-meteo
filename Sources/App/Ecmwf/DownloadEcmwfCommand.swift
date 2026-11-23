@@ -3,6 +3,7 @@ import Foundation
 import OmFileFormat
 import Vapor
 import SwiftNetCDF
+@preconcurrency import SwiftEccodes
 
 
 /**
@@ -29,7 +30,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Number of concurrent processing/conversion jobs (default: 1)")
         var concurrent: Int?
 
-        @Option(name: "download-concurrent", help: "Number of concurrent download requests (defaults to twice --concurrent)")
+        @Option(name: "download-concurrent", help: "Number of concurrent download requests; chunks per file for IFS 0.1° ensembles (defaults to twice --concurrent)")
         var downloadConcurrent: Int?
 
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
@@ -95,10 +96,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 
-        if (domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels) && signature.downloadFullGribFile {
-            throw Abort(.badRequest, reason: "IFS 0.1° ensemble downloads require index inventories")
-        }
-
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let variables = (onlyVariables ?? EcmwfVariable.allCases).filter { domain.includes(variable: $0) }
         if domain.isIfs01 && variables.isEmpty {
@@ -114,7 +111,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let selected = variables.filter { $0.gribName != nil }
             for run in runs {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run, uploadQueues: uploadQueues)
                 try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
             }
             return
@@ -139,7 +135,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download elevation file
-    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {
+    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, uploadQueues: [S3UploadQueue], localGribPath: String? = nil) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
@@ -151,15 +147,23 @@ struct DownloadEcmwfCommand: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         logger.info("Downloading height and elevation data")
-        let url = domain.elevationDomain.getUrl(base: base, run: run, hour: 0)[0]
-        let request = try EcmwfOpenDataSource.prepareDownload(url: url)
-        for try await message in try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
-            guard entry.number == nil else {
-                // ignore ensemble members, only use control
-                return false
-            }
-            return entry.levtype == .sfc && ["lsm", "2t", "sp", "msl"].contains(entry.param)
-        }) {
+        let messages: AnyAsyncSequence<GribMessage>
+        if let localGribPath {
+            messages = try SwiftEccodes.iterateMessages(fileName: localGribPath, multiSupport: true).filter {
+                ($0.getLong(attribute: "perturbationNumber") ?? 0) == 0 && ["lsm", "2t", "sp", "msl"].contains($0.get(attribute: "shortName") ?? "")
+            }.eraseToAnyAsyncSequence()
+        } else {
+            let url = domain.elevationDomain.getUrl(base: base, run: run, hour: 0)[0]
+            let request = try EcmwfOpenDataSource.prepareDownload(url: url)
+            messages = try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
+                guard entry.number == nil else {
+                    // ignore ensemble members, only use control
+                    return false
+                }
+                return entry.levtype == .sfc && ["lsm", "2t", "sp", "msl"].contains(entry.param)
+            })
+        }
+        for try await message in messages {
             let shortName = message.get(attribute: "shortName")!
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()

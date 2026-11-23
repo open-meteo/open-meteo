@@ -3,26 +3,25 @@ import Testing
 
 struct EcmwfEnsembleDownloadTests {
 
-    private func entry(_ param: String, member: String? = nil, level: String? = nil, type: Curl.EcmwfIndexEntry.LevelType = .sfc, offset: Int = 10) -> Curl.EcmwfIndexEntry {
-        .init(levtype: type, levelist: level, number: member, param: param, _offset: offset, _length: 5)
+    private func entry(_ param: String, level: Int = 0, type: String = "surface") -> EcmwfLocalGribFile.Field {
+        .init(range: 0..<20, submessage: 0, shortName: param, level: level, typeOfLevel: type, member: 0)
     }
 
     @Test func matchingDistinguishesPressureAndSoilLevelsFromSurfaceHeights() {
-        #expect(EcmwfVariable.temperature_2m.matches(entry("2t")))
-        #expect(EcmwfVariable.relative_humidity_2m.matches(entry("2d")))
+        #expect(EcmwfVariable.temperature_2m.matches(entry("2t", level: 2)))
+        #expect(EcmwfVariable.relative_humidity_2m.matches(entry("2d", level: 2)))
         #expect(EcmwfVariable.snow_depth.matches(entry("rsn")))
         #expect(EcmwfVariable.snow_depth_water_equivalent.matches(entry("sd")))
-        #expect(EcmwfVariable.temperature_2m_max.matches(entry("max_2t")))
-        #expect(EcmwfVariable.temperature_2m_max.matches(entry("mx2t6")))
-        #expect(EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", level: "2", type: .sol)))
-        #expect(!EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", level: "1", type: .sol)))
-        #expect(EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", type: .sol)))
+        #expect(EcmwfVariable.temperature_2m_max.matches(entry("max_2t", level: 2)))
+        #expect(EcmwfVariable.temperature_2m_max.matches(entry("mx2t6", level: 2)))
+        #expect(EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", level: 2, type: "depthBelowLandLayer")))
+        #expect(!EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", level: 1, type: "depthBelowLandLayer")))
         #expect(EcmwfVariable.soil_temperature_7_to_28cm.matches(shortName: "sot", level: 2))
         #expect(!EcmwfVariable.soil_temperature_7_to_28cm.matches(shortName: "sot", level: 1))
-        #expect(EcmwfVariable.vertical_velocity_500hPa.matches(entry("w", level: "500", type: .pl)))
-        #expect(!EcmwfVariable.vertical_velocity_500hPa.matches(entry("w", level: "700", type: .pl)))
-        #expect(!EcmwfVariable.temperature_500hPa.matches(entry("t", level: "500")))
-        #expect(EcmwfVariable.geopotential_height_500hPa.matches(entry("z", level: "500", type: .pl)))
+        #expect(EcmwfVariable.vertical_velocity_500hPa.matches(entry("w", level: 500, type: "isobaricInhPa")))
+        #expect(!EcmwfVariable.vertical_velocity_500hPa.matches(entry("w", level: 700, type: "isobaricInhPa")))
+        #expect(!EcmwfVariable.temperature_500hPa.matches(entry("t", level: 500)))
+        #expect(EcmwfVariable.geopotential_height_500hPa.matches(entry("z", level: 500, type: "isobaricInhPa")))
     }
 
     @Test func gustMatchingIncludesIntervalSpecificNames() {
