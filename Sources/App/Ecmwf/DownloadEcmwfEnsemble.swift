@@ -177,8 +177,8 @@ extension DownloadEcmwfCommand {
         let nextHour = Dictionary(uniqueKeysWithValues: zip([0] + positiveHours, positiveHours))
         let lastMember = nMembers - 1
         // Completed jobs may emit multiple variables, with derived hours arriving
-        // late. Keep independent time-fast buffers and finish by received count.
-        var series = [EnsembleVariableMember: (data: Array2DFastTime, count: Int, activeTime: Double, start: DispatchTime)]()
+        // late. Collect spatial fields and transpose once each series is complete.
+        var series = [EnsembleVariableMember: (timesteps: [(time: Int, data: [Float])], start: DispatchTime)]()
         let inMemoryAccumulated = VariablePerMemberStorage<EnsembleAccumulation>()
         let deaverager = GribDeaverager()
 
@@ -295,22 +295,20 @@ extension DownloadEcmwfCommand {
             let member = decodedField.member
             let variable = decodedField.variable
             let key = EnsembleVariableMember(variable: variable, member: member)
-            var current = series.removeValue(forKey: key) ?? (Array2DFastTime(nLocations: domain.grid.count, nTime: time.count), 0, 0, DispatchTime.now())
-            let loopStart = DispatchTime.now()
-            await current.data.setConcurrent(location: 0..<domain.grid.count, time: decodedField.hour * 3600 / domain.dtSeconds, values: decodedField.grib.array.data)
-            current.activeTime += loopStart.timeElapsedSeconds()
-            current.count += 1
-            guard current.count == expectedHours[variable]! else {
+            var current = series.removeValue(forKey: key) ?? ([], DispatchTime.now())
+            current.timesteps.append((time: decodedField.hour * 3600 / domain.dtSeconds, data: decodedField.grib.array.data))
+            guard current.timesteps.count == expectedHours[variable]! else {
                 series[key] = current
                 continue
             }
-            var data = current.data
-            current.data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
             let readTime = current.start.timeElapsedPretty()
+            let transposeStart = DispatchTime.now()
+            var data = await Array2DFastTime(timesteps: current.timesteps, nLocations: domain.grid.count, nTime: time.count, nConcurrent: concurrent)
+            current.timesteps.removeAll()
+            let transposeTime = transposeStart.timeElapsedPretty()
             let interpolationStart = DispatchTime.now()
             await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
             let interpolationTime = interpolationStart.timeElapsedPretty()
-            let convertLoopTime = current.activeTime.asSecondsPrettyPrint
             let waitStart = DispatchTime.now()
             if let writeJob { handles.append(try await writeJob.value) }
             let writeJobWait = waitStart.timeElapsedPretty()
@@ -321,7 +319,7 @@ extension DownloadEcmwfCommand {
                 let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [1, chunkLocations, time.count])
                 let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: values, nConcurrent: concurrent)
                 let handle = try await GenericVariableHandle(variable: variable, time: run, member: member, fn: fn, domain: domain)
-                logger.info("\(variable.rawValue) member \(member): write=\(writeStart.timeElapsedPretty()), interpolation=\(interpolationTime), wait=\(writeJobWait), read=\(readTime), transpose=\(convertLoopTime)")
+                logger.info("\(variable.rawValue) member \(member): write=\(writeStart.timeElapsedPretty()), interpolation=\(interpolationTime), wait=\(writeJobWait), read=\(readTime), transpose=\(transposeTime)")
                 return handle
             }
             // Convert an output once its final member has been written.

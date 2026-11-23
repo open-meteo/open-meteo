@@ -3,16 +3,14 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
-    @Test func concurrentTimeColumnAssignmentMatchesSerial() async {
-        let original = Array2DFastTime(nLocations: 9, nTime: 3)
-        var expected = original
-        var actual = original
-        let values: [Float] = [1, 2, .nan, 4, 5, 6, 7]
-        expected[1..<8, 1] = values
-        await actual.setConcurrent(location: 1..<8, time: 1, values: values)
-        await actual.setConcurrent(location: 9..<9, time: 0, values: [])
+    @Test(arguments: [1, 4]) func timestepTransposePreservesMissingAndUnorderedTimes(concurrent: Int) async {
+        let timesteps = [6, 1, 4].map { time in
+            (time: time, data: (0..<137).map { location in location == 65 ? Float.nan : Float(time * 1000 + location) })
+        }
+        var expected = Array2DFastTime(nLocations: 137, nTime: 7)
+        for timestep in timesteps { expected[0..<137, timestep.time] = timestep.data }
+        let actual = await Array2DFastTime(timesteps: timesteps, nLocations: 137, nTime: 7, nConcurrent: concurrent)
         #expect(zip(actual.data, expected.data).allSatisfy { $0 == $1 || ($0.isNaN && $1.isNaN) })
-        #expect(original.data.allSatisfy { $0.isNaN })
     }
 
     @Test func concurrentMultiplyAddMatchesFusedSerialResults() async {
