@@ -55,7 +55,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             throw WeatherNextDownloaderError.notImplemented("Direct download of \(domain.rawValue) is not supported. Download \(WeatherNextDomain.weathernext_global.rawValue) to generate ensemble mean output.")
         }
         let logger = context.application.logger
-        let auth = GoogleCloudStorageAuth(client: context.application.dedicatedHttpClient, logger: logger)
         let run: Timestamp
         if let runArg = signature.run {
             run = try Timestamp.fromRunHourOrYYYYMMDD(runArg)
@@ -64,7 +63,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             let deadline = Date().addingTimeInterval(TimeInterval(6 * 3600))
             let server = signature.server ?? "weathernext_2_0_0/zarr/2025_to_present/"
             try await waitForZarrMarker(
-                auth: auth,
+                auth: GoogleCloudStorageAuth(client: context.application.dedicatedHttpClient, logger: logger),
                 logger: logger,
                 targetRun: targetRun,
                 deadline: deadline,
@@ -82,7 +81,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
         try await download(
             application: context.application,
-            auth: auth,
             domain: domain,
             run: run,
             server: server,
@@ -96,7 +94,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
     func download(
         application: Application,
-        auth: GoogleCloudStorageAuth,
         domain: WeatherNextDomain,
         run: Timestamp,
         server: String,
@@ -135,6 +132,8 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             logger.info("Processing timestep \(timeIdx) / \(timestamps.count): \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
             do {
 
+            // Each timestep uses a fresh token for all of its member and pressure-level reads.
+            let auth = GoogleCloudStorageAuth(client: application.dedicatedHttpClient, logger: logger)
             let storage = try await auth.storage(
                 bucket: "weathernext",
                 retryConfiguration: .init(
