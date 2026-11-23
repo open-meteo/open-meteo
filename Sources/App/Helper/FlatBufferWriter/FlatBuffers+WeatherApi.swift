@@ -11,7 +11,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .p50: meta.aggregation = .median
         case .p75: meta.aggregation = .p75
         case .p90: meta.aggregation = .p90
-        case .mean, nil: break
+        case nil: break
         }
         return meta
     }

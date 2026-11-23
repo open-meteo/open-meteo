@@ -38,6 +38,14 @@ import Testing
         }
         #expect(ForecastVariable(rawValue: "temperature_2m_p99") == nil)
         #expect(ForecastVariable(rawValue: "relative_humidity_2m_p90") == nil)
+
+        let otherModel = VariableHourlyDeriver(
+            reader: reader.reader,
+            options: try GenericReaderOptions(),
+            domainRegistry: .ncep_gfs025
+        )
+        let percentile = try #require(ForecastVariable(rawValue: "temperature_2m_p10"))
+        #expect(otherModel.getDeriverMap(variable: percentile) == nil)
     }
 
     private struct SampleReader<V: GenericVariable>: GenericReaderProtocol {
