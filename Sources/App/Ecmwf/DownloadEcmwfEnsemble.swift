@@ -62,15 +62,18 @@ extension DownloadEcmwfCommand {
         if needsElevation && !files.contains(where: { $0.url == elevationURL }) {
             downloads.insert((url: elevationURL, path: elevationPath), at: 0)
         }
-        try await curl.download(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
+        let hoursByPath = Dictionary(uniqueKeysWithValues: localFiles.map { ($0.path, $0.hour) })
+        logger.info("Scanning GRIB headers as files become available")
+        let inventories = try await curl.download(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
+            .mapConcurrent(nConcurrent: concurrent) { file -> (hour: Int, file: EcmwfLocalGribFile)? in
+                // The additional surface file is only needed for elevation.
+                guard let hour = hoursByPath[file.path] else { return nil }
+                return (hour: hour, file: try EcmwfLocalGribFile(path: file.path))
+            }.compactMap { $0 }
         // Elevation must also use a complete local file, never an index inventory.
         if needsElevation {
             try await downloadEcmwfElevation(application: application, domain: domain, base: base, run: run, uploadQueues: uploadQueues, localGribPath: elevationPath)
         }
-        logger.info("Scanning \(localFiles.count) local GRIB files")
-        let inventories = try await localFiles.mapStream(nConcurrent: concurrent) { file in
-            (hour: file.hour, file: try EcmwfLocalGribFile(path: file.path))
-        }.collect()
 
         let createNetcdf = signature.createNetcdf
         let generateTimeSeries = !signature.skipTimeseries
