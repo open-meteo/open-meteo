@@ -32,6 +32,15 @@ import Testing
             solarPrevious: 0.1, solarCurrent: 0.01, solarNext: 0) == 0)
     }
 
+    @Test func februarySunsetHole() {
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 50.9211, lonMin: 5.7819, dx: 1, dy: 1)
+        let time = TimerangeDt(start: Timestamp(2026, 2, 4, 16, 30), nTime: 3, dtSeconds: 1800)
+        let solar = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time).data
+        #expect(solar[0] > 0 && solar[1] == 0 && solar[2] == 0)
+        #expect(EumetsatSarahRepairSunsetCommand.reconstruct(previous: 1,
+            solarPrevious: solar[0], solarCurrent: solar[1], solarNext: solar[2]) == 0)
+    }
+
     @Test func holeImmediatelyAfterSunset() {
         // Observed 1 W/m², then a hole in a dark interval, then nighttime zero.
         for previousSolar: Float in [0.1, 0.001, 0] {
