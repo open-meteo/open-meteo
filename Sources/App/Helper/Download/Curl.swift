@@ -232,7 +232,10 @@ final class Curl: Sendable {
                         try CurlMemoryDownloadError.validateSize(current: 0, additional: contentLength, limit: chunk.count)
                         buffer.reserveCapacity(contentLength)
                     }
-                    for try await fragement in response.body {
+                    // Call next() directly because a for-await loop here can emit a duplicate
+                    // protocol witness with the wrong async frame size.
+                    var iterator = response.body.makeAsyncIterator()
+                    while let fragement = try await iterator.next() {
                         // await tracker.add(fragement.readableBytes)
                         if Date() > deadLineChunk {
                             throw CurlError.timeoutPerChunkReached(httpRange: chunk)
