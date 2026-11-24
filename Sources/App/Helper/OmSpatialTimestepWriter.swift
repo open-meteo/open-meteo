@@ -123,9 +123,8 @@ actor OmSpatialTimestepWriter {
         let writer = try getWriter()
         
         let y = min(domain.grid.ny, 32)
-        let x = min(domain.grid.nx, 1024 / y)
+        let chunks = [y, min(domain.grid.nx, 1024 / y)]
         let dimensions = [domain.grid.ny, domain.grid.nx]
-        let chunks = [y, x]
         guard dimensions.reduce(1, *) == data.count else {
             fatalError(#function + ": Array size \(data.count) does not match dimensions \(dimensions)")
         }
@@ -357,9 +356,12 @@ actor OmSpatialMultistepWriter {
     
     /// Finalize the time step
     func finalise() async throws -> [GenericVariableHandle] {
-        let handles = try await writer.asyncFlatMap({
+        let handles = try await writer.sorted { $0.time < $1.time }.asyncFlatMap({
             return try await $0.finalise()
         })
+        // Returned handles own the mappings. Temporary writers need not retain
+        // their files and compression buffers after conversion has been scheduled.
+        if !storeOnDisk { writer.removeAll() }
         return handles
     }
     

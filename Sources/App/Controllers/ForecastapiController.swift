@@ -841,6 +841,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
+    case ecmwf_ifs01
+    case ecmwf_ifs01_ensemble
+    case ecmwf_ifs01_ensemble_mean
     case ecmwf_ifs025
     case ecmwf_aifs025
     case ecmwf_aifs025_single
@@ -955,6 +958,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_ewam
     case dwd_gwam
     case era5_ocean
+    case ecmwf_wam01
+    case ecmwf_wam01_ensemble
+    case ecmwf_wam01_ensemble_mean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ncep_gfswave025
@@ -1275,6 +1281,34 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .multipleWithPrecipitationProbability(domains, precipitationProb: NcepRrfsDomain.ncep_rrfs_conus_ensemble)
         case .ecmwf_ifs04:
             return .single(EcmwfDomain.ifs04, EcmwfVariable.self)
+        case .ecmwf_ifs01:
+            return .init(
+                primary: [.mixedBeforeDerivation(SupplementalReaderGroup(
+                    primary: (EcmwfDomain.ifs01, EcmwfIfsVariable.self),
+                    supplemental: (EcmwfDomain.ifs01_pressure_levels, EcmwfIfsVariable.self)
+                ))],
+                secondary: [.domain(EcmwfDomain.ifs01_ensemble, ProbabilityVariable.self)],
+                gridForBoundingBoxRequests: EcmwfDomain.ifs01,
+                prefetchAllReaders: true, requirePrimaryCoverage: true
+            )
+        case .ecmwf_ifs01_ensemble:
+            return .init(
+                primary: [.mixedBeforeDerivation(SupplementalReaderGroup(
+                    primary: (EcmwfDomain.ifs01_ensemble, EcmwfIfsVariable.self),
+                    supplemental: (EcmwfDomain.ifs01_ensemble_pressure_levels, EcmwfIfsVariable.self)
+                ))],
+                gridForBoundingBoxRequests: EcmwfDomain.ifs01_ensemble,
+                prefetchAllReaders: true, requirePrimaryCoverage: true
+            )
+        case .ecmwf_ifs01_ensemble_mean:
+            return .init(
+                primary: [.mixedBeforeDerivation(SupplementalReaderGroup(
+                    primary: (EcmwfDomain.ifs01_ensemble_mean, VariableOrSpread<EcmwfIfsVariable>.self),
+                    supplemental: (EcmwfDomain.ifs01_ensemble_pressure_levels_mean, VariableOrSpread<EcmwfIfsVariable>.self)
+                ))],
+                gridForBoundingBoxRequests: EcmwfDomain.ifs01_ensemble_mean,
+                prefetchAllReaders: true, requirePrimaryCoverage: true
+            )
         case .ecmwf_ifs025:
             return .singleWithPrecipitationProbability(EcmwfDomain.ifs025, EcmwfIfsVariable.self, precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .ecmwf_aifs025:
@@ -1772,6 +1806,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(IconWaveDomain.gwam, IconWaveVariable.self)
         case .era5_ocean:
             return .single(CdsDomain.era5_ocean, Era5Variable.self)
+        case .ecmwf_wam01:
+            return .single(EcmwfDomain.wam01, EcmwfWaveVariable.self)
+        case .ecmwf_wam01_ensemble:
+            return .single(EcmwfDomain.wam01_ensemble, EcmwfWaveVariable.self)
+        case .ecmwf_wam01_ensemble_mean:
+            return .single(EcmwfDomain.wam01_ensemble_mean, VariableOrSpread<EcmwfWaveVariable>.self)
         case .ecmwf_wam025:
             return .single(EcmwfDomain.wam025, EcmwfWaveVariable.self)
         case .ecmwf_wam025_ensemble:
@@ -1881,6 +1921,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .icon_eu_eps
         case .icon_d2:
             return .icon_d2_eps
+        case .ecmwf_ifs01:
+            return .ecmwf_ifs01_ensemble
         case .ecmwf_ifs025:
             return .ecmwf_ifs025_ensemble
         case .ecmwf_aifs025:
@@ -2344,6 +2386,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return IconDomains.iconEuEps.countEnsembleMember
         case .icon_d2_eps, .dwd_icon_d2_eps, .dwd_icon_d2_eps_native:
             return IconDomains.iconD2Eps.countEnsembleMember
+        case .ecmwf_ifs01_ensemble:
+            return EcmwfDomain.ifs01_ensemble.countEnsembleMember
         case .ecmwf_ifs025_ensemble:
             return EcmwfDomain.ifs025_ensemble.countEnsembleMember
         case .ecmwf_aifs025_ensemble:
@@ -2374,6 +2418,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return MeteoSwissDomain.icon_ch2_ensemble.countEnsembleMember
         case .ecmwf_seasonal_seamless, .ecmwf_seas5, .ecmwf_ec46:
             return EcmwfSeasDomain.seas5.countEnsembleMember
+        case .ecmwf_wam01_ensemble:
+            return EcmwfDomain.wam01_ensemble.countEnsembleMember
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble.countEnsembleMember
         case .ncep_gefswave025:
