@@ -222,8 +222,10 @@ struct GenericVariableHandle: Sendable {
                                 guard nt == reader.time.count else {
                                     fatalError("invalid timesteps")
                                 }
-                                let read = try! await reader.reader.read(range: [yRange, xRange, 0..<nt])
-                                data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = read[0..<nLoc * Int(nt)]
+                                // Flatten member/time into the destination's last dimension.
+                                try await reader.reader.read(into: &data3d.data, range: [yRange, xRange, 0..<nt],
+                                    intoCubeOffset: [0, 0, UInt64(reader.member * nTime + timeArrayIndex)],
+                                    intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(memberRange.count * nTime)])
                             } else {
                                 // Single time step
                                 let read = try! await reader.reader.read(range: [yRange, xRange])
@@ -308,10 +310,6 @@ struct GenericVariableHandle: Sendable {
                 return statisticsHandles
             }
             guard let timeMax = handles.max(by: { $0.time.range.upperBound < $1.time.range.upperBound })?.time.range.upperBound else {
-                logger.warning("No data to convert")
-                return statisticsHandles
-            }
-            guard let maxTimeStepsPerFile = handles.max(by: { $0.time.count < $1.time.count })?.time.count else {
                 logger.warning("No data to convert")
                 return statisticsHandles
             }
@@ -400,7 +398,7 @@ struct GenericVariableHandle: Sendable {
             try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays, multipartUploadQueues: variableUploadQueues, concurrent: spatialConcurrent, statisticsWriter: statisticsWriter) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
-                var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
+                var readTemp = [Float]()
                 for reader in handles {
                     let nDimensions = reader.reader.getDimensionsCount()
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
@@ -409,6 +407,7 @@ struct GenericVariableHandle: Sendable {
                     }
                     if reader.time.count == 1 && nDimensions == 3 && reader.reader.withDimensions({ $0[0] == nMembers && $0[1] == ny && $0[2] == nx }) {
                         /// Dimensions [member, y, x]
+                        if readTemp.isEmpty { readTemp = [Float](repeating: .nan, count: nLoc) }
                         try await reader.reader.read(into: &readTemp, range: [UInt64(reader.member)..<UInt64(reader.member+1), yRange, xRange])
                         data3d[0..<nLoc, Int(reader.member), timeArrayIndex] = readTemp[0..<nLoc]
                     } else if nDimensions == 3 {
@@ -418,10 +417,13 @@ struct GenericVariableHandle: Sendable {
                         guard nt == reader.time.count else {
                             fatalError("invalid timesteps")
                         }
-                        try await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
-                        data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
+                        // Flatten member/time into the destination's last dimension.
+                        try await reader.reader.read(into: &data3d.data, range: [yRange, xRange, 0..<nt],
+                            intoCubeOffset: [0, 0, UInt64(reader.member * time.count + timeArrayIndex)],
+                            intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(memberRange.count * time.count)])
                     } else {
                         // Single time step
+                        if readTemp.isEmpty { readTemp = [Float](repeating: .nan, count: nLoc) }
                         try await reader.reader.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }

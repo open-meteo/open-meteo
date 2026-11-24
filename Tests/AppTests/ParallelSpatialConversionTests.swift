@@ -24,10 +24,27 @@ struct ParallelSpatialConversionTests {
         #expect(handle.time.range == time.range)
         #expect(handle.reader.getDimensions() == [UInt64(domain.grid.ny), UInt64(domain.grid.nx), 7])
         #expect(handle.reader.getChunkDimensions() == [UInt64(chunks.y), UInt64(chunks.x), 7])
-        let actual = try await handle.reader.read()
-        for location in 0..<domain.grid.count {
-            for hour in 0..<time.count {
-                #expect(actual[location * time.count + hour] == Float(location % 101 + hour))
+        // Read a spatial slice directly into member 1 with a time offset,
+        // leaving the other members and surrounding timesteps untouched.
+        let y: Range<UInt64> = 1..<3
+        let x: Range<UInt64> = 7..<17
+        var actual = Array3DFastTime(nLocations: y.count * x.count, nLevel: 3, nTime: 10)
+        try await handle.reader.read(into: &actual.data, range: [y, x, 0..<7],
+            intoCubeOffset: [0, 0, 12], intoCubeDimension: [2, 10, 30])
+        for row in 0..<y.count {
+            for column in 0..<x.count {
+                let location = row * x.count + column
+                let sourceLocation = (row + Int(y.lowerBound)) * domain.grid.nx + column + Int(x.lowerBound)
+                for member in 0..<3 {
+                    for hour in 0..<10 {
+                        let value = actual.data[(location * 3 + member) * 10 + hour]
+                        if member == 1 && (2..<9).contains(hour) {
+                            #expect(value == Float(sourceLocation % 101 + hour - 2))
+                        } else {
+                            #expect(value.isNaN)
+                        }
+                    }
+                }
             }
         }
     }
