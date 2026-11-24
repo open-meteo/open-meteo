@@ -534,6 +534,7 @@ extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
+            // Copy the surface variable so normalization preserves its percentile.
             var normalized = surface
             normalized.variable = surface.variable.remapped
             normalized.previousDay = 0
@@ -682,6 +683,7 @@ private struct VariableHourlyDerivationCompatibility {
     let reversesWaveDirections: Bool
     let estimatesDiffuseRadiationFromShortwave: Bool
     let derivesCloudLayersFromPressureHumidity: Bool
+    let usesNativePercentiles: Bool
     let swapUVComponents: Bool
 
     private init(
@@ -697,6 +699,7 @@ private struct VariableHourlyDerivationCompatibility {
         reversesWaveDirections: Bool = false,
         estimatesDiffuseRadiationFromShortwave: Bool = false,
         derivesCloudLayersFromPressureHumidity: Bool = false,
+        usesNativePercentiles: Bool = false,
         swapUVComponents: Bool = false
     ) {
         self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
@@ -711,6 +714,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.reversesWaveDirections = reversesWaveDirections
         self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
         self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
+        self.usesNativePercentiles = usesNativePercentiles
         self.swapUVComponents = swapUVComponents
     }
 
@@ -798,6 +802,8 @@ private struct VariableHourlyDerivationCompatibility {
             self = .init(convectivePrecipitation: .zeroWherePrecipitationIsAvailable, omitsConvectivePrecipitationFromWeatherCode: true)
         case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
             self = .init(usesLegacyIconEpsRadiationStorage: true)
+        case .google_weathernext3_ensemble_mean, .google_weathernext3_station_ensemble_mean:
+            self = .init(usesNativePercentiles: true)
         case .meteofrance_wave:
             self = .init(reversesWaveDirections: true)
         default:
@@ -815,7 +821,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     private let pressureLevelInterpolations: [Int: SurroundingPressureLevels]
     /// Correct wind direction for HRRR and NAM models on the demand
     private let trueNorth: Float?
-    private let isWeatherNext3: Bool
 
     init(
         reader: Reader,
@@ -824,7 +829,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     ) {
         self.reader = reader
         self.options = options
-        self.isWeatherNext3 = domainRegistry == .google_weathernext3_ensemble_mean || domainRegistry == .google_weathernext3_station_ensemble_mean
         self.compatibility = .init(domain: domainRegistry)
         self.pressureLevelInterpolations = pressureLevelInterpolationTable[domainRegistry] ?? [:]
         let windGridDomain: GfsDomain?
@@ -1057,31 +1061,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
-        if isWeatherNext3 && variable.rawValue.hasSuffix("_spread") {
-            let name = String(variable.rawValue.dropLast(7))
-            guard let field = WeatherNext3Field(rawValue: name), field.spread,
-                let low = Reader.variableFromString(name + "_p10"),
-                let high = Reader.variableFromString(name + "_p90")
-            else {
-                return nil
-            }
-            let unit = field.unit == .celsius ? SiUnit.kelvin : field.unit
-            return .two(.raw(low), .raw(high)) { low, high, _ in
-                let spread = zip(low.data, high.data).map { lower, upper -> Float in
-                    guard lower.isFinite, upper.isFinite, upper >= lower else { return .nan }
-                    // Gaussian-equivalent standard deviation from the central 80% interval.
-                    // Exact for Gaussian population quantiles; finite-ensemble percentiles add sampling error.
-                    // Temperature, pressure and wind components can be approximately Gaussian, but skewness,
-                    // heavy tails or bounded distributions change the interval-to-standard-deviation ratio.
-                    // Using population quantiles, this overestimates standard deviation by about 8% for a
-                    // uniform distribution, and underestimates it by 11% for Laplace and 14% for exponential.
-                    // Zero-inflated distributions can yield zero spread despite a nonzero standard deviation
-                    // when at least 90% of values are zero; rare extremes outside P10-P90 are not represented.
-                    // Accuracy therefore depends on the source variable and local forecast distribution.
-                    return (upper - lower) / 2.5631031311
-                }
-                return DataAndUnit(spread, unit)
-            }
+        if compatibility.usesNativePercentiles, variable.rawValue.hasSuffix("_spread") {
+            return weatherNext3SpreadMapping(for: String(variable.rawValue.dropLast("_spread".count)))
         }
 
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
@@ -1999,7 +1980,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         switch variable {
         case .surface(let variable):
             if variable.percentile != nil {
-                guard isWeatherNext3 else { return nil }
+                guard compatibility.usesNativePercentiles else { return nil }
                 return .direct(Reader.variableFromString(variable.rawValue))
             }
             return getDeriverMap(variable: variable.variable.remapped)
