@@ -54,15 +54,24 @@ import Testing
             #expect(output.unit == unit)
         }
         #expect(ForecastVariable(rawValue: "temperature_2m_p99") == nil)
-        #expect(ForecastVariable(rawValue: "relative_humidity_2m_p90") == nil)
+        let humidity = try #require(ForecastVariable(rawValue: "relative_humidity_2m_p90"))
+        #expect(try await reader.get(variable: humidity, time: time) == nil)
+
+        let alias = try #require(ForecastVariable(rawValue: "temperature_p10"))
+        #expect(alias.rawValue == "temperature_p10")
+        let normalized = alias.variableAndPreviousDay.0
+        #expect(normalized.rawValue == "temperature_2m_p10")
+        #expect(try await reader.get(variable: normalized, time: time)?.data == [18])
 
         let otherModel = VariableHourlyDeriver(
-            reader: reader.reader,
+            reader: SampleReader<WeatherNextVariable>(values: ["temperature_2m": 20]),
             options: try GenericReaderOptions(),
-            domainRegistry: .ncep_gfs025
+            domainRegistry: .google_weathernext2_ensemble_mean
         )
         let percentile = try #require(ForecastVariable(rawValue: "temperature_2m_p10"))
-        #expect(otherModel.getDeriverMap(variable: percentile) == nil)
+        #expect(try await otherModel.get(variable: percentile, time: time) == nil)
+        let temperature = try #require(ForecastVariable(rawValue: "temperature_2m"))
+        #expect(try await otherModel.get(variable: temperature, time: time)?.data == [20])
     }
 
     private struct SampleReader<V: GenericVariable>: GenericReaderProtocol {

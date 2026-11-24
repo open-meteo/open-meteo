@@ -690,7 +690,7 @@ private struct VariableHourlyDerivationCompatibility {
     let reversesWaveDirections: Bool
     let estimatesDiffuseRadiationFromShortwave: Bool
     let derivesCloudLayersFromPressureHumidity: Bool
-    let usesNativePercentiles: Bool
+    let derivesSpreadFromPercentiles: Bool
     let swapUVComponents: Bool
 
     private init(
@@ -706,7 +706,7 @@ private struct VariableHourlyDerivationCompatibility {
         reversesWaveDirections: Bool = false,
         estimatesDiffuseRadiationFromShortwave: Bool = false,
         derivesCloudLayersFromPressureHumidity: Bool = false,
-        usesNativePercentiles: Bool = false,
+        derivesSpreadFromPercentiles: Bool = false,
         swapUVComponents: Bool = false
     ) {
         self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
@@ -721,7 +721,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.reversesWaveDirections = reversesWaveDirections
         self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
         self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
-        self.usesNativePercentiles = usesNativePercentiles
+        self.derivesSpreadFromPercentiles = derivesSpreadFromPercentiles
         self.swapUVComponents = swapUVComponents
     }
 
@@ -810,7 +810,7 @@ private struct VariableHourlyDerivationCompatibility {
         case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
             self = .init(usesLegacyIconEpsRadiationStorage: true)
         case .google_weathernext3_ensemble_mean, .google_weathernext3_station_ensemble_mean:
-            self = .init(usesNativePercentiles: true)
+            self = .init(derivesSpreadFromPercentiles: true)
         case .meteofrance_wave:
             self = .init(reversesWaveDirections: true)
         default:
@@ -1068,7 +1068,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
-        if compatibility.usesNativePercentiles, variable.rawValue.hasSuffix("_spread") {
+        if compatibility.derivesSpreadFromPercentiles, variable.rawValue.hasSuffix("_spread") {
             return weatherNext3SpreadMapping(for: String(variable.rawValue.dropLast("_spread".count)))
         }
 
@@ -1987,7 +1987,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         switch variable {
         case .surface(let variable):
             if variable.percentile != nil {
-                guard compatibility.usesNativePercentiles else { return nil }
                 return .direct(Reader.variableFromString(variable.rawValue))
             }
             return getDeriverMap(variable: variable.variable.remapped)

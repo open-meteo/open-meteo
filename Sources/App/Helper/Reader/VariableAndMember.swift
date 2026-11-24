@@ -23,9 +23,9 @@ struct VariableAndPreviousDay: RawRepresentableString {
                 self.init(variable, 0)
                 return
             }
-            guard let native = WeatherNext3Variable(rawValue: rawValue),
-                  let percentile = Percentile(rawValue: native.statistic.rawValue),
-                  let variable = ForecastSurfaceVariable(rawValue: native.field.rawValue) else {
+            guard let separator = rawValue.lastIndex(of: "_"),
+                  let percentile = Percentile(rawValue: String(rawValue[rawValue.index(after: separator)...])),
+                  let variable = ForecastSurfaceVariable(rawValue: String(rawValue[..<separator])) else {
                 return nil
             }
             self.init(variable, 0)
