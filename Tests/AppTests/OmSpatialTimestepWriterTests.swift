@@ -24,9 +24,7 @@ struct OmSpatialTimestepWriterTests {
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let domain = MultistepTestDomain()
         let run = Timestamp(2026, 11, 17)
-        let readChunks = OmFileSplitter(domain).spatialReadChunkDimensions
-        let chunks = [readChunks.y, readChunks.x]
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: Logger(label: "multistep-test"), chunkDimensions: chunks)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: Logger(label: "multistep-test"))
         let variable = EcmwfVariable.temperature_2m
         try await withThrowingTaskGroup(of: Void.self) { group in
             for (hour, member) in [(6, 0), (3, 0), (3, 1)] {
@@ -41,7 +39,6 @@ struct OmSpatialTimestepWriterTests {
         #expect(handles.count == 3)
         #expect(handles.map { $0.time.range.lowerBound } == [run.add(hours: 3), run.add(hours: 3), run.add(hours: 6)])
         for handle in handles {
-            #expect(handle.reader.getChunkDimensions() == chunks.map(UInt64.init))
             let hour = (handle.time.range.lowerBound.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let data = try await handle.reader.read()
             #expect(data == Array(repeating: Float(hour + handle.member), count: domain.grid.count))
