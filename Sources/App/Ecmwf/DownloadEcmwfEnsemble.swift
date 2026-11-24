@@ -164,7 +164,7 @@ extension DownloadEcmwfCommand {
 
         // Workers decode, deaccumulate, derive and write spatial fields. Only
         // completed-field accounting and conversion scheduling run in the consumer.
-        let processed = fields.mapStream(nConcurrent: concurrent, nBuffered: concurrent, body: { entry -> [(variable: EcmwfVariable, member: Int, hour: Int, process: Double, write: Double)] in
+        let processed = fields.mapStream(nConcurrent: concurrent, body: { entry -> [(variable: EcmwfVariable, member: Int, hour: Int, process: Double, write: Double)] in
             var field = try entry.file.withMessage(field: entry.field) { message in
                 guard let shortName = message.get(attribute: "shortName"),
                       let level = message.get(attribute: "level").flatMap(Int.init),

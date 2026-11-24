@@ -405,7 +405,7 @@ struct OmFileSplitter {
         }
         let calculateMeanAndSpread = statisticsWriter?.calculateMeanAndSpread ?? false
         let calculateProbability = statisticsWriter?.calculateProbability ?? false
-        let prepared = blocks.mapStream(nConcurrent: concurrent, nBuffered: concurrent, body: { block in
+        let prepared = blocks.mapStream(nConcurrent: concurrent, body: { block in
             let (yRange, xRange) = block
             let memberRange = 0..<UInt64(nMembers)
             let data = try await supplyChunk(yRange, xRange, memberRange)
@@ -552,7 +552,7 @@ struct OmFileSplitter {
         }
         let calculateMeanAndSpread = statisticsWriter?.calculateMeanAndSpread ?? false
         let calculateProbability = statisticsWriter?.calculateProbability ?? false
-        let prepared = blocks.mapStream(nConcurrent: concurrent, nBuffered: concurrent, body: { block in
+        let prepared = blocks.mapStream(nConcurrent: concurrent, body: { block in
             let (yRange, xRange) = block
             let memberRange = 0..<UInt64(nMembers)
             let data = try await supplyChunk(yRange, xRange, memberRange)

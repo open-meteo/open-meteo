@@ -31,13 +31,13 @@ import Testing
         await #expect(throws: CancellationError.self) { try await consumer.value }
     }
 
-    @Test(.timeLimit(.minutes(1)), arguments: [false, true], [nil, 5] as [Int?])
-    func stoppingStreamCancelsPendingWork(failInMapping: Bool, nBuffered: Int?) async throws {
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func stoppingStreamCancelsPendingWork(failInMapping: Bool) async throws {
         let started = AsyncStream<Void>.makeStream()
         let cancelled = AsyncStream<Void>.makeStream()
         var didThrow = false
         do {
-            let stream = [0, 1].mapStream(nConcurrent: 2, nBuffered: nBuffered) { value in
+            let stream = [0, 1].mapStream(nConcurrent: 2) { value in
                 if value == 0 {
                     for await _ in started.stream { break }
                     if failInMapping { throw Failure.expected }
@@ -65,12 +65,12 @@ import Testing
         for await _ in cancelled.stream { break }
     }
 
-    @Test(.timeLimit(.minutes(1)), arguments: [nil, 5] as [Int?])
-    func cancellingConsumerCancelsActiveRead(nBuffered: Int?) async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func cancellingConsumerCancelsActiveRead() async throws {
         let started = AsyncStream<Void>.makeStream()
         let cancelled = AsyncStream<Void>.makeStream()
         let consumer = Task {
-            let stream = [0].mapStream(nConcurrent: 1, nBuffered: nBuffered) { value in
+            let stream = [0].mapStream(nConcurrent: 1) { value in
                 started.continuation.yield(())
                 started.continuation.finish()
                 do {
@@ -89,54 +89,4 @@ import Testing
         await #expect(throws: CancellationError.self) { try await consumer.value }
         for await _ in cancelled.stream { break }
     }
-
-    private actor WorkCounter {
-        var active = 0
-        var peak = 0
-        var completed = 0
-        var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
-
-        func start() {
-            active += 1
-            peak = max(peak, active)
-        }
-
-        func finish() {
-            active -= 1
-            completed += 1
-            let ready = waiters.filter { completed >= $0.0 }
-            waiters.removeAll { completed >= $0.0 }
-            for (_, continuation) in ready { continuation.resume() }
-        }
-
-        func waitForCompleted(_ count: Int) async {
-            if completed >= count { return }
-            await withCheckedContinuation { waiters.append((count, $0)) }
-        }
-    }
-
-    @Test(.timeLimit(.minutes(1)))
-    func buffersFiveResultsWhileRunningOnlyTwoJobs() async throws {
-        let counter = WorkCounter()
-        let stream = Array(0..<20).mapStream(nConcurrent: 2, nBuffered: 5) { value in
-            await counter.start()
-            // Vary completion order; the stream must still deliver input order.
-            try await Task.sleep(for: .milliseconds(value.isMultiple(of: 2) ? 10 : 1))
-            await counter.finish()
-            return value
-        }
-        var iterator = stream.makeAsyncIterator()
-        #expect(try await iterator.next() == 0)
-        // Do not ask for another item: the five reserved slots must fill independently.
-        await counter.waitForCompleted(6)
-        #expect(await counter.completed == 6)
-        #expect(await counter.active == 0)
-        #expect(await counter.peak == 2)
-        var values = [0]
-        while let value = try await iterator.next() { values.append(value) }
-        #expect(values == Array(0..<20))
-        #expect(await counter.peak == 2)
-        #expect(try await iterator.next() == nil)
-    }
-
 }
