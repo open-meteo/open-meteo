@@ -3,15 +3,23 @@ import Testing
 @testable import App
 
 @Suite struct WeatherNext3Tests {
+    typealias Station = WeatherNext3Variable<WeatherNext3StationField>
+    typealias Surface = WeatherNext3Variable<WeatherNext3SurfaceField>
+
     @Test func percentilesUseNativeHourlySamples() async throws {
+        try await checkNativeSamples(.station, WeatherNext3StationField.self)
+        try await checkNativeSamples(.surface, WeatherNext3SurfaceField.self)
+    }
+
+    private func checkNativeSamples<Field: WeatherNext3Field>(_ domain: WeatherNext3Domain, _: Field.Type) async throws {
         let start = Timestamp(2026, 11, 8)
         let hourly = TimerangeDt(start: start, nTime: 7, dtSeconds: 3600)
         let quarterHourly = TimerangeDt(start: start, nTime: 4, dtSeconds: 900)
         let offsetHourly = TimerangeDt(start: start.add(900), nTime: 2, dtSeconds: 3600)
         let hourlyValues: [Float] = [10, 8, 5, 4, 3, 7, 9]
 
-        for field in WeatherNext3Field.allCases {
-            let reader = try await GenericReader<WeatherNext3Domain, WeatherNext3Variable>(domain: field.domain, position: 0, options: GenericReaderOptions())
+        for field in Field.allCases {
+            let reader = try await GenericReader<WeatherNext3Domain, WeatherNext3Variable<Field>>(domain: domain, position: 0, options: GenericReaderOptions())
             #expect(WeatherNext3Variable(field: field, statistic: .mean).supportsTimeRange(quarterHourly))
             for statistic in field.statistics where statistic != .mean {
                 let variable = WeatherNext3Variable(field: field, statistic: statistic)
@@ -19,8 +27,8 @@ import Testing
                 var unsupported = [quarterHourly, offsetHourly]
                 for hours in [3, 6] {
                     let time = TimerangeDt(start: start, nTime: 1 + 6 / hours, dtSeconds: hours * 3600)
-                    switch field {
-                    case .precipitation, .shortwave_radiation, .direct_radiation:
+                    switch field.rawValue {
+                    case "precipitation", "shortwave_radiation", "direct_radiation":
                         unsupported.append(time)
                     default:
                         #expect(variable.supportsTimeRange(time))
@@ -40,7 +48,7 @@ import Testing
 
     @Test func rawPercentiles() async throws {
         let reader = VariableHourlyDeriver(
-            reader: SampleReader<WeatherNext3Variable>(values: ["temperature_2m_p10": 18, "precipitation_p90": 12]),
+            reader: SampleReader<VariableSchemaUnion<Station, Surface>>(values: ["temperature_2m_p10": 18, "precipitation_p90": 12]),
             options: try GenericReaderOptions(),
             domainRegistry: .google_weathernext3_station_ensemble_mean
         )
@@ -92,8 +100,6 @@ import Testing
     }
 
     @Test func composedReaderPreservesNativeMeansAndRestrictsSpreads() async throws {
-        typealias Station = WeatherNext3GridVariable<WeatherNext3StationGrid>
-        typealias Surface = WeatherNext3GridVariable<WeatherNext3SurfaceGrid>
         #expect(Station(rawValue: "wind_speed_10m") == nil)
         #expect(Surface(rawValue: "temperature_2m") == nil)
         let mixer = GenericReaderMixerByVariableName<VariableSchemaUnion<Station, Surface>>(reader: [
@@ -158,7 +164,7 @@ import Testing
         let variable = try #require(ForecastVariable(rawValue: "temperature_2m_spread"))
         for (low, high) in [(Float.nan, Float(20)), (21, 20), (20, Float.infinity), (20, 20)] {
             let reader = VariableHourlyDeriver(
-                reader: SampleReader<WeatherNext3Variable>(values: [
+                reader: SampleReader<Station>(values: [
                     "temperature_2m_p10": low, "temperature_2m_p90": high,
                 ]),
                 options: try GenericReaderOptions(),

@@ -39,7 +39,8 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var dtSeconds: Int { 3600 }
+    static let nativeStepSeconds = 3600
+    var dtSeconds: Int { Self.nativeStepSeconds }
 
     var coordinateSuffix: String {
         switch self {
@@ -70,9 +71,36 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
     }
 }
 
-enum WeatherNext3Field: String, CaseIterable, Sendable {
+enum WeatherNext3Statistic: String, CaseIterable {
+    case mean, p10, p25, p50, p75, p90
+}
+
+protocol WeatherNext3Field: RawRepresentable, CaseIterable, Hashable, Sendable where RawValue == String {
+    var source: String { get }
+    var unit: SiUnit { get }
+    var sourceUnit: String { get }
+    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    var statistics: [WeatherNext3Statistic] { get }
+}
+
+enum WeatherNext3StationField: String, WeatherNext3Field {
     case temperature_2m
     case dew_point_2m
+
+    var source: String {
+        switch self {
+        case .temperature_2m: "station_head_temperature_2m"
+        case .dew_point_2m: "station_head_dewpoint_temperature_2m"
+        }
+    }
+
+    var unit: SiUnit { .celsius }
+    var sourceUnit: String { "K" }
+    var multiplyAdd: (multiply: Float, add: Float)? { (1, -273.15) }
+    var statistics: [WeatherNext3Statistic] { WeatherNext3Statistic.allCases }
+}
+
+enum WeatherNext3SurfaceField: String, WeatherNext3Field {
     case pressure_msl
     case sea_surface_temperature
     case precipitation
@@ -91,8 +119,6 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
 
     var source: String {
         switch self {
-        case .temperature_2m: "station_head_temperature_2m"
-        case .dew_point_2m: "station_head_dewpoint_temperature_2m"
         case .pressure_msl: "mean_sea_level_pressure"
         case .sea_surface_temperature, .wind_speed_10m, .wind_speed_100m: rawValue
         case .precipitation: "total_precipitation_1hr"
@@ -109,21 +135,9 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
         }
     }
 
-    var domain: WeatherNext3Domain {
-        switch self {
-        case .temperature_2m, .dew_point_2m:
-            .station
-        case .pressure_msl, .sea_surface_temperature, .precipitation, .shortwave_radiation, .direct_radiation,
-            .wind_u_component_10m, .wind_v_component_10m, .wind_speed_10m,
-            .wind_u_component_100m, .wind_v_component_100m, .wind_speed_100m,
-            .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
-            .surface
-        }
-    }
-
     var unit: SiUnit {
         switch self {
-        case .temperature_2m, .dew_point_2m, .sea_surface_temperature:
+        case .sea_surface_temperature:
             .celsius
         case .pressure_msl:
             .hectopascal
@@ -141,7 +155,7 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
 
     var sourceUnit: String {
         switch self {
-        case .temperature_2m, .dew_point_2m, .sea_surface_temperature:
+        case .sea_surface_temperature:
             "K"
         case .pressure_msl:
             "Pa"
@@ -159,7 +173,7 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
 
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m, .dew_point_2m, .sea_surface_temperature:
+        case .sea_surface_temperature:
             (1, -273.15)
         case .pressure_msl:
             (0.01, 0)
@@ -175,64 +189,39 @@ enum WeatherNext3Field: String, CaseIterable, Sendable {
         }
     }
 
-    var statistics: [WeatherNext3Variable.Statistic] {
+    var statistics: [WeatherNext3Statistic] {
         switch self {
         case .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m:
             // The mean vector supplies the point forecast for wind direction.
             return [.mean]
         default:
-            return WeatherNext3Variable.Statistic.allCases
+            return WeatherNext3Statistic.allCases
         }
     }
 
-    /// Whether the API exposes a Gaussian-equivalent spread, calculated as (p90 - p10) / 2.5631.
-    var spread: Bool {
-        switch self {
-        case .temperature_2m, .dew_point_2m, .pressure_msl, .wind_speed_10m, .wind_speed_100m:
-            true
-        case .sea_surface_temperature, .precipitation, .shortwave_radiation, .direct_radiation,
-            .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m,
-            .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
-            false
-        }
-    }
 }
 
-struct WeatherNext3Variable: GenericVariable {
-
-    enum Statistic: String, CaseIterable {
-        case mean
-        case p10
-        case p25
-        case p50
-        case p75
-        case p90
-    }
-
-    let statistic: Statistic
-    let field: WeatherNext3Field
+struct WeatherNext3Variable<Field: WeatherNext3Field>: GenericVariable {
+    let statistic: WeatherNext3Statistic
+    let field: Field
 
     var rawValue: String {
         statistic == .mean ? field.rawValue : field.rawValue + "_" + statistic.rawValue
     }
 
-    init(field: WeatherNext3Field, statistic: Statistic) {
+    init(field: Field, statistic: WeatherNext3Statistic) {
         self.field = field
         self.statistic = statistic
     }
 
     init?(rawValue: String) {
-        let statistic = Statistic.allCases.first { $0 != .mean && rawValue.hasSuffix("_" + $0.rawValue) } ?? .mean
+        let statistic = WeatherNext3Statistic.allCases.first { $0 != .mean && rawValue.hasSuffix("_" + $0.rawValue) } ?? .mean
         let name = statistic == .mean ? rawValue : String(rawValue.dropLast(statistic.rawValue.count + 1))
-        guard let field = WeatherNext3Field(rawValue: name), field.statistics.contains(statistic) else {
+        guard let field = Field(rawValue: name), field.statistics.contains(statistic) else {
             return nil
         }
         self.init(field: field, statistic: statistic)
     }
-
-    static func == (lhs: Self, rhs: Self) -> Bool { lhs.rawValue == rhs.rawValue }
-
-    func hash(into hasher: inout Hasher) { hasher.combine(rawValue) }
 
     var omFileName: (file: String, level: Int) { (rawValue, 0) }
 
@@ -254,10 +243,10 @@ struct WeatherNext3Variable: GenericVariable {
 
     func supportsTimeRange(_ time: TimerangeDt) -> Bool {
         guard statistic != .mean else { return true }
-        let nativeStep = field.domain.dtSeconds
+        let nativeStep = WeatherNext3Domain.nativeStepSeconds
         guard time.range.lowerBound.timeIntervalSince1970.isMultiple(of: nativeStep) else { return false }
-        switch field {
-        case .precipitation, .shortwave_radiation, .direct_radiation:
+        switch interpolation {
+        case .backwards_sum, .solar_backwards_averaged:
             // Interval percentiles require member-level data to calculate at a different resolution.
             return time.dtSeconds == nativeStep
         default:
@@ -267,7 +256,7 @@ struct WeatherNext3Variable: GenericVariable {
     }
 
     var interpolation: ReaderInterpolation {
-        if field == .precipitation { return .backwards_sum }
+        if field.unit == .millimetre { return .backwards_sum }
         if field.unit == .wattPerSquareMetre { return .solar_backwards_averaged }
         return .linear
     }
@@ -277,54 +266,19 @@ struct WeatherNext3Variable: GenericVariable {
     var storePreviousForecast: Bool { false }
 }
 
-protocol WeatherNext3Grid: Sendable, Hashable {
-    static var domain: WeatherNext3Domain { get }
-}
-
-enum WeatherNext3SurfaceGrid: WeatherNext3Grid {
-    static var domain: WeatherNext3Domain { .surface }
-}
-
-enum WeatherNext3StationGrid: WeatherNext3Grid {
-    static var domain: WeatherNext3Domain { .station }
-}
-
-struct WeatherNext3GridVariable<Grid: WeatherNext3Grid>: GenericVariable {
-    let variable: WeatherNext3Variable
-
-    init?(rawValue: String) {
-        guard let variable = WeatherNext3Variable(rawValue: rawValue), variable.field.domain == Grid.domain else {
-            return nil
-        }
-        self.variable = variable
-    }
-
-    var rawValue: String { variable.rawValue }
-
-    var omFileName: (file: String, level: Int) { variable.omFileName }
-
-    var scalefactor: Float { variable.scalefactor }
-
-    var unit: SiUnit { variable.unit }
-
-    var interpolation: ReaderInterpolation { variable.interpolation }
-
-    func supportsTimeRange(_ time: TimerangeDt) -> Bool { variable.supportsTimeRange(time) }
-
-    var isElevationCorrectable: Bool { false }
-
-    var storePreviousForecast: Bool { false }
-}
-
 extension VariableHourlyDeriver {
     func weatherNext3SpreadMapping(for name: String) -> DerivedMapping<Reader.MixingVar>? {
-        guard let field = WeatherNext3Field(rawValue: name), field.spread,
-            let low = Reader.variableFromString(name + "_p10"),
+        switch ForecastSurfaceVariable(rawValue: name) {
+        case .temperature_2m, .dew_point_2m, .pressure_msl, .wind_speed_10m, .wind_speed_100m:
+            break
+        default:
+            return nil
+        }
+        guard let low = Reader.variableFromString(name + "_p10"),
             let high = Reader.variableFromString(name + "_p90")
         else {
             return nil
         }
-        let unit = field.unit == .celsius ? SiUnit.kelvin : field.unit
         return .two(.raw(low), .raw(high)) { low, high, _ in
             let spread = zip(low.data, high.data).map { lower, upper -> Float in
                 guard lower.isFinite, upper.isFinite, upper >= lower else { return .nan }
@@ -339,7 +293,7 @@ extension VariableHourlyDeriver {
                 // Accuracy therefore depends on the source variable and local forecast distribution.
                 return (upper - lower) / 2.5631031311
             }
-            return DataAndUnit(spread, unit)
+            return DataAndUnit(spread, low.unit == .celsius ? .kelvin : low.unit)
         }
     }
 }

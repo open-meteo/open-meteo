@@ -99,8 +99,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             throw Abort(.badRequest, reason: "Unexpected WeatherNext 3 hourly lead coordinates")
         }
 
-        var handles = [GenericVariableHandle]()
-        for domain in WeatherNext3Domain.allCases {
+        func downloadGrid<Field: WeatherNext3Field>(_ domain: WeatherNext3Domain, _: Field.Type) async throws -> [GenericVariableHandle] {
             let grid = domain.grid
             let suffix = domain.coordinateSuffix
             let root = try await ZarrGroup(
@@ -108,7 +107,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 path: prefix + "predictions.zarr/"
             )
             logger.info("WeatherNext 3: loading and validating \(domain.rawValue) field metadata")
-            let variables = WeatherNext3Field.allCases.filter { $0.domain == domain }.flatMap { field in
+            let variables = Field.allCases.flatMap { field in
                 field.statistics.map {
                     WeatherNext3Variable(field: field, statistic: $0)
                 }
@@ -156,9 +155,11 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                 logger.info("WeatherNext 3: completed hour \(index + 1)/\(hours), \(domain.rawValue)")
                 return handles
             }
-            handles += hourlyHandles.joined()
+            return Array(hourlyHandles.joined())
         }
 
+        var handles = try await downloadGrid(.surface, WeatherNext3SurfaceField.self)
+        handles += try await downloadGrid(.station, WeatherNext3StationField.self)
         return handles
     }
 }
