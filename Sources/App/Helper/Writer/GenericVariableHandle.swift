@@ -214,11 +214,11 @@ struct GenericVariableHandle: Sendable {
                         let nLoc = yRange.count * xRange.count
                         var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: nTime)
                         for reader in handles {
-                            let dimensions = reader.reader.getDimensions()
+                            let nDimensions = reader.reader.getDimensionsCount()
                             let timeArrayIndex = time.firstIndex(of: reader.time.range.lowerBound)!
-                            if dimensions.count == 3 {
+                            if nDimensions == 3 {
                                 /// Number of time steps in this file
-                                let nt = dimensions[2]
+                                let nt = reader.reader.withDimensions { $0[2] }
                                 guard nt == reader.time.count else {
                                     fatalError("invalid timesteps")
                                 }
@@ -402,19 +402,19 @@ struct GenericVariableHandle: Sendable {
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
                 for reader in handles {
-                    let dimensions = reader.reader.getDimensions()
+                    let nDimensions = reader.reader.getDimensionsCount()
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
                     guard memberRange.contains(UInt64(reader.member)) else {
                         fatalError("Invalid reader.member \(reader.member) for range \(memberRange)")
                     }
-                    if reader.time.count == 1 && dimensions.count == 3 && dimensions[0] == nMembers && dimensions[1] == ny && dimensions[2] == nx {
+                    if reader.time.count == 1 && nDimensions == 3 && reader.reader.withDimensions({ $0[0] == nMembers && $0[1] == ny && $0[2] == nx }) {
                         /// Dimensions [member, y, x]
                         try await reader.reader.read(into: &readTemp, range: [UInt64(reader.member)..<UInt64(reader.member+1), yRange, xRange])
                         data3d[0..<nLoc, Int(reader.member), timeArrayIndex] = readTemp[0..<nLoc]
-                    } else if dimensions.count == 3 {
+                    } else if nDimensions == 3 {
                         /// Dimensions [y, x, time]
                         /// Number of time steps in this file
-                        let nt = dimensions[2]
+                        let nt = reader.reader.withDimensions { $0[2] }
                         guard nt == reader.time.count else {
                             fatalError("invalid timesteps")
                         }
