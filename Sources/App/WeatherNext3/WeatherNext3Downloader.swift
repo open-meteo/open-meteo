@@ -56,8 +56,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
             handles: handles,
             concurrent: conversionConcurrency,
             writeUpdateJson: true,
-            uploadQueues: queues,
-            generateFullRun: false
+            uploadQueues: queues
         )
 
         logger.info("WeatherNext 3: completed run \(run.iso8601_YYYY_MM_dd_HH_mm)")
@@ -138,29 +137,17 @@ struct DownloadWeatherNext3Command: AsyncCommand {
                         storage: auth.storage(bucket: "weathernext3_statistics_spatial"),
                         path: template.path
                     )
-                    let readStarted = DispatchTime.now().uptimeNanoseconds
                     var data: [Float] = try await array.retrieveArraySubset([
                         index..<index + 1, 0..<grid.ny, 0..<grid.nx,
                     ])
-                    let transformStarted = DispatchTime.now().uptimeNanoseconds
                     data.shift180Longitude(nt: 1, ny: grid.ny, nx: grid.nx)
                     if let multiplyAdd = field.multiplyAdd {
                         data.multiplyAdd(multiply: multiplyAdd.multiply, add: multiplyAdd.add)
                     }
-                    let writeStarted = DispatchTime.now().uptimeNanoseconds
                     try await writer.write(
                         member: 0,
                         variable: variable,
                         data: data
-                    )
-                    let finished = DispatchTime.now().uptimeNanoseconds
-                    logger.debug(
-                        """
-                        WeatherNext 3: hour \(index + 1)/\(hours), \(variable.rawValue): \
-                        read/decode \((transformStarted - readStarted) / 1_000_000)ms, \
-                        transform \((writeStarted - transformStarted) / 1_000_000)ms, \
-                        writer wait/write \((finished - writeStarted) / 1_000_000)ms
-                        """
                     )
                 }
                 let handles = try await writer.finalise()
