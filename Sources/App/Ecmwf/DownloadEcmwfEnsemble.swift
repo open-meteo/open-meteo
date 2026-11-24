@@ -355,6 +355,9 @@ extension DownloadEcmwfCommand {
         let inventories = try await downloadLocalGribFiles(curl: curl, domain: domain, base: base, run: run, hours: hours, concurrent: concurrent, downloadConcurrent: downloadConcurrent)
         let chunks = OmFileSplitter(domain).spatialReadChunkDimensions
         let time = TimerangeDt(start: run, nTime: lastHour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
+        try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
+        var conversionJob: Task<Void, any Error>?
+        defer { conversionJob?.cancel() }
         var convertedVariables = 0
         for variable in variables {
             let fields = inventories.flatMap { inventory in
@@ -371,21 +374,53 @@ extension DownloadEcmwfCommand {
             }
             guard hoursPerMember.allSatisfy({ $0 == Set(hours) }) else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
             logger.info("Reading \(variable.rawValue): \(fields.count) local fields")
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, chunkDimensions: [chunks.y, chunks.x])
-            try await fields.async.foreachConcurrent(nConcurrent: concurrent) { entry in
+            var timesteps = [(time: Int, data: [Float])]()
+            var handles = [GenericVariableHandle]()
+            var decodeTime = 0.0
+            let processed = fields.mapStream(nConcurrent: concurrent) { entry in
+                let decodeStart = DispatchTime.now()
                 let data = try entry.file.withMessage(field: entry.field) { message in
                     var grib = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     try grib.load(message: message)
                     grib.array.flipLatitude()
                     return grib.array.data
                 }
-                try await writer.write(time: run.add(hours: entry.hour), member: entry.field.member, variable: variable, data: data)
+                return (hour: entry.hour, member: entry.field.member, data: data, decode: decodeStart.timeElapsedSeconds())
             }
-            let handles = try await writer.finalise()
-            try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: !domain.isEnsemble, generateTimeSeries: !signature.skipTimeseries, ensembleMeanDomain: domain.ensembleMeanDomain)
+            for try await field in processed {
+                timesteps.append((time: field.hour * 3600 / domain.dtSeconds, data: field.data))
+                decodeTime += field.decode
+                guard field.hour == lastHour else { continue }
+
+                let transposeStart = DispatchTime.now()
+                var data = await Array2DFastTime(timesteps: timesteps, nLocations: domain.grid.count, nTime: time.count, nConcurrent: concurrent)
+                timesteps.removeAll()
+                let transposeTime = transposeStart.timeElapsedPretty()
+                let interpolationStart = DispatchTime.now()
+                await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
+                let interpolationTime = interpolationStart.timeElapsedPretty()
+                let writeStart = DispatchTime.now()
+                let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [chunks.y, chunks.x, time.count])
+                let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data.data, nConcurrent: concurrent)
+                handles.append(try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: fn, domain: domain))
+                logger.info("\(variable.rawValue) member \(field.member): decode=\(decodeTime.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime), write=\(writeStart.timeElapsedPretty())")
+                decodeTime = 0
+            }
+            let conversionWaitStart = DispatchTime.now()
+            try await conversionJob?.value
+            logger.info("Before converting \(variable.rawValue): conversionWait=\(conversionWaitStart.timeElapsedPretty())")
+            let completedHandles = handles
+            conversionJob = Task {
+                let conversionStart = DispatchTime.now()
+                try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: completedHandles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: !domain.isEnsemble, generateTimeSeries: !signature.skipTimeseries, ensembleMeanDomain: domain.ensembleMeanDomain)
+                logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
+            }
             convertedVariables += 1
         }
         guard convertedVariables > 0 else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        let conversionWaitStart = DispatchTime.now()
+        try await conversionJob?.value
+        logger.info("Final conversionWait=\(conversionWaitStart.timeElapsedPretty())")
         try await publishLocalGribRun(signature: signature, domain: domain, run: run, time: time, uploadQueues: uploadQueues)
         await curl.printStatistics()
     }
