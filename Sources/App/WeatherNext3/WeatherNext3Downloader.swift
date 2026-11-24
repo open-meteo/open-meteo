@@ -10,6 +10,8 @@ struct DownloadWeatherNext3Command: AsyncCommand {
         @Option(name: "concurrent", help: "Maximum concurrent temporal OM conversion tasks (default: 1)")
         var concurrent: Int?
         @Option(name: "upload-s3-bucket") var uploadS3Bucket: String?
+        @Option(name: "upload-s3-rolling-bucket", help: "Upload generated products, excluding spatial files, to these S3 buckets.")
+        var uploadS3RollingBucket: String?
     }
 
     var help: String { "Download WeatherNext 3 hourly surface statistics on both native grids" }
@@ -32,7 +34,7 @@ struct DownloadWeatherNext3Command: AsyncCommand {
 
         let queues = await app.s3SyncManager.getQueues(
             bucketsOpt: signature.uploadS3Bucket,
-            rollingBucketsOpt: nil,
+            rollingBucketsOpt: signature.uploadS3RollingBucket,
             onlyProbabilityTimeSeries: false
         )
 
