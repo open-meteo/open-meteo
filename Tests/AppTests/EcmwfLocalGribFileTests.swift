@@ -21,7 +21,8 @@ struct EcmwfLocalGribFileTests {
                     #expect(file.fields.count == 4)
                     #expect(file.fields.map(\.submessage) == [0, 1, 0, 1])
                     #expect(file.fields.map(\.range) == [0..<data.count, 0..<data.count, data.count..<2 * data.count, data.count..<2 * data.count])
-                    for index in [3, 0, 2, 1] {
+                    // These small, unaligned messages share pages; repeated reads must remain valid.
+                    for index in [3, 0, 2, 1, 3, 0] {
                         let values = try file.withMessage(field: file.fields[index]) { try $0.getDouble() }
                         #expect(values == Array(repeating: index.isMultiple(of: 2) ? 3 : 4, count: 4))
                     }

@@ -4,7 +4,7 @@ import OmFileIO
 @preconcurrency import SwiftEccodes
 
 /// Scan headers once, retaining only byte ranges and submessage numbers. Grids
-/// are decoded on demand while the mapping keeps their compressed bytes alive.
+/// are decoded on demand; consumed file-backed pages are released from memory.
 final class EcmwfLocalGribFile: Sendable {
     struct Field: Sendable {
         let range: Range<Int>
@@ -57,9 +57,18 @@ final class EcmwfLocalGribFile: Sendable {
     }
 
     func withMessage<T>(field: Field, body: (GribMessage) throws -> T) throws -> T {
-        try withExtendedLifetime(mapping) {
+        return try withExtendedLifetime(mapping) {
             let bytes = try mapping.getData(offset: field.range.lowerBound, count: field.range.count)
             let messages = try GribAsyncStreamHelper.decodeMessages(memory: bytes)
+            defer {
+                let pageSize = Int(getpagesize())
+                // Round inward so adjacent GRIB messages keep their shared pages.
+                let start = (field.range.lowerBound + pageSize - 1) / pageSize * pageSize
+                let end = field.range.upperBound / pageSize * pageSize
+                if start < end {
+                    mapping.adviseData(offset: start, count: end - start, advice: .dontneed)
+                }
+            }
             return try body(messages[field.submessage])
         }
     }
