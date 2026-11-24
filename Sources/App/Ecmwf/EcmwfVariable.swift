@@ -60,7 +60,12 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     }
 
     var storePreviousForecast: Bool {
-        return true
+        switch self {
+        case .wave_height, .wave_period, .wave_direction:
+            return true
+        default:
+            return false
+        }
     }
 
     var isElevationCorrectable: Bool {
