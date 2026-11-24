@@ -59,6 +59,50 @@ import Testing
         #expect(abs(result - 0.1) < 0.0001)
     }
 
+    @Test func berlinSunriseSpike() {
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 52.5, lonMin: 13.400002, dx: 1, dy: 1)
+        let time = TimerangeDt(start: Timestamp(2025, 10, 25, 6, 30), nTime: 2, dtSeconds: 1800)
+        let solar = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: 0..<1, timerange: time).data
+        let extraterrestrial = solar[0] * Zensun.solarConstant
+        #expect(extraterrestrial > 0 && extraterrestrial < 9095)
+        let corrected = EumetsatSarahRepairSunsetCommand.limitRadiation(9095,
+            solarFactor: solar[0], next: 33, solarNext: solar[1])
+        #expect(abs(corrected - 33 * solar[0] / solar[1]) < 0.0001)
+    }
+
+    @Test func nextTimestepKtAndFallback() {
+        let solar: Float = 0.1
+        let solarNext: Float = 0.2
+        let extraterrestrial = solar * Zensun.solarConstant
+        for kt: Float in [0, 0.4, 0.9] {
+            let corrected = EumetsatSarahRepairSunsetCommand.limitRadiation(9095,
+                solarFactor: solar, next: kt * solarNext * Zensun.solarConstant, solarNext: solarNext)
+            #expect(abs(corrected - kt * extraterrestrial) < 0.0001)
+        }
+        for (next, nextSolar): (Float, Float) in [(.nan, 0.2), (.infinity, 0.2), (-1, 0.2),
+                                                (9095, 0.2), (0.95 * 0.2 * Zensun.solarConstant, 0.2), (0, 0), (33, .nan)] {
+            #expect(EumetsatSarahRepairSunsetCommand.limitRadiation(9095,
+                solarFactor: solar, next: next, solarNext: nextSolar) == 0.8 * extraterrestrial)
+        }
+    }
+
+    @Test func radiationLimitThreshold() {
+        let solar: Float = 0.1
+        let extraterrestrial = solar * Zensun.solarConstant
+        for fraction: Float in [0, 0.8, 0.9] {
+            let value = fraction * extraterrestrial
+            #expect(EumetsatSarahRepairSunsetCommand.limitRadiation(value, solarFactor: solar) == value)
+        }
+        for fraction: Float in [0.9001, 0.95, 1, 2] {
+            #expect(EumetsatSarahRepairSunsetCommand.limitRadiation(fraction * extraterrestrial, solarFactor: solar) == 0.8 * extraterrestrial)
+            #expect(abs(EumetsatSarahRepairSunsetCommand.limitRadiation(fraction * extraterrestrial,
+                solarFactor: solar, next: 0.4 * extraterrestrial, solarNext: solar) - 0.4 * extraterrestrial) < 0.0001)
+        }
+        #expect(EumetsatSarahRepairSunsetCommand.limitRadiation(10, solarFactor: 0) == 0)
+        #expect(EumetsatSarahRepairSunsetCommand.limitRadiation(.nan, solarFactor: solar).isNaN)
+        #expect(EumetsatSarahRepairSunsetCommand.limitRadiation(10, solarFactor: .nan) == 10)
+    }
+
     @Test func correctedOutputPaths() {
         for variable in ["shortwave_radiation", "direct_radiation"] {
             for name in ["year_2020.om", "chunk_12345.om"] {

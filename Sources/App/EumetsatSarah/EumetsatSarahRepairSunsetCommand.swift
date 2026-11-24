@@ -19,7 +19,7 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
         var execute: Bool
     }
 
-    var help: String { "Fill sunset NaNs in all timestamp-corrected SARAH-3 shortwave and direct radiation files" }
+    var help: String { "Repair sunset NaNs and excessive radiation in timestamp-corrected SARAH-3 files" }
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let concurrent = signature.concurrent ?? 1
@@ -63,6 +63,7 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
         let output: String
         let temporary: String
         var repaired = 0
+        var limited = 0
     }
 
     func repairFiles(files: [String], domain: EumetsatSarahDomain, execute: Bool, logger: Logger) async throws {
@@ -128,10 +129,11 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
                 let writer = state.writer
                 for t in stride(from: 0, to: expectedCount, by: Int(chunks.last!)) {
                     let end = min(t + Int(chunks.last!), expectedCount)
-                    // Include i-1 from this same file when a hole starts a time chunk.
+                    // Read neighbouring samples from the same file across internal time chunks.
                     let lower = max(t - 1, 0)
-                    let readCount = end - lower
-                    let ranges = spatialRange.map { $0.toUInt64() } + [UInt64(lower)..<UInt64(end)]
+                    let upper = min(end + 1, expectedCount)
+                    let readCount = upper - lower
+                    let ranges = spatialRange.map { $0.toUInt64() } + [UInt64(lower)..<UInt64(upper)]
                     let source: [Float]
                     if ranges.count == 2 {
                         source = try await reader.read(range: [ranges[0], ranges[1]])
@@ -143,18 +145,21 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
                     for i in locations.indices {
                         for step in t..<end {
                             let index = i * readCount + step - lower
-                            let value = source[index]
+                            var value = source[index]
                             // At the file start there is no previous KT; use zero if the next interval is dark.
                             if step == 0, value.isNaN, solar[i, step + 1] == 0 {
-                                output.append(0)
+                                value = 0
                                 states[stateIndex].repaired += 1
                             } else if step > 0, value.isNaN, let replacement = Self.reconstruct(previous: source[index - 1],
                                 solarPrevious: solar[i, step - 1], solarCurrent: solar[i, step], solarNext: solar[i, step + 1]) {
-                                output.append(replacement)
+                                value = replacement
                                 states[stateIndex].repaired += 1
-                            } else {
-                                output.append(value)
                             }
+                            let next = step + 1 < expectedCount ? source[index + 1] : .nan
+                            let limited = Self.limitRadiation(value, solarFactor: solar[i, step],
+                                next: next, solarNext: solar[i, step + 1])
+                            if limited < value { states[stateIndex].limited += 1 }
+                            output.append(limited)
                         }
                     }
                     try writer?.writeData(array: output,
@@ -171,8 +176,23 @@ struct EumetsatSarahRepairSunsetCommand: AsyncCommand {
                 try handle.close()
                 try FileManager.default.moveFileOverwrite(from: state.temporary, to: state.output)
             }
-            logger.info("\(execute ? "Wrote" : "Would write") \(state.output), repairing \(state.repaired) sunset NaNs from \(state.file)")
+            logger.info("\(execute ? "Wrote" : "Would write") \(state.output), repairing \(state.repaired) sunset NaNs and limiting \(state.limited) radiation peaks from \(state.file)")
         }
+    }
+
+    /// Replace radiation above 90% of extraterrestrial radiation using the next observed KT.
+    /// Missing, dark or excessive next samples fall back to KT = 0.8.
+    static func limitRadiation(_ value: Float, solarFactor: Float, next: Float = .nan, solarNext: Float = .nan) -> Float {
+        guard solarFactor.isFinite, solarFactor >= 0 else { return value }
+        let extraterrestrial = solarFactor * Zensun.solarConstant
+        guard value > 0.9 * extraterrestrial else { return value }
+        if next.isFinite, next >= 0, solarNext.isFinite, solarNext > 0 {
+            let kt = next / (solarNext * Zensun.solarConstant)
+            if kt.isFinite, kt <= 0.9 {
+                return kt * extraterrestrial
+            }
+        }
+        return 0.8 * extraterrestrial
     }
 
     static func correctedFilePath(_ file: String) -> String {
