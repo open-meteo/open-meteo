@@ -27,7 +27,10 @@ struct CurlDownloadFilesTests {
             }
             app.get(":file") { request async throws -> Response in
                 let index = Int(request.parameters.get("file")!)!
-                let range = try #require(CurlMemoryDownloadError.singleRange(String(request.headers.first(name: "Range")!.dropFirst(6))))
+                let bounds = try #require(request.headers.first(name: "Range")).dropFirst(6).split(separator: "-")
+                let start = try #require(Int(bounds[0]))
+                let end = try #require(Int(bounds[1]))
+                let range = start..<(end + 1)
                 observed.withLock {
                     $0.active += 1
                     $0.maximum = max($0.maximum, $0.active)
@@ -52,7 +55,7 @@ struct CurlDownloadFilesTests {
             let files = payloads.indices.map { (url: "http://127.0.0.1:\(port)/\($0)", path: directory.appendingPathComponent("\($0)").path) }
             var yieldedURLs = [String]()
             var yieldedBeforeFirstFinished = false
-            for try await file in curl.download(files: files, nConcurrent: concurrent) {
+            for try await file in curl.downloadChunked(files: files, nConcurrent: concurrent) {
                 let index = try #require(files.firstIndex(where: { $0.url == file.url }))
                 #expect(try file.handle.offset() == 0)
                 #expect(try (file.handle.readToEnd() ?? Data()) == payloads[index])
@@ -98,7 +101,7 @@ struct CurlDownloadFilesTests {
             let port = try #require(app.http.server.shared.localAddress?.port)
             let curl = Curl(logger: app.logger, client: HTTPClient.shared)
             var completed = 0
-            for try await file in curl.download(files: [(url: "http://127.0.0.1:\(port)/file", path: directory.appendingPathComponent("file").path)], nConcurrent: 2) {
+            for try await file in curl.downloadChunked(files: [(url: "http://127.0.0.1:\(port)/file", path: directory.appendingPathComponent("file").path)], nConcurrent: 2) {
                 #expect(try file.handle.readToEnd() == payload)
                 try file.handle.close()
                 completed += 1

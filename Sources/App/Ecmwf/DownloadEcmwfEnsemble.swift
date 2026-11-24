@@ -49,7 +49,7 @@ extension DownloadEcmwfCommand {
         let downloads = files.map { (url: $0.url, path: domain.downloadDirectory + URL(string: $0.url)!.lastPathComponent) }
         let hoursByURL = Dictionary(uniqueKeysWithValues: files.map { ($0.url, $0.hour) })
         logger.info("Scanning GRIB headers as files become available")
-        let inventories = try await curl.download(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
+        let inventories = try await curl.downloadChunked(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
             .mapConcurrent(nConcurrent: concurrent) { file in
                 (hour: hoursByURL[file.url]!, file: try EcmwfLocalGribFile(handle: file.handle, source: file.url))
             }

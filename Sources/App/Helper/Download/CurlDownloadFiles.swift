@@ -30,7 +30,7 @@ extension Curl {
     /// at their final paths. Yield cached files immediately and new files in
     /// completion order. Handles are positioned at zero and owned by the consumer.
     /// Parent directories must already exist.
-    func download(files: [(url: String, path: String)], nConcurrent: Int, deadLineHours: Double? = nil) -> AsyncThrowingStream<(url: String, handle: FileHandle), any Error> {
+    func downloadChunked(files: [(url: String, path: String)], nConcurrent: Int, deadLineHours: Double? = nil) -> AsyncThrowingStream<(url: String, handle: FileHandle), any Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -101,7 +101,10 @@ extension Curl {
                                             // A retry overwrites this range from the beginning. Other
                                             // workers write disjoint ranges using independent offsets.
                                             var received = 0
-                                            for try await fragment in response.body {
+                                            // Call next() directly because a for-await loop here can emit a duplicate
+                                            // protocol witness with the wrong async frame size.
+                                            var iterator = response.body.makeAsyncIterator()
+                                            while let fragment = try await iterator.next() {
                                                 try Task.checkCancellation()
                                                 guard Date() <= deadline else { throw CurlError.timeoutReached }
                                                 try CurlMemoryDownloadError.validateSize(current: received, additional: fragment.readableBytes, limit: range.count)
@@ -164,5 +167,4 @@ extension Curl {
             continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
-
 }

@@ -315,39 +315,29 @@ final class Curl: Sendable {
 
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    /// A single closed `range` validates the HTTP response and limits the downloaded byte count.
-    /// Pass `cacheDirectory: nil` to bypass the cache, which buffers responses independently.
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, cacheDirectory: String? = Curl.cacheDirectory, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], quiet: Bool = false) async throws -> ByteBuffer {
-        let expectedRange = range.flatMap(CurlMemoryDownloadError.singleRange)
+    func downloadInMemoryAsync(url: String, minSize: Int?, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], quiet: Bool = false) async throws -> ByteBuffer {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, deadline: deadline, nConcurrent: nConcurrent, quiet: quiet, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
+            let response = try await initiateDownload(url: url, range: nil, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, quiet: quiet, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
 
             // Retry failed file transfers after this point
             do {
-                // Cached and concurrently assembled responses have synthetic headers.
-                if let expectedRange, cacheDirectory == nil, nConcurrent == 1, !url.hasPrefix("file://") {
-                    try CurlMemoryDownloadError.validateRange(status: Int(response.status.code), contentRange: response.headers.first(name: "Content-Range"), expected: expectedRange)
-                }
                 var buffer = ByteBuffer()
                 let contentLength = try response.contentLength()
                 if let contentLength {
-                    try CurlMemoryDownloadError.validateSize(current: 0, additional: contentLength, limit: expectedRange?.count)
                     buffer.reserveCapacity(contentLength)
                 }
                 let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     for try await fragement in response.body.tracker(tracker).decodeBzip2() {
                         try Task.checkCancellation()
-                        // The byte range describes compressed bytes, not the decoded size.
                         buffer.writeImmutableBuffer(fragement)
                     }
                 } else {
                     for try await fragement in response.body.tracker(tracker) {
                         try Task.checkCancellation()
-                        try CurlMemoryDownloadError.validateSize(current: buffer.readableBytes, additional: fragement.readableBytes, limit: expectedRange?.count)
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
