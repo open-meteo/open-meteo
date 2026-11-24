@@ -404,6 +404,13 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     
     case wave_direction
     case wave_height
+    case wave_height_10_to_12s
+    case wave_height_12_to_14s
+    case wave_height_14_to_17s
+    case wave_height_17_to_21s
+    case wave_height_21_to_25s
+    case wave_height_25_to_30s
+    case wave_drag_coefficient
     case wave_period
     case wave_peak_period
     case wind_wave_height

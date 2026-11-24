@@ -5,6 +5,21 @@ import Testing
 @testable import App
 
 struct OmSpatialTimestepWriterTests {
+    @Test func waveDragRetainsPrecisionThroughStorageAndFormatting() async throws {
+        try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
+        let domain = MultistepTestDomain()
+        let run = Timestamp(2026, 11, 24)
+        let variable = EcmwfWaveVariable.wave_drag_coefficient
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: Logger(label: "wave-drag-test"))
+        try await writer.write(time: run, member: 0, variable: variable, data: Array(repeating: 0.00123, count: domain.grid.count))
+        let handles = try await writer.finalise()
+        let handle = try #require(handles.first)
+        let values = try await handle.reader.read()
+        #expect(values.allSatisfy { abs($0 - 0.00123) < 0.000005 })
+        #expect(values[0].formatted(decimals: variable.unit.significantDigits) == "0.001")
+        #expect(variable.unit.abbreviation == "fraction")
+    }
+
     @Test func multistepWriterPreservesTimeAndMemberIdentity() async throws {
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let domain = MultistepTestDomain()

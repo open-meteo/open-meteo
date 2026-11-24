@@ -475,6 +475,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .potentialEvapotranspiration, previousDay: previousDay)
         case .snow_density:
             return .init(variable: .snowDensity, previousDay: previousDay)
+        case .wave_height_10_to_12s, .wave_height_12_to_14s, .wave_height_14_to_17s, .wave_height_17_to_21s, .wave_height_21_to_25s, .wave_height_25_to_30s, .wave_drag_coefficient:
+            // TODO: add period-band heights and wave drag to the SDK.
+            return .init(variable: .undefined)
         case .wave_height:
             return .init(variable: .waveHeight)
         case .wave_period:
