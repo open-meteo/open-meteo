@@ -220,7 +220,7 @@ extension DownloadEcmwfCommand {
                         if step == lastHour { await deaverager.remove(variable: metadata.variable, member: field.member) }
                         let dtSeconds = (step - max(start, lastStep)) * 3600
                         if let fma = metadata.variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
-                            await data.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
+                            data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         let processTime = processStart.timeElapsedSeconds()
                         let writeStart = DispatchTime.now()
@@ -232,9 +232,9 @@ extension DownloadEcmwfCommand {
                 }
             }
             if field.stepType != "instant" {
-                if field.shortName == "z" { await field.grib.array.data.multiplyAddConcurrent(multiply: 1 / 9.80665, add: 0) }
+                if field.shortName == "z" { field.grib.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
                 if let fma = field.variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
-                    await field.grib.array.data.multiplyAddConcurrent(multiply: fma.multiply, add: fma.add)
+                    field.grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
             }
             let timestamp = run.add(hours: field.hour)

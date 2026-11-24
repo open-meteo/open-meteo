@@ -169,35 +169,6 @@ extension Array where Element == Float {
         }
     }
 
-    /// Apply fused multiply-add in place using disjoint ranges of the array's storage.
-    mutating func multiplyAddConcurrent(multiply: Float, add: Float, nConcurrent: Int = 4) async {
-        precondition(nConcurrent > 0)
-        guard !isEmpty else { return }
-        if nConcurrent == 1 {
-            multiplyAdd(multiply: multiply, add: add)
-            return
-        }
-        await Self.multiplyAddConcurrent(&self, count: count, multiply: multiply, add: add, nConcurrent: nConcurrent)
-    }
-
-    private static func multiplyAddConcurrent(_ values: UnsafeMutablePointer<Float>, count: Int, multiply: Float, add: Float, nConcurrent: Int) async {
-        // Implicit array-to-pointer conversion keeps storage valid until this group completes.
-        nonisolated(unsafe) let pointer = values
-        let workers = Swift.min(nConcurrent, count)
-        await withTaskGroup(of: Void.self) { group in
-            for worker in 0..<workers {
-                let lower = count * worker / workers
-                let upper = count * (worker + 1) / workers
-                group.addTask {
-                    for i in lower..<upper {
-                        pointer[i] = fma(pointer[i], multiply, add)
-                    }
-                }
-            }
-            await group.waitForAll()
-        }
-    }
-
     /// Perform a simple delta encoding. Leave the first value as seed.
     /*mutating func deltaEncode() {
         if count <= 1 {
