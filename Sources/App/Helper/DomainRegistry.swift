@@ -137,6 +137,9 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_aifs_europe_ensemble
     case ecmwf_aifs_europe_ensemble_mean
     case ecmwf_wam
+    case ecmwf_wam01
+    case ecmwf_wam01_ensemble
+    case ecmwf_wam01_ensemble_mean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ecmwf_wam025_ensemble_mean
@@ -228,7 +231,7 @@ enum DomainRegistry: String, CaseIterable {
     /// Instead of generating time chunks, use a single rolling files and retain a certain number of days inside
     var useRollingDays: Int? {
         switch self {
-        case .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels:
+        case .ecmwf_wam01_ensemble, .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels:
             return 1
         case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
@@ -531,6 +534,12 @@ enum DomainRegistry: String, CaseIterable {
             return GfsGraphCastDomain.hgefs025_ensemble_mean
         case .ncep_aigefs025_ensemble_mean:
             return GfsGraphCastDomain.aigefs025_ensemble_mean
+        case .ecmwf_wam01:
+            return EcmwfDomain.wam01
+        case .ecmwf_wam01_ensemble:
+            return EcmwfDomain.wam01_ensemble
+        case .ecmwf_wam01_ensemble_mean:
+            return EcmwfDomain.wam01_ensemble_mean
         case .ecmwf_wam025:
             return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:

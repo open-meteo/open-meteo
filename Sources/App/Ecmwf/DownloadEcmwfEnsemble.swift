@@ -44,15 +44,7 @@ extension DownloadEcmwfCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, chunkSizeMB: EcmwfOpenDataSource.fullFileChunkSizeMB(base: base), retryUnauthorized: true, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
         let hours = domain.getDownloadForecastSteps(run: run.hour).filter { $0 <= (signature.maxForecastHour ?? Int.max) }
         guard let lastHour = hours.last else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-        let files = hours.flatMap { hour in domain.getUrl(base: base, run: run, hour: hour).map { (hour: hour, url: $0) } }
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let downloads = files.map { (url: $0.url, path: domain.downloadDirectory + URL(string: $0.url)!.lastPathComponent) }
-        let hoursByURL = Dictionary(uniqueKeysWithValues: files.map { ($0.url, $0.hour) })
-        logger.info("Scanning GRIB headers as files become available")
-        let inventories = try await curl.downloadChunked(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
-            .mapConcurrent(nConcurrent: concurrent) { file in
-                (hour: hoursByURL[file.url]!, file: try EcmwfLocalGribFile(handle: file.handle, source: file.url))
-            }
+        let inventories = try await downloadLocalGribFiles(curl: curl, domain: domain, base: base, run: run, hours: hours, concurrent: concurrent, downloadConcurrent: downloadConcurrent)
         if !domain.isPressureLevels && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             let elevationURL = domain.getUrl(base: base, run: run, hour: 0)[0]
             let elevationPath = domain.downloadDirectory + URL(string: elevationURL)!.lastPathComponent
@@ -315,6 +307,23 @@ extension DownloadEcmwfCommand {
         let conversionWaitStart = DispatchTime.now()
         try await conversionJob?.value
         logger.info("Final conversionWait=\(conversionWaitStart.timeElapsedPretty())")
+        try await publishLocalGribRun(signature: signature, domain: domain, run: run, time: time, uploadQueues: uploadQueues)
+        await curl.printStatistics()
+    }
+
+    private func downloadLocalGribFiles(curl: Curl, domain: EcmwfDomain, base: String, run: Timestamp, hours: [Int], concurrent: Int, downloadConcurrent: Int) async throws -> [(hour: Int, file: EcmwfLocalGribFile)] {
+        let files = hours.flatMap { hour in domain.getUrl(base: base, run: run, hour: hour).map { (hour: hour, url: $0) } }
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        let downloads = files.map { (url: $0.url, path: domain.downloadDirectory + URL(string: $0.url)!.lastPathComponent) }
+        let hoursByURL = Dictionary(uniqueKeysWithValues: files.map { ($0.url, $0.hour) })
+        curl.logger.info("Scanning GRIB headers as files become available")
+        return try await curl.downloadChunked(files: downloads, nConcurrent: downloadConcurrent, deadLineHours: 5.5)
+            .mapConcurrent(nConcurrent: concurrent) { file in
+                (hour: hoursByURL[file.url]!, file: try EcmwfLocalGribFile(handle: file.handle, source: file.url))
+            }
+    }
+
+    private func publishLocalGribRun(signature: Signature, domain: EcmwfDomain, run: Timestamp, time: TimerangeDt, uploadQueues: [S3UploadQueue]) async throws {
         // Publish the run only after all available variables have been converted.
         if !signature.skipTimeseries && signature.timeinterval == nil && domain.generateTimeSeries {
             for outputDomain in [domain, domain.ensembleMeanDomain].compactMap({ $0 }) {
@@ -324,6 +333,48 @@ extension DownloadEcmwfCommand {
                 }
             }
         }
+    }
+
+    func downloadWaveVariables(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
+        let logger = application.logger
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5.5, chunkSizeMB: EcmwfOpenDataSource.fullFileChunkSizeMB(base: base), retryUnauthorized: true, prepareRequest: EcmwfAzureAccess.prepareRequest(base: base, client: application.dedicatedHttpClient))
+        let hours = domain.getDownloadForecastSteps(run: run.hour).filter { $0 <= (signature.maxForecastHour ?? Int.max) }
+        guard let lastHour = hours.last else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        let inventories = try await downloadLocalGribFiles(curl: curl, domain: domain, base: base, run: run, hours: hours, concurrent: concurrent, downloadConcurrent: downloadConcurrent)
+        let chunks = OmFileSplitter(domain).spatialReadChunkDimensions
+        let time = TimerangeDt(start: run, nTime: lastHour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
+        var convertedVariables = 0
+        for variable in variables {
+            let fields = inventories.flatMap { inventory in
+                inventory.file.fields.filter { $0.shortName == variable.gribName }.map {
+                    (hour: inventory.hour, file: inventory.file, field: $0)
+                }
+            }.sorted { ($0.field.member, $0.hour) < ($1.field.member, $1.hour) }
+            guard !fields.isEmpty else { continue }
+            var hoursPerMember = [Set<Int>](repeating: [], count: domain.countEnsembleMember)
+            for entry in fields {
+                guard hoursPerMember.indices.contains(entry.field.member), hoursPerMember[entry.field.member].insert(entry.hour).inserted else {
+                    throw EcmwfLocalGribFile.Failure.invalidMetadata
+                }
+            }
+            guard hoursPerMember.allSatisfy({ $0 == Set(hours) }) else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+            logger.info("Reading \(variable.rawValue): \(fields.count) local fields")
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, chunkDimensions: [chunks.y, chunks.x])
+            try await fields.async.foreachConcurrent(nConcurrent: concurrent) { entry in
+                let data = try entry.file.withMessage(field: entry.field) { message in
+                    var grib = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    try grib.load(message: message)
+                    grib.array.flipLatitude()
+                    return grib.array.data
+                }
+                try await writer.write(time: run.add(hours: entry.hour), member: entry.field.member, variable: variable, data: data)
+            }
+            let handles = try await writer.finalise()
+            try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: !domain.isEnsemble, generateTimeSeries: !signature.skipTimeseries, ensembleMeanDomain: domain.ensembleMeanDomain)
+            convertedVariables += 1
+        }
+        guard convertedVariables > 0 else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        try await publishLocalGribRun(signature: signature, domain: domain, run: run, time: time, uploadQueues: uploadQueues)
         await curl.printStatistics()
     }
 }

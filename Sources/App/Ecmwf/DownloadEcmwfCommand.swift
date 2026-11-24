@@ -87,7 +87,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
         let logger = context.application.logger
-        let isWave = domain == .wam025 || domain == .wam025_ensemble
+        let isWave = domain.isWam01 || domain == .wam025 || domain == .wam025_ensemble
 
         let nConcurrent = signature.concurrent ?? 1
         let nDownloadConcurrent = signature.downloadConcurrent ?? (2 * nConcurrent)
@@ -96,14 +96,15 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 
-        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
+        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: isWave ? nil : signature.onlyVariables)
         let variables = (onlyVariables ?? EcmwfVariable.allCases).filter { domain.includes(variable: $0) }
         if domain.isIfs01 && variables.isEmpty {
             throw Abort(.badRequest, reason: "No selected variables belong to \(domain.rawValue)")
         }
-        let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_peak_period]
+        let waveVariables = try EcmwfWaveVariable.load(commaSeparatedOptional: isWave ? signature.onlyVariables : nil)
+            ?? (domain.isWam01 ? EcmwfWaveVariable.allCases : [.wave_direction, .wave_height, .wave_period, .wave_peak_period])
 
-        if domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels {
+        if domain.isIfs01 || domain.isWam01 {
             let runs = try signature.timeinterval.map {
                 Array(try Timestamp.parseRange(yyyymmdd: $0).toRange(dt: 86400).with(dtSeconds: 86400 / 4))
             } ?? [run]
@@ -111,7 +112,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let selected = variables.filter { $0.gribName != nil }
             for run in runs {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
+                if domain.isWam01 {
+                    try await downloadWaveVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
+                } else {
+                    try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
+                }
             }
             return
         }
@@ -543,7 +548,7 @@ extension EcmwfDomain {
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .ifs01, .ifs01_pressure_levels, .ifs01_ensemble, .ifs01_ensemble_pressure_levels:
+        case .wam01, .wam01_ensemble, .ifs01, .ifs01_pressure_levels, .ifs01_ensemble, .ifs01_ensemble_pressure_levels:
             // IFS 0.1° open data is published two hours later than IFS 0.25°.
             return t.subtract(hours: 8).floor(toNearestHour: 6)
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
@@ -552,7 +557,7 @@ extension EcmwfDomain {
         case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
             return t.subtract(hours: 4).floor(toNearestHour: 6)
-        case .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .wam01_ensemble_mean, .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             fatalError()
         }
     }
@@ -569,6 +574,12 @@ extension EcmwfDomain {
             return isEnsemble ? [control, "\(root)enfo/\(prefix)-enfo-ef-\(levelType).grib2"] : [control]
         case .ifs04, .ifs04_ensemble:
             preconditionFailure("IFS 0.4° downloads are deprecated")
+        case .wam01, .wam01_ensemble:
+            let root = "\(base)\(dateStr)/\(runStr)z/ifs/0p1/"
+            let prefix = "\(dateStr)\(runStr)0000-\(hour)h"
+            let product = isEnsemble ? "waef" : "wave"
+            let type = isEnsemble ? "ef" : "fc"
+            return ["\(root)\(product)/\(prefix)-\(product)-\(type)-sfc.grib2"]
         case .wam025:
             let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "wave" : "scwv"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
@@ -594,7 +605,7 @@ extension EcmwfDomain {
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-cf.grib2",
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-pf.grib2"
             ]
-        case .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .wam01_ensemble_mean, .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             fatalError()
         }
     }

@@ -1261,9 +1261,10 @@ extension MultiDomains {
             return .ewam
         case .era5_ocean:
             return .era5Ocean
-        case .ecmwf_wam025:
+        // TODO: add WAM 0.1° model identifiers to the SDK.
+        case .ecmwf_wam01, .ecmwf_wam025:
             return .ecmwfWam025
-        case .ecmwf_wam025_ensemble:
+        case .ecmwf_wam01_ensemble, .ecmwf_wam025_ensemble:
             return .ecmwfWam025Ensemble
         case .meteofrance_wave:
             return .meteofranceWave
@@ -1356,7 +1357,7 @@ extension MultiDomains {
             return .meteoswissIconCh1EnsembleMean
         case .meteoswiss_icon_ch2_ensemble_mean:
             return .meteoswissIconCh2EnsembleMean
-        case .ecmwf_wam025_ensemble_mean:
+        case .ecmwf_wam01_ensemble_mean, .ecmwf_wam025_ensemble_mean:
             return .ecmwfWam025EnsembleMean
         case .ncep_gefswave025_ensemble_mean:
             return .ncepGefswave025EnsembleMean

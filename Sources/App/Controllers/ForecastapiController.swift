@@ -958,6 +958,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_ewam
     case dwd_gwam
     case era5_ocean
+    case ecmwf_wam01
+    case ecmwf_wam01_ensemble
+    case ecmwf_wam01_ensemble_mean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ncep_gfswave025
@@ -1803,6 +1806,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(IconWaveDomain.gwam, IconWaveVariable.self)
         case .era5_ocean:
             return .single(CdsDomain.era5_ocean, Era5Variable.self)
+        case .ecmwf_wam01:
+            return .single(EcmwfDomain.wam01, EcmwfWaveVariable.self)
+        case .ecmwf_wam01_ensemble:
+            return .single(EcmwfDomain.wam01_ensemble, EcmwfWaveVariable.self)
+        case .ecmwf_wam01_ensemble_mean:
+            return .single(EcmwfDomain.wam01_ensemble_mean, VariableOrSpread<EcmwfWaveVariable>.self)
         case .ecmwf_wam025:
             return .single(EcmwfDomain.wam025, EcmwfWaveVariable.self)
         case .ecmwf_wam025_ensemble:
@@ -2409,6 +2418,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return MeteoSwissDomain.icon_ch2_ensemble.countEnsembleMember
         case .ecmwf_seasonal_seamless, .ecmwf_seas5, .ecmwf_ec46:
             return EcmwfSeasDomain.seas5.countEnsembleMember
+        case .ecmwf_wam01_ensemble:
+            return EcmwfDomain.wam01_ensemble.countEnsembleMember
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble.countEnsembleMember
         case .ncep_gefswave025:
