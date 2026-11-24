@@ -28,7 +28,12 @@ extension DownloadEcmwfCommand {
         let stepRange: String
     }
 
-    /// Cache and index complete GRIB files, then write spatial fields for conversion.
+    private struct EnsembleVariableMember: Hashable {
+        let variable: EcmwfVariable
+        let member: Int
+    }
+
+    /// Cache and index complete GRIB files, then assemble time series for conversion.
     func downloadEnsembleVariables(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
         let variables = domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels || domain == .ifs025_ensemble
             ? variables.filter {
@@ -129,7 +134,7 @@ extension DownloadEcmwfCommand {
             return $0.field.range.lowerBound < $1.field.range.lowerBound
         }
         logger.info("Reading \(availableVariableCount) variables: \(fields.count) local fields")
-        // Convert each variable once all its spatial fields have been written.
+        // Convert each variable once all its member time series have been written.
         var conversionJob: Task<Void, any Error>?
 
         let progress = TransferAmountTracker(logger: curl.logger, totalSize: fields.reduce(0) { $0 + $1.field.range.count }, name: "Read \(domain.rawValue)")
@@ -143,20 +148,17 @@ extension DownloadEcmwfCommand {
         let specificHumidityCalculator = SpecificHumidityCalculator<EcmwfVariable>()
         let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
         let chunks = OmFileSplitter(domain).spatialReadChunkDimensions
-        // Writers create timestep files lazily, including outputs produced by calculators.
-        let writers = Dictionary(uniqueKeysWithValues: EcmwfVariable.allCases.map { variable in
-            (variable, OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger, chunkDimensions: [chunks.y, chunks.x]))
-        })
         let deaverager = GribDeaverager()
         let inMemoryAccumulated = VariablePerMemberStorage<AccumulatedVariable>()
         let positiveHours = hours.filter { $0 > 0 }
         let nextHours = Dictionary(uniqueKeysWithValues: zip([0] + positiveHours, positiveHours))
-        var timings = [EcmwfVariable: (process: Double, write: Double)]()
+        var series = [EnsembleVariableMember: (timesteps: [(time: Int, data: [Float])], process: Double)]()
+        var handles = [EcmwfVariable: [GenericVariableHandle]]()
         defer { conversionJob?.cancel() }
 
-        // Workers decode, deaccumulate, derive and write spatial fields. Only
-        // completed-field accounting and conversion scheduling run in the consumer.
-        let processed = fields.mapStream(nConcurrent: concurrent, body: { entry -> [(variable: EcmwfVariable, member: Int, hour: Int, process: Double, write: Double)] in
+        // Workers decode, deaccumulate and derive spatial fields. The consumer
+        // assembles complete member time series for interpolation and conversion.
+        let processed = fields.mapStream(nConcurrent: concurrent, body: { entry -> [(variable: EcmwfVariable, member: Int, hour: Int, data: [Float], process: Double)] in
             var field = try entry.file.withMessage(field: entry.field) { message in
                 guard let shortName = message.get(attribute: "shortName"),
                       let level = message.get(attribute: "level").flatMap(Int.init),
@@ -182,7 +184,7 @@ extension DownloadEcmwfCommand {
                 }
                 return DecodedEnsembleField(variable: entry.variable, hour: entry.hour, member: entry.member, shortName: shortName, stepType: stepType, stepRange: stepRange, array2d: grib.array)
             }
-            var written = [(variable: EcmwfVariable, member: Int, hour: Int, process: Double, write: Double)]()
+            var decoded = [(variable: EcmwfVariable, member: Int, hour: Int, data: [Float], process: Double)]()
             let processStart = DispatchTime.now()
             let start = field.stepRange.splitTo2Integer()?.0 ?? field.hour
             let dtSeconds = field.stepType == "instant" ? domain.dtSeconds : max(1, field.hour - start) * 3600
@@ -215,12 +217,10 @@ extension DownloadEcmwfCommand {
                             data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         let processTime = processStart.timeElapsedSeconds()
-                        let writeStart = DispatchTime.now()
-                        try await writers[metadata.variable]!.write(time: timestamp, member: field.member, variable: metadata.variable, data: data.data)
-                        written.append((metadata.variable, field.member, step, processTime, writeStart.timeElapsedSeconds()))
+                        decoded.append((metadata.variable, field.member, step, data.data, processTime))
                     }
                     await progress.add(entry.field.range.count)
-                    return written
+                    return decoded
                 }
             }
             if field.stepType != "instant" {
@@ -272,37 +272,49 @@ extension DownloadEcmwfCommand {
             }
             let processTime = processStart.timeElapsedSeconds() / Double(max(1, results.count))
             for result in results {
-                let writer = writers[result.variable]!
-                let writeStart = DispatchTime.now()
-                try await writer.write(time: timestamp, member: field.member, variable: result.variable, data: result.data)
-                written.append((result.variable, field.member, field.hour, processTime, writeStart.timeElapsedSeconds()))
+                decoded.append((result.variable, field.member, field.hour, result.data, processTime))
             }
             await progress.add(entry.field.range.count)
-            return written
+            return decoded
         })
         for try await field in processed.flatMap({ $0.async }) {
             let variable = field.variable
-            var timing = timings.removeValue(forKey: variable) ?? (0, 0)
-            timing.process += field.process
-            timing.write += field.write
+            let key = EnsembleVariableMember(variable: variable, member: field.member)
+            var current = series.removeValue(forKey: key) ?? ([], 0)
+            current.timesteps.append((time: field.hour * 3600 / domain.dtSeconds, data: field.data))
+            current.process += field.process
             guard field.hour == lastHour else {
-                timings[variable] = timing
+                series[key] = current
                 continue
             }
-            logger.info("\(variable.rawValue) member \(field.member): process=\(timing.process.asSecondsPrettyPrint), write=\(timing.write.asSecondsPrettyPrint)")
+
+            let transposeStart = DispatchTime.now()
+            var data = await Array2DFastTime(timesteps: current.timesteps, nLocations: domain.grid.count, nTime: time.count, nConcurrent: concurrent)
+            current.timesteps.removeAll()
+            let transposeTime = transposeStart.timeElapsedPretty()
+            let interpolationStart = DispatchTime.now()
+            await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
+            let interpolationTime = interpolationStart.timeElapsedPretty()
+            let writeStart = DispatchTime.now()
+            let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [chunks.y, chunks.x, time.count])
+            let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data.data, nConcurrent: concurrent)
+            let handle = try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: fn, domain: domain)
+            data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
+            logger.info("\(variable.rawValue) member \(field.member): process=\(current.process.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime), write=\(writeStart.timeElapsedPretty())")
+            handles[variable, default: []].append(handle)
             guard field.member == lastMember else { continue }
 
-            let handles = try await writers[variable]!.finalise()
+            let completedHandles = handles.removeValue(forKey: variable)!
             let conversionWaitStart = DispatchTime.now()
             try await conversionJob?.value
             logger.info("Before converting \(variable.rawValue): conversionWait=\(conversionWaitStart.timeElapsedPretty())")
             conversionJob = Task {
                 let conversionStart = DispatchTime.now()
-                try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
+                try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: completedHandles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
                 logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
             }
         }
-        guard timings.isEmpty, await deaverager.data.isEmpty, await inMemoryAccumulated.data.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        guard series.isEmpty, handles.isEmpty, await deaverager.data.isEmpty, await inMemoryAccumulated.data.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         await progress.finish()
         let conversionWaitStart = DispatchTime.now()
         try await conversionJob?.value
