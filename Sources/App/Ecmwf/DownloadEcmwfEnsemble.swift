@@ -18,7 +18,7 @@ extension DownloadEcmwfCommand {
         let shortName: String
         let stepType: String
         let stepRange: String
-        var grib: GribArray2D
+        var array2d: Array2D
     }
 
     struct AccumulatedVariable: Hashable, Sendable {
@@ -188,7 +188,7 @@ extension DownloadEcmwfCommand {
                     let fma = entry.variable.gribName == "2d" ? (multiply: Float(1), add: Float(-273.15)) : entry.variable.multiplyAdd(domain: domain, dtSeconds: domain.dtSeconds)
                     if let fma { grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add) }
                 }
-                return DecodedEnsembleField(variable: entry.variable, hour: entry.hour, member: entry.member, shortName: shortName, stepType: stepType, stepRange: stepRange, grib: grib)
+                return DecodedEnsembleField(variable: entry.variable, hour: entry.hour, member: entry.member, shortName: shortName, stepType: stepType, stepRange: stepRange, array2d: grib.array)
             }
             var written = [(variable: EcmwfVariable, member: Int, hour: Int, process: Double, write: Double)]()
             let processStart = DispatchTime.now()
@@ -196,10 +196,10 @@ extension DownloadEcmwfCommand {
             let dtSeconds = field.stepType == "instant" ? domain.dtSeconds : max(1, field.hour - start) * 3600
             if field.stepType == "accum" || field.stepType == "avg" {
                 if field.hour == 0 {
-                    field.grib.array.data = [Float](repeating: .nan, count: field.grib.array.data.count)
+                    field.array2d.data = [Float](repeating: .nan, count: field.array2d.data.count)
                 } else {
                     let accumulated = AccumulatedVariable(variable: field.variable, shortName: field.shortName, stepType: field.stepType, stepRange: field.stepRange)
-                    await inMemoryAccumulated.set(variable: accumulated, timestamp: run.add(hours: field.hour), member: field.member, data: field.grib.array)
+                    await inMemoryAccumulated.set(variable: accumulated, timestamp: run.add(hours: field.hour), member: field.member, data: field.array2d)
                     // Drain buffered timesteps in sequence. Each result keeps its own timestamp.
                     while true {
                         try Task.checkCancellation()
@@ -232,9 +232,9 @@ extension DownloadEcmwfCommand {
                 }
             }
             if field.stepType != "instant" {
-                if field.shortName == "z" { field.grib.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
+                if field.shortName == "z" { field.array2d.data.multiplyAdd(multiply: 1 / 9.80665, add: 0) }
                 if let fma = field.variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
-                    field.grib.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    field.array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
             }
             let timestamp = run.add(hours: field.hour)
@@ -243,14 +243,14 @@ extension DownloadEcmwfCommand {
             switch parameter {
             case "2t", "2d":
                 guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-                let input: RelativeHumidityCalculator.Input = parameter == "2t" ? .temperature(field.grib.array) : .dewpoint(field.grib.array)
+                let input: RelativeHumidityCalculator.Input = parameter == "2t" ? .temperature(field.array2d) : .dewpoint(field.array2d)
                 if let data = await rhCalculator.calculate(input, member: field.member, timestamp: timestamp) {
                     results.append((.relative_humidity_2m, data))
                 }
             case "sd", "rsn":
                 if !isAifs {
                     guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-                    let input: SnowDepthCalculator.Input = parameter == "sd" ? .waterEquivalent(field.grib.array) : .density(field.grib.array)
+                    let input: SnowDepthCalculator.Input = parameter == "sd" ? .waterEquivalent(field.array2d) : .density(field.array2d)
                     if let data = await snowDepthCalculator.calculate(input, member: field.member, timestamp: timestamp) {
                         results.append((.snow_depth, data))
                     }
@@ -259,14 +259,14 @@ extension DownloadEcmwfCommand {
                 let level = field.variable.level!
                 if parameter != "q", let output = EcmwfVariable.from(shortName: "w", levelhPa: level) {
                     guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-                    let input: VerticalVelocityCalculator<EcmwfVariable>.Input = parameter == "t" ? .temperature(field.grib.array) : .omega(field.grib.array)
+                    let input: VerticalVelocityCalculator<EcmwfVariable>.Input = parameter == "t" ? .temperature(field.array2d) : .omega(field.array2d)
                     if let data = await verticalVelocityCalculator.calculate(input, member: field.member, timestamp: timestamp, pressureLevel: Float(level), outVariable: output) {
                         results.append((output, data))
                     }
                 }
                 if isAifs && level != 10 && parameter != "w", let output = EcmwfVariable.from(shortName: "r", levelhPa: level) {
                     guard field.stepType == "instant" else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
-                    let input: SpecificHumidityCalculator<EcmwfVariable>.Input = parameter == "t" ? .temperature(field.grib.array) : .specificHumidity(field.grib.array)
+                    let input: SpecificHumidityCalculator<EcmwfVariable>.Input = parameter == "t" ? .temperature(field.array2d) : .specificHumidity(field.array2d)
                     if let data = await specificHumidityCalculator.calculate(input, member: field.member, timestamp: timestamp, pressureLevel: Float(level), outVariable: output) {
                         results.append((output, data))
                     }
@@ -276,7 +276,7 @@ extension DownloadEcmwfCommand {
             }
             // Derived inputs are never written as if they were the final output.
             if !["2d", "rsn", "w", "q"].contains(parameter) {
-                results.append((field.variable, field.grib.array.data))
+                results.append((field.variable, field.array2d.data))
             }
             let processTime = processStart.timeElapsedSeconds() / Double(max(1, results.count))
             for result in results {
