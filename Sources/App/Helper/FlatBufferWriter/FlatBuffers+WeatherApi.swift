@@ -2,16 +2,23 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
+private extension VariableAndPreviousDay.Percentile {
+    var flatBuffersAggregation: openmeteo_sdk_Aggregation {
+        switch self {
+        case .p10: .p10
+        case .p25: .p25
+        case .p50: .median
+        case .p75: .p75
+        case .p90: .p90
+        }
+    }
+}
+
 extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         var meta = getBaseFlatBuffersMeta()
-        switch percentile {
-        case .p10: meta.aggregation = .p10
-        case .p25: meta.aggregation = .p25
-        case .p50: meta.aggregation = .median
-        case .p75: meta.aggregation = .p75
-        case .p90: meta.aggregation = .p90
-        case nil: break
+        if let percentile {
+            meta.aggregation = percentile.flatBuffersAggregation
         }
         return meta
     }
