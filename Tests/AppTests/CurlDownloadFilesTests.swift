@@ -52,7 +52,10 @@ struct CurlDownloadFilesTests {
             try await app.server.start(address: .hostname("127.0.0.1", port: 0))
             let port = try #require(app.http.server.shared.localAddress?.port)
             let curl = Curl(logger: app.logger, client: HTTPClient.shared, chunkSizeMB: 1)
-            let files = payloads.indices.map { (url: "http://127.0.0.1:\(port)/\($0)", path: directory.appendingPathComponent("\($0)").path) }
+            var files = payloads.indices.map { (url: "http://127.0.0.1:\(port)/\($0)", path: directory.appendingPathComponent("\($0)").path) }
+            // Cached files must be yielded without making a request, even for an invalid URL.
+            try payloads[3].write(to: URL(fileURLWithPath: files[3].path))
+            files[3].url = "not a URL"
             var yieldedURLs = [String]()
             var yieldedBeforeFirstFinished = false
             for try await file in curl.downloadChunked(files: files, nConcurrent: concurrent) {

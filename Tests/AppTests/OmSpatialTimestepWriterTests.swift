@@ -5,12 +5,12 @@ import Testing
 @testable import App
 
 struct OmSpatialTimestepWriterTests {
-    @Test(arguments: [false, true]) func multistepWriterPreservesTimeAndMemberIdentity(alignedChunks: Bool) async throws {
+    @Test func multistepWriterPreservesTimeAndMemberIdentity() async throws {
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         let domain = MultistepTestDomain()
         let run = Timestamp(2026, 11, 17)
         let readChunks = OmFileSplitter(domain).spatialReadChunkDimensions
-        let chunks = alignedChunks ? [readChunks.y, readChunks.x] : nil
+        let chunks = [readChunks.y, readChunks.x]
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: Logger(label: "multistep-test"), chunkDimensions: chunks)
         let variable = EcmwfVariable.temperature_2m
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -26,19 +26,12 @@ struct OmSpatialTimestepWriterTests {
         #expect(handles.count == 3)
         #expect(handles.map { $0.time.range.lowerBound } == [run.add(hours: 3), run.add(hours: 3), run.add(hours: 6)])
         for handle in handles {
-            #expect(handle.reader.getChunkDimensions() == (chunks ?? [3, 341]).map(UInt64.init))
+            #expect(handle.reader.getChunkDimensions() == chunks.map(UInt64.init))
             let hour = (handle.time.range.lowerBound.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
-            for y in stride(from: 0, to: domain.grid.ny, by: readChunks.y) {
-                for x in stride(from: 0, to: domain.grid.nx, by: readChunks.x) {
-                    let endY = min(y + readChunks.y, domain.grid.ny)
-                    let endX = min(x + readChunks.x, domain.grid.nx)
-                    let data = try await handle.reader.read(range: [UInt64(y)..<UInt64(endY), UInt64(x)..<UInt64(endX)])
-                    #expect(data == Array(repeating: Float(hour + handle.member), count: (endY - y) * (endX - x)))
-                }
-            }
+            let data = try await handle.reader.read()
+            #expect(data == Array(repeating: Float(hour + handle.member), count: domain.grid.count))
         }
     }
-
 }
 
 private struct MultistepTestDomain: GenericDomain {

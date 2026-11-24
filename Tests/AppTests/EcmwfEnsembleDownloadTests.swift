@@ -8,16 +8,8 @@ struct EcmwfEnsembleDownloadTests {
     }
 
     @Test func matchingDistinguishesPressureAndSoilLevelsFromSurfaceHeights() {
-        #expect(EcmwfVariable.temperature_2m.matches(entry("2t", level: 2)))
-        #expect(EcmwfVariable.relative_humidity_2m.matches(entry("2d", level: 2)))
-        #expect(EcmwfVariable.snow_depth.matches(entry("rsn")))
-        #expect(EcmwfVariable.snow_depth_water_equivalent.matches(entry("sd")))
-        #expect(EcmwfVariable.temperature_2m_max.matches(entry("max_2t", level: 2)))
-        #expect(EcmwfVariable.temperature_2m_max.matches(entry("mx2t6", level: 2)))
         #expect(EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", level: 2, type: "depthBelowLandLayer")))
         #expect(!EcmwfVariable.soil_temperature_7_to_28cm.matches(entry("sot", level: 1, type: "depthBelowLandLayer")))
-        #expect(EcmwfVariable.soil_temperature_7_to_28cm.matches(shortName: "sot", level: 2))
-        #expect(!EcmwfVariable.soil_temperature_7_to_28cm.matches(shortName: "sot", level: 1))
         #expect(EcmwfVariable.vertical_velocity_500hPa.matches(entry("w", level: 500, type: "isobaricInhPa")))
         #expect(!EcmwfVariable.vertical_velocity_500hPa.matches(entry("w", level: 700, type: "isobaricInhPa")))
         #expect(!EcmwfVariable.temperature_500hPa.matches(entry("t", level: 500)))

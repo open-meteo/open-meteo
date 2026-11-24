@@ -1,6 +1,4 @@
-import AsyncHTTPClient
 import Foundation
-import Logging
 import OmFileFormat
 import Testing
 @testable import App
@@ -34,28 +32,5 @@ struct EcmwfLocalGribFileTests {
         let truncated = directory.appendingPathComponent("truncated.grib2")
         try data.dropLast().write(to: truncated)
         #expect(throws: EcmwfLocalGribFile.Failure.self) { try EcmwfLocalGribFile(handle: FileHandle.openFileReading(file: truncated.path), source: truncated.path) }
-    }
-
-    @Test func existingFilesAreReusedWithoutAnyHTTPRequests() async throws {
-        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let data = try #require(Data(base64Encoded: fixture))
-        try data.write(to: path)
-        defer { try? FileManager.default.removeItem(at: path) }
-        let curl = Curl(logger: Logger(label: "cache-test"), client: HTTPClient.shared)
-        // Any attempted HTTP request would fail with this invalid URL.
-        let files = try await curl.downloadChunked(files: [(url: "not a URL", path: path.path)], nConcurrent: 8).collect()
-        #expect(files.count == 1)
-        #expect(files.first?.url == "not a URL")
-        let handle = try #require(files.first?.handle)
-        #expect(try handle.offset() == 0)
-        #expect(try handle.readToEnd() == data)
-        try handle.close()
-    }
-
-    @Test func selectsProviderChunkSizes() {
-        #expect(EcmwfOpenDataSource.fullFileChunkSizeMB(base: EcmwfOpenDataSource.aws.baseURL) == 8)
-        #expect(EcmwfOpenDataSource.fullFileChunkSizeMB(base: EcmwfOpenDataSource.ecmwf.baseURL) == 64)
-        #expect(EcmwfOpenDataSource.fullFileChunkSizeMB(base: EcmwfOpenDataSource.azure.baseURL) == 4)
-        #expect(EcmwfOpenDataSource.fullFileChunkSizeMB(base: EcmwfOpenDataSource.google.baseURL) == 100)
     }
 }

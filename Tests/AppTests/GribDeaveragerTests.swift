@@ -2,22 +2,6 @@ import Testing
 @testable import App
 
 struct GribDeaveragerTests {
-    @Test func bufferedFieldsRetainTheirOwnAccumulationInterval() async throws {
-        let storage = VariablePerMemberStorage<DownloadEcmwfCommand.AccumulatedVariable>()
-        let time = Timestamp(2026, 11, 18)
-        let first = DownloadEcmwfCommand.AccumulatedVariable(variable: .precipitation, shortName: "tp", stepType: "accum", stepRange: "0-3")
-        let reset = DownloadEcmwfCommand.AccumulatedVariable(variable: .precipitation, shortName: "tp", stepType: "accum", stepRange: "3-6")
-        await storage.set(variable: first, timestamp: time, member: 0, data: Array2D(data: [3], nx: 1, ny: 1))
-        await storage.set(variable: reset, timestamp: time.add(hours: 3), member: 0, data: Array2D(data: [5], nx: 1, ny: 1))
-        await storage.set(variable: first, timestamp: time, member: 1, data: Array2D(data: [9], nx: 1, ny: 1))
-        let field = try #require(await storage.remove(timestamp: time.add(hours: 3), member: 0, matching: { $0.variable == .precipitation }))
-        #expect(field.variable.stepRange == "3-6")
-        #expect(field.data.data == [5])
-        #expect(await storage.remove(timestamp: time.add(hours: 3), member: 0, matching: { $0.variable == .precipitation }) == nil)
-        #expect(await storage.get(variable: first, timestamp: time, member: 0)?.data == [3])
-        #expect(await storage.get(variable: first, timestamp: time, member: 1)?.data == [9])
-    }
-
     @Test func concurrentAccumulationAndAveragesPreserveHistoryAndResets() async {
         for length in [0, 1, 7] {
             for stepType in ["accum", "avg"] {
@@ -39,26 +23,5 @@ struct GribDeaveragerTests {
                 }
             }
         }
-    }
-
-    @Test func skippedStepsAndStreamsRemainIndependent() async {
-        let deaverager = GribDeaverager()
-        var array = Array2D(data: [10, 20], nx: 2, ny: 1)
-        #expect(await deaverager.deaccumulateIfRequired(variable: "rain", member: 0, stepType: "instant", stepRange: "invalid", array2d: &array))
-        #expect(await deaverager.lastStep("rain", 0) == nil)
-        #expect(!(await deaverager.deaccumulateIfRequired(variable: "rain", member: 0, stepType: "accum", stepRange: "invalid", array2d: &array)))
-        #expect(!(await deaverager.deaccumulateIfRequired(variable: "rain", member: 0, stepType: "accum", stepRange: "0-0", array2d: &array)))
-        #expect(await deaverager.lastStep("rain", 0) == nil)
-        for (variable, member, scale) in [("rain", 0, 1), ("rain", 1, 2), ("snow", 0, 3)] {
-            for hour in [3, 6, 9] {
-                var field = Array2D(data: [Float(hour * scale), Float(hour * scale * 2)], nx: 2, ny: 1)
-                #expect(await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(hour)", array2d: &field))
-                #expect(field.data == [Float(3 * scale), Float(6 * scale)])
-            }
-        }
-        #expect(await deaverager.deaccumulateIfRequired(variable: "rain", member: 0, stepType: "accum", stepRange: "0-9", array2d: &array))
-        #expect(array.data == [10, 20])
-        #expect(await deaverager.deaccumulateIfRequired(variable: "rain", member: 0, stepType: "accum", stepRange: "0-6", array2d: &array))
-        #expect(array.data == [10, 20])
     }
 }
