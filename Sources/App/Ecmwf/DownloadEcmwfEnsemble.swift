@@ -61,22 +61,45 @@ extension DownloadEcmwfCommand {
 
         let createNetcdf = signature.createNetcdf
         let generateTimeSeries = !signature.skipTimeseries
-        // Process source fields before their consumers at each member/timestep.
+        let priorityVariables: [EcmwfVariable] = [
+            .temperature_2m, .relative_humidity_2m, .temperature_2m_max, .temperature_2m_min,
+            .shortwave_radiation,
+            .wind_u_component_10m, .wind_v_component_10m,
+            .wind_u_component_100m, .wind_v_component_100m, .wind_gusts_10m,
+            .precipitation, .showers, .snowfall_water_equivalent,
+            .snow_depth, .snow_depth_water_equivalent,
+            .surface_temperature, .pressure_msl,
+            .cloud_cover, .cloud_cover_high, .cloud_cover_low, .cloud_cover_mid, .cape,
+            .soil_moisture_0_to_7cm, .soil_moisture_100_to_255cm,
+            .soil_moisture_28_to_100cm, .soil_moisture_7_to_28cm,
+            .soil_temperature_0_to_7cm, .soil_temperature_100_to_255cm,
+            .soil_temperature_28_to_100cm, .soil_temperature_7_to_28cm,
+            .total_column_integrated_water_vapour, .runoff, .precipitation_type,
+            .ocean_u_current, .ocean_v_current, .sea_ice_thickness, .sea_level_height_msl
+        ]
+        let priorities = Dictionary(uniqueKeysWithValues: priorityVariables.enumerated().map { ($0.element, $0.offset) })
+        // Keep calculator inputs together at each member/timestep, in priority order.
         let order = Dictionary(uniqueKeysWithValues: variables.map { variable in
             let parameter: String
-            let priority: Int
+            let inputPriority: Int
             switch variable.gribName {
-            case "2t": parameter = "2t"; priority = 0
-            case "2d": parameter = "2t"; priority = 1
-            case "sd": parameter = "sd"; priority = 0
-            case "rsn": parameter = "sd"; priority = 1
-            case "t": parameter = "t"; priority = 0
-            case "w": parameter = "t"; priority = 1
-            case "q": parameter = "t"; priority = 2
-            default: parameter = variable.gribName!; priority = 0
+            case "2t": parameter = "2t"; inputPriority = 0
+            case "2d": parameter = "2t"; inputPriority = 1
+            case "rsn": parameter = "sd"; inputPriority = 0
+            case "sd": parameter = "sd"; inputPriority = 1
+            case "t": parameter = "t"; inputPriority = 0
+            case "w": parameter = "t"; inputPriority = 1
+            case "q": parameter = "t"; inputPriority = 2
+            default: parameter = variable.gribName!; inputPriority = 0
             }
-            let level = variable.level ?? 0
-            return (variable, (parameter, level, priority, variable.rawValue))
+            let groupVariable: EcmwfVariable
+            switch variable {
+            case .relative_humidity_2m: groupVariable = .temperature_2m
+            case .snow_depth_water_equivalent: groupVariable = .snow_depth
+            default: groupVariable = variable
+            }
+            let priority = priorities[groupVariable] ?? priorityVariables.count
+            return (variable, (priority, parameter, variable.level ?? 0, inputPriority, variable.rawValue))
         })
         var fields = [EnsembleField]()
         var availableVariableCount = 0
@@ -106,11 +129,8 @@ extension DownloadEcmwfCommand {
         fields.sort {
             let a = order[$0.variable]!
             let b = order[$1.variable]!
-            let aDerives = ["2t", "sd", "t"].contains(a.0)
-            let bDerives = ["2t", "sd", "t"].contains(b.0)
-            if aDerives != bDerives { return aDerives }
             // Keep related inputs together; each variable's hours remain ascending.
-            if (a.0, a.1) != (b.0, b.1) { return (a.0, a.1) < (b.0, b.1) }
+            if (a.0, a.1, a.2) != (b.0, b.1, b.2) { return (a.0, a.1, a.2) < (b.0, b.1, b.2) }
             if $0.member != $1.member { return $0.member < $1.member }
             if $0.hour != $1.hour { return $0.hour < $1.hour }
             if $0.variable != $1.variable { return a < b }
