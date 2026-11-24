@@ -488,6 +488,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .potentialEvapotranspiration, previousDay: previousDay)
         case .snow_density:
             return .init(variable: .snowDensity, previousDay: previousDay)
+        case .wave_height_10_to_12s, .wave_height_12_to_14s, .wave_height_14_to_17s, .wave_height_17_to_21s, .wave_height_21_to_25s, .wave_height_25_to_30s, .wave_drag_coefficient:
+            // TODO: add period-band heights and wave drag to the SDK.
+            return .init(variable: .undefined)
         case .wave_height:
             return .init(variable: .waveHeight)
         case .wave_period:
@@ -1142,6 +1145,12 @@ extension MultiDomains {
             return .arpaeCosmo2iRuc
         case .arpae_cosmo_5m:
             return .arpaeCosmo5m
+        case .ecmwf_ifs01, .ecmwf_ifs01_ensemble:
+            // TODO: add to sdk — use an IFS 0.1° model identifier.
+            return .ecmwfIfs025
+        case .ecmwf_ifs01_ensemble_mean:
+            // TODO: add to sdk — use an IFS 0.1° ensemble mean identifier.
+            return .ecmwfIfs025EnsembleMean
         case .ecmwf_ifs025:
             return .ecmwfIfs025
         case .ecmwf_aifs025:
@@ -1268,9 +1277,10 @@ extension MultiDomains {
             return .ewam
         case .era5_ocean:
             return .era5Ocean
-        case .ecmwf_wam025:
+        // TODO: add WAM 0.1° model identifiers to the SDK.
+        case .ecmwf_wam01, .ecmwf_wam025:
             return .ecmwfWam025
-        case .ecmwf_wam025_ensemble:
+        case .ecmwf_wam01_ensemble, .ecmwf_wam025_ensemble:
             return .ecmwfWam025Ensemble
         case .meteofrance_wave:
             return .meteofranceWave
@@ -1365,7 +1375,7 @@ extension MultiDomains {
             return .meteoswissIconCh1EnsembleMean
         case .meteoswiss_icon_ch2_ensemble_mean:
             return .meteoswissIconCh2EnsembleMean
-        case .ecmwf_wam025_ensemble_mean:
+        case .ecmwf_wam01_ensemble_mean, .ecmwf_wam025_ensemble_mean:
             return .ecmwfWam025EnsembleMean
         case .ncep_gefswave025_ensemble_mean:
             return .ncepGefswave025EnsembleMean

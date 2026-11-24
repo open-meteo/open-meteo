@@ -1,7 +1,7 @@
 import AsyncHTTPClient
 import Synchronization
 
-/// One process-wide connection pool for remote data listings, metadata, range reads and health checks.
+/// One process-wide connection pool for remote data listings, metadata and range reads.
 /// See `docs/remote-data.md` at the repository root for HTTP connection settings.
 extension HTTPClient {
     private static let remoteDataInitialized = Atomic(false)

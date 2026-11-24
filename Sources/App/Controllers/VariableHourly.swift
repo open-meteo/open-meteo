@@ -404,6 +404,13 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     
     case wave_direction
     case wave_height
+    case wave_height_10_to_12s
+    case wave_height_12_to_14s
+    case wave_height_14_to_17s
+    case wave_height_17_to_21s
+    case wave_height_21_to_25s
+    case wave_height_25_to_30s
+    case wave_drag_coefficient
     case wave_period
     case wave_peak_period
     case wind_wave_height
@@ -731,7 +738,7 @@ private struct VariableHourlyDerivationCompatibility {
 
     init(domain: DomainRegistry) {
         switch domain {
-        case .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
+        case .ecmwf_ifs01, .ecmwf_ifs01_pressure_levels, .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels, .ecmwf_ifs01_ensemble_mean, .ecmwf_ifs01_ensemble_pressure_levels_mean, .ecmwf_ifs04, .ecmwf_ifs025, .ecmwf_ifs025_ensemble, .ecmwf_aifs025:
             self = .init(
                 aliasesSoilTemperature0To10cmTo0To7cm: true,
                 supportsEra5SoilMoistureIndices: true,

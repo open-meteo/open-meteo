@@ -40,11 +40,18 @@ struct RelativeHumidityCalculator {
     let outVariable: any GenericVariable
     fileprivate let data = CaptureTwo<MemberTimestamp, Array2D>()
     
-    func ingest(_ value: Input, member: Int, writer: OmSpatialTimestepWriter) async throws {
-        guard let (temperature, dewpoint) = await data.insert(value: value.firstOrSecond, key: MemberTimestamp(member, writer.time)) else {
-            return
+    var isEmpty: Bool { get async { await data.isEmpty } }
+
+    /// Return the derived field when both inputs have arrived, in either order.
+    func calculate(_ value: Input, member: Int, timestamp: Timestamp) async -> [Float]? {
+        guard let (temperature, dewpoint) = await data.insert(value: value.firstOrSecond, key: MemberTimestamp(member, timestamp)) else {
+            return nil
         }
-        let rh = zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity)
+        return zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity)
+    }
+
+    func ingest(_ value: Input, member: Int, writer: OmSpatialTimestepWriter) async throws {
+        guard let rh = await calculate(value, member: member, timestamp: writer.time) else { return }
         try await writer.write(member: member, variable: outVariable, data: rh)
     }
 }
@@ -110,12 +117,71 @@ struct VerticalVelocityCalculator<V: GenericVariable & Hashable> {
     
     fileprivate let data = CaptureTwo<MemberTimestampVariable<V>, Array2D>()
     
-    func ingest(_ value: Input, member: Int, pressureLevel: Float, outVariable: V, writer: OmSpatialTimestepWriter) async throws {
-        guard let (temperature, omega) = await data.insert(value: value.firstOrSecond, key: MemberTimestampVariable(member, writer.time, outVariable)) else {
-            return
+    var isEmpty: Bool { get async { await data.isEmpty } }
+
+    func calculate(_ value: Input, member: Int, timestamp: Timestamp, pressureLevel: Float, outVariable: V) async -> [Float]? {
+        guard let (temperature, omega) = await data.insert(value: value.firstOrSecond, key: MemberTimestampVariable(member, timestamp, outVariable)) else {
+            return nil
         }
-        let v = Meteorology.verticalVelocityPressureToGeometric(omega: omega.data, temperature: temperature.data, pressureLevel: pressureLevel)
+        return Meteorology.verticalVelocityPressureToGeometric(omega: omega.data, temperature: temperature.data, pressureLevel: pressureLevel)
+    }
+
+    func ingest(_ value: Input, member: Int, pressureLevel: Float, outVariable: V, writer: OmSpatialTimestepWriter) async throws {
+        guard let v = await calculate(value, member: member, timestamp: writer.time, pressureLevel: pressureLevel, outVariable: outVariable) else { return }
         try await writer.write(member: member, variable: outVariable, data: v)
+    }
+}
+
+
+/// Calculate relative humidity from specific humidity (g/kg) and temperature (Celsius).
+struct SpecificHumidityCalculator<V: GenericVariable & Hashable> {
+    enum Input {
+        case temperature(Array2D)
+        case specificHumidity(Array2D)
+
+        var firstOrSecond: FirstSecond<Array2D> {
+            switch self {
+            case .temperature(let data): return .first(data)
+            case .specificHumidity(let data): return .second(data)
+            }
+        }
+    }
+
+    private let data = CaptureTwo<MemberTimestampVariable<V>, Array2D>()
+
+    var isEmpty: Bool { get async { await data.isEmpty } }
+
+    func calculate(_ value: Input, member: Int, timestamp: Timestamp, pressureLevel: Float, outVariable: V) async -> [Float]? {
+        guard let (temperature, humidity) = await data.insert(value: value.firstOrSecond, key: MemberTimestampVariable(member, timestamp, outVariable)) else {
+            return nil
+        }
+        return Meteorology.specificToRelativeHumidity(specificHumidity: humidity.data, temperature: temperature.data, pressure: pressureLevel)
+    }
+}
+
+/// Calculate snow depth from snow water equivalent (kg/m²) and density (kg/m³).
+struct SnowDepthCalculator {
+    enum Input {
+        case waterEquivalent(Array2D)
+        case density(Array2D)
+
+        var firstOrSecond: FirstSecond<Array2D> {
+            switch self {
+            case .waterEquivalent(let data): return .first(data)
+            case .density(let data): return .second(data)
+            }
+        }
+    }
+
+    private let data = CaptureTwo<MemberTimestamp, Array2D>()
+
+    var isEmpty: Bool { get async { await data.isEmpty } }
+
+    func calculate(_ value: Input, member: Int, timestamp: Timestamp) async -> [Float]? {
+        guard let (waterEquivalent, density) = await data.insert(value: value.firstOrSecond, key: MemberTimestamp(member, timestamp)) else {
+            return nil
+        }
+        return zip(waterEquivalent.data, density.data).map(/)
     }
 }
 
@@ -129,6 +195,8 @@ enum FirstSecond<V> {
 /// First and second are kept in order. It is safe to insert the first or the second value multiple times.
 fileprivate actor CaptureTwo<Key: Hashable, Value> {
     private var data = [Key: FirstSecond<Value>]()
+
+    var isEmpty: Bool { data.isEmpty }
     
     func insert(value: FirstSecond<Value>, key: Key) -> (first: Value, second: Value)? {
         switch value {

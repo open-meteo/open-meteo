@@ -3,12 +3,13 @@ import Foundation
 import OmFileFormat
 import Vapor
 import SwiftNetCDF
+@preconcurrency import SwiftEccodes
 
 
 /**
  Download from
  https://confluence.ecmwf.int/display/UDOC/ECMWF+Open+Data+-+Real+Time
- https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/
+ https://data.ecmwf.int/forecasts/
  
  model info (not everything is open data) https://www.ecmwf.int/en/forecasts/datasets/set-i
  */
@@ -17,7 +18,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "run")
         var run: String?
 
-        @Option(name: "domain")
+        @Option(name: "domain", help: "ECMWF domain (default: ifs025)")
         var domain: String?
 
         @Option(name: "server", help: "Root server path. Default: 'https://data.ecmwf.int/forecasts/'")
@@ -29,7 +30,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Number of concurrent processing/conversion jobs (default: 1)")
         var concurrent: Int?
 
-        @Option(name: "download-concurrent", help: "Number of concurrent download requests (defaults to twice --concurrent)")
+        @Option(name: "download-concurrent", help: "Number of concurrent download requests; shared across files for IFS 0.1° ensembles (defaults to twice --concurrent)")
         var downloadConcurrent: Int?
 
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
@@ -55,7 +56,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         @Flag(name: "download-full-grib-file", help: "Skip GRIB inventory and process entire file")
         var downloadFullGribFile: Bool
-        
+
         @Flag(name: "skip-timeseries")
         var skipTimeseries: Bool
     }
@@ -73,15 +74,21 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 fatalError("Could not initialise domain from \($0)")
             }
             return domain
-        } ?? EcmwfDomain.ifs04
+        } ?? EcmwfDomain.ifs025
+
+        guard domain != .ifs04 && domain != .ifs04_ensemble else {
+            throw Abort(.badRequest, reason: "IFS 0.4° is deprecated. Use ifs025 or ifs025_ensemble.")
+        }
+
+        guard domain != .aifs025 else {
+            throw Abort(.badRequest, reason: "aifs025 is deprecated. Use aifs025_single.")
+        }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
         let logger = context.application.logger
-        let isWave = domain == .wam025 || domain == .wam025_ensemble
+        let isWave = domain.isWam01 || domain == .wam025 || domain == .wam025_ensemble
 
-        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
-        let variables = onlyVariables ?? EcmwfVariable.allCases
         let nConcurrent = signature.concurrent ?? 1
         let nDownloadConcurrent = signature.downloadConcurrent ?? (2 * nConcurrent)
         guard nConcurrent > 0, nDownloadConcurrent > 0 else {
@@ -89,7 +96,30 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let base = try EcmwfOpenDataSource.baseURL(source: signature.source, server: signature.server)
 
-        let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_peak_period]
+        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: isWave ? nil : signature.onlyVariables)
+        let variables = (onlyVariables ?? EcmwfVariable.allCases).filter { domain.includes(variable: $0) }
+        if domain.isIfs01 && variables.isEmpty {
+            throw Abort(.badRequest, reason: "No selected variables belong to \(domain.rawValue)")
+        }
+        let waveVariables = try EcmwfWaveVariable.load(commaSeparatedOptional: isWave ? signature.onlyVariables : nil)
+            ?? (domain.isWam01 ? EcmwfWaveVariable.allCases : [.wave_direction, .wave_height, .wave_period, .wave_peak_period])
+
+        if domain.isIfs01 || domain.isWam01 {
+            let runs = try signature.timeinterval.map {
+                Array(try Timestamp.parseRange(yyyymmdd: $0).toRange(dt: 86400).with(dtSeconds: 86400 / 4))
+            } ?? [run]
+            let uploadQueues = signature.timeinterval == nil ? resolvedUploadQueues : []
+            let selected = variables.filter { $0.gribName != nil }
+            for run in runs {
+                logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+                if domain.isWam01 {
+                    try await downloadWaveVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
+                } else {
+                    try await downloadEnsembleVariables(application: context.application, signature: signature, domain: domain, base: base, run: run, variables: selected, concurrent: nConcurrent, downloadConcurrent: nDownloadConcurrent, uploadQueues: uploadQueues)
+                }
+            }
+            return
+        }
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
@@ -110,7 +140,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download elevation file
-    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, uploadQueues: [S3UploadQueue]) async throws {
+    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, uploadQueues: [S3UploadQueue], localGribPath: String? = nil) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
@@ -122,15 +152,23 @@ struct DownloadEcmwfCommand: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         logger.info("Downloading height and elevation data")
-        let url = domain.getUrl(base: base, run: run, hour: 0)[0]
-        let request = try EcmwfOpenDataSource.prepareDownload(url: url)
-        for try await message in try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
-            guard entry.number == nil else {
-                // ignore ensemble members, only use control
-                return false
-            }
-            return entry.levtype == .sfc && ["lsm", "2t", "sp", "msl"].contains(entry.param)
-        }) {
+        let messages: AnyAsyncSequence<GribMessage>
+        if let localGribPath {
+            messages = try SwiftEccodes.iterateMessages(fileName: localGribPath, multiSupport: true).filter {
+                ($0.getLong(attribute: "perturbationNumber") ?? 0) == 0 && ["lsm", "2t", "sp", "msl"].contains($0.get(attribute: "shortName") ?? "")
+            }.eraseToAnyAsyncSequence()
+        } else {
+            let url = domain.elevationDomain.getUrl(base: base, run: run, hour: 0)[0]
+            let request = try EcmwfOpenDataSource.prepareDownload(url: url)
+            messages = try await curl.downloadEcmwfIndexed(url: request.url, indexURL: request.indexURL, allowMultipleRanges: request.allowMultipleRanges, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
+                guard entry.number == nil else {
+                    // ignore ensemble members, only use control
+                    return false
+                }
+                return entry.levtype == .sfc && ["lsm", "2t", "sp", "msl"].contains(entry.param)
+            })
+        }
+        for try await message in messages {
             let shortName = message.get(attribute: "shortName")!
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()
@@ -193,7 +231,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let timestamps = forecastHours.map { run.add(hours: $0) }
         let deaverager = GribDeaverager()
         
-        let storeOnDisk = domain == .ifs025 || domain == .aifs025_single || domain == .wam025
+        let storeOnDisk = domain == .ifs01 || domain == .ifs01_pressure_levels || domain == .ifs025 || domain == .aifs025_single || domain == .wam025
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -307,7 +345,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     
                     // Keep relative humidity in memory to generate total cloud cover files
-                    if variable.gribName == "r" {
+                    if variable.gribName == "r" && domain.requiresCloudCoverFromHumidity {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
@@ -376,7 +414,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
-            for member in 0..<domain.countEnsembleMember {
+            for member in 0..<domain.countEnsembleMember where domain.requiresCloudCoverFromHumidity {
                 if await writer.contains(member: member, variable: EcmwfVariable.cloud_cover_low) {
                     continue
                 }
@@ -510,13 +548,16 @@ extension EcmwfDomain {
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .wam01, .wam01_ensemble, .ifs01, .ifs01_pressure_levels, .ifs01_ensemble, .ifs01_ensemble_pressure_levels:
+            // IFS 0.1° open data is published two hours later than IFS 0.25°.
+            return t.subtract(hours: 8).floor(toNearestHour: 6)
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return t.subtract(hours: 6).floor(toNearestHour: 6)
         case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
             return t.subtract(hours: 4).floor(toNearestHour: 6)
-        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .wam01_ensemble_mean, .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             fatalError()
         }
     }
@@ -525,17 +566,26 @@ extension EcmwfDomain {
         let runStr = run.hour.zeroPadded(len: 2)
         let dateStr = run.format_YYYYMMdd
         switch self {
-        case .ifs04:
-            let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
-            return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
+        case .ifs01, .ifs01_pressure_levels, .ifs01_ensemble, .ifs01_ensemble_pressure_levels:
+            let levelType = isPressureLevels ? "pl" : "sfc"
+            let root = "\(base)\(dateStr)/\(runStr)z/ifs/0p1/"
+            let prefix = "\(dateStr)\(runStr)0000-\(hour)h"
+            let control = "\(root)oper/\(prefix)-oper-fc-\(levelType).grib2"
+            return isEnsemble ? [control, "\(root)enfo/\(prefix)-enfo-ef-\(levelType).grib2"] : [control]
+        case .ifs04, .ifs04_ensemble:
+            preconditionFailure("IFS 0.4° downloads are deprecated")
+        case .wam01, .wam01_ensemble:
+            let root = "\(base)\(dateStr)/\(runStr)z/ifs/0p1/"
+            let prefix = "\(dateStr)\(runStr)0000-\(hour)h"
+            let product = isEnsemble ? "waef" : "wave"
+            let type = isEnsemble ? "ef" : "fc"
+            return ["\(root)\(product)/\(prefix)-\(product)-\(type)-sfc.grib2"]
         case .wam025:
             let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "wave" : "scwv"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
         case .wam025_ensemble:
             let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "waef" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-ef.grib2"]
-        case .ifs04_ensemble:
-            return ["\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
         case .ifs025:
             let product = run.hour == 0 || run.hour == 12 || run >= Timestamp(2025,5,12,6,0) ? "oper" : "scda"
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"]
@@ -545,7 +595,7 @@ extension EcmwfDomain {
             return ["\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2",
                     "\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"]
         case .aifs025:
-            return ["\(base)\(dateStr)/\(runStr)z/aifs/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"]
+            preconditionFailure("aifs025 downloads are deprecated; use aifs025_single")
         case .aifs025_single:
             // https://data.ecmwf.int/forecasts/20250220/00z/aifs-single/0p25/experimental/oper/
             return ["\(base)\(dateStr)/\(runStr)z/aifs-single/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"]
@@ -555,7 +605,7 @@ extension EcmwfDomain {
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-cf.grib2",
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-pf.grib2"
             ]
-        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+        case .wam01_ensemble_mean, .ifs01_ensemble_mean, .ifs01_ensemble_pressure_levels_mean, .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             fatalError()
         }
     }
