@@ -3,6 +3,16 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
+    @Test(arguments: [1, 4]) func timestepTransposePreservesMissingAndUnorderedTimes(concurrent: Int) async {
+        let timesteps = [6, 1, 4].map { time in
+            (time: time, data: (0..<137).map { location in location == 65 ? Float.nan : Float(time * 1000 + location) })
+        }
+        var expected = Array2DFastTime(nLocations: 137, nTime: 7)
+        for timestep in timesteps { expected[0..<137, timestep.time] = timestep.data }
+        let actual = await Array2DFastTime(timesteps: timesteps, nLocations: 137, nTime: 7, nConcurrent: concurrent)
+        #expect(zip(actual.data, expected.data).allSatisfy { $0 == $1 || ($0.isNaN && $1.isNaN) })
+    }
+
     @Test func concurrentMultiplyAddMatchesFusedSerialResults() async {
         let input: [Float] = [0, -0.0, .nan, .infinity, -.infinity, 1.0000001, .greatestFiniteMagnitude]
         var expected = input

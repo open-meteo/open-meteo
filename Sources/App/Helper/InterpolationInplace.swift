@@ -24,9 +24,51 @@ extension Array2DFastTime {
         data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
 
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: some RandomAccessCollection<Int> & Sendable, nConcurrent: Int) async {
+        precondition(nTime == time.count)
+        await data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange, nConcurrent: nConcurrent)
+    }
 }
 
 extension Array where Element == Float {
+    /// The implicit array-to-pointer conversion retains exclusive access until all child tasks finish.
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: some RandomAccessCollection<Int> & Sendable, nConcurrent: Int) async {
+        precondition(nConcurrent > 0)
+        guard !isEmpty else { return }
+        if nConcurrent == 1 {
+            interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
+            return
+        }
+        await Self.interpolateInplaceConcurrent(&self, valueCount: count, type: type, time: time, grid: grid, locationRange: locationRange, nConcurrent: nConcurrent)
+    }
+
+    private static func interpolateInplaceConcurrent(_ values: UnsafeMutablePointer<Float>, valueCount: Int, type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: some RandomAccessCollection<Int> & Sendable, nConcurrent: Int) async {
+        precondition(time.count > 0 && !locationRange.isEmpty)
+        precondition(valueCount % (locationRange.count * time.count) == 0)
+        let nMembers = valueCount / (locationRange.count * time.count)
+        let valuesPerLocation = nMembers * time.count
+        // Each worker owns complete time series for a row of locations, including all members.
+        nonisolated(unsafe) let pointer = values
+        await withTaskGroup(of: Void.self) { group in
+            for (index, lower) in stride(from: 0, to: locationRange.count, by: grid.nx).enumerated() {
+                if index >= nConcurrent {
+                    await group.next()
+                }
+                let upper = Swift.min(lower + grid.nx, locationRange.count)
+                group.addTask {
+                    let start = locationRange.index(locationRange.startIndex, offsetBy: lower)
+                    let end = locationRange.index(locationRange.startIndex, offsetBy: upper)
+                    var row = UnsafeMutableBufferPointer(start: pointer.advanced(by: lower * valuesPerLocation), count: (upper - lower) * valuesPerLocation)
+                    row.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange[start..<end])
+                }
+            }
+            await group.waitForAll()
+        }
+    }
+}
+
+// Shared kernels for zero-based arrays and pointer-backed views.
+extension MutableCollection where Self: RandomAccessCollection, Element == Float, Index == Int {
     /// Fill in missing data by interpolating using different interpolation types
     ///
     /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour precipitation value should be divided by 2 before, to preserve the sum correctly
