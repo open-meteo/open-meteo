@@ -76,18 +76,42 @@ struct ParallelSpatialConversionTests {
             return ArraySlice(data)
         }
         let statisticsWriter = try OmEnsembleStatisticsWriter(domain: StatisticsDomain(), variable: EcmwfVariable.temperature_2m, time: forecast, chunkLocations: 8)
-        try await om.updateFromTimeOrientedStreaming3D(variable: variable, run: run, time: forecast, scalefactor: 1, onlyGeneratePreviousDays: false, concurrent: 4, statisticsWriter: statisticsWriter) { y, x, memberRange in
-            var data = [Float]()
-            for row in y {
-                for column in x {
-                    for member in memberRange {
-                        for t in 0..<forecast.count {
-                            data.append(t.isMultiple(of: 2) ? .nan : Float(200 + (Int(row) * nx + Int(column)) % 13 + Int(member) * 20 + t))
+        if members > 1 {
+            let ensemble = (0..<members).map { member in
+                var data = Array2DFastTime(nLocations: nx * ny, nTime: forecast.count)
+                for location in 0..<nx * ny {
+                    for t in 0..<forecast.count {
+                        data[location, t] = t.isMultiple(of: 2) ? .nan : Float(200 + location % 13 + member * 20 + t)
+                    }
+                }
+                return data
+            }
+            try await om.updateRollingTimeSeries(variable: variable, run: run, time: forecast, retainDays: DomainRegistry.ecmwf_ifs01_ensemble.useRollingDays!, scalefactor: 1, concurrent: 4, statisticsWriter: statisticsWriter) { y, x, memberRange in
+                var block = [Float]()
+                for row in y {
+                    for column in x {
+                        let offset = (Int(row) * nx + Int(column)) * forecast.count
+                        for member in memberRange {
+                            block.append(contentsOf: ensemble[Int(member)].data[offset..<offset + forecast.count])
                         }
                     }
                 }
+                return ArraySlice(block)
             }
-            return ArraySlice(data)
+        } else {
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable, run: run, time: forecast, scalefactor: 1, onlyGeneratePreviousDays: false, concurrent: 4, statisticsWriter: statisticsWriter) { y, x, memberRange in
+                var data = [Float]()
+                for row in y {
+                    for column in x {
+                        for member in memberRange {
+                            for t in 0..<forecast.count {
+                                data.append(t.isMultiple(of: 2) ? .nan : Float(200 + (Int(row) * nx + Int(column)) % 13 + Int(member) * 20 + t))
+                            }
+                        }
+                    }
+                }
+                return ArraySlice(data)
+            }
         }
         let statistics = try await statisticsWriter.finalise()
         let means = try await statistics[0].reader.read()

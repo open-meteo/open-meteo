@@ -204,7 +204,7 @@ struct Array2DFastSpace {
  
  Data is stored to be accessed quickly for multiple time temps in a row, while accessing locations is slower
 */
-public struct Array2DFastTime {
+public struct Array2DFastTime: Sendable {
     /// The underlying data storage for the 2D array.
     public var data: [Float]
 

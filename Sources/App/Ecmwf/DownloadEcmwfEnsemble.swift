@@ -1,6 +1,7 @@
 import Foundation
 import OmFileIO
 import Vapor
+import SwiftNetCDF
 
 extension DownloadEcmwfCommand {
     struct EnsembleField: Sendable {
@@ -33,7 +34,7 @@ extension DownloadEcmwfCommand {
         let member: Int
     }
 
-    /// Cache and index complete GRIB files, then collect timesteps and write time-series handles.
+    /// Cache and index GRIB files, collect all member series, then update rolling files and statistics.
     func downloadEnsembleVariables(application: Application, signature: Signature, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, downloadConcurrent: Int, uploadQueues: [S3UploadQueue]) async throws {
         let variables = domain == .ifs01_ensemble || domain == .ifs01_ensemble_pressure_levels || domain == .ifs025_ensemble
             ? variables.filter {
@@ -122,7 +123,7 @@ extension DownloadEcmwfCommand {
             return $0.field.range.lowerBound < $1.field.range.lowerBound
         }
         logger.info("Reading \(availableVariableCount) variables: \(fields.count) local fields")
-        // Convert each variable once all its member time-series handles have been written.
+        // Convert each variable once all its member time series have been collected.
         var conversionJob: Task<Void, any Error>?
 
         let progress = TransferAmountTracker(logger: curl.logger, totalSize: fields.reduce(0) { $0 + $1.field.range.count }, name: "Read \(domain.rawValue)")
@@ -135,13 +136,12 @@ extension DownloadEcmwfCommand {
         let verticalVelocityCalculator = VerticalVelocityCalculator<EcmwfVariable>()
         let specificHumidityCalculator = SpecificHumidityCalculator<EcmwfVariable>()
         let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
-        let chunks = OmFileSplitter(domain).spatialReadChunkDimensions
         let deaverager = GribDeaverager()
         let inMemoryAccumulated = VariablePerMemberStorage<AccumulatedVariable>()
         let positiveHours = hours.filter { $0 > 0 }
         let nextHours = Dictionary(uniqueKeysWithValues: zip([0] + positiveHours, positiveHours))
         var series = [EnsembleVariableMember: (timesteps: [(time: Int, data: [Float])], process: Double)]()
-        var handles = [EcmwfVariable: [GenericVariableHandle]]()
+        var members = [EcmwfVariable: [Int: Array2DFastTime]]()
         defer { conversionJob?.cancel() }
 
         // Workers decode, deaccumulate and derive fields. The consumer collects
@@ -285,26 +285,74 @@ extension DownloadEcmwfCommand {
                 let interpolationStart = DispatchTime.now()
                 await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
                 let interpolationTime = interpolationStart.timeElapsedPretty()
-                let writeStart = DispatchTime.now()
-                let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [chunks.y, chunks.x, time.count])
-                let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data.data, nConcurrent: concurrent)
-                let handle = try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: fn, domain: domain)
-                data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
-                logger.info("\(variable.rawValue) member \(field.member): process=\(current.process.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime), write=\(writeStart.timeElapsedPretty())")
-                handles[variable, default: []].append(handle)
-                guard handles[variable]!.count == nMembers else { continue }
-                let completedHandles = handles.removeValue(forKey: variable)!
+                logger.info("\(variable.rawValue) member \(field.member): process=\(current.process.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime)")
+                var ensemble = members.removeValue(forKey: variable) ?? [:]
+                guard ensemble.updateValue(data, forKey: field.member) == nil else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+                guard ensemble.count == nMembers else {
+                    members[variable] = ensemble
+                    continue
+                }
+                let ensembleData = (0..<nMembers).map { ensemble[$0]! }
                 let conversionWaitStart = DispatchTime.now()
                 try await conversionJob?.value
                 logger.info("Before converting \(variable.rawValue): conversionWait=\(conversionWaitStart.timeElapsedPretty())")
                 conversionJob = Task {
                     let conversionStart = DispatchTime.now()
-                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: completedHandles, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: domain.countEnsembleMember == 1, generateTimeSeries: generateTimeSeries, ensembleMeanDomain: domain.ensembleMeanDomain, precipitationProbability: true)
+                    guard generateTimeSeries && domain.generateTimeSeries else { return }
+                    guard let retainDays = domain.domainRegistry.useRollingDays else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+                    if createNetcdf {
+                        let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
+                        try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
+                        var ncVariable = try ncFile.createVariable(name: "data", type: Int16.self, dimensions: [
+                            try ncFile.createDimension(name: "time", length: time.count),
+                            try ncFile.createDimension(name: "member", length: nMembers),
+                            try ncFile.createDimension(name: "LAT", length: domain.grid.ny),
+                            try ncFile.createDimension(name: "LON", length: domain.grid.nx)
+                        ])
+                        try ncVariable.defineSzip(options: .nearestNeighbor, pixelPerBlock: 16)
+                        try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, domain.grid.ny, domain.grid.nx])
+                        try ncVariable.setAttribute("scale_factor", 1 / variable.scalefactor)
+                        try ncVariable.setAttribute("add_offset", Float(0))
+                        try ncVariable.setAttribute("_FillValue", Int16.max)
+                        for member in 0..<nMembers {
+                            let spatial = ensembleData[member].transpose()
+                            try ncVariable.write(spatial.data.map { $0.isFinite ? Int16($0 * variable.scalefactor) : Int16.max }, offset: [0, member, 0, 0], count: [time.count, 1, domain.grid.ny, domain.grid.nx])
+                        }
+                    }
+                    let om = OmFileSplitter(domain)
+                    let statisticsWriter = try OmEnsembleStatisticsWriter(domain: domain.ensembleMeanDomain, variable: variable, time: time, chunkLocations: om.chunknLocations, probabilityDomain: variable == .precipitation ? domain : nil)
+                    let queues = uploadQueues.filter { !$0.onlyProbabilityTimeSeries }
+                    let multipartQueues = queues.map { $0.startMultiPartUploads() }
+                    do {
+                        try await om.updateRollingTimeSeries(variable: variable.omFileName.file, run: run, time: time, retainDays: retainDays, scalefactor: variable.scalefactor, multipartUploadQueues: multipartQueues, concurrent: concurrent, statisticsWriter: statisticsWriter) { yRange, xRange, memberRange in
+                            var block = [Float]()
+                            block.reserveCapacity(yRange.count * xRange.count * memberRange.count * time.count)
+                            for y in yRange {
+                                for x in xRange {
+                                    let offset = (Int(y) * domain.grid.nx + Int(x)) * time.count
+                                    for member in memberRange {
+                                        block.append(contentsOf: ensembleData[Int(member)].data[offset..<offset + time.count])
+                                    }
+                                }
+                            }
+                            return ArraySlice(block)
+                        }
+                        for (queue, multipart) in zip(queues, multipartQueues) {
+                            await queue.finishMultiPartUploads(multipart)
+                        }
+                    } catch {
+                        for (queue, multipart) in zip(queues, multipartQueues) {
+                            await queue.abortMultiPartUploads(multipart)
+                        }
+                        throw error
+                    }
+                    let statistics = try await statisticsWriter.finalise()
+                    try await GenericVariableHandle.convert(application: application, domain: domain, createNetcdf: createNetcdf, run: run, handles: statistics, concurrent: 1, spatialConcurrent: concurrent, writeUpdateJson: false, uploadQueues: uploadQueues, generateFullRun: false, generateTimeSeries: true)
                     logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
                 }
             }
         }
-        guard series.isEmpty, handles.isEmpty, await deaverager.data.isEmpty, await inMemoryAccumulated.data.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        guard series.isEmpty, members.isEmpty, await deaverager.data.isEmpty, await inMemoryAccumulated.data.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         await progress.finish()
         let conversionWaitStart = DispatchTime.now()
         try await conversionJob?.value
