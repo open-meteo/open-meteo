@@ -541,11 +541,7 @@ extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
-            // Copy the surface variable so normalization preserves its percentile.
-            var normalized = surface
-            normalized.variable = surface.variable.remapped
-            normalized.previousDay = 0
-            return (ForecastVariable.surface(normalized), surface.previousDay)
+            return (.surface(.init(surface.variable.remapped, 0, percentile: surface.percentile)), surface.previousDay)
         case .pressure(let pressure):
             return (ForecastVariable.pressure(pressure), 0)
         case .height(let height):

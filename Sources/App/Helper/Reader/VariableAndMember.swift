@@ -5,13 +5,14 @@ struct VariableAndPreviousDay: RawRepresentableString {
         case p10, p25, p50, p75, p90
     }
 
-    var variable: ForecastSurfaceVariable
-    var previousDay: Int
-    var percentile: Percentile?
+    let variable: ForecastSurfaceVariable
+    let previousDay: Int
+    let percentile: Percentile?
 
-    init(_ variable: ForecastSurfaceVariable, _ previousDay: Int) {
+    init(_ variable: ForecastSurfaceVariable, _ previousDay: Int, percentile: Percentile? = nil) {
         self.variable = variable
         self.previousDay = previousDay
+        self.percentile = percentile
     }
 
     init?(rawValue: String) {
@@ -28,8 +29,7 @@ struct VariableAndPreviousDay: RawRepresentableString {
                   let variable = ForecastSurfaceVariable(rawValue: String(rawValue[..<separator])) else {
                 return nil
             }
-            self.init(variable, 0)
-            self.percentile = percentile
+            self.init(variable, 0, percentile: percentile)
             return
         }
         guard let variable = ForecastSurfaceVariable(rawValue: String(rawValue[rawValue.startIndex..<pos.lowerBound])) else {
