@@ -1,5 +1,5 @@
 {
-  "originHash" : "7999a67a15dcadc1ef37b1c71f4b76e27410a76df1300287cb12e0d366965093",
+  "originHash" : "a448c6a3fde186b69b8f8d25fa708a42e952cfbf87f68305b75cdedb36d79cae",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -149,8 +149,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
       "state" : {
-        "revision" : "f96b909e1a9e469620bc5037c1e24e00153f376f",
-        "version" : "1.7.5"
+        "revision" : "88754449ab766a739610b660e117762115fabc9c",
+        "version" : "1.7.6"
       }
     },
     {
@@ -167,8 +167,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "f8fad2f95ad67b45f6340c0960e2396094d67e07",
-        "version" : "5.1.1"
+        "revision" : "3280a5f72874d2f73bf25551bbb64f524c76d834",
+        "version" : "5.1.2"
       }
     },
     {
@@ -201,10 +201,10 @@
     {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-log",
+      "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "e3da04078777e6a1b72ce19981fbd6539b0847d8",
-        "version" : "1.17.0"
+        "revision" : "c7413d967b97aae67c46452bf7645bdb7b200e8e",
+        "version" : "1.17.2"
       }
     },
     {
@@ -212,8 +212,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-metrics.git",
       "state" : {
-        "revision" : "2c13e7385089ea705ee3009ea6cbe41db843930e",
-        "version" : "2.13.0"
+        "revision" : "5da0b6ea2a89dcce222eec559289e298d357d0a5",
+        "version" : "2.13.1"
       }
     },
     {
@@ -293,8 +293,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
-        "version" : "1.8.1"
+        "revision" : "640e5755b5826f4437eaeedd366fd776737db62c",
+        "version" : "1.9.0"
       }
     },
     {
@@ -302,8 +302,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/swift-zarr.git",
       "state" : {
-        "revision" : "fa3861c69cf6f03871c83fc0a543ff63292433ce",
-        "version" : "0.1.5"
+        "revision" : "3e0c0cc8657f7fd3918c73d5e46e270d2f1c8a21",
+        "version" : "0.2.1"
       }
     },
     {
@@ -338,8 +338,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "48852309b11230e62a89b41a9c578c93f4d2d916",
-        "version" : "4.122.3"
+        "revision" : "cf69b535b3d5ba6c50920d9470d304cfac409899",
+        "version" : "4.122.4"
       }
     },
     {
