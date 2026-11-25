@@ -86,8 +86,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "d806856d3e54232695a4587e54238ad5105ecab6",
-        "version" : "1.30.0"
+        "revision" : "cb4ac7d162671db3eab15f1ee89531108feefead",
+        "version" : "1.31.1"
       }
     },
     {
@@ -302,8 +302,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/swift-zarr.git",
       "state" : {
-        "revision" : "fa3861c69cf6f03871c83fc0a543ff63292433ce",
-        "version" : "0.1.5"
+        "revision" : "3e0c0cc8657f7fd3918c73d5e46e270d2f1c8a21",
+        "version" : "0.2.1"
       }
     },
     {

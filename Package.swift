@@ -28,11 +28,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
-        .package(url: "https://github.com/open-meteo/swift-zarr.git", from: "0.1.4"),
+        .package(url: "https://github.com/open-meteo/swift-zarr.git", from: "0.2.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.30.0"),
+        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.31.1"),
         .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "3ea30afc395c7de4023e856e365dff77429c8fb6"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),

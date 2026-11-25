@@ -251,6 +251,73 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case roughness_length
     case potential_evapotranspiration
 
+    // Native ensemble percentiles
+    case cloud_cover_p10
+    case cloud_cover_p25
+    case cloud_cover_p50
+    case cloud_cover_p75
+    case cloud_cover_p90
+    case cloud_cover_high_p10
+    case cloud_cover_high_p25
+    case cloud_cover_high_p50
+    case cloud_cover_high_p75
+    case cloud_cover_high_p90
+    case cloud_cover_low_p10
+    case cloud_cover_low_p25
+    case cloud_cover_low_p50
+    case cloud_cover_low_p75
+    case cloud_cover_low_p90
+    case cloud_cover_mid_p10
+    case cloud_cover_mid_p25
+    case cloud_cover_mid_p50
+    case cloud_cover_mid_p75
+    case cloud_cover_mid_p90
+    case direct_radiation_p10
+    case direct_radiation_p25
+    case direct_radiation_p50
+    case direct_radiation_p75
+    case direct_radiation_p90
+    case precipitation_p10
+    case precipitation_p25
+    case precipitation_p50
+    case precipitation_p75
+    case precipitation_p90
+    case pressure_msl_p10
+    case pressure_msl_p25
+    case pressure_msl_p50
+    case pressure_msl_p75
+    case pressure_msl_p90
+    case sea_surface_temperature_p10
+    case sea_surface_temperature_p25
+    case sea_surface_temperature_p50
+    case sea_surface_temperature_p75
+    case sea_surface_temperature_p90
+    case shortwave_radiation_p10
+    case shortwave_radiation_p25
+    case shortwave_radiation_p50
+    case shortwave_radiation_p75
+    case shortwave_radiation_p90
+    case wind_speed_100m_p10
+    case wind_speed_100m_p25
+    case wind_speed_100m_p50
+    case wind_speed_100m_p75
+    case wind_speed_100m_p90
+    case wind_speed_10m_p10
+    case wind_speed_10m_p25
+    case wind_speed_10m_p50
+    case wind_speed_10m_p75
+    case wind_speed_10m_p90
+    case dew_point_2m_p10
+    case dew_point_2m_p25
+    case dew_point_2m_p50
+    case dew_point_2m_p75
+    case dew_point_2m_p90
+    case temperature_2m_p10
+    case temperature_2m_p25
+    case temperature_2m_p50
+    case temperature_2m_p75
+    case temperature_2m_p90
+
     case wind_speed_10m_spread
     case wind_speed_40m_spread
     case wind_speed_80m_spread
@@ -339,11 +406,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case sea_surface_temperature
     case sea_water_salinity
     
-    /*case wind_u_component_10m
+    case wind_u_component_10m
     case wind_v_component_10m
     case wind_u_component_100m
     case wind_v_component_100m
-    case wind_u_component_200m
+    /*case wind_u_component_200m
     case wind_v_component_200m
     case wind_u_component_70m
     case wind_v_component_70m
@@ -541,7 +608,7 @@ extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
-            return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
+            return (.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
         case .pressure(let pressure):
             return (ForecastVariable.pressure(pressure), 0)
         case .height(let height):
@@ -686,6 +753,7 @@ private struct VariableHourlyDerivationCompatibility {
     let reversesWaveDirections: Bool
     let estimatesDiffuseRadiationFromShortwave: Bool
     let derivesCloudLayersFromPressureHumidity: Bool
+    let derivesSpreadFromPercentiles: Bool
     let swapUVComponents: Bool
 
     private init(
@@ -701,6 +769,7 @@ private struct VariableHourlyDerivationCompatibility {
         reversesWaveDirections: Bool = false,
         estimatesDiffuseRadiationFromShortwave: Bool = false,
         derivesCloudLayersFromPressureHumidity: Bool = false,
+        derivesSpreadFromPercentiles: Bool = false,
         swapUVComponents: Bool = false
     ) {
         self.aliasesSoilTemperature0To10cmTo0To7cm = aliasesSoilTemperature0To10cmTo0To7cm
@@ -715,6 +784,7 @@ private struct VariableHourlyDerivationCompatibility {
         self.reversesWaveDirections = reversesWaveDirections
         self.estimatesDiffuseRadiationFromShortwave = estimatesDiffuseRadiationFromShortwave
         self.derivesCloudLayersFromPressureHumidity = derivesCloudLayersFromPressureHumidity
+        self.derivesSpreadFromPercentiles = derivesSpreadFromPercentiles
         self.swapUVComponents = swapUVComponents
     }
 
@@ -802,6 +872,8 @@ private struct VariableHourlyDerivationCompatibility {
             self = .init(convectivePrecipitation: .zeroWherePrecipitationIsAvailable, omitsConvectivePrecipitationFromWeatherCode: true)
         case .dwd_icon_eps, .dwd_icon_eps_ensemble_mean:
             self = .init(usesLegacyIconEpsRadiationStorage: true)
+        case .google_weathernext3_ensemble_mean, .google_weathernext3_station_ensemble_mean:
+            self = .init(derivesSpreadFromPercentiles: true)
         case .meteofrance_wave:
             self = .init(reversesWaveDirections: true)
         default:
@@ -1059,6 +1131,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     }
 
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
+        if compatibility.derivesSpreadFromPercentiles, variable.rawValue.hasSuffix("_spread") {
+            return weatherNext3SpreadMapping(for: String(variable.rawValue.dropLast("_spread".count)))
+        }
+
         // Historical ICON-EPS archives stored total shortwave radiation as `diffuse_radiation`.
         if compatibility.usesLegacyIconEpsRadiationStorage {
             switch variable {
