@@ -138,7 +138,6 @@ extension DownloadEcmwfCommand {
         var conversionJob: Task<Void, any Error>?
 
         let progress = TransferAmountTracker(logger: curl.logger, totalSize: fields.reduce(0) { $0 + $1.field.range.count }, name: "Read \(domain.rawValue)")
-        let lastMember = domain.countEnsembleMember - 1
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
         guard !fields.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
         let time = TimerangeDt(start: run, nTime: lastHour * 3600 / domain.dtSeconds + 1, dtSeconds: domain.dtSeconds)
@@ -283,7 +282,10 @@ extension DownloadEcmwfCommand {
             var current = series.removeValue(forKey: key) ?? ([], 0)
             current.timesteps.append((time: field.hour * 3600 / domain.dtSeconds, data: field.data))
             current.process += field.process
-            guard field.hour == lastHour else {
+            // A worker can drain several accumulated steps, so ordered input
+            // tasks do not guarantee ordered output hours (or member completion).
+            let expectedSteps = hours.count - (variable.skipHourZero && hours.first == 0 ? 1 : 0)
+            guard current.timesteps.count == expectedSteps else {
                 series[key] = current
                 continue
             }
@@ -302,7 +304,7 @@ extension DownloadEcmwfCommand {
             data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
             logger.info("\(variable.rawValue) member \(field.member): process=\(current.process.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime), write=\(writeStart.timeElapsedPretty())")
             handles[variable, default: []].append(handle)
-            guard field.member == lastMember else { continue }
+            guard handles[variable]!.count == domain.countEnsembleMember else { continue }
 
             let completedHandles = handles.removeValue(forKey: variable)!
             let conversionWaitStart = DispatchTime.now()
@@ -314,7 +316,19 @@ extension DownloadEcmwfCommand {
                 logger.info("Convert \(variable.rawValue): total=\(conversionStart.timeElapsedPretty())")
             }
         }
-        guard series.isEmpty, handles.isEmpty, await deaverager.data.isEmpty, await inMemoryAccumulated.data.isEmpty else { throw EcmwfLocalGribFile.Failure.invalidMetadata }
+        let remainingHistory = await deaverager.data.count
+        let remainingAccumulated = await inMemoryAccumulated.data.count
+        guard series.isEmpty, handles.isEmpty, remainingHistory == 0, remainingAccumulated == 0 else {
+            for (key, pending) in series {
+                let receivedHours = pending.timesteps.map { $0.time * domain.dtSeconds / 3600 }.sorted()
+                logger.error("Incomplete time series: \(key.variable.rawValue) member \(key.member), received hours \(receivedHours)")
+            }
+            for (variable, pending) in handles {
+                logger.error("Incomplete members: \(variable.rawValue), completed members \(pending.map(\.member).sorted())")
+            }
+            logger.error("Unfinished ensemble conversion: series=\(series.count), variables=\(handles.count), deaverager=\(remainingHistory), accumulated=\(remainingAccumulated)")
+            throw EcmwfLocalGribFile.Failure.invalidMetadata
+        }
         await progress.finish()
         let conversionWaitStart = DispatchTime.now()
         try await conversionJob?.value
