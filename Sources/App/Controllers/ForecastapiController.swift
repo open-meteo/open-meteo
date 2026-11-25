@@ -527,7 +527,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             let (v, previousDay) = variable.variableAndPreviousDay
             let timeRead = currentTimeRange.toSettings(previousDay: previousDay)
             
-            if case .surface(let v) = v, v.percentile == nil {
+            if case .surface(let v) = v {
                 switch v.variable {
                 case .is_day:
                     let isDay = Zensun.calculateIsDay(timeRange: currentTimeRange, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
@@ -561,7 +561,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             let (v, previousDay) = variable.variableAndPreviousDay
             let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
             
-            if case .surface(let v) = v, v.percentile == nil {
+            if case .surface(let v) = v {
                 switch v.variable {
                 case .is_day:
                     let isDay = Zensun.calculateIsDay(timeRange: timeHourlyRead, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
@@ -664,7 +664,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             let (v, previousDay) = variable.variableAndPreviousDay
             let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
             
-            if case .surface(let v) = v, v.percentile == nil {
+            if case .surface(let v) = v {
                 switch v.variable {
                 case .is_day:
                     let isDay = Zensun.calculateIsDay(timeRange: time.minutely15, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
