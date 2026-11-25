@@ -374,7 +374,9 @@ extension ErrorMiddleware {
             case .minutelyExceeded(let quota, let retryAfter), .hourlyExceeded(let quota, let retryAfter), .dailyExceeded(let quota, let retryAfter):
                 quota.applyHeaders(to: &headers)
                 headers.replaceOrAdd(name: "Retry-After", value: String(retryAfter))
-            case .tooManyConcurrentRequests, .serviceOverloaded:
+            case .serviceOverloaded:
+                headers.replaceOrAdd(name: "X-Open-Meteo-Error", value: "service-overloaded")
+            case .tooManyConcurrentRequests:
                 break
             }
 
