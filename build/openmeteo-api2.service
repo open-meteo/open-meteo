@@ -3,6 +3,7 @@ Description = Run Open-Meteo API, second process
 StartLimitIntervalSec=0
 
 [Service]
+Environment=ICU_TIMEZONE_FILES_DIR=/usr/share/zoneinfo-icu/44/le
 EnvironmentFile=/etc/default/openmeteo-api.env
 PassEnvironment=VAPOR_ENV API_SYNC_APIKEYS LOG_LEVEL CACHE_FILE CACHE_SIZE BLOCK_SIZE CACHE_META_FILE CACHE_META_SIZE REMOTE_DATA_DIRECTORY SWIFT_BACKTRACE REMOTE_DATA_DIRECTORY_MINIMUM_AGE STRIPE_API_KEY
 Type=simple
@@ -16,6 +17,7 @@ ExecStopPost=/bin/bash -c 'if [[ "$$EXIT_STATUS" != 0 && -n "$API_BIND2" ]]; the
 Restart=always
 RestartSec=1
 LimitNOFILE=infinity
+LimitNICE=-4
 ExecCondition=/bin/bash -c '/bin/test -n "$API_BIND2"'
 
 [Install]

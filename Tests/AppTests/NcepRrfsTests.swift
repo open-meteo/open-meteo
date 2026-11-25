@@ -306,7 +306,10 @@ import OpenMeteoSdk
         #expect(NcepRrfsDomain.ncep_rrfs_conus_ensemble.countEnsembleMember == 5)
         #expect(NcepRrfsDomain.ncep_rrfs_conus.lastRun(now: run.add(hours: 3).add(44 * 60)) == run.add(hours: -6))
         #expect(NcepRrfsDomain.ncep_rrfs_conus.lastRun(now: run.add(hours: 3).add(45 * 60)) == run)
-        #expect(NcepRrfsDomain.ncep_rrfs_conus_15min.lastRun(now: run.add(hours: 4).add(45 * 60)) == run.add(hours: 1))
+        #expect(NcepRrfsDomain.ncep_rrfs_conus_15min.lastRun(now: run.add(hours: 2).add(29 * 60)) == run.add(hours: -1))
+        #expect(NcepRrfsDomain.ncep_rrfs_conus_15min.lastRun(now: run.add(hours: 2).add(30 * 60)) == run)
+        #expect(NcepRrfsDomain.ncep_rrfs_conus_15min.lastRun(now: run.add(hours: 2).add(45 * 60)) == run)
+        #expect(NcepRrfsDomain.ncep_rrfs_conus_15min.lastRun(now: run.add(hours: 3).add(30 * 60)) == run.add(hours: 1))
         for member in 0..<5 {
             let urls = NcepRrfsDomain.ncep_rrfs_conus_ensemble.gribUrls(run: run, forecastHour: 60, member: member, server: "https://example.com/")
             #expect(urls[0] == "https://example.com/rrfsens.20260920/00/m00\(member + 1)/rrfs.t00z.m00\(member + 1).2dfldnomads.3km.f060.conus.grib2")

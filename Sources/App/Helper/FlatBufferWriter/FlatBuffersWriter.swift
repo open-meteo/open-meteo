@@ -7,7 +7,7 @@ extension ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
-    func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, logger: Logger) throws -> Response {
+    func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int?, prefetchLookAhead: Int = OpenMeteo.prefetchLookAhead, logger: Logger) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
         let response = Response(body: .init(asyncStream: { writer in
@@ -24,7 +24,10 @@ extension ForecastapiResult {
                 // }
                 // first = nil
                 // try await b.flushIfRequired()
-                for location in results {
+                for (i, location) in results.enumerated() {
+                    if prefetchLookAhead > 0, prefetchLookAhead < results.count - i {
+                        try await prefetchLocation(at: i + prefetchLookAhead)
+                    }
                     for model in location.results {
                         try await model.writeToFlatbuffer(&fbb, variables: variables, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
                         let buffer = fbb.buffer
@@ -47,7 +50,7 @@ extension ForecastapiResult {
 /// Encode meta data for flatbuffer variables
 struct FlatBufferVariableMeta {
     let variable: openmeteo_sdk_Variable
-    let aggregation: openmeteo_sdk_Aggregation
+    var aggregation: openmeteo_sdk_Aggregation
     let probability: openmeteo_sdk_Probability
     let altitude: Int16
     let pressureLevel: Int16

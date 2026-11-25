@@ -42,24 +42,22 @@ struct S3DataController: RouteCollection {
     }
     
     func boot(routes: RoutesBuilder) throws {
-        if Self.syncApiKeys.isEmpty && readCredentials.isEmpty && uploadCredentials.isEmpty {
-            return
-        }
-        
+        routes.on(.HEAD, [], use: self.headRoot)
         if !Self.syncApiKeys.isEmpty || !self.readCredentials.isEmpty {
             routes.get("", use: self.list)
             routes.get("index.html", use: self.index)
             routes.get("openmeteo", use: self.list)
             routes.get("openmeteo-local", use: self.list)
-            routes.on(.HEAD, [], use: self.headRoot)
-            for root in ["data", "data_run", "data_spatial"] {
-                routes.on(.HEAD, [PathComponent(stringLiteral: root), .catchall], use: self.get)
-                routes.on(.HEAD, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.get)
-                routes.on(.HEAD, ["openmeteo-local", PathComponent(stringLiteral: root), .catchall], use: self.get)
-                routes.get(PathComponent(stringLiteral: root), "**", use: self.get)
-                routes.get("openmeteo", PathComponent(stringLiteral: root), "**", use: self.get)
-                routes.get("openmeteo-local", PathComponent(stringLiteral: root), "**", use: self.get)
-            }
+        }
+
+        // JSON metadata is public even without credentials. Other downloads authenticate in get.
+        for root in ["data", "data_run", "data_spatial"] {
+            routes.on(.HEAD, [PathComponent(stringLiteral: root), .catchall], use: self.get)
+            routes.on(.HEAD, ["openmeteo", PathComponent(stringLiteral: root), .catchall], use: self.get)
+            routes.on(.HEAD, ["openmeteo-local", PathComponent(stringLiteral: root), .catchall], use: self.get)
+            routes.get(PathComponent(stringLiteral: root), "**", use: self.get)
+            routes.get("openmeteo", PathComponent(stringLiteral: root), "**", use: self.get)
+            routes.get("openmeteo-local", PathComponent(stringLiteral: root), "**", use: self.get)
         }
         
         if !self.uploadCredentials.isEmpty {
@@ -76,7 +74,6 @@ struct S3DataController: RouteCollection {
     }
     
     func headRoot(_ req: Request) throws -> HTTPStatus {
-        try verifyRequestSignature(req: req, body: ByteBuffer(), isRead: true)
         return .ok
     }
     
@@ -247,12 +244,13 @@ struct S3DataController: RouteCollection {
             }
             let modifiedDate = try req.headers.getXAmzMetaMtime() ?? .now()
             let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-            if !FileManager.default.fileExists(atPath: tempPath) {
+            do {
+                try await validateMultipartCompletionBody(filePath: tempPath, body: body)
+            } catch let error as FileSystemError where error.code == .notFound {
                 req.logger.warning("Multipart upload completion, but temp file is missing. Validating the destination file instead")
-                try await validateMultipartCompletionBody(filePath: absolutePath, body: body)
+                try await validateAlreadyCompletedUpload(filePath: absolutePath, body: body)
                 return Response(status: .ok)
             }
-            try await validateMultipartCompletionBody(filePath: tempPath, body: body)
             try await replicateMultipartComplete(req: req, uploadId: uploadId, body: body, lastModified: modifiedDate)
             try await finalizeMultipartUpload(req: req, absolutePath: absolutePath, uploadId: uploadId, lastModified: modifiedDate)
             return Response(status: .ok)
@@ -365,22 +363,36 @@ struct S3DataController: RouteCollection {
             throw S3ApiError.chunkSizeExceeds8MB
         }
         let tempPath = tempUploadPath(finalPath: absolutePath, uploadId: uploadId)
-        _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
-            let tempInfo = try await handle.fileHandle.info()
-            
-            let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
-            let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
-            let isLastPart = partNumber == numParts
-            guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
-                throw S3ApiError.partSizeNotChunkSize
+        do {
+            _ = try await FileSystem.shared.withFileHandle(forWritingAt: FilePath(tempPath), options: .modifyFile(createIfNecessary: false)) { handle in
+                let tempInfo = try await handle.fileHandle.info()
+
+                let offset = Int64(partNumber - 1) * Int64(Self.multipartChunkSize)
+                let numParts = (Int(tempInfo.size) + Self.multipartChunkSize - 1) / Self.multipartChunkSize
+                let isLastPart = partNumber == numParts
+                guard isLastPart || body.readableBytes == Self.multipartChunkSize else {
+                    throw S3ApiError.partSizeNotChunkSize
+                }
+                guard offset + Int64(body.readableBytes) <= tempInfo.size else {
+                    throw S3ApiError.partExceedsAllocatedFileSize
+                }
+                try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
             }
-            guard offset + Int64(body.readableBytes) <= tempInfo.size else {
-                throw S3ApiError.partExceedsAllocatedFileSize
-            }
-            try await handle.write(contentsOf: body, toAbsoluteOffset: offset)
+        } catch let error as FileSystemError where error.code == .notFound {
+            throw S3ApiError.noSuchUpload
         }
     }
     
+    private func validateAlreadyCompletedUpload(filePath: String, body: ByteBuffer) async throws {
+        do {
+            try await validateMultipartCompletionBody(filePath: filePath, body: body)
+        } catch S3ApiError.multipartPartHashMismatch, S3ApiError.invalidNumberOfParts {
+            throw S3ApiError.noSuchUpload
+        } catch let error as FileSystemError where error.code == .notFound {
+            throw S3ApiError.noSuchUpload
+        }
+    }
+
     private func validateMultipartCompletionBody(filePath: String, body: ByteBuffer) async throws {
         guard let completionXML = body.getString(at: body.readerIndex, length: body.readableBytes) else {
             throw S3ApiError.couldNotDecodeCompletionXML
@@ -390,6 +402,14 @@ struct S3DataController: RouteCollection {
         _ = try await FileSystem.shared.withFileHandle(forReadingAt: FilePath(filePath)) { handle in
             let fileSize = try await handle.getFileSize()
             guard fileSize > 0 else {
+                if !parts.isEmpty {
+                    guard parts.count == 1, parts[0].partNumber == 1 else {
+                        throw S3ApiError.invalidNumberOfParts
+                    }
+                    guard parts[0].etagSha256.caseInsensitiveCompare(Data().sha256Hex) == .orderedSame else {
+                        throw S3ApiError.multipartPartHashMismatch
+                    }
+                }
                 return
             }
             var partIndex = 0
@@ -428,9 +448,12 @@ struct S3DataController: RouteCollection {
         let objectDirectory = path.lastIndex(of: "/").map { String(path[path.index(after: path.startIndex) ... $0]) } ?? ""
         await OmFileSystemManager.instance.updateLocalDirectory(path: objectDirectory)
         
-        for queue in await lazyReplicationQueues(req) {
+        let queues = await lazyReplicationQueues(req)
+        guard !queues.isEmpty else { return }
+        let handle = try Foundation.FileHandle(forReadingFrom: URL(fileURLWithPath: absolutePath))
+        for queue in queues {
             let session = queue.startMultiPartUploads()
-            await session.uploadMultipart(file: absolutePath, objectName: String(path.dropFirst(1)), lastModified: lastModified)
+            await session.uploadMultipart(data: handle, objectName: String(path.dropFirst(1)), lastModified: lastModified)
             await queue.finishMultiPartUploads(session)
         }
     }
@@ -565,6 +588,15 @@ struct S3DataController: RouteCollection {
         }
     }
     
+    /// Preserve a sibling's missing-session response across the forwarding hop.
+    func forwardMultipartRequest(_ request: HTTPClientRequest, req: Request, deadline: Date, timeout: TimeAmount) async throws {
+        do {
+            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: deadline, timeoutPerRequest: timeout)
+        } catch CurlErrorNonRetry.other(.gone) {
+            throw S3ApiError.noSuchUpload
+        }
+    }
+
     private func replicateMultipartPart(req: Request, uploadId: Int, partNumber: Int, body: ByteBuffer) async throws {
         let servers = await activeReplicationServers(req)
         if servers.isEmpty { return }
@@ -577,7 +609,7 @@ struct S3DataController: RouteCollection {
             request.body = .bytes(body)
             request.headers.add(name: "x-amz-content-sha256", value: bodyHash)
             request.headers.add(name: "x-replication", value: "false")
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(5), timeoutPerRequest: .seconds(60))
+            try await forwardMultipartRequest(request, req: req, deadline: .minutes(5), timeout: .seconds(60))
         }
     }
     
@@ -596,7 +628,7 @@ struct S3DataController: RouteCollection {
             request.headers.add(name: "x-replication", value: "false")
             request.headers.add(name: .contentType, value: "application/xml")
             request.headers.add(name: "x-om-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
-            _ = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger, deadline: .minutes(2), timeoutPerRequest: .seconds(5))
+            try await forwardMultipartRequest(request, req: req, deadline: .minutes(2), timeout: .seconds(5))
         }
     }
     
@@ -716,6 +748,7 @@ enum S3ApiError: AbortError, Equatable {
     case expectedBodyPayload
     case incompleteBodyPayload(expected: Int?, actual: Int)
     case invalidUploadId
+    case noSuchUpload
     case invalidPartNumber
     case expectedCompletionXMLBody
     case unsupportedPostOperation
@@ -739,6 +772,8 @@ enum S3ApiError: AbortError, Equatable {
     
     var status: NIOHTTP1.HTTPResponseStatus {
         switch self {
+        case .noSuchUpload:
+            return .gone
         case .invalidApiKey:
             return .unauthorized
         case .forbidden:
@@ -765,6 +800,8 @@ enum S3ApiError: AbortError, Equatable {
         case .incompleteBodyPayload(let expected, let actual):
             let expectedDescription = expected.map(String.init) ?? "a valid Content-Length"
             return "Incomplete body payload: expected \(expectedDescription) bytes, received \(actual)"
+        case .noSuchUpload:
+            return "NoSuchUpload"
         case .invalidUploadId:
             return "Invalid uploadId"
         case .invalidPartNumber:

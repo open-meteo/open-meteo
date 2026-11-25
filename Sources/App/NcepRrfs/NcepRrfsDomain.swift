@@ -38,7 +38,9 @@ enum NcepRrfsDomain: String, CaseIterable, SyncGridDomain {
     }
     var lastRun: Timestamp { lastRun(now: .now()) }
     func lastRun(now: Timestamp) -> Timestamp {
-        now.add(-3 * 3600 - 45 * 60).floor(toNearestHour: updateIntervalSeconds / 3600)
+        // Start subhourly downloads at 2:30; retries cover publication around 2:45.
+        let delay = self == .ncep_rrfs_conus_15min ? 2 * 3600 + 30 * 60 : 3 * 3600 + 45 * 60
+        return now.add(-delay).floor(toNearestHour: updateIntervalSeconds / 3600)
     }
 
     func gribUrls(run: Timestamp, forecastHour: Int, member: Int, server: String) -> [String] {

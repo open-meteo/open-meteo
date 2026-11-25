@@ -112,6 +112,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_d2_eps_ensemble_mean
     case dwd_ewam
     case dwd_gwam
+    case noaa_goes19
     case dwd_sis_europe_africa_v4
     case dwd_aicon_global_native
 
@@ -120,6 +121,12 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_ifs_europe_ensemble_mean
     case ecmwf_ifs04
     case ecmwf_ifs04_ensemble
+    case ecmwf_ifs01
+    case ecmwf_ifs01_pressure_levels
+    case ecmwf_ifs01_ensemble
+    case ecmwf_ifs01_ensemble_pressure_levels
+    case ecmwf_ifs01_ensemble_mean
+    case ecmwf_ifs01_ensemble_pressure_levels_mean
     case ecmwf_ifs025
     case ecmwf_ifs025_ensemble
     case ecmwf_ifs025_ensemble_mean
@@ -130,6 +137,9 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_aifs_europe_ensemble
     case ecmwf_aifs_europe_ensemble_mean
     case ecmwf_wam
+    case ecmwf_wam01
+    case ecmwf_wam01_ensemble
+    case ecmwf_wam01_ensemble_mean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ecmwf_wam025_ensemble_mean
@@ -165,6 +175,8 @@ enum DomainRegistry: String, CaseIterable {
 
     case bom_access_global
     case bom_access_global_ensemble
+    case google_weathernext3_ensemble_mean
+    case google_weathernext3_station_ensemble_mean
     case google_weathernext2_ensemble
     case google_weathernext2_ensemble_mean
 
@@ -221,6 +233,8 @@ enum DomainRegistry: String, CaseIterable {
     /// Instead of generating time chunks, use a single rolling files and retain a certain number of days inside
     var useRollingDays: Int? {
         switch self {
+        case .ecmwf_wam01_ensemble, .ecmwf_ifs01_ensemble, .ecmwf_ifs01_ensemble_pressure_levels:
+            return 1
         case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
             return 3
         case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps,
@@ -430,6 +444,18 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.ifs04
         case .ecmwf_ifs04_ensemble:
             return EcmwfDomain.ifs04_ensemble
+        case .ecmwf_ifs01:
+            return EcmwfDomain.ifs01
+        case .ecmwf_ifs01_pressure_levels:
+            return EcmwfDomain.ifs01_pressure_levels
+        case .ecmwf_ifs01_ensemble:
+            return EcmwfDomain.ifs01_ensemble
+        case .ecmwf_ifs01_ensemble_pressure_levels:
+            return EcmwfDomain.ifs01_ensemble_pressure_levels
+        case .ecmwf_ifs01_ensemble_mean:
+            return EcmwfDomain.ifs01_ensemble_mean
+        case .ecmwf_ifs01_ensemble_pressure_levels_mean:
+            return EcmwfDomain.ifs01_ensemble_pressure_levels_mean
         case .ecmwf_ifs025:
             return EcmwfDomain.ifs025
         case .ecmwf_ifs025_ensemble:
@@ -502,6 +528,10 @@ enum DomainRegistry: String, CaseIterable {
             return BomDomain.access_global_ensemble
         case .google_weathernext2_ensemble:
             return WeatherNextDomain.weathernext_global
+        case .google_weathernext3_ensemble_mean:
+            return WeatherNext3Domain.surface
+        case .google_weathernext3_station_ensemble_mean:
+            return WeatherNext3Domain.station
         case .google_weathernext2_ensemble_mean:
             return WeatherNextDomain.weathernext_global_ensemble_mean
         case .meteofrance_arome_france0025_15min:
@@ -517,6 +547,12 @@ enum DomainRegistry: String, CaseIterable {
             return GfsGraphCastDomain.hgefs025_ensemble_mean
         case .ncep_aigefs025_ensemble_mean:
             return GfsGraphCastDomain.aigefs025_ensemble_mean
+        case .ecmwf_wam01:
+            return EcmwfDomain.wam01
+        case .ecmwf_wam01_ensemble:
+            return EcmwfDomain.wam01_ensemble
+        case .ecmwf_wam01_ensemble_mean:
+            return EcmwfDomain.wam01_ensemble_mean
         case .ecmwf_wam025:
             return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:
@@ -593,6 +629,8 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfSeasDomain.seas5_daily_ensemble_mean
         case .ecmwf_ec46_ensemble_mean:
             return EcmwfSeasDomain.ec46_ensemble_mean
+        case .noaa_goes19:
+            return GoesDomain.goes19
         case .dwd_sis_europe_africa_v4:
             return DwdSisDomain.europe_africa_v4
         case .cmc_gem_geps_ensemble_mean:

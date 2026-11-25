@@ -84,6 +84,9 @@ om_file_remote_directories_open \(OmFileSystemMetrics.fileRemoteDirectoriesOpen.
 # TYPE om_file_remote_directory_updated_total counter
 # HELP om_file_remote_directory_updated_total Number of remote directory refreshes
 om_file_remote_directory_updated_total \(OmFileSystemMetrics.fileRemoteDirectoryUpdatedTotal.load(ordering: .relaxed))
+# TYPE om_file_remote_directory_update_running gauge
+# HELP om_file_remote_directory_update_running Number of remote directory loads and revalidations currently running
+om_file_remote_directory_update_running \(OmFileSystemMetrics.fileRemoteDirectoryUpdateRunning.load(ordering: .relaxed))
 # TYPE om_file_remote_directory_update_waiting gauge
 # HELP om_file_remote_directory_update_waiting Number of callers waiting for a remote directory update
 om_file_remote_directory_update_waiting \(OmFileSystemMetrics.fileRemoteDirectoryUpdateWaiting.load(ordering: .relaxed))
@@ -96,6 +99,26 @@ om_file_remote_payload_waiting \(OmFileSystemMetrics.fileRemotePayloadWaiting.lo
 # TYPE om_file_remote_payload_update_waiting gauge
 # HELP om_file_remote_payload_update_waiting Number of callers waiting for a remote payload update to resolve
 om_file_remote_payload_update_waiting \(OmFileSystemMetrics.fileRemotePayloadUpdateWaiting.load(ordering: .relaxed))
+# TYPE om_block_cache_fetches_running gauge
+# HELP om_block_cache_fetches_running Running remote data fetches
+om_block_cache_fetches_running \(OmFileSystemMetrics.blockCacheFetchesRunning.load(ordering: .relaxed))
+# TYPE om_block_cache_fetches_queued gauge
+# HELP om_block_cache_fetches_queued Queued remote data fetches
+om_block_cache_fetches_queued \(OmFileSystemMetrics.blockCacheFetchesQueued.load(ordering: .relaxed))
+# TYPE om_block_cache_queue_full_total counter
+# HELP om_block_cache_queue_full_total Queue full errors
+om_block_cache_queue_full_total \(OmFileSystemMetrics.blockCacheQueueFullTotal.load(ordering: .relaxed))
+# TYPE om_block_cache_fetched_bytes_total counter
+# UNIT om_block_cache_fetched_bytes_total bytes
+# HELP om_block_cache_fetched_bytes_total Remote data fetched bytes
+om_block_cache_fetched_bytes_total \(OmFileSystemMetrics.blockCacheFetchedBytesTotal.load(ordering: .relaxed))
+# TYPE om_block_cache_preloads_bytes_total counter
+# UNIT om_block_cache_preloads_bytes_total bytes
+# HELP om_block_cache_preloads_bytes_total Remote data preloaded bytes
+om_block_cache_preloads_bytes_total \(OmFileSystemMetrics.blockCachePreloadsBytesTotal.load(ordering: .relaxed))
+# TYPE om_block_cache_merged_blocks_total counter
+# HELP om_block_cache_merged_blocks_total Merged blocks
+om_block_cache_merged_blocks_total \(OmFileSystemMetrics.blockCacheMergedBlocksTotal.load(ordering: .relaxed))
 # TYPE om_block_cache_used_bytes gauge
 # UNIT om_block_cache_used_bytes bytes
 # HELP om_block_cache_used_bytes Used cache bytes

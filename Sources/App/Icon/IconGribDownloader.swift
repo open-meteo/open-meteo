@@ -10,6 +10,18 @@ struct IconGribDownloader: Sendable {
     let curl: Curl
     let gridIdentity: IconNativeGridIdentity
 
+    /// Snow water equivalent, including graupel for the D2 models.
+    func downloadSnowfall(run: Timestamp, leadSeconds: Int, member: Int = 0) async throws -> (message: GribMessage, data: Array2D)? {
+        guard let field = domain.getVarAndLevel(IconSurfaceVariable.snowfall_water_equivalent) else { return nil }
+        let (message, snow) = try await download(field: field, run: run, leadSeconds: leadSeconds, member: member)
+        guard [.iconD2, .iconD2Eps, .iconD2Ruc].contains(domain) else { return (message, snow) }
+
+        let (_, graupel) = try await download(field: ("GRAU_GSP", "single-level", nil), run: run, leadSeconds: leadSeconds, member: member)
+        var combined = snow
+        combined.data = zip(snow.data, graupel.data).map(+)
+        return (message, combined)
+    }
+
     func download(field: (variable: String, cat: String, level: Int?), run: Timestamp, leadSeconds: Int, member: Int = 0) async throws -> (message: GribMessage, data: Array2D) {
         let url = domain.getGribUrl(field: field, run: run, leadSeconds: leadSeconds, member: member)
         let messages = try await curl.downloadGrib(url: url, bzip2Decode: false)

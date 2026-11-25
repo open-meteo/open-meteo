@@ -1,8 +1,8 @@
 import Foundation
 
 struct VariableAndPreviousDay: RawRepresentableString {
-    var variable: ForecastSurfaceVariable
-    var previousDay: Int
+    let variable: ForecastSurfaceVariable
+    let previousDay: Int
 
     init(_ variable: ForecastSurfaceVariable, _ previousDay: Int) {
         self.variable = variable
@@ -17,15 +17,13 @@ struct VariableAndPreviousDay: RawRepresentableString {
             guard let variable = ForecastSurfaceVariable(rawValue: rawValue) else {
                 return nil
             }
-            self.variable = variable
-            self.previousDay = 0
+            self.init(variable, 0)
             return
         }
         guard let variable = ForecastSurfaceVariable(rawValue: String(rawValue[rawValue.startIndex..<pos.lowerBound])) else {
             return nil
         }
-        self.variable = variable
-        self.previousDay = previousDay
+        self.init(variable, previousDay)
     }
 
     var rawValue: String {

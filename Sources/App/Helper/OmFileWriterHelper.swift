@@ -51,6 +51,26 @@ public final class OmFileWriterHelper: Sendable {
         return GenericVariableHandle(variable: variable, time: time, member: member, fn: fn)
     }*/
 
+    public func writeTemporary(compressionType: OmCompressionType, scalefactor: Float, all: [Float], nConcurrent: Int) async throws -> FileHandle {
+        let path = "\(OpenMeteo.tempDirectory)/\(UUID().uuidString).om"
+        let fn = try FileHandle.createNewFile(file: path, overwrite: true, temporary: true)
+        let file = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
+        let array = try file.prepareArray(
+            type: Float.self,
+            dimensions: dimensions.map(UInt64.init),
+            chunkDimensions: chunks.map(UInt64.init),
+            compression: compressionType,
+            scale_factor: scalefactor,
+            add_offset: 0
+        )
+        try await array.writeDataConcurrent(array: all, nConcurrent: nConcurrent)
+        let finalised = try array.finalise()
+        let createdAt = try file.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+        let root = try file.write(array: finalised, name: "", children: [createdAt])
+        try file.writeTrailer(rootVariable: root)
+        return fn
+    }
+
     public func writeTemporary(compressionType: OmCompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
         let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
         try FileManager.default.removeItemIfExists(at: file)
@@ -112,9 +132,11 @@ extension Array where Element == Float {
     /// Retains caller isolation through the write so elevation-generating actors cannot interleave writes.
     nonisolated(nonsending) func writeStaticOmFile(file: OmFileType, grid: any Gridable, application: Application, uploadQueues: [S3UploadQueue], createNetCdf: Bool = false) async throws {
         try writeOmFile2D(file: file.getFilePath(), grid: grid, createNetCdf: createNetCdf)
+        guard !uploadQueues.isEmpty else { return }
+        let handle = try FileHandle.openFileReading(file: file.getFilePath())
         for queue in uploadQueues {
             let uploads = queue.startMultiPartUploads()
-            await uploads.uploadMultipart(file: file.getFilePath(), objectName: file.getRelativeFilePathWithData(), lastModified: .now())
+            await uploads.uploadMultipart(data: handle, objectName: file.getRelativeFilePathWithData(), lastModified: .now())
             await queue.finishMultiPartUploads(uploads)
         }
     }

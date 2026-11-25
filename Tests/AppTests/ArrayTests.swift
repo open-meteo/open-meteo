@@ -3,6 +3,35 @@ import Foundation
 import Testing
 
 @Suite struct ArrayTests {
+    @Test func solarInterpolationSparseLocationsAndMembers() {
+        let grid = RegularGrid(nx: 4, ny: 1, latMin: 40, lonMin: -76, dx: 1, dy: 1)
+        let time = TimerangeDt(start: Timestamp(2026, 6, 1, 12), nTime: 8, dtSeconds: 600)
+        let series: [[Float]] = [
+            Array(repeating: .nan, count: 8),
+            Array(repeating: 100, count: 8),
+            [100, 120, .nan, .nan, .nan, .nan, .nan, .nan],
+            Array(repeating: .nan, count: 8),
+            [100, 120, .nan, .nan, 180, 200, 210, 220],
+            [.nan, .nan, 120, .nan, .nan, 180, .nan, .nan],
+            [100, .nan, 140, 160, .nan, 200, 210, 220],
+            Array(repeating: 100, count: 8)
+        ]
+        for averaged in [false, true] {
+            var combined = series.flatMap { $0 }
+            combined.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<4, missingValuesAreBackwardsAveraged: averaged)
+            for (index, input) in series.enumerated() {
+                var single = input
+                single.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: [index / 2], missingValuesAreBackwardsAveraged: averaged)
+                for t in 0..<time.count {
+                    let actual = combined[index * time.count + t]
+                    #expect(actual == single[t] || (actual.isNaN && single[t].isNaN))
+                }
+            }
+            #expect(combined[2 * time.count + 7].isNaN)
+            #expect(combined[4 * time.count + 2].isFinite)
+        }
+    }
+
     @Test func percentile() {
         let ensemble = (0...50).reversed().map(Float.init)
         #expect(ensemble.percentile(0) == 0)

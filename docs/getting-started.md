@@ -108,6 +108,8 @@ Although the Docker image supports cloud-native data access and local caching, a
 
 Data fetched from the [Open-Meteo data distribution on AWS S3](https://github.com/open-meteo/open-data) is stored in a local least-recently-used (LRU) cache. Increase `CACHE_SIZE` when retrieving many variables or large amounts of historical data; caches of multiple terabytes are supported. The API checks S3 for forecast updates roughly every two minutes and preloads changes. Repeated requests and requests for nearby coordinates are typically faster.
 
+For remote backend configuration, cache settings, and prefetch controls, see [Remote Data Access](./remote-data.md).
+
 Storage latency is important. For AWS deployments, running EC2 or Fargate in the same `us-west-2` region as the public data provides reasonable self-hosting performance.
 
 ## Downloading Weather Models

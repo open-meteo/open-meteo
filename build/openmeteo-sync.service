@@ -3,6 +3,7 @@ Description = Run Open-Meteo sync client
 StartLimitIntervalSec=0
 
 [Service]
+Environment=ICU_TIMEZONE_FILES_DIR=/usr/share/zoneinfo-icu/44/le
 EnvironmentFile=/etc/default/openmeteo-api.env
 PassEnvironment=VAPOR_ENV SWIFT_BACKTRACE
 Type=simple

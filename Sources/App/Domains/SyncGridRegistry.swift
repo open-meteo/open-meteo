@@ -46,6 +46,7 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case dwd_sis_europe_africa_v4
     case ecmwf_aifs_europe_ensemble
     case ecmwf_ifs
+    case ecmwf_ifs01
     case ecmwf_ifs025
     case ecmwf_ifs04
     case ecmwf_ifs04_ensemble
@@ -60,6 +61,8 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case geosphere_claef_austria
     case glofas_v3
     case glofas_v4
+    case google_weathernext3_ensemble_mean
+    case google_weathernext3_station_ensemble_mean
     case italia_meteo_arpae_icon_2i
     case jma_gsm
     case jma_jaxa_himawari_10min
@@ -93,15 +96,16 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
     case ncep_rrfs_north_america
     case ncep_nbm_alaska
     case ncep_nbm_conus
+    case noaa_goes19
     case ukmo_global_deterministic_10km
     case ukmo_global_ensemble_20km
     case ukmo_uk_deterministic_2km
     case ukmo_uk_ensemble_2km
 
-    /// Existing storage owner. Nil means this grid has no static fields (GloFAS).
+    /// Existing storage owner. Nil means this grid has no static fields.
     var staticDomain: DomainRegistry? {
         switch self {
-        case .glofas_v3, .glofas_v4:
+        case .glofas_v3, .glofas_v4, .google_weathernext3_ensemble_mean, .google_weathernext3_station_ensemble_mean:
             return nil
         case .bom_access_global:
             return .bom_access_global
@@ -189,6 +193,10 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             return .ecmwf_aifs_europe_ensemble
         case .ecmwf_ifs:
             return .ecmwf_ifs
+        case .ecmwf_ifs01:
+            return .ecmwf_ifs01
+        case .noaa_goes19:
+            return .noaa_goes19
         case .ecmwf_ifs025:
             return .ecmwf_ifs025
         case .ecmwf_ifs04:
@@ -372,6 +380,12 @@ enum SyncGridRegistry: String, CaseIterable, Sendable {
             )
         case .ecmwf_ifs04, .ecmwf_ifs04_ensemble:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360 / 900, dy: 180 / 450)
+        case .ecmwf_ifs01, .google_weathernext3_ensemble_mean:
+            return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
+        case .google_weathernext3_station_ensemble_mean:
+            return RegularGrid(nx: 7200, ny: 3601, latMin: -90, lonMin: -180, dx: 0.05, dy: 0.05)
+        case .noaa_goes19:
+            return GoesDomain.fixedGrid
         case .ecmwf_ifs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360 / 1440, dy: 180 / (721 - 1))
         case .copernicus_era5, .ncep_gfs025, .ncep_gefs025, .meteofrance_arpege_world025:

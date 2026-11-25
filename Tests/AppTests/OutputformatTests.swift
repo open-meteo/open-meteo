@@ -18,12 +18,15 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model = .bestMatch
     var modelName: String = "beest_match"
 
+    var onPrefetch: (() async -> Void)?
+    var onHourly: (() async -> Void)?
+
     var latitude: Float = 41
     var longitude: Float = 2
     var elevation: Float? = nil
 
     func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [App.ForecastVariableDaily]?) async throws {
-        
+        await onPrefetch?()
     }
 
     func current(variables: [App.ForecastVariable]?) async throws -> App.ApiSectionSingle<App.ForecastVariable>? {
@@ -34,7 +37,8 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
     }
 
     func hourly(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
-        ApiSection(name: "hourly", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 48, dtSeconds: 3600), columns: [
+        await onHourly?()
+        return ApiSection(name: "hourly", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 48, dtSeconds: 3600), columns: [
             ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
             ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))])
         ])
@@ -80,6 +84,56 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
 }
 
 @Suite struct OutputformatTests {
+    private actor PrefetchEvents {
+        var events: [String] = []
+
+        func record(_ event: String) {
+            events.append(event)
+        }
+    }
+
+    @Test(arguments: [0, 1, 3, 7], [0, 1, 3, 10])
+    func rollingPrefetch(locationCount: Int, prefetchLookAhead: Int) async throws {
+        for format: ForecastResultFormatWithOptions in [.json(), .csv(), .xlsx(), .flatbuffers()] {
+            let events = PrefetchEvents()
+            let template = DummyDataProvider.makeData(timeformat: .iso8601, locationCount: 1).results[0]
+            let locations = (0..<locationCount).map { index in
+                ForecastapiResult<DummyDataProvider>.PerLocation(
+                    timezone: template.timezone, time: template.time, locationId: index,
+                    results: [DummyDataProvider(
+                        onPrefetch: { await events.record("prefetch \(index)") },
+                        onHourly: { await events.record("hourly \(index)") }
+                    )]
+                )
+            }
+            // No current section: CSV and XLSX must wait for hourly output
+            // before advancing the window, and must not repeat it for daily.
+            let data = ForecastapiResult<DummyDataProvider>(
+                timeformat: .iso8601, results: locations,
+                currentVariables: nil, minutely15Variables: nil,
+                hourlyVariables: [.surface(.init(.temperature_2m, 0))],
+                dailyVariables: [.temperature_2m_mean], weeklyVariables: nil, monthlyVariables: nil
+            )
+            let response = try await data.response(format: format, prefetchLookAhead: prefetchLookAhead, logger: Logger(label: "OutputformatTests"))
+            if case .xlsx = format {
+                // XLSX generates its body eagerly.
+            } else {
+                let initial = await events.events
+                #expect(initial == (prefetchLookAhead > 0 ? (0..<min(prefetchLookAhead, locationCount)).map { "prefetch \($0)" } : []))
+            }
+            _ = await drainData(response)
+            var expected = prefetchLookAhead > 0 ? (0..<min(prefetchLookAhead, locationCount)).map { "prefetch \($0)" } : []
+            for index in 0..<locationCount {
+                if prefetchLookAhead > 0 && index + prefetchLookAhead < locationCount {
+                    expected.append("prefetch \(index + prefetchLookAhead)")
+                }
+                expected.append("hourly \(index)")
+            }
+            let actual = await events.events
+            #expect(actual == expected)
+        }
+    }
+
     /*func testBz2Grib() async throws {
         let url = "http://opendata.dwd.de/weather/nwp/icon-d2/grib/06/relhum/icon-d2_germany_regular-lat-lon_pressure-level_2022101306_004_500_relhum.grib2.bz2"
         let curl = Curl(logger: app!.logger)

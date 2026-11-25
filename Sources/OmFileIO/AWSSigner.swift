@@ -1,6 +1,7 @@
 import Foundation
 import AsyncHTTPClient
-import Vapor
+import Crypto
+import NIOHTTP1
 
 extension CharacterSet {
     static let awsUriAllowed: CharacterSet = {
@@ -112,7 +113,7 @@ public struct AWSSigner {
         let stringToSign = "AWS4-HMAC-SHA256\n\(amzDate)\n\(credentialScope)\n\((canonicalRequest.data(using: .utf8) ?? Data()).sha256Hex)"
 
         let signingKey = getSignatureKey(date: dateStamp)
-        let signature = stringToSign.hmacSHA256(key: signingKey).hex
+        let signature = stringToSign.hmacSHA256(key: signingKey).awsHex
 
         let authorizationHeader = """
         AWS4-HMAC-SHA256 Credential=\(accessKey)/\(credentialScope), SignedHeaders=\(signedHeaders), Signature=\(signature)
@@ -222,7 +223,7 @@ public struct AWSSigner {
         canonicalRequestHash.update(signedHeadersString)
         canonicalRequestHash.update("\n")
         canonicalRequestHash.update(headerPayloadHash)
-        let canonicalRequestHashHex = canonicalRequestHash.finalize().hex
+        let canonicalRequestHashHex = canonicalRequestHash.finalize().awsHex
 
         let signingKey = getSignatureKey(date: dateStamp, region: requestedRegion)
         var stringToSignHmac = HMAC<SHA256>(key: SymmetricKey(data: signingKey))
@@ -237,7 +238,7 @@ public struct AWSSigner {
         stringToSignHmac.update(service)
         stringToSignHmac.update("/aws4_request\n")
         stringToSignHmac.update(canonicalRequestHashHex)
-        let computedSignature = stringToSignHmac.finalize().hex
+        let computedSignature = stringToSignHmac.finalize().awsHex
         guard computedSignature == expectedSignature else {
             throw SigningError.invalidSignature
         }
@@ -444,7 +445,7 @@ public struct AWSSigner {
         }
     }
 
-    public enum SigningError: Error, Equatable, AbortError {
+    public enum SigningError: Error, Equatable {
         case invalidURL
         case missingAuthorization
         case unsupportedAuthorizationType
@@ -598,5 +599,18 @@ extension HTTPClientRequest {
         self.url = components.withoutCredentials.url!.absoluteString
         let signer = AWSSigner(accessKey: String(username), secretKey: String(password), region: "us-west-2", service: "s3")
         try signer.sign(request: &self)
+    }
+}
+
+private extension Sequence where Element == UInt8 {
+    var awsHex: String {
+        let digits = Array("0123456789abcdef".utf8)
+        var bytes = [UInt8]()
+        bytes.reserveCapacity(underestimatedCount * 2)
+        for byte in self {
+            bytes.append(digits[Int(byte >> 4)])
+            bytes.append(digits[Int(byte & 0x0f)])
+        }
+        return String(decoding: bytes, as: UTF8.self)
     }
 }

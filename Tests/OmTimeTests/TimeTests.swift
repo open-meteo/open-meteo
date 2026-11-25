@@ -93,4 +93,21 @@ import Testing
         #expect(date.minute == 0)
         #expect(date.second == 0)
     }
+
+    @Test func isoDateRejectsDaysOutsideMonth() throws {
+        #expect(try IsoDate(fromIsoString: "2024-02-29").toIsoString() == "2024-02-29")
+        #expect(try IsoDate(fromIsoString: "2025-04-30").toIsoString() == "2025-04-30")
+        #expect(try IsoDate(fromIsoString: "2025-12-31").toIsoString() == "2025-12-31")
+        for str in ["2025-02-29", "2025-02-30", "2025-04-31", "2025-09-31", "1900-02-29"] {
+            #expect(throws: TimeError.InvalidDate) {
+                try IsoDate(fromIsoString: str)
+            }
+        }
+        #expect(try IsoDateTime(fromIsoString: "2024-02-29T23:00").day == 29)
+        for str in ["2025-02-29", "2025-02-30T00:00", "2026-09-31T00:00", "2025-11-31T12:00:00"] {
+            #expect(throws: TimeError.InvalidDate) {
+                try IsoDateTime(fromIsoString: str)
+            }
+        }
+    }
 }

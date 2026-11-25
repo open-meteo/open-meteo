@@ -335,6 +335,43 @@ public struct Array2DFastTime {
         }
     }
 
+    /// Transpose complete spatial timesteps into location-major time series.
+    /// Missing timesteps remain NaN for interpolation. Small spatial tiles keep
+    /// output cache lines hot while copying all available timesteps.
+    init(timesteps: [(time: Int, data: [Float])], nLocations: Int, nTime: Int, nConcurrent: Int) async {
+        precondition(nConcurrent > 0 && nLocations >= 0 && nTime >= 0)
+        precondition(timesteps.allSatisfy { $0.time >= 0 && $0.time < nTime && $0.data.count == nLocations })
+        precondition(Set(timesteps.map(\.time)).count == timesteps.count)
+        var data = [Float](repeating: .nan, count: nLocations * nTime)
+        await Self.transposeTimesteps(&data, timesteps: timesteps, nLocations: nLocations, nTime: nTime, nConcurrent: nConcurrent)
+        self.init(data: data, nLocations: nLocations, nTime: nTime)
+    }
+
+    private static func transposeTimesteps(_ data: UnsafeMutablePointer<Float>, timesteps: [(time: Int, data: [Float])], nLocations: Int, nTime: Int, nConcurrent: Int) async {
+        // The output remains exclusively borrowed until all workers finish.
+        nonisolated(unsafe) let destination = data
+        let workers = min(nConcurrent, nLocations)
+        await withTaskGroup(of: Void.self) { group in
+            for worker in 0..<workers {
+                let lower = nLocations * worker / workers
+                let upper = nLocations * (worker + 1) / workers
+                group.addTask {
+                    for start in stride(from: lower, to: upper, by: 64) {
+                        let end = min(start + 64, upper)
+                        for timestep in timesteps {
+                            timestep.data.withUnsafeBufferPointer { source in
+                                for location in start..<end {
+                                    destination[location * nTime + timestep.time] = source[location]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            await group.waitForAll()
+        }
+    }
+
     /// Transpose to fast space
     func transpose() -> Array2DFastSpace {
         precondition(data.count == nLocations * nTime)
