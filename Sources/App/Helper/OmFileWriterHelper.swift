@@ -51,6 +51,60 @@ public final class OmFileWriterHelper: Sendable {
         return GenericVariableHandle(variable: variable, time: time, member: member, fn: fn)
     }*/
 
+    /// Transpose and interpolate bounded row blocks in parallel, then append them
+    /// in chunk order. Only the original timesteps and a few row blocks stay in memory.
+    /// Transpose/interpolation timings sum worker time; write measures compression and IO.
+    func writeTemporaryTimeSeries(compressionType: OmCompressionType, scalefactor: Float, timesteps: [(time: Int, data: [Float])], time: TimerangeDt, grid: any Gridable, interpolation: ReaderInterpolation, nConcurrent: Int) async throws -> (handle: FileHandle, transpose: Double, interpolation: Double, write: Double) {
+        precondition(nConcurrent > 0 && time.count > 0)
+        precondition(dimensions == [grid.ny, grid.nx, time.count] && chunks.count == 3 && chunks.allSatisfy { $0 > 0 })
+        precondition(chunks[2] == time.count)
+        precondition(timesteps.allSatisfy { $0.time >= 0 && $0.time < time.count && $0.data.count == grid.count })
+        precondition(Set(timesteps.map(\.time)).count == timesteps.count)
+        let writeStart = DispatchTime.now()
+        let path = "\(OpenMeteo.tempDirectory)/\(UUID().uuidString).om"
+        let fn = try FileHandle.createNewFile(file: path, overwrite: true, temporary: true)
+        let file = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
+        let array = try file.prepareArray(type: Float.self, dimensions: dimensions.map(UInt64.init), chunkDimensions: chunks.map(UInt64.init), compression: compressionType, scale_factor: scalefactor, add_offset: 0)
+        var writeTime = writeStart.timeElapsedSeconds()
+        var transposeTime = 0.0
+        var interpolationTime = 0.0
+        // Aim for 8 MiB per worker, rounded down to complete spatial chunk rows.
+        let rows = max(1, 8 * 1024 * 1024 / (grid.nx * time.count * MemoryLayout<Float>.size * chunks[0])) * chunks[0]
+        let blocks = stride(from: 0, to: grid.ny, by: rows).map { $0..<min($0 + rows, grid.ny) }
+        let prepared = blocks.mapStream(nConcurrent: nConcurrent) { y in
+            try Task.checkCancellation()
+            let transposeStart = DispatchTime.now()
+            let locations = y.lowerBound * grid.nx..<y.upperBound * grid.nx
+            var data = Array2DFastTime(nLocations: locations.count, nTime: time.count)
+            for start in stride(from: 0, to: locations.count, by: 64) {
+                let end = min(start + 64, locations.count)
+                for timestep in timesteps {
+                    for location in start..<end {
+                        data.data[location * time.count + timestep.time] = timestep.data[locations.lowerBound + location]
+                    }
+                }
+            }
+            let transpose = transposeStart.timeElapsedSeconds()
+            let interpolationStart = DispatchTime.now()
+            data.interpolateInplace(type: interpolation, time: time, grid: grid, locationRange: locations)
+            return (rows: y.count, data: data.data, transpose: transpose, interpolation: interpolationStart.timeElapsedSeconds())
+        }
+        for try await block in prepared {
+            transposeTime += block.transpose
+            interpolationTime += block.interpolation
+            let writeStart = DispatchTime.now()
+            try await array.writeDataConcurrent(array: block.data, arrayDimensions: [UInt64(block.rows), UInt64(grid.nx), UInt64(time.count)], nConcurrent: nConcurrent)
+            writeTime += writeStart.timeElapsedSeconds()
+        }
+        let finaliseStart = DispatchTime.now()
+        let finalised = try array.finalise()
+        let createdAt = try file.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+        let root = try file.write(array: finalised, name: "", children: [createdAt])
+        try file.writeTrailer(rootVariable: root)
+        writeTime += finaliseStart.timeElapsedSeconds()
+        return (fn, transposeTime, interpolationTime, writeTime)
+    }
+
     public func writeTemporary(compressionType: OmCompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
         let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
         try FileManager.default.removeItemIfExists(at: file)

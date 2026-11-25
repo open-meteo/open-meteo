@@ -29,6 +29,22 @@ enum EcmwfOpenDataSource: String, CaseIterable {
         return selected.baseURL
     }
 
+    /// Full-object download chunks. Azure and Google use their Python upload SDK
+    /// defaults; these are not guarantees about an object's original upload layout.
+    static func fullFileChunkSizeMB(base: String) -> Int {
+        let host = URLComponents(string: base)?.host?.lowercased() ?? ""
+        switch host {
+        case let host where host.hasSuffix("amazonaws.com"):
+            return 8
+        case let host where host.hasSuffix("blob.core.windows.net"):
+            return 4
+        case let host where host == "storage.googleapis.com" || host.hasSuffix(".storage.googleapis.com"):
+            return 100
+        default:
+            return 64
+        }
+    }
+
     static func supportsMultipleRanges(url: String) -> Bool {
         return URLComponents(string: url)?.host?.lowercased() == "data.ecmwf.int"
     }

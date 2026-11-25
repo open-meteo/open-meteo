@@ -20,6 +20,18 @@ public enum TimeError: Error {
     }
 }
 
+/// Number of days in a month of the Gregorian calendar
+func daysInMonth(year: Int, month: Int) -> Int {
+    switch month {
+    case 2:
+        return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 ? 29 : 28
+    case 4, 6, 9, 11:
+        return 30
+    default:
+        return 31
+    }
+}
+
 public struct Timestamp: Hashable, Sendable {
     public let timeIntervalSince1970: Int
 

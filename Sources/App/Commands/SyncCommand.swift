@@ -240,7 +240,7 @@ struct SyncCommand: AsyncCommand {
         } else {
             keep = nil
         }
-        let endpoint = S3ServerHealth(logger: logger, servers: [S3BucketEndpoint(rawEndpoint: server, profile: nil)], checksHealth: false)
+        let endpoint = S3ServerHealth(client: .sharedRemoteData, logger: logger, servers: [S3BucketEndpoint(rawEndpoint: server, profile: nil)], checksHealth: false)
         
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
         let downloadAllVariables = variablesSig.contains("really_download_all_variables")

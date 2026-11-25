@@ -1,20 +1,15 @@
 import AsyncHTTPClient
 import Synchronization
-import Vapor
 
 /// One process-wide connection pool for remote data listings, metadata and range reads.
-/// Health checks use `HTTPClient.shared` independently.
+/// See `docs/remote-data.md` at the repository root for HTTP connection settings.
 extension HTTPClient {
     private static let remoteDataInitialized = Atomic(false)
 
     public static let sharedRemoteData: HTTPClient = {
-        let rawLimit = Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "8"
-        guard let limit = Int(rawLimit), limit > 0 else {
-            fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
-        }
         var configuration = HTTPClient.Configuration.singletonConfiguration
-        // HTTP/2 uses the peer's concurrent-stream limit instead.
-        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = limit
+        configuration.httpVersion = .http1Only
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = OpenMeteo.remoteDataHTTPConnections
         let client = HTTPClient(eventLoopGroup: HTTPClient.defaultEventLoopGroup, configuration: configuration)
         remoteDataInitialized.store(true, ordering: .releasing)
         return client

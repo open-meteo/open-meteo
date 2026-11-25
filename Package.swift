@@ -28,12 +28,12 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
-        .package(url: "https://github.com/open-meteo/swift-zarr.git", from: "0.1.4"),
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "4.0.0"),
+        .package(url: "https://github.com/open-meteo/swift-zarr.git", from: "0.2.1"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "5.1.1"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.30.0"),
-        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "61188abb6f382e6724f258a04cf4e88c9ac70618"), // Because unsafe C flags are set, tagged releases cannot be used
+        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.31.1"),
+        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "3ea30afc395c7de4023e856e365dff77429c8fb6"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/curl-swift.git", from: "1.0.1"),
@@ -43,7 +43,10 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
-        //.package(url: "https://github.com/swift-server/async-http-client.git", from: "1.9.0")
+        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.37.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.17.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.7.5"),
+        .package(url: "https://github.com/apple/swift-system.git", from: "1.8.1"),
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.3")
@@ -96,18 +99,24 @@ let package = Package(
         .target(
             name: "OmFileIO",
             dependencies: [
-                //.product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Collections", package: "swift-collections"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "OmFileFormat", package: "om-file-format"),
-                .product(name: "Vapor", package: "vapor"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                "OmFileIOC",
                 "OmTime"
             ]
         ),
         .target(name: "OmTime"),
+        .target(name: "OmFileIOC"),
         .target(
             name: "Lbzip2"
         ),

@@ -6,16 +6,25 @@ protocol EcmwfVariableDownloadable: GenericVariable {
 enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, GenericVariableMixable {
     case wave_direction
     case wave_height
+    case wave_height_10_to_12s
+    case wave_height_12_to_14s
+    case wave_height_14_to_17s
+    case wave_height_17_to_21s
+    case wave_height_21_to_25s
+    case wave_height_25_to_30s
+    case wave_drag_coefficient
     case wave_period
     case wave_peak_period
     case wave_mean_zero_crossing_period // Mean zero-crossing wave period
 
     var interpolation: ReaderInterpolation {
         switch self {
-        case .wave_height:
+        case .wave_height, .wave_height_10_to_12s, .wave_height_12_to_14s, .wave_height_14_to_17s, .wave_height_17_to_21s, .wave_height_21_to_25s, .wave_height_25_to_30s:
             return .linear
         case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return .hermite(bounds: 0...Float.infinity)
+        case .wave_drag_coefficient:
+            return .linear
         case .wave_direction:
             return .linearDegrees
         }
@@ -23,10 +32,13 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
 
     var unit: SiUnit {
         switch self {
-        case .wave_height:
+        case .wave_height, .wave_height_10_to_12s, .wave_height_12_to_14s, .wave_height_14_to_17s, .wave_height_17_to_21s, .wave_height_21_to_25s, .wave_height_25_to_30s:
             return .metre
         case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return .seconds
+        case .wave_drag_coefficient:
+            // TODO: Use a dimensionless unit with 5 decimal places of precision.
+            return .fraction
         case .wave_direction:
             return .degreeDirection
         }
@@ -36,17 +48,24 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         let height: Float = 50 // 0.02m resolution
         let direction: Float = 1
         switch self {
-        case .wave_height:
+        case .wave_height, .wave_height_10_to_12s, .wave_height_12_to_14s, .wave_height_14_to_17s, .wave_height_17_to_21s, .wave_height_21_to_25s, .wave_height_25_to_30s:
             return height
         case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return period
+        case .wave_drag_coefficient:
+            return 100_000 // Preserve the original coefficient at 0.00001 precision.
         case .wave_direction:
             return direction
         }
     }
 
     var storePreviousForecast: Bool {
-        return true
+        switch self {
+        case .wave_height, .wave_period, .wave_direction:
+            return true
+        default:
+            return false
+        }
     }
 
     var isElevationCorrectable: Bool {
@@ -74,6 +93,20 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return "pp1d"
         case .wave_mean_zero_crossing_period:
             return "mp2"
+        case .wave_height_10_to_12s:
+            return "h1012"
+        case .wave_height_12_to_14s:
+            return "h1214"
+        case .wave_height_14_to_17s:
+            return "h1417"
+        case .wave_height_17_to_21s:
+            return "h1721"
+        case .wave_height_21_to_25s:
+            return "h2125"
+        case .wave_height_25_to_30s:
+            return "h2530"
+        case .wave_drag_coefficient:
+            return "cdww"
         }
     }
 }
@@ -288,6 +321,11 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     }
 
     static let pressure_levels = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
+
+    /// Pressure fields use the hPa suffix; soil fields also have a GRIB level.
+    var isPressureLevel: Bool {
+        rawValue.hasSuffix("hPa")
+    }
 
     var omFileName: (file: String, level: Int) {
         return (nameInFiles, 0)

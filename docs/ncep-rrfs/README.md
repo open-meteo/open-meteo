@@ -250,7 +250,7 @@ RRFS ensemble processing also writes hourly `precipitation_probability`: the per
 
 Run `swift run openmeteo-api download-noaa-rrfs DOMAIN --run YYYYMMDDHH --concurrent 4`.
 
-Without `--run`, the cycle is selected with a 3-hour-45-minute availability delay. The default source is `https://noaa-rrfs-ops-pds.s3.amazonaws.com`; `--server` overrides the root while retaining the RRFS directory layout. `--timeinterval YYYYMMDD-YYYYMMDD` downloads historical cycles. `--max-forecast-hour` limits processing for a smoke run. Standard `--create-netcdf`, `--skip-timeseries`, and `--upload-s3-bucket` options are supported.
+Without `--run`, the subhourly (`ncep_rrfs_conus_15min`) cycle is selected with a 2-hour-30-minute delay so downloaders can start ahead of publication around 2 hours 45 minutes after the cycle; download retries wait for the files to become available. Other RRFS products use a 3-hour-45-minute availability delay. The default source is `https://noaa-rrfs-ops-pds.s3.amazonaws.com`; `--server` overrides the root while retaining the RRFS directory layout. `--timeinterval YYYYMMDD-YYYYMMDD` downloads historical cycles. `--max-forecast-hour` limits processing for a smoke run. Standard `--create-netcdf`, `--skip-timeseries`, and `--upload-s3-bucket` options are supported.
 
 ### File selection and processing
 

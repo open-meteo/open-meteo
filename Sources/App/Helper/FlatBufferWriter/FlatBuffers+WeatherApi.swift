@@ -6,6 +6,145 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         let previousDay = Int16(previousDay)
         switch variable {
+        case .cloud_cover_p10:
+            return .init(variable: .cloudCover, aggregation: .p10, previousDay: previousDay)
+        case .cloud_cover_p25:
+            return .init(variable: .cloudCover, aggregation: .p25, previousDay: previousDay)
+        case .cloud_cover_p50:
+            return .init(variable: .cloudCover, aggregation: .median, previousDay: previousDay)
+        case .cloud_cover_p75:
+            return .init(variable: .cloudCover, aggregation: .p75, previousDay: previousDay)
+        case .cloud_cover_p90:
+            return .init(variable: .cloudCover, aggregation: .p90, previousDay: previousDay)
+        case .cloud_cover_high_p10:
+            return .init(variable: .cloudCoverHigh, aggregation: .p10, previousDay: previousDay)
+        case .cloud_cover_high_p25:
+            return .init(variable: .cloudCoverHigh, aggregation: .p25, previousDay: previousDay)
+        case .cloud_cover_high_p50:
+            return .init(variable: .cloudCoverHigh, aggregation: .median, previousDay: previousDay)
+        case .cloud_cover_high_p75:
+            return .init(variable: .cloudCoverHigh, aggregation: .p75, previousDay: previousDay)
+        case .cloud_cover_high_p90:
+            return .init(variable: .cloudCoverHigh, aggregation: .p90, previousDay: previousDay)
+        case .cloud_cover_low_p10:
+            return .init(variable: .cloudCoverLow, aggregation: .p10, previousDay: previousDay)
+        case .cloud_cover_low_p25:
+            return .init(variable: .cloudCoverLow, aggregation: .p25, previousDay: previousDay)
+        case .cloud_cover_low_p50:
+            return .init(variable: .cloudCoverLow, aggregation: .median, previousDay: previousDay)
+        case .cloud_cover_low_p75:
+            return .init(variable: .cloudCoverLow, aggregation: .p75, previousDay: previousDay)
+        case .cloud_cover_low_p90:
+            return .init(variable: .cloudCoverLow, aggregation: .p90, previousDay: previousDay)
+        case .cloud_cover_mid_p10:
+            return .init(variable: .cloudCoverMid, aggregation: .p10, previousDay: previousDay)
+        case .cloud_cover_mid_p25:
+            return .init(variable: .cloudCoverMid, aggregation: .p25, previousDay: previousDay)
+        case .cloud_cover_mid_p50:
+            return .init(variable: .cloudCoverMid, aggregation: .median, previousDay: previousDay)
+        case .cloud_cover_mid_p75:
+            return .init(variable: .cloudCoverMid, aggregation: .p75, previousDay: previousDay)
+        case .cloud_cover_mid_p90:
+            return .init(variable: .cloudCoverMid, aggregation: .p90, previousDay: previousDay)
+        case .direct_radiation_p10:
+            return .init(variable: .directRadiation, aggregation: .p10, previousDay: previousDay)
+        case .direct_radiation_p25:
+            return .init(variable: .directRadiation, aggregation: .p25, previousDay: previousDay)
+        case .direct_radiation_p50:
+            return .init(variable: .directRadiation, aggregation: .median, previousDay: previousDay)
+        case .direct_radiation_p75:
+            return .init(variable: .directRadiation, aggregation: .p75, previousDay: previousDay)
+        case .direct_radiation_p90:
+            return .init(variable: .directRadiation, aggregation: .p90, previousDay: previousDay)
+        case .precipitation_p10:
+            return .init(variable: .precipitation, aggregation: .p10, previousDay: previousDay)
+        case .precipitation_p25:
+            return .init(variable: .precipitation, aggregation: .p25, previousDay: previousDay)
+        case .precipitation_p50:
+            return .init(variable: .precipitation, aggregation: .median, previousDay: previousDay)
+        case .precipitation_p75:
+            return .init(variable: .precipitation, aggregation: .p75, previousDay: previousDay)
+        case .precipitation_p90:
+            return .init(variable: .precipitation, aggregation: .p90, previousDay: previousDay)
+        case .pressure_msl_p10:
+            return .init(variable: .pressureMsl, aggregation: .p10, previousDay: previousDay)
+        case .pressure_msl_p25:
+            return .init(variable: .pressureMsl, aggregation: .p25, previousDay: previousDay)
+        case .pressure_msl_p50:
+            return .init(variable: .pressureMsl, aggregation: .median, previousDay: previousDay)
+        case .pressure_msl_p75:
+            return .init(variable: .pressureMsl, aggregation: .p75, previousDay: previousDay)
+        case .pressure_msl_p90:
+            return .init(variable: .pressureMsl, aggregation: .p90, previousDay: previousDay)
+        case .sea_surface_temperature_p10:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .p10, previousDay: previousDay)
+        case .sea_surface_temperature_p25:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .p25, previousDay: previousDay)
+        case .sea_surface_temperature_p50:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .median, previousDay: previousDay)
+        case .sea_surface_temperature_p75:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .p75, previousDay: previousDay)
+        case .sea_surface_temperature_p90:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .p90, previousDay: previousDay)
+        case .shortwave_radiation_p10:
+            return .init(variable: .shortwaveRadiation, aggregation: .p10, previousDay: previousDay)
+        case .shortwave_radiation_p25:
+            return .init(variable: .shortwaveRadiation, aggregation: .p25, previousDay: previousDay)
+        case .shortwave_radiation_p50:
+            return .init(variable: .shortwaveRadiation, aggregation: .median, previousDay: previousDay)
+        case .shortwave_radiation_p75:
+            return .init(variable: .shortwaveRadiation, aggregation: .p75, previousDay: previousDay)
+        case .shortwave_radiation_p90:
+            return .init(variable: .shortwaveRadiation, aggregation: .p90, previousDay: previousDay)
+        case .wind_speed_100m_p10:
+            return .init(variable: .windSpeed, aggregation: .p10, altitude: 100, previousDay: previousDay)
+        case .wind_speed_100m_p25:
+            return .init(variable: .windSpeed, aggregation: .p25, altitude: 100, previousDay: previousDay)
+        case .wind_speed_100m_p50:
+            return .init(variable: .windSpeed, aggregation: .median, altitude: 100, previousDay: previousDay)
+        case .wind_speed_100m_p75:
+            return .init(variable: .windSpeed, aggregation: .p75, altitude: 100, previousDay: previousDay)
+        case .wind_speed_100m_p90:
+            return .init(variable: .windSpeed, aggregation: .p90, altitude: 100, previousDay: previousDay)
+        case .wind_speed_10m_p10:
+            return .init(variable: .windSpeed, aggregation: .p10, altitude: 10, previousDay: previousDay)
+        case .wind_speed_10m_p25:
+            return .init(variable: .windSpeed, aggregation: .p25, altitude: 10, previousDay: previousDay)
+        case .wind_speed_10m_p50:
+            return .init(variable: .windSpeed, aggregation: .median, altitude: 10, previousDay: previousDay)
+        case .wind_speed_10m_p75:
+            return .init(variable: .windSpeed, aggregation: .p75, altitude: 10, previousDay: previousDay)
+        case .wind_speed_10m_p90:
+            return .init(variable: .windSpeed, aggregation: .p90, altitude: 10, previousDay: previousDay)
+        case .dew_point_2m_p10:
+            return .init(variable: .dewPoint, aggregation: .p10, altitude: 2, previousDay: previousDay)
+        case .dew_point_2m_p25:
+            return .init(variable: .dewPoint, aggregation: .p25, altitude: 2, previousDay: previousDay)
+        case .dew_point_2m_p50:
+            return .init(variable: .dewPoint, aggregation: .median, altitude: 2, previousDay: previousDay)
+        case .dew_point_2m_p75:
+            return .init(variable: .dewPoint, aggregation: .p75, altitude: 2, previousDay: previousDay)
+        case .dew_point_2m_p90:
+            return .init(variable: .dewPoint, aggregation: .p90, altitude: 2, previousDay: previousDay)
+        case .temperature_2m_p10:
+            return .init(variable: .temperature, aggregation: .p10, altitude: 2, previousDay: previousDay)
+        case .temperature_2m_p25:
+            return .init(variable: .temperature, aggregation: .p25, altitude: 2, previousDay: previousDay)
+        case .temperature_2m_p50:
+            return .init(variable: .temperature, aggregation: .median, altitude: 2, previousDay: previousDay)
+        case .temperature_2m_p75:
+            return .init(variable: .temperature, aggregation: .p75, altitude: 2, previousDay: previousDay)
+        case .temperature_2m_p90:
+            return .init(variable: .temperature, aggregation: .p90, altitude: 2, previousDay: previousDay)
+        case .wind_u_component_10m:
+            return .init(variable: .windUComponent, altitude: 10, previousDay: previousDay)
+        case .wind_u_component_100m:
+            return .init(variable: .windUComponent, altitude: 100, previousDay: previousDay)
+        case .wind_v_component_10m:
+            return .init(variable: .windVComponent, altitude: 10, previousDay: previousDay)
+        case .wind_v_component_100m:
+            return .init(variable: .windVComponent, altitude: 100, previousDay: previousDay)
+
         case .soil_moisture_0cm:
             return .init(variable: .soilMoisture, depth: 0, previousDay: previousDay)
         case .soil_moisture_100cm:
@@ -475,6 +614,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .potentialEvapotranspiration, previousDay: previousDay)
         case .snow_density:
             return .init(variable: .snowDensity, previousDay: previousDay)
+        case .wave_height_10_to_12s, .wave_height_12_to_14s, .wave_height_14_to_17s, .wave_height_17_to_21s, .wave_height_21_to_25s, .wave_height_25_to_30s, .wave_drag_coefficient:
+            // TODO: add period-band heights and wave drag to the SDK.
+            return .init(variable: .undefined)
         case .wave_height:
             return .init(variable: .waveHeight)
         case .wave_period:
@@ -1129,6 +1271,12 @@ extension MultiDomains {
             return .arpaeCosmo2iRuc
         case .arpae_cosmo_5m:
             return .arpaeCosmo5m
+        case .ecmwf_ifs01, .ecmwf_ifs01_ensemble:
+            // TODO: add to sdk — use an IFS 0.1° model identifier.
+            return .ecmwfIfs025
+        case .ecmwf_ifs01_ensemble_mean:
+            // TODO: add to sdk — use an IFS 0.1° ensemble mean identifier.
+            return .ecmwfIfs025EnsembleMean
         case .ecmwf_ifs025:
             return .ecmwfIfs025
         case .ecmwf_aifs025:
@@ -1255,9 +1403,10 @@ extension MultiDomains {
             return .ewam
         case .era5_ocean:
             return .era5Ocean
-        case .ecmwf_wam025:
+        // TODO: add WAM 0.1° model identifiers to the SDK.
+        case .ecmwf_wam01, .ecmwf_wam025:
             return .ecmwfWam025
-        case .ecmwf_wam025_ensemble:
+        case .ecmwf_wam01_ensemble, .ecmwf_wam025_ensemble:
             return .ecmwfWam025Ensemble
         case .meteofrance_wave:
             return .meteofranceWave
@@ -1313,6 +1462,9 @@ extension MultiDomains {
             return .ncepHgefs025EnsembleMean
         case .ncep_aigefs025_ensemble_mean:
             return .ncepAigefs025
+        case .noaa_goes19:
+            // The SDK has not assigned a GOES-19 model identifier yet.
+            return .undefined
         case .dwd_sis_europe_africa_v4:
             return .dwdSisEuropeAfricaV4
         case .dwd_icon_eps_ensemble_mean_seamless:
@@ -1337,6 +1489,8 @@ extension MultiDomains {
             return .cmcGemGepsEnsembleMean
         case .bom_access_global_ensemble_mean:
             return .bomAccessGlobalEnsembleMean
+        case .google_weathernext3_ensemble_mean:
+            return .googleWeathernext3EnsembleMean
         case .google_weathernext2_ensemble_mean:
             return .googleWeathernext2EnsembleMean
         case .ukmo_global_ensemble_mean_20km:
@@ -1347,7 +1501,7 @@ extension MultiDomains {
             return .meteoswissIconCh1EnsembleMean
         case .meteoswiss_icon_ch2_ensemble_mean:
             return .meteoswissIconCh2EnsembleMean
-        case .ecmwf_wam025_ensemble_mean:
+        case .ecmwf_wam01_ensemble_mean, .ecmwf_wam025_ensemble_mean:
             return .ecmwfWam025EnsembleMean
         case .ncep_gefswave025_ensemble_mean:
             return .ncepGefswave025EnsembleMean

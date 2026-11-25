@@ -1,6 +1,12 @@
 import Foundation
 import OmFileFormat
 import Synchronization
+#if os(Linux)
+import OmFileIOC
+import Glibc
+#elseif os(macOS)
+import Darwin
+#endif
 
 /**
  Needs to be some kind of writeable memory region
@@ -9,10 +15,31 @@ public protocol AtomicBlockCacheStorable: Sendable {
     var count: Int { get }
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R
     func prefetchData(offset: Int, count: Int)
+    func requestWriteback(offset: Int, count: Int) throws
     func adviseData(offset: Int, count: Int, advice: MmapFile.MAdvice)
 }
 
 extension MmapFile: AtomicBlockCacheStorable {
+    /// Request payload writeback on Linux and macOS without waiting for disk completion.
+    /// Offset is relative to the start of the file, including the cache index.
+    public func requestWriteback(offset: Int, count: Int) throws {
+        precondition(offset >= 0 && count >= 0 && offset <= data.count && count <= data.count - offset)
+        guard count > 0 else { return }
+        #if os(Linux)
+        // Submit only this range, retaining cached pages. Queue pressure may still block.
+        let result = om_request_writeback(file.fileDescriptor, Int64(offset), Int64(count))
+        #else
+        // msync flushes whole pages, potentially including index bytes sharing a payload page.
+        let pageSize = Int(getpagesize())
+        let pageStart = offset / pageSize * pageSize
+        let address = UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart))
+        let result = msync(address, offset - pageStart + count, MS_ASYNC)
+        #endif
+        guard result == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
+    }
+
     public func prefetchData(offset: Int, count: Int) {
         self.prefetchData(offset: offset, count: count, advice: .willneed)
     }
@@ -25,6 +52,10 @@ extension MmapFile: AtomicBlockCacheStorable {
 }
 
 extension DataAsClass: AtomicBlockCacheStorable {
+    public func requestWriteback(offset: Int, count: Int) throws {
+        // In-memory storage needs no writeback.
+    }
+
     public func prefetchData(offset: Int, count: Int) {
         // Not necessary
     }
@@ -66,6 +97,14 @@ extension AtomicBlockCache where Backend == MmapFile {
 /**
  Key-value cache for fixed block sizes and a fixed amount of blocks. Uses a hash map with LRU strategy.
  The entire cache size is preallocated. Due to the fixed number of elements, the hash map does not need rebalancing
+
+ See `docs/remote-data.md` at the repository root for cache storage and block-size settings.
+
+ Returned pointers borrow cache storage; they do not pin entries against eviction. A later write
+ can overwrite the bytes before or during a read. Copies are independent once taken, but the source
+ is not pinned while copying.
+ This risk is accepted to avoid copying or pinning blocks. The production cache is very large, so
+ such reuse is not expected under normal real-world load, but is possible under eviction pressure.
  
  Uses Atomics for thread safety. The beginning of the cache contains N key entries. Each key entry is the 64 bit key and a 64 bit timestamp in nanoseconds.
  
@@ -145,8 +184,12 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
-    /// Advise the memory pages of a cached block.
-    func advise(key: UInt64, advice: MmapFile.MAdvice) {
+    /// Advise only pages intersecting the requested bytes within a cached block.
+    /// The mmap backend aligns the physical offset to the platform's page size.
+    func advise(key: UInt64, byteRange: Range<Int>? = nil, advice: MmapFile.MAdvice) {
+        let byteRange = byteRange ?? 0..<blockSize
+        precondition(byteRange.lowerBound >= 0 && byteRange.upperBound <= blockSize)
+        guard !byteRange.isEmpty else { return }
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
         data.withMutableUnsafeBytes { bytes in
@@ -161,13 +204,27 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         break
                     }
                     let offset = blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot)
-                    data.adviseData(offset: offset, count: blockSize, advice: advice)
+                    data.adviseData(offset: offset + byteRange.lowerBound, count: byteRange.count, advice: advice)
                     return
                 }
             }
         }
     }
     
+    /// Check for a committed block regardless of age, without reading its data or refreshing LRU.
+    /// Examines at most 1,024 candidate slots and allocates no storage.
+    func contains(key: UInt64) -> Bool {
+        let blockCount = blockCount
+        return data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            for lookAhead: UInt64 in 0..<1024 {
+                let entry = entries[Int((key &+ lookAhead) % UInt64(blockCount))].load(ordering: .relaxed)
+                if entry.first == key && entry.second & 0x1 == 1 { return true }
+            }
+            return false
+        }
+    }
+
     /// Find key in cache, updates the LRU timestamp and returns a pointer to the memory region. There is a slight chance, that data is modified while reading, but it should practically never happen
     func get(key: UInt64, maxAccessedAgeInSeconds: UInt) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
@@ -271,8 +328,10 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 guard entry.second <= olderThan else {
                     continue
                 }
-                entries[slot].store(.init(first: 0, second: 0), ordering: .relaxed)
-                deleted += 1
+                // A concurrent writer or reader may have replaced/refreshed this entry since the load.
+                if entries[slot].compareExchange(expected: entry, desired: .init(first: 0, second: 0), ordering: .relaxed).exchanged {
+                    deleted += 1
+                }
             }
             return deleted
         }

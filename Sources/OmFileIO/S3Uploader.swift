@@ -1,6 +1,7 @@
 import Foundation
 import AsyncHTTPClient
 import NIOCore
+import NIOFoundationCompat
 import Logging
 import NIOFileSystem
 import OmTime
@@ -44,6 +45,10 @@ public enum S3Uploader {
     /// Returns the `UploadId` which needs to be committed in a second step
     /// URL in form "https://S3-access-key:S3-secret-key@s3-host.tld/some-bucket/object"
     public static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String = "application/octet-stream", lastModified: Timestamp, executor: LimitedConcurrencyExecutor) async throws -> S3MultiPartUploadPrepared {
+        try await uploadMultipart(client: client, data: data, url: url, contentType: contentType, lastModified: lastModified, executor: executor, restartOnMissingPart: true)
+    }
+
+    private static func uploadMultipart<Data: S3UploadAble>(client: HTTPClient, data: Data, url: String, contentType: String, lastModified: Timestamp, executor: LimitedConcurrencyExecutor, restartOnMissingPart: Bool) async throws -> S3MultiPartUploadPrepared {
         let logger = Logger(label: "S3Uploader")
         
         // Step 1: Initiate multipart upload
@@ -53,7 +58,8 @@ public enum S3Uploader {
         initiateRequest.headers.add(name: "Content-Type", value: contentType)
         initiateRequest.headers.add(name: "x-amz-meta-mtime", value: "\(lastModified.timeIntervalSince1970)")
         // custom header to set the total expected upload file size. Might be used by a custom upload implementation in the future
-        initiateRequest.headers.add(name: "x-file-size", value: "\(try await data.getFileSize())")
+        let fileSize = try await data.getFileSize()
+        initiateRequest.headers.add(name: "x-file-size", value: "\(fileSize)")
         let initiateResponse = try await client.executeRetry(initiateRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(60))
         guard
             let initiateXml = try await initiateResponse.readStringImmutable(upTo: 1024*1024),
@@ -64,17 +70,18 @@ public enum S3Uploader {
         
         // uploadId may contain '+', '/' or '=' — percent-encode for use in query strings
         let encodedUploadId = uploadId.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed) ?? uploadId
+        let session = S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified)
 
         // Step 2: Upload parts concurrently (up to 8 in parallel), abort on any error
         let timeChunkedRequestStart = DispatchTime.now().uptimeNanoseconds
-        let chunks = data.readChunks(chunkLength: .mebibytes(8))
+        let chunks = data.readChunks(chunkLength: .mebibytes(8), fileSize: fileSize)
         do {
             let uploaded: [(etag: String, size: Int)] = try await chunks.mapEnumeratedConcurrent(executor: executor) { (partNumber, chunk) in
                 var req = HTTPClientRequest(url: url + "?partNumber=\(partNumber+1)&uploadId=\(encodedUploadId)")
                 req.method = .PUT
                 req.body = .bytes(chunk)
                 req.headers.add(name: "x-amz-content-sha256", value: chunk.readableBytesView.sha256Hex)
-                req.headers.add(name: .contentLength, value: "\(chunk.readableBytes)")
+                req.headers.add(name: "Content-Length", value: "\(chunk.readableBytes)")
                 let response = try await client.executeRetry(req, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(120))
                 guard let etag = response.headers.first(name: "ETag") else {
                     throw S3UploaderError.missingETag(partNumber: partNumber)
@@ -92,8 +99,14 @@ public enum S3Uploader {
             let rate = Double(size) / timeChunkedRequest
             logger.info("Upload \(url.asUrlGetQueryForLogging) \(size.bytesHumanReadable). Initiate=\(timeInitiateRequest.asSecondsPrettyPrint), Upload=\(timeChunkedRequest.asSecondsPrettyPrint) Upload rate=\(rate.asRatePrettyPrint)")
             return prepared
+        } catch CurlErrorNonRetry.other(.gone) {
+            try? await session.abort(client: client, timeout: .seconds(5))
+            guard restartOnMissingPart else { throw CurlErrorNonRetry.other(.gone) }
+            try Task.checkCancellation()
+            logger.warning("Restarting multipart upload after a missing session: \(url.asUrlGetQueryForLogging)")
+            return try await uploadMultipart(client: client, data: data, url: url, contentType: contentType, lastModified: lastModified, executor: executor, restartOnMissingPart: false)
         } catch {
-            try await S3MultiPartUploadPrepared(etags: [], url: url, encodedUploadId: encodedUploadId, lastModified: lastModified).abort(client: client)
+            try? await session.abort(client: client)
             throw error
         }
     }
@@ -245,11 +258,16 @@ public struct S3MultiPartUploadPrepared: Sendable {
     let encodedUploadId: String
     let lastModified: Timestamp
 
-    public func abort(client: HTTPClient) async throws {
+    public func abort(client: HTTPClient, timeout: TimeAmount? = nil) async throws {
         let logger = Logger(label: "S3Uploader")
         var abortRequest = HTTPClientRequest(url: url + "?uploadId=\(encodedUploadId)")
         abortRequest.method = .DELETE
-        let _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+        if let timeout {
+            // Recovery cleanup gets one attempt so it can't delay a fresh upload.
+            _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .now, timeoutPerRequest: timeout)
+        } else {
+            _ = try await client.executeRetry(abortRequest, logger: logger, deadline: .minutes(60), timeoutPerRequest: .seconds(30))
+        }
     }
 
     /// complete multipart upload. This may take longer than expected

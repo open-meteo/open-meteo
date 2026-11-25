@@ -4,11 +4,46 @@ import Synchronization
 @_exported import OmTime
 import OmFileIO
 
+/// Application environment settings. Remote backend, cache, and prefetch configuration
+/// is documented in `docs/remote-data.md` at the repository root.
 enum OpenMeteo {
     static let remotePressureLevelsOnly = Environment.get("REMOTE_PRESSURE_LEVELS_ONLY") == "true"
 
     /// Set `DATA_DIRECTORY_NETWORK_FS=true` when the data directory is on a network file system (NFS) that another machine writes to
     static let dataDirectoryNetworkFileSystem = Environment.get("DATA_DIRECTORY_NETWORK_FS") == "true"
+  
+    /// HTTP/1 connection limit per remote host, with headroom for metadata and health checks.
+    static let remoteDataHTTPConnections: Int = {
+        guard let value = Int(Environment.get("REMOTE_DATA_HTTP_CONNECTIONS") ?? "16"), value > 0 else {
+            fatalError("REMOTE_DATA_HTTP_CONNECTIONS must be a positive integer")
+        }
+        return value
+    }()
+
+    /// Number of locations to prefetch ahead while writing API responses. Zero disables prefetching.
+    static let prefetchLookAhead: Int = {
+        guard let value = Int(Environment.get("PREFETCH_LOOK_AHEAD") ?? "3"), value >= 0 else {
+            fatalError("PREFETCH_LOOK_AHEAD must be a non-negative integer")
+        }
+        return value
+    }()
+
+    /// Preload replacement-file blocks accessed within this many seconds. Defaults to 15 minutes.
+    /// Zero disables inventory preloading.
+    static let remoteDataPreloadMaxAgeSeconds: UInt = {
+        guard let value = UInt(Environment.get("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS") ?? "900") else {
+            fatalError("REMOTE_DATA_PRELOAD_MAX_AGE_SECONDS must be a non-negative integer")
+        }
+        return value
+    }()
+
+    /// Scheduling allowance for replacement-file preloads. Defaults to 10 minutes.
+    static let remoteDataPreloadDeadlineSeconds: Int = {
+        guard let value = Int(Environment.get("REMOTE_DATA_PRELOAD_DEADLINE_SECONDS") ?? "600"), value >= 0 else {
+            fatalError("REMOTE_DATA_PRELOAD_DEADLINE_SECONDS must be a non-negative integer")
+        }
+        return value
+    }()
 
     /// Data directory with trailing slash
     static let dataDirectory = {
@@ -45,7 +80,21 @@ enum OpenMeteo {
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
         let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
-        let cache = AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
+        guard let maxConcurrentFetches = Int(Environment.get("REMOTE_DATA_MAX_CONCURRENT_FETCHES") ?? "12"), maxConcurrentFetches > 0 else {
+            fatalError("REMOTE_DATA_MAX_CONCURRENT_FETCHES must be a positive integer")
+        }
+        guard let maxPendingFetches = Int(Environment.get("REMOTE_DATA_MAX_PENDING_FETCHES") ?? "65536"), maxPendingFetches > 0 else {
+            fatalError("REMOTE_DATA_MAX_PENDING_FETCHES must be a positive integer")
+        }
+        guard let preloadQueuePercent = Int(Environment.get("REMOTE_DATA_PRELOAD_QUEUE_PERCENT") ?? "50"), (0...100).contains(preloadQueuePercent) else {
+            fatalError("REMOTE_DATA_PRELOAD_QUEUE_PERCENT must be an integer between 0 and 100")
+        }
+        let cache = AtomicCacheCoordinator(
+            cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount),
+            maxConcurrentFetches: maxConcurrentFetches,
+            maxPendingFetches: maxPendingFetches,
+            preloadQueuePercent: preloadQueuePercent
+        )
         dataBlockCacheInitialized.store(true, ordering: .relaxed)
         return cache
     }()
@@ -169,6 +218,13 @@ extension Application {
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
         configuration.httpVersion = httpVersion
+        // Keep AsyncHTTPClient's default unless explicitly configured. HTTP/2
+        // concurrency is controlled by the peer's stream limit instead.
+        let rawLimit = Environment.get("DEDICATED_HTTP_CONNECTIONS") ?? "24"
+        guard let limit = Int(rawLimit), limit > 0 else {
+            fatalError("DEDICATED_HTTP_CONNECTIONS must be a positive integer")
+        }
+        configuration.connectionPool.concurrentHTTP1ConnectionsPerHostSoftLimit = limit
 
         return HTTPClient(
             eventLoopGroupProvider: .shared(eventLoopGroup),
@@ -236,7 +292,9 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
     app.asyncCommands.use(ValidateOmFilesCommand(), as: "validate-om-files")
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
+    app.asyncCommands.use(GoesDownloader(), as: "download-goes")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
+    app.asyncCommands.use(DownloadWeatherNext3Command(), as: "download-weathernext3")
     app.asyncCommands.use(DownloadWeatherNextCommand(), as: "download-weathernext")
 
     app.http.server.configuration.hostname = "0.0.0.0"

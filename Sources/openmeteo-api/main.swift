@@ -24,6 +24,7 @@ do {
     ProcessExitStatus.shared.exitIfFailure()
 } catch let error as CommandError {
     fputs("\(error)\n", stderr)
+    exit(EXIT_FAILURE)
 } catch {
     let logger = Logger(label: "TopLevelError")
     logger.critical("Uncaught top-level error", metadata: [

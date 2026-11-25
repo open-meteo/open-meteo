@@ -63,7 +63,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             let deadline = Date().addingTimeInterval(TimeInterval(6 * 3600))
             let server = signature.server ?? "weathernext_2_0_0/zarr/2025_to_present/"
             try await waitForZarrMarker(
-                client: context.application.dedicatedHttpClient,
+                auth: GoogleCloudStorageAuth(client: context.application.dedicatedHttpClient, logger: logger),
                 logger: logger,
                 targetRun: targetRun,
                 deadline: deadline,
@@ -127,31 +127,22 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         ]
 
         let zarrRootPath = WeatherNextDomain.zarrRunPath(server: server, run: run)
-        let httpClient = application.dedicatedHttpClient
 
         let allHandles: [GenericVariableHandle] = try await timestamps.enumerated().mapConcurrent(nConcurrent: concurrent) { (timeIdx, timestamp) in
             logger.info("Processing timestep \(timeIdx) / \(timestamps.count): \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
             do {
 
-            // Fresh token + storage + Zarr group per timestep so the OAuth token
-            // never expires mid-run (token lifetime is 1 hour).
-            let googleToken = try await GoogleCloudStorageAuth(
-                client: httpClient,
-                logger: logger
-            ).getAccessToken()
-            let storage = try S3CompatibleStorage(
-                baseURL: "https://storage.googleapis.com/weathernext",
-                retryingClient: .init(
-                    httpClient: httpClient, 
-                    config: .init(
-                        maxAttempts: 5, 
-                        baseDelay: .milliseconds(500), 
-                        maxDelay: .seconds(60), 
-                        jitter: 0.2, 
-                        timeout: .seconds(180)
-                    ),
-                ),
-                additionalHeaders: ["Authorization": "Bearer \(googleToken)"]
+            // Each timestep uses a fresh token for all of its member and pressure-level reads.
+            let auth = GoogleCloudStorageAuth(client: application.dedicatedHttpClient, logger: logger)
+            let storage = try await auth.storage(
+                bucket: "weathernext",
+                retryConfiguration: .init(
+                    maxAttempts: 5,
+                    baseDelay: .milliseconds(500),
+                    maxDelay: .seconds(60),
+                    jitter: 0.2,
+                    timeout: .seconds(180)
+                )
             )
             let root = try await ZarrGroup(storage: storage, path: zarrRootPath)
 
@@ -384,7 +375,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
 
     /// Poll the Zarr `success` marker file.
     func waitForZarrMarker(
-        client: HTTPClient,
+        auth: GoogleCloudStorageAuth,
         logger: Logger,
         targetRun: Timestamp,
         deadline: Date,
@@ -393,10 +384,6 @@ struct DownloadWeatherNextCommand: AsyncCommand {
         let baseInterval: TimeInterval = 60
         let maxInterval: TimeInterval = 300
         var attempt = 0
-        let authProvider = GoogleCloudStorageAuth(
-            client: client,
-            logger: logger
-        )
 
         while true {
             attempt += 1
@@ -406,11 +393,7 @@ struct DownloadWeatherNextCommand: AsyncCommand {
             logger.info("Checking Zarr success marker: \(successPath)")
 
             do {
-                let token = try await authProvider.getAccessToken()
-                let storage = try S3CompatibleStorage(
-                    baseURL: "https://storage.googleapis.com/weathernext",
-                    additionalHeaders: ["Authorization": "Bearer \(token)"]
-                )
+                let storage = try await auth.storage(bucket: "weathernext")
                 if try await storage.exists(path: objectPath) {
                     logger.info("Zarr success marker found for run \(targetRun.iso8601_YYYY_MM_dd_HH_mm). Proceeding.")
                     return

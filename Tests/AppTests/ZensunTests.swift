@@ -4,6 +4,30 @@ import Testing
 
 @Suite struct ZensunTests {
     /// Clear sky radiation approximation
+    @Test func inlineSolarInterpolationMatchesBulkClearSky() {
+        let grid = GoesDomain.fixedGrid
+        let locations = [2712 * 5424 + 2600, 2712 * 5424 + 2800, 3200 * 5424 + 2712]
+        let time = TimerangeDt(start: Timestamp(2026, 11, 3, 15), nTime: 24, dtSeconds: 600)
+        let factors = Zensun.calculateClearSkyRadiationBackwardsAveraged(grid: grid, locationRange: locations, timerange: time)
+        // Constant clearness factors must reproduce the bulk integral at missing
+        // timestamps, including when the per-location cache is shared by members.
+        var expected = [Float]()
+        var input = [Float]()
+        for location in locations.indices {
+            for member in 0..<2 {
+                for t in 0..<time.count {
+                    let value = factors[location, t] * Float(400 + member * 100)
+                    expected.append(value)
+                    input.append(t > 0 && t < time.count - 1 && t % 3 == 1 ? .nan : value)
+                }
+            }
+        }
+        input.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locations, missingValuesAreBackwardsAveraged: false)
+        for (actual, reference) in zip(input, expected) {
+            #expect(abs(actual - reference) < 0.001)
+        }
+    }
+
     @Test func clearSkyRadiationTest() {
         let time1h = TimerangeDt(start: Timestamp(2022, 8, 17, 1), nTime: 24, dtSeconds: 3600)
         let time3h = TimerangeDt(start: Timestamp(2022, 8, 17, 3), nTime: 24/3, dtSeconds: 3*3600)
