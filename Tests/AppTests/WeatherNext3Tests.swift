@@ -28,10 +28,18 @@ import Testing
     }
 
     @Test func percentileNames() throws {
-        let alias = try #require(ForecastVariable(rawValue: "temperature_p10"))
-        #expect(alias.rawValue == "temperature_p10")
-        #expect(alias.variableAndPreviousDay.0.rawValue == "temperature_2m_p10")
+        let variable = try #require(ForecastVariable(rawValue: "temperature_2m_p10"))
+        #expect(variable.rawValue == "temperature_2m_p10")
+        #expect(variable.variableAndPreviousDay.0.rawValue == "temperature_2m_p10")
+        #expect(ForecastVariable(rawValue: "temperature_p10") == nil)
         #expect(ForecastVariable(rawValue: "temperature_2m_p99") == nil)
+        let previous = try #require(ForecastVariable(rawValue: "temperature_2m_p10_previous_day1"))
+        #expect(previous.variableAndPreviousDay.0.rawValue == "temperature_2m_p10")
+        #expect(previous.variableAndPreviousDay.1 == 1)
+        let meta = VariableAndPreviousDay(.temperature_2m_p50, 1).getFlatBuffersMeta()
+        #expect(meta.aggregation == .median)
+        #expect(meta.altitude == 2)
+        #expect(meta.previousDay == 1)
         #expect(WeatherNextVariable(rawValue: "temperature_2m_p10") == nil)
         #expect(WeatherNextVariable(rawValue: "temperature_2m") != nil)
     }
@@ -48,10 +56,10 @@ import Testing
             return try await reader.get(variable: variable.variableAndPreviousDay.0, time: time)
         }
 
-        #expect(try await read("temperature_p10")?.data == [18])
+        #expect(try await read("temperature_2m_p10")?.data == [18])
         #expect(try await read("wind_speed_10m")?.data == [8])
         #expect(try await read("wind_speed_10m_p90")?.data == [12])
-        #expect(try await read("relative_humidity_2m_p90") == nil)
+        #expect(ForecastVariable(rawValue: "relative_humidity_2m_p90") == nil)
         #expect(try await read("precipitation_spread") == nil)
         let spread = try #require(await read("temperature_2m_spread"))
         #expect(spread.unit == .kelvin)
