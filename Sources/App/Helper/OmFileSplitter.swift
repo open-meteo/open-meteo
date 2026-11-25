@@ -479,7 +479,14 @@ struct OmFileSplitter {
 
         /// Write end of file and move it in position
         for writer in writers {
-            let root = try writer.writeFile.write(array: writer.write.finalise(), name: "", children: [])
+            let previousLastValidTime: Int? = try await writer.read?.getChild(name: "forecast_last_valid_time")?.readScalar()
+            let runLastValidTime = time.range.upperBound.add(-time.dtSeconds).timeIntervalSince1970
+            let lastValidTime = previousLastValidTime.map { max($0, runLastValidTime) } ?? runLastValidTime
+            let finalised = try writer.write.finalise()
+            let root = try writer.writeFile.write(array: finalised, name: "", children: [
+                try writer.writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: []),
+                try writer.writeFile.write(value: lastValidTime, name: "forecast_last_valid_time", children: [])
+            ])
             try writer.writeFile.writeTrailer(rootVariable: root)
             // Overwrite existing file, with newly created
             try writer.writeFn.linkTemporary(file: writer.fileName)
@@ -617,6 +624,7 @@ struct OmFileSplitter {
         // Write end of file and move it in position
         let finalised = try writer.finalise()
         let root = try writeFile.write(array: finalised, name: "", children: [
+            try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: []),
             try writeFile.write(value: fileTime.range.lowerBound.timeIntervalSince1970, name: "time_start", children: []),
             try writeFile.write(value: fileTime.range.upperBound.timeIntervalSince1970, name: "time_end", children: []),
             try writeFile.write(value: fileTime.dtSeconds, name: "dt_seconds", children: [])
