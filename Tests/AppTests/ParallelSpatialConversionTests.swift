@@ -9,28 +9,27 @@ struct ParallelSpatialConversionTests {
     @Test
     func collectedTimestepsProduceInterpolatedTimeSeriesHandle() async throws {
         try FileManager.default.createDirectory(atPath: OpenMeteo.tempDirectory, withIntermediateDirectories: true)
-        let domain = StatisticsDomain()
+        let domain = StatisticsDomain(ny: 401)
         let run = Timestamp(2026, 11, 24)
         let time = TimerangeDt(start: run, nTime: 7, dtSeconds: domain.dtSeconds)
         let timesteps = [6, 0, 2].map { hour in
             (time: hour, data: (0..<domain.grid.count).map { Float($0 % 101 + hour) })
         }
-        var data = await Array2DFastTime(timesteps: timesteps, nLocations: domain.grid.count, nTime: time.count, nConcurrent: 4)
-        await data.interpolateInplace(type: .linear, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: 4)
         let chunks = OmFileSplitter(domain).spatialReadChunkDimensions
         let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [chunks.y, chunks.x, time.count])
-        let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data.data, nConcurrent: 4)
-        let handle = try await GenericVariableHandle(variable: EcmwfVariable.temperature_2m, time: run, member: 0, fn: fn, domain: domain)
+        let written = try await writer.writeTemporaryTimeSeries(compressionType: .pfor_delta2d_int16, scalefactor: 1, timesteps: timesteps, time: time, grid: domain.grid, interpolation: .linear, nConcurrent: 4)
+        let handle = try await GenericVariableHandle(variable: EcmwfVariable.temperature_2m, time: run, member: 0, fn: written.handle, domain: domain)
         #expect(handle.time.range == time.range)
         #expect(handle.reader.getDimensions() == [UInt64(domain.grid.ny), UInt64(domain.grid.nx), 7])
         #expect(handle.reader.getChunkDimensions() == [UInt64(chunks.y), UInt64(chunks.x), 7])
         // Read a spatial slice directly into member 1 with a time offset,
         // leaving the other members and surrounding timesteps untouched.
-        let y: Range<UInt64> = 1..<3
+        // Cross a writer block boundary and include the partial final block.
+        let y: Range<UInt64> = 370..<401
         let x: Range<UInt64> = 7..<17
         var actual = Array3DFastTime(nLocations: y.count * x.count, nLevel: 3, nTime: 10)
         try await handle.reader.read(into: &actual.data, range: [y, x, 0..<7],
-            intoCubeOffset: [0, 0, 12], intoCubeDimension: [2, 10, 30])
+            intoCubeOffset: [0, 0, 12], intoCubeDimension: [UInt64(y.count), 10, 30])
         for row in 0..<y.count {
             for column in 0..<x.count {
                 let location = row * x.count + column
@@ -50,8 +49,9 @@ struct ParallelSpatialConversionTests {
     }
 
     private struct StatisticsDomain: GenericDomain {
+        var ny = 4
         var countEnsembleMember: Int { 1 }
-        var grid: any Gridable { RegularGrid(nx: 800, ny: 4, latMin: 0, lonMin: 0, dx: 0.1, dy: 0.1) }
+        var grid: any Gridable { RegularGrid(nx: 800, ny: ny, latMin: 0, lonMin: 0, dx: 0.1, dy: 0.1) }
         var domainRegistry: DomainRegistry { .ecmwf_ifs01_ensemble_mean }
         var domainRegistryStatic: DomainRegistry? { nil }
         var dtSeconds: Int { 3600 }

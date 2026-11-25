@@ -290,19 +290,12 @@ extension DownloadEcmwfCommand {
                 continue
             }
 
-            let transposeStart = DispatchTime.now()
-            var data = await Array2DFastTime(timesteps: current.timesteps, nLocations: domain.grid.count, nTime: time.count, nConcurrent: concurrent)
-            current.timesteps.removeAll()
-            let transposeTime = transposeStart.timeElapsedPretty()
-            let interpolationStart = DispatchTime.now()
-            await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
-            let interpolationTime = interpolationStart.timeElapsedPretty()
             let writeStart = DispatchTime.now()
             let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [chunks.y, chunks.x, time.count])
-            let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data.data, nConcurrent: concurrent)
-            let handle = try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: fn, domain: domain)
-            data = Array2DFastTime(nLocations: domain.grid.count, nTime: 0)
-            logger.info("\(variable.rawValue) member \(field.member): process=\(current.process.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime), write=\(writeStart.timeElapsedPretty())")
+            let written = try await writer.writeTemporaryTimeSeries(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, timesteps: current.timesteps, time: time, grid: domain.grid, interpolation: variable.interpolation, nConcurrent: concurrent)
+            current.timesteps.removeAll()
+            let handle = try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: written.handle, domain: domain)
+            logger.info("\(variable.rawValue) member \(field.member): process=\(current.process.asSecondsPrettyPrint), transpose=\(written.transpose.asSecondsPrettyPrint), interpolation=\(written.interpolation.asSecondsPrettyPrint), write=\(written.write.asSecondsPrettyPrint), total=\(writeStart.timeElapsedPretty())")
             handles[variable, default: []].append(handle)
             guard handles[variable]!.count == domain.countEnsembleMember else { continue }
 
@@ -406,18 +399,12 @@ extension DownloadEcmwfCommand {
                 decodeTime += field.decode
                 guard field.hour == lastHour else { continue }
 
-                let transposeStart = DispatchTime.now()
-                var data = await Array2DFastTime(timesteps: timesteps, nLocations: domain.grid.count, nTime: time.count, nConcurrent: concurrent)
-                timesteps.removeAll()
-                let transposeTime = transposeStart.timeElapsedPretty()
-                let interpolationStart = DispatchTime.now()
-                await data.interpolateInplace(type: variable.interpolation, time: time, grid: domain.grid, locationRange: 0..<domain.grid.count, nConcurrent: concurrent)
-                let interpolationTime = interpolationStart.timeElapsedPretty()
                 let writeStart = DispatchTime.now()
                 let writer = OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, time.count], chunks: [chunks.y, chunks.x, time.count])
-                let fn = try await writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data.data, nConcurrent: concurrent)
-                handles.append(try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: fn, domain: domain))
-                logger.info("\(variable.rawValue) member \(field.member): decode=\(decodeTime.asSecondsPrettyPrint), transpose=\(transposeTime), interpolation=\(interpolationTime), write=\(writeStart.timeElapsedPretty())")
+                let written = try await writer.writeTemporaryTimeSeries(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, timesteps: timesteps, time: time, grid: domain.grid, interpolation: variable.interpolation, nConcurrent: concurrent)
+                timesteps.removeAll()
+                handles.append(try await GenericVariableHandle(variable: variable, time: run, member: field.member, fn: written.handle, domain: domain))
+                logger.info("\(variable.rawValue) member \(field.member): decode=\(decodeTime.asSecondsPrettyPrint), transpose=\(written.transpose.asSecondsPrettyPrint), interpolation=\(written.interpolation.asSecondsPrettyPrint), write=\(written.write.asSecondsPrettyPrint), total=\(writeStart.timeElapsedPretty())")
                 decodeTime = 0
             }
             let conversionWaitStart = DispatchTime.now()
