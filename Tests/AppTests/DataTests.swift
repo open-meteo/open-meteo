@@ -826,6 +826,26 @@ extension InlineArray {
     }
 
 
+    @Test func harmonieEuropeWindRotation() throws {
+        let grid = try #require(KnmiDomain.harmonie_arome_europe.grid as? ProjectionGrid<RotatedLatLonProjection>)
+        let north = grid.getTrueNorthDirection()
+        // Along the central meridian (-8°), increasing rows point due north.
+        let centre = try #require(grid.findPoint(lat: 52, lon: -8))
+        #expect(abs(north[centre]) < 0.01)
+
+        let point = try #require(grid.findPoint(lat: 52, lon: 5))
+        let here = grid.getCoordinates(gridpoint: point)
+        let next = grid.getCoordinates(gridpoint: point + grid.nx)
+        // A rotated meridian is a great circle. Its initial geographic bearing
+        // gives the direction of grid north clockwise from true north.
+        let lat1 = here.latitude.degreesToRadians
+        let lat2 = next.latitude.degreesToRadians
+        let deltaLon = (next.longitude - here.longitude).degreesToRadians
+        let gridNorth = atan2(sin(deltaLon) * cos(lat2),
+                              cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(deltaLon)).radiansToDegrees
+        #expect(abs(north[point] + gridNorth) < 0.05)
+    }
+
     @Test func rotatedLatLon() {
         /*
          xmin, xmax = -6.86, 4.83
