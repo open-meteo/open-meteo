@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.9.0](https://github.com/open-meteo/open-meteo/compare/1.8.0...1.9.0) (2026-11-26)
+
+
+### Features
+
+* add ifs01 deterministic and ensemble domains with buffered downloading for grib streams ([#2256](https://github.com/open-meteo/open-meteo/issues/2256)) ([136e196](https://github.com/open-meteo/open-meteo/commit/136e19679af2393a0106e04f201510aad910e33c))
+* GOES-19 satellite shortwave radiation integration ([#2298](https://github.com/open-meteo/open-meteo/issues/2298)) ([c0d2f3e](https://github.com/open-meteo/open-meteo/commit/c0d2f3eac3650203a1bf4dc515d903642852afb0))
+* store forecast_reference_time and forecast_last_valid_time in om-files ([#2357](https://github.com/open-meteo/open-meteo/issues/2357)) ([2518fbf](https://github.com/open-meteo/open-meteo/commit/2518fbfb5eb15d97d59cc6559c4c3618ccc8338e))
+* weathernext 3 ([#2310](https://github.com/open-meteo/open-meteo/issues/2310)) ([2e7e6a1](https://github.com/open-meteo/open-meteo/commit/2e7e6a121ffb5b253f3a9fd4b7c73e90eb13f94b))
+
+
+### Bug Fixes
+
+* add graupel to icon d2 snow and store hail for icon d2 ruc ([#2323](https://github.com/open-meteo/open-meteo/issues/2323)) ([be287f3](https://github.com/open-meteo/open-meteo/commit/be287f33a93152846f2ec58c5974d8f1bc205c80))
+* Add metric om_file_remote_directory_update_running ([#2327](https://github.com/open-meteo/open-meteo/issues/2327)) ([b485547](https://github.com/open-meteo/open-meteo/commit/b485547236a73d528b721f448d5d19a1b6bd15c5))
+* adjust RRFS download timing ([6c9a1bf](https://github.com/open-meteo/open-meteo/commit/6c9a1bfae064854b1640a70be6429f81e5ef0bff))
+* allow libdispatch worker priority in API services ([#2340](https://github.com/open-meteo/open-meteo/issues/2340)) ([b6babd8](https://github.com/open-meteo/open-meteo/commit/b6babd831ee78456635cc2bec1e936af66d88184))
+* Allow preload deadline of 10 minutes, allow 50% queue depth and make it configurable. ([#2325](https://github.com/open-meteo/open-meteo/issues/2325)) ([5ecf8d8](https://github.com/open-meteo/open-meteo/commit/5ecf8d8856efadd85dc1eb292d030ba6b862ba63))
+* always allow HEAD / ([b4c2896](https://github.com/open-meteo/open-meteo/commit/b4c28960092caee3a1a45e9398f049262376f537))
+* Always enable meta.json metadata api ([#2334](https://github.com/open-meteo/open-meteo/issues/2334)) ([cff3b2f](https://github.com/open-meteo/open-meteo/commit/cff3b2fa9a03bc7a442017410843f945864a7d21))
+* bump the swift-dependencies group across 1 directory with 15 updates ([#2311](https://github.com/open-meteo/open-meteo/issues/2311)) ([d9b5a06](https://github.com/open-meteo/open-meteo/commit/d9b5a067edbe6a48af51f859c72035475e44308f))
+* bump the swift-dependencies group across 1 directory with 6 updates ([#2356](https://github.com/open-meteo/open-meteo/issues/2356)) ([130e2b9](https://github.com/open-meteo/open-meteo/commit/130e2b967ab8fc32176e305a94964faf721ded96))
+* correct KNMI HARMONIE Europe wind direction ([#2362](https://github.com/open-meteo/open-meteo/issues/2362)) ([7e8b503](https://github.com/open-meteo/open-meteo/commit/7e8b503de7c68c1a3ab1573470dc5a8363d25542))
+* ECMWF ECDPS downloader allow multiple short cut offs ([81125ba](https://github.com/open-meteo/open-meteo/commit/81125ba9d97c6ec5a05f4a0ecb28560530330883))
+* force http1 for remote data requests ([#2322](https://github.com/open-meteo/open-meteo/issues/2322)) ([4110a30](https://github.com/open-meteo/open-meteo/commit/4110a301101edac1959c1f5f6cab4a5e4be3a935))
+* gem_hrdps_west snowfall reads SDWE (snowpack) instead of WEASN ([#2295](https://github.com/open-meteo/open-meteo/issues/2295)) ([396cdd4](https://github.com/open-meteo/open-meteo/commit/396cdd4e60ee023a441ea30cca38a83c18da57e3))
+* IFS01 downloader out of order processing ([#2352](https://github.com/open-meteo/open-meteo/issues/2352)) ([170ebbd](https://github.com/open-meteo/open-meteo/commit/170ebbd61c0fb059576d454b1373822830e1ece3))
+* preserve fractional precipitation during interpolation ([#2361](https://github.com/open-meteo/open-meteo/issues/2361)) ([b6f42f9](https://github.com/open-meteo/open-meteo/commit/b6f42f95173e28b3ad2d153b5ccdc456d55ced3f))
+* reject start and end dates with a day that does not exist in the month ([#2296](https://github.com/open-meteo/open-meteo/issues/2296)) ([cdbb18d](https://github.com/open-meteo/open-meteo/commit/cdbb18d054a0be0c5bf20f0e86857eec3b77a348))
+* Remove GeoSphere AROME Austria from `geosphere_seamless` ([#2313](https://github.com/open-meteo/open-meteo/issues/2313)) ([e7b08a4](https://github.com/open-meteo/open-meteo/commit/e7b08a43faa1de470ffdad8577b402f6f517357d))
+* request writeback after each superblock ([#2320](https://github.com/open-meteo/open-meteo/issues/2320)) ([c82ef3a](https://github.com/open-meteo/open-meteo/commit/c82ef3abf193a00a87164ee17fa7558b54f97519))
+* retry replication ([#2341](https://github.com/open-meteo/open-meteo/issues/2341)) ([d46beaf](https://github.com/open-meteo/open-meteo/commit/d46beaf363a43b67e975ef5510f2c09388f00c4e))
+* return failure for CLI argument errors ([#2350](https://github.com/open-meteo/open-meteo/issues/2350)) ([345c016](https://github.com/open-meteo/open-meteo/commit/345c01630e02815b52e5672e5e725727512f634d))
+* s3list was not applying the deadline correctly ([5af7b1f](https://github.com/open-meteo/open-meteo/commit/5af7b1f03b896a7aafa0781c1d0b89fd84d66282))
+* **sarah-3:** Use forward timestamps similar to DWD SIS ([#2301](https://github.com/open-meteo/open-meteo/issues/2301)) ([4e602cc](https://github.com/open-meteo/open-meteo/commit/4e602ccddf8e4e519855aac02ed402261800512a))
+* support aifs025 precipitation probability ([#2360](https://github.com/open-meteo/open-meteo/issues/2360)) ([c495db1](https://github.com/open-meteo/open-meteo/commit/c495db178d8999da5b70157ef5da246a413f176b))
+* Unblock background file preloads, use deadline scheduling and limit concurrency ([#2308](https://github.com/open-meteo/open-meteo/issues/2308)) ([a358d6c](https://github.com/open-meteo/open-meteo/commit/a358d6c591f21f3adbdcfa10517f761d688b527d))
+* use madv random for atomic block cache ([#2303](https://github.com/open-meteo/open-meteo/issues/2303)) ([97132c5](https://github.com/open-meteo/open-meteo/commit/97132c51bbb138c0041ebbbe6570e4140943eb03))
+* Use N+3 lookahead prefetch for multi location queries ([#2307](https://github.com/open-meteo/open-meteo/issues/2307)) ([e0e7fd5](https://github.com/open-meteo/open-meteo/commit/e0e7fd5c706e4a5d1df71b6ce15d0f60e3ddcc96))
+* use separate pool for health checks again ([#2343](https://github.com/open-meteo/open-meteo/issues/2343)) ([7cc41ff](https://github.com/open-meteo/open-meteo/commit/7cc41ffa9a79c2e4c7ad4e18f13b51ab8df610aa))
+* While preloading use new file if cached ([#2326](https://github.com/open-meteo/open-meteo/issues/2326)) ([f182671](https://github.com/open-meteo/open-meteo/commit/f1826714bb5abd4bf6d03ffb6b36bf18dea7365b))
+
 ## [1.8.0](https://github.com/open-meteo/open-meteo/compare/1.7.0...1.8.0) (2026-11-03)
 
 
