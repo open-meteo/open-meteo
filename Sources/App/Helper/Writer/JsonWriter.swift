@@ -2,27 +2,23 @@ import Foundation
 import Vapor
 
 extension AsyncBodyStreamWriter {
-    /// Execute async code and capture any errors. In case of error, print the error to the output stream
+    /// Fail the body stream if producing the response throws.
     func submit(concurrencySlot: Int?, logger: Logger, _ task: @escaping () async throws -> Void) async throws {
         if let concurrencySlot {
             try await ConcurrencyGroupLimiter.instance.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
         }
         do {
             try await task()
-            if let concurrencySlot {
-                await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
-            }
         } catch {
+            logger.warning("Error during streaming. Error \(error)")
             if let concurrencySlot {
                 await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
             }
-            logger.info("Error during streaming. Error \(error)")
-            do {
-                try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
-                try await write(.end)
-            } catch {
-                logger.info("Error during streaming end. Error \(error)")
-            }
+            try await write(.error(error))
+            return
+        }
+        if let concurrencySlot {
+            await ConcurrencyGroupLimiter.instance.release(slot: concurrencySlot)
         }
     }
 }

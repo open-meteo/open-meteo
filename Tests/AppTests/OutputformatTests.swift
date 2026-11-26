@@ -84,6 +84,40 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
 }
 
 @Suite struct OutputformatTests {
+    private enum StreamFailure: Error {
+        case dataRead
+    }
+
+    private actor RecordingWriter: AsyncBodyStreamWriter {
+        var events: [String] = []
+
+        func write(_ result: BodyStreamResult) async throws {
+            switch result {
+            case .buffer:
+                events.append("buffer")
+            case .end:
+                events.append("end")
+            case .error(let error):
+                events.append("error")
+                throw error
+            }
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func dataReadFailureAbortsStream(afterFlush: Bool) async {
+        let writer = RecordingWriter()
+        await #expect(throws: StreamFailure.dataRead) {
+            try await writer.submit(concurrencySlot: nil, logger: Logger(label: "OutputformatTests")) {
+                if afterFlush {
+                    try await writer.write(.buffer(.init(string: "partial")))
+                }
+                throw StreamFailure.dataRead
+            }
+        }
+        #expect(await writer.events == (afterFlush ? ["buffer", "error"] : ["error"]))
+    }
+
     private actor PrefetchEvents {
         var events: [String] = []
 
