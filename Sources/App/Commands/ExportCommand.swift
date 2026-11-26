@@ -385,10 +385,14 @@ struct ExportCommand: AsyncCommand {
             // Loop over locations, read and write
             do {
                 let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
+                    guard let plan = try await domain.readerPlan() else {
+                        fatalError("Export not supported for domain \(domain)")
+                    }
+                    let factory = plan.makeFactory(options: options)
                     return try await points.asyncMap { (gridpoint, elevation) in
                         let coords = grid.getCoordinates(gridpoint: gridpoint)
                         // Read data
-                        guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
+                        guard let reader = try await factory.getReaders(gridpoint: gridpoint).hourly else {
                             fatalError("Could not get reader for domain \(domain)")
                         }
                         let rows = try await variables.asyncMap { variable in
@@ -464,10 +468,14 @@ struct ExportCommand: AsyncCommand {
         }*/
         do {
             let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
+                guard let plan = try await domain.readerPlan() else {
+                    fatalError("Export not supported for domain \(domain)")
+                }
+                let factory = plan.makeFactory(options: options)
                 return try await points.asyncMap { (gridpoint, elevation) in
                     let coords = grid.getCoordinates(gridpoint: gridpoint)
                     // Read data
-                    guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
+                    guard let reader = try await factory.getReaders(gridpoint: gridpoint).hourly else {
                         fatalError("Could not create reader for domain \(domain)")
                     }
                     let rows = try await variables.asyncMap { variable in
@@ -574,9 +582,13 @@ struct ExportCommand: AsyncCommand {
                     return
                 }*/
                 // Loop over locations, read and write
+                guard let plan = try await domain.readerPlan() else {
+                    fatalError("Export not supported for domain \(domain)")
+                }
+                let factory = plan.makeFactory(options: options)
                 for gridpoint in 0..<grid.count {
                     // Read data
-                    guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
+                    guard let reader = try await factory.getReaders(gridpoint: gridpoint).hourly else {
                         fatalError("Could not create reader for domain \(domain)")
                     }
                     guard let data = try await reader.get(variable: variable, time: time.toSettings())?.data else {
@@ -627,9 +639,13 @@ struct ExportCommand: AsyncCommand {
             }*/
 
             // Loop over locations, read and write
+            guard let plan = try await domain.readerPlan() else {
+                fatalError("Export not supported for domain \(domain)")
+            }
+            let factory = plan.makeFactory(options: options)
             for gridpoint in 0..<grid.count {
                 // Read data
-                guard let reader = try await domain.getReaders(gridpoint: gridpoint, options: options).hourly else {
+                guard let reader = try await factory.getReaders(gridpoint: gridpoint).hourly else {
                     fatalError("Could not create reader for domain \(domain)")
                 }
                 guard let data = try await reader.get(variable: variable, time: time.toSettings()) else {
