@@ -1315,7 +1315,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_aifs025:
             return .single(EcmwfDomain.aifs025, EcmwfVariable.self)
         case .ecmwf_aifs025_single:
-            return .single(EcmwfDomain.aifs025_single, EcmwfAifsVariable.self)
+            return .singleWithPrecipitationProbability(EcmwfDomain.aifs025_single, EcmwfAifsVariable.self, precipitationProb: EcmwfDomain.aifs025_ensemble)
         case .ecmwf_ifs025_ensemble:
             return .single(EcmwfDomain.ifs025_ensemble, EcmwfIfsVariable.self)
         case .ecmwf_aifs025_ensemble:
