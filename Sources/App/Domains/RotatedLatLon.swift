@@ -69,12 +69,16 @@ extension ProjectionGrid where Projection == RotatedLatLonProjection {
     func getTrueNorthDirection() -> [Float] {
         let pole = projection.forward(latitude: 90, longitude: 0)
         let poleLatitude = pole.y.degreesToRadians
+        // Express the bearing in the directions of increasing grid column and row.
+        let columnSign: Float = dx < 0 ? -1 : 1
+        let rowSign: Float = dy < 0 ? -1 : 1
         return (0..<count).map { point in
             let latitude = (origin.y + Float(point / nx) * dy).degreesToRadians
             let longitude = origin.x + Float(point % nx) * dx
             let deltaLongitude = (pole.x - longitude).degreesToRadians
-            return atan2(sin(deltaLongitude) * cos(poleLatitude),
-                         cos(latitude) * sin(poleLatitude) - sin(latitude) * cos(poleLatitude) * cos(deltaLongitude)).radiansToDegrees
+            let east = sin(deltaLongitude) * cos(poleLatitude)
+            let north = cos(latitude) * sin(poleLatitude) - sin(latitude) * cos(poleLatitude) * cos(deltaLongitude)
+            return atan2(columnSign * east, rowSign * north).radiansToDegrees
         }
     }
 }
