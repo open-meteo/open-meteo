@@ -5,6 +5,25 @@ import NIO
 // import Vapor
 
 @Suite struct HelperTests {
+    @Test(arguments: [3, 6])
+    func splitPrecipitationKeepsTraceRain(intervalHours: Int) {
+        let run = Timestamp(2026, 11, 26)
+        let native = TimerangeDt(start: run, nTime: 3, dtSeconds: intervalHours * 3600)
+        let hourly = TimerangeDt(start: run.add(hours: 1), nTime: intervalHours * 2, dtSeconds: 3600)
+        let precipitation: [Float] = [0, 0.3, .nan]
+        let snowfallWater: [Float] = [0, 0.2, 0]
+        let hourlyPrecipitation = precipitation.backwardsSum(timeOld: native, timeNew: hourly)
+        let hourlySnowfallWater = snowfallWater.backwardsSum(timeOld: native, timeNew: hourly)
+        let rain = zip(hourlyPrecipitation, hourlySnowfallWater).map { max($0 - $1, 0) }
+
+        #expect(abs(hourlyPrecipitation.prefix(intervalHours).reduce(0, +) - 0.3) < 0.000001)
+        #expect(abs(rain.prefix(intervalHours).reduce(0, +) - 0.1) < 0.000001)
+        let formatted = rain.prefix(intervalHours).map { $0.formatted(decimals: SiUnit.millimetre.significantDigits) }
+        #expect(formatted == Array(repeating: intervalHours == 6 ? "0.02" : "0.03", count: intervalHours))
+        let missingRainStaysMissing = rain.suffix(intervalHours).allSatisfy(\.isNaN)
+        #expect(missingRainStaysMissing)
+    }
+
     @Test func mapStream() async {
         let a = (0..<100).map { $0 }
         let res = try! await a.mapStream(nConcurrent: 4) {

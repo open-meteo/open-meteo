@@ -13,7 +13,7 @@ extension Array where Element == Float {
         case .solar_backwards_averaged, .solar_backwards_missing_not_averaged:
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
         case .backwards_sum:
-            return backwardsSum(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
+            return backwardsSum(timeOld: timeOld, timeNew: timeNew)
         case .backwards, .backwards_max:
             return backwards(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         }
@@ -103,14 +103,15 @@ extension Array where Element == Float {
         }
     }
 
-    /// Take the next value and devide it by dt. Used for precipitation, snow, etc
-    func backwardsSum(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+    /// Spread each accumulation over the shorter steps preceding and ending at its timestamp.
+    /// Keep fractional amounts so summing the steps recovers the original total and
+    /// subtracting snowfall from precipitation does not turn rounding differences into rain.
+    func backwardsSum(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt) -> [Float] {
         let multiply = Float(time.dtSeconds) / Float(timeLow.dtSeconds)
         return time.map { t in
             /// Take the next array element, except it it is the same timestamp
             let index = Swift.min((t.timeIntervalSince1970 - time.dtSeconds) / timeLow.dtSeconds + 1 - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds, self.count - 1)
-            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
-            return roundf(self[index] * multiply * scalefactor) / scalefactor
+            return self[index] * multiply
         }
     }
 
