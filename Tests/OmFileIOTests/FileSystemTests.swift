@@ -95,7 +95,7 @@ import OmTime
         try Data("replacement".utf8).write(to: replacementUrl)
         try FileManager.default.moveFileOverwrite(from: replacementUrl.path, to: fileUrl.path)
 
-        let reopened = try #require(await oldFile.reopen())
+        let reopened = try #require(await directory.reopenFile(name: "file", stale: oldFile))
         #expect(try reopened.fd.readToEnd() == Data("replacement".utf8))
         #expect(await directory.getFile(name: "file") === reopened)
     }

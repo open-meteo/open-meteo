@@ -202,9 +202,7 @@ public enum OmFileSystemLocal {
                             fd: fd,
                             inode: entryInode,
                             size: Int64(stat.st_size),
-                            modificationTimestamp: stat.modificationTimestamp,
-                            name: name,
-                            directory: self
+                            modificationTimestamp: stat.modificationTimestamp
                         )
                     } catch {
                         print("[ WARNING ] OmFileSystemLocal: Failed to open file \(name): \(error)")
@@ -272,7 +270,7 @@ public enum OmFileSystemLocal {
         
         /// Open `name` again in place of `stale`, for a read that failed because another machine replaced the file. Returns the current entry if another request already did so
         /// A forced listing re-reads the directory handle, which a network file system serves from its cache for a while after a rename; an open by name always asks the server.
-        func reopenFile(name: String, stale: File) -> File? {
+        public func reopenFile(name: String, stale: File) -> File? {
             guard let current = files[name], current === stale else {
                 return files[name]
             }
@@ -280,7 +278,7 @@ public enum OmFileSystemLocal {
                 return nil
             }
             let stat = handle.fileStats()
-            let reopened = File(fd: handle, inode: UInt64(stat.st_ino), size: Int64(stat.st_size), modificationTimestamp: stat.modificationTimestamp, name: name, directory: self)
+            let reopened = File(fd: handle, inode: UInt64(stat.st_ino), size: Int64(stat.st_size), modificationTimestamp: stat.modificationTimestamp)
             files[name] = reopened
             return reopened
         }
@@ -313,8 +311,6 @@ public enum OmFileSystemLocal {
         let inode: UInt64 // required to check while looping directories
         nonisolated public let size: Int64
         nonisolated public let modificationTimestamp: Timestamp
-        nonisolated let name: String
-        nonisolated weak let directory: Directory?
         
         /// Reference to the open-meteo file or json file
         private var payload: PayloadState
@@ -326,24 +322,17 @@ public enum OmFileSystemLocal {
             case error(Error)
         }
         
-        init(fd: FileHandle, inode: UInt64, size: Int64, modificationTimestamp: Timestamp, name: String, directory: Directory?) {
+        init(fd: FileHandle, inode: UInt64, size: Int64, modificationTimestamp: Timestamp) {
             OmFileSystemMetrics.fileLocalOpen.add(1, ordering: .relaxed)
             self.fd = fd
             self.inode = inode
             self.size = size
             self.modificationTimestamp = modificationTimestamp
-            self.name = name
-            self.directory = directory
             payload = .none
         }
         
         deinit {
             OmFileSystemMetrics.fileLocalOpen.add(-1, ordering: .relaxed)
-        }
-
-        /// Open this file again by name, for a read that a network file system failed as stale (ESTALE or EIO) because another machine replaced it
-        public nonisolated func reopen() async -> File? {
-            return await directory?.reopenFile(name: name, stale: self)
         }
         
         public func getPayload<T: OmLocalPayload>(ofType: T.Type) async throws -> T {
