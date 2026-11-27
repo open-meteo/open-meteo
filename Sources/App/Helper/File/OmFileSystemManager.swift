@@ -1,3 +1,4 @@
+import Foundation
 import OmFileFormat
 import Dispatch
 import Logging
@@ -102,8 +103,10 @@ final class OmFileSystemManager: Sendable {
         let path = file.getRelativeFilePathWithData()
         assert(path.hasPrefix("/") == false)
         if let object = await localFileSystem.getFile(fullPath: path) {
-            let payload = try await object.getPayload(ofType: Key.Payload.self)
-            return try await fn(payload)
+            return try await object.with(payloadType: Key.Payload.self, fn: fn) {
+                let name = path.lastIndex(of: "/").map { path.index(after: $0) } ?? path.startIndex
+                return await localFileSystem.getDirectory(fullPath: String(path[..<name]))?.reopenFile(name: String(path[name...]), stale: object)
+            }
         }
         guard !OpenMeteo.remotePressureLevelsOnly || path.contains("hPa"), let remoteFileSystem else {
             return nil
@@ -161,11 +164,11 @@ extension OmFileSystemManager {
             name += "_member"
             name += ensembleMember.zeroPadded(len: 2)
         }
-        let local = await localFileSystem
+        let localDirectory = await localFileSystem
             .getDirectory(name: "data")?
             .getDirectory(name: domain.rawValue)?
-            .getDirectory(name: name)?
-            .getSeriesIndex()
+            .getDirectory(name: name)
+        let local = await localDirectory?.getSeriesIndex()
         var remote: OmFileSystemS3.DirectoryWithContext?
         if !OpenMeteo.remotePressureLevelsOnly || variable.contains("hPa"), let remoteFileSystem {
             remote = try await remoteFileSystem.getRoot()
@@ -176,11 +179,13 @@ extension OmFileSystemManager {
         guard local != nil || remote != nil else {
             return nil
         }
-        return SeriesDirectory(local: local, remote: await remote?.directory.getSeriesIndex(), context: remote)
+        return SeriesDirectory(local: local, localDirectory: localDirectory, remote: await remote?.directory.getSeriesIndex(), context: remote)
     }
 
     struct SeriesDirectory {
         let local: OmFileSeriesIndex<OmFileSystemLocal.File>?
+        /// Only used to open a local file again after a stale read
+        let localDirectory: OmFileSystemLocal.Directory?
         let remote: OmFileSeriesIndex<OmFileSystemS3.File>?
         let context: OmFileSystemS3.DirectoryWithContext?
 
@@ -194,7 +199,7 @@ extension OmFileSystemManager {
         var yearRange: Range<Int> { union(local?.yearRange, remote?.yearRange) }
 
         func getChunk(index: Int) -> LocalOrRemoteFile? {
-            if let file = local?.chunks[index] { return .local(file) }
+            if let file = local?.chunks[index] { return .local(file, localDirectory, .chunk(index)) }
             if let file = remote?.chunks[index], let context {
                 return .remote(context.withContext(file: file))
             }
@@ -202,7 +207,7 @@ extension OmFileSystemManager {
         }
 
         func getYear(year: Int) -> LocalOrRemoteFile? {
-            if let file = local?.years[year] { return .local(file) }
+            if let file = local?.years[year] { return .local(file, localDirectory, .year(year)) }
             if let file = remote?.years[year], let context {
                 return .remote(context.withContext(file: file))
             }
@@ -210,7 +215,7 @@ extension OmFileSystemManager {
         }
 
         func getMaster() -> LocalOrRemoteFile? {
-            if let file = local?.master { return .local(file) }
+            if let file = local?.master { return .local(file, localDirectory, .master) }
             if let file = remote?.master, let context {
                 return .remote(context.withContext(file: file))
             }
@@ -218,7 +223,7 @@ extension OmFileSystemManager {
         }
 
         func getRolling() -> LocalOrRemoteFile? {
-            if let file = local?.rolling { return .local(file) }
+            if let file = local?.rolling { return .local(file, localDirectory, .rolling) }
             if let file = remote?.rolling, let context {
                 return .remote(context.withContext(file: file))
             }
@@ -226,18 +231,48 @@ extension OmFileSystemManager {
         }
     }
 
+    /// Which file of a series directory, so its name is built only when a stale read opens it again
+    enum SeriesFile {
+        case chunk(Int), year(Int), master, rolling
+
+        var name: String {
+            switch self {
+            case .chunk(let index): return "chunk_\(index).om"
+            case .year(let year): return "year_\(year).om"
+            case .master: return "master_0.om"
+            case .rolling: return "rolling.om"
+            }
+        }
+    }
+
     enum LocalOrRemoteFile {
-        case local(OmFileSystemLocal.File)
+        case local(OmFileSystemLocal.File, OmFileSystemLocal.Directory?, SeriesFile)
         case remote(OmFileSystemS3.FileWithContext)
         
         func with<R, Key: OmFileManagable>(payloadType: Key.Type, fn: (_ value: Key.Payload) async throws -> R) async throws -> R? {
             switch self {
-            case .local(let file):
-                return try await fn(file.getPayload(ofType: Key.Payload.self))
+            case .local(let file, let directory, let seriesFile):
+                return try await file.with(payloadType: Key.Payload.self, fn: fn) {
+                    await directory?.reopenFile(name: seriesFile.name, stale: file)
+                }
             case .remote(let file):
                 return try await file.with(fn: fn)
             }
         }
     }
 
+}
+
+extension OmFileSystemLocal.File {
+    /// On a network file system, a file that another machine replaced fails reads with ESTALE or EIO until the directory is listed again, so the read is retried once on the file `reopen` opens again by name
+    nonisolated func with<T: OmLocalPayload, R>(payloadType: T.Type, fn: (T) async throws -> R, reopen: () async -> OmFileSystemLocal.File?) async throws -> R {
+        do {
+            return try await fn(getPayload(ofType: T.self))
+        } catch OmFileFormatSwiftError.cannotReadFile(let code, let message) where OpenMeteo.dataDirectoryNetworkFileSystem && (code == ESTALE || code == EIO) {
+            guard let reopened = await reopen() else {
+                throw OmFileFormatSwiftError.cannotReadFile(errno: code, error: message)
+            }
+            return try await fn(reopened.getPayload(ofType: T.self))
+        }
+    }
 }

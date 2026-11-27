@@ -268,6 +268,21 @@ public enum OmFileSystemLocal {
             return directory
         }
         
+        /// Open `name` again in place of `stale`, for a read that failed because another machine replaced the file. Returns the current entry if another request already did so
+        /// A forced listing re-reads the directory handle, which a network file system serves from its cache for a while after a rename; an open by name always asks the server.
+        public func reopenFile(name: String, stale: File) -> File? {
+            guard let current = files[name], current === stale else {
+                return files[name]
+            }
+            guard let handle = try? fd?.openRelative(path: name, mode: .fileReadOnly) else {
+                return nil
+            }
+            let stat = handle.fileStats()
+            let reopened = File(fd: handle, inode: UInt64(stat.st_ino), size: Int64(stat.st_size), modificationTimestamp: stat.modificationTimestamp)
+            files[name] = reopened
+            return reopened
+        }
+
         /// Find an object for a path
         public nonisolated func getFile(fullPath path: String) async -> File? {
             assert(path.hasPrefix("/") == false)
