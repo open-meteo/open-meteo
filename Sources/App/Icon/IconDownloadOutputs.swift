@@ -10,20 +10,20 @@ struct IconDownloadOutputs: Sendable {
     let nativeDomain: IconNativeDomains
 
     init(_ domain: IconNativeDomains, skipRegridding: Bool = false) async throws {
-        self.init(domain, grid: try await domain.nativeGridFile.load(), skipRegridding: skipRegridding)
+        self.init(domain, grid: try await IconNativeGridLoader.shared.loadGeometry(grid: domain.asyncGridRegistry), skipRegridding: skipRegridding)
     }
 
-    init(_ domain: IconNativeDomains, grid: IconNativeGrid, skipRegridding: Bool = false) {
+    init(_ domain: IconNativeDomains, grid: any Gridable, skipRegridding: Bool = false) {
         self.nativeDomain = domain
-        self.primary = IconNativeDomain(definition: domain, nativeGrid: grid)
-        self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
+        self.primary = IconNativeDomain(definition: domain, grid: grid)
+        self.modelLevel = domain.modelLevelDomain.map { IconNativeDomain(definition: $0, grid: grid) }
         self.remapped = domain == .iconNative && !skipRegridding ? IconDomains.icon : nil
-        self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, nativeGrid: grid) }
+        self.ensembleMean = domain.ensembleMeanDomain.map { IconNativeDomain(definition: $0, grid: grid) }
         switch domain {
         case .iconD2RucNative:
-            self.fifteenMinute = IconNativeDomain(definition: .iconD2RucNative15min, nativeGrid: grid)
+            self.fifteenMinute = IconNativeDomain(definition: .iconD2RucNative15min, grid: grid)
         case .iconD2Native:
-            self.fifteenMinute = IconNativeDomain(definition: .iconD2Native15min, nativeGrid: grid)
+            self.fifteenMinute = IconNativeDomain(definition: .iconD2Native15min, grid: grid)
         default:
             self.fifteenMinute = nil
         }

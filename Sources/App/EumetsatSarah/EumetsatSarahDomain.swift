@@ -1,4 +1,4 @@
-enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
+enum EumetsatSarahDomain: String, SyncGridDomain, CaseIterable {
     case sarah3_30min
 
     var domainRegistry: DomainRegistry {
@@ -8,9 +8,7 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
-    }
+    var syncGridRegistry: SyncGridRegistry { .eumetsat_sarah3_30min }
     
     var countEnsembleMember: Int {
         return 1
@@ -29,10 +27,6 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
         case .sarah3_30min:
             return 1800
         }
-    }
-
-    var grid: any Gridable {
-        return RegularGrid(nx: 2600, ny: 2600, latMin: -65, lonMin: -65, dx: 0.05, dy: 0.05)
     }
 
     var updateIntervalSeconds: Int {

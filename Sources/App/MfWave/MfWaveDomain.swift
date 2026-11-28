@@ -3,7 +3,7 @@ import Foundation
 /**
  Domain definition for MeteoFrance Wave models
  */
-enum MfWaveDomain: String, CaseIterable, GenericDomain {
+enum MfWaveDomain: String, CaseIterable, SyncGridDomain {
     case mfwave
     case mfcurrents
     case mfsst
@@ -27,9 +27,16 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
-        /// Note: sea land mask is slighly differnet for each model
-        return domainRegistry
+    /// These models have the same geometry but different land-sea masks.
+    var syncGridRegistry: SyncGridRegistry {
+        switch self {
+        case .mfwave:
+            return .meteofrance_wave
+        case .mfcurrents:
+            return .meteofrance_currents
+        case .mfsst:
+            return .meteofrance_sea_surface_temperature
+        }
     }
 
     /// Number of time steps in each time series optimised file. 5 days more than each run.
@@ -45,14 +52,6 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
             return 3600
         case .mfsst:
             return 6 * 3600
-        }
-    }
-
-    var grid: any Gridable {
-        switch self {
-        case .mfwave, .mfsst, .mfcurrents:
-            // Important: GRID needs to be aligned to center points by dx/2 and dy/2
-            return RegularGrid(nx: 4320, ny: 2041, latMin: -80 + 1 / 24, lonMin: -180 + 1 / 24, dx: 1 / 12, dy: 1 / 12, searchRadius: 2)
         }
     }
 

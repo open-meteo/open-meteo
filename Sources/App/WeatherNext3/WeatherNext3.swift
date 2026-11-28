@@ -1,6 +1,6 @@
 import Foundation
 
-enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
+enum WeatherNext3Domain: String, SyncGridDomain, CaseIterable {
     case surface, station
 
     var domainRegistry: DomainRegistry {
@@ -14,28 +14,12 @@ enum WeatherNext3Domain: String, GenericDomain, CaseIterable {
 
     // Surface (0.1°): ECMWF surface geopotential and land/sea mask provide static forcings; these grids are not included in the forecast buckets.
     // Station (0.05°): GMTED2010 elevation and ESA WorldCover 10m v200 land/sea data are averaged onto the grid for the station decoder; these grids are not included in the forecast buckets.
-    var domainRegistryStatic: DomainRegistry? { nil }
-
-    var grid: any Gridable {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
         case .surface:
-            RegularGrid(
-                nx: 3600,
-                ny: 1801,
-                latMin: -90,
-                lonMin: -180,
-                dx: 0.1,
-                dy: 0.1
-            )
+            .google_weathernext3_ensemble_mean
         case .station:
-            RegularGrid(
-                nx: 7200,
-                ny: 3601,
-                latMin: -90,
-                lonMin: -180,
-                dx: 0.05,
-                dy: 0.05
-            )
+            .google_weathernext3_station_ensemble_mean
         }
     }
 

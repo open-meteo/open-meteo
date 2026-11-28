@@ -2,10 +2,10 @@ import Foundation
 
 /// GOES-East ABI fixed grid. Coordinates are retained at the native 2 km sampling,
 /// with rows flipped to south-to-north to match the other Open-Meteo grids.
-enum GoesDomain: String, CaseIterable, GenericDomain {
+enum GoesDomain: String, CaseIterable, SyncGridDomain {
     case goes19
     var domainRegistry: DomainRegistry { .noaa_goes19 }
-    var domainRegistryStatic: DomainRegistry? { domainRegistry }
+    var syncGridRegistry: SyncGridRegistry { .noaa_goes19 }
     var dtSeconds: Int { 600 }
     var updateIntervalSeconds: Int { 600 }
     /// One file chunk per day (GMT+0)
@@ -13,7 +13,6 @@ enum GoesDomain: String, CaseIterable, GenericDomain {
     var countEnsembleMember: Int { 1 }
     var masterTimeRange: Range<Timestamp>? { nil }
     var generateFullRun: Bool { false }
-    var grid: any Gridable { Self.fixedGrid }
 
     static let fixedGrid = ProjectionGrid(nx: 5424, ny: 5424,
         latitudeProjectionOrigin: -0.151844 * Float(GoesProjection.height),

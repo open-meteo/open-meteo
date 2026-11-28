@@ -1,7 +1,7 @@
 import OmFileFormat
 
 ///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
-enum CdsDomain: String, GenericDomain, CaseIterable {
+enum CdsDomain: String, SyncGridDomain, CaseIterable {
     case era5
     case era5_daily
     case era5_ocean
@@ -54,16 +54,20 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var domainRegistryStatic: DomainRegistry? {
+    var syncGridRegistry: SyncGridRegistry {
         switch self {
-        case .era5_daily:
+        case .era5, .era5_daily:
             return .copernicus_era5
-        case .era5_land_daily:
+        case .era5_ocean:
+            return .copernicus_era5_ocean
+        case .era5_land, .era5_land_daily:
             return .copernicus_era5_land
-        case .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
+        case .era5_ensemble:
+            return .copernicus_era5_ensemble
+        case .cerra:
+            return .copernicus_cerra
+        case .ecmwf_ifs, .ecmwf_ifs_analysis, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
             return .ecmwf_ifs
-        default:
-            return domainRegistry
         }
     }
 
@@ -134,18 +138,4 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: any Gridable {
-        switch self {
-        case .era5, .era5_daily:
-            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .era5_ocean, .era5_ensemble:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .era5_land, .era5_land_daily:
-            return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
-        case .cerra:
-            return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50, radius: 6371229))
-        case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
-            return GaussianGrid(type: .o1280)
-        }
-    }
 }

@@ -53,7 +53,7 @@ struct ParallelSpatialConversionTests {
         var countEnsembleMember: Int { 1 }
         var grid: any Gridable { RegularGrid(nx: 800, ny: ny, latMin: 0, lonMin: 0, dx: 0.1, dy: 0.1) }
         var domainRegistry: DomainRegistry { .ecmwf_ifs01_ensemble_mean }
-        var domainRegistryStatic: DomainRegistry? { nil }
+        var gridRegistry: GridRegistry { .synchronous(.ecmwf_ifs01) }
         var dtSeconds: Int { 3600 }
         var updateIntervalSeconds: Int { 21600 }
         var masterTimeRange: Range<Timestamp>? { nil }

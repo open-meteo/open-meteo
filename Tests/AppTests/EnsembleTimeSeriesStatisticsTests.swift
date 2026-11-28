@@ -85,7 +85,7 @@ private struct StatisticsTestDomain: GenericDomain {
     var countEnsembleMember: Int { domainRegistry == .ecmwf_ifs01_ensemble ? 51 : 1 }
     var grid: any Gridable { RegularGrid(nx: 17, ny: 2, latMin: 0, lonMin: 0, dx: 0.1, dy: 0.1) }
     var domainRegistry: DomainRegistry = .ecmwf_ifs01_ensemble_mean
-    var domainRegistryStatic: DomainRegistry? { nil }
+    var gridRegistry: GridRegistry { .synchronous(.ecmwf_ifs01) }
     var dtSeconds: Int { 10800 }
     var updateIntervalSeconds: Int { 21600 }
     var masterTimeRange: Range<Timestamp>? { nil }

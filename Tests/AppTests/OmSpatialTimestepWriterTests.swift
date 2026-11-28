@@ -50,7 +50,7 @@ private struct MultistepTestDomain: GenericDomain {
     var countEnsembleMember: Int { 51 }
     var grid: any Gridable { RegularGrid(nx: 800, ny: 3, latMin: 0, lonMin: 0, dx: 0.1, dy: 0.1) }
     var domainRegistry: DomainRegistry { .ecmwf_ifs01_ensemble }
-    var domainRegistryStatic: DomainRegistry? { nil }
+    var gridRegistry: GridRegistry { .synchronous(.ecmwf_ifs01) }
     var dtSeconds: Int { 10800 }
     var updateIntervalSeconds: Int { 21600 }
     var masterTimeRange: Range<Timestamp>? { nil }
